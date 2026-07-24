@@ -1,0 +1,78 @@
+schema_version: 1
+
+milestones:
+  - id: M00
+    title: Repository and architecture
+    status: in_progress
+    document: ../milestones/M00-repository.md
+    work_items: [WI-0001, WI-0002, WI-0003, WI-0004]
+  - id: M01
+    title: Single-image inference
+    status: proposed
+    document: ../milestones/M01-single-image.md
+    work_items: [WI-0005, WI-0006, WI-0007, WI-0008, WI-0009, WI-0010]
+  - id: M02
+    title: Local catalogue and jobs
+    status: proposed
+    document: ../milestones/M02-local-catalogue.md
+    work_items: [WI-0011, WI-0012, WI-0013]
+  - id: M03
+    title: OneDrive synchronised source
+    status: proposed
+    document: ../milestones/M03-onedrive-sync.md
+    work_items: [WI-0014]
+  - id: M04
+    title: Minimal review application
+    status: proposed
+    document: ../milestones/M04-review-ui.md
+    work_items: [WI-0015]
+  - id: M05
+    title: Identity matching
+    status: proposed
+    document: ../milestones/M05-identity-matching.md
+    work_items: [WI-0016]
+  - id: M06
+    title: Evaluation harness
+    status: proposed
+    document: ../milestones/M06-evaluation.md
+    work_items: [WI-0017]
+  - id: M07
+    title: Portable job bundles
+    status: proposed
+    document: ../milestones/M07-portable-bundles.md
+    work_items: [WI-0018]
+  - id: M08
+    title: Second model
+    status: proposed
+    document: ../milestones/M08-second-model.md
+    work_items: [WI-0019]
+  - id: M09
+    title: Azure VM pilot without identities
+    status: proposed
+    document: ../milestones/M09-azure-pilot.md
+    work_items: [WI-0020]
+  - id: M10
+    title: Azure checkpointing
+    status: proposed
+    document: ../milestones/M10-checkpointing.md
+    work_items: [WI-0021]
+  - id: M11
+    title: Production model selection
+    status: proposed
+    document: ../milestones/M11-model-selection.md
+    work_items: [WI-0022]
+  - id: M12
+    title: Full archive processing
+    status: proposed
+    document: ../milestones/M12-full-archive.md
+    work_items: [WI-0023]
+  - id: M13
+    title: Ongoing local synchronisation
+    status: proposed
+    document: ../milestones/M13-ongoing-sync.md
+    work_items: [WI-0024]
+  - id: M14
+    title: Collection-ready API
+    status: proposed
+    document: ../milestones/M14-collection-api.md
+    work_items: [WI-0025]
