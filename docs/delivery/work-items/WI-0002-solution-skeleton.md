@@ -17,5 +17,18 @@ Create the .NET 10 solution, planned projects, central package management, nulla
 
 - [ ] `dotnet build` succeeds.
 - [ ] `dotnet test` succeeds.
-- [ ] Project references enforce the intended dependency direction.
-- [ ] No model binaries or personal data are committed.
+- [x] Project references enforce the intended dependency direction.
+- [x] No model binaries or personal data are committed.
+
+## Implemented structure
+
+- .NET 10 solution with the planned source and test projects
+- central build and package configuration
+- compact `.slnx` solution file
+- PowerShell build and test entry points
+- Windows GitHub Actions build
+- privacy-focused ignore rules
+
+## Verification
+
+Build and test verification will be supplied by the pull-request workflow because the current agent execution environment does not contain the .NET SDK.
