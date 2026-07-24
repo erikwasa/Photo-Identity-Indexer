@@ -22,7 +22,8 @@ This page is a human-readable snapshot. The YAML files in this directory are can
 - Branch: `agent/WI-0002-solution-skeleton`
 - Pull request: [#2](https://github.com/erikwasa/Photo-Identity-Indexer/pull/2)
 - Status: `in_review`
-- Required verification: .NET 10 build and test
+- CI: [successful Windows .NET 10 build and test](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30129132466)
+- Required verification: human review and merge
 
 ## Next dependency-bound items
 

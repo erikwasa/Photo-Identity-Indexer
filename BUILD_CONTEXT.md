@@ -54,10 +54,10 @@ dotnet test PhotoIdentity.slnx
 
 ## Known issues
 
-- Local verification is unavailable in the current agent container because the .NET SDK is not installed.
-- Pull-request CI is the first executable verification of the skeleton.
+- GitHub Actions run `30129132466` successfully restored, built and tested the solution on Windows with .NET 10.
+- The current agent container does not contain the .NET SDK, so no independent local build was run.
 - Documentation status generation remains manual until WI-0004.
 
 ## Next action
 
-Verify the GitHub Actions build, review pull request #2, then merge and mark WI-0002 completed.
+Review and merge pull request #2, then mark WI-0002 completed and make WI-0003 ready.

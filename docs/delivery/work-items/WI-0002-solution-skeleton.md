@@ -15,8 +15,8 @@ Create the .NET 10 solution, planned projects, central package management, nulla
 
 ## Acceptance criteria
 
-- [ ] `dotnet build` succeeds.
-- [ ] `dotnet test` succeeds.
+- [x] `dotnet build` succeeds.
+- [x] `dotnet test` succeeds.
 - [x] Project references enforce the intended dependency direction.
 - [x] No model binaries or personal data are committed.
 
@@ -31,4 +31,6 @@ Create the .NET 10 solution, planned projects, central package management, nulla
 
 ## Verification
 
-Pull request [#2](https://github.com/erikwasa/Photo-Identity-Indexer/pull/2) contains the implementation. Build and test verification is supplied by its GitHub Actions workflow because the current agent execution environment does not contain the .NET SDK.
+Pull request [#2](https://github.com/erikwasa/Photo-Identity-Indexer/pull/2) contains the implementation.
+
+GitHub Actions run [30129132466](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30129132466) successfully restored, built and tested the solution on Windows with .NET 10.

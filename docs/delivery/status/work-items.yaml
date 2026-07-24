@@ -42,6 +42,8 @@ work_items:
     evidence:
       - type: pull_request
         value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/2
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30129132466
 
   - id: WI-0003
     title: Define core identifiers and contracts
