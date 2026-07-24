@@ -29,3 +29,9 @@ jobs:
 
       - name: Test
         run: dotnet test PhotoIdentity.slnx --configuration Release --no-build
+
+      - name: Validate living documentation
+        run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- validate
+
+      - name: Check generated documentation
+        run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- generate --check

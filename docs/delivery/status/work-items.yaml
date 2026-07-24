@@ -49,27 +49,33 @@ work_items:
 - id: WI-0003
   title: Define core identifiers and contracts
   milestone: M00
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0003-core-types.md
   started_at: '2026-07-24'
-  last_updated_at: '2026-07-24'
+  completed_at: '2026-07-25'
+  verified_at: '2026-07-25'
+  verified_by: human
+  last_updated_at: '2026-07-25'
   branch: agent/WI-0003-core-contracts
   blockers: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/3
   - type: workflow
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30130764843
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30131013371
+  - type: merge_commit
+    value: 93d58f0de6afbcbcc32fc265a7c1ca79e0941ed6
 - id: WI-0004
   title: Add documentation status tooling
   milestone: M00
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0004-docs-tooling.md
-  blockers:
-  - WI-0002
-  - WI-0003
+  started_at: '2026-07-25'
+  last_updated_at: '2026-07-25'
+  branch: agent/WI-0004-docs-tooling
+  blockers: []
   evidence: []
 - id: WI-0005
   title: Add model installation and verification

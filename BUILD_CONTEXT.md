@@ -6,57 +6,51 @@
 
 ## Current work item
 
-**WI-0003 — Define core identifiers and contracts**
+**WI-0004 — Add documentation status tooling**
 
-Status: `in_review`
+Status: `in_progress`
 
-## Branch and pull request
+## Branch
 
-- Branch: `agent/WI-0003-core-contracts`
-- Pull request: [#3 — Define core identifiers and contracts](https://github.com/erikwasa/Photo-Identity-Indexer/pull/3)
+`agent/WI-0004-docs-tooling`
 
 ## Objective
 
-Define the neutral domain values and ports used by replaceable source, image, recognition and persistence adapters.
+Create a small .NET tool that validates the living-document registries and links, calculates milestone status, generates human-readable status pages, selects ready work, and performs safe status transitions.
 
 ## Relevant files
 
-- `src/PhotoIdentity.Core/Identifiers/`
-- `src/PhotoIdentity.Core/Geometry/`
-- `src/PhotoIdentity.Core/Imaging/`
-- `src/PhotoIdentity.Core/Recognition/`
-- `src/PhotoIdentity.Core/Sources/`
-- `src/PhotoIdentity.Core/README.md`
-- `tests/PhotoIdentity.Core.Tests/`
-- `docs/delivery/work-items/WI-0003-core-types.md`
+- `tools/PhotoIdentity.Docs/`
+- `tests/PhotoIdentity.Docs.Tests/`
 - `docs/delivery/status/work-items.yaml`
+- `docs/delivery/status/milestones.yaml`
+- `docs/delivery/status/current.md`
+- `docs/delivery/roadmap.md`
+- `docs/delivery/work-items/WI-0004-docs-tooling.md`
 
 ## Commands
 
 ```powershell
-./build.ps1
-./test.ps1
-```
-
-Focused command:
-
-```powershell
-dotnet test tests/PhotoIdentity.Core.Tests/PhotoIdentity.Core.Tests.csproj
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+dotnet run --project tools/PhotoIdentity.Docs -- next
+dotnet test tests/PhotoIdentity.Docs.Tests/PhotoIdentity.Docs.Tests.csproj
 ```
 
 ## Acceptance test
 
-- Strong identifiers are type-distinct and validated.
-- Pixel and normalised coordinate spaces cannot be confused accidentally.
-- Bounding-box IoU and vector similarity are tested.
-- Core exposes no infrastructure-specific dependencies or types.
+- Duplicate IDs, missing IDs, missing references and dependency cycles are reported.
+- Completed items without evidence and blocked items without blockers are rejected.
+- `current.md`, `roadmap.md` and milestone status are generated deterministically.
+- Start, block, review and complete transitions enforce their preconditions.
+- CI validates the registries and checks generated files.
 
-## Verification
+## Known issues
 
-- GitHub Actions run `30130764843` successfully restored, built and tested the solution on Windows with .NET 10.
-- The current agent container does not contain the .NET SDK, so no independent local build was run.
-- Documentation status generation remains manual until WI-0004.
+- The current agent container has no .NET SDK; GitHub Actions performs executable verification.
+- Registry mutations rewrite YAML using YamlDotNet formatting.
 
 ## Next action
 
-Review and merge pull request #3, then mark WI-0003 completed and make WI-0004 ready.
+Open a draft pull request, verify the Windows .NET 10 workflow, then mark WI-0004 `in_review`.
