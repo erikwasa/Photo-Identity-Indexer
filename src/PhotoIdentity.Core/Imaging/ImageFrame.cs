@@ -44,9 +44,9 @@ public sealed class ImageFrame
 
     public static int BytesPerPixel(PixelFormat pixelFormat) => pixelFormat switch
     {
-        Imaging.PixelFormat.Gray8 => 1,
-        Imaging.PixelFormat.Rgb24 or Imaging.PixelFormat.Bgr24 => 3,
-        Imaging.PixelFormat.Rgba32 or Imaging.PixelFormat.Bgra32 => 4,
+        global::PhotoIdentity.Core.Imaging.PixelFormat.Gray8 => 1,
+        global::PhotoIdentity.Core.Imaging.PixelFormat.Rgb24 or global::PhotoIdentity.Core.Imaging.PixelFormat.Bgr24 => 3,
+        global::PhotoIdentity.Core.Imaging.PixelFormat.Rgba32 or global::PhotoIdentity.Core.Imaging.PixelFormat.Bgra32 => 4,
         _ => throw new ArgumentOutOfRangeException(nameof(pixelFormat)),
     };
 }
