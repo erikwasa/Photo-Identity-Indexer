@@ -25,7 +25,18 @@ jobs:
         run: dotnet restore PhotoIdentity.slnx
 
       - name: Build
-        run: dotnet build PhotoIdentity.slnx --configuration Release --no-restore
+        shell: pwsh
+        run: |
+          dotnet build PhotoIdentity.slnx --configuration Release --no-restore 2>&1 | Tee-Object -FilePath build.log
+          exit $LASTEXITCODE
+
+      - name: Upload build diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics
+          path: build.log
+          retention-days: 1
 
       - name: Test
         run: dotnet test PhotoIdentity.slnx --configuration Release --no-build
