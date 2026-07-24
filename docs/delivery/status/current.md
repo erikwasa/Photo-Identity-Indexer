@@ -8,24 +8,25 @@ This page is a human-readable snapshot. The YAML files in this directory are can
 
 ## Recently completed
 
-**WI-0001 — Establish living documentation**
+**WI-0002 — Create solution skeleton**
 
 - Status: `completed`
-- Evidence: pull request [#1](https://github.com/erikwasa/Photo-Identity-Indexer/pull/1)
-- Merge commit: `f342e76b94b5e643d353c852d55cd08907f159f7`
+- Evidence: pull request [#2](https://github.com/erikwasa/Photo-Identity-Indexer/pull/2)
+- CI: [successful Windows .NET 10 build and test](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30129316996)
+- Merge commit: `0fedd16f131396ec05a175714736346f6cec23a8`
 
 ## Active review
 
-**WI-0002 — Create solution skeleton**
+**WI-0003 — Define core identifiers and contracts**
 
 - Owner: AI agent
-- Branch: `agent/WI-0002-solution-skeleton`
-- Pull request: [#2](https://github.com/erikwasa/Photo-Identity-Indexer/pull/2)
+- Branch: `agent/WI-0003-core-contracts`
+- Pull request: [#3](https://github.com/erikwasa/Photo-Identity-Indexer/pull/3)
 - Status: `in_review`
-- CI: [successful Windows .NET 10 build and test](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30129132466)
+- CI: [successful Windows .NET 10 build and test](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30130764843)
 - Required verification: human review and merge
 
 ## Next dependency-bound items
 
-- WI-0003 becomes ready after WI-0002 is completed.
-- WI-0004 requires both WI-0002 and WI-0003.
+- WI-0004 becomes ready after WI-0003 is completed.
+- WI-0005 and WI-0006 also depend on WI-0003 but belong to the next milestone.
