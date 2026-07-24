@@ -49,10 +49,10 @@ public static class Program
         if (command == "next")
         {
             Dictionary<string, WorkItem> itemMap = workItems.WorkItems
-                .ToDictionary(item => item.Id, StringComparer.Ordinal);
+                .ToDictionary(value => value.Id, StringComparer.Ordinal);
             List<WorkItem> ready = workItems.WorkItems
-                .Where(item => WorkItemRules.IsReady(item, itemMap))
-                .OrderBy(item => item.Id, StringComparer.Ordinal)
+                .Where(value => WorkItemRules.IsReady(value, itemMap))
+                .OrderBy(value => value.Id, StringComparer.Ordinal)
                 .ToList();
 
             if (ready.Count == 0)
@@ -61,9 +61,9 @@ public static class Program
                 return 0;
             }
 
-            foreach (WorkItem item in ready)
+            foreach (WorkItem readyItem in ready)
             {
-                output.WriteLine($"{item.Id}\t{item.Milestone}\t{item.Title}");
+                output.WriteLine($"{readyItem.Id}\t{readyItem.Milestone}\t{readyItem.Title}");
             }
 
             return 0;
@@ -84,8 +84,8 @@ public static class Program
 
         string id = positionals[0];
         Dictionary<string, WorkItem> map = workItems.WorkItems
-            .ToDictionary(item => item.Id, StringComparer.Ordinal);
-        if (!map.TryGetValue(id, out WorkItem? item))
+            .ToDictionary(value => value.Id, StringComparer.Ordinal);
+        if (!map.TryGetValue(id, out WorkItem? selectedItem))
         {
             throw new KeyNotFoundException($"Unknown work item '{id}'.");
         }
@@ -97,7 +97,7 @@ public static class Program
         {
             case "start":
                 service.Start(
-                    item,
+                    selectedItem,
                     map,
                     SingleOption(options, "owner") ?? "ai-agent",
                     SingleOption(options, "branch"),
@@ -114,16 +114,16 @@ public static class Program
                     }
                 }
 
-                service.Block(item, blockerIds, SingleOption(options, "note"), today);
+                service.Block(selectedItem, blockerIds, SingleOption(options, "note"), today);
                 break;
 
             case "review":
-                service.Review(item, today);
+                service.Review(selectedItem, today);
                 break;
 
             case "complete":
                 service.Complete(
-                    item,
+                    selectedItem,
                     new Evidence
                     {
                         Type = RequiredOption(options, "evidence-type"),
@@ -150,7 +150,7 @@ public static class Program
             return 1;
         }
 
-        output.WriteLine($"{id} is now {item.Status}.");
+        output.WriteLine($"{id} is now {selectedItem.Status}.");
         return 0;
     }
 
