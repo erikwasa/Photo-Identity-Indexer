@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
+  </ItemGroup>
+</Project>

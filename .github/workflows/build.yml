@@ -1,0 +1,31 @@
+name: build
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore PhotoIdentity.slnx
+
+      - name: Build
+        run: dotnet build PhotoIdentity.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test PhotoIdentity.slnx --configuration Release --no-build
