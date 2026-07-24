@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
+    <ProjectReference Include="../PhotoIdentity.Imaging.OpenCv/PhotoIdentity.Imaging.OpenCv.csproj" />
+    <ProjectReference Include="../PhotoIdentity.Recognition.Onnx/PhotoIdentity.Recognition.Onnx.csproj" />
+    <ProjectReference Include="../PhotoIdentity.Transfer.Bundles/PhotoIdentity.Transfer.Bundles.csproj" />
+  </ItemGroup>
+</Project>
