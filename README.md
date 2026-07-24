@@ -2,16 +2,28 @@
 
 A private, model-independent system for detecting and identifying people in a personal photo archive.
 
-The project is planned as a local-first modular .NET application. Personal OneDrive is accessed through the Windows sync client. Optional Azure compute receives explicit portable job bundles and does not authenticate to OneDrive or use Azure application identities.
+The project is a local-first modular .NET application. Personal OneDrive is accessed through the Windows sync client. Optional Azure compute receives explicit portable job bundles and does not authenticate to OneDrive or use Azure application identities.
 
 ## Project status
 
-The project is currently in **M00 — Repository and architecture**. No application implementation exists yet.
+The project is currently in **M00 — Repository and architecture**. The .NET solution skeleton is under review in WI-0002.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
 - [Roadmap](docs/delivery/roadmap.md)
 - [Canonical work-item status](docs/delivery/status/work-items.yaml)
+
+## Prerequisites
+
+- .NET 10 SDK
+- PowerShell 7 or Windows PowerShell
+
+## Build and test
+
+```powershell
+./build.ps1
+./test.ps1
+```
 
 ## First target demonstration
 

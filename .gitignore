@@ -33,7 +33,6 @@ ScaffoldingReadMe.txt
 
 # NuGet Packages
 *.nupkg
-# NuGet Symbol Packages
 *.snupkg
 
 # dotenv environment variables file
@@ -47,11 +46,26 @@ CodeCoverage/
 # MSBuild Binary and Structured Log
 *.binlog
 
-# MSTest test Results
+# Test results
 [Tt]est[Rr]esult*/
 [Bb]uild[Ll]og.*
-
-# NUnit
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Private photo and biometric data
+data/
+private/
+staging/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Model binaries (manifests and download scripts remain tracked)
+models/**/*.onnx
+models/**/*.pt
+models/**/*.pth
+models/**/*.tflite
+models/**/*.bin

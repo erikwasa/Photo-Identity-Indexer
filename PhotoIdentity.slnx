@@ -1,0 +1,19 @@
+<Solution>
+  <Project Path="src/PhotoIdentity.Api/PhotoIdentity.Api.csproj" />
+  <Project Path="src/PhotoIdentity.Cli/PhotoIdentity.Cli.csproj" />
+  <Project Path="src/PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
+  <Project Path="src/PhotoIdentity.Imaging.OpenCv/PhotoIdentity.Imaging.OpenCv.csproj" />
+  <Project Path="src/PhotoIdentity.Persistence.Sqlite/PhotoIdentity.Persistence.Sqlite.csproj" />
+  <Project Path="src/PhotoIdentity.Recognition.Onnx/PhotoIdentity.Recognition.Onnx.csproj" />
+  <Project Path="src/PhotoIdentity.Source.Local/PhotoIdentity.Source.Local.csproj" />
+  <Project Path="src/PhotoIdentity.Source.OneDriveSync/PhotoIdentity.Source.OneDriveSync.csproj" />
+  <Project Path="src/PhotoIdentity.Transfer.Bundles/PhotoIdentity.Transfer.Bundles.csproj" />
+  <Project Path="src/PhotoIdentity.Web/PhotoIdentity.Web.csproj" />
+  <Project Path="src/PhotoIdentity.Worker/PhotoIdentity.Worker.csproj" />
+  <Project Path="tests/PhotoIdentity.Bundle.Tests/PhotoIdentity.Bundle.Tests.csproj" />
+  <Project Path="tests/PhotoIdentity.Core.Tests/PhotoIdentity.Core.Tests.csproj" />
+  <Project Path="tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj" />
+  <Project Path="tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj" />
+  <Project Path="tests/PhotoIdentity.Recognition.Tests/PhotoIdentity.Recognition.Tests.csproj" />
+  <Project Path="tests/PhotoIdentity.Source.Tests/PhotoIdentity.Source.Tests.csproj" />
+</Solution>
