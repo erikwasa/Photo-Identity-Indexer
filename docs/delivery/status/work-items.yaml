@@ -1,253 +1,273 @@
 schema_version: 1
-
 allowed_statuses:
-  - proposed
-  - ready
-  - in_progress
-  - blocked
-  - in_review
-  - completed
-  - cancelled
-
+- proposed
+- ready
+- in_progress
+- blocked
+- in_review
+- completed
+- cancelled
 work_items:
-  - id: WI-0001
-    title: Establish living documentation
-    milestone: M00
-    status: completed
-    owner: ai-agent
-    document: ../work-items/WI-0001-living-documentation.md
-    started_at: 2026-07-24
-    completed_at: 2026-07-24
-    verified_at: 2026-07-24
-    verified_by: human
-    last_updated_at: 2026-07-24
-    branch: agent/living-documentation
-    blockers: []
-    evidence:
-      - type: pull_request
-        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/1
-      - type: merge_commit
-        value: f342e76b94b5e643d353c852d55cd08907f159f7
-
-  - id: WI-0002
-    title: Create solution skeleton
-    milestone: M00
-    status: in_review
-    owner: ai-agent
-    document: ../work-items/WI-0002-solution-skeleton.md
-    started_at: 2026-07-24
-    last_updated_at: 2026-07-24
-    branch: agent/WI-0002-solution-skeleton
-    blockers: []
-    evidence:
-      - type: pull_request
-        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/2
-      - type: workflow
-        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30129132466
-
-  - id: WI-0003
-    title: Define core identifiers and contracts
-    milestone: M00
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0003-core-types.md
-    blockers: [WI-0002]
-    evidence: []
-
-  - id: WI-0004
-    title: Add documentation status tooling
-    milestone: M00
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0004-docs-tooling.md
-    blockers: [WI-0002, WI-0003]
-    evidence: []
-
-  - id: WI-0005
-    title: Add model installation and verification
-    milestone: M01
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0005-model-installation.md
-    blockers: [WI-0003]
-    evidence: []
-
-  - id: WI-0006
-    title: Implement image decoding
-    milestone: M01
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0006-image-decoder.md
-    blockers: [WI-0003]
-    evidence: []
-
-  - id: WI-0007
-    title: Implement YuNet detection
-    milestone: M01
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0007-yunet.md
-    blockers: [WI-0005, WI-0006]
-    evidence: []
-
-  - id: WI-0008
-    title: Implement face crops and alignment
-    milestone: M01
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0008-alignment.md
-    blockers: [WI-0007]
-    evidence: []
-
-  - id: WI-0009
-    title: Implement SFace embeddings
-    milestone: M01
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0009-sface.md
-    blockers: [WI-0005, WI-0008]
-    evidence: []
-
-  - id: WI-0010
-    title: Build photoid inspect command
-    milestone: M01
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0010-inspect-command.md
-    blockers: [WI-0009]
-    evidence: []
-
-  - id: WI-0011
-    title: Add SQLite persistence
-    milestone: M02
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0011-sqlite.md
-    blockers: [WI-0003]
-    evidence: []
-
-  - id: WI-0012
-    title: Add local folder scanning
-    milestone: M02
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0012-local-scanner.md
-    blockers: [WI-0011]
-    evidence: []
-
-  - id: WI-0013
-    title: Add resumable batch processing
-    milestone: M02
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0013-resumable-processing.md
-    blockers: [WI-0010, WI-0011, WI-0012]
-    evidence: []
-
-  - id: WI-0014
-    title: Add OneDrive availability and staging
-    milestone: M03
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0014-onedrive-staging.md
-    blockers: [WI-0012, WI-0013]
-    evidence: []
-
-  - id: WI-0015
-    title: Build minimal review application
-    milestone: M04
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0015-review-ui.md
-    blockers: [WI-0011, WI-0013]
-    evidence: []
-
-  - id: WI-0016
-    title: Add identity matcher
-    milestone: M05
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0016-matcher.md
-    blockers: [WI-0009, WI-0015]
-    evidence: []
-
-  - id: WI-0017
-    title: Add evaluation harness
-    milestone: M06
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0017-evaluation.md
-    blockers: [WI-0016]
-    evidence: []
-
-  - id: WI-0018
-    title: Add portable bundles
-    milestone: M07
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0018-portable-bundles.md
-    blockers: [WI-0013]
-    evidence: []
-
-  - id: WI-0019
-    title: Add a second model adapter
-    milestone: M08
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0019-second-model.md
-    blockers: [WI-0017, WI-0018]
-    evidence: []
-
-  - id: WI-0020
-    title: Run Azure VM pilot
-    milestone: M09
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0020-azure-pilot.md
-    blockers: [WI-0018]
-    evidence: []
-
-  - id: WI-0021
-    title: Add Azure checkpointing
-    milestone: M10
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0021-azure-checkpointing.md
-    blockers: [WI-0020]
-    evidence: []
-
-  - id: WI-0022
-    title: Select production models
-    milestone: M11
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0022-model-selection.md
-    blockers: [WI-0019, WI-0021]
-    evidence: []
-
-  - id: WI-0023
-    title: Process the full archive
-    milestone: M12
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0023-full-archive.md
-    blockers: [WI-0022]
-    evidence: []
-
-  - id: WI-0024
-    title: Add ongoing local synchronisation
-    milestone: M13
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0024-ongoing-sync.md
-    blockers: [WI-0014, WI-0023]
-    evidence: []
-
-  - id: WI-0025
-    title: Add collection-ready queries
-    milestone: M14
-    status: proposed
-    owner: unassigned
-    document: ../work-items/WI-0025-collection-api.md
-    blockers: [WI-0015, WI-0016]
-    evidence: []
+- id: WI-0001
+  title: Establish living documentation
+  milestone: M00
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0001-living-documentation.md
+  started_at: '2026-07-24'
+  completed_at: '2026-07-24'
+  verified_at: '2026-07-24'
+  verified_by: human
+  last_updated_at: '2026-07-24'
+  branch: agent/living-documentation
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/1
+  - type: merge_commit
+    value: f342e76b94b5e643d353c852d55cd08907f159f7
+- id: WI-0002
+  title: Create solution skeleton
+  milestone: M00
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0002-solution-skeleton.md
+  started_at: '2026-07-24'
+  completed_at: '2026-07-24'
+  verified_at: '2026-07-24'
+  verified_by: human
+  last_updated_at: '2026-07-24'
+  branch: agent/WI-0002-solution-skeleton
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/2
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30129316996
+  - type: merge_commit
+    value: 0fedd16f131396ec05a175714736346f6cec23a8
+- id: WI-0003
+  title: Define core identifiers and contracts
+  milestone: M00
+  status: in_review
+  owner: ai-agent
+  document: ../work-items/WI-0003-core-types.md
+  started_at: '2026-07-24'
+  last_updated_at: '2026-07-24'
+  branch: agent/WI-0003-core-contracts
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/3
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30130764843
+- id: WI-0004
+  title: Add documentation status tooling
+  milestone: M00
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0004-docs-tooling.md
+  blockers:
+  - WI-0002
+  - WI-0003
+  evidence: []
+- id: WI-0005
+  title: Add model installation and verification
+  milestone: M01
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0005-model-installation.md
+  blockers:
+  - WI-0003
+  evidence: []
+- id: WI-0006
+  title: Implement image decoding
+  milestone: M01
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0006-image-decoder.md
+  blockers:
+  - WI-0003
+  evidence: []
+- id: WI-0007
+  title: Implement YuNet detection
+  milestone: M01
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0007-yunet.md
+  blockers:
+  - WI-0005
+  - WI-0006
+  evidence: []
+- id: WI-0008
+  title: Implement face crops and alignment
+  milestone: M01
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0008-alignment.md
+  blockers:
+  - WI-0007
+  evidence: []
+- id: WI-0009
+  title: Implement SFace embeddings
+  milestone: M01
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0009-sface.md
+  blockers:
+  - WI-0005
+  - WI-0008
+  evidence: []
+- id: WI-0010
+  title: Build photoid inspect command
+  milestone: M01
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0010-inspect-command.md
+  blockers:
+  - WI-0009
+  evidence: []
+- id: WI-0011
+  title: Add SQLite persistence
+  milestone: M02
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0011-sqlite.md
+  blockers:
+  - WI-0003
+  evidence: []
+- id: WI-0012
+  title: Add local folder scanning
+  milestone: M02
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0012-local-scanner.md
+  blockers:
+  - WI-0011
+  evidence: []
+- id: WI-0013
+  title: Add resumable batch processing
+  milestone: M02
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0013-resumable-processing.md
+  blockers:
+  - WI-0010
+  - WI-0011
+  - WI-0012
+  evidence: []
+- id: WI-0014
+  title: Add OneDrive availability and staging
+  milestone: M03
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0014-onedrive-staging.md
+  blockers:
+  - WI-0012
+  - WI-0013
+  evidence: []
+- id: WI-0015
+  title: Build minimal review application
+  milestone: M04
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0015-review-ui.md
+  blockers:
+  - WI-0011
+  - WI-0013
+  evidence: []
+- id: WI-0016
+  title: Add identity matcher
+  milestone: M05
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0016-matcher.md
+  blockers:
+  - WI-0009
+  - WI-0015
+  evidence: []
+- id: WI-0017
+  title: Add evaluation harness
+  milestone: M06
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0017-evaluation.md
+  blockers:
+  - WI-0016
+  evidence: []
+- id: WI-0018
+  title: Add portable bundles
+  milestone: M07
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0018-portable-bundles.md
+  blockers:
+  - WI-0013
+  evidence: []
+- id: WI-0019
+  title: Add a second model adapter
+  milestone: M08
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0019-second-model.md
+  blockers:
+  - WI-0017
+  - WI-0018
+  evidence: []
+- id: WI-0020
+  title: Run Azure VM pilot
+  milestone: M09
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0020-azure-pilot.md
+  blockers:
+  - WI-0018
+  evidence: []
+- id: WI-0021
+  title: Add Azure checkpointing
+  milestone: M10
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0021-azure-checkpointing.md
+  blockers:
+  - WI-0020
+  evidence: []
+- id: WI-0022
+  title: Select production models
+  milestone: M11
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0022-model-selection.md
+  blockers:
+  - WI-0019
+  - WI-0021
+  evidence: []
+- id: WI-0023
+  title: Process the full archive
+  milestone: M12
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0023-full-archive.md
+  blockers:
+  - WI-0022
+  evidence: []
+- id: WI-0024
+  title: Add ongoing local synchronisation
+  milestone: M13
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0024-ongoing-sync.md
+  blockers:
+  - WI-0014
+  - WI-0023
+  evidence: []
+- id: WI-0025
+  title: Add collection-ready queries
+  milestone: M14
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0025-collection-api.md
+  blockers:
+  - WI-0015
+  - WI-0016
+  evidence: []

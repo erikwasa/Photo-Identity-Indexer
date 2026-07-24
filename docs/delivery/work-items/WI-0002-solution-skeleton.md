@@ -31,6 +31,6 @@ Create the .NET 10 solution, planned projects, central package management, nulla
 
 ## Verification
 
-Pull request [#2](https://github.com/erikwasa/Photo-Identity-Indexer/pull/2) contains the implementation.
+Pull request [#2](https://github.com/erikwasa/Photo-Identity-Indexer/pull/2) was reviewed and merged as commit `0fedd16f131396ec05a175714736346f6cec23a8`.
 
-GitHub Actions run [30129132466](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30129132466) successfully restored, built and tested the solution on Windows with .NET 10.
+GitHub Actions run [30129316996](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30129316996) successfully restored, built and tested the final pull-request head on Windows with .NET 10.
