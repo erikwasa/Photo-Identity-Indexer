@@ -8,11 +8,12 @@
 
 **WI-0004 — Add documentation status tooling**
 
-Status: `in_progress`
+Status: `in_review`
 
-## Branch
+## Branch and pull request
 
-`agent/WI-0004-docs-tooling`
+- Branch: `agent/WI-0004-docs-tooling`
+- Pull request: [#4 — Add documentation status tooling](https://github.com/erikwasa/Photo-Identity-Indexer/pull/4)
 
 ## Objective
 
@@ -46,6 +47,10 @@ dotnet test tests/PhotoIdentity.Docs.Tests/PhotoIdentity.Docs.Tests.csproj
 - Start, block, review and complete transitions enforce their preconditions.
 - CI validates the registries and checks generated files.
 
+## Verification
+
+GitHub Actions run `30132244049` passed restore, build, tests, registry and link validation, and generated-file checks on Windows with .NET 10.
+
 ## Known issues
 
 - The current agent container has no .NET SDK; GitHub Actions performs executable verification.
@@ -53,4 +58,4 @@ dotnet test tests/PhotoIdentity.Docs.Tests/PhotoIdentity.Docs.Tests.csproj
 
 ## Next action
 
-Open a draft pull request, verify the Windows .NET 10 workflow, then mark WI-0004 `in_review`.
+Review and merge pull request #4, mark WI-0004 completed with merge evidence, then begin WI-0005.

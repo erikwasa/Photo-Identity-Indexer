@@ -69,14 +69,18 @@ work_items:
 - id: WI-0004
   title: Add documentation status tooling
   milestone: M00
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0004-docs-tooling.md
   started_at: '2026-07-25'
   last_updated_at: '2026-07-25'
   branch: agent/WI-0004-docs-tooling
   blockers: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/4
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30132244049
 - id: WI-0005
   title: Add model installation and verification
   milestone: M01

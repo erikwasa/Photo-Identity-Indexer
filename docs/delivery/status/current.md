@@ -10,7 +10,7 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Active work
 
-- [**WI-0004 — Add documentation status tooling**](../work-items/WI-0004-docs-tooling.md) — `in_progress`; owner: `ai-agent`
+- [**WI-0004 — Add documentation status tooling**](../work-items/WI-0004-docs-tooling.md) — `in_review`; owner: `ai-agent`
 
 ## Recently completed
 
