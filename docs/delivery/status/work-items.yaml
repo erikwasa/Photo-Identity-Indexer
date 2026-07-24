@@ -22,7 +22,7 @@ work_items:
     blockers: []
     evidence:
       - type: pull_request
-        value: pending
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/1
 
   - id: WI-0002
     title: Create solution skeleton

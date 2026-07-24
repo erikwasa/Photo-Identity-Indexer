@@ -12,6 +12,7 @@ This page is a human-readable snapshot. The YAML files in this directory are can
 
 - Owner: AI agent
 - Branch: `agent/living-documentation`
+- Pull request: [#1](https://github.com/erikwasa/Photo-Identity-Indexer/pull/1)
 - Status: `in_review`
 - Required verification: human review of the pull request
 

@@ -10,9 +10,10 @@
 
 Status: `in_review`
 
-## Branch
+## Branch and pull request
 
-`agent/living-documentation`
+- Branch: `agent/living-documentation`
+- Pull request: [#1 — Introduce living project documentation](https://github.com/erikwasa/Photo-Identity-Indexer/pull/1)
 
 ## Objective
 
@@ -45,4 +46,4 @@ No application build commands exist yet.
 
 ## Next action
 
-Review and merge the living-documentation pull request, then start WI-0002.
+Review and merge pull request #1, mark WI-0001 completed with evidence, then start WI-0002.
