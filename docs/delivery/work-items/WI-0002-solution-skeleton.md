@@ -31,4 +31,4 @@ Create the .NET 10 solution, planned projects, central package management, nulla
 
 ## Verification
 
-Build and test verification will be supplied by the pull-request workflow because the current agent execution environment does not contain the .NET SDK.
+Pull request [#2](https://github.com/erikwasa/Photo-Identity-Indexer/pull/2) contains the implementation. Build and test verification is supplied by its GitHub Actions workflow because the current agent execution environment does not contain the .NET SDK.

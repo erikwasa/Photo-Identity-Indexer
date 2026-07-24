@@ -14,13 +14,14 @@ This page is a human-readable snapshot. The YAML files in this directory are can
 - Evidence: pull request [#1](https://github.com/erikwasa/Photo-Identity-Indexer/pull/1)
 - Merge commit: `f342e76b94b5e643d353c852d55cd08907f159f7`
 
-## Active work
+## Active review
 
 **WI-0002 — Create solution skeleton**
 
 - Owner: AI agent
 - Branch: `agent/WI-0002-solution-skeleton`
-- Status: `in_progress`
+- Pull request: [#2](https://github.com/erikwasa/Photo-Identity-Indexer/pull/2)
+- Status: `in_review`
 - Required verification: .NET 10 build and test
 
 ## Next dependency-bound items

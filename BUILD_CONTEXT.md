@@ -8,11 +8,12 @@
 
 **WI-0002 — Create solution skeleton**
 
-Status: `in_progress`
+Status: `in_review`
 
-## Branch
+## Branch and pull request
 
-`agent/WI-0002-solution-skeleton`
+- Branch: `agent/WI-0002-solution-skeleton`
+- Pull request: [#2 — Create .NET solution skeleton](https://github.com/erikwasa/Photo-Identity-Indexer/pull/2)
 
 ## Objective
 
@@ -59,4 +60,4 @@ dotnet test PhotoIdentity.slnx
 
 ## Next action
 
-Open the WI-0002 pull request, verify the GitHub Actions build, then merge and mark WI-0002 completed.
+Verify the GitHub Actions build, review pull request #2, then merge and mark WI-0002 completed.

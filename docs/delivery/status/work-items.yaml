@@ -32,14 +32,16 @@ work_items:
   - id: WI-0002
     title: Create solution skeleton
     milestone: M00
-    status: in_progress
+    status: in_review
     owner: ai-agent
     document: ../work-items/WI-0002-solution-skeleton.md
     started_at: 2026-07-24
     last_updated_at: 2026-07-24
     branch: agent/WI-0002-solution-skeleton
     blockers: []
-    evidence: []
+    evidence:
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/2
 
   - id: WI-0003
     title: Define core identifiers and contracts
