@@ -30,13 +30,13 @@ public sealed class ImageFrame
         }
 
         Size = size;
-        PixelFormat = pixelFormat;
+        Format = pixelFormat;
         Stride = stride;
         _data = data.ToArray();
     }
 
     public ImageSize Size { get; }
-    public PixelFormat PixelFormat { get; }
+    public PixelFormat Format { get; }
     public int Stride { get; }
     public ReadOnlySpan<byte> Data => _data;
 
@@ -44,9 +44,9 @@ public sealed class ImageFrame
 
     public static int BytesPerPixel(PixelFormat pixelFormat) => pixelFormat switch
     {
-        PixelFormat.Gray8 => 1,
-        PixelFormat.Rgb24 or PixelFormat.Bgr24 => 3,
-        PixelFormat.Rgba32 or PixelFormat.Bgra32 => 4,
+        Imaging.PixelFormat.Gray8 => 1,
+        Imaging.PixelFormat.Rgb24 or Imaging.PixelFormat.Bgr24 => 3,
+        Imaging.PixelFormat.Rgba32 or Imaging.PixelFormat.Bgra32 => 4,
         _ => throw new ArgumentOutOfRangeException(nameof(pixelFormat)),
     };
 }
