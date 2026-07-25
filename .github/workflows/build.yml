@@ -60,4 +60,47 @@ jobs:
 
       - name: Smoke-test local verification harness
         shell: pwsh
-        run: ./verify-local.ps1 -Configuration Release -SkipModels
+        run: |
+          $fixtureDirectory = Join-Path $PWD ".artifacts/ci-verification"
+          New-Item -ItemType Directory -Path $fixtureDirectory -Force | Out-Null
+
+          $validPng = Join-Path $fixtureDirectory "valid.png"
+          $corruptJpeg = Join-Path $fixtureDirectory "corrupt.jpg"
+          [IO.File]::WriteAllBytes(
+            $validPng,
+            [Convert]::FromBase64String(
+              "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAFUlEQVQIHWOUE+FiAANGOREuBjAAAAZyAHsISLb5AAAAAElFTkSuQmCC"))
+          [IO.File]::WriteAllBytes(
+            $corruptJpeg,
+            [byte[]](0xff, 0xd8, 0xff, 0xd9))
+
+          ./verify-local.ps1 `
+            -Configuration Release `
+            -SkipModels `
+            -Image @($validPng, $corruptJpeg)
+          $verificationExitCode = $LASTEXITCODE
+
+          if ($verificationExitCode -ne 1) {
+            throw "Expected verification exit code 1 for the mixed valid/corrupt fixture run, received $verificationExitCode."
+          }
+
+          $report = Get-Content ".artifacts/local-verification/verification-report.json" -Raw | ConvertFrom-Json
+          if ($report.result -ne "failed") {
+            throw "Expected aggregate result 'failed'."
+          }
+
+          if ($report.decoderChecks.Count -ne 2) {
+            throw "Expected both decoder checks to be retained in the report."
+          }
+
+          if ($report.decoderChecks[0].result -ne "passed") {
+            throw "Expected the valid PNG check to pass."
+          }
+
+          if ($report.decoderChecks[1].failure -ne "corrupt_media") {
+            throw "Expected the corrupt JPEG check to be classified as corrupt_media."
+          }
+
+          if (-not $report.decoderChecks[0].inputUnchanged -or -not $report.decoderChecks[1].inputUnchanged) {
+            throw "Expected both fixture inputs to remain unchanged."
+          }
