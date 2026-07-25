@@ -268,7 +268,7 @@ internal static class YuNetOutputParser
         }
     }
 
-    private sealed record RawCandidate(
+    private readonly record struct RawCandidate(
         double X,
         double Y,
         double Width,
