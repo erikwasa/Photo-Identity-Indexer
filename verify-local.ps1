@@ -1,3 +1,29 @@
+<#
+.SYNOPSIS
+Runs the local Windows verification checkpoint.
+
+.DESCRIPTION
+Builds and tests the solution, validates living documentation, optionally installs
+and verifies pinned models, then checks private JPEG and PNG files without
+modifying them. Multiple image paths must be supplied as one array value.
+
+.EXAMPLE
+./verify-local.ps1 -InstallModels
+
+.EXAMPLE
+./verify-local.ps1 `
+  -Image "C:\PrivateVerification\normal.jpg","C:\PrivateVerification\pixel-rotated.jpg","C:\PrivateVerification\sample.png" `
+  -UnsupportedImage "C:\PrivateVerification\sample.heic"
+
+.EXAMPLE
+./verify-local.ps1 `
+  -Image @(
+    "C:\PrivateVerification\normal.jpg"
+    "C:\PrivateVerification\pixel-rotated.jpg"
+    "C:\PrivateVerification\sample.png"
+  ) `
+  -UnsupportedImage "C:\PrivateVerification\sample.heic"
+#>
 [CmdletBinding()]
 param(
     [ValidateSet("Debug", "Release")]
@@ -47,14 +73,15 @@ $report = [ordered]@{
     documentation = "pending"
     modelsSkipped = [bool] $SkipModels
     models = @()
-    manualImagesProvided = ($Image.Count -gt 0)
+    manualImagesProvided = (($Image.Count + $UnsupportedImage.Count) -gt 0)
     decoderChecks = @()
     unsupportedChecks = @()
 }
 
 $exitCode = 0
+$cliAssemblyPath = Join-Path $root "src/PhotoIdentity.Cli/bin/$Configuration/net10.0/PhotoIdentity.Cli.dll"
 
-function Invoke-CheckedCommand {
+function Invoke-CommandCapture {
     [CmdletBinding(DefaultParameterSetName = "ArgumentList")]
     param(
         [Parameter(Mandatory)]
@@ -72,23 +99,89 @@ function Invoke-CheckedCommand {
 
     Write-Host "`n== $Name =="
 
-    $LASTEXITCODE = 0
+    $previousErrorActionPreference = $ErrorActionPreference
+    $nativePreferenceExists = Test-Path variable:PSNativeCommandUseErrorActionPreference
+    if ($nativePreferenceExists) {
+        $previousNativePreference = $PSNativeCommandUseErrorActionPreference
+    }
+
+    $commandOutput = @()
+    $commandSucceeded = $false
+    $nativeExitCode = 1
+
+    try {
+        # Native tools may legitimately write diagnostics to stderr while returning a
+        # structured exit code. Capture that output and decide from the exit code below.
+        $ErrorActionPreference = "Continue"
+        if ($nativePreferenceExists) {
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+
+        $LASTEXITCODE = 0
+        if ($PSCmdlet.ParameterSetName -eq "Parameters") {
+            $commandOutput = & $FilePath @Parameters 2>&1
+        }
+        else {
+            $commandOutput = & $FilePath @ArgumentList 2>&1
+        }
+
+        $commandSucceeded = $?
+        $nativeExitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+        if ($nativePreferenceExists) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativePreference
+        }
+    }
+
+    $textOutput = @($commandOutput | ForEach-Object { $_.ToString() })
+    $textOutput | ForEach-Object { Write-Host $_ }
+
+    return [pscustomobject]@{
+        Succeeded = $commandSucceeded
+        ExitCode = $nativeExitCode
+        Output = $textOutput
+    }
+}
+
+function Invoke-CheckedCommand {
+    [CmdletBinding(DefaultParameterSetName = "ArgumentList")]
+    param(
+        [Parameter(Mandatory)]
+        [string] $Name,
+
+        [Parameter(Mandatory)]
+        [string] $FilePath,
+
+        [Parameter(ParameterSetName = "ArgumentList")]
+        [string[]] $ArgumentList = @(),
+
+        [Parameter(ParameterSetName = "Parameters")]
+        [hashtable] $Parameters = @{}
+    )
+
     if ($PSCmdlet.ParameterSetName -eq "Parameters") {
-        $commandOutput = & $FilePath @Parameters 2>&1
+        $result = Invoke-CommandCapture -Name $Name -FilePath $FilePath -Parameters $Parameters
     }
     else {
-        $commandOutput = & $FilePath @ArgumentList 2>&1
+        $result = Invoke-CommandCapture -Name $Name -FilePath $FilePath -ArgumentList $ArgumentList
     }
 
-    $commandSucceeded = $?
-    $nativeExitCode = $LASTEXITCODE
-    $commandOutput | ForEach-Object { Write-Host $_ }
-
-    if (-not $commandSucceeded -or $nativeExitCode -ne 0) {
-        throw "$Name failed with exit code $nativeExitCode."
+    if (-not $result.Succeeded -or $result.ExitCode -ne 0) {
+        throw "$Name failed with exit code $($result.ExitCode)."
     }
 
-    return @($commandOutput | ForEach-Object { $_.ToString() })
+    return $result.Output
+}
+
+function Get-InputHash {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Path
+    )
+
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
 
 function Invoke-DecodeCheck {
@@ -106,12 +199,10 @@ function Invoke-DecodeCheck {
 
     $outputPath = Join-Path $artifactDirectory ("decoded-{0:D3}.png" -f $Index)
     $caseReportPath = Join-Path $artifactDirectory ("decoded-{0:D3}.json" -f $Index)
+    Remove-Item -LiteralPath $outputPath, $caseReportPath -Force -ErrorAction SilentlyContinue
+
     $arguments = @(
-        "run",
-        "--project", (Join-Path $root "src/PhotoIdentity.Cli"),
-        "--configuration", $Configuration,
-        "--no-build",
-        "--",
+        $cliAssemblyPath,
         "decode",
         "--input", $InputPath,
         "--output", $outputPath,
@@ -122,18 +213,56 @@ function Invoke-DecodeCheck {
         $arguments += @("--max-width", $MaxWidth.ToString(), "--max-height", $MaxHeight.ToString())
     }
 
-    Invoke-CheckedCommand -Name ("Decode check {0}" -f $Index) -FilePath "dotnet" -ArgumentList $arguments | Out-Null
-    $caseReport = Get-Content -LiteralPath $caseReportPath -Raw | ConvertFrom-Json
+    $hashBefore = Get-InputHash -Path $InputPath
+    $command = Invoke-CommandCapture `
+        -Name ("Decode check {0}" -f $Index) `
+        -FilePath "dotnet" `
+        -ArgumentList $arguments
+    $hashAfter = Get-InputHash -Path $InputPath
+    $inputUnchanged = [string]::Equals($hashBefore, $hashAfter, [StringComparison]::OrdinalIgnoreCase)
+
+    if ($command.ExitCode -eq 0 -and $command.Succeeded) {
+        if (-not (Test-Path -LiteralPath $caseReportPath -PathType Leaf)) {
+            return [ordered]@{
+                case = ("image-{0:D3}" -f $Index)
+                result = "failed"
+                failure = "missing_case_report"
+                exitCode = 0
+                inputUnchanged = $inputUnchanged
+            }
+        }
+
+        $caseReport = Get-Content -LiteralPath $caseReportPath -Raw | ConvertFrom-Json
+        return [ordered]@{
+            case = ("image-{0:D3}" -f $Index)
+            result = $caseReport.result
+            sourceType = $caseReport.sourceType
+            width = $caseReport.width
+            height = $caseReport.height
+            pixelFormat = $caseReport.pixelFormat
+            inputUnchanged = ($inputUnchanged -and $caseReport.inputUnchanged)
+            outputFileName = $caseReport.outputFileName
+            exitCode = 0
+        }
+    }
+
+    $diagnostics = $command.Output -join "`n"
+    $failure = if ($command.ExitCode -eq 3 -or $diagnostics.Contains("unsupported-format:", [StringComparison]::Ordinal)) {
+        "unsupported_format"
+    }
+    elseif ($command.ExitCode -eq 4 -or $diagnostics.Contains("corrupt-media:", [StringComparison]::Ordinal)) {
+        "corrupt_media"
+    }
+    else {
+        "execution_error"
+    }
 
     return [ordered]@{
         case = ("image-{0:D3}" -f $Index)
-        result = $caseReport.result
-        sourceType = $caseReport.sourceType
-        width = $caseReport.width
-        height = $caseReport.height
-        pixelFormat = $caseReport.pixelFormat
-        inputUnchanged = $caseReport.inputUnchanged
-        outputFileName = $caseReport.outputFileName
+        result = "failed"
+        failure = $failure
+        exitCode = $command.ExitCode
+        inputUnchanged = $inputUnchanged
     }
 }
 
@@ -151,26 +280,30 @@ function Invoke-UnsupportedCheck {
     }
 
     $outputPath = Join-Path $artifactDirectory ("unsupported-{0:D3}.png" -f $Index)
-    Write-Host "`n== Unsupported-format check $Index =="
-    & dotnet run `
-        --project (Join-Path $root "src/PhotoIdentity.Cli") `
-        --configuration $Configuration `
-        --no-build `
-        -- `
-        decode `
-        --input $InputPath `
-        --output $outputPath
-    $nativeExitCode = $LASTEXITCODE
+    Remove-Item -LiteralPath $outputPath -Force -ErrorAction SilentlyContinue
 
-    if ($nativeExitCode -ne 3) {
-        throw "Unsupported-format check $Index returned exit code $nativeExitCode instead of 3."
-    }
+    $hashBefore = Get-InputHash -Path $InputPath
+    $command = Invoke-CommandCapture `
+        -Name ("Unsupported-format check {0}" -f $Index) `
+        -FilePath "dotnet" `
+        -ArgumentList @(
+            $cliAssemblyPath,
+            "decode",
+            "--input", $InputPath,
+            "--output", $outputPath
+        )
+    $hashAfter = Get-InputHash -Path $InputPath
+    $inputUnchanged = [string]::Equals($hashBefore, $hashAfter, [StringComparison]::OrdinalIgnoreCase)
+    $diagnostics = $command.Output -join "`n"
+    $unsupportedResult = $command.ExitCode -eq 3 -or $diagnostics.Contains("unsupported-format:", [StringComparison]::Ordinal)
+    $passed = $unsupportedResult -and $inputUnchanged -and -not (Test-Path -LiteralPath $outputPath)
 
     return [ordered]@{
         case = ("unsupported-{0:D3}" -f $Index)
-        result = "passed"
+        result = if ($passed) { "passed" } else { "failed" }
         expectedExitCode = 3
-        actualExitCode = $nativeExitCode
+        actualExitCode = $command.ExitCode
+        inputUnchanged = $inputUnchanged
     }
 }
 
@@ -260,17 +393,25 @@ try {
     }
     $report.unsupportedChecks = $unsupportedChecks
 
-    $report.result = if ($Image.Count -gt 0) {
-        "passed"
+    $failedDecodeChecks = @($decodeChecks | Where-Object { $_.result -ne "passed" }).Count
+    $failedUnsupportedChecks = @($unsupportedChecks | Where-Object { $_.result -ne "passed" }).Count
+
+    if (($failedDecodeChecks + $failedUnsupportedChecks) -gt 0) {
+        $exitCode = 1
+        $report.result = "failed"
+        $report.error = "One or more manual media checks failed. Review decoderChecks and unsupportedChecks."
+    }
+    elseif (($Image.Count + $UnsupportedImage.Count) -gt 0) {
+        $report.result = "passed"
     }
     else {
-        "passed_automated_checks"
+        $report.result = "passed_automated_checks"
     }
 }
 catch {
     $exitCode = 1
     $report.result = "failed"
-    $report.error = "A verification step failed. Review the console output."
+    $report.error = "A repository verification step failed. Review the console output."
     Write-Error $_
 }
 finally {

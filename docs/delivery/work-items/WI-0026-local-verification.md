@@ -24,6 +24,9 @@ Provide one repeatable Windows checkpoint that proves the repository, native Ope
 - [x] The input file hash is checked before and after decoding.
 - [x] Unsupported and corrupt media return stable, distinct exit codes.
 - [x] CI executes the verifier itself with model downloads skipped.
+- [x] Native stderr is captured without discarding structured media exit codes.
+- [x] One failed image does not prevent later media checks from running.
+- [x] Successful and failed cases are retained in the aggregate JSON report.
 - [ ] A local run succeeds with a real JPEG, a real PNG and an EXIF-rotated Pixel photo.
 - [ ] The generated PNGs are manually inspected and are upright and viewable.
 - [ ] A local HEIC or other unsupported file returns the expected unsupported-format result.
@@ -82,6 +85,9 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 - The aggregate verification report is local-only and ignored by Git.
 - PowerShell script parameters are passed through a hashtable; native executable arguments use an array. This avoids positional binding of strings such as `-Configuration`.
 - PowerShell named parameters may be specified only once per invocation; multiple image paths must be passed as one array value.
+- Native stderr is captured with error promotion disabled around child-process execution. The verifier decides from the stable exit code instead.
+- Exit code 3 is recorded as `unsupported_format`; exit code 4 is recorded as `corrupt_media`.
+- Failed media cases include the input-unchanged result and do not prevent subsequent checks.
 - `-SkipModels` exists for CI regression coverage and cannot be combined with `-InstallModels`.
 - CI proves the automated path. Completion still requires manual verification on the developer's Windows computer with private images.
 
@@ -89,8 +95,10 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 
 Pull request [#7](https://github.com/erikwasa/Photo-Identity-Indexer/pull/7) introduced the local verification harness.
 
-Pull request [#8](https://github.com/erikwasa/Photo-Identity-Indexer/pull/8) fixes PowerShell named-parameter binding and adds a CI smoke run of the verifier.
+Pull request [#8](https://github.com/erikwasa/Photo-Identity-Indexer/pull/8) fixed PowerShell named-parameter binding and added a CI smoke run of the verifier.
 
-Pull request [#9](https://github.com/erikwasa/Photo-Identity-Indexer/pull/9) corrects the array-valued private-image invocation examples.
+Pull request [#9](https://github.com/erikwasa/Photo-Identity-Indexer/pull/9) corrected the array-valued private-image invocation examples.
 
-The work item remains `in_review` until the private-image checks above are completed locally.
+Pull request [#10](https://github.com/erikwasa/Photo-Identity-Indexer/pull/10) hardens mixed-media handling after a real Pixel JPEG produced a libjpeg corrupt-media diagnostic.
+
+The work item remains `in_review` until the private-image checks above are completed locally with a decodable EXIF-rotated phone photo.

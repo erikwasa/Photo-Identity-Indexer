@@ -58,6 +58,67 @@ jobs:
       - name: Check generated documentation
         run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- generate --check
 
-      - name: Smoke-test local verification harness
+      - name: Prepare mixed-media verification fixtures
         shell: pwsh
-        run: ./verify-local.ps1 -Configuration Release -SkipModels
+        run: |
+          $fixtureDirectory = Join-Path $PWD ".artifacts/ci-verification"
+          New-Item -ItemType Directory -Path $fixtureDirectory -Force | Out-Null
+
+          [IO.File]::WriteAllBytes(
+            (Join-Path $fixtureDirectory "valid.png"),
+            [Convert]::FromBase64String(
+              "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAFUlEQVQIHWOUE+FiAANGOREuBjAAAAZyAHsISLb5AAAAAElFTkSuQmCC"))
+          [IO.File]::WriteAllBytes(
+            (Join-Path $fixtureDirectory "corrupt.jpg"),
+            [byte[]](0xff, 0xd8, 0xff, 0xd9))
+
+      - name: Run mixed-media local verification
+        id: mixed-verification
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          ./verify-local.ps1 `
+            -Configuration Release `
+            -SkipModels `
+            -Image @(
+              ".artifacts/ci-verification/valid.png"
+              ".artifacts/ci-verification/corrupt.jpg"
+            )
+
+      - name: Assert mixed-media verification report
+        shell: pwsh
+        env:
+          VERIFICATION_OUTCOME: ${{ steps.mixed-verification.outcome }}
+        run: |
+          if ($env:VERIFICATION_OUTCOME -ne "failure") {
+            throw "Expected the mixed valid/corrupt verification step to fail."
+          }
+
+          $report = Get-Content ".artifacts/local-verification/verification-report.json" -Raw | ConvertFrom-Json
+          if ($report.result -ne "failed") {
+            throw "Expected aggregate result 'failed'."
+          }
+
+          if ($report.decoderChecks.Count -ne 2) {
+            throw "Expected both decoder checks to be retained in the report."
+          }
+
+          if ($report.decoderChecks[0].result -ne "passed") {
+            throw "Expected the valid PNG check to pass."
+          }
+
+          if ($report.decoderChecks[1].failure -ne "corrupt_media") {
+            throw "Expected the corrupt JPEG check to be classified as corrupt_media."
+          }
+
+          if (-not $report.decoderChecks[0].inputUnchanged -or -not $report.decoderChecks[1].inputUnchanged) {
+            throw "Expected both fixture inputs to remain unchanged."
+          }
+
+      - name: Upload local verification diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-verification-diagnostics
+          path: .artifacts/local-verification/verification-report.json
+          retention-days: 1
