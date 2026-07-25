@@ -6,35 +6,38 @@
 
 ## Current work item
 
-**WI-0011 — Add SQLite persistence**
+**WI-0012 — Add local folder scanning**
 
-Status: `in_review`
+Status: `in_progress`
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0011-operational-policy`
-- Draft pull request: [#22 — Document SQLite operational policy](https://github.com/erikwasa/Photo-Identity-Indexer/pull/22)
+- Branch: `agent/WI-0012-local-folder-scanning`
+- Pull request: pending creation
 
 ## Objective
 
-Establish versioned SQLite migrations and repositories for the local catalogue, human identity labels, model-derived observations and embeddings, durable processing records, and a safe operational policy.
+Recursively catalogue supported local files, preserve stable source-owned identities, create immutable content revisions for changes, mark missing files without removing derived identity data, and report unsupported formats.
 
 ## Current slice
 
-Document the supported backup and restore path, concurrent-writer boundary, transient-lock handling, abandoned-claim limitation and forward-only schema-upgrade policy needed to complete WI-0011.
+Implement the complete local-folder scan boundary using the existing `IAssetSource` contract. `Source.Local` owns filesystem enumeration and diagnostics; the SQLite adapter owns hashing, stable assets, revisions and deletion markers.
 
 ## Relevant files
 
-- `docs/operations/sqlite-persistence.md`
-- `docs/delivery/work-items/WI-0011-sqlite.md`
+- `src/PhotoIdentity.Source.Local/LocalFolderAssetSource.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteSourceCatalogueScanner.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteCatalogueDatabase.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/CatalogueRecords.cs`
+- `tests/PhotoIdentity.Source.Tests/LocalFolderAssetSourceTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/LocalFolderCatalogueScannerTests.cs`
+- `docs/delivery/work-items/WI-0012-local-scanner.md`
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/status/current.md`
-- `docs/index.md`
-- `README.md`
 
 ## Commands
 
 ```powershell
+dotnet test tests/PhotoIdentity.Source.Tests/PhotoIdentity.Source.Tests.csproj
 dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
@@ -42,36 +45,29 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Acceptance test for this slice
 
-- The supported backup is a quiesced file copy verified with SQLite integrity, foreign-key and schema-version checks.
-- Live-file copying and network-share catalogue locations are explicitly unsupported.
-- Restore preserves the previous database for diagnostics and verifies the restored file before processing resumes.
-- Repository transactions remain short and do not span decoding, inference, file copying or user interaction.
-- Sustained lock failures are surfaced; orchestration may use bounded retries with jitter rather than unbounded retries.
-- Abandoned running jobs remain an explicit WI-0013 recovery concern because claims do not yet expire.
-- Released migration versions are immutable and future upgrades are forward-only, transactional and backed up first.
-- Database backups are documented as separate from source photos and externally stored aligned crops.
+- Recursive and non-recursive scans use stable root-relative source keys.
+- JPEG and PNG files are catalogued; unsupported extensions are returned as diagnostics.
+- Repeated scans retain one asset and one revision for unchanged content.
+- Changed content creates another immutable revision while retaining the asset ID.
+- Missing files receive a deletion timestamp instead of being removed.
+- Face occurrences and human labels attached to historical revisions survive deletion marking.
+- Reappearing paths can clear the deletion marker through a later successful observation.
+- Source IDs and path traversal are validated before content is opened.
+- Existing schema-version-one databases upgrade transactionally to schema version two.
 
 ## Verification
 
-The schema foundation merged in pull request #17 at `d1fa036ea256f8d5c9f8133ab184747908f0d64e`; GitHub Actions run `30173090694` passed.
+WI-0011 completed through pull requests #17–#22. The final operational-policy pull request #22 merged at `35814a403d7d53d38105daa0cc4c1a2c616fbacf`; GitHub Actions run `30178418550` passed restore and vulnerability audit, Release build, all tests, living-document checks and Windows mixed-media verification.
 
-The typed asset catalogue repository merged in pull request #18 at `2de0194b0835a8c9b8d13f08b6fa5311e855f889`; GitHub Actions run `30173892338` passed.
-
-The transactional face inspection repository merged in pull request #19 at `382011588f7055d783a0eae4d567f4bbc0adc0c9`; GitHub Actions run `30174420996` passed.
-
-The identity and human-label repository merged in pull request #20 at `e4c2d1311a18b53b1492523789385b65edc9a7fc`; GitHub Actions run `30176173088` passed.
-
-The durable processing repository merged in pull request #21 at `9a3ca9f869b1ae1ae6c09fa4f49130bfd8a832c6`; GitHub Actions run `30176700097` passed restore and vulnerability audit, Release build, all tests, living-document checks and Windows mixed-media verification.
-
-Draft pull request #22 relies on GitHub Actions for executable validation because this agent environment does not contain the .NET SDK.
+The current branch relies on GitHub Actions for executable validation because this agent environment does not contain the .NET SDK.
 
 ## Known issues
 
-- Job claims do not use expiring leases; WI-0013 must define abandoned-claim recovery before automatic requeueing.
-- Cancellation transitions are represented in typed records but are deferred until the batch orchestration policy is defined.
-- Online backup is not exposed by the adapter; only quiesced backups are supported today.
-- WAL mode and an application-level busy retry loop are not enabled; the operational policy therefore requires short transactions and bounded orchestration-level retries.
+- The first scanner version hashes every supported file on every scan; metadata-based hash avoidance is deferred until correctness is established.
+- Unsupported files are reported by the local-source scan report but are not persisted.
+- The scan timestamp is the presence token, so overlapping scans of the same source are outside the supported single-writer policy.
+- Image dimensions are not decoded during catalogue scanning; decoding remains a later processing stage.
 
 ## Next action
 
-Resolve CI or review findings on pull request #22. After it is merged and human verified, mark WI-0011 completed and begin WI-0012 local folder scanning.
+Open the WI-0012 draft pull request, resolve CI or review findings, then move the work item to human review.
