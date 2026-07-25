@@ -45,9 +45,9 @@ dotnet test tests/PhotoIdentity.Recognition.Tests/PhotoIdentity.Recognition.Test
 
 ## Verification
 
-Pull request [#5](https://github.com/erikwasa/Photo-Identity-Indexer/pull/5) contains the implementation.
+Pull request [#5](https://github.com/erikwasa/Photo-Identity-Indexer/pull/5) was merged as commit `07fdaed57bcf0a3370beda42fc0fec62d331ab76`.
 
-GitHub Actions run [30137094223](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30137094223) successfully restored, built, tested, validated the living documentation and verified generated files on Windows with .NET 10.
+GitHub Actions run [30137525511](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30137525511) successfully restored, built, tested, validated the living documentation and verified generated files on Windows with .NET 10.
 
 ## Completion notes
 
