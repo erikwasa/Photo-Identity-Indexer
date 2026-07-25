@@ -7,6 +7,7 @@ public sealed class ModelManifestLoader
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = false,
         AllowTrailingCommas = false,
         ReadCommentHandling = JsonCommentHandling.Disallow,
