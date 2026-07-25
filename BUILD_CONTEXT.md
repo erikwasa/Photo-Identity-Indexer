@@ -12,8 +12,8 @@ Status: `in_review`
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0026-local-verification`
-- Pull request: [#7 — Add local developer verification](https://github.com/erikwasa/Photo-Identity-Indexer/pull/7)
+- Branch: `agent/fix-local-verification-arguments`
+- Pull request: [#8 — Fix local verification PowerShell argument binding](https://github.com/erikwasa/Photo-Identity-Indexer/pull/8)
 
 ## Objective
 
@@ -22,13 +22,13 @@ Provide one repeatable Windows checkpoint proving that the repository, native Op
 ## Relevant files
 
 - `verify-local.ps1`
+- `.github/workflows/build.yml`
 - `src/PhotoIdentity.Cli/Program.cs`
 - `src/PhotoIdentity.Cli/PhotoIdentity.Cli.csproj`
 - `src/PhotoIdentity.Imaging.OpenCv/OpenCvPngEncoder.cs`
 - `tests/PhotoIdentity.Integration.Tests/DecodeCommandTests.cs`
 - `docs/delivery/work-items/WI-0026-local-verification.md`
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/status/milestones.yaml`
 
 ## Commands
 
@@ -41,6 +41,8 @@ Provide one repeatable Windows checkpoint proving that the repository, native Op
   -Image "C:\PrivateVerification\sample.png" `
   -UnsupportedImage "C:\PrivateVerification\sample.heic"
 
+./verify-local.ps1 -Configuration Release -SkipModels
+
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
@@ -48,6 +50,8 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ## Acceptance test
 
 - Release restore, build and tests pass on Windows.
+- The verifier passes `Configuration` to PowerShell child scripts as a named parameter.
+- CI executes the verifier with `-SkipModels`.
 - Living-document registries, links and generated views validate.
 - YuNet and SFace model files pass size and SHA-256 verification.
 - Real JPEG, PNG and EXIF-rotated Pixel photos produce upright, viewable PNGs.
@@ -57,16 +61,17 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Verification
 
-GitHub Actions must pass the automated repository path on the final PR head.
+PR #8 must pass the full Windows workflow, including the local-verifier smoke step.
 
-Human completion requires running the private-image command on the developer's Windows computer and inspecting the generated PNGs.
+Human completion requires rerunning `./verify-local.ps1 -InstallModels`, then running the private-image command and inspecting the generated PNGs.
 
 ## Known issues
 
+- PR #7 used array splatting for PowerShell script arguments. That caused `-Configuration` to bind as the parameter value instead of the parameter name.
 - HEIC is intentionally unsupported by the current decoder and is used only to verify explicit unsupported-format handling.
 - The local report is ignored by Git and must not be attached to the PR when it contains information derived from private photos.
 - YuNet work remains blocked by WI-0026 until the local private-image checks pass.
 
 ## Next action
 
-Merge pull request #7 after CI passes, run the private-image verification locally, record human evidence, complete WI-0026, then begin WI-0007 — Implement YuNet detection.
+Merge PR #8 after CI passes, rerun the model and private-image verification locally, record human evidence, complete WI-0026, then begin WI-0007 — Implement YuNet detection.
