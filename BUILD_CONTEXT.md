@@ -6,32 +6,33 @@
 
 ## Current work item
 
-**WI-0008 — Implement face crops and alignment**
+**WI-0009 — Implement SFace embeddings**
 
 Status: `in_progress`
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0008-face-alignment`
-- Draft pull request: [#14 — Implement face crops and alignment](https://github.com/erikwasa/Photo-Identity-Indexer/pull/14)
+- Branch: `agent/WI-0009-sface-embeddings`
+- Draft pull request: [#15 — Implement SFace embeddings](https://github.com/erikwasa/Photo-Identity-Indexer/pull/15)
 
 ## Objective
 
-Create reusable padded review crops and deterministic five-point aligned model inputs with boundary handling, stable crop hashes and an explicit alignment protocol.
+Add the pinned SFace ONNX embedder behind the neutral `IFaceEmbedder` contract with manifest-driven preprocessing, strict output validation, L2 normalisation, cosine comparison and repeatability evidence.
 
 ## Relevant files
 
-- `src/PhotoIdentity.Imaging.OpenCv/OpenCvFaceCropper.cs`
-- `src/PhotoIdentity.Imaging.OpenCv/OpenCvFaceAligner.cs`
-- `src/PhotoIdentity.Imaging.OpenCv/README.md`
-- `tests/PhotoIdentity.Recognition.Tests/FaceCropAndAlignmentTests.cs`
+- `src/PhotoIdentity.Recognition.Onnx/SFace/OnnxSFaceInferenceSession.cs`
+- `src/PhotoIdentity.Recognition.Onnx/SFace/SFaceFaceEmbedder.cs`
+- `src/PhotoIdentity.Recognition.Onnx/README.md`
+- `tests/PhotoIdentity.Recognition.Tests/SFaceEmbedderTests.cs`
 - `models/manifests/sface-2021dec-fp32.json`
-- `docs/delivery/work-items/WI-0008-alignment.md`
+- `docs/delivery/work-items/WI-0009-sface.md`
 - `docs/delivery/status/work-items.yaml`
 
 ## Commands
 
 ```powershell
+./models/install-models.ps1 -Id sface-2021dec-fp32
 dotnet test tests/PhotoIdentity.Recognition.Tests/PhotoIdentity.Recognition.Tests.csproj
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
@@ -39,27 +40,27 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Acceptance test
 
-- Padded crops expand outwards from a normalised detection and remain inside decoded source bounds.
-- Crop pixels are packed independently of source stride padding.
-- Crop SHA-256 digests are stable for equivalent pixels across repeated runs.
-- `sface-five-point-v1` produces fixed 112×112 `AlignedFace` values.
-- Anatomical landmark semantics are reordered explicitly into the OpenCV SFace reference-template order.
-- Rotated synthetic fixtures align back to the canonical model input.
-- Unsupported protocols and degenerate landmark configurations fail explicitly.
-- OpenCV types remain behind the imaging adapter boundary.
+- The adapter accepts only `sface-five-point-v1` aligned 112×112 image frames.
+- Manifest preprocessing converts application-owned pixels to RGB channel-first float32 tensors without scale or mean subtraction.
+- The ONNX model must expose exactly one input and one float32 output.
+- Output shape is `[128]` or `[1,128]`, and every component must be finite and non-zero as a vector.
+- Returned embeddings are L2-normalised and expose the SFace model descriptor.
+- Synthetic same-person fixtures score above selected different-person fixtures.
+- Repeated deterministic inference produces equivalent vectors within tolerance.
+- Final completion still requires the installed model on private same-person and different-person photos, plus repeated CPU inference of one aligned crop.
 
 ## Verification
 
-WI-0007 is complete. Pull requests #12 and #13 merged, their final Windows workflows passed, and the developer confirmed correct YuNet boxes and landmarks on representative private photos.
+WI-0008 is complete. Pull request #14 merged at `65b6ffc28212c403b2f98df6bc8cdef70fa3d492`, and GitHub Actions run `30167234799` passed the final Windows workflow.
 
-The WI-0008 branch uses synthetic edge and rotation fixtures so no private or biometric image data is committed. GitHub Actions run `30167129536` passed restore, Release build, all tests, living-document validation, generated-document checks and the Windows mixed-media verifier.
+The SFace preprocessing metadata follows OpenCV `FaceRecognizerSF::feature`, which converts aligned BGR images to RGB float32 without scaling or mean subtraction. Adapter-owned L2 normalisation is applied after inference.
 
 ## Known issues
 
-- The alignment implementation currently supports only the manifest-owned `sface-five-point-v1` protocol.
-- Constant zero fill is used when the affine transform samples beyond source bounds.
-- The current native test runtime is Windows; hosts on other platforms must select their matching OpenCvSharp runtime package.
+- The current execution provider is CPU-only.
+- Real-model similarity and repeatability checks require locally installed model binaries and private photos that must not be committed.
+- SFace completion thresholds will be recorded from selected local fixtures rather than treated as universal identity-matching policy.
 
 ## Next action
 
-Review pull request #14, inspect the deterministic crop and alignment contract, then merge and mark WI-0008 completed before starting WI-0009.
+Resolve CI findings on pull request #15, then run the pinned model locally on selected private same-person and different-person photos and record the privacy-safe scores and repeatability tolerance.
