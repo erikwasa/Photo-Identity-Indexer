@@ -53,6 +53,8 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 WI-0008 is complete. Pull request #14 merged at `65b6ffc28212c403b2f98df6bc8cdef70fa3d492`, and GitHub Actions run `30167234799` passed the final Windows workflow.
 
+GitHub Actions run `30168478981` passed restore, Release build, all automated tests, living-document validation, generated-document checks and the Windows mixed-media verifier for the WI-0009 implementation.
+
 The SFace preprocessing metadata follows OpenCV `FaceRecognizerSF::feature`, which converts aligned BGR images to RGB float32 without scaling or mean subtraction. Adapter-owned L2 normalisation is applied after inference.
 
 ## Known issues
@@ -63,4 +65,4 @@ The SFace preprocessing metadata follows OpenCV `FaceRecognizerSF::feature`, whi
 
 ## Next action
 
-Resolve CI findings on pull request #15, then run the pinned model locally on selected private same-person and different-person photos and record the privacy-safe scores and repeatability tolerance.
+Run the pinned model locally on selected private same-person and different-person photos, record privacy-safe similarity scores and repeated-inference tolerance, then mark WI-0009 ready for review.
