@@ -15,7 +15,7 @@ Add a YuNet ONNX detector adapter with preprocessing, output parsing, landmarks,
 
 ## Acceptance criteria
 
-- [ ] Representative faces receive visually correct boxes and landmarks.
+- [x] Representative faces receive visually correct boxes and landmarks.
 - [x] Output coordinates use the documented normalised image space.
 - [x] Model descriptor and timing are recorded.
 - [x] Invalid output shapes fail clearly.
@@ -42,12 +42,10 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Verification
 
-Pull request [#12](https://github.com/erikwasa/Photo-Identity-Indexer/pull/12) introduced the implementation.
+Pull request [#12](https://github.com/erikwasa/Photo-Identity-Indexer/pull/12) introduced the implementation. Pull request [#13](https://github.com/erikwasa/Photo-Identity-Indexer/pull/13) corrected the pinned model input from the erroneous 320×320 manifest value to the ONNX file's fixed 640×640 shape.
 
 Deterministic tests cover preprocessing channel order, normalised boxes, landmark ordering, confidence thresholding, the pinned 640×640 model input size and explicit invalid-shape failures without downloading model binaries.
 
-GitHub Actions run [30164144590](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30164144590) passed restore, build, all tests, living-document validation, generated-document checks and the Windows mixed-media verifier smoke path.
+GitHub Actions runs [30164251213](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30164251213) and [30166209245](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30166209245) passed the complete Windows workflow for the implementation and manifest correction.
 
-The first real-model local run exposed that the manifest incorrectly declared 320×320 while the pinned ONNX file requires 640×640. The manifest and regression test were corrected before visual verification continued.
-
-The remaining completion check is a successful local run with the installed YuNet model and representative private photos so boxes and landmarks can be inspected visually.
+The developer then ran the installed YuNet model against representative private photos and confirmed that boxes and five-point landmarks were visually correct. No private source photos or generated overlays were committed.
