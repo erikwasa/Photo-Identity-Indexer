@@ -58,39 +58,40 @@ jobs:
       - name: Check generated documentation
         run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- generate --check
 
-      - name: Smoke-test local verification harness
+      - name: Prepare mixed-media verification fixtures
         shell: pwsh
         run: |
           $fixtureDirectory = Join-Path $PWD ".artifacts/ci-verification"
           New-Item -ItemType Directory -Path $fixtureDirectory -Force | Out-Null
 
-          $validPng = Join-Path $fixtureDirectory "valid.png"
-          $corruptJpeg = Join-Path $fixtureDirectory "corrupt.jpg"
           [IO.File]::WriteAllBytes(
-            $validPng,
+            (Join-Path $fixtureDirectory "valid.png"),
             [Convert]::FromBase64String(
               "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAFUlEQVQIHWOUE+FiAANGOREuBjAAAAZyAHsISLb5AAAAAElFTkSuQmCC"))
           [IO.File]::WriteAllBytes(
-            $corruptJpeg,
+            (Join-Path $fixtureDirectory "corrupt.jpg"),
             [byte[]](0xff, 0xd8, 0xff, 0xd9))
 
-          $env:PHOTOIDENTITY_VALID_PNG = $validPng
-          $env:PHOTOIDENTITY_CORRUPT_JPEG = $corruptJpeg
-          $previousErrorActionPreference = $ErrorActionPreference
-          $previousNativePreference = $PSNativeCommandUseErrorActionPreference
-          try {
-            $ErrorActionPreference = "Continue"
-            $PSNativeCommandUseErrorActionPreference = $false
-            & pwsh -NoProfile -Command '& ./verify-local.ps1 -Configuration Release -SkipModels -Image @($env:PHOTOIDENTITY_VALID_PNG, $env:PHOTOIDENTITY_CORRUPT_JPEG)'
-            $verificationExitCode = $LASTEXITCODE
-          }
-          finally {
-            $ErrorActionPreference = $previousErrorActionPreference
-            $PSNativeCommandUseErrorActionPreference = $previousNativePreference
-          }
+      - name: Run mixed-media local verification
+        id: mixed-verification
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          ./verify-local.ps1 `
+            -Configuration Release `
+            -SkipModels `
+            -Image @(
+              ".artifacts/ci-verification/valid.png"
+              ".artifacts/ci-verification/corrupt.jpg"
+            )
 
-          if ($verificationExitCode -ne 1) {
-            throw "Expected verification exit code 1 for the mixed valid/corrupt fixture run, received $verificationExitCode."
+      - name: Assert mixed-media verification report
+        shell: pwsh
+        env:
+          VERIFICATION_OUTCOME: ${{ steps.mixed-verification.outcome }}
+        run: |
+          if ($env:VERIFICATION_OUTCOME -ne "failure") {
+            throw "Expected the mixed valid/corrupt verification step to fail."
           }
 
           $report = Get-Content ".artifacts/local-verification/verification-report.json" -Raw | ConvertFrom-Json
@@ -113,3 +114,11 @@ jobs:
           if (-not $report.decoderChecks[0].inputUnchanged -or -not $report.decoderChecks[1].inputUnchanged) {
             throw "Expected both fixture inputs to remain unchanged."
           }
+
+      - name: Upload local verification diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-verification-diagnostics
+          path: .artifacts/local-verification/verification-report.json
+          retention-days: 1
