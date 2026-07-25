@@ -12,8 +12,8 @@ Status: `in_progress`
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0011-face-persistence`
-- Draft pull request: [#19 — Add transactional face inspection persistence](https://github.com/erikwasa/Photo-Identity-Indexer/pull/19)
+- Branch: `agent/WI-0011-identity-persistence`
+- Draft pull request: [#20 — Add identity and human-label persistence](https://github.com/erikwasa/Photo-Identity-Indexer/pull/20)
 
 ## Objective
 
@@ -21,15 +21,15 @@ Establish versioned SQLite migrations and repositories for the local catalogue, 
 
 ## Current slice
 
-Add the transactional persistence boundary for one complete face inspection result. The occurrence, detector observation, aligned crop and embedding are committed together, with natural-key resolution for safe reruns.
+Add the identity persistence boundary for people, authoritative human labels and separately versioned model suggestions. Person-plus-label writes are transactional, repeated labels keep a stable row identity, and suggestion reruns do not overwrite reviewed status.
 
 ## Relevant files
 
-- `src/PhotoIdentity.Persistence.Sqlite/FaceCatalogueRecords.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/IdentityCatalogueRecords.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteIdentityCatalogueRepository.cs`
 - `src/PhotoIdentity.Persistence.Sqlite/SqliteFaceCatalogueRepository.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteAssetCatalogueRepository.cs`
 - `src/PhotoIdentity.Persistence.Sqlite/SqliteCatalogueDatabase.cs`
-- `tests/PhotoIdentity.Integration.Tests/SqliteFaceCatalogueRepositoryTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/SqliteIdentityCatalogueRepositoryTests.cs`
 - `docs/delivery/work-items/WI-0011-sqlite.md`
 - `docs/delivery/status/work-items.yaml`
 
@@ -43,27 +43,30 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Acceptance test for this slice
 
-- Strong occurrence, crop and model identifiers round-trip without conversion leaking to callers.
-- Occurrence, detector observation, crop and embedding rows are written in one transaction.
-- A failed foreign-key write leaves no partial inspection rows.
-- Reruns resolve an existing revision/ordinal occurrence and crop/protocol/hash to their stable identifiers.
-- Detector output and crop storage metadata can be refreshed on a rerun.
-- The first embedding remains immutable for an exact crop, model ID and model hash.
-- Normalized geometry and embedding vectors round-trip without loss.
+- Strong person, face occurrence and model identifiers round-trip without conversion leaking to callers.
+- A new person and human label are committed in one transaction.
+- A missing occurrence rolls back the person and label together.
+- Human labels can be stored without detector observations, crops, embeddings or suggestions.
+- Repeated person/occurrence/label-kind assignments keep one stable label row and refresh reviewer metadata.
+- Suggestions are versioned by occurrence, person, model ID and model hash.
+- A rerun refreshes a suggestion score without overwriting reviewed status or original creation time.
+- Person merge targets round-trip and self-merges are rejected before writing.
 
 ## Verification
 
 The schema foundation merged in pull request #17 at `d1fa036ea256f8d5c9f8133ab184747908f0d64e`; GitHub Actions run `30173090694` passed.
 
-The typed asset catalogue repository merged in pull request #18 at `2de0194b0835a8c9b8d13f08b6fa5311e855f889`; GitHub Actions run `30173892338` passed restore and vulnerability audit, Release build, all tests, living-document checks and Windows mixed-media verification.
+The typed asset catalogue repository merged in pull request #18 at `2de0194b0835a8c9b8d13f08b6fa5311e855f889`; GitHub Actions run `30173892338` passed.
 
-Draft pull request #19 relies on GitHub Actions for executable validation because the agent environment does not contain the .NET SDK.
+The transactional face inspection repository merged in pull request #19 at `382011588f7055d783a0eae4d567f4bbc0adc0c9`; GitHub Actions run `30174420996` passed restore and vulnerability audit, Release build, all tests, living-document checks and Windows mixed-media verification.
+
+Draft pull request #20 relies on GitHub Actions for executable validation because the agent environment does not contain the .NET SDK.
 
 ## Known issues
 
-- This slice persists one detector observation, crop and embedding graph at a time; batch orchestration remains outside the repository.
-- Identity records, processing records, backup behaviour and the concurrent writer policy remain before WI-0011 is complete.
+- Label kinds, assignee identifiers and suggestion statuses remain validated extensible strings until the review workflow defines a closed vocabulary.
+- Processing records, backup behaviour and the concurrent writer policy remain before WI-0011 is complete.
 
 ## Next action
 
-Resolve CI or review findings on pull request #19, then add typed people, human-label and identity-suggestion repositories.
+Resolve CI or review findings on pull request #20, then add typed processing-run and processing-job repositories with concurrency coverage.
