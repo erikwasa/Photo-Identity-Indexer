@@ -76,8 +76,18 @@ jobs:
 
           $env:PHOTOIDENTITY_VALID_PNG = $validPng
           $env:PHOTOIDENTITY_CORRUPT_JPEG = $corruptJpeg
-          & pwsh -NoProfile -Command '& ./verify-local.ps1 -Configuration Release -SkipModels -Image @($env:PHOTOIDENTITY_VALID_PNG, $env:PHOTOIDENTITY_CORRUPT_JPEG)'
-          $verificationExitCode = $LASTEXITCODE
+          $previousErrorActionPreference = $ErrorActionPreference
+          $previousNativePreference = $PSNativeCommandUseErrorActionPreference
+          try {
+            $ErrorActionPreference = "Continue"
+            $PSNativeCommandUseErrorActionPreference = $false
+            & pwsh -NoProfile -Command '& ./verify-local.ps1 -Configuration Release -SkipModels -Image @($env:PHOTOIDENTITY_VALID_PNG, $env:PHOTOIDENTITY_CORRUPT_JPEG)'
+            $verificationExitCode = $LASTEXITCODE
+          }
+          finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+            $PSNativeCommandUseErrorActionPreference = $previousNativePreference
+          }
 
           if ($verificationExitCode -ne 1) {
             throw "Expected verification exit code 1 for the mixed valid/corrupt fixture run, received $verificationExitCode."
