@@ -21,6 +21,15 @@ YuNet face detection:
 - conversion to application-owned normalised boxes and five-point landmarks
 - model descriptor plus preprocessing, inference and postprocessing timing
 
+SFace embeddings:
+
+- requires `sface-five-point-v1` aligned 112×112 frames
+- converts application-owned pixels to RGB channel-first float32 input
+- runs one-input, one-output CPU inference through disposable `OrtValue` buffers
+- validates the declared 128-dimensional finite non-zero output
+- L2-normalises embeddings before returning the neutral `EmbeddingVector`
+- exposes model descriptor plus preprocessing, inference and postprocessing timing
+
 ## Invariants
 
 - A model file is never considered installed until its size and SHA-256 match.
@@ -28,5 +37,6 @@ YuNet face detection:
 - Download URLs are HTTPS and pinned to an upstream repository revision.
 - Unknown manifest fields are rejected rather than silently ignored.
 - An embedding manifest must declare alignment, output dimensions and distance metric.
-- ONNX Runtime, tensor names and tensor shapes do not cross the `IFaceDetector` boundary.
-- Invalid or non-finite model outputs fail explicitly rather than producing partial detections.
+- ONNX Runtime, tensor names and tensor shapes do not cross the `IFaceDetector` or `IFaceEmbedder` boundaries.
+- Invalid or non-finite model outputs fail explicitly rather than producing partial detections or embeddings.
+- Embeddings returned by the SFace adapter are unit-normalised before persistence or comparison.

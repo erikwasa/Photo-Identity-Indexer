@@ -50,8 +50,8 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Verification
 
-Draft pull request [#14](https://github.com/erikwasa/Photo-Identity-Indexer/pull/14) contains the implementation.
+Pull request [#14](https://github.com/erikwasa/Photo-Identity-Indexer/pull/14) merged on 2026-07-25 at commit `65b6ffc28212c403b2f98df6bc8cdef70fa3d492`.
 
 The SFace destination coordinates and 112×112 output dimensions follow OpenCV's `FaceRecognizerSF::alignCrop` implementation.
 
-GitHub Actions run [30167129536](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30167129536) passed restore, Release build, all tests, living-document validation, generated-document checks and the Windows mixed-media verifier on the completed implementation.
+GitHub Actions run [30167234799](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30167234799) passed restore, Release build, all tests, living-document validation, generated-document checks and the Windows mixed-media verifier on the final branch head.

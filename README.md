@@ -6,7 +6,7 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project is currently in **M01 — Single-image inference**. WI-0007 is complete after local YuNet verification, and WI-0008 is implementing deterministic review crops and five-point SFace alignment.
+The project is currently in **M01 — Single-image inference**. WI-0008 is complete, and WI-0009 is implementing pinned SFace embeddings behind the neutral recognition contracts.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)

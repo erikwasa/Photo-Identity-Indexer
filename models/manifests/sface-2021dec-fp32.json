@@ -12,11 +12,11 @@
   "input": {
     "width": 112,
     "height": 112,
-    "colourOrder": "BGR",
+    "colourOrder": "RGB",
     "dataType": "float32",
     "normalisation": {
-      "scale": 0.0078125,
-      "mean": [127.5, 127.5, 127.5]
+      "scale": 1.0,
+      "mean": [0.0, 0.0, 0.0]
     }
   },
   "output": {
@@ -24,7 +24,7 @@
     "dimensions": 128,
     "normalisation": "l2-by-adapter",
     "distanceMetric": "cosine",
-    "semantics": "One 128-dimensional face embedding. The application adapter L2-normalises the vector before persistence and comparison."
+    "semantics": "One 128-dimensional face embedding. Input follows OpenCV FaceRecognizerSF feature preprocessing: aligned BGR pixels are converted to RGB float32 without scaling or mean subtraction. The application adapter L2-normalises the output before persistence and comparison."
   },
   "alignmentProtocol": "sface-five-point-v1",
   "licences": {

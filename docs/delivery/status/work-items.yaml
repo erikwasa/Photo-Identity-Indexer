@@ -155,26 +155,36 @@ work_items:
 - id: WI-0008
   title: Implement face crops and alignment
   milestone: M01
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0008-alignment.md
   started_at: '2026-07-25'
+  completed_at: '2026-07-25'
+  verified_at: '2026-07-25'
+  verified_by: human
   last_updated_at: '2026-07-25'
   branch: agent/WI-0008-face-alignment
   blockers: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/14
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30167234799
+  - type: merge_commit
+    value: 65b6ffc28212c403b2f98df6bc8cdef70fa3d492
 - id: WI-0009
   title: Implement SFace embeddings
   milestone: M01
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0009-sface.md
-  blockers:
-  - WI-0005
-  - WI-0008
-  evidence: []
+  started_at: '2026-07-25'
+  last_updated_at: '2026-07-25'
+  branch: agent/WI-0009-sface-embeddings
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/15
 - id: WI-0010
   title: Build photoid inspect command
   milestone: M01
