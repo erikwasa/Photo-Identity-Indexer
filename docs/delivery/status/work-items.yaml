@@ -129,25 +129,42 @@ work_items:
 - id: WI-0007
   title: Implement YuNet detection
   milestone: M01
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0007-yunet.md
   started_at: '2026-07-25'
+  completed_at: '2026-07-25'
+  verified_at: '2026-07-25'
+  verified_by: human
   last_updated_at: '2026-07-25'
   branch: agent/WI-0007-yunet
   blockers: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/12
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/13
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30164251213
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30166209245
+  - type: merge_commit
+    value: d48d02d8610f58211749e096a9114916112d9880
+  - type: merge_commit
+    value: 03c2d95a7e41d2932df45a31ed5c57071a35967d
 - id: WI-0008
   title: Implement face crops and alignment
   milestone: M01
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0008-alignment.md
-  blockers:
-  - WI-0007
-  evidence: []
+  started_at: '2026-07-25'
+  last_updated_at: '2026-07-25'
+  branch: agent/WI-0008-face-alignment
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/14
 - id: WI-0009
   title: Implement SFace embeddings
   milestone: M01
