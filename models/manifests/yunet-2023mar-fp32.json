@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "modelId": "yunet-2023mar-fp32",
+  "role": "faceDetection",
+  "format": "onnx",
+  "fileName": "face_detection_yunet_2023mar.onnx",
+  "downloadUri": "https://github.com/opencv/opencv_zoo/raw/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_detection_yunet/face_detection_yunet_2023mar.onnx",
+  "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4",
+  "sizeBytes": 232589,
+  "runtime": "onnxruntime",
+  "sourceVersion": "opencv/opencv_zoo@47534e27c9851bb1128ccc0102f1145e27f23f98",
+  "input": {
+    "width": 320,
+    "height": 320,
+    "colourOrder": "BGR",
+    "dataType": "float32",
+    "normalisation": {
+      "scale": 1.0,
+      "mean": [0.0, 0.0, 0.0]
+    }
+  },
+  "output": {
+    "kind": "detections",
+    "dimensions": null,
+    "normalisation": "none",
+    "distanceMetric": null,
+    "semantics": "Per face: x, y, width, height, five landmark coordinate pairs, confidence score."
+  },
+  "alignmentProtocol": null,
+  "licences": {
+    "code": {
+      "spdx": "MIT",
+      "source": "https://github.com/opencv/opencv_zoo/blob/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_detection_yunet/LICENSE"
+    },
+    "weights": {
+      "spdx": "MIT",
+      "source": "https://github.com/opencv/opencv_zoo/blob/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_detection_yunet/LICENSE"
+    },
+    "trainingData": {
+      "name": "WIDER FACE",
+      "licence": "not asserted by this project",
+      "notes": "The upstream YuNet documentation reports WIDER FACE evaluation and links to the training project. Review dataset terms before model training or redistribution."
+    }
+  }
+}
