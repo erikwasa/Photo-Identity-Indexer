@@ -78,10 +78,12 @@ public sealed class LocalFolderAssetSourceTests
             Assert.Equal(
                 AssetAvailability.Local,
                 await source.GetAvailabilityAsync(reference, CancellationToken.None));
-            await using Stream stream = await source.OpenContentAsync(reference, CancellationToken.None);
-            using MemoryStream copy = new();
-            await stream.CopyToAsync(copy);
-            Assert.Equal(content, copy.ToArray());
+            using (MemoryStream copy = new())
+            {
+                await using Stream stream = await source.OpenContentAsync(reference, CancellationToken.None);
+                await stream.CopyToAsync(copy);
+                Assert.Equal(content, copy.ToArray());
+            }
 
             File.Delete(filePath);
             Assert.Equal(
