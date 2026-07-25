@@ -22,3 +22,7 @@ WI-0011 through WI-0013.
 - Reruns are idempotent.
 - Changed files create new revisions.
 - Unsupported formats and failures are reported separately.
+
+## Current work
+
+WI-0011 starts M02 by establishing schema version 1, migration behaviour and persistence invariants. Typed repositories follow before local folder scanning begins.
