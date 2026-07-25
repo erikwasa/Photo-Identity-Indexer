@@ -52,7 +52,7 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 WI-0007 is complete. Pull requests #12 and #13 merged, their final Windows workflows passed, and the developer confirmed correct YuNet boxes and landmarks on representative private photos.
 
-The WI-0008 branch uses synthetic edge and rotation fixtures so no private or biometric image data is committed. GitHub Actions provides the final branch build, test and documentation evidence.
+The WI-0008 branch uses synthetic edge and rotation fixtures so no private or biometric image data is committed. GitHub Actions run `30167129536` passed restore, Release build, all tests, living-document validation, generated-document checks and the Windows mixed-media verifier.
 
 ## Known issues
 
@@ -62,4 +62,4 @@ The WI-0008 branch uses synthetic edge and rotation fixtures so no private or bi
 
 ## Next action
 
-Resolve any CI findings on pull request #14, then review the deterministic crop and alignment outputs before marking WI-0008 ready for merge.
+Review pull request #14, inspect the deterministic crop and alignment contract, then merge and mark WI-0008 completed before starting WI-0009.
