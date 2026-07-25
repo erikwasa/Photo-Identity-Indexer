@@ -36,13 +36,23 @@ Automated repository and model verification:
 ./verify-local.ps1 -InstallModels
 ```
 
-Private-image verification:
+Private-image verification. Supply the array-valued `-Image` parameter once with all image paths:
 
 ```powershell
 ./verify-local.ps1 `
-  -Image "C:\PrivateVerification\normal.jpg" `
-  -Image "C:\PrivateVerification\pixel-rotated.jpg" `
-  -Image "C:\PrivateVerification\sample.png" `
+  -Image "C:\PrivateVerification\normal.jpg","C:\PrivateVerification\pixel-rotated.jpg","C:\PrivateVerification\sample.png" `
+  -UnsupportedImage "C:\PrivateVerification\sample.heic"
+```
+
+An explicit array expression is also valid:
+
+```powershell
+./verify-local.ps1 `
+  -Image @(
+    "C:\PrivateVerification\normal.jpg"
+    "C:\PrivateVerification\pixel-rotated.jpg"
+    "C:\PrivateVerification\sample.png"
+  ) `
   -UnsupportedImage "C:\PrivateVerification\sample.heic"
 ```
 
@@ -71,6 +81,7 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 - Per-image reports contain dimensions, pixel format, timing, output filename and the input-unchanged result, but not the source path.
 - The aggregate verification report is local-only and ignored by Git.
 - PowerShell script parameters are passed through a hashtable; native executable arguments use an array. This avoids positional binding of strings such as `-Configuration`.
+- PowerShell named parameters may be specified only once per invocation; multiple image paths must be passed as one array value.
 - `-SkipModels` exists for CI regression coverage and cannot be combined with `-InstallModels`.
 - CI proves the automated path. Completion still requires manual verification on the developer's Windows computer with private images.
 
@@ -80,4 +91,6 @@ Pull request [#7](https://github.com/erikwasa/Photo-Identity-Indexer/pull/7) int
 
 Pull request [#8](https://github.com/erikwasa/Photo-Identity-Indexer/pull/8) fixes PowerShell named-parameter binding and adds a CI smoke run of the verifier.
 
-The work item remains `in_review` until PR #8 passes CI and the private-image checks above are completed locally.
+Pull request [#9](https://github.com/erikwasa/Photo-Identity-Indexer/pull/9) corrects the array-valued private-image invocation examples.
+
+The work item remains `in_review` until the private-image checks above are completed locally.
