@@ -175,25 +175,36 @@ work_items:
 - id: WI-0009
   title: Implement SFace embeddings
   milestone: M01
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0009-sface.md
   started_at: '2026-07-25'
+  completed_at: '2026-07-25'
+  verified_at: '2026-07-25'
+  verified_by: human
   last_updated_at: '2026-07-25'
   branch: agent/WI-0009-sface-embeddings
   blockers: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/15
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30168578069
+  - type: merge_commit
+    value: 19b36537368304f4b7c11bd330f6e6089338eca6
 - id: WI-0010
   title: Build photoid inspect command
   milestone: M01
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0010-inspect-command.md
-  blockers:
-  - WI-0009
-  evidence: []
+  started_at: '2026-07-25'
+  last_updated_at: '2026-07-25'
+  branch: agent/WI-0010-inspect-command
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/16
 - id: WI-0011
   title: Add SQLite persistence
   milestone: M02
