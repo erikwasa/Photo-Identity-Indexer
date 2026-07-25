@@ -91,4 +91,6 @@ Pull request [#7](https://github.com/erikwasa/Photo-Identity-Indexer/pull/7) int
 
 Pull request [#8](https://github.com/erikwasa/Photo-Identity-Indexer/pull/8) fixes PowerShell named-parameter binding and adds a CI smoke run of the verifier.
 
+Pull request [#9](https://github.com/erikwasa/Photo-Identity-Indexer/pull/9) corrects the array-valued private-image invocation examples.
+
 The work item remains `in_review` until the private-image checks above are completed locally.
