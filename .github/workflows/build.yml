@@ -74,10 +74,9 @@ jobs:
             $corruptJpeg,
             [byte[]](0xff, 0xd8, 0xff, 0xd9))
 
-          ./verify-local.ps1 `
-            -Configuration Release `
-            -SkipModels `
-            -Image @($validPng, $corruptJpeg)
+          $env:PHOTOIDENTITY_VALID_PNG = $validPng
+          $env:PHOTOIDENTITY_CORRUPT_JPEG = $corruptJpeg
+          & pwsh -NoProfile -Command '& ./verify-local.ps1 -Configuration Release -SkipModels -Image @($env:PHOTOIDENTITY_VALID_PNG, $env:PHOTOIDENTITY_CORRUPT_JPEG)'
           $verificationExitCode = $LASTEXITCODE
 
           if ($verificationExitCode -ne 1) {
