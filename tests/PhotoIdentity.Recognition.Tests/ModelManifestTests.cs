@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Recognition.Onnx.Models;
 using Xunit;
@@ -18,6 +19,13 @@ public sealed class ModelManifestTests
         Assert.Equal(2, manifests.Count);
         Assert.Contains(manifests, value => value.ModelId == "yunet-2023mar-fp32");
         Assert.Contains(manifests, value => value.ModelId == "sface-2021dec-fp32");
+
+        ModelDescriptor yunet = manifests
+            .Single(value => value.ModelId == "yunet-2023mar-fp32")
+            .ToDescriptor();
+
+        Assert.Equal(ModelRole.FaceDetection, yunet.Role);
+        Assert.Equal(new ImageSize(640, 640), yunet.InputSize);
 
         ModelDescriptor sface = manifests
             .Single(value => value.ModelId == "sface-2021dec-fp32")
