@@ -24,7 +24,7 @@ Add a YuNet ONNX detector adapter with preprocessing, output parsing, landmarks,
 ## Implemented surface
 
 - Microsoft ONNX Runtime CPU inference through disposable `OrtValue` buffers.
-- Fixed-size channel-first float32 preprocessing from application-owned image frames.
+- Fixed-size 640×640 channel-first float32 preprocessing for the pinned `face_detection_yunet_2023mar.onnx` model.
 - Strict validation of the twelve YuNet output names and shapes.
 - OpenCV-compatible class/object score fusion and stride decoding.
 - Bounding boxes plus five landmarks converted into normalised application geometry.
@@ -42,10 +42,12 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Verification
 
-Draft pull request [#12](https://github.com/erikwasa/Photo-Identity-Indexer/pull/12) contains the implementation.
+Pull request [#12](https://github.com/erikwasa/Photo-Identity-Indexer/pull/12) introduced the implementation.
 
-Deterministic tests cover preprocessing channel order, normalised boxes, landmark ordering, confidence thresholding and explicit invalid-shape failures without downloading model binaries.
+Deterministic tests cover preprocessing channel order, normalised boxes, landmark ordering, confidence thresholding, the pinned 640×640 model input size and explicit invalid-shape failures without downloading model binaries.
 
 GitHub Actions run [30164144590](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30164144590) passed restore, build, all tests, living-document validation, generated-document checks and the Windows mixed-media verifier smoke path.
 
-The remaining completion check is a local run with the installed YuNet model and representative private photos so boxes and landmarks can be inspected visually.
+The first real-model local run exposed that the manifest incorrectly declared 320×320 while the pinned ONNX file requires 640×640. The manifest and regression test were corrected before visual verification continued.
+
+The remaining completion check is a successful local run with the installed YuNet model and representative private photos so boxes and landmarks can be inspected visually.
