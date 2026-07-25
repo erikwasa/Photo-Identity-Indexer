@@ -6,7 +6,7 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project is currently in **M01 — Single-image inference**. YuNet detection, face crops/alignment and SFace embeddings are implementation-complete; WI-0010 is composing them into the first end-to-end `photoid inspect` command.
+The project is currently in **M02 — Local catalogue and jobs**. M01 single-image inference is complete and verified; WI-0011 is establishing the versioned SQLite catalogue before repository CRUD, local scanning and resumable processing are added.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
@@ -53,7 +53,7 @@ dotnet run --project src/PhotoIdentity.Cli -- `
   --output ".artifacts\local-verification\pixel-normalised.png"
 ```
 
-Run the complete single-image inspection path after WI-0010 is merged:
+Run the complete single-image inspection path:
 
 ```powershell
 dotnet run --project src/PhotoIdentity.Cli -- `
