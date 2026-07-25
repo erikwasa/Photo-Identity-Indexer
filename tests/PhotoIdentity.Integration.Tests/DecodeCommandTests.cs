@@ -8,8 +8,8 @@ public sealed class DecodeCommandTests
     private static readonly byte[] PngSignature =
         [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
-    private static readonly byte[] OnePixelPng = Convert.FromBase64String(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlS8AAAAASUVORK5CYII=");
+    private static readonly byte[] SmallPng = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAFUlEQVQIHWOUE+FiAANGOREuBjAAAAZyAHsISLb5AAAAAElFTkSuQmCC");
 
     [Fact]
     public async Task Decode_writes_normalised_png_and_privacy_safe_report()
@@ -20,7 +20,7 @@ public sealed class DecodeCommandTests
             string inputPath = Path.Combine(directory, "private-phone-photo.png");
             string outputPath = Path.Combine(directory, "normalised.png");
             string reportPath = Path.Combine(directory, "report.json");
-            await File.WriteAllBytesAsync(inputPath, OnePixelPng);
+            await File.WriteAllBytesAsync(inputPath, SmallPng);
             byte[] original = await File.ReadAllBytesAsync(inputPath);
 
             StringWriter output = new();
