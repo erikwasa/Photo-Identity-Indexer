@@ -6,7 +6,7 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project is currently in **M01 — Single-image inference**. WI-0026 adds a local Windows verification checkpoint before YuNet inference work begins.
+The project is currently in **M01 — Single-image inference**. WI-0026 is complete, and WI-0007 is implementing YuNet face detection behind the neutral recognition contracts.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
