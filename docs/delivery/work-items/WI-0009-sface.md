@@ -53,4 +53,6 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 Draft pull request [#15](https://github.com/erikwasa/Photo-Identity-Indexer/pull/15) contains the implementation.
 
+GitHub Actions run [30168478981](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30168478981) passed restore, Release build, all automated tests, living-document validation, generated-document checks and the Windows mixed-media verifier.
+
 The remaining completion evidence is a local run of the pinned SFace model using selected private same-person and different-person photos, including repeated CPU inference of the same aligned crop. No private photos, crops or embeddings may be committed.
