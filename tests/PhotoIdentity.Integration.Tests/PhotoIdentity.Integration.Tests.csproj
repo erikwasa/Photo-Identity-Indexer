@@ -21,5 +21,6 @@
     <ProjectReference Include="../../src/PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Imaging.OpenCv/PhotoIdentity.Imaging.OpenCv.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Persistence.Sqlite/PhotoIdentity.Persistence.Sqlite.csproj" />
+    <ProjectReference Include="../../src/PhotoIdentity.Source.Local/PhotoIdentity.Source.Local.csproj" />
   </ItemGroup>
 </Project>
