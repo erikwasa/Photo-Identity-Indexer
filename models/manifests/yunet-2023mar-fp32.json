@@ -10,8 +10,8 @@
   "runtime": "onnxruntime",
   "sourceVersion": "opencv/opencv_zoo@47534e27c9851bb1128ccc0102f1145e27f23f98",
   "input": {
-    "width": 320,
-    "height": 320,
+    "width": 640,
+    "height": 640,
     "colourOrder": "BGR",
     "dataType": "float32",
     "normalisation": {
