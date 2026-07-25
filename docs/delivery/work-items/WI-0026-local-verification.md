@@ -25,6 +25,8 @@ Provide one repeatable Windows checkpoint that proves the repository, native Ope
 - [x] Unsupported and corrupt media return stable, distinct exit codes.
 - [x] CI executes the verifier itself with model downloads skipped.
 - [x] Native stderr is captured without discarding structured media exit codes.
+- [x] Native exit code zero is treated as success when a decoder emits a recoverable warning.
+- [x] Diagnostic matching is compatible with Windows PowerShell 5.1 and PowerShell 7.
 - [x] One failed image does not prevent later media checks from running.
 - [x] Successful and failed cases are retained in the aggregate JSON report.
 - [ ] A local run succeeds with a real JPEG, a real PNG and an EXIF-rotated Pixel photo.
@@ -85,7 +87,9 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 - The aggregate verification report is local-only and ignored by Git.
 - PowerShell script parameters are passed through a hashtable; native executable arguments use an array. This avoids positional binding of strings such as `-Configuration`.
 - PowerShell named parameters may be specified only once per invocation; multiple image paths must be passed as one array value.
-- Native stderr is captured with error promotion disabled around child-process execution. The verifier decides from the stable exit code instead.
+- Native stderr is captured with error promotion disabled around child-process execution.
+- Native executable exit code zero is authoritative even if Windows PowerShell sets `$?` to false because stderr contains a warning.
+- Ordinal diagnostic matching uses `IndexOf`, which is available in Windows PowerShell 5.1, rather than newer `Contains` overloads.
 - Exit code 3 is recorded as `unsupported_format`; exit code 4 is recorded as `corrupt_media`.
 - Failed media cases include the input-unchanged result and do not prevent subsequent checks.
 - `-SkipModels` exists for CI regression coverage and cannot be combined with `-InstallModels`.
@@ -99,6 +103,8 @@ Pull request [#8](https://github.com/erikwasa/Photo-Identity-Indexer/pull/8) fix
 
 Pull request [#9](https://github.com/erikwasa/Photo-Identity-Indexer/pull/9) corrected the array-valued private-image invocation examples.
 
-Pull request [#10](https://github.com/erikwasa/Photo-Identity-Indexer/pull/10) hardens mixed-media handling after a real Pixel JPEG produced a libjpeg corrupt-media diagnostic.
+Pull request [#10](https://github.com/erikwasa/Photo-Identity-Indexer/pull/10) retained mixed-media results and input hashes after failed decodes.
 
-The work item remains `in_review` until the private-image checks above are completed locally with a decodable EXIF-rotated phone photo.
+Pull request [#11](https://github.com/erikwasa/Photo-Identity-Indexer/pull/11) verifies Windows PowerShell compatibility and preserves successful JPEG decoding when libjpeg writes a recoverable warning to stderr.
+
+The work item remains `in_review` until the private-image checks above are completed locally and the generated images are inspected.

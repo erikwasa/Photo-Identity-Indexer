@@ -12,8 +12,8 @@ Status: `in_review`
 
 ## Branch and pull request
 
-- Branch: `agent/fix-local-verification-image-array`
-- Pull request: [#10 — Harden local verification for corrupt media](https://github.com/erikwasa/Photo-Identity-Indexer/pull/10)
+- Branch: `agent/fix-windows-powershell-verifier`
+- Pull request: [#11 — Fix Windows PowerShell media verification](https://github.com/erikwasa/Photo-Identity-Indexer/pull/11)
 
 ## Objective
 
@@ -53,6 +53,8 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 - CI executes the verifier with `-SkipModels`.
 - Array-valued PowerShell parameters are supplied once with all values.
 - Native stderr does not terminate the verifier before its structured exit code is recorded.
+- Native exit code zero remains authoritative when libjpeg emits a recoverable warning.
+- Diagnostic matching works in both Windows PowerShell 5.1 and PowerShell 7.
 - A corrupt supported image is recorded as `corrupt_media` while later checks continue.
 - Successful and failed media checks remain in the aggregate JSON report.
 - Living-document registries, links and generated views validate.
@@ -68,13 +70,15 @@ PR #8 passed the full Windows workflow, including the local-verifier smoke step.
 
 PR #9 corrected the private-image invocation examples so PowerShell binds all image paths to the single `string[]` parameter.
 
-PR #10 must pass a mixed valid-PNG and corrupt-JPEG smoke run and prove that both cases remain in the final report.
+PR #10 retained mixed-media results and input hashes after failed decodes.
 
-Human completion requires rerunning the private-image command after PR #10 is merged, inspecting successful PNG outputs, and replacing or re-exporting any source image classified as corrupt media.
+PR #11 must pass the mixed-media verifier under Windows PowerShell, including a JPEG that emits `Invalid SOS parameters for sequential JPEG` while still decoding successfully.
+
+Human completion requires rerunning the private-image command after PR #11 is merged and manually confirming that all generated PNGs are upright and viewable.
 
 ## Known issues
 
-- The tested Pixel JPEG contains scan parameters rejected by the OpenCV/libjpeg decoder and is treated as corrupt supported media.
+- Some JPEG files can produce recoverable libjpeg warnings on stderr while decoding successfully; native exit code zero is authoritative.
 - PowerShell does not permit the same named parameter to be specified more than once, even when its type is an array.
 - HEIC is intentionally unsupported by the current decoder and is used only to verify explicit unsupported-format handling.
 - The local report is ignored by Git and must not be attached to the PR when it contains information derived from private photos.
@@ -82,4 +86,4 @@ Human completion requires rerunning the private-image command after PR #10 is me
 
 ## Next action
 
-Merge PR #10 after CI passes, rerun the private-image verification, inspect the successful outputs, replace the corrupt Pixel fixture with another genuine EXIF-rotated photo or a losslessly re-exported copy, record human evidence, complete WI-0026, then begin WI-0007 — Implement YuNet detection.
+Merge PR #11 after CI passes, pull `main`, rerun the private-image verification, inspect all generated PNGs, record human evidence, complete WI-0026, then begin WI-0007 — Implement YuNet detection.

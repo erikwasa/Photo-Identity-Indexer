@@ -117,7 +117,7 @@ function Invoke-CommandCapture {
             $PSNativeCommandUseErrorActionPreference = $false
         }
 
-        $LASTEXITCODE = 0
+        $global:LASTEXITCODE = 0
         if ($PSCmdlet.ParameterSetName -eq "Parameters") {
             $commandOutput = & $FilePath @Parameters 2>&1
         }
@@ -126,7 +126,7 @@ function Invoke-CommandCapture {
         }
 
         $commandSucceeded = $?
-        $nativeExitCode = $LASTEXITCODE
+        $nativeExitCode = $global:LASTEXITCODE
     }
     finally {
         $ErrorActionPreference = $previousErrorActionPreference
@@ -138,8 +138,18 @@ function Invoke-CommandCapture {
     $textOutput = @($commandOutput | ForEach-Object { $_.ToString() })
     $textOutput | ForEach-Object { Write-Host $_ }
 
+    $isPowerShellScript = [IO.Path]::GetExtension($FilePath) -ieq ".ps1"
+    $effectiveSuccess = if ($isPowerShellScript) {
+        $commandSucceeded -and $nativeExitCode -eq 0
+    }
+    else {
+        # Native tools can write recoverable warnings to stderr while returning zero.
+        # The exit code is authoritative for executable success.
+        $nativeExitCode -eq 0
+    }
+
     return [pscustomobject]@{
-        Succeeded = $commandSucceeded
+        Succeeded = $effectiveSuccess
         ExitCode = $nativeExitCode
         Output = $textOutput
     }
@@ -184,6 +194,18 @@ function Get-InputHash {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
 
+function Test-TextContainsOrdinal {
+    param(
+        [AllowEmptyString()]
+        [string] $Text,
+
+        [Parameter(Mandatory)]
+        [string] $Value
+    )
+
+    return $Text.IndexOf($Value, [StringComparison]::Ordinal) -ge 0
+}
+
 function Invoke-DecodeCheck {
     param(
         [Parameter(Mandatory)]
@@ -221,7 +243,7 @@ function Invoke-DecodeCheck {
     $hashAfter = Get-InputHash -Path $InputPath
     $inputUnchanged = [string]::Equals($hashBefore, $hashAfter, [StringComparison]::OrdinalIgnoreCase)
 
-    if ($command.ExitCode -eq 0 -and $command.Succeeded) {
+    if ($command.ExitCode -eq 0) {
         if (-not (Test-Path -LiteralPath $caseReportPath -PathType Leaf)) {
             return [ordered]@{
                 case = ("image-{0:D3}" -f $Index)
@@ -247,10 +269,10 @@ function Invoke-DecodeCheck {
     }
 
     $diagnostics = $command.Output -join "`n"
-    $failure = if ($command.ExitCode -eq 3 -or $diagnostics.Contains("unsupported-format:", [StringComparison]::Ordinal)) {
+    $failure = if ($command.ExitCode -eq 3 -or (Test-TextContainsOrdinal -Text $diagnostics -Value "unsupported-format:")) {
         "unsupported_format"
     }
-    elseif ($command.ExitCode -eq 4 -or $diagnostics.Contains("corrupt-media:", [StringComparison]::Ordinal)) {
+    elseif ($command.ExitCode -eq 4 -or (Test-TextContainsOrdinal -Text $diagnostics -Value "corrupt-media:")) {
         "corrupt_media"
     }
     else {
@@ -295,7 +317,7 @@ function Invoke-UnsupportedCheck {
     $hashAfter = Get-InputHash -Path $InputPath
     $inputUnchanged = [string]::Equals($hashBefore, $hashAfter, [StringComparison]::OrdinalIgnoreCase)
     $diagnostics = $command.Output -join "`n"
-    $unsupportedResult = $command.ExitCode -eq 3 -or $diagnostics.Contains("unsupported-format:", [StringComparison]::Ordinal)
+    $unsupportedResult = $command.ExitCode -eq 3 -or (Test-TextContainsOrdinal -Text $diagnostics -Value "unsupported-format:")
     $passed = $unsupportedResult -and $inputUnchanged -and -not (Test-Path -LiteralPath $outputPath)
 
     return [ordered]@{

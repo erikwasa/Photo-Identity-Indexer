@@ -58,7 +58,7 @@ jobs:
       - name: Check generated documentation
         run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- generate --check
 
-      - name: Prepare mixed-media verification fixtures
+      - name: Prepare Windows PowerShell verification fixtures
         shell: pwsh
         run: |
           $fixtureDirectory = Join-Path $PWD ".artifacts/ci-verification"
@@ -69,29 +69,38 @@ jobs:
             [Convert]::FromBase64String(
               "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAAFUlEQVQIHWOUE+FiAANGOREuBjAAAAZyAHsISLb5AAAAAElFTkSuQmCC"))
           [IO.File]::WriteAllBytes(
+            (Join-Path $fixtureDirectory "warning.jpg"),
+            [Convert]::FromBase64String(
+              "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAIBAQEBAQIBAQECAgICAgQDAgICAgUEBAMEBgUGBgYFBgYGBwkIBgcJBwYGCAsICQoKCgoKBggLDAsKDAkKCgr/2wBDAQICAgICAgUDAwUKBwYHCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgr/wAARCAAKABQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEBPwD8V6KKK8M9gKKKKAP/2Q=="))
+          [IO.File]::WriteAllBytes(
             (Join-Path $fixtureDirectory "corrupt.jpg"),
             [byte[]](0xff, 0xd8, 0xff, 0xd9))
+          [IO.File]::WriteAllBytes(
+            (Join-Path $fixtureDirectory "unsupported.heic"),
+            [byte[]](0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63))
 
-      - name: Run mixed-media local verification
+      - name: Run Windows PowerShell mixed-media verification
         id: mixed-verification
         continue-on-error: true
-        shell: pwsh
+        shell: powershell
         run: |
           ./verify-local.ps1 `
             -Configuration Release `
             -SkipModels `
             -Image @(
               ".artifacts/ci-verification/valid.png"
+              ".artifacts/ci-verification/warning.jpg"
               ".artifacts/ci-verification/corrupt.jpg"
-            )
+            ) `
+            -UnsupportedImage ".artifacts/ci-verification/unsupported.heic"
 
-      - name: Assert mixed-media verification report
+      - name: Assert Windows PowerShell verification report
         shell: pwsh
         env:
           VERIFICATION_OUTCOME: ${{ steps.mixed-verification.outcome }}
         run: |
           if ($env:VERIFICATION_OUTCOME -ne "failure") {
-            throw "Expected the mixed valid/corrupt verification step to fail."
+            throw "Expected the mixed valid/warning/corrupt verification step to fail."
           }
 
           $report = Get-Content ".artifacts/local-verification/verification-report.json" -Raw | ConvertFrom-Json
@@ -99,20 +108,29 @@ jobs:
             throw "Expected aggregate result 'failed'."
           }
 
-          if ($report.decoderChecks.Count -ne 2) {
-            throw "Expected both decoder checks to be retained in the report."
+          if ($report.decoderChecks.Count -ne 3) {
+            throw "Expected all three decoder checks to be retained in the report."
           }
 
           if ($report.decoderChecks[0].result -ne "passed") {
             throw "Expected the valid PNG check to pass."
           }
 
-          if ($report.decoderChecks[1].failure -ne "corrupt_media") {
+          if ($report.decoderChecks[1].result -ne "passed") {
+            throw "Expected the warning-producing JPEG check to pass."
+          }
+
+          if ($report.decoderChecks[2].failure -ne "corrupt_media") {
             throw "Expected the corrupt JPEG check to be classified as corrupt_media."
           }
 
-          if (-not $report.decoderChecks[0].inputUnchanged -or -not $report.decoderChecks[1].inputUnchanged) {
-            throw "Expected both fixture inputs to remain unchanged."
+          if ($report.unsupportedChecks.Count -ne 1 -or $report.unsupportedChecks[0].result -ne "passed") {
+            throw "Expected the unsupported HEIC check to pass."
+          }
+
+          $allChecks = @($report.decoderChecks) + @($report.unsupportedChecks)
+          if (@($allChecks | Where-Object { -not $_.inputUnchanged }).Count -ne 0) {
+            throw "Expected every fixture input to remain unchanged."
           }
 
       - name: Upload local verification diagnostics
