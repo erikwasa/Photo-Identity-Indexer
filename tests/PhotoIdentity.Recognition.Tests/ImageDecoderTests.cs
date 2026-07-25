@@ -3,6 +3,7 @@ using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
+using Xunit;
 
 namespace PhotoIdentity_Recognition_Tests;
 
