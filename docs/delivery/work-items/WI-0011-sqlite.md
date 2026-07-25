@@ -57,7 +57,7 @@ Pull request [#20](https://github.com/erikwasa/Photo-Identity-Indexer/pull/20) a
 
 ## Durable processing repository
 
-Draft pull request [#21](https://github.com/erikwasa/Photo-Identity-Indexer/pull/21) adds the run and job persistence boundary required by resumable processing:
+Pull request [#21](https://github.com/erikwasa/Photo-Identity-Indexer/pull/21) added durable run and job persistence. It merged as `9a3ca9f869b1ae1ae6c09fa4f49130bfd8a832c6` after GitHub Actions run `30176700097` passed.
 
 - typed pending, running and terminal run/job states;
 - atomic run-plus-job creation with idempotence by run ID and run/revision pair;
@@ -67,6 +67,19 @@ Draft pull request [#21](https://github.com/erikwasa/Photo-Identity-Indexer/pull
 - run completion only after every job is terminal, with failed-job outcomes propagated;
 - temporary-database tests including concurrent workers claiming distinct jobs.
 
+## Operational persistence policy
+
+The [SQLite persistence operations](../../operations/sqlite-persistence.md) document defines the supported operating boundary:
+
+- quiesced, integrity-checked backups and restores;
+- local-disk deployment with short repository-owned writer transactions;
+- bounded orchestration-level handling for transient database locks;
+- explicit deferral of abandoned-claim recovery to WI-0013;
+- forward-only, transactionally applied schema upgrades with pre-upgrade backups;
+- no in-place edits to released migration versions and no down migrations.
+
+The policy also records that database-only backups do not include source photos or externally stored aligned crops, and that backups contain sensitive biometric and identity data.
+
 ## Validation
 
 ```powershell
@@ -75,8 +88,6 @@ dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
 
-## Remaining work
+## Completion
 
-- Resolve CI or review findings for pull request #21.
-- Document backup, concurrent writer and schema-upgrade behaviour.
-- Complete WI-0011 after the operational persistence policy is documented and verified.
+All WI-0011 repository, migration, integration-test and operational-documentation scope is implemented. The work item can move from `in_review` to `completed` after the operational-policy pull request is merged and human verified.

@@ -6,12 +6,13 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project is currently in **M02 — Local catalogue and jobs**. M01 single-image inference is complete and verified; WI-0011 is establishing the versioned SQLite catalogue before repository CRUD, local scanning and resumable processing are added.
+The project is currently in **M02 — Local catalogue and jobs**. M01 single-image inference is complete and verified. WI-0011 now has the versioned SQLite catalogue, typed repositories, durable processing records and an operational backup/concurrency/upgrade policy in review before local folder scanning begins.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
 - [Roadmap](docs/delivery/roadmap.md)
 - [Canonical work-item status](docs/delivery/status/work-items.yaml)
+- [SQLite persistence operations](docs/operations/sqlite-persistence.md)
 
 ## Prerequisites
 

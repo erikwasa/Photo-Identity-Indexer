@@ -215,16 +215,46 @@ work_items:
 - id: WI-0011
   title: Add SQLite persistence
   milestone: M02
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0011-sqlite.md
   started_at: '2026-07-25'
-  last_updated_at: '2026-07-25'
-  branch: agent/WI-0011-sqlite-foundation
+  last_updated_at: '2026-07-26'
+  branch: agent/WI-0011-operational-policy
   blockers: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/17
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30173090694
+  - type: merge_commit
+    value: d1fa036ea256f8d5c9f8133ab184747908f0d64e
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/18
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30173892338
+  - type: merge_commit
+    value: 2de0194b0835a8c9b8d13f08b6fa5311e855f889
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/19
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30174420996
+  - type: merge_commit
+    value: 382011588f7055d783a0eae4d567f4bbc0adc0c9
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/20
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30176173088
+  - type: merge_commit
+    value: e4c2d1311a18b53b1492523789385b65edc9a7fc
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/21
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30176700097
+  - type: merge_commit
+    value: 9a3ca9f869b1ae1ae6c09fa4f49130bfd8a832c6
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/22
 - id: WI-0012
   title: Add local folder scanning
   milestone: M02
