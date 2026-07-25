@@ -12,8 +12,8 @@ Status: `in_progress`
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0011-identity-persistence`
-- Draft pull request: [#20 — Add identity and human-label persistence](https://github.com/erikwasa/Photo-Identity-Indexer/pull/20)
+- Branch: `agent/WI-0011-processing-persistence`
+- Draft pull request: [#21 — Add durable processing run and job persistence](https://github.com/erikwasa/Photo-Identity-Indexer/pull/21)
 
 ## Objective
 
@@ -21,15 +21,14 @@ Establish versioned SQLite migrations and repositories for the local catalogue, 
 
 ## Current slice
 
-Add the identity persistence boundary for people, authoritative human labels and separately versioned model suggestions. Person-plus-label writes are transactional, repeated labels keep a stable row identity, and suggestion reruns do not overwrite reviewed status.
+Add the durable processing boundary for creating runs and queued asset-revision jobs, atomically claiming due work, recording attempts, scheduling retries and finalizing terminal outcomes.
 
 ## Relevant files
 
-- `src/PhotoIdentity.Persistence.Sqlite/IdentityCatalogueRecords.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteIdentityCatalogueRepository.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteFaceCatalogueRepository.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/ProcessingRecords.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteProcessingRepository.cs`
 - `src/PhotoIdentity.Persistence.Sqlite/SqliteCatalogueDatabase.cs`
-- `tests/PhotoIdentity.Integration.Tests/SqliteIdentityCatalogueRepositoryTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/SqliteProcessingRepositoryTests.cs`
 - `docs/delivery/work-items/WI-0011-sqlite.md`
 - `docs/delivery/status/work-items.yaml`
 
@@ -43,14 +42,17 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Acceptance test for this slice
 
-- Strong person, face occurrence and model identifiers round-trip without conversion leaking to callers.
-- A new person and human label are committed in one transaction.
-- A missing occurrence rolls back the person and label together.
-- Human labels can be stored without detector observations, crops, embeddings or suggestions.
-- Repeated person/occurrence/label-kind assignments keep one stable label row and refresh reviewer metadata.
-- Suggestions are versioned by occurrence, person, model ID and model hash.
-- A rerun refreshes a suggestion score without overwriting reviewed status or original creation time.
-- Person merge targets round-trip and self-merges are rejected before writing.
+- Strong run, job and asset-revision identifiers round-trip without conversion leaking to callers.
+- A run and its queued jobs are committed in one transaction.
+- A missing asset revision rolls back the run and every job.
+- Repeated run creation and run/revision pairs retain existing durable rows.
+- Only due queued jobs can be claimed.
+- Claiming increments the attempt count and moves the run to running.
+- Delayed retries preserve attempt history and are unavailable before their retry time.
+- Only running jobs can transition to success or failure.
+- Concurrent workers claim distinct jobs.
+- A run cannot complete while jobs remain queued or running.
+- Failed jobs produce a failed terminal run.
 
 ## Verification
 
@@ -58,15 +60,18 @@ The schema foundation merged in pull request #17 at `d1fa036ea256f8d5c9f8133ab18
 
 The typed asset catalogue repository merged in pull request #18 at `2de0194b0835a8c9b8d13f08b6fa5311e855f889`; GitHub Actions run `30173892338` passed.
 
-The transactional face inspection repository merged in pull request #19 at `382011588f7055d783a0eae4d567f4bbc0adc0c9`; GitHub Actions run `30174420996` passed restore and vulnerability audit, Release build, all tests, living-document checks and Windows mixed-media verification.
+The transactional face inspection repository merged in pull request #19 at `382011588f7055d783a0eae4d567f4bbc0adc0c9`; GitHub Actions run `30174420996` passed.
 
-Draft pull request #20 relies on GitHub Actions for executable validation because the agent environment does not contain the .NET SDK.
+The identity and human-label repository merged in pull request #20 at `e4c2d1311a18b53b1492523789385b65edc9a7fc`; GitHub Actions run `30176173088` passed restore and vulnerability audit, Release build, all tests, living-document checks and Windows mixed-media verification.
+
+Draft pull request #21 relies on GitHub Actions for executable validation because the agent environment does not contain the .NET SDK.
 
 ## Known issues
 
-- Label kinds, assignee identifiers and suggestion statuses remain validated extensible strings until the review workflow defines a closed vocabulary.
-- Processing records, backup behaviour and the concurrent writer policy remain before WI-0011 is complete.
+- Job claims do not yet use expiring leases; a worker that dies after claiming requires orchestration-level recovery in WI-0013.
+- Cancellation transitions are represented in the typed records but are not exposed until the batch orchestration policy is defined.
+- Backup behaviour, long-running concurrent writer policy and future schema upgrades remain before WI-0011 is complete.
 
 ## Next action
 
-Resolve CI or review findings on pull request #20, then add typed processing-run and processing-job repositories with concurrency coverage.
+Resolve CI or review findings on pull request #21, then document the operational SQLite policy and complete WI-0011.
