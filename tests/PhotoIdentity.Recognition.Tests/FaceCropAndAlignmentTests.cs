@@ -47,7 +47,7 @@ public sealed class FaceCropAndAlignmentTests
         ImageFrame padded = CreateGradientFrame(12, 10, stridePadding: 11);
         DetectedFaceCandidate detection = CreateDetection(
             new NormalizedBoundingBox(0.25, 0.2, 0.5, 0.6),
-            CanonicalLandmarks(new ImageSize(12, 10)));
+            CanonicalLandmarks());
 
         PaddedFaceCrop first = _cropper.CreatePaddedCrop(packed, detection);
         PaddedFaceCrop second = _cropper.CreatePaddedCrop(packed, detection);
@@ -64,7 +64,7 @@ public sealed class FaceCropAndAlignmentTests
         ImageFrame canonical = CreateGradientFrame(112, 112);
         DetectedFaceCandidate detection = CreateDetection(
             new NormalizedBoundingBox(0.15, 0.2, 0.7, 0.75),
-            CanonicalLandmarks(canonical.Size));
+            CanonicalLandmarks());
 
         AlignedFace result = await _aligner.AlignAsync(
             canonical,
@@ -110,7 +110,7 @@ public sealed class FaceCropAndAlignmentTests
             new Scalar(0, 0, 0));
 
         ImageFrame rotated = ToFrame(rotatedMat, PixelFormat.Bgr24);
-        PixelFaceLandmarks canonicalPixels = CanonicalLandmarks(canonical.Size)
+        PixelFaceLandmarks canonicalPixels = CanonicalLandmarks()
             .ToPixels(canonical.Size);
         PixelFaceLandmarks rotatedPixels = new(
             Transform(canonicalPixels.LeftEye, forward),
@@ -138,7 +138,7 @@ public sealed class FaceCropAndAlignmentTests
         ImageFrame image = CreateGradientFrame(112, 112);
         DetectedFaceCandidate detection = CreateDetection(
             new NormalizedBoundingBox(0.15, 0.2, 0.7, 0.75),
-            CanonicalLandmarks(image.Size));
+            CanonicalLandmarks());
 
         await Assert.ThrowsAsync<NotSupportedException>(
             () => _aligner.AlignAsync(
@@ -178,14 +178,13 @@ public sealed class FaceCropAndAlignmentTests
         NormalizedPoint mouthRight) =>
         new(leftEye, rightEye, nose, mouthLeft, mouthRight);
 
-    private static NormalizedFaceLandmarks CanonicalLandmarks(ImageSize imageSize) =>
-        new PixelFaceLandmarks(
-            LeftEye: new PixelPoint(73.5318, 51.5014),
-            RightEye: new PixelPoint(38.2946, 51.6963),
-            Nose: new PixelPoint(56.0252, 71.7366),
-            MouthLeft: new PixelPoint(70.7299, 92.2041),
-            MouthRight: new PixelPoint(41.5493, 92.3655))
-        .ToNormalized(imageSize);
+    private static NormalizedFaceLandmarks CanonicalLandmarks() =>
+        new(
+            LeftEye: new NormalizedPoint(73.5318 / 112, 51.5014 / 112),
+            RightEye: new NormalizedPoint(38.2946 / 112, 51.6963 / 112),
+            Nose: new NormalizedPoint(56.0252 / 112, 71.7366 / 112),
+            MouthLeft: new NormalizedPoint(70.7299 / 112, 92.2041 / 112),
+            MouthRight: new NormalizedPoint(41.5493 / 112, 92.3655 / 112));
 
     private static ImageFrame CreateGradientFrame(
         int width,
@@ -218,7 +217,7 @@ public sealed class FaceCropAndAlignmentTests
     {
         ImageFrame gradient = CreateGradientFrame(112, 112);
         byte[] data = gradient.ToArray();
-        PixelFaceLandmarks landmarks = CanonicalLandmarks(gradient.Size)
+        PixelFaceLandmarks landmarks = CanonicalLandmarks()
             .ToPixels(gradient.Size);
 
         DrawMarker(data, gradient.Stride, landmarks.RightEye, [255, 0, 0]);
