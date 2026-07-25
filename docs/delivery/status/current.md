@@ -10,13 +10,13 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Active work
 
-- [**WI-0008 — Implement face crops and alignment**](../work-items/WI-0008-alignment.md) — `in_progress`; owner: `ai-agent`
+- [**WI-0009 — Implement SFace embeddings**](../work-items/WI-0009-sface.md) — `in_progress`; owner: `ai-agent`
 
 ## Recently completed
 
 - [**WI-0026 — Add local developer verification**](../work-items/WI-0026-local-verification.md) — `completed`; owner: `ai-agent`
+- [**WI-0008 — Implement face crops and alignment**](../work-items/WI-0008-alignment.md) — `completed`; owner: `ai-agent`
 - [**WI-0007 — Implement YuNet detection**](../work-items/WI-0007-yunet.md) — `completed`; owner: `ai-agent`
-- [**WI-0006 — Implement image decoding**](../work-items/WI-0006-image-decoder.md) — `completed`; owner: `ai-agent`
 
 ## Next ready work
 
