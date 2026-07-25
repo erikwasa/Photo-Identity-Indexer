@@ -57,3 +57,7 @@ jobs:
 
       - name: Check generated documentation
         run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- generate --check
+
+      - name: Smoke-test local verification harness
+        shell: pwsh
+        run: ./verify-local.ps1 -Configuration Release -SkipModels
