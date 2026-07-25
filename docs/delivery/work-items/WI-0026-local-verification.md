@@ -29,9 +29,9 @@ Provide one repeatable Windows checkpoint that proves the repository, native Ope
 - [x] Diagnostic matching is compatible with Windows PowerShell 5.1 and PowerShell 7.
 - [x] One failed image does not prevent later media checks from running.
 - [x] Successful and failed cases are retained in the aggregate JSON report.
-- [ ] A local run succeeds with a real JPEG, a real PNG and an EXIF-rotated Pixel photo.
-- [ ] The generated PNGs are manually inspected and are upright and viewable.
-- [ ] A local HEIC or other unsupported file returns the expected unsupported-format result.
+- [x] A local run succeeds with a real JPEG, a real PNG and an EXIF-rotated Pixel photo.
+- [x] The generated PNGs are manually inspected and are upright and viewable.
+- [x] A local HEIC or other unsupported file returns the expected unsupported-format result.
 
 ## Commands
 
@@ -93,7 +93,7 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 - Exit code 3 is recorded as `unsupported_format`; exit code 4 is recorded as `corrupt_media`.
 - Failed media cases include the input-unchanged result and do not prevent subsequent checks.
 - `-SkipModels` exists for CI regression coverage and cannot be combined with `-InstallModels`.
-- CI proves the automated path. Completion still requires manual verification on the developer's Windows computer with private images.
+- CI proves the automated path. Completion additionally required manual verification on the developer's Windows computer with private images.
 
 ## Verification
 
@@ -105,6 +105,6 @@ Pull request [#9](https://github.com/erikwasa/Photo-Identity-Indexer/pull/9) cor
 
 Pull request [#10](https://github.com/erikwasa/Photo-Identity-Indexer/pull/10) retained mixed-media results and input hashes after failed decodes.
 
-Pull request [#11](https://github.com/erikwasa/Photo-Identity-Indexer/pull/11) verifies Windows PowerShell compatibility and preserves successful JPEG decoding when libjpeg writes a recoverable warning to stderr.
+Pull request [#11](https://github.com/erikwasa/Photo-Identity-Indexer/pull/11) was merged as commit `c7002eca9ebeb8f00e2fcdb96bb6a0e31d252063`. GitHub Actions run [30162808500](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30162808500) passed the final automated Windows verification path.
 
-The work item remains `in_review` until the private-image checks above are completed locally and the generated images are inspected.
+On 2026-07-25, the developer reran the private-image verification, confirmed the JPEG, PNG and EXIF-rotated Pixel outputs were upright and viewable, and confirmed the unsupported-media result. WI-0026 is complete.
