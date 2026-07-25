@@ -55,7 +55,7 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 WI-0026 was completed after PR #11 merged, GitHub Actions run `30162808500` passed, and the developer confirmed the private JPEG, PNG, EXIF-rotated Pixel and unsupported-media checks locally.
 
-PR #12 includes deterministic YuNet tests that do not download model binaries. GitHub Actions must pass on the final branch head before the pull request is ready for review.
+GitHub Actions run `30164144590` passed the full Windows workflow for PR #12: restore, build, all tests, living-document validation, generated-document checks and the mixed-media local-verifier smoke path.
 
 ## Known issues
 
@@ -65,4 +65,4 @@ PR #12 includes deterministic YuNet tests that do not download model binaries. G
 
 ## Next action
 
-Resolve any CI findings on draft pull request #12, run the installed YuNet model against representative private photos, inspect boxes and landmarks, then mark WI-0007 in review.
+Run the installed YuNet model against representative private photos, inspect boxes and landmarks, then mark WI-0007 in review and make pull request #12 ready for review.
