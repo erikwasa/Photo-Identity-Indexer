@@ -20,6 +20,10 @@
 - [Portable processing bundles](architecture/portable-bundles.md)
 - [Security and privacy](architecture/security-and-privacy.md)
 
+## Operations
+
+- [SQLite persistence operations](operations/sqlite-persistence.md)
+
 ## Sources and processing
 
 - [OneDrive synchronised source](sources/onedrive-sync.md)
