@@ -79,6 +79,7 @@ $report = [ordered]@{
 }
 
 $exitCode = 0
+$cliAssemblyPath = Join-Path $root "src/PhotoIdentity.Cli/bin/$Configuration/net10.0/PhotoIdentity.Cli.dll"
 
 function Invoke-CommandCapture {
     [CmdletBinding(DefaultParameterSetName = "ArgumentList")]
@@ -201,11 +202,7 @@ function Invoke-DecodeCheck {
     Remove-Item -LiteralPath $outputPath, $caseReportPath -Force -ErrorAction SilentlyContinue
 
     $arguments = @(
-        "run",
-        "--project", (Join-Path $root "src/PhotoIdentity.Cli"),
-        "--configuration", $Configuration,
-        "--no-build",
-        "--",
+        $cliAssemblyPath,
         "decode",
         "--input", $InputPath,
         "--output", $outputPath,
@@ -249,10 +246,15 @@ function Invoke-DecodeCheck {
         }
     }
 
-    $failure = switch ($command.ExitCode) {
-        3 { "unsupported_format" }
-        4 { "corrupt_media" }
-        default { "execution_error" }
+    $diagnostics = $command.Output -join "`n"
+    $failure = if ($command.ExitCode -eq 3 -or $diagnostics.Contains("unsupported-format:", [StringComparison]::Ordinal)) {
+        "unsupported_format"
+    }
+    elseif ($command.ExitCode -eq 4 -or $diagnostics.Contains("corrupt-media:", [StringComparison]::Ordinal)) {
+        "corrupt_media"
+    }
+    else {
+        "execution_error"
     }
 
     return [ordered]@{
@@ -285,18 +287,16 @@ function Invoke-UnsupportedCheck {
         -Name ("Unsupported-format check {0}" -f $Index) `
         -FilePath "dotnet" `
         -ArgumentList @(
-            "run",
-            "--project", (Join-Path $root "src/PhotoIdentity.Cli"),
-            "--configuration", $Configuration,
-            "--no-build",
-            "--",
+            $cliAssemblyPath,
             "decode",
             "--input", $InputPath,
             "--output", $outputPath
         )
     $hashAfter = Get-InputHash -Path $InputPath
     $inputUnchanged = [string]::Equals($hashBefore, $hashAfter, [StringComparison]::OrdinalIgnoreCase)
-    $passed = $command.ExitCode -eq 3 -and $inputUnchanged -and -not (Test-Path -LiteralPath $outputPath)
+    $diagnostics = $command.Output -join "`n"
+    $unsupportedResult = $command.ExitCode -eq 3 -or $diagnostics.Contains("unsupported-format:", [StringComparison]::Ordinal)
+    $passed = $unsupportedResult -and $inputUnchanged -and -not (Test-Path -LiteralPath $outputPath)
 
     return [ordered]@{
         case = ("unsupported-{0:D3}" -f $Index)
