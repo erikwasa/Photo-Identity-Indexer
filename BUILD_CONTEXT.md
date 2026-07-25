@@ -6,57 +6,67 @@
 
 ## Current work item
 
-**WI-0006 — Implement image decoding**
+**WI-0026 — Add local developer verification**
 
 Status: `in_review`
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0006-image-decoding`
-- Pull request: [#6 — Implement image decoding](https://github.com/erikwasa/Photo-Identity-Indexer/pull/6)
+- Branch: `agent/WI-0026-local-verification`
+- Pull request: [#7 — Add local developer verification](https://github.com/erikwasa/Photo-Identity-Indexer/pull/7)
 
 ## Objective
 
-Provide deterministic JPEG and PNG decoding behind the neutral `IImageDecoder` contract, including EXIF orientation, explicit BGR pixel layout, resizing and structured failure handling.
+Provide one repeatable Windows checkpoint proving that the repository, native OpenCV runtime, pinned model files and real-photo decoding work together before YuNet ONNX inference is introduced.
 
 ## Relevant files
 
-- `src/PhotoIdentity.Imaging.OpenCv/OpenCvImageDecoder.cs`
-- `src/PhotoIdentity.Imaging.OpenCv/ImageDecodingException.cs`
-- `src/PhotoIdentity.Imaging.OpenCv/README.md`
-- `tests/PhotoIdentity.Recognition.Tests/ImageDecoderTests.cs`
-- `Directory.Packages.props`
-- `docs/delivery/work-items/WI-0006-image-decoder.md`
+- `verify-local.ps1`
+- `src/PhotoIdentity.Cli/Program.cs`
+- `src/PhotoIdentity.Cli/PhotoIdentity.Cli.csproj`
+- `src/PhotoIdentity.Imaging.OpenCv/OpenCvPngEncoder.cs`
+- `tests/PhotoIdentity.Integration.Tests/DecodeCommandTests.cs`
+- `docs/delivery/work-items/WI-0026-local-verification.md`
 - `docs/delivery/status/work-items.yaml`
+- `docs/delivery/status/milestones.yaml`
 
 ## Commands
 
 ```powershell
-dotnet test tests/PhotoIdentity.Recognition.Tests/PhotoIdentity.Recognition.Tests.csproj
+./verify-local.ps1 -InstallModels
+
+./verify-local.ps1 `
+  -Image "C:\PrivateVerification\normal.jpg" `
+  -Image "C:\PrivateVerification\pixel-rotated.jpg" `
+  -Image "C:\PrivateVerification\sample.png" `
+  -UnsupportedImage "C:\PrivateVerification\sample.heic"
+
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
 
 ## Acceptance test
 
-- JPEG and PNG signatures are accepted; unsupported signatures are rejected explicitly.
-- EXIF-rotated JPEG content decodes into the expected orientation.
-- Output is a packed application-owned BGR24 `ImageFrame`.
-- Maximum-size options preserve aspect ratio without upscaling.
-- Corrupt supported media and unsupported media are distinguished.
-- Cancellation is honoured.
-- `PhotoIdentity.Core` has no OpenCV dependency.
+- Release restore, build and tests pass on Windows.
+- Living-document registries, links and generated views validate.
+- YuNet and SFace model files pass size and SHA-256 verification.
+- Real JPEG, PNG and EXIF-rotated Pixel photos produce upright, viewable PNGs.
+- Input hashes are unchanged.
+- Unsupported HEIC or other media returns exit code 3.
+- Reports below `.artifacts/local-verification` contain no source paths or image data.
 
 ## Verification
 
-GitHub Actions run `30150743391` passed restore, build, all tests, documentation validation and generated-file checks on Windows with .NET 10.
+GitHub Actions must pass the automated repository path on the final PR head.
+
+Human completion requires running the private-image command on the developer's Windows computer and inspecting the generated PNGs.
 
 ## Known issues
 
-- The current agent container has no .NET SDK; GitHub Actions performs executable verification.
-- The current native runtime selection is Windows-only in the test host. Linux runtime packaging belongs to the later worker-container work.
-- HEIC is intentionally not supported by this adapter.
+- HEIC is intentionally unsupported by the current decoder and is used only to verify explicit unsupported-format handling.
+- The local report is ignored by Git and must not be attached to the PR when it contains information derived from private photos.
+- YuNet work remains blocked by WI-0026 until the local private-image checks pass.
 
 ## Next action
 
-Review and merge pull request #6, mark WI-0006 completed with merge evidence, then begin WI-0007 — Implement YuNet detection.
+Merge pull request #7 after CI passes, run the private-image verification locally, record human evidence, complete WI-0026, then begin WI-0007 — Implement YuNet detection.

@@ -109,10 +109,13 @@ work_items:
 - id: WI-0006
   title: Implement image decoding
   milestone: M01
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0006-image-decoder.md
   started_at: '2026-07-25'
+  completed_at: '2026-07-25'
+  verified_at: '2026-07-25'
+  verified_by: human
   last_updated_at: '2026-07-25'
   branch: agent/WI-0006-image-decoding
   blockers: []
@@ -120,7 +123,9 @@ work_items:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/6
   - type: workflow
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30150743391
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30150930457
+  - type: merge_commit
+    value: d85c098474e621769569f7110e34e164570c23c1
 - id: WI-0007
   title: Implement YuNet detection
   milestone: M01
@@ -130,6 +135,7 @@ work_items:
   blockers:
   - WI-0005
   - WI-0006
+  - WI-0026
   evidence: []
 - id: WI-0008
   title: Implement face crops and alignment
@@ -303,3 +309,16 @@ work_items:
   - WI-0015
   - WI-0016
   evidence: []
+- id: WI-0026
+  title: Add local developer verification
+  milestone: M01
+  status: in_review
+  owner: ai-agent
+  document: ../work-items/WI-0026-local-verification.md
+  started_at: '2026-07-25'
+  last_updated_at: '2026-07-25'
+  branch: agent/WI-0026-local-verification
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/7

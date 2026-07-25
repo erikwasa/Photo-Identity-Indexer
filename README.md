@@ -6,7 +6,7 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project is currently in **M00 — Repository and architecture**. The .NET solution skeleton is under review in WI-0002.
+The project is currently in **M01 — Single-image inference**. WI-0026 adds a local Windows verification checkpoint before YuNet inference work begins.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
@@ -17,6 +17,7 @@ The project is currently in **M00 — Repository and architecture**. The .NET so
 
 - .NET 10 SDK
 - PowerShell 7 or Windows PowerShell
+- Windows for the current OpenCV native-runtime verification path
 
 ## Build and test
 
@@ -25,9 +26,38 @@ The project is currently in **M00 — Repository and architecture**. The .NET so
 ./test.ps1
 ```
 
+## Local verification checkpoint
+
+Install and verify the pinned models, build the solution, run all tests and validate the living documentation:
+
+```powershell
+./verify-local.ps1 -InstallModels
+```
+
+Verify real private images without committing them to the repository:
+
+```powershell
+./verify-local.ps1 `
+  -Image "C:\PrivateVerification\normal.jpg" `
+  -Image "C:\PrivateVerification\pixel-rotated.jpg" `
+  -Image "C:\PrivateVerification\sample.png" `
+  -UnsupportedImage "C:\PrivateVerification\sample.heic"
+```
+
+Outputs and privacy-safe reports are written below ignored `.artifacts/local-verification`. Inspect the generated PNGs manually and confirm that the originals remain unchanged.
+
+Decode one JPEG or PNG directly:
+
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -- `
+  decode `
+  --input "C:\PrivateVerification\pixel-rotated.jpg" `
+  --output ".artifacts\local-verification\pixel-normalised.png"
+```
+
 ## First target demonstration
 
-1. Run `photoid inspect family-photo.jpg`.
+1. Run `photoid inspect family-photo.jpg` after the remaining M01 inference work is complete.
 2. Verify detected face boxes and crops.
 3. Generate SFace embeddings.
 4. Compare same-person and different-person similarities.
