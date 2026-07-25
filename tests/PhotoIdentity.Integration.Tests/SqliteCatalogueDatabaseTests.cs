@@ -88,16 +88,18 @@ public sealed class SqliteCatalogueDatabaseTests
             SqliteCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
-            await using SqliteConnection upgraded = await database.OpenConnectionAsync();
-            Assert.Equal(2, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
-            Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM assets;"));
-            using SqliteCommand read = upgraded.CreateCommand();
-            read.CommandText = "SELECT last_seen_at_utc, deleted_at_utc FROM assets WHERE id = $id;";
-            read.Parameters.AddWithValue("$id", assetId);
-            await using SqliteDataReader reader = await read.ExecuteReaderAsync();
-            Assert.True(await reader.ReadAsync());
-            Assert.Equal(createdAt, reader.GetString(0));
-            Assert.True(reader.IsDBNull(1));
+            await using (SqliteConnection upgraded = await database.OpenConnectionAsync())
+            {
+                Assert.Equal(2, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
+                Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM assets;"));
+                using SqliteCommand read = upgraded.CreateCommand();
+                read.CommandText = "SELECT last_seen_at_utc, deleted_at_utc FROM assets WHERE id = $id;";
+                read.Parameters.AddWithValue("$id", assetId);
+                await using SqliteDataReader reader = await read.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(createdAt, reader.GetString(0));
+                Assert.True(reader.IsDBNull(1));
+            }
         }
         finally
         {
