@@ -23,6 +23,7 @@ Provide one repeatable Windows checkpoint that proves the repository, native Ope
 - [x] Reports omit source paths and biometric content.
 - [x] The input file hash is checked before and after decoding.
 - [x] Unsupported and corrupt media return stable, distinct exit codes.
+- [x] CI executes the verifier itself with model downloads skipped.
 - [ ] A local run succeeds with a real JPEG, a real PNG and an EXIF-rotated Pixel photo.
 - [ ] The generated PNGs are manually inspected and are upright and viewable.
 - [ ] A local HEIC or other unsupported file returns the expected unsupported-format result.
@@ -45,6 +46,12 @@ Private-image verification:
   -UnsupportedImage "C:\PrivateVerification\sample.heic"
 ```
 
+CI-only smoke path without model downloads:
+
+```powershell
+./verify-local.ps1 -Configuration Release -SkipModels
+```
+
 Decode one image directly:
 
 ```powershell
@@ -63,10 +70,14 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 - Console output omits the input path unless `--verbose` is used.
 - Per-image reports contain dimensions, pixel format, timing, output filename and the input-unchanged result, but not the source path.
 - The aggregate verification report is local-only and ignored by Git.
+- PowerShell script parameters are passed through a hashtable; native executable arguments use an array. This avoids positional binding of strings such as `-Configuration`.
+- `-SkipModels` exists for CI regression coverage and cannot be combined with `-InstallModels`.
 - CI proves the automated path. Completion still requires manual verification on the developer's Windows computer with private images.
 
 ## Verification
 
-Pull request [#7](https://github.com/erikwasa/Photo-Identity-Indexer/pull/7) contains the implementation.
+Pull request [#7](https://github.com/erikwasa/Photo-Identity-Indexer/pull/7) introduced the local verification harness.
 
-The work item remains `in_review` until CI passes and the private-image checks above are completed locally.
+Pull request [#8](https://github.com/erikwasa/Photo-Identity-Indexer/pull/8) fixes PowerShell named-parameter binding and adds a CI smoke run of the verifier.
+
+The work item remains `in_review` until PR #8 passes CI and the private-image checks above are completed locally.
