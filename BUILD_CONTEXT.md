@@ -6,84 +6,63 @@
 
 ## Current work item
 
-**WI-0026 — Add local developer verification**
+**WI-0007 — Implement YuNet detection**
 
-Status: `in_review`
+Status: `in_progress`
 
 ## Branch and pull request
 
-- Branch: `agent/fix-windows-powershell-verifier`
-- Pull request: [#11 — Fix Windows PowerShell media verification](https://github.com/erikwasa/Photo-Identity-Indexer/pull/11)
+- Branch: `agent/WI-0007-yunet`
+- Draft pull request: [#12 — Implement YuNet face detection](https://github.com/erikwasa/Photo-Identity-Indexer/pull/12)
 
 ## Objective
 
-Provide one repeatable Windows checkpoint proving that the repository, native OpenCV runtime, pinned model files and real-photo decoding work together before YuNet ONNX inference is introduced.
+Add the pinned YuNet ONNX face detector behind the neutral `IFaceDetector` contract with deterministic preprocessing, output parsing, landmarks, confidence filtering and timing metadata.
 
 ## Relevant files
 
-- `verify-local.ps1`
-- `.github/workflows/build.yml`
-- `README.md`
-- `src/PhotoIdentity.Cli/Program.cs`
-- `src/PhotoIdentity.Cli/PhotoIdentity.Cli.csproj`
-- `src/PhotoIdentity.Imaging.OpenCv/OpenCvPngEncoder.cs`
-- `tests/PhotoIdentity.Integration.Tests/DecodeCommandTests.cs`
-- `docs/delivery/work-items/WI-0026-local-verification.md`
+- `src/PhotoIdentity.Recognition.Onnx/YuNet/YuNetFaceDetector.cs`
+- `src/PhotoIdentity.Recognition.Onnx/YuNet/YuNetOutputParser.cs`
+- `src/PhotoIdentity.Recognition.Onnx/YuNet/OnnxYuNetInferenceSession.cs`
+- `src/PhotoIdentity.Recognition.Onnx/PhotoIdentity.Recognition.Onnx.csproj`
+- `tests/PhotoIdentity.Recognition.Tests/YuNetDetectorTests.cs`
+- `models/manifests/yunet-2023mar-fp32.json`
+- `docs/delivery/work-items/WI-0007-yunet.md`
 - `docs/delivery/status/work-items.yaml`
 
 ## Commands
 
 ```powershell
-./verify-local.ps1 -InstallModels
-
-./verify-local.ps1 `
-  -Image "C:\PrivateVerification\normal.jpg","C:\PrivateVerification\pixel-rotated.jpg","C:\PrivateVerification\sample.png" `
-  -UnsupportedImage "C:\PrivateVerification\sample.heic"
-
-./verify-local.ps1 -Configuration Release -SkipModels
-
+./models/install-models.ps1 -Id yunet-2023mar-fp32
+dotnet test tests/PhotoIdentity.Recognition.Tests/PhotoIdentity.Recognition.Tests.csproj
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
 
 ## Acceptance test
 
-- Release restore, build and tests pass on Windows.
-- The verifier passes `Configuration` to PowerShell child scripts as a named parameter.
-- CI executes the verifier with `-SkipModels`.
-- Array-valued PowerShell parameters are supplied once with all values.
-- Native stderr does not terminate the verifier before its structured exit code is recorded.
-- Native exit code zero remains authoritative when libjpeg emits a recoverable warning.
-- Diagnostic matching works in both Windows PowerShell 5.1 and PowerShell 7.
-- A corrupt supported image is recorded as `corrupt_media` while later checks continue.
-- Successful and failed media checks remain in the aggregate JSON report.
-- Living-document registries, links and generated views validate.
-- YuNet and SFace model files pass size and SHA-256 verification.
-- Real JPEG, PNG and EXIF-rotated Pixel photos produce upright, viewable PNGs.
-- Input hashes are unchanged, including failed decode cases.
-- Unsupported HEIC or other media returns exit code 3.
-- Reports below `.artifacts/local-verification` contain no source paths or image data.
+- Input image frames are resized and converted to channel-first float32 tensors using manifest preprocessing metadata.
+- All twelve YuNet tensors are required and their shapes are checked against the model input dimensions and strides.
+- Class and object scores, boxes and five landmarks are decoded with the OpenCV YuNet semantics.
+- Confidence thresholding, top-K limiting and non-maximum suppression are deterministic.
+- Output boxes and landmarks use application-owned normalised geometry.
+- YuNet right/left landmark order is mapped to the core semantic contract.
+- Model descriptor and preprocessing, inference and postprocessing durations are returned.
+- Invalid shapes and non-finite model outputs fail explicitly.
+- Representative private photos still require visual box and landmark inspection before completion.
 
 ## Verification
 
-PR #8 passed the full Windows workflow, including the local-verifier smoke step.
+WI-0026 was completed after PR #11 merged, GitHub Actions run `30162808500` passed, and the developer confirmed the private JPEG, PNG, EXIF-rotated Pixel and unsupported-media checks locally.
 
-PR #9 corrected the private-image invocation examples so PowerShell binds all image paths to the single `string[]` parameter.
-
-PR #10 retained mixed-media results and input hashes after failed decodes.
-
-PR #11 must pass the mixed-media verifier under Windows PowerShell, including a JPEG that emits `Invalid SOS parameters for sequential JPEG` while still decoding successfully.
-
-Human completion requires rerunning the private-image command after PR #11 is merged and manually confirming that all generated PNGs are upright and viewable.
+PR #12 includes deterministic YuNet tests that do not download model binaries. GitHub Actions must pass on the final branch head before the pull request is ready for review.
 
 ## Known issues
 
-- Some JPEG files can produce recoverable libjpeg warnings on stderr while decoding successfully; native exit code zero is authoritative.
-- PowerShell does not permit the same named parameter to be specified more than once, even when its type is an array.
-- HEIC is intentionally unsupported by the current decoder and is used only to verify explicit unsupported-format handling.
-- The local report is ignored by Git and must not be attached to the PR when it contains information derived from private photos.
-- YuNet work remains blocked by WI-0026 until the local private-image checks pass.
+- The current execution provider is CPU-only.
+- The pinned 2023mar YuNet model has a fixed 320x320 input, so preprocessing resizes the whole image to that shape and maps results back through normalised coordinates.
+- The repository has no public photo fixture suitable for visual correctness assertions; final verification uses private local images and must not commit outputs.
 
 ## Next action
 
-Merge PR #11 after CI passes, pull `main`, rerun the private-image verification, inspect all generated PNGs, record human evidence, complete WI-0026, then begin WI-0007 — Implement YuNet detection.
+Resolve any CI findings on draft pull request #12, run the installed YuNet model against representative private photos, inspect boxes and landmarks, then mark WI-0007 in review.
