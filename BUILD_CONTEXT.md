@@ -12,8 +12,8 @@ Status: `in_progress`
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0011-catalogue-repositories`
-- Draft pull request: [#18 — Add typed asset catalogue repositories](https://github.com/erikwasa/Photo-Identity-Indexer/pull/18)
+- Branch: `agent/WI-0011-face-persistence`
+- Draft pull request: [#19 — Add transactional face inspection persistence](https://github.com/erikwasa/Photo-Identity-Indexer/pull/19)
 
 ## Objective
 
@@ -21,14 +21,15 @@ Establish versioned SQLite migrations and repositories for the local catalogue, 
 
 ## Current slice
 
-Add the typed source, asset and immutable revision repository used by local folder scanning. Source, asset and revision writes are committed atomically, and repeated observations of the same asset/content hash resolve to the existing revision.
+Add the transactional persistence boundary for one complete face inspection result. The occurrence, detector observation, aligned crop and embedding are committed together, with natural-key resolution for safe reruns.
 
 ## Relevant files
 
-- `src/PhotoIdentity.Persistence.Sqlite/CatalogueRecords.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/FaceCatalogueRecords.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteFaceCatalogueRepository.cs`
 - `src/PhotoIdentity.Persistence.Sqlite/SqliteAssetCatalogueRepository.cs`
 - `src/PhotoIdentity.Persistence.Sqlite/SqliteCatalogueDatabase.cs`
-- `tests/PhotoIdentity.Integration.Tests/SqliteAssetCatalogueRepositoryTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/SqliteFaceCatalogueRepositoryTests.cs`
 - `docs/delivery/work-items/WI-0011-sqlite.md`
 - `docs/delivery/status/work-items.yaml`
 
@@ -42,24 +43,27 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Acceptance test for this slice
 
-- Strong source, asset and revision identifiers round-trip without conversion leaking to callers.
-- Source and asset natural-key lookups resolve stable identities for reruns.
-- Source, asset and revision rows are written in one transaction.
-- Repeated writes for the same asset and SHA-256 return one immutable revision.
-- Updated source and asset metadata do not overwrite existing revision history.
-- Invalid source/asset/revision relationships are rejected before writing.
+- Strong occurrence, crop and model identifiers round-trip without conversion leaking to callers.
+- Occurrence, detector observation, crop and embedding rows are written in one transaction.
+- A failed foreign-key write leaves no partial inspection rows.
+- Reruns resolve an existing revision/ordinal occurrence and crop/protocol/hash to their stable identifiers.
+- Detector output and crop storage metadata can be refreshed on a rerun.
+- The first embedding remains immutable for an exact crop, model ID and model hash.
+- Normalized geometry and embedding vectors round-trip without loss.
 
 ## Verification
 
-The schema foundation is complete. Pull request #17 merged at `d1fa036ea256f8d5c9f8133ab184747908f0d64e`, and GitHub Actions run `30173090694` passed restore and vulnerability audit, Release build, all tests, living-document checks and Windows mixed-media verification.
+The schema foundation merged in pull request #17 at `d1fa036ea256f8d5c9f8133ab184747908f0d64e`; GitHub Actions run `30173090694` passed.
 
-Draft pull request #18 relies on GitHub Actions for executable validation because the agent environment does not contain the .NET SDK.
+The typed asset catalogue repository merged in pull request #18 at `2de0194b0835a8c9b8d13f08b6fa5311e855f889`; GitHub Actions run `30173892338` passed restore and vulnerability audit, Release build, all tests, living-document checks and Windows mixed-media verification.
+
+Draft pull request #19 relies on GitHub Actions for executable validation because the agent environment does not contain the .NET SDK.
 
 ## Known issues
 
-- This slice covers scanner-facing source, asset and revision persistence only.
-- Complete inspection-result transactions, identity records, processing records, backup behaviour and concurrent writer policy remain before WI-0011 is complete.
+- This slice persists one detector observation, crop and embedding graph at a time; batch orchestration remains outside the repository.
+- Identity records, processing records, backup behaviour and the concurrent writer policy remain before WI-0011 is complete.
 
 ## Next action
 
-Resolve CI or review findings on pull request #18, then add transactional persistence for complete inspection results: occurrences, observations, crops and embeddings.
+Resolve CI or review findings on pull request #19, then add typed people, human-label and identity-suggestion repositories.
