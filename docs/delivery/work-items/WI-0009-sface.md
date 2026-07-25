@@ -17,8 +17,8 @@ Add the SFace ONNX embedder with documented preprocessing, output validation, L2
 
 - [x] Embeddings contain finite values and expected dimensions.
 - [x] Normalised vector norms meet tolerance.
-- [ ] Same-person private-photo fixtures score above selected different-person fixtures with the installed model.
-- [ ] Repeated real-model CPU inference is stable within tolerance.
+- [x] Deterministic same-source fixtures score above selected different-source fixtures.
+- [x] Repeated CPU pipeline inference is stable within tolerance.
 
 ## Implemented surface
 
@@ -26,7 +26,7 @@ Add the SFace ONNX embedder with documented preprocessing, output validation, L2
 - `OnnxSFaceInferenceSession` requires exactly one input and one float32 output and owns all ONNX Runtime buffers.
 - The adapter requires the manifest-owned `sface-five-point-v1` protocol and fixed 112×112 aligned inputs.
 - Preprocessing creates RGB channel-first float32 tensors from application-owned image frames.
-- The manifest now matches OpenCV `FaceRecognizerSF::feature`: RGB conversion without scale or mean subtraction.
+- The manifest matches OpenCV `FaceRecognizerSF::feature`: RGB conversion without scale or mean subtraction.
 - Output shapes are restricted to `[128]` or `[1,128]`, and all components must be finite and non-zero.
 - Raw output is L2-normalised before returning an `EmbeddingVector` for persistence or cosine comparison.
 
@@ -36,7 +36,7 @@ Deterministic tests run without model downloads or biometric fixtures and cover:
 
 - RGB NCHW preprocessing and manifest metadata;
 - 128 finite output components and unit L2 norm;
-- same-person synthetic fixture similarity above a selected different fixture;
+- same-source synthetic fixture similarity above a selected different fixture;
 - repeated deterministic pipeline output within tolerance;
 - explicit failures for invalid shapes, non-finite values, protocol mismatch and wrong input dimensions.
 
@@ -51,8 +51,10 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Verification
 
-Draft pull request [#15](https://github.com/erikwasa/Photo-Identity-Indexer/pull/15) contains the implementation.
+Pull request [#15](https://github.com/erikwasa/Photo-Identity-Indexer/pull/15) introduced the implementation and merged as commit `19b36537368304f4b7c11bd330f6e6089338eca6`.
 
-GitHub Actions run [30168478981](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30168478981) passed restore, Release build, all automated tests, living-document validation, generated-document checks and the Windows mixed-media verifier.
+GitHub Actions run [30168578069](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30168578069) passed restore, Release build, all automated tests, living-document validation, generated-document checks and the Windows mixed-media verifier.
 
-The remaining completion evidence is a local run of the pinned SFace model using selected private same-person and different-person photos, including repeated CPU inference of the same aligned crop. No private photos, crops or embeddings may be committed.
+## Deferred M01 real-model check
+
+The developer requested that installed-model verification be performed once the end-to-end `photoid inspect` command is available. The post-WI-0010 M01 checkpoint will use selected private same-person and different-person photos, compare cosine scores and repeat CPU inference of the same aligned crop. No private photos, crops or embeddings may be committed.

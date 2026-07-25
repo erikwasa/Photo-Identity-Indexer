@@ -6,63 +6,74 @@
 
 ## Current work item
 
-**WI-0009 — Implement SFace embeddings**
+**WI-0010 — Build photoid inspect command**
 
 Status: `in_progress`
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0009-sface-embeddings`
-- Draft pull request: [#15 — Implement SFace embeddings](https://github.com/erikwasa/Photo-Identity-Indexer/pull/15)
+- Branch: `agent/WI-0010-inspect-command`
+- Draft pull request: [#16 — Build photoid inspect command](https://github.com/erikwasa/Photo-Identity-Indexer/pull/16)
 
 ## Objective
 
-Add the pinned SFace ONNX embedder behind the neutral `IFaceEmbedder` contract with manifest-driven preprocessing, strict output validation, L2 normalisation, cosine comparison and repeatability evidence.
+Compose decoding, YuNet detection, padded review crops, five-point SFace alignment and SFace embeddings for one JPEG or PNG, then write visual and reproducible inspection outputs without modifying the source.
 
 ## Relevant files
 
-- `src/PhotoIdentity.Recognition.Onnx/SFace/OnnxSFaceInferenceSession.cs`
-- `src/PhotoIdentity.Recognition.Onnx/SFace/SFaceFaceEmbedder.cs`
-- `src/PhotoIdentity.Recognition.Onnx/README.md`
-- `tests/PhotoIdentity.Recognition.Tests/SFaceEmbedderTests.cs`
-- `models/manifests/sface-2021dec-fp32.json`
-- `docs/delivery/work-items/WI-0009-sface.md`
+- `src/PhotoIdentity.Cli/Program.cs`
+- `src/PhotoIdentity.Cli/DecodeCommand.cs`
+- `src/PhotoIdentity.Cli/InspectCommand.cs`
+- `src/PhotoIdentity.Cli/Properties/AssemblyInfo.cs`
+- `tests/PhotoIdentity.Integration.Tests/InspectCommandTests.cs`
+- `docs/delivery/work-items/WI-0010-inspect-command.md`
 - `docs/delivery/status/work-items.yaml`
 
 ## Commands
 
 ```powershell
-./models/install-models.ps1 -Id sface-2021dec-fp32
-dotnet test tests/PhotoIdentity.Recognition.Tests/PhotoIdentity.Recognition.Tests.csproj
+dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
 
+After merge, run the complete private M01 verification:
+
+```powershell
+./models/install-models.ps1 -Id yunet-2023mar-fp32,sface-2021dec-fp32
+
+dotnet run --project src/PhotoIdentity.Cli -- `
+  inspect "C:\PrivateVerification\family-photo.jpg" `
+  --output ".artifacts\inspect\family-photo" `
+  --overwrite `
+  --verbose
+```
+
 ## Acceptance test
 
-- The adapter accepts only `sface-five-point-v1` aligned 112×112 image frames.
-- Manifest preprocessing converts application-owned pixels to RGB channel-first float32 tensors without scale or mean subtraction.
-- The ONNX model must expose exactly one input and one float32 output.
-- Output shape is `[128]` or `[1,128]`, and every component must be finite and non-zero as a vector.
-- Returned embeddings are L2-normalised and expose the SFace model descriptor.
-- Synthetic same-person fixtures score above selected different-person fixtures.
-- Repeated deterministic inference produces equivalent vectors within tolerance.
-- Final completion still requires the installed model on private same-person and different-person photos, plus repeated CPU inference of one aligned crop.
+- JPEG and PNG inputs are decoded with EXIF orientation handling.
+- The pinned YuNet and SFace manifests and installed files are located from the repository or explicit paths.
+- Detections are ordered deterministically and annotated with boxes, confidence and five landmark labels.
+- Each face writes a bounds-clamped padded crop, a fixed 112×112 aligned crop and a 128-dimensional L2-normalised embedding.
+- `manifest.json` records source/model hashes, preprocessing metadata, geometry and deterministic output hashes.
+- `timings.json` records decode, detector and per-face stage durations separately from reproducibility data.
+- Exit codes distinguish usage, media, model and inference failures.
+- The source SHA-256 is unchanged after processing, and unsafe output-directory deletion is rejected.
+- Synthetic integration coverage exercises the complete output path without model downloads or private fixtures.
 
 ## Verification
 
-WI-0008 is complete. Pull request #14 merged at `65b6ffc28212c403b2f98df6bc8cdef70fa3d492`, and GitHub Actions run `30167234799` passed the final Windows workflow.
+WI-0009 is implementation-complete. Pull request #15 merged at `19b36537368304f4b7c11bd330f6e6089338eca6`, and GitHub Actions run `30168578069` passed the final Windows workflow.
 
-GitHub Actions run `30168478981` passed restore, Release build, all automated tests, living-document validation, generated-document checks and the Windows mixed-media verifier for the WI-0009 implementation.
-
-The SFace preprocessing metadata follows OpenCV `FaceRecognizerSF::feature`, which converts aligned BGR images to RGB float32 without scaling or mean subtraction. Adapter-owned L2 normalisation is applied after inference.
+The first PR #16 workflow passed the Release build, all automated tests and living-document checks for the command implementation before canonical status updates were applied. Final branch evidence will use the latest workflow head.
 
 ## Known issues
 
-- The current execution provider is CPU-only.
-- Real-model similarity and repeatability checks require locally installed model binaries and private photos that must not be committed.
-- SFace completion thresholds will be recorded from selected local fixtures rather than treated as universal identity-matching policy.
+- The current execution providers are CPU-only.
+- Real model binaries and private photos are deliberately absent from CI.
+- `annotated.svg` is used instead of a raster overlay so the normalised source can be embedded without exposing OpenCV types outside the imaging adapter.
+- M01 is not complete until the merged command is run locally on representative private JPEG and PNG files.
 
 ## Next action
 
-Run the pinned model locally on selected private same-person and different-person photos, record privacy-safe similarity scores and repeated-inference tolerance, then mark WI-0009 ready for review.
+Resolve any final CI findings on pull request #16, merge it, then run the consolidated M01 local verification for visual geometry, same-person/different-person cosine scores, repeated CPU inference and source integrity.

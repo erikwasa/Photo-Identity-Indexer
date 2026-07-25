@@ -6,7 +6,7 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project is currently in **M01 — Single-image inference**. WI-0008 is complete, and WI-0009 is implementing pinned SFace embeddings behind the neutral recognition contracts.
+The project is currently in **M01 — Single-image inference**. YuNet detection, face crops/alignment and SFace embeddings are implementation-complete; WI-0010 is composing them into the first end-to-end `photoid inspect` command.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
@@ -53,12 +53,24 @@ dotnet run --project src/PhotoIdentity.Cli -- `
   --output ".artifacts\local-verification\pixel-normalised.png"
 ```
 
+Run the complete single-image inspection path after WI-0010 is merged:
+
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -- `
+  inspect "C:\PrivateVerification\family-photo.jpg" `
+  --output ".artifacts\inspect\family-photo" `
+  --overwrite `
+  --verbose
+```
+
+The inspect output contains an embedded-image annotated SVG, padded and aligned face PNGs, one JSON embedding per face, a reproducibility manifest and stage timings. The command verifies that the original source hash remains unchanged.
+
 ## First target demonstration
 
-1. Run `photoid inspect family-photo.jpg` after the remaining M01 inference work is complete.
-2. Verify detected face boxes and crops.
-3. Generate SFace embeddings.
-4. Compare same-person and different-person similarities.
+1. Run `photoid inspect family-photo.jpg`.
+2. Verify detected face boxes, landmarks, padded crops and aligned model inputs.
+3. Confirm 128-dimensional unit-normalised SFace embeddings.
+4. Compare same-person and different-person cosine similarities and repeated CPU inference.
 
 ## Privacy
 
