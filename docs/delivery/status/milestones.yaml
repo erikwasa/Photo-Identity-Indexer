@@ -11,7 +11,7 @@ milestones:
   - WI-0004
 - id: M01
   title: Single-image inference
-  status: in_progress
+  status: completed
   document: ../milestones/M01-single-image.md
   work_items:
   - WI-0005
@@ -23,7 +23,7 @@ milestones:
   - WI-0010
 - id: M02
   title: Local catalogue and jobs
-  status: ready
+  status: in_progress
   document: ../milestones/M02-local-catalogue.md
   work_items:
   - WI-0011

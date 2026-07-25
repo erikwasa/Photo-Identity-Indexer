@@ -63,6 +63,8 @@ faces/
 
 The integration test uses a synthetic PNG plus fake detector/embedder adapters while retaining the real decoder, PNG encoder, cropper and five-point aligner. It verifies the complete output layout, manifest contents, 128-dimensional unit-normalised embedding serialization, embedded annotation, stable non-timing output hashes across repeated runs and unchanged source bytes.
 
-## Deferred M01 verification
+## Completion evidence
 
-After pull request #16 is merged, run this command with installed YuNet and SFace models on representative private JPEG and PNG images. The milestone check will cover visual boxes, landmarks and crops; same-person versus different-person cosine scores; repeated CPU inference stability; and source integrity without committing any biometric output.
+Pull request [#16](https://github.com/erikwasa/Photo-Identity-Indexer/pull/16) merged as commit `4afa704dd6032cefcae598f544d3166c1107692e`. GitHub Actions run [30169777119](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30169777119) passed the Windows build, tests and living-document checks.
+
+The developer then ran the complete command with installed YuNet and SFace models on representative private images and verified that M01 works, including visual output, CPU inference and source integrity. No private images or biometric outputs were committed.

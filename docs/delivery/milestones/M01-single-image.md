@@ -22,3 +22,7 @@ WI-0005 through WI-0010, plus WI-0026 for the local Windows verification checkpo
 - CPU inference works on Windows.
 - Failures are actionable.
 - The local verification harness has passed with real private images before YuNet implementation begins.
+
+## Completion
+
+All M01 work items are complete. Pull request #16 merged the end-to-end inspection command, its final Windows workflow passed, and the developer verified the full YuNet and SFace path with representative private images on 2026-07-25.
