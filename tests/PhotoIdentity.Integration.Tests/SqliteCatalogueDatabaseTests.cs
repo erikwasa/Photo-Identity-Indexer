@@ -50,8 +50,13 @@ public sealed class SqliteCatalogueDatabaseTests
             string sourceId = Guid.NewGuid().ToString("D");
             string assetId = Guid.NewGuid().ToString("D");
             string createdAt = new DateTimeOffset(2026, 7, 26, 9, 0, 0, TimeSpan.Zero).ToString("O");
+            string seedConnectionString = new SqliteConnectionStringBuilder
+            {
+                DataSource = databasePath,
+                Pooling = false,
+            }.ToString();
 
-            await using (SqliteConnection connection = new($"Data Source={databasePath}"))
+            await using (SqliteConnection connection = new(seedConnectionString))
             {
                 await connection.OpenAsync();
                 using SqliteCommand command = connection.CreateCommand();
