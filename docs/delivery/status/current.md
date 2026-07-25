@@ -10,7 +10,7 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Active work
 
-- [**WI-0011 — Add SQLite persistence**](../work-items/WI-0011-sqlite.md) — `in_progress`; owner: `ai-agent`
+- [**WI-0011 — Add SQLite persistence**](../work-items/WI-0011-sqlite.md) — `in_review`; owner: `ai-agent`
 
 ## Recently completed
 
