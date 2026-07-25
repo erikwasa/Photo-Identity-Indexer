@@ -117,7 +117,7 @@ function Invoke-CommandCapture {
             $PSNativeCommandUseErrorActionPreference = $false
         }
 
-        $LASTEXITCODE = 0
+        $global:LASTEXITCODE = 0
         if ($PSCmdlet.ParameterSetName -eq "Parameters") {
             $commandOutput = & $FilePath @Parameters 2>&1
         }
@@ -126,7 +126,7 @@ function Invoke-CommandCapture {
         }
 
         $commandSucceeded = $?
-        $nativeExitCode = $LASTEXITCODE
+        $nativeExitCode = $global:LASTEXITCODE
     }
     finally {
         $ErrorActionPreference = $previousErrorActionPreference
