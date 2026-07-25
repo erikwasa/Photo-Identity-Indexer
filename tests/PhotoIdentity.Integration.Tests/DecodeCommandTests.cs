@@ -86,6 +86,33 @@ public sealed class DecodeCommandTests
         }
     }
 
+    [Fact]
+    public async Task Decode_returns_specific_exit_code_for_corrupt_jpeg()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string inputPath = Path.Combine(directory, "corrupt.jpg");
+            string outputPath = Path.Combine(directory, "normalised.png");
+            await File.WriteAllBytesAsync(inputPath, [0xff, 0xd8, 0xff, 0xd9]);
+
+            StringWriter output = new();
+            StringWriter error = new();
+            int exitCode = await PhotoIdentity.Cli.Program.RunAsync(
+                ["decode", "--input", inputPath, "--output", outputPath],
+                output,
+                error);
+
+            Assert.Equal(4, exitCode);
+            Assert.Contains("corrupt-media", error.ToString(), StringComparison.Ordinal);
+            Assert.False(File.Exists(outputPath));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
     private static string CreateTemporaryDirectory()
     {
         string path = Path.Combine(Path.GetTempPath(), $"photoidentity-{Guid.NewGuid():N}");
