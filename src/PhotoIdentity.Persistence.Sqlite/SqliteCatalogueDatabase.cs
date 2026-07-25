@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -169,6 +169,19 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 1;
         """;
 
+    private const string VersionTwoMigration = """
+        ALTER TABLE assets ADD COLUMN last_seen_at_utc TEXT NULL;
+        ALTER TABLE assets ADD COLUMN deleted_at_utc TEXT NULL;
+        UPDATE assets
+        SET last_seen_at_utc = created_at_utc
+        WHERE last_seen_at_utc IS NULL;
+        CREATE INDEX IF NOT EXISTS ix_assets_source_presence
+            ON assets (source_id, deleted_at_utc, source_key);
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (2, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 2;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -205,9 +218,15 @@ public sealed class SqliteCatalogueDatabase
                 $"Database schema version {version} is newer than supported version {CurrentSchemaVersion}.");
         }
 
-        if (version == 0)
+        if (version < 1)
         {
-            await ApplyVersionOneAsync(connection, cancellationToken);
+            await ApplyMigrationAsync(connection, VersionOneSchema, cancellationToken);
+            version = 1;
+        }
+
+        if (version < 2)
+        {
+            await ApplyMigrationAsync(connection, VersionTwoMigration, cancellationToken);
         }
     }
 
@@ -240,14 +259,15 @@ public sealed class SqliteCatalogueDatabase
         return Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private static async Task ApplyVersionOneAsync(
+    private static async Task ApplyMigrationAsync(
         SqliteConnection connection,
+        string sql,
         CancellationToken cancellationToken)
     {
         using SqliteTransaction transaction = connection.BeginTransaction();
         using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = VersionOneSchema;
+        command.CommandText = sql;
         await command.ExecuteNonQueryAsync(cancellationToken);
         transaction.Commit();
     }
