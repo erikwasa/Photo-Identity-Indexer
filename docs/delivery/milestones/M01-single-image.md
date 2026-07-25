@@ -13,7 +13,7 @@ depends_on: [M00]
 
 ## Work items
 
-WI-0005 through WI-0010.
+WI-0005 through WI-0010, plus WI-0026 for the local Windows verification checkpoint before ONNX inference.
 
 ## Exit criteria
 
@@ -21,3 +21,4 @@ WI-0005 through WI-0010.
 - Embeddings are reproducible within tolerance.
 - CPU inference works on Windows.
 - Failures are actionable.
+- The local verification harness has passed with real private images before YuNet implementation begins.
