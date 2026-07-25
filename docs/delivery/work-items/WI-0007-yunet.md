@@ -46,4 +46,6 @@ Draft pull request [#12](https://github.com/erikwasa/Photo-Identity-Indexer/pull
 
 Deterministic tests cover preprocessing channel order, normalised boxes, landmark ordering, confidence thresholding and explicit invalid-shape failures without downloading model binaries.
 
+GitHub Actions run [30164144590](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30164144590) passed restore, build, all tests, living-document validation, generated-document checks and the Windows mixed-media verifier smoke path.
+
 The remaining completion check is a local run with the installed YuNet model and representative private photos so boxes and landmarks can be inspected visually.
