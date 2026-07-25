@@ -20,21 +20,10 @@ Create application-owned identifiers, geometry, landmarks, embeddings, model des
 - [x] IoU and vector behaviour are unit-tested.
 - [x] Core has no EF Core, OpenCV, ONNX Runtime, Azure SDK or Graph dependency.
 
-## Implemented surface
-
-- strongly typed entity, model and alignment identifiers
-- separate pixel and normalised geometry types
-- bounding-box conversion and intersection-over-union
-- five-point face landmarks
-- immutable neutral image buffers
-- immutable embedding vectors with cosine similarity
-- model descriptors with hashes and model metadata
-- source, staging, decoding, detection, alignment, embedding and matching ports
-
 ## Verification
 
-Pull request [#3](https://github.com/erikwasa/Photo-Identity-Indexer/pull/3) contains the implementation.
+Pull request [#3](https://github.com/erikwasa/Photo-Identity-Indexer/pull/3) was merged after human review.
 
-GitHub Actions run [30130764843](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30130764843) successfully restored, built and tested the solution on Windows with .NET 10.
+GitHub Actions run [30131013371](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30131013371) restored, built and tested the final pull-request head on Windows with .NET 10.
 
-Human review and merge are still required before this work item is completed.
+Merge commit: `93d58f0de6afbcbcc32fc265a7c1ca79e0941ed6`.

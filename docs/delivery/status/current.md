@@ -1,32 +1,25 @@
 # Current delivery status
 
-This page is a human-readable snapshot. The YAML files in this directory are canonical.
+Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
-## Current milestone
+## Milestones
 
-**M00 — Repository and architecture** (`in_progress`)
+- **M00 — Repository and architecture**: `in_progress`
+- **M01 — Single-image inference**: `ready`
+- **M02 — Local catalogue and jobs**: `ready`
+
+## Active work
+
+- [**WI-0004 — Add documentation status tooling**](../work-items/WI-0004-docs-tooling.md) — `in_review`; owner: `ai-agent`
 
 ## Recently completed
 
-**WI-0002 — Create solution skeleton**
+- [**WI-0003 — Define core identifiers and contracts**](../work-items/WI-0003-core-types.md) — `completed`; owner: `ai-agent`
+- [**WI-0002 — Create solution skeleton**](../work-items/WI-0002-solution-skeleton.md) — `completed`; owner: `ai-agent`
+- [**WI-0001 — Establish living documentation**](../work-items/WI-0001-living-documentation.md) — `completed`; owner: `ai-agent`
 
-- Status: `completed`
-- Evidence: pull request [#2](https://github.com/erikwasa/Photo-Identity-Indexer/pull/2)
-- CI: [successful Windows .NET 10 build and test](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30129316996)
-- Merge commit: `0fedd16f131396ec05a175714736346f6cec23a8`
+## Next ready work
 
-## Active review
-
-**WI-0003 — Define core identifiers and contracts**
-
-- Owner: AI agent
-- Branch: `agent/WI-0003-core-contracts`
-- Pull request: [#3](https://github.com/erikwasa/Photo-Identity-Indexer/pull/3)
-- Status: `in_review`
-- CI: [successful Windows .NET 10 build and test](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30130764843)
-- Required verification: human review and merge
-
-## Next dependency-bound items
-
-- WI-0004 becomes ready after WI-0003 is completed.
-- WI-0005 and WI-0006 also depend on WI-0003 but belong to the next milestone.
+- [**WI-0005 — Add model installation and verification**](../work-items/WI-0005-model-installation.md) — `proposed`; owner: `unassigned`
+- [**WI-0006 — Implement image decoding**](../work-items/WI-0006-image-decoder.md) — `proposed`; owner: `unassigned`
+- [**WI-0011 — Add SQLite persistence**](../work-items/WI-0011-sqlite.md) — `proposed`; owner: `unassigned`

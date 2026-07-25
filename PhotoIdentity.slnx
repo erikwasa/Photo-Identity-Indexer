@@ -12,8 +12,10 @@
   <Project Path="src/PhotoIdentity.Worker/PhotoIdentity.Worker.csproj" />
   <Project Path="tests/PhotoIdentity.Bundle.Tests/PhotoIdentity.Bundle.Tests.csproj" />
   <Project Path="tests/PhotoIdentity.Core.Tests/PhotoIdentity.Core.Tests.csproj" />
+  <Project Path="tests/PhotoIdentity.Docs.Tests/PhotoIdentity.Docs.Tests.csproj" />
   <Project Path="tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj" />
   <Project Path="tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj" />
   <Project Path="tests/PhotoIdentity.Recognition.Tests/PhotoIdentity.Recognition.Tests.csproj" />
   <Project Path="tests/PhotoIdentity.Source.Tests/PhotoIdentity.Source.Tests.csproj" />
+  <Project Path="tools/PhotoIdentity.Docs/PhotoIdentity.Docs.csproj" />
 </Solution>

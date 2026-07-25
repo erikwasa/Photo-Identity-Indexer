@@ -32,7 +32,14 @@ Never commit personal photos, face crops, embeddings, biometric datasets, model 
 
 ## Status workflow
 
-The YAML registries are canonical.
+The YAML registries are canonical. Use `PhotoIdentity.Docs` instead of hand-editing status when the required command is available.
+
+```powershell
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- next
+dotnet run --project tools/PhotoIdentity.Docs -- start WI-0005 --owner ai-agent --branch agent/WI-0005
+dotnet run --project tools/PhotoIdentity.Docs -- review WI-0005
+```
 
 - `proposed` → identified but not ready
 - `ready` → scoped and unblocked
@@ -55,3 +62,4 @@ Before work, mark the item `in_progress`. After implementation, add evidence and
 - The affected documentation is updated.
 - `BUILD_CONTEXT.md` reflects the next concrete step.
 - Evidence is recorded in `work-items.yaml`.
+- `PhotoIdentity.Docs validate` and `generate --check` pass.

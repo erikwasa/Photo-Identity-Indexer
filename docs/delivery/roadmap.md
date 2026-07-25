@@ -1,12 +1,12 @@
 # Roadmap
 
-Status is canonical in [`status/milestones.yaml`](status/milestones.yaml).
+Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit the table manually.
 
 | Milestone | Outcome | Current status |
 |---|---|---|
 | M00 | Repository and architecture | in_progress |
-| M01 | Single-image inference | proposed |
-| M02 | Local catalogue and jobs | proposed |
+| M01 | Single-image inference | ready |
+| M02 | Local catalogue and jobs | ready |
 | M03 | OneDrive synchronised source | proposed |
 | M04 | Minimal review application | proposed |
 | M05 | Identity matching | proposed |
