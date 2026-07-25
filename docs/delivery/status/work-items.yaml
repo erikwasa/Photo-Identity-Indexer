@@ -129,14 +129,16 @@ work_items:
 - id: WI-0007
   title: Implement YuNet detection
   milestone: M01
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0007-yunet.md
-  blockers:
-  - WI-0005
-  - WI-0006
-  - WI-0026
-  evidence: []
+  started_at: '2026-07-25'
+  last_updated_at: '2026-07-25'
+  branch: agent/WI-0007-yunet
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/12
 - id: WI-0008
   title: Implement face crops and alignment
   milestone: M01
@@ -312,13 +314,28 @@ work_items:
 - id: WI-0026
   title: Add local developer verification
   milestone: M01
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0026-local-verification.md
   started_at: '2026-07-25'
+  completed_at: '2026-07-25'
+  verified_at: '2026-07-25'
+  verified_by: human
   last_updated_at: '2026-07-25'
   branch: agent/WI-0026-local-verification
   blockers: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/7
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/8
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/9
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/10
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/11
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30162808500
+  - type: merge_commit
+    value: c7002eca9ebeb8f00e2fcdb96bb6a0e31d252063
