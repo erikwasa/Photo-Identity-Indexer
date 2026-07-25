@@ -182,6 +182,7 @@ public sealed class SqliteCatalogueDatabase
             Mode = SqliteOpenMode.ReadWriteCreate,
             Cache = SqliteCacheMode.Shared,
             ForeignKeys = true,
+            Pooling = false,
         }.ToString();
     }
 
