@@ -39,7 +39,18 @@ jobs:
           retention-days: 1
 
       - name: Test
-        run: dotnet test PhotoIdentity.slnx --configuration Release --no-build
+        shell: pwsh
+        run: |
+          dotnet test PhotoIdentity.slnx --configuration Release --no-build 2>&1 | Tee-Object -FilePath test.log
+          exit $LASTEXITCODE
+
+      - name: Upload test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-diagnostics
+          path: test.log
+          retention-days: 1
 
       - name: Validate living documentation
         run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- validate

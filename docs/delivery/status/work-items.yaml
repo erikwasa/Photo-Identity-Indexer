@@ -69,10 +69,13 @@ work_items:
 - id: WI-0004
   title: Add documentation status tooling
   milestone: M00
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0004-docs-tooling.md
   started_at: '2026-07-25'
+  completed_at: '2026-07-25'
+  verified_at: '2026-07-25'
+  verified_by: human
   last_updated_at: '2026-07-25'
   branch: agent/WI-0004-docs-tooling
   blockers: []
@@ -80,16 +83,24 @@ work_items:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/4
   - type: workflow
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30132244049
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30132402177
+  - type: merge_commit
+    value: 46b4a549cd8ad23def2a321c0cdc55b1bb7611da
 - id: WI-0005
   title: Add model installation and verification
   milestone: M01
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0005-model-installation.md
-  blockers:
-  - WI-0003
-  evidence: []
+  started_at: '2026-07-25'
+  last_updated_at: '2026-07-25'
+  branch: agent/WI-0005-model-installation
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/5
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30137094223
 - id: WI-0006
   title: Implement image decoding
   milestone: M01

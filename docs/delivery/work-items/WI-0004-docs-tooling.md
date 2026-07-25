@@ -36,6 +36,6 @@ dotnet run --project tools/PhotoIdentity.Docs -- complete WI-0005 --evidence-typ
 
 ## Verification
 
-Pull request [#4](https://github.com/erikwasa/Photo-Identity-Indexer/pull/4) contains the implementation.
+Pull request [#4](https://github.com/erikwasa/Photo-Identity-Indexer/pull/4) was merged as commit `46b4a549cd8ad23def2a321c0cdc55b1bb7611da`.
 
-GitHub Actions run [30132244049](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30132244049) successfully restored, built, tested, validated documentation links and registries, and verified generated files on Windows with .NET 10.
+GitHub Actions run [30132402177](https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30132402177) successfully restored, built, tested, validated documentation links and registries, and verified generated files on Windows with .NET 10.

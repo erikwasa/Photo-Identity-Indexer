@@ -4,8 +4,8 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 
 | Milestone | Outcome | Current status |
 |---|---|---|
-| M00 | Repository and architecture | in_progress |
-| M01 | Single-image inference | ready |
+| M00 | Repository and architecture | completed |
+| M01 | Single-image inference | in_progress |
 | M02 | Local catalogue and jobs | ready |
 | M03 | OneDrive synchronised source | proposed |
 | M04 | Minimal review application | proposed |

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "modelId": "sface-2021dec-fp32",
+  "role": "faceEmbedding",
+  "format": "onnx",
+  "fileName": "face_recognition_sface_2021dec.onnx",
+  "downloadUri": "https://github.com/opencv/opencv_zoo/raw/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface/face_recognition_sface_2021dec.onnx",
+  "sha256": "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79",
+  "sizeBytes": 38696353,
+  "runtime": "onnxruntime",
+  "sourceVersion": "opencv/opencv_zoo@47534e27c9851bb1128ccc0102f1145e27f23f98",
+  "input": {
+    "width": 112,
+    "height": 112,
+    "colourOrder": "BGR",
+    "dataType": "float32",
+    "normalisation": {
+      "scale": 0.0078125,
+      "mean": [127.5, 127.5, 127.5]
+    }
+  },
+  "output": {
+    "kind": "embedding",
+    "dimensions": 128,
+    "normalisation": "l2-by-adapter",
+    "distanceMetric": "cosine",
+    "semantics": "One 128-dimensional face embedding. The application adapter L2-normalises the vector before persistence and comparison."
+  },
+  "alignmentProtocol": "sface-five-point-v1",
+  "licences": {
+    "code": {
+      "spdx": "Apache-2.0",
+      "source": "https://github.com/opencv/opencv_zoo/blob/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface/LICENSE"
+    },
+    "weights": {
+      "spdx": "Apache-2.0",
+      "source": "https://github.com/opencv/opencv_zoo/blob/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface/LICENSE"
+    },
+    "trainingData": {
+      "name": "See SFace upstream paper and repository",
+      "licence": "not asserted by this project",
+      "notes": "The upstream model documentation describes MobileFaceNet instances trained with SFace loss. Review source-dataset terms before model training or redistribution."
+    }
+  }
+}
