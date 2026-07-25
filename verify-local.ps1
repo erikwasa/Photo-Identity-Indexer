@@ -5,6 +5,8 @@ param(
 
     [switch] $InstallModels,
 
+    [switch] $SkipModels,
+
     [Alias("Images")]
     [string[]] $Image = @(),
 
@@ -24,6 +26,10 @@ if (($MaxWidth -eq 0) -ne ($MaxHeight -eq 0)) {
     throw "MaxWidth and MaxHeight must both be zero or both be positive."
 }
 
+if ($InstallModels -and $SkipModels) {
+    throw "InstallModels and SkipModels cannot be used together."
+}
+
 $root = $PSScriptRoot
 $artifactDirectory = Join-Path $root ".artifacts/local-verification"
 $reportPath = Join-Path $artifactDirectory "verification-report.json"
@@ -39,6 +45,7 @@ $report = [ordered]@{
     build = "pending"
     tests = "pending"
     documentation = "pending"
+    modelsSkipped = [bool] $SkipModels
     models = @()
     manualImagesProvided = ($Image.Count -gt 0)
     decoderChecks = @()
@@ -48,6 +55,7 @@ $report = [ordered]@{
 $exitCode = 0
 
 function Invoke-CheckedCommand {
+    [CmdletBinding(DefaultParameterSetName = "ArgumentList")]
     param(
         [Parameter(Mandatory)]
         [string] $Name,
@@ -55,15 +63,28 @@ function Invoke-CheckedCommand {
         [Parameter(Mandatory)]
         [string] $FilePath,
 
-        [string[]] $Arguments = @()
+        [Parameter(ParameterSetName = "ArgumentList")]
+        [string[]] $ArgumentList = @(),
+
+        [Parameter(ParameterSetName = "Parameters")]
+        [hashtable] $Parameters = @{}
     )
 
     Write-Host "`n== $Name =="
-    $commandOutput = & $FilePath @Arguments 2>&1
+
+    $LASTEXITCODE = 0
+    if ($PSCmdlet.ParameterSetName -eq "Parameters") {
+        $commandOutput = & $FilePath @Parameters 2>&1
+    }
+    else {
+        $commandOutput = & $FilePath @ArgumentList 2>&1
+    }
+
+    $commandSucceeded = $?
     $nativeExitCode = $LASTEXITCODE
     $commandOutput | ForEach-Object { Write-Host $_ }
 
-    if ($nativeExitCode -ne 0) {
+    if (-not $commandSucceeded -or $nativeExitCode -ne 0) {
         throw "$Name failed with exit code $nativeExitCode."
     }
 
@@ -101,7 +122,7 @@ function Invoke-DecodeCheck {
         $arguments += @("--max-width", $MaxWidth.ToString(), "--max-height", $MaxHeight.ToString())
     }
 
-    Invoke-CheckedCommand -Name ("Decode check {0}" -f $Index) -FilePath "dotnet" -Arguments $arguments | Out-Null
+    Invoke-CheckedCommand -Name ("Decode check {0}" -f $Index) -FilePath "dotnet" -ArgumentList $arguments | Out-Null
     $caseReport = Get-Content -LiteralPath $caseReportPath -Raw | ConvertFrom-Json
 
     return [ordered]@{
@@ -154,25 +175,25 @@ function Invoke-UnsupportedCheck {
 }
 
 try {
-    $dotnetVersionOutput = Invoke-CheckedCommand -Name ".NET SDK" -FilePath "dotnet" -Arguments @("--version")
+    $dotnetVersionOutput = Invoke-CheckedCommand -Name ".NET SDK" -FilePath "dotnet" -ArgumentList @("--version")
     $report.dotnetVersion = ($dotnetVersionOutput | Select-Object -Last 1).Trim()
 
     Invoke-CheckedCommand `
         -Name "Restore and build" `
         -FilePath (Join-Path $root "build.ps1") `
-        -Arguments @("-Configuration", $Configuration) | Out-Null
+        -Parameters @{ Configuration = $Configuration } | Out-Null
     $report.build = "passed"
 
     Invoke-CheckedCommand `
         -Name "Automated tests" `
         -FilePath (Join-Path $root "test.ps1") `
-        -Arguments @("-Configuration", $Configuration) | Out-Null
+        -Parameters @{ Configuration = $Configuration } | Out-Null
     $report.tests = "passed"
 
     Invoke-CheckedCommand `
         -Name "Living-document validation" `
         -FilePath "dotnet" `
-        -Arguments @(
+        -ArgumentList @(
             "run", "--project", (Join-Path $root "tools/PhotoIdentity.Docs"),
             "--configuration", $Configuration,
             "--no-build", "--", "validate"
@@ -181,49 +202,51 @@ try {
     Invoke-CheckedCommand `
         -Name "Generated-document consistency" `
         -FilePath "dotnet" `
-        -Arguments @(
+        -ArgumentList @(
             "run", "--project", (Join-Path $root "tools/PhotoIdentity.Docs"),
             "--configuration", $Configuration,
             "--no-build", "--", "generate", "--check"
         ) | Out-Null
     $report.documentation = "passed"
 
-    $modelList = Invoke-CheckedCommand `
-        -Name "Model manifests" `
-        -FilePath "dotnet" `
-        -Arguments @(
-            "run", "--project", (Join-Path $root "tools/PhotoIdentity.Models"),
-            "--configuration", $Configuration,
-            "--no-build", "--", "list", "--root", $root
-        )
+    if (-not $SkipModels) {
+        $modelList = Invoke-CheckedCommand `
+            -Name "Model manifests" `
+            -FilePath "dotnet" `
+            -ArgumentList @(
+                "run", "--project", (Join-Path $root "tools/PhotoIdentity.Models"),
+                "--configuration", $Configuration,
+                "--no-build", "--", "list", "--root", $root
+            )
 
-    if ($InstallModels) {
+        if ($InstallModels) {
+            Invoke-CheckedCommand `
+                -Name "Model installation" `
+                -FilePath (Join-Path $root "models/install-models.ps1") | Out-Null
+        }
+
         Invoke-CheckedCommand `
-            -Name "Model installation" `
-            -FilePath (Join-Path $root "models/install-models.ps1") | Out-Null
-    }
+            -Name "Model verification" `
+            -FilePath "dotnet" `
+            -ArgumentList @(
+                "run", "--project", (Join-Path $root "tools/PhotoIdentity.Models"),
+                "--configuration", $Configuration,
+                "--no-build", "--", "verify", "--root", $root
+            ) | Out-Null
 
-    Invoke-CheckedCommand `
-        -Name "Model verification" `
-        -FilePath "dotnet" `
-        -Arguments @(
-            "run", "--project", (Join-Path $root "tools/PhotoIdentity.Models"),
-            "--configuration", $Configuration,
-            "--no-build", "--", "verify", "--root", $root
-        ) | Out-Null
-
-    $report.models = @(
-        $modelList |
-            Where-Object { $_ -match "\t" } |
-            ForEach-Object {
-                $modelId = ($_ -split "\t")[0]
-                [ordered]@{
-                    id = $modelId
-                    installed = $true
-                    verified = $true
+        $report.models = @(
+            $modelList |
+                Where-Object { $_ -match "\t" } |
+                ForEach-Object {
+                    $modelId = ($_ -split "\t")[0]
+                    [ordered]@{
+                        id = $modelId
+                        installed = $true
+                        verified = $true
+                    }
                 }
-            }
-    )
+        )
+    }
 
     $decodeChecks = @()
     for ($index = 0; $index -lt $Image.Count; $index++) {
