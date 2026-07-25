@@ -5,6 +5,9 @@ namespace PhotoIdentity_Integration_Tests;
 
 public sealed class DecodeCommandTests
 {
+    private static readonly byte[] PngSignature =
+        [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+
     private static readonly byte[] OnePixelPng = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlS8AAAAASUVORK5CYII=");
 
@@ -38,8 +41,7 @@ public sealed class DecodeCommandTests
             Assert.Equal(original, await File.ReadAllBytesAsync(inputPath));
 
             byte[] encoded = await File.ReadAllBytesAsync(outputPath);
-            Assert.True(encoded.AsSpan().StartsWith(
-                [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+            Assert.True(encoded.AsSpan().StartsWith(PngSignature));
 
             string json = await File.ReadAllTextAsync(reportPath);
             Assert.False(json.Contains(inputPath, StringComparison.OrdinalIgnoreCase));
