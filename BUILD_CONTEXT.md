@@ -8,12 +8,12 @@
 
 **WI-0012 — Add local folder scanning**
 
-Status: `in_progress`
+Status: `in_review`
 
 ## Branch and pull request
 
 - Branch: `agent/WI-0012-local-folder-scanning`
-- Pull request: pending creation
+- Draft pull request: [#23 — Add local folder catalogue scanning](https://github.com/erikwasa/Photo-Identity-Indexer/pull/23)
 
 ## Objective
 
@@ -59,7 +59,7 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 WI-0011 completed through pull requests #17–#22. The final operational-policy pull request #22 merged at `35814a403d7d53d38105daa0cc4c1a2c616fbacf`; GitHub Actions run `30178418550` passed restore and vulnerability audit, Release build, all tests, living-document checks and Windows mixed-media verification.
 
-The current branch relies on GitHub Actions for executable validation because this agent environment does not contain the .NET SDK.
+Draft pull request #23 relies on GitHub Actions for executable validation because this agent environment does not contain the .NET SDK.
 
 ## Known issues
 
@@ -70,4 +70,4 @@ The current branch relies on GitHub Actions for executable validation because th
 
 ## Next action
 
-Open the WI-0012 draft pull request, resolve CI or review findings, then move the work item to human review.
+Resolve CI or review findings on pull request #23, then complete WI-0012 after merge and human verification.
