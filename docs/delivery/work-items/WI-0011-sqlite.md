@@ -69,7 +69,9 @@ Pull request [#21](https://github.com/erikwasa/Photo-Identity-Indexer/pull/21) a
 
 ## Operational persistence policy
 
-The [SQLite persistence operations](../../operations/sqlite-persistence.md) document defines the supported operating boundary:
+Pull request [#22](https://github.com/erikwasa/Photo-Identity-Indexer/pull/22) added the [SQLite persistence operations](../../operations/sqlite-persistence.md) policy. It merged as `35814a403d7d53d38105daa0cc4c1a2c616fbacf` after GitHub Actions run `30178418550` passed.
+
+The operating boundary includes:
 
 - quiesced, integrity-checked backups and restores;
 - local-disk deployment with short repository-owned writer transactions;
@@ -90,4 +92,4 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Completion
 
-All WI-0011 repository, migration, integration-test and operational-documentation scope is implemented. The work item can move from `in_review` to `completed` after the operational-policy pull request is merged and human verified.
+WI-0011 was human verified after pull request #22 merged on 26 July 2026. The versioned SQLite catalogue, typed repositories, durable processing records, integration coverage and operational policy are complete.
