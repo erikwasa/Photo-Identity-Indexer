@@ -89,10 +89,13 @@ work_items:
 - id: WI-0005
   title: Add model installation and verification
   milestone: M01
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0005-model-installation.md
   started_at: '2026-07-25'
+  completed_at: '2026-07-25'
+  verified_at: '2026-07-25'
+  verified_by: human
   last_updated_at: '2026-07-25'
   branch: agent/WI-0005-model-installation
   blockers: []
@@ -100,16 +103,24 @@ work_items:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/5
   - type: workflow
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30137094223
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30137525511
+  - type: merge_commit
+    value: 07fdaed57bcf0a3370beda42fc0fec62d331ab76
 - id: WI-0006
   title: Implement image decoding
   milestone: M01
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0006-image-decoder.md
-  blockers:
-  - WI-0003
-  evidence: []
+  started_at: '2026-07-25'
+  last_updated_at: '2026-07-25'
+  branch: agent/WI-0006-image-decoding
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/6
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30150743391
 - id: WI-0007
   title: Implement YuNet detection
   milestone: M01
