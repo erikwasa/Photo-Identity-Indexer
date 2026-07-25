@@ -34,13 +34,11 @@ Install and verify the pinned models, build the solution, run all tests and vali
 ./verify-local.ps1 -InstallModels
 ```
 
-Verify real private images without committing them to the repository:
+Verify real private images without committing them to the repository. Array-valued parameters such as `-Image` must be supplied once with all values:
 
 ```powershell
 ./verify-local.ps1 `
-  -Image "C:\PrivateVerification\normal.jpg" `
-  -Image "C:\PrivateVerification\pixel-rotated.jpg" `
-  -Image "C:\PrivateVerification\sample.png" `
+  -Image "C:\PrivateVerification\normal.jpg","C:\PrivateVerification\pixel-rotated.jpg","C:\PrivateVerification\sample.png" `
   -UnsupportedImage "C:\PrivateVerification\sample.heic"
 ```
 
