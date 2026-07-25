@@ -33,7 +33,7 @@ public sealed record CatalogueSource
 }
 
 /// <summary>
-/// Stable source-owned asset identity.
+/// Stable source-owned asset identity and its latest scan-presence state.
 /// </summary>
 public sealed record CatalogueAsset
 {
@@ -41,20 +41,44 @@ public sealed record CatalogueAsset
         AssetId id,
         SourceId sourceId,
         string sourceKey,
-        DateTimeOffset createdAtUtc)
+        DateTimeOffset createdAtUtc,
+        DateTimeOffset? lastSeenAtUtc = null,
+        DateTimeOffset? deletedAtUtc = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceKey);
+
+        DateTimeOffset created = createdAtUtc.ToUniversalTime();
+        DateTimeOffset lastSeen = (lastSeenAtUtc ?? createdAtUtc).ToUniversalTime();
+        DateTimeOffset? deleted = deletedAtUtc?.ToUniversalTime();
+        if (lastSeen < created)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(lastSeenAtUtc),
+                "The last-seen time cannot precede asset creation.");
+        }
+
+        if (deleted < created)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(deletedAtUtc),
+                "The deletion time cannot precede asset creation.");
+        }
 
         Id = id;
         SourceId = sourceId;
         SourceKey = sourceKey.Trim();
-        CreatedAtUtc = createdAtUtc.ToUniversalTime();
+        CreatedAtUtc = created;
+        LastSeenAtUtc = lastSeen;
+        DeletedAtUtc = deleted;
     }
 
     public AssetId Id { get; }
     public SourceId SourceId { get; }
     public string SourceKey { get; }
     public DateTimeOffset CreatedAtUtc { get; }
+    public DateTimeOffset LastSeenAtUtc { get; }
+    public DateTimeOffset? DeletedAtUtc { get; }
+    public bool IsDeleted => DeletedAtUtc.HasValue;
 }
 
 /// <summary>
