@@ -42,7 +42,7 @@ This boundary allows WI-0012 to catalogue files without owning SQL or converting
 
 ## Transactional face inspection repository
 
-Draft pull request [#19](https://github.com/erikwasa/Photo-Identity-Indexer/pull/19) adds the persistence boundary for complete inspection output:
+Pull request [#19](https://github.com/erikwasa/Photo-Identity-Indexer/pull/19) added the persistence boundary for complete inspection output. It merged as `382011588f7055d783a0eae4d567f4bbc0adc0c9` after GitHub Actions run `30174420996` passed.
 
 - typed occurrence, detector observation, aligned crop and embedding records;
 - one transaction for the occurrence, observation, crop and embedding graph;
@@ -51,6 +51,19 @@ Draft pull request [#19](https://github.com/erikwasa/Photo-Identity-Indexer/pull
 - immutable embeddings for an exact crop, model ID and model hash;
 - normalized geometry encoded as JSON and embedding floats encoded as deterministic little-endian binary;
 - temporary-database tests for round trips, idempotence, relationship validation and rollback.
+
+## Identity and human-label repository
+
+Draft pull request [#20](https://github.com/erikwasa/Photo-Identity-Indexer/pull/20) adds the identity persistence boundary:
+
+- typed people, human-label assignments, persisted human labels and versioned identity suggestions;
+- transactional person-plus-label writes so a failed face-occurrence reference leaves no orphaned person;
+- stable label row identities for repeated person/occurrence/label-kind assignments while reviewer metadata can be corrected;
+- human labels remain writable without observations, crops, embeddings or suggestions;
+- versioned suggestions by face occurrence, suggested person, model ID and model hash;
+- suggestion reruns refresh scores without overwriting reviewed status or original creation time;
+- explicit suggestion status transitions and typed person merge targets;
+- temporary-database tests for round trips, independence, idempotence, model versioning and rollback.
 
 ## Validation
 
@@ -62,6 +75,5 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Remaining work
 
-- Add typed people, human-label and suggestion repositories.
 - Add processing-run and processing-job repositories with update and concurrency coverage.
 - Document backup, concurrent writer and schema-upgrade behaviour before WI-0011 is completed.
