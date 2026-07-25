@@ -6,34 +6,32 @@
 
 ## Current work item
 
-**WI-0007 — Implement YuNet detection**
+**WI-0008 — Implement face crops and alignment**
 
 Status: `in_progress`
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0007-yunet`
-- Draft pull request: [#12 — Implement YuNet face detection](https://github.com/erikwasa/Photo-Identity-Indexer/pull/12)
+- Branch: `agent/WI-0008-face-alignment`
+- Draft pull request: [#14 — Implement face crops and alignment](https://github.com/erikwasa/Photo-Identity-Indexer/pull/14)
 
 ## Objective
 
-Add the pinned YuNet ONNX face detector behind the neutral `IFaceDetector` contract with deterministic preprocessing, output parsing, landmarks, confidence filtering and timing metadata.
+Create reusable padded review crops and deterministic five-point aligned model inputs with boundary handling, stable crop hashes and an explicit alignment protocol.
 
 ## Relevant files
 
-- `src/PhotoIdentity.Recognition.Onnx/YuNet/YuNetFaceDetector.cs`
-- `src/PhotoIdentity.Recognition.Onnx/YuNet/YuNetOutputParser.cs`
-- `src/PhotoIdentity.Recognition.Onnx/YuNet/OnnxYuNetInferenceSession.cs`
-- `src/PhotoIdentity.Recognition.Onnx/PhotoIdentity.Recognition.Onnx.csproj`
-- `tests/PhotoIdentity.Recognition.Tests/YuNetDetectorTests.cs`
-- `models/manifests/yunet-2023mar-fp32.json`
-- `docs/delivery/work-items/WI-0007-yunet.md`
+- `src/PhotoIdentity.Imaging.OpenCv/OpenCvFaceCropper.cs`
+- `src/PhotoIdentity.Imaging.OpenCv/OpenCvFaceAligner.cs`
+- `src/PhotoIdentity.Imaging.OpenCv/README.md`
+- `tests/PhotoIdentity.Recognition.Tests/FaceCropAndAlignmentTests.cs`
+- `models/manifests/sface-2021dec-fp32.json`
+- `docs/delivery/work-items/WI-0008-alignment.md`
 - `docs/delivery/status/work-items.yaml`
 
 ## Commands
 
 ```powershell
-./models/install-models.ps1 -Id yunet-2023mar-fp32
 dotnet test tests/PhotoIdentity.Recognition.Tests/PhotoIdentity.Recognition.Tests.csproj
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
@@ -41,28 +39,27 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Acceptance test
 
-- Input image frames are resized and converted to channel-first float32 tensors using manifest preprocessing metadata.
-- All twelve YuNet tensors are required and their shapes are checked against the model input dimensions and strides.
-- Class and object scores, boxes and five landmarks are decoded with the OpenCV YuNet semantics.
-- Confidence thresholding, top-K limiting and non-maximum suppression are deterministic.
-- Output boxes and landmarks use application-owned normalised geometry.
-- YuNet right/left landmark order is mapped to the core semantic contract.
-- Model descriptor and preprocessing, inference and postprocessing durations are returned.
-- Invalid shapes and non-finite model outputs fail explicitly.
-- Representative private photos still require visual box and landmark inspection before completion.
+- Padded crops expand outwards from a normalised detection and remain inside decoded source bounds.
+- Crop pixels are packed independently of source stride padding.
+- Crop SHA-256 digests are stable for equivalent pixels across repeated runs.
+- `sface-five-point-v1` produces fixed 112×112 `AlignedFace` values.
+- Anatomical landmark semantics are reordered explicitly into the OpenCV SFace reference-template order.
+- Rotated synthetic fixtures align back to the canonical model input.
+- Unsupported protocols and degenerate landmark configurations fail explicitly.
+- OpenCV types remain behind the imaging adapter boundary.
 
 ## Verification
 
-WI-0026 was completed after PR #11 merged, GitHub Actions run `30162808500` passed, and the developer confirmed the private JPEG, PNG, EXIF-rotated Pixel and unsupported-media checks locally.
+WI-0007 is complete. Pull requests #12 and #13 merged, their final Windows workflows passed, and the developer confirmed correct YuNet boxes and landmarks on representative private photos.
 
-GitHub Actions run `30164144590` passed the full Windows workflow for PR #12: restore, build, all tests, living-document validation, generated-document checks and the mixed-media local-verifier smoke path.
+The WI-0008 branch uses synthetic edge and rotation fixtures so no private or biometric image data is committed. GitHub Actions run `30167129536` passed restore, Release build, all tests, living-document validation, generated-document checks and the Windows mixed-media verifier.
 
 ## Known issues
 
-- The current execution provider is CPU-only.
-- The pinned 2023mar YuNet model has a fixed 320x320 input, so preprocessing resizes the whole image to that shape and maps results back through normalised coordinates.
-- The repository has no public photo fixture suitable for visual correctness assertions; final verification uses private local images and must not commit outputs.
+- The alignment implementation currently supports only the manifest-owned `sface-five-point-v1` protocol.
+- Constant zero fill is used when the affine transform samples beyond source bounds.
+- The current native test runtime is Windows; hosts on other platforms must select their matching OpenCvSharp runtime package.
 
 ## Next action
 
-Run the installed YuNet model against representative private photos, inspect boxes and landmarks, then mark WI-0007 in review and make pull request #12 ready for review.
+Review pull request #14, inspect the deterministic crop and alignment contract, then merge and mark WI-0008 completed before starting WI-0009.
