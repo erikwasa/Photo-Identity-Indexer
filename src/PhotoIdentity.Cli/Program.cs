@@ -40,6 +40,10 @@ public static class Program
         {
             return args[0] switch
             {
+                "batch" => await BatchCommandRunner.RunAsync(
+                    BatchCommandOptions.Parse(args.Skip(1).ToArray()),
+                    output,
+                    cancellationToken),
                 "decode" => await DecodeCommandRunner.RunAsync(
                     DecodeCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
@@ -73,12 +77,18 @@ public static class Program
         output.WriteLine("""
             Photo Identity Indexer CLI
 
+              batch status --database PATH --run RUN_ID
+              batch cancel --database PATH --run RUN_ID
+
               decode --input PATH --output PATH [--report PATH]
                      [--max-width PIXELS --max-height PIXELS] [--verbose]
 
               inspect PATH [--output DIR] [--root PATH] [--model-dir DIR]
                            [--confidence 0..1] [--padding RATIO]
                            [--overwrite] [--verbose]
+
+            The batch status command reports durable progress counts. Batch cancel
+            atomically cancels queued and active work and invalidates active leases.
 
             The decode command reads JPEG or PNG content, applies EXIF orientation,
             optionally downsizes it, and writes a normalised PNG without modifying the input.
