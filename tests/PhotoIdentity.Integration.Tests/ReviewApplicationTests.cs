@@ -240,7 +240,7 @@ public sealed class ReviewApplicationTests
         string CropPath,
         byte[] CropBytes);
 
-    private sealed class ReviewApiFactory : WebApplicationFactory<Program>
+    private sealed class ReviewApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
     {
         private readonly string _databasePath;
 
