@@ -174,7 +174,7 @@ internal static class PortableBundlePath
         string normalized = path.Replace('\\', '/').Trim('/');
         string[] segments = normalized.Split('/');
         if (normalized.Length == 0 ||
-            normalized.Contains(':', StringComparison.Ordinal) ||
+            normalized.Contains(':') ||
             Path.IsPathRooted(normalized) ||
             segments.Any(segment => segment.Length == 0 || segment is "." or ".."))
         {
