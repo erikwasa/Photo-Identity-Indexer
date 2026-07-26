@@ -21,6 +21,8 @@ A local ASP.NET Core API and responsive Blazor PWA allow face review, person cre
 - Sensitive local paths are not unnecessarily exposed.
 - Human review works comfortably on the phone.
 
-## Current work
+## Completion
 
-WI-0015 is implementing a same-origin local review host. SQLite schema version 4 stores append-only assignment, rejection and undo actions. The API owns filesystem and database access, and the Blazor WebAssembly client receives opaque image URLs and privacy-limited metadata. Automated tests cover restart persistence, audit history, reversal ordering and path redaction; Windows and Pixel interaction remain the final human acceptance boundary.
+WI-0015 provides a same-origin local review host. SQLite schema version 4 stores append-only assignment, rejection and undo actions. The API owns filesystem and database access, and the Blazor WebAssembly client receives opaque image URLs and privacy-limited metadata.
+
+Automated tests cover restart persistence, audit history, reversal ordering, path redaction, published-client hosting and production-shaped batch-relative crop resolution. The maintainer completed the final Windows and Pixel trusted-network interaction verification on 2026-07-27. M04 is complete.

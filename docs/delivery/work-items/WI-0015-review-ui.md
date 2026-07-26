@@ -15,12 +15,12 @@ Create a local ASP.NET Core API and responsive Blazor PWA for face galleries, pe
 
 ## Acceptance criteria
 
-- [ ] The UI works on Windows and a Pixel on a trusted network.
+- [x] The UI works on Windows and a Pixel on a trusted network.
 - [x] Labels persist after restart.
 - [x] Review actions are auditable and reversible.
 - [x] Sensitive source paths are not unnecessarily returned to the browser.
 
-The remaining criterion requires human interaction and layout verification on the target Windows computer and Pixel device. Automated coverage validates the persistence, API and privacy boundaries but cannot prove touch comfort or trusted-network setup.
+The maintainer completed the final Windows and Pixel interaction check on 2026-07-27, including trusted-network access, touch interaction, assignment, rejection, undo, restart persistence and privacy-limited details.
 
 ## Architecture
 
@@ -48,7 +48,7 @@ The local API provides:
 - assignment, rejection and one-step undo;
 - face-image streaming through an opaque occurrence URL.
 
-Image files are resolved only inside the API process. Missing crop files return not found without exposing their server path. Every `/api/review` response sends `Cache-Control: no-store`, including JSON and face images, so ordinary browser HTTP caching is explicitly disabled.
+Image files are resolved only inside the API process. Missing crop files return not found without exposing their server path. Batch-relative crop paths are resolved against the matching processing run's persisted output root and converted to validated physical paths before streaming. Every `/api/review` response sends `Cache-Control: no-store`, including JSON and face images, so ordinary browser HTTP caching is explicitly disabled.
 
 ## Responsive web application
 
@@ -83,14 +83,25 @@ Use the printed localhost URL on Windows and a printed LAN URL on the Pixel. Kee
 
 ## Operator command for a real catalogue
 
+Publish the hosted application so the Blazor client is present under `wwwroot`, then run the published API from its publish directory:
+
 ```powershell
+$publish = Join-Path $PWD ".artifacts\review-app"
+
+dotnet publish `
+  .\src\PhotoIdentity.Api\PhotoIdentity.Api.csproj `
+  --configuration Release `
+  --output $publish
+
 $env:PhotoIdentity__DatabasePath = "C:\PhotoIdentity\catalogue.db"
-dotnet run --project src/PhotoIdentity.Api --urls "http://0.0.0.0:5080"
+
+Push-Location $publish
+dotnet .\PhotoIdentity.Api.dll --urls "http://0.0.0.0:5080"
 ```
 
-Open `http://localhost:5080` on Windows. For Pixel verification, use the computer's LAN address on a trusted network and permit the selected port through Windows Firewall only for the intended network profile.
+Open `http://localhost:5080` on Windows. For Pixel verification, use the computer's LAN address on a trusted network and permit the selected port through Windows Firewall only for the intended network profile. Stop the application before running `Pop-Location`.
 
-## Validation
+## Validation and completion
 
 ```powershell
 ./verify-review.ps1 -Mode Smoke -Configuration Release
@@ -101,12 +112,15 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 Pull request [#27](https://github.com/erikwasa/Photo-Identity-Indexer/pull/27) merged the schema migration, review repository, same-origin API, responsive client and integration coverage at `88f5c2c1b2dbccea9e99870405bbb9e280aa1d00`. Pull request [#28](https://github.com/erikwasa/Photo-Identity-Indexer/pull/28) merged the isolated device-verification harness at `2dbb4de34df81ebfe2b326f0bc4fb48369d46b81`.
 
-GitHub Actions run `30191749014` passed the published hosted-client smoke path, synthetic gallery and image streaming, privacy/cache checks, assignment and undo, documentation validation and the existing Windows mixed-media verification. WI-0015 remains open because this automated evidence does not establish successful interaction on the maintainer's actual Windows and Pixel devices.
+GitHub Actions run `30191749014` passed the published hosted-client smoke path, synthetic gallery and image streaming, privacy/cache checks, assignment and undo, documentation validation and the existing Windows mixed-media verification.
+
+During the real-catalogue acceptance run, batch-generated relative crop paths exposed a physical-versus-virtual path-resolution defect. Pull request [#31](https://github.com/erikwasa/Photo-Identity-Indexer/pull/31) resolved those paths against the processing run output root, rejected root escapes and added production-shaped integration coverage. GitHub Actions run `30221154431` passed on that fix.
+
+The maintainer then reported successful Windows and Pixel interaction verification on 2026-07-27. WI-0015 and M04 are complete.
 
 ## Deliberate limitations
 
 - Authentication and per-user identities are not included; this slice is limited to a trusted local network and the client currently reports a local actor string.
 - Person rename, merge and bulk review are outside WI-0015.
 - Historical `person_labels` rows are retained; current review state must be read through the review-action projection.
-- Automated smoke checks cannot prove Pixel touch comfort or real LAN reachability.
-- The final Windows and Pixel verification remains a human acceptance step.
+- PWA installation over trusted-network HTTP is not part of the acceptance boundary.

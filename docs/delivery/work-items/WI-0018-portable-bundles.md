@@ -22,7 +22,7 @@ Implement job and result bundles with manifests, checksums, full-image, reduced-
 - [x] Operator commands export, process and import verified bundles.
 - [ ] A privacy-safe real-image round trip exercises the production commands.
 
-The model-independent and production command paths are automated. WI-0018 remains in progress until a maintainer runs the commands against ignored private media and retains only non-biometric aggregate evidence.
+The model-independent and production command paths are automated. The maintainer has exercised export, database-free processing, import, reimport and preservation of an existing human assignment using ignored private media. WI-0018 remains in progress until only a privacy-safe aggregate summary is retained and temporary artefacts are handled under an explicit cleanup and retention decision.
 
 ## Bundle format
 
@@ -126,11 +126,18 @@ Automated coverage includes:
 
 Pull request [#29](https://github.com/erikwasa/Photo-Identity-Indexer/pull/29) merged the verified archive, database-free worker contract and guarded importer at merge commit `8df838dd2764480baf8de87777c019dfdb23ed0e`.
 
-Draft pull request [#30](https://github.com/erikwasa/Photo-Identity-Indexer/pull/30) adds the production processor, exporter and operator commands. GitHub Actions run `30209633129` passed dependency restore and audit, Release build, all tests, documentation checks, the published review application smoke test and Windows mixed-media verification on the implementation head.
+Pull request [#30](https://github.com/erikwasa/Photo-Identity-Indexer/pull/30) merged the production processor, exporter and operator commands at merge commit `16c5d8e9bca30ae4ee0e905e1b7d937f2d9ba6d7`. GitHub Actions run `30210084910` passed dependency restore and audit, Release build, all tests, documentation checks, the published review application smoke test and Windows mixed-media verification on the final documented head.
+
+During the maintainer's real-catalogue verification, pull request [#31](https://github.com/erikwasa/Photo-Identity-Indexer/pull/31) fixed review streaming of batch-relative crop paths at merge commit `7b8e151d74dc1129470e0012ddef20bf609595f7`; workflow run `30221154431` passed.
+
+## Local verification progress
+
+On 2026-07-27 the maintainer reported that a private real image successfully completed production export, database-free processing, import and replay-safe reimport. The pre-existing human assignment remained current after import. No private image, crop, embedding, local path, content hash or revision identifier is retained in the repository.
 
 ## Remaining work
 
-- Run a real private-image full or reduced job through export, process and import, then retain only a privacy-safe summary.
-- Define cleanup and retention policy for exported jobs, returned results, disposable working directories and verified imported crops.
+- Retain a privacy-safe aggregate summary of the completed private-image round trip, limited to command success, selected profile, aggregate face count and assignment-preservation result.
+- Delete temporary job and result archives plus disposable processing directories when they are no longer needed.
+- Decide whether verified imported crops should remain alongside the catalogue or be removed under a future catalogue cleanup operation.
 - Imported crop bytes are written before the SQLite transaction; a database failure can leave a verified orphan file. Deterministic paths and replay-safe natural keys make recovery unambiguous, but automated orphan cleanup is not included in this slice.
 - ZIP archives are integrity-checked but not encrypted; transport, access control and retention remain operator responsibilities.
