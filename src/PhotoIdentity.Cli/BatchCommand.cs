@@ -49,7 +49,12 @@ internal sealed record BatchCommandOptions(
                         throw new ArgumentException($"Option '{option}' may be supplied only once.");
                     }
 
-                    runId = ProcessingRunId.From(Guid.Parse(value));
+                    if (!Guid.TryParse(value, out Guid parsedRunId) || parsedRunId == Guid.Empty)
+                    {
+                        throw new ArgumentException($"Option '{option}' requires a non-empty GUID.");
+                    }
+
+                    runId = ProcessingRunId.From(parsedRunId);
                     break;
                 default:
                     throw new ArgumentException($"Unknown option '{option}'.");
