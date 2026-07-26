@@ -2,76 +2,73 @@
 
 ## Current milestone
 
-**M02 — Local catalogue and jobs**
+**M03 — OneDrive synchronised source**
 
 ## Current work item
 
-**WI-0013 — Add resumable batch processing**
+**WI-0014 — Add OneDrive availability and staging**
 
 Status: `in_progress`
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0013-local-batch-inspection`
-- Draft pull request: [#25 — Connect local batches to production inspection](https://github.com/erikwasa/Photo-Identity-Indexer/pull/25)
+- Branch: `agent/WI-0014-onedrive-staging`
+- Draft pull request: [#26 — Add OneDrive sync availability and verified staging](https://github.com/erikwasa/Photo-Identity-Indexer/pull/26)
 
 ## Objective
 
-Connect durable resumable orchestration to local folder scanning and the production decode, YuNet, alignment, SFace and transactional persistence path.
+Treat Personal OneDrive as a local Windows sync-root source with explicit placeholder availability, user-managed hydration, verified staging fingerprints and cleanup that cannot remove unverified or source content.
 
 ## Current slice
 
-Add usable `batch start` and `batch resume` commands. A model-agnostic coordinator scans and creates jobs; a production handler validates immutable source revisions, writes deterministic aligned crops, persists face results and checkpoints after every committed face.
+Implement the complete source and staging boundary without OneDrive credentials or Microsoft Graph. The source classifies local, online-only, hydrating, unavailable and failed states from filesystem metadata. The stager independently verifies copied bytes and writes a cleanup sidecar only after verification succeeds.
 
 ## Relevant files
 
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteLocalBatchRepository.cs`
-- `src/PhotoIdentity.Worker/LocalBatchProcessing.cs`
-- `src/PhotoIdentity.Worker/LocalInspectionJobHandler.cs`
-- `src/PhotoIdentity.Worker/ResumableBatchProcessor.cs`
-- `src/PhotoIdentity.Cli/BatchCommand.cs`
-- `src/PhotoIdentity.Cli/Program.cs`
-- `tests/PhotoIdentity.Integration.Tests/LocalBatchInspectionTests.cs`
-- `docs/delivery/work-items/WI-0013-resumable-processing.md`
+- `src/PhotoIdentity.Source.OneDriveSync/OneDriveSyncAssetSource.cs`
+- `src/PhotoIdentity.Source.OneDriveSync/OneDriveSyncAssetStager.cs`
+- `src/PhotoIdentity.Source.OneDriveSync/Properties/AssemblyInfo.cs`
+- `tests/PhotoIdentity.Source.Tests/OneDriveSyncAssetSourceTests.cs`
+- `tests/PhotoIdentity.Source.Tests/OneDriveFileAttributeStatusProviderTests.cs`
+- `docs/delivery/work-items/WI-0014-onedrive-staging.md`
 - `docs/delivery/status/work-items.yaml`
+- `docs/delivery/status/milestones.yaml`
 
 ## Commands
 
 ```powershell
-dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj
+dotnet test tests/PhotoIdentity.Source.Tests/PhotoIdentity.Source.Tests.csproj
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
 
 ## Acceptance test for this slice
 
-- The same canonical local root reuses its persisted source identity.
-- Start scans supported files and creates one durable job per current non-deleted revision.
-- Unsupported files are reported separately from processing failures.
-- A partial invocation resumes the same run without repeating completed revisions.
-- Resume reconstructs the saved source, output and model configuration.
-- The handler rejects path traversal and source content that no longer matches the immutable revision.
-- Face order, crop paths and result paths are deterministic for a run and revision.
-- Each face transaction commits before its checkpoint is advanced.
-- Retrying from a face checkpoint does not duplicate occurrences, observations, crops or embeddings.
-- Batch output cannot be placed below the scanned source root.
-- The existing leased orchestration, cancellation and synthetic 500-job tests continue to pass.
+- Normal local files are reported as `Local`.
+- Offline or recall-on-access placeholders are reported as `OnlineOnly`.
+- Pinned placeholders whose content is still absent are reported as `Downloading`.
+- Attribute I/O failures are reported as `Error` and retained in scan diagnostics.
+- Opening or staging an online-only item returns a hydration-required error instead of intentionally triggering recall.
+- Staging is refused unless SHA-256 verification is enabled and the target is outside the source root.
+- Copied bytes are hashed during copy and independently re-hashed before becoming eligible for processing.
+- Stable names include both content and source-item fingerprints, avoiding manifest collisions for duplicate content.
+- Cleanup requires a matching sidecar and a fresh size/hash verification.
+- Tampered, arbitrary, source-root and reparse-point paths are never removed by cleanup.
+- No OneDrive credential, token or Graph dependency is introduced.
 
 ## Verification
 
-WI-0012 completed in pull request #23 at `5ac2b8263a7b0d82b7a3e23d9dfb676733cc702a`; GitHub Actions run `30179785787` passed.
+WI-0013 completed through pull requests #24 and #25. Pull request #25 merged at `b7527275168ebc351ba4066e7c00a589ea0d03b6`; GitHub Actions run `30182282923` passed dependency audit, Release build, all tests, documentation checks and Windows mixed-media verification. The human maintainer then verified the private local 500-photo acceptance run.
 
-The leased WI-0013 orchestration foundation merged in pull request #24 at `d87d1604fe1d958f8bcf5fb023f9dadd14786cb8`; GitHub Actions run `30181221035` passed dependency audit, Release build, all tests, living-document validation, generated-document checks and Windows mixed-media verification.
-
-Draft pull request #25 relies on GitHub Actions for executable validation because this agent environment does not contain the .NET SDK.
+The implementation-only head for draft pull request #26 passed GitHub Actions run `30184907471`, including all new OneDrive source and staging tests.
 
 ## Known issues
 
-- The final 500-photo acceptance criterion requires a private local folder and a privacy-safe retained summary; CI uses synthetic and generated images only.
-- Batch output stores aligned crops and compact per-asset result manifests rather than the interactive annotated SVG.
-- Changed or missing content fails the immutable revision and requires a new scan/run.
-- The host runs until idle rather than as a resident service.
+- Hydration remains user-managed through the OneDrive sync client; the adapter deliberately does not force recall.
+- Availability is a point-in-time local filesystem observation and can change after it is reported.
+- Placeholder availability is not yet persisted into SQLite catalogue rows.
+- Cleanup removes only individually verified staged files and sidecars; directory lifecycle remains host-owned.
 
 ## Next action
 
-Resolve CI or review findings on pull request #25. After merge, run a private 500-photo verification and record only aggregate status evidence before marking WI-0013 completed.
+Resolve final CI or review findings on pull request #26, then verify the availability mapping and staging flow against a real Personal OneDrive Files On-Demand folder before completing WI-0014.
