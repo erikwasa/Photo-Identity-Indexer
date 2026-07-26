@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -210,6 +210,37 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 3;
         """;
 
+    private const string VersionFourMigration = """
+        CREATE TABLE review_actions (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            face_occurrence_id TEXT NOT NULL,
+            action_kind TEXT NOT NULL CHECK (action_kind IN ('assign', 'reject', 'undo')),
+            person_id TEXT NULL,
+            person_label_id INTEGER NULL,
+            actor TEXT NOT NULL,
+            note TEXT NULL,
+            created_at_utc TEXT NOT NULL,
+            reversed_at_utc TEXT NULL,
+            reverses_action_id INTEGER NULL,
+            FOREIGN KEY (face_occurrence_id) REFERENCES face_occurrences (id) ON DELETE CASCADE,
+            FOREIGN KEY (person_id) REFERENCES people (id) ON DELETE RESTRICT,
+            FOREIGN KEY (person_label_id) REFERENCES person_labels (id) ON DELETE RESTRICT,
+            FOREIGN KEY (reverses_action_id) REFERENCES review_actions (id) ON DELETE RESTRICT,
+            CHECK (
+                (action_kind = 'assign' AND person_id IS NOT NULL AND person_label_id IS NOT NULL AND reverses_action_id IS NULL)
+                OR (action_kind = 'reject' AND person_id IS NULL AND person_label_id IS NULL AND reverses_action_id IS NULL)
+                OR (action_kind = 'undo' AND reverses_action_id IS NOT NULL)
+            )
+        );
+        CREATE INDEX ix_review_actions_face_history
+            ON review_actions (face_occurrence_id, id DESC);
+        CREATE INDEX ix_review_actions_face_active
+            ON review_actions (face_occurrence_id, action_kind, reversed_at_utc, id DESC);
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 4;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -261,6 +292,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 3)
         {
             await ApplyMigrationAsync(connection, VersionThreeMigration, cancellationToken);
+            version = 3;
+        }
+
+        if (version < 4)
+        {
+            await ApplyMigrationAsync(connection, VersionFourMigration, cancellationToken);
         }
     }
 
