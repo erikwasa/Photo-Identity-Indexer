@@ -137,10 +137,12 @@ public sealed class PortableBundleTests
 
             SqliteBundleResultImporter importer = new(database);
             PortableBundleImportResult first = await importer.ImportAsync(
+                jobPath,
                 resultPath,
                 Path.Combine(directory, "imported"),
                 Path.Combine(directory, "import-work"));
             PortableBundleImportResult second = await importer.ImportAsync(
+                jobPath,
                 resultPath,
                 Path.Combine(directory, "imported"),
                 Path.Combine(directory, "import-work"));
@@ -169,7 +171,13 @@ public sealed class PortableBundleTests
                 staleResultPath,
                 Path.Combine(directory, "stale-worker"));
             await Assert.ThrowsAsync<PortableBundleValidationException>(() => importer.ImportAsync(
+                staleJobPath,
                 staleResultPath,
+                Path.Combine(directory, "imported"),
+                Path.Combine(directory, "import-work")));
+            await Assert.ThrowsAsync<PortableBundleValidationException>(() => importer.ImportAsync(
+                staleJobPath,
+                resultPath,
                 Path.Combine(directory, "imported"),
                 Path.Combine(directory, "import-work")));
 
@@ -186,6 +194,7 @@ public sealed class PortableBundleTests
                 await output.WriteAsync(new byte[] { 7, 7, 7 });
             }
             await Assert.ThrowsAsync<PortableBundleValidationException>(() => importer.ImportAsync(
+                jobPath,
                 resultPath,
                 Path.Combine(directory, "imported"),
                 Path.Combine(directory, "import-work")));
