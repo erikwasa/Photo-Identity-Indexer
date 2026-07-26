@@ -40,6 +40,7 @@ $stdoutPath = Join-Path $artifactDirectory "api.stdout.log"
 $stderrPath = Join-Path $artifactDirectory "api.stderr.log"
 $toolAssembly = Join-Path $root "tools/PhotoIdentity.ReviewVerification/bin/$Configuration/net10.0/PhotoIdentity.ReviewVerification.dll"
 $apiAssembly = Join-Path $root "src/PhotoIdentity.Api/bin/$Configuration/net10.0/PhotoIdentity.Api.dll"
+$apiDirectory = Split-Path -Parent $apiAssembly
 
 function Invoke-CheckedNative {
     param(
@@ -101,6 +102,7 @@ $report = [ordered]@{
     smoke = [ordered]@{
         health = "not_run"
         gallery = "not_run"
+        hostedClient = "not_run"
         image = "not_run"
         mutation = "not_run"
         cacheControl = "not_run"
@@ -122,9 +124,11 @@ try {
     Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     $argumentString = ('"{0}" --urls "http://{1}:{2}"' -f $apiAssembly, $ListenAddress, $Port)
     $process = Start-Process -FilePath "dotnet" -ArgumentList $argumentString -PassThru `
+        -WorkingDirectory $apiDirectory `
         -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
 
-    $healthUrl = "http://127.0.0.1:$Port/health"
+    $baseUrl = "http://127.0.0.1:$Port"
+    $healthUrl = "$baseUrl/health"
     $ready = $false
     for ($attempt = 0; $attempt -lt 120; $attempt++) {
         if ($process.HasExited) {
@@ -146,7 +150,14 @@ try {
     }
     $report.smoke.health = "passed"
 
-    $galleryResponse = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/api/review/faces?state=all" `
+    $clientResponse = Invoke-WebRequest -Uri "$baseUrl/" -UseBasicParsing -TimeoutSec 10
+    if ($clientResponse.StatusCode -ne 200 -or
+        $clientResponse.Content.IndexOf("blazor.webassembly.js", [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+        throw "Hosted Blazor client was not served from the API output directory."
+    }
+    $report.smoke.hostedClient = "passed"
+
+    $galleryResponse = Invoke-WebRequest -Uri "$baseUrl/api/review/faces?state=all" `
         -UseBasicParsing -TimeoutSec 10
     $gallery = $galleryResponse.Content | ConvertFrom-Json
     if ($gallery.Total -ne $manifest.FaceCount -or @($gallery.Items).Count -ne $manifest.FaceCount) {
@@ -159,8 +170,13 @@ try {
         throw "Review gallery response did not include Cache-Control: no-store."
     }
 
-    $firstFace = @($gallery.Items)[0]
-    $imageResponse = Invoke-WebRequest -Uri "http://127.0.0.1:$Port$($firstFace.ImageUrl)" `
+    $unreviewedFaces = @($gallery.Items | Where-Object { $_.state -eq "unreviewed" })
+    if ($unreviewedFaces.Count -eq 0) {
+        throw "Review verification catalogue did not contain an unreviewed face."
+    }
+    $firstFace = $unreviewedFaces[0]
+
+    $imageResponse = Invoke-WebRequest -Uri "$baseUrl$($firstFace.ImageUrl)" `
         -UseBasicParsing -TimeoutSec 10
     if ($imageResponse.StatusCode -ne 200 -or $imageResponse.RawContentLength -le 0) {
         throw "Review face image did not return content."
@@ -173,22 +189,22 @@ try {
     $report.smoke.cacheControl = "passed"
 
     $personBody = @{ displayName = "Verification Person" } | ConvertTo-Json
-    $person = Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/review/people" `
+    $person = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/review/people" `
         -ContentType "application/json" -Body $personBody -TimeoutSec 10
     $assignBody = @{
         personId = $person.id
         actor = "verification:smoke"
         note = "Automated assignment followed by undo."
     } | ConvertTo-Json
-    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/review/faces/$($firstFace.id)/assign" `
+    Invoke-RestMethod -Method Post -Uri "$baseUrl/api/review/faces/$($firstFace.id)/assign" `
         -ContentType "application/json" -Body $assignBody -TimeoutSec 10 | Out-Null
     $undoBody = @{
         actor = "verification:smoke"
         note = "Automated undo confirms reversibility."
     } | ConvertTo-Json
-    Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:$Port/api/review/faces/$($firstFace.id)/undo" `
+    Invoke-RestMethod -Method Post -Uri "$baseUrl/api/review/faces/$($firstFace.id)/undo" `
         -ContentType "application/json" -Body $undoBody -TimeoutSec 10 | Out-Null
-    $details = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/review/faces/$($firstFace.id)" -TimeoutSec 10
+    $details = Invoke-RestMethod -Uri "$baseUrl/api/review/faces/$($firstFace.id)" -TimeoutSec 10
     if (@($details.actions).Count -lt 2 -or $details.face.state -ne "unreviewed") {
         throw "Review assignment and undo did not restore the unreviewed state with audit history."
     }
