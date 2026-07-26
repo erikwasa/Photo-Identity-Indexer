@@ -6,7 +6,7 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project is currently in **M04 — Minimal review application**. M01 single-image inference, M02 local catalogue and durable processing, and M03 OneDrive availability and verified staging are complete and verified. WI-0015 is adding a responsive local face-review gallery with durable assignments, rejections, undo and an audit history.
+The project is currently in **M04 — Minimal review application**. M01 single-image inference, M02 local catalogue and durable processing, and M03 OneDrive availability and verified staging are complete and verified. The review application has merged; WI-0015 remains open only for repeatable Windows and Pixel acceptance verification.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
@@ -48,7 +48,7 @@ Outputs and privacy-safe reports are written below ignored `.artifacts/local-ver
 Decode one JPEG or PNG directly:
 
 ```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
+ dotnet run --project src/PhotoIdentity.Cli -- `
   decode `
   --input "C:\PrivateVerification\pixel-rotated.jpg" `
   --output ".artifacts\local-verification\pixel-normalised.png"
@@ -57,7 +57,7 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 Run the complete single-image inspection path:
 
 ```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
+ dotnet run --project src/PhotoIdentity.Cli -- `
   inspect "C:\PrivateVerification\family-photo.jpg" `
   --output ".artifacts\inspect\family-photo" `
   --overwrite `
@@ -69,7 +69,7 @@ The inspect output contains an embedded-image annotated SVG, padded and aligned 
 Start a durable local-folder batch. The output directory must be outside the source root:
 
 ```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
+ dotnet run --project src/PhotoIdentity.Cli -- `
   batch start `
   --database "C:\PhotoIdentity\catalogue.db" `
   --source "C:\Photos" `
@@ -79,13 +79,13 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 Resume, inspect or cancel the run using the printed run ID:
 
 ```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
+ dotnet run --project src/PhotoIdentity.Cli -- `
   batch resume --database "C:\PhotoIdentity\catalogue.db" --run RUN_ID
 
-dotnet run --project src/PhotoIdentity.Cli -- `
+ dotnet run --project src/PhotoIdentity.Cli -- `
   batch status --database "C:\PhotoIdentity\catalogue.db" --run RUN_ID
 
-dotnet run --project src/PhotoIdentity.Cli -- `
+ dotnet run --project src/PhotoIdentity.Cli -- `
   batch cancel --database "C:\PhotoIdentity\catalogue.db" --run RUN_ID
 ```
 
@@ -105,6 +105,18 @@ dotnet run --project src/PhotoIdentity.Api --urls "http://0.0.0.0:5080"
 ```
 
 Open `http://localhost:5080` on Windows. A Pixel on the same trusted network can use the computer's LAN address when the Windows Firewall rule permits the port for that network profile. The client receives opaque image URLs and limited metadata; source roots and crop storage paths remain inside the API process. The current trusted-network slice does not include authentication, so do not expose the listener to an untrusted network.
+
+Verify the device workflow without using personal photos or a real catalogue:
+
+```powershell
+./verify-review.ps1
+```
+
+The script creates synthetic review data below ignored `.artifacts/review-verification`, runs automated API/privacy checks, prints localhost and LAN URLs, and waits while the Windows and Pixel checklist is completed. It never creates firewall rules. For CI or command-line smoke verification, use:
+
+```powershell
+./verify-review.ps1 -Mode Smoke -Configuration Release
+```
 
 ## First target demonstration
 
