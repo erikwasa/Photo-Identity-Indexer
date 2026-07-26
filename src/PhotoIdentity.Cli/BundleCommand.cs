@@ -148,7 +148,10 @@ internal sealed record BundleCommandOptions(
             }
         }
 
-        jobPath ??= throw new ArgumentException("Option '--job' is required.");
+        if (jobPath is null)
+        {
+            throw new ArgumentException("Option '--job' is required.");
+        }
         workingDirectory ??= Path.Combine(
             ".artifacts",
             "bundles",
