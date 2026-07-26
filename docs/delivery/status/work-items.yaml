@@ -265,27 +265,36 @@ work_items:
 - id: WI-0012
   title: Add local folder scanning
   milestone: M02
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0012-local-scanner.md
   started_at: '2026-07-26'
+  completed_at: '2026-07-26'
+  verified_at: '2026-07-26'
+  verified_by: human
   last_updated_at: '2026-07-26'
   branch: agent/WI-0012-local-folder-scanning
   blockers: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/23
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30179785787
+  - type: merge_commit
+    value: 5ac2b8263a7b0d82b7a3e23d9dfb676733cc702a
 - id: WI-0013
   title: Add resumable batch processing
   milestone: M02
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0013-resumable-processing.md
-  blockers:
-  - WI-0010
-  - WI-0011
-  - WI-0012
-  evidence: []
+  started_at: '2026-07-26'
+  last_updated_at: '2026-07-26'
+  branch: agent/WI-0013-resumable-orchestration
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/24
 - id: WI-0014
   title: Add OneDrive availability and staging
   milestone: M03
