@@ -24,6 +24,8 @@ public sealed class PortableBundleWorker
         ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
 
         string fullWorkingDirectory = Path.GetFullPath(workingDirectory);
+        EnsureOutsideWorkingDirectory(jobBundlePath, fullWorkingDirectory, nameof(jobBundlePath));
+        EnsureOutsideWorkingDirectory(resultBundlePath, fullWorkingDirectory, nameof(resultBundlePath));
         string jobDirectory = Path.Combine(fullWorkingDirectory, "job");
         string processorOutputDirectory = Path.Combine(fullWorkingDirectory, "processor-output");
         ResetDirectory(fullWorkingDirectory);
@@ -42,6 +44,21 @@ public sealed class PortableBundleWorker
             job,
             output,
             cancellationToken);
+    }
+
+    private static void EnsureOutsideWorkingDirectory(string path, string workingDirectory, string parameterName)
+    {
+        string fullPath = Path.GetFullPath(path);
+        string prefix = workingDirectory.EndsWith(Path.DirectorySeparatorChar)
+            ? workingDirectory
+            : workingDirectory + Path.DirectorySeparatorChar;
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (fullPath.StartsWith(prefix, comparison))
+        {
+            throw new ArgumentException("Bundle paths must be outside the disposable working directory.", parameterName);
+        }
     }
 
     private static void ResetDirectory(string directory)
