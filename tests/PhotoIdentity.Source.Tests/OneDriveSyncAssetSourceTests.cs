@@ -85,7 +85,7 @@ public sealed class OneDriveSyncAssetSourceTests
     }
 
     [Fact]
-    public async Task Stage_creates_verified_content_addressed_copy_and_reuses_it()
+    public async Task Stage_creates_verified_content_fingerprinted_copy_and_reuses_it()
     {
         string sourceDirectory = CreateTemporaryDirectory();
         string stagingDirectory = CreateTemporaryDirectory();
@@ -103,10 +103,12 @@ public sealed class OneDriveSyncAssetSourceTests
             StagedAsset second = await stager.StageAsync(asset, options, CancellationToken.None);
 
             string expectedHash = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
+            string fileName = Path.GetFileName(first.LocalPath);
             Assert.Equal(expectedHash, first.ContentHash.ToString());
             Assert.Equal(content.Length, first.SizeBytes);
             Assert.Equal(first.LocalPath, second.LocalPath);
-            Assert.Equal($"{expectedHash}.jpg", Path.GetFileName(first.LocalPath));
+            Assert.StartsWith($"{expectedHash}-", fileName, StringComparison.Ordinal);
+            Assert.EndsWith(".jpg", fileName, StringComparison.Ordinal);
             Assert.Equal(content, await File.ReadAllBytesAsync(first.LocalPath));
             Assert.True(File.Exists(first.LocalPath + OneDriveSyncAssetStager.VerificationManifestSuffix));
             Assert.DoesNotContain(
@@ -203,6 +205,7 @@ public sealed class OneDriveSyncAssetSourceTests
     public async Task Staging_requires_verification_and_a_directory_outside_the_source_root()
     {
         string sourceDirectory = CreateTemporaryDirectory();
+        string stagingDirectory = CreateTemporaryDirectory();
         try
         {
             await WriteAsync(sourceDirectory, "family.jpg", [1, 2, 3]);
@@ -219,12 +222,13 @@ public sealed class OneDriveSyncAssetSourceTests
             await Assert.ThrowsAsync<ArgumentException>(
                 () => stager.StageAsync(
                     reference,
-                    new StagingOptions(CreateTemporaryDirectory(), verifyContentHash: false),
+                    new StagingOptions(stagingDirectory, verifyContentHash: false),
                     CancellationToken.None));
         }
         finally
         {
             DeleteTemporaryDirectory(sourceDirectory);
+            DeleteTemporaryDirectory(stagingDirectory);
         }
     }
 
