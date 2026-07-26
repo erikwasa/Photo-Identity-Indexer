@@ -10,14 +10,15 @@
 
 Status: `in_progress`
 
-## Parallel acceptance item
+## Completed parallel acceptance item
 
-**WI-0015 / M04** remains `in_progress` until the maintainer reports successful Windows and Pixel interaction verification. Pull requests #27 and #28 are merged and the automated verification harness is green, but merge and CI evidence do not prove device comfort or LAN reachability.
+**WI-0015 / M04** completed on 2026-07-27 after the maintainer reported successful Windows and Pixel trusted-network interaction verification. Pull requests #27 and #28 established the review host and verification harness. Pull request #31 corrected production batch-relative crop resolution found during real-catalogue verification.
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0018-production-portable-cli`
-- Draft pull request: [#30 — Add production portable processing commands](https://github.com/erikwasa/Photo-Identity-Indexer/pull/30)
+- Implementation branch: `agent/WI-0018-production-portable-cli`
+- Merged pull requests: [#29 — Add verified portable job and result bundles](https://github.com/erikwasa/Photo-Identity-Indexer/pull/29), [#30 — Add production portable processing commands](https://github.com/erikwasa/Photo-Identity-Indexer/pull/30)
+- Related merged review fix: [#31 — Resolve batch-relative review crop paths](https://github.com/erikwasa/Photo-Identity-Indexer/pull/31)
 
 ## Objective
 
@@ -25,7 +26,7 @@ Create self-contained, verifiable work packages that can be processed without th
 
 ## Current slice
 
-Connect the verified bundle format to production OpenCV, YuNet and SFace processing. A database-backed exporter verifies the immutable revision and writes full-image, reduced-image or explicitly numbered aligned-crop jobs. A database-free processor reads signed inference configuration, produces result crops and embeddings, and a CLI exposes export, process and import operations.
+Retain privacy-safe aggregate evidence from the maintainer's private real-image export, process, import and reimport verification, then remove portable archives and disposable working data according to an explicit local retention decision. Do not commit private images, crops, embeddings, hashes, revision identifiers or local paths.
 
 ## Relevant files
 
@@ -80,17 +81,21 @@ For crop-only work, every input must include the canonical one-based face number
 - Explicit crop face numbers survive transport, including non-first ordinals, and duplicates are rejected.
 - Import requires the exact job/result pair and current immutable revision hash.
 - Reimport remains harmless and existing human review state remains canonical.
-- All existing review-host and Windows mixed-media verification gates remain green.
+- The maintainer has exercised the production commands with private media; only privacy-safe aggregate evidence and cleanup remain before completion.
 
 ## Verification
 
-Pull request #29 merged at `8df838dd2764480baf8de87777c019dfdb23ed0e` with no comments, reviews or unresolved threads. It established the verified archive format, database-free worker contract and guarded SQLite importer.
+Pull request #29 merged at `8df838dd2764480baf8de87777c019dfdb23ed0e` and established the verified archive format, database-free worker contract and guarded SQLite importer.
 
-Draft pull request #30 implementation head passed GitHub Actions run `30209633129`, including dependency audit, Release build, all automated tests, living-document validation, generated-document checks, review application smoke and Windows mixed-media verification.
+Pull request #30 merged at `16c5d8e9bca30ae4ee0e905e1b7d937f2d9ba6d7`. GitHub Actions run `30210084910` passed on the final documented head.
+
+Pull request #31 merged at `7b8e151d74dc1129470e0012ddef20bf609595f7`. GitHub Actions run `30221154431` passed the physical crop-path fix and production-shaped integration coverage.
+
+The maintainer has confirmed export, database-free processing, import, replay safety and preservation of the human assignment using ignored private media.
 
 ## Known issues
 
-- The final WI-0018 acceptance step requires a real private-image export, process and import run. Only a privacy-safe aggregate summary should be retained.
+- The final WI-0018 acceptance record must contain only aggregate facts and no biometric content, hashes, revision identifiers or private paths.
 - Model files must be installed separately on the worker; they are not duplicated inside every job archive.
 - Face-crop export accepts only already-aligned 112x112 crops and requires explicit canonical face numbers.
 - Imported crop bytes are written before the SQLite transaction. A database failure can leave a verified orphan file, although replay is safe and deterministic paths prevent ambiguity.
@@ -98,4 +103,4 @@ Draft pull request #30 implementation head passed GitHub Actions run `3020963312
 
 ## Next action
 
-Resolve final CI or review findings on pull request #30. After merge, add a privacy-safe local verification command or script for a real-image full/reduced round trip. Keep WI-0018/M07 open until that evidence is reported, and keep WI-0015/M04 open until explicit Windows and Pixel verification is reported.
+Record a privacy-safe summary of the real-image round trip, delete the portable job/result archives and disposable processing directories that are no longer needed, and decide whether verified imported crops should be retained with the catalogue. Then mark WI-0018/M07 complete.
