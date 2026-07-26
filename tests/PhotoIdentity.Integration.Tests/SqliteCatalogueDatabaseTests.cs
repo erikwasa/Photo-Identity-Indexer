@@ -20,9 +20,9 @@ public sealed class SqliteCatalogueDatabaseTests
 
             Assert.True(File.Exists(databasePath));
             await using SqliteConnection connection = await database.OpenConnectionAsync();
-            Assert.Equal(3, await ReadInt64Async(connection, "PRAGMA user_version;"));
+            Assert.Equal(4, await ReadInt64Async(connection, "PRAGMA user_version;"));
             Assert.Equal(1, await ReadInt64Async(connection, "PRAGMA foreign_keys;"));
-            Assert.Equal(3, await ReadInt64Async(connection, "SELECT COUNT(*) FROM schema_migrations;"));
+            Assert.Equal(4, await ReadInt64Async(connection, "SELECT COUNT(*) FROM schema_migrations;"));
             Assert.Equal(
                 1,
                 await ReadInt64Async(
@@ -38,6 +38,11 @@ public sealed class SqliteCatalogueDatabaseTests
                 await ReadInt64Async(
                     connection,
                     "SELECT COUNT(*) FROM pragma_table_info('processing_jobs') WHERE name = 'checkpoint_json';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    connection,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'review_actions';"));
         }
         finally
         {
@@ -146,7 +151,7 @@ public sealed class SqliteCatalogueDatabaseTests
             await database.InitializeAsync();
 
             await using SqliteConnection upgraded = await database.OpenConnectionAsync();
-            Assert.Equal(3, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
+            Assert.Equal(4, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
             Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM assets;"));
             Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM processing_jobs;"));
             using SqliteCommand read = upgraded.CreateCommand();

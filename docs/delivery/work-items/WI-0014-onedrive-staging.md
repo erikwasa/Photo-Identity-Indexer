@@ -24,7 +24,7 @@ Add a filesystem source for the local OneDrive directory with placeholder detect
 
 `OneDriveSyncAssetSource` treats Personal OneDrive as a Windows-synchronised filesystem root. It does not call Microsoft Graph, authenticate to OneDrive or request application permissions. Stable source-owned relative keys remain the public asset identity.
 
-The source scans JPEG and PNG files and reports unsupported extensions separately. Reparse-point directories are not traversed. Cross-source references and paths escaping the configured root are rejected before any content is opened.
+The source scans JPEG and PNG files and reports unsupported extensions separately. Reparse-point directories are not traversed, while placeholder files that are themselves reparse points remain visible for availability reporting. Cross-source references and paths escaping the configured root are rejected before content is opened.
 
 ## Availability policy
 
@@ -61,17 +61,8 @@ Cleanup removes one staged file and its sidecar only when all of these checks pa
 
 Missing manifests, tampered bytes, arbitrary files and source paths are retained and reported through `StagingVerificationException`. Cleanup never recursively deletes a staging directory.
 
-## Validation
+## Validation and completion
 
-```powershell
-dotnet test tests/PhotoIdentity.Source.Tests/PhotoIdentity.Source.Tests.csproj
-dotnet run --project tools/PhotoIdentity.Docs -- validate
-dotnet run --project tools/PhotoIdentity.Docs -- generate --check
-```
+Pull request [#26](https://github.com/erikwasa/Photo-Identity-Indexer/pull/26) merged at `b5d2a1ce24629df9fdb516eea12a69534fe257d5`. GitHub Actions run `30185278984` passed dependency audit, Release build, all automated tests, documentation checks and Windows mixed-media verification.
 
-Draft pull request [#26](https://github.com/erikwasa/Photo-Identity-Indexer/pull/26) adds availability classification, placeholder-safe content access, verified staging, guarded cleanup and automated source tests.
-
-## Remaining work
-
-- Resolve CI or review findings on pull request #26.
-- Verify availability against a real Personal OneDrive Files On-Demand folder before marking WI-0014 complete.
+The human maintainer then validated availability classification, user-managed hydration, verified staging and guarded cleanup against a real Personal OneDrive Files On-Demand folder. WI-0014 and M03 completed on 2026-07-26.

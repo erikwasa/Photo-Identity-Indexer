@@ -31,13 +31,13 @@ milestones:
   - WI-0013
 - id: M03
   title: OneDrive synchronised source
-  status: in_progress
+  status: completed
   document: ../milestones/M03-onedrive-sync.md
   work_items:
   - WI-0014
 - id: M04
   title: Minimal review application
-  status: ready
+  status: in_progress
   document: ../milestones/M04-review-ui.md
   work_items:
   - WI-0015

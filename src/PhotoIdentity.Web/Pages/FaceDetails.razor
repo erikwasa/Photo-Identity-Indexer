@@ -1,0 +1,147 @@
+@page "/faces/{Id}"
+@inject HttpClient Http
+
+<PageTitle>Face details · Photo Identity</PageTitle>
+
+@if (Loading)
+{
+    <section class="empty-state">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading face details…</p>
+    </section>
+}
+else if (!string.IsNullOrWhiteSpace(Error))
+{
+    <section class="empty-state">
+        <h1>Face details unavailable</h1>
+        <p>@Error</p>
+        <a class="button primary" href="/">Return to gallery</a>
+    </section>
+}
+else if (Details is not null)
+{
+    <a class="back-link" href="/">← Back to review gallery</a>
+
+    <section class="details-header">
+        <div>
+            <p class="eyebrow">Photo details</p>
+            <h1>@Details.Face.PhotoName · face @(Details.Face.FaceOrdinal + 1)</h1>
+            <p>The browser receives a face image endpoint and privacy-limited metadata, never the source root or crop storage path.</p>
+        </div>
+        <span class="state-badge large">@StateLabel</span>
+    </section>
+
+    <div class="details-grid">
+        <section class="details-image-panel">
+            <img class="details-image" src="@Details.Face.ImageUrl" alt="Detected face from @Details.Face.PhotoName" />
+        </section>
+
+        <section class="metadata-card">
+            <h2>Metadata</h2>
+            <dl>
+                <div><dt>Review state</dt><dd>@StateLabel</dd></div>
+                <div><dt>Assigned person</dt><dd>@(Details.Face.Person?.DisplayName ?? "—")</dd></div>
+                <div><dt>Detector confidence</dt><dd>@ConfidenceLabel</dd></div>
+                <div><dt>Media type</dt><dd>@Details.MediaType</dd></div>
+                <div><dt>Photo dimensions</dt><dd>@DimensionLabel</dd></div>
+                <div><dt>Revision fingerprint</dt><dd><code>@Details.RevisionHashPrefix…</code></dd></div>
+                <div><dt>Occurrence ID</dt><dd><code>@Details.Face.Id</code></dd></div>
+            </dl>
+        </section>
+    </div>
+
+    <section class="audit-section">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Audit trail</p>
+                <h2>Review history</h2>
+            </div>
+            <span>@Details.Actions.Count action@(Details.Actions.Count == 1 ? "" : "s")</span>
+        </div>
+
+        @if (Details.Actions.Count == 0)
+        {
+            <div class="empty-state compact"><p>No review actions have been recorded.</p></div>
+        }
+        else
+        {
+            <ol class="timeline">
+                @foreach (ReviewActionResponse action in Details.Actions)
+                {
+                    <li class="@(action.Reversed ? "reversed" : "")">
+                        <div class="timeline-marker" aria-hidden="true"></div>
+                        <div>
+                            <div class="timeline-title">
+                                <strong>@ActionLabel(action)</strong>
+                                @if (action.Reversed)
+                                {
+                                    <span class="state-badge">Reversed</span>
+                                }
+                            </div>
+                            <p>@action.Actor · @action.CreatedAtUtc.ToLocalTime().ToString("g")</p>
+                            @if (!string.IsNullOrWhiteSpace(action.Note))
+                            {
+                                <blockquote>@action.Note</blockquote>
+                            }
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+    </section>
+}
+
+@code {
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    private ReviewFaceDetailsResponse? Details { get; set; }
+    private bool Loading { get; set; } = true;
+    private string? Error { get; set; }
+
+    private string StateLabel => Details?.Face.State switch
+    {
+        "assigned" => "Assigned",
+        "rejected" => "Rejected",
+        _ => "Needs review",
+    };
+
+    private string ConfidenceLabel => Details?.Face.Confidence is double confidence
+        ? confidence.ToString("P1")
+        : "—";
+
+    private string DimensionLabel => Details?.PhotoWidth is int width && Details.PhotoHeight is int height
+        ? $"{width} × {height}"
+        : "—";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Details = await Http.GetFromJsonAsync<ReviewFaceDetailsResponse>(
+                $"api/review/faces/{Uri.EscapeDataString(Id)}");
+            if (Details is null)
+            {
+                Error = "The face occurrence was not found.";
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private static string ActionLabel(ReviewActionResponse action) => action.Kind switch
+    {
+        "assign" when action.Person is not null => $"Assigned to {action.Person.DisplayName}",
+        "reject" => "Rejected face",
+        "undo" when action.ReversesActionId is long id => $"Undid action #{id}",
+        _ => action.Kind,
+    };
+}

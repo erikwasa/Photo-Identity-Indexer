@@ -1,0 +1,129 @@
+<article class="face-card state-@Face.State">
+    <a class="face-image-link" href="/faces/@Face.Id" aria-label="Open details for @Face.PhotoName face @(Face.FaceOrdinal + 1)">
+        <img class="face-image" src="@Face.ImageUrl" alt="Detected face from @Face.PhotoName" loading="lazy" />
+    </a>
+
+    <div class="face-card-body">
+        <div class="face-heading">
+            <div>
+                <strong>@Face.PhotoName</strong>
+                <small>Face @(Face.FaceOrdinal + 1)</small>
+            </div>
+            <span class="state-badge">@StateLabel</span>
+        </div>
+
+        @if (Face.Confidence is double confidence)
+        {
+            <div class="confidence" aria-label="Detector confidence @confidence.ToString("P0")">
+                <span style="width: @(Math.Clamp(confidence, 0, 1) * 100)%"></span>
+            </div>
+        }
+
+        @if (Face.Person is not null)
+        {
+            <p class="current-person">Assigned to <strong>@Face.Person.DisplayName</strong></p>
+        }
+
+        <label class="field-label" for="person-@Face.Id">Person</label>
+        <select id="person-@Face.Id" @bind="SelectedPersonId" disabled="@(People.Count == 0 || Busy)">
+            <option value="">Choose a person</option>
+            @foreach (ReviewPersonResponse person in People)
+            {
+                <option value="@person.Id">@person.DisplayName</option>
+            }
+        </select>
+
+        <div class="card-actions">
+            <button class="button primary" disabled="@(string.IsNullOrWhiteSpace(SelectedPersonId) || Busy)" @onclick="AssignAsync">
+                Assign
+            </button>
+            <button class="button danger" disabled="@Busy" @onclick="RejectAsync">
+                Reject
+            </button>
+            <button class="button secondary" disabled="@(Face.State == "unreviewed" || Busy)" @onclick="UndoAsync">
+                Undo
+            </button>
+        </div>
+
+        <a class="details-link" href="/faces/@Face.Id">Photo details and audit history →</a>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public ReviewFaceResponse Face { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+
+    [Parameter]
+    public EventCallback<(string FaceId, string PersonId)> AssignRequested { get; set; }
+
+    [Parameter]
+    public EventCallback<string> RejectRequested { get; set; }
+
+    [Parameter]
+    public EventCallback<string> UndoRequested { get; set; }
+
+    private string SelectedPersonId { get; set; } = "";
+    private bool Busy { get; set; }
+
+    private string StateLabel => Face.State switch
+    {
+        "assigned" => "Assigned",
+        "rejected" => "Rejected",
+        _ => "Needs review",
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedPersonId) && Face.Person is not null)
+        {
+            SelectedPersonId = Face.Person.Id;
+        }
+    }
+
+    private async Task AssignAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedPersonId))
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            await AssignRequested.InvokeAsync((Face.Id, SelectedPersonId));
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RejectAsync()
+    {
+        Busy = true;
+        try
+        {
+            await RejectRequested.InvokeAsync(Face.Id);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task UndoAsync()
+    {
+        Busy = true;
+        try
+        {
+            await UndoRequested.InvokeAsync(Face.Id);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+}
