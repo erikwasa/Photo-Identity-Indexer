@@ -193,6 +193,7 @@ public static class PortableBundleArchive
                 }
             }
             await stream.FlushAsync(cancellationToken);
+            await stream.DisposeAsync();
             File.Move(temporaryPath, fullPath, overwrite: true);
         }
         finally
@@ -223,8 +224,14 @@ public static class PortableBundleArchive
         ResetDirectory(destinationDirectory);
         await using FileStream stream = new(fullBundlePath, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, useAsync: true);
         using ZipArchive archive = new(stream, ZipArchiveMode.Read, leaveOpen: true);
-        ZipArchiveEntry manifestEntry = archive.Entries.SingleOrDefault(entry => string.Equals(entry.FullName, ManifestEntryName, StringComparison.Ordinal))
-            ?? throw new PortableBundleValidationException("Bundle manifest is missing.");
+        ZipArchiveEntry[] manifestEntries = archive.Entries
+            .Where(entry => string.Equals(entry.FullName, ManifestEntryName, StringComparison.Ordinal))
+            .ToArray();
+        if (manifestEntries.Length != 1)
+        {
+            throw new PortableBundleValidationException("Bundle must contain exactly one manifest.");
+        }
+        ZipArchiveEntry manifestEntry = manifestEntries[0];
         byte[] manifestBytes;
         await using (Stream manifestStream = manifestEntry.Open())
         await using (MemoryStream buffer = new())
@@ -277,17 +284,17 @@ public static class PortableBundleArchive
             await using Stream input = entry.Open();
             await using FileStream output = new(destinationPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true);
             using IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            byte[] buffer = new byte[64 * 1024];
+            byte[] copyBuffer = new byte[64 * 1024];
             long length = 0;
             while (true)
             {
-                int read = await input.ReadAsync(buffer, cancellationToken);
+                int read = await input.ReadAsync(copyBuffer, cancellationToken);
                 if (read == 0)
                 {
                     break;
                 }
-                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-                hash.AppendData(buffer, 0, read);
+                await output.WriteAsync(copyBuffer.AsMemory(0, read), cancellationToken);
+                hash.AppendData(copyBuffer, 0, read);
                 length += read;
             }
             await output.FlushAsync(cancellationToken);
