@@ -1,11 +1,13 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Processing;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
-/// Stores durable processing runs and atomically claims scheduled asset-revision jobs.
+/// Stores durable processing runs, leases work and guards worker transitions with lease tokens.
 /// </summary>
 public sealed class SqliteProcessingRepository
 {
@@ -19,7 +21,7 @@ public sealed class SqliteProcessingRepository
 
     /// <summary>
     /// Creates a pending run and its queued jobs in one transaction.
-    /// Repeating the same run ID or run/revision pair returns the existing durable rows.
+    /// Repeating the same run ID or idempotency key returns the existing durable rows.
     /// </summary>
     public async Task<CatalogueProcessingBatch> CreateRunAsync(
         CatalogueProcessingRun run,
@@ -41,7 +43,11 @@ public sealed class SqliteProcessingRepository
                 throw new ArgumentException("Every job must belong to the supplied run.", nameof(jobs));
             }
 
-            if (job.Status != ProcessingJobStatus.Queued || job.AttemptCount != 0 || job.Error is not null)
+            if (job.Status != ProcessingJobStatus.Queued ||
+                job.AttemptCount != 0 ||
+                job.Error is not null ||
+                job.LeaseToken is not null ||
+                job.CheckpointJson is not null)
             {
                 throw new ArgumentException("New processing jobs must be clean, unattempted queued jobs.", nameof(jobs));
             }
@@ -101,16 +107,63 @@ public sealed class SqliteProcessingRepository
         return await ReadJobsAsync(connection, transaction: null, runId, cancellationToken);
     }
 
+    public async Task<ProcessingRunSummary> GetRunSummaryAsync(
+        ProcessingRunId runId,
+        CancellationToken cancellationToken = default)
+    {
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        CatalogueProcessingRun run = await ReadRunAsync(connection, transaction: null, runId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Processing run {runId} was not found.");
+
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                COUNT(*),
+                COALESCE(SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN status = 'succeeded' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(attempt_count), 0),
+                MIN(CASE WHEN status = 'queued' THEN available_at_utc ELSE NULL END)
+            FROM processing_jobs
+            WHERE processing_run_id = $run_id;
+            """;
+        command.Parameters.AddWithValue("$run_id", runId.ToString());
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
+
+        return new ProcessingRunSummary(
+            runId,
+            run.Status,
+            reader.GetInt32(0),
+            reader.GetInt32(1),
+            reader.GetInt32(2),
+            reader.GetInt32(3),
+            reader.GetInt32(4),
+            reader.GetInt32(5),
+            reader.GetInt32(6),
+            reader.IsDBNull(7) ? null : ParseTimestamp(reader.GetString(7)));
+    }
+
     /// <summary>
-    /// Claims the oldest due queued job for a run. The write is serialized by SQLite so
-    /// concurrent workers cannot receive the same job.
+    /// Claims the oldest due queued job or reclaims the oldest expired running job.
+    /// The returned token is required for every subsequent transition.
     /// </summary>
     public async Task<CatalogueProcessingJob?> ClaimNextJobAsync(
         ProcessingRunId runId,
         DateTimeOffset claimedAtUtc,
+        TimeSpan leaseDuration,
         CancellationToken cancellationToken = default)
     {
+        if (leaseDuration <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(leaseDuration), "The lease duration must be positive.");
+        }
+
         DateTimeOffset claimedAt = claimedAtUtc.ToUniversalTime();
+        DateTimeOffset leasedUntil = claimedAt.Add(leaseDuration);
+        ProcessingLeaseToken leaseToken = ProcessingLeaseToken.New();
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
 
@@ -124,22 +177,46 @@ public sealed class SqliteProcessingRepository
                     attempt_count = attempt_count + 1,
                     started_at_utc = $claimed_at_utc,
                     completed_at_utc = NULL,
-                    error = NULL
+                    error = NULL,
+                    last_failure_kind = CASE
+                        WHEN status = 'running' THEN 'transient'
+                        ELSE last_failure_kind
+                    END,
+                    lease_token = $lease_token,
+                    leased_until_utc = $leased_until_utc
                 WHERE id = (
-                    SELECT id
-                    FROM processing_jobs
-                    WHERE processing_run_id = $run_id
-                      AND status = 'queued'
-                      AND available_at_utc <= $claimed_at_utc
-                    ORDER BY available_at_utc, id
+                    SELECT job.id
+                    FROM processing_jobs AS job
+                    INNER JOIN processing_runs AS run
+                        ON run.id = job.processing_run_id
+                    WHERE job.processing_run_id = $run_id
+                      AND run.status IN ('pending', 'running')
+                      AND run.cancellation_requested_at_utc IS NULL
+                      AND (
+                          (job.status = 'queued' AND job.available_at_utc <= $claimed_at_utc)
+                          OR
+                          (job.status = 'running' AND job.leased_until_utc <= $claimed_at_utc)
+                      )
+                    ORDER BY
+                        CASE job.status WHEN 'queued' THEN 0 ELSE 1 END,
+                        job.available_at_utc,
+                        job.id
                     LIMIT 1
                 )
-                  AND status = 'queued'
+                  AND (
+                      (status = 'queued' AND available_at_utc <= $claimed_at_utc)
+                      OR
+                      (status = 'running' AND leased_until_utc <= $claimed_at_utc)
+                  )
                 RETURNING id, processing_run_id, asset_revision_id, status, attempt_count,
-                          available_at_utc, started_at_utc, completed_at_utc, error;
+                          available_at_utc, started_at_utc, completed_at_utc, error,
+                          idempotency_key, lease_token, leased_until_utc, checkpoint_json,
+                          last_failure_kind;
                 """;
             command.Parameters.AddWithValue("$run_id", runId.ToString());
             command.Parameters.AddWithValue("$claimed_at_utc", Format(claimedAt));
+            command.Parameters.AddWithValue("$lease_token", leaseToken.ToString());
+            command.Parameters.AddWithValue("$leased_until_utc", Format(leasedUntil));
 
             await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
             claimed = await reader.ReadAsync(cancellationToken) ? ReadJob(reader) : null;
@@ -162,61 +239,249 @@ public sealed class SqliteProcessingRepository
         return claimed;
     }
 
-    public Task<CatalogueProcessingJob> CompleteJobAsync(
+    public Task<CatalogueProcessingJob> RenewLeaseAsync(
         ProcessingJobId jobId,
-        DateTimeOffset completedAtUtc,
-        CancellationToken cancellationToken = default) =>
-        TransitionRunningJobAsync(
+        ProcessingLeaseToken leaseToken,
+        DateTimeOffset renewedAtUtc,
+        TimeSpan leaseDuration,
+        CancellationToken cancellationToken = default)
+    {
+        if (leaseDuration <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(leaseDuration), "The lease duration must be positive.");
+        }
+
+        DateTimeOffset renewedAt = renewedAtUtc.ToUniversalTime();
+        return TransitionLeasedJobAsync(
             jobId,
+            leaseToken,
+            renewedAt,
             """
             UPDATE processing_jobs
-            SET status = 'succeeded', completed_at_utc = $completed_at_utc, error = NULL
-            WHERE id = $id AND status = 'running'
+            SET leased_until_utc = $leased_until_utc
+            WHERE id = $id
+              AND status = 'running'
+              AND lease_token = $lease_token
+              AND leased_until_utc > $transition_at_utc
             RETURNING id, processing_run_id, asset_revision_id, status, attempt_count,
-                      available_at_utc, started_at_utc, completed_at_utc, error;
+                      available_at_utc, started_at_utc, completed_at_utc, error,
+                      idempotency_key, lease_token, leased_until_utc, checkpoint_json,
+                      last_failure_kind;
             """,
-            completedAtUtc,
             error: null,
+            checkpointJson: null,
+            failureKind: null,
             retryAtUtc: null,
+            leasedUntilUtc: renewedAt.Add(leaseDuration),
+            cancellationToken);
+    }
+
+    public Task<CatalogueProcessingJob> SaveCheckpointAsync(
+        ProcessingJobId jobId,
+        ProcessingLeaseToken leaseToken,
+        string checkpointJson,
+        DateTimeOffset savedAtUtc,
+        TimeSpan leaseDuration,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(checkpointJson);
+        using JsonDocument _ = JsonDocument.Parse(checkpointJson);
+        if (leaseDuration <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(leaseDuration), "The lease duration must be positive.");
+        }
+
+        DateTimeOffset savedAt = savedAtUtc.ToUniversalTime();
+        return TransitionLeasedJobAsync(
+            jobId,
+            leaseToken,
+            savedAt,
+            """
+            UPDATE processing_jobs
+            SET checkpoint_json = $checkpoint_json,
+                leased_until_utc = $leased_until_utc
+            WHERE id = $id
+              AND status = 'running'
+              AND lease_token = $lease_token
+              AND leased_until_utc > $transition_at_utc
+            RETURNING id, processing_run_id, asset_revision_id, status, attempt_count,
+                      available_at_utc, started_at_utc, completed_at_utc, error,
+                      idempotency_key, lease_token, leased_until_utc, checkpoint_json,
+                      last_failure_kind;
+            """,
+            error: null,
+            checkpointJson: checkpointJson.Trim(),
+            failureKind: null,
+            retryAtUtc: null,
+            leasedUntilUtc: savedAt.Add(leaseDuration),
+            cancellationToken);
+    }
+
+    public Task<CatalogueProcessingJob> CompleteJobAsync(
+        ProcessingJobId jobId,
+        ProcessingLeaseToken leaseToken,
+        DateTimeOffset completedAtUtc,
+        CancellationToken cancellationToken = default) =>
+        TransitionLeasedJobAsync(
+            jobId,
+            leaseToken,
+            completedAtUtc.ToUniversalTime(),
+            """
+            UPDATE processing_jobs
+            SET status = 'succeeded',
+                completed_at_utc = $transition_at_utc,
+                error = NULL,
+                last_failure_kind = NULL,
+                lease_token = NULL,
+                leased_until_utc = NULL
+            WHERE id = $id
+              AND status = 'running'
+              AND lease_token = $lease_token
+              AND leased_until_utc > $transition_at_utc
+            RETURNING id, processing_run_id, asset_revision_id, status, attempt_count,
+                      available_at_utc, started_at_utc, completed_at_utc, error,
+                      idempotency_key, lease_token, leased_until_utc, checkpoint_json,
+                      last_failure_kind;
+            """,
+            error: null,
+            checkpointJson: null,
+            failureKind: null,
+            retryAtUtc: null,
+            leasedUntilUtc: null,
             cancellationToken);
 
     /// <summary>
-    /// Records a failed attempt. Supplying a retry time returns the job to the queue while
-    /// preserving its attempt count; omitting it makes the failure terminal.
+    /// Records a classified failure. A retry time returns a transient failure to the queue;
+    /// omitting it makes the failure terminal.
     /// </summary>
     public Task<CatalogueProcessingJob> FailJobAsync(
         ProcessingJobId jobId,
+        ProcessingLeaseToken leaseToken,
+        ProcessingFailureKind failureKind,
         string error,
         DateTimeOffset failedAtUtc,
         DateTimeOffset? retryAtUtc = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(error);
+        if (retryAtUtc is not null && failureKind != ProcessingFailureKind.Transient)
+        {
+            throw new ArgumentException("Only transient failures can be scheduled for retry.", nameof(retryAtUtc));
+        }
 
         string sql = retryAtUtc is null
             ? """
               UPDATE processing_jobs
-              SET status = 'failed', completed_at_utc = $completed_at_utc, error = $error
-              WHERE id = $id AND status = 'running'
+              SET status = 'failed',
+                  completed_at_utc = $transition_at_utc,
+                  error = $error,
+                  last_failure_kind = $failure_kind,
+                  lease_token = NULL,
+                  leased_until_utc = NULL
+              WHERE id = $id
+                AND status = 'running'
+                AND lease_token = $lease_token
+                AND leased_until_utc > $transition_at_utc
               RETURNING id, processing_run_id, asset_revision_id, status, attempt_count,
-                        available_at_utc, started_at_utc, completed_at_utc, error;
+                        available_at_utc, started_at_utc, completed_at_utc, error,
+                        idempotency_key, lease_token, leased_until_utc, checkpoint_json,
+                        last_failure_kind;
               """
             : """
               UPDATE processing_jobs
-              SET status = 'queued', available_at_utc = $retry_at_utc,
-                  started_at_utc = NULL, completed_at_utc = NULL, error = $error
-              WHERE id = $id AND status = 'running'
+              SET status = 'queued',
+                  available_at_utc = $retry_at_utc,
+                  started_at_utc = NULL,
+                  completed_at_utc = NULL,
+                  error = $error,
+                  last_failure_kind = $failure_kind,
+                  lease_token = NULL,
+                  leased_until_utc = NULL
+              WHERE id = $id
+                AND status = 'running'
+                AND lease_token = $lease_token
+                AND leased_until_utc > $transition_at_utc
               RETURNING id, processing_run_id, asset_revision_id, status, attempt_count,
-                        available_at_utc, started_at_utc, completed_at_utc, error;
+                        available_at_utc, started_at_utc, completed_at_utc, error,
+                        idempotency_key, lease_token, leased_until_utc, checkpoint_json,
+                        last_failure_kind;
               """;
 
-        return TransitionRunningJobAsync(
+        return TransitionLeasedJobAsync(
             jobId,
+            leaseToken,
+            failedAtUtc.ToUniversalTime(),
             sql,
-            failedAtUtc,
             error.Trim(),
+            checkpointJson: null,
+            failureKind,
             retryAtUtc,
+            leasedUntilUtc: null,
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Cancels the run and invalidates every queued or active job lease in one transaction.
+    /// Completed and failed jobs remain unchanged for reporting.
+    /// </summary>
+    public async Task<CatalogueProcessingRun> RequestCancellationAsync(
+        ProcessingRunId runId,
+        DateTimeOffset requestedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        DateTimeOffset requestedAt = requestedAtUtc.ToUniversalTime();
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        CatalogueProcessingRun run = await ReadRunAsync(connection, transaction, runId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Processing run {runId} was not found.");
+        if (run.Status is ProcessingRunStatus.Completed or ProcessingRunStatus.Failed or ProcessingRunStatus.Cancelled)
+        {
+            transaction.Commit();
+            return run;
+        }
+
+        using (SqliteCommand command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = """
+                UPDATE processing_runs
+                SET status = 'cancelled',
+                    cancellation_requested_at_utc = $requested_at_utc,
+                    completed_at_utc = $requested_at_utc,
+                    error = NULL
+                WHERE id = $run_id;
+                """;
+            command.Parameters.AddWithValue("$run_id", runId.ToString());
+            command.Parameters.AddWithValue("$requested_at_utc", Format(requestedAt));
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        using (SqliteCommand command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText = """
+                UPDATE processing_jobs
+                SET status = 'cancelled',
+                    completed_at_utc = $requested_at_utc,
+                    lease_token = NULL,
+                    leased_until_utc = NULL
+                WHERE processing_run_id = $run_id
+                  AND status IN ('queued', 'running');
+                """;
+            command.Parameters.AddWithValue("$run_id", runId.ToString());
+            command.Parameters.AddWithValue("$requested_at_utc", Format(requestedAt));
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        CatalogueProcessingRun cancelled = await ReadRunAsync(
+            connection,
+            transaction,
+            runId,
+            cancellationToken)
+            ?? throw new InvalidOperationException("The processing run disappeared while it was cancelled.");
+        transaction.Commit();
+        return cancelled;
     }
 
     /// <summary>
@@ -291,26 +556,34 @@ public sealed class SqliteProcessingRepository
         return persisted;
     }
 
-    private async Task<CatalogueProcessingJob> TransitionRunningJobAsync(
+    private async Task<CatalogueProcessingJob> TransitionLeasedJobAsync(
         ProcessingJobId jobId,
+        ProcessingLeaseToken leaseToken,
+        DateTimeOffset transitionAtUtc,
         string sql,
-        DateTimeOffset completedAtUtc,
         string? error,
+        string? checkpointJson,
+        ProcessingFailureKind? failureKind,
         DateTimeOffset? retryAtUtc,
+        DateTimeOffset? leasedUntilUtc,
         CancellationToken cancellationToken)
     {
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = sql;
         command.Parameters.AddWithValue("$id", jobId.ToString());
-        command.Parameters.AddWithValue("$completed_at_utc", Format(completedAtUtc));
+        command.Parameters.AddWithValue("$lease_token", leaseToken.ToString());
+        command.Parameters.AddWithValue("$transition_at_utc", Format(transitionAtUtc));
         command.Parameters.AddWithValue("$error", (object?)error ?? DBNull.Value);
+        command.Parameters.AddWithValue("$checkpoint_json", (object?)checkpointJson ?? DBNull.Value);
+        command.Parameters.AddWithValue("$failure_kind", failureKind is null ? DBNull.Value : Format(failureKind.Value));
         command.Parameters.AddWithValue("$retry_at_utc", retryAtUtc is null ? DBNull.Value : Format(retryAtUtc.Value));
+        command.Parameters.AddWithValue("$leased_until_utc", leasedUntilUtc is null ? DBNull.Value : Format(leasedUntilUtc.Value));
 
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
-            throw new InvalidOperationException("Only a running processing job can make this transition.");
+            throw new ProcessingLeaseLostException(jobId);
         }
 
         return ReadJob(reader);
@@ -326,8 +599,9 @@ public sealed class SqliteProcessingRepository
         command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO processing_runs (
-                id, status, configuration_json, started_at_utc, completed_at_utc, error)
-            VALUES ($id, $status, $configuration_json, $started_at_utc, NULL, NULL)
+                id, status, configuration_json, started_at_utc, completed_at_utc,
+                error, cancellation_requested_at_utc)
+            VALUES ($id, $status, $configuration_json, $started_at_utc, NULL, NULL, NULL)
             ON CONFLICT(id) DO NOTHING;
             """;
         command.Parameters.AddWithValue("$id", run.Id.ToString());
@@ -348,15 +622,19 @@ public sealed class SqliteProcessingRepository
         command.CommandText = """
             INSERT INTO processing_jobs (
                 id, processing_run_id, asset_revision_id, status, attempt_count,
-                available_at_utc, started_at_utc, completed_at_utc, error)
+                available_at_utc, started_at_utc, completed_at_utc, error,
+                idempotency_key, lease_token, leased_until_utc, checkpoint_json,
+                last_failure_kind)
             VALUES ($id, $processing_run_id, $asset_revision_id, 'queued', 0,
-                    $available_at_utc, NULL, NULL, NULL)
-            ON CONFLICT(processing_run_id, asset_revision_id) DO NOTHING;
+                    $available_at_utc, NULL, NULL, NULL,
+                    $idempotency_key, NULL, NULL, NULL, NULL)
+            ON CONFLICT(idempotency_key) DO NOTHING;
             """;
         command.Parameters.AddWithValue("$id", job.Id.ToString());
         command.Parameters.AddWithValue("$processing_run_id", job.ProcessingRunId.ToString());
         command.Parameters.AddWithValue("$asset_revision_id", job.AssetRevisionId.ToString());
         command.Parameters.AddWithValue("$available_at_utc", Format(job.AvailableAtUtc));
+        command.Parameters.AddWithValue("$idempotency_key", job.IdempotencyKey);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -403,7 +681,8 @@ public sealed class SqliteProcessingRepository
             reader.GetString(2),
             ParseTimestamp(reader.GetString(3)),
             reader.IsDBNull(4) ? null : ParseTimestamp(reader.GetString(4)),
-            reader.IsDBNull(5) ? null : reader.GetString(5));
+            reader.IsDBNull(5) ? null : reader.GetString(5),
+            reader.IsDBNull(6) ? null : ParseTimestamp(reader.GetString(6)));
 
     private static CatalogueProcessingJob ReadJob(SqliteDataReader reader) =>
         new(
@@ -415,7 +694,12 @@ public sealed class SqliteProcessingRepository
             ParseTimestamp(reader.GetString(5)),
             reader.IsDBNull(6) ? null : ParseTimestamp(reader.GetString(6)),
             reader.IsDBNull(7) ? null : ParseTimestamp(reader.GetString(7)),
-            reader.IsDBNull(8) ? null : reader.GetString(8));
+            reader.IsDBNull(8) ? null : reader.GetString(8),
+            reader.GetString(9),
+            reader.IsDBNull(10) ? null : ProcessingLeaseToken.From(Guid.Parse(reader.GetString(10))),
+            reader.IsDBNull(11) ? null : ParseTimestamp(reader.GetString(11)),
+            reader.IsDBNull(12) ? null : reader.GetString(12),
+            reader.IsDBNull(13) ? null : ParseFailureKind(reader.GetString(13)));
 
     private static string Format(ProcessingRunStatus status) => status switch
     {
@@ -447,6 +731,20 @@ public sealed class SqliteProcessingRepository
         _ => throw new InvalidDataException($"Unknown processing job status '{status}'."),
     };
 
+    private static string Format(ProcessingFailureKind failureKind) => failureKind switch
+    {
+        ProcessingFailureKind.Transient => "transient",
+        ProcessingFailureKind.Permanent => "permanent",
+        _ => throw new ArgumentOutOfRangeException(nameof(failureKind)),
+    };
+
+    private static ProcessingFailureKind ParseFailureKind(string failureKind) => failureKind switch
+    {
+        "transient" => ProcessingFailureKind.Transient,
+        "permanent" => ProcessingFailureKind.Permanent,
+        _ => throw new InvalidDataException($"Unknown processing failure kind '{failureKind}'."),
+    };
+
     private static string Format(DateTimeOffset value) =>
         value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
 
@@ -454,13 +752,27 @@ public sealed class SqliteProcessingRepository
         DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
 
     private const string RunSelect = """
-        SELECT id, status, configuration_json, started_at_utc, completed_at_utc, error
+        SELECT id, status, configuration_json, started_at_utc, completed_at_utc,
+               error, cancellation_requested_at_utc
         FROM processing_runs
         """;
 
     private const string JobSelect = """
         SELECT id, processing_run_id, asset_revision_id, status, attempt_count,
-               available_at_utc, started_at_utc, completed_at_utc, error
+               available_at_utc, started_at_utc, completed_at_utc, error,
+               idempotency_key, lease_token, leased_until_utc, checkpoint_json,
+               last_failure_kind
         FROM processing_jobs
         """;
+}
+
+public sealed class ProcessingLeaseLostException : InvalidOperationException
+{
+    public ProcessingLeaseLostException(ProcessingJobId jobId)
+        : base($"The lease for processing job {jobId} is no longer valid.")
+    {
+        JobId = jobId;
+    }
+
+    public ProcessingJobId JobId { get; }
 }
