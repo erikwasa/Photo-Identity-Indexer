@@ -4,7 +4,7 @@ title: Build minimal review application
 milestone: M04
 status_source: ../status/work-items.yaml
 depends_on: [WI-0011, WI-0013]
-affected_modules: [PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Integration.Tests]
+affected_modules: [PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Integration.Tests, PhotoIdentity.ReviewVerification]
 ---
 
 # WI-0015: Build minimal review application
@@ -63,7 +63,25 @@ The hosted Blazor WebAssembly client includes:
 
 The service worker excludes every `/api/` request, including face images and review JSON, so the application does not deliberately retain biometric API responses in its cache. Together with the API's `no-store` headers, this prevents both application-managed and ordinary HTTP caching of review responses. The responsive UI can be tested over trusted-network HTTP. PWA installation on a phone generally requires a secure context and is not treated as proof of the core review workflow.
 
-## Operator command
+## Device verification harness
+
+`verify-review.ps1` creates an isolated catalogue below `.artifacts/review-verification` using synthetic coloured PNG crops. It never opens or changes the operator's real catalogue. The script supports:
+
+- `Interactive`, which starts the real hosted application and waits while Windows and Pixel checks are performed;
+- `Smoke`, which starts the app, validates the API and exits automatically;
+- `Prepare`, which creates only the disposable catalogue and crops.
+
+The smoke path verifies health, all three queue states, opaque image streaming, `no-store`, person creation, assignment, undo and retained audit history. GitHub Actions runs this mode through Windows PowerShell. The script detects LAN IPv4 addresses but deliberately does not create Windows Firewall rules.
+
+Run the final acceptance path with:
+
+```powershell
+./verify-review.ps1
+```
+
+Use the printed localhost URL on Windows and a printed LAN URL on the Pixel. Keep the listener on a trusted private network because this milestone intentionally has no authentication and uses HTTP.
+
+## Operator command for a real catalogue
 
 ```powershell
 $env:PhotoIdentity__DatabasePath = "C:\PhotoIdentity\catalogue.db"
@@ -75,16 +93,18 @@ Open `http://localhost:5080` on Windows. For Pixel verification, use the compute
 ## Validation
 
 ```powershell
+./verify-review.ps1 -Mode Smoke -Configuration Release
 dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
 
-Draft pull request [#27](https://github.com/erikwasa/Photo-Identity-Indexer/pull/27) adds the schema migration, review repository, same-origin API, responsive client and integration coverage.
+Pull request [#27](https://github.com/erikwasa/Photo-Identity-Indexer/pull/27) merged the schema migration, review repository, same-origin API, responsive client and integration coverage. Draft pull request [#28](https://github.com/erikwasa/Photo-Identity-Indexer/pull/28) adds the isolated device-verification harness.
 
 ## Deliberate limitations
 
 - Authentication and per-user identities are not included; this slice is limited to a trusted local network and the client currently reports a local actor string.
 - Person rename, merge and bulk review are outside WI-0015.
 - Historical `person_labels` rows are retained; current review state must be read through the review-action projection.
+- Automated smoke checks cannot prove Pixel touch comfort or real LAN reachability.
 - The final Windows and Pixel verification remains a human acceptance step.
