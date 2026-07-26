@@ -6,7 +6,7 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project is currently in **M02 — Local catalogue and jobs**. M01 single-image inference, WI-0011 SQLite persistence and WI-0012 local-folder scanning are complete and verified. WI-0013 now has leased resumable orchestration and is connecting it to production local batch inspection; the remaining acceptance step is a private 500-photo verification.
+The project is currently in **M03 — OneDrive synchronised source**. M01 single-image inference and M02 local catalogue, durable jobs and resumable batch processing are complete and verified. WI-0014 is adding explicit OneDrive Files On-Demand availability, user-managed hydration, verified staging fingerprints and guarded cleanup.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
@@ -18,7 +18,7 @@ The project is currently in **M02 — Local catalogue and jobs**. M01 single-ima
 
 - .NET 10 SDK
 - PowerShell 7 or Windows PowerShell
-- Windows for the current OpenCV native-runtime verification path
+- Windows for the current OpenCV native-runtime and OneDrive Files On-Demand verification paths
 
 ## Build and test
 
@@ -90,6 +90,10 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 ```
 
 Batch start scans JPEG and PNG files, records unsupported files separately, creates one durable job for each current revision and processes aligned crops and embeddings into SQLite. Resume reconstructs the saved source, output and model configuration.
+
+## OneDrive sync-root policy
+
+OneDrive integration uses the local Windows sync folder only. Online-only placeholders are reported without intentionally opening them; hydrate them through the OneDrive client before staging. Verified staging directories must be outside the source root. The adapter does not request Microsoft Graph permissions, OneDrive credentials or access tokens.
 
 ## First target demonstration
 
