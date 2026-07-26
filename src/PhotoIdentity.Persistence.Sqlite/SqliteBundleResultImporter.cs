@@ -63,7 +63,7 @@ public sealed class SqliteBundleResultImporter
                 StringComparer.Ordinal);
             foreach (PortableFaceResult face in manifest.Faces.OrderBy(face => face.Ordinal))
             {
-                if (!files.TryGetValue(face.CropPath, out PortableBundleFile? cropFile) ||
+                if (!files.TryGetValue(face.CropPath, out PortableBundleFile cropFile) ||
                     cropFile.Role != PortableBundleRoles.ResultCrop)
                 {
                     throw new PortableBundleValidationException(
