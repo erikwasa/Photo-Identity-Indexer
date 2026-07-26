@@ -17,7 +17,7 @@ public sealed class BatchCommandTests
             await database.InitializeAsync();
             IReadOnlyList<CatalogueAssetRevision> revisions =
                 await SqliteProcessingRepositoryTests.SeedRevisionsAsync(database, 2);
-            DateTimeOffset now = new(2026, 7, 26, 12, 0, 0, TimeSpan.Zero);
+            DateTimeOffset now = DateTimeOffset.UtcNow.AddMinutes(-1);
             CatalogueProcessingRun run = SqliteProcessingRepositoryTests.CreateRun(now);
             SqliteProcessingRepository repository = new(database);
             await repository.CreateRunAsync(
@@ -38,12 +38,14 @@ public sealed class BatchCommandTests
             Assert.Equal(string.Empty, statusError.ToString());
 
             StringWriter cancelOutput = new();
+            StringWriter cancelError = new();
             int cancelExit = await Program.RunAsync(
                 ["batch", "cancel", "--database", databasePath, "--run", run.Id.ToString()],
                 cancelOutput,
-                TextWriter.Null);
+                cancelError);
 
             Assert.Equal(0, cancelExit);
+            Assert.Equal(string.Empty, cancelError.ToString());
             Assert.Contains("status: cancelled", cancelOutput.ToString(), StringComparison.Ordinal);
             Assert.Contains("cancelled: 2", cancelOutput.ToString(), StringComparison.Ordinal);
         }
