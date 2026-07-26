@@ -6,7 +6,7 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project has two active tracks. **M04 — Minimal review application** is implemented and automated verification is green, but WI-0015 remains open until Windows and Pixel interaction is explicitly verified. **M07 — Portable job bundles** is now active through WI-0018, establishing verified database-free work packages and guarded result import.
+The project has two active tracks. **M04 — Minimal review application** is implemented and automated verification is green, but WI-0015 remains open until Windows and Pixel interaction is explicitly verified. **M07 — Portable job bundles** is active through WI-0018; verified database-free packages, production processing commands and guarded result import are implemented, with a private real-image round trip still required.
 
 M01 single-image inference, M02 local catalogue and durable processing, and M03 OneDrive availability and verified staging are complete and verified.
 
@@ -120,13 +120,43 @@ The script creates synthetic review data below ignored `.artifacts/review-verifi
 ./verify-review.ps1 -Mode Smoke -Configuration Release
 ```
 
-## Portable bundle boundary
+## Portable bundle workflow
 
-WI-0018 defines versioned job and result ZIP archives for full-image, reduced-image and face-crop processing. Each payload has a canonical archive path, role, byte count and SHA-256 digest. Extraction rejects unsafe paths, cross-platform name collisions, undeclared files and corrupted bytes.
+WI-0018 defines versioned job and result ZIP archives for full-image, reduced-image and aligned face-crop processing. Each payload has a canonical archive path, role, byte count and SHA-256 digest. Extraction rejects unsafe paths, cross-platform name collisions, undeclared files and corrupted bytes.
 
-The portable worker contract has no SQLite dependency. A returned result is linked to the exact original job-manifest digest and immutable asset revision. SQLite import requires both archives, validates the canonical revision and writes only model-derived face data. People, human labels and review actions are outside the import path.
+Export one immutable revision:
 
-The current slice is a library and test boundary. Operator-facing export, process and import commands are not available yet and should not be inferred from the internal APIs.
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -- `
+  bundle export `
+  --database "C:\PhotoIdentity\catalogue.db" `
+  --revision REVISION_ID `
+  --job "C:\PhotoIdentity\transfer\job.photoid-job"
+```
+
+Use `--profile reduced-image --max-width 1600 --max-height 1600` for bounded transfer. Crop-only export requires every canonical one-based face number, such as `--crop "3=C:\PhotoIdentity\crops\face-003.png"`; argument order is never treated as face identity.
+
+Process the verified job on a machine with the pinned models installed but no catalogue access:
+
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -- `
+  bundle process `
+  --job "C:\PhotoIdentity\transfer\job.photoid-job" `
+  --result "C:\PhotoIdentity\transfer\result.photoid-result"
+```
+
+Import the exact job/result pair:
+
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -- `
+  bundle import `
+  --database "C:\PhotoIdentity\catalogue.db" `
+  --job "C:\PhotoIdentity\transfer\job.photoid-job" `
+  --result "C:\PhotoIdentity\transfer\result.photoid-result" `
+  --output "C:\PhotoIdentity\bundle-imports"
+```
+
+The returned result is linked to the exact original job-manifest digest and immutable revision. SQLite import writes only model-derived face data. People, human labels and review actions are outside the import path, and replaying the same result is harmless.
 
 ## First target demonstration
 

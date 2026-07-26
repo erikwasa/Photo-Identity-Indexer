@@ -44,6 +44,10 @@ public static class Program
                     BatchCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
                     cancellationToken),
+                "bundle" => await BundleCommandRunner.RunAsync(
+                    BundleCommandOptions.Parse(args.Skip(1).ToArray()),
+                    output,
+                    cancellationToken),
                 "decode" => await DecodeCommandRunner.RunAsync(
                     DecodeCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
@@ -85,6 +89,16 @@ public static class Program
               batch status --database PATH --run RUN_ID
               batch cancel --database PATH --run RUN_ID
 
+              bundle export --database PATH --revision REVISION_ID --job PATH
+                            [--profile full-image|reduced-image|face-crops]
+                            [--confidence 0..1] [--work DIR]
+                            [--max-width PIXELS --max-height PIXELS]
+                            [--crop FACE_NUMBER=PATH ...]
+              bundle process --job PATH --result PATH [--work DIR]
+                             [--root PATH] [--model-dir DIR]
+              bundle import --database PATH --job PATH --result PATH
+                            --output DIR [--work DIR]
+
               decode --input PATH --output PATH [--report PATH]
                      [--max-width PIXELS --max-height PIXELS] [--verbose]
 
@@ -97,6 +111,15 @@ public static class Program
             Batch resume reconstructs the saved configuration and continues due work.
             Batch status reports durable progress counts. Batch cancel atomically
             cancels queued and active work and invalidates active leases.
+
+            Bundle export verifies a canonical immutable revision and writes a portable
+            full-image, reduced-image or aligned face-crop job. Face-crop exports require
+            each human-facing one-based face number, for example --crop 3=C:\\Crops\\face.png,
+            so returned embeddings retain the canonical occurrence ordinal. Bundle process
+            runs the database-free OpenCV, YuNet and SFace worker using settings stored in
+            the job. Bundle import verifies the exact job/result pair and revision hash
+            before replay-safe SQLite persistence. Face-crop jobs treat every 112x112 input
+            as an already-aligned face and record explicit crop-input provenance.
 
             The decode command reads JPEG or PNG content, applies EXIF orientation,
             optionally downsizes it, and writes a normalised PNG without modifying the input.
