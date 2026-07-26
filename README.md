@@ -6,7 +6,9 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project is currently in **M04 — Minimal review application**. M01 single-image inference, M02 local catalogue and durable processing, and M03 OneDrive availability and verified staging are complete and verified. The review application has merged; WI-0015 remains open only for repeatable Windows and Pixel acceptance verification.
+The project has two active tracks. **M04 — Minimal review application** is implemented and automated verification is green, but WI-0015 remains open until Windows and Pixel interaction is explicitly verified. **M07 — Portable job bundles** is now active through WI-0018, establishing verified database-free work packages and guarded result import.
+
+M01 single-image inference, M02 local catalogue and durable processing, and M03 OneDrive availability and verified staging are complete and verified.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
@@ -117,6 +119,14 @@ The script creates synthetic review data below ignored `.artifacts/review-verifi
 ```powershell
 ./verify-review.ps1 -Mode Smoke -Configuration Release
 ```
+
+## Portable bundle boundary
+
+WI-0018 defines versioned job and result ZIP archives for full-image, reduced-image and face-crop processing. Each payload has a canonical archive path, role, byte count and SHA-256 digest. Extraction rejects unsafe paths, cross-platform name collisions, undeclared files and corrupted bytes.
+
+The portable worker contract has no SQLite dependency. A returned result is linked to the exact original job-manifest digest and immutable asset revision. SQLite import requires both archives, validates the canonical revision and writes only model-derived face data. People, human labels and review actions are outside the import path.
+
+The current slice is a library and test boundary. Operator-facing export, process and import commands are not available yet and should not be inferred from the internal APIs.
 
 ## First target demonstration
 
