@@ -6,9 +6,9 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project has two active tracks. **M04 — Minimal review application** is implemented and automated verification is green, but WI-0015 remains open until Windows and Pixel interaction is explicitly verified. **M07 — Portable job bundles** is active through WI-0018; verified database-free packages, production processing commands and guarded result import are implemented, with a private real-image round trip still required.
+**M04 — Minimal review application** is complete after automated verification and maintainer-confirmed Windows and Pixel trusted-network interaction. **M07 — Portable job bundles** remains active through WI-0018; verified database-free packages, production processing commands and guarded result import are implemented, with privacy-safe evidence retention and cleanup still required after the real-image round trip.
 
-M01 single-image inference, M02 local catalogue and durable processing, and M03 OneDrive availability and verified staging are complete and verified.
+M01 single-image inference, M02 local catalogue and durable processing, M03 OneDrive availability and verified staging, and M04 local review are complete and verified.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
@@ -99,14 +99,23 @@ OneDrive integration uses the local Windows sync folder only. Online-only placeh
 
 ## Local review application
 
-Run the same-origin API and responsive Blazor client against an existing catalogue:
+Publish the same-origin API and responsive Blazor client before running it against an existing catalogue:
 
 ```powershell
+$publish = Join-Path $PWD ".artifacts\review-app"
+
+dotnet publish `
+  .\src\PhotoIdentity.Api\PhotoIdentity.Api.csproj `
+  --configuration Release `
+  --output $publish
+
 $env:PhotoIdentity__DatabasePath = "C:\PhotoIdentity\catalogue.db"
-dotnet run --project src/PhotoIdentity.Api --urls "http://0.0.0.0:5080"
+
+Push-Location $publish
+dotnet .\PhotoIdentity.Api.dll --urls "http://0.0.0.0:5080"
 ```
 
-Open `http://localhost:5080` on Windows. A Pixel on the same trusted network can use the computer's LAN address when the Windows Firewall rule permits the port for that network profile. The client receives opaque image URLs and limited metadata; source roots and crop storage paths remain inside the API process. The current trusted-network slice does not include authentication, so do not expose the listener to an untrusted network.
+Open `http://localhost:5080` on Windows. A Pixel on the same trusted network can use the computer's LAN address when the Windows Firewall rule permits the port for that network profile. The client receives opaque image URLs and limited metadata; source roots and crop storage paths remain inside the API process. The current trusted-network slice does not include authentication, so do not expose the listener to an untrusted network. Stop the application before running `Pop-Location`.
 
 Verify the device workflow without using personal photos or a real catalogue:
 
