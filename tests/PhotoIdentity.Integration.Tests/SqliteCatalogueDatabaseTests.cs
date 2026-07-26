@@ -20,9 +20,9 @@ public sealed class SqliteCatalogueDatabaseTests
 
             Assert.True(File.Exists(databasePath));
             await using SqliteConnection connection = await database.OpenConnectionAsync();
-            Assert.Equal(2, await ReadInt64Async(connection, "PRAGMA user_version;"));
+            Assert.Equal(3, await ReadInt64Async(connection, "PRAGMA user_version;"));
             Assert.Equal(1, await ReadInt64Async(connection, "PRAGMA foreign_keys;"));
-            Assert.Equal(2, await ReadInt64Async(connection, "SELECT COUNT(*) FROM schema_migrations;"));
+            Assert.Equal(3, await ReadInt64Async(connection, "SELECT COUNT(*) FROM schema_migrations;"));
             Assert.Equal(
                 1,
                 await ReadInt64Async(
@@ -32,7 +32,12 @@ public sealed class SqliteCatalogueDatabaseTests
                 1,
                 await ReadInt64Async(
                     connection,
-                    "SELECT COUNT(*) FROM pragma_table_info('assets') WHERE name = 'deleted_at_utc';"));
+                    "SELECT COUNT(*) FROM pragma_table_info('processing_jobs') WHERE name = 'lease_token';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    connection,
+                    "SELECT COUNT(*) FROM pragma_table_info('processing_jobs') WHERE name = 'checkpoint_json';"));
         }
         finally
         {
@@ -41,7 +46,7 @@ public sealed class SqliteCatalogueDatabaseTests
     }
 
     [Fact]
-    public async Task Version_one_database_is_upgraded_without_losing_assets()
+    public async Task Version_one_database_is_upgraded_without_losing_assets_or_processing_jobs()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -49,6 +54,9 @@ public sealed class SqliteCatalogueDatabaseTests
             string databasePath = Path.Combine(directory, "catalogue.db");
             string sourceId = Guid.NewGuid().ToString("D");
             string assetId = Guid.NewGuid().ToString("D");
+            string revisionId = Guid.NewGuid().ToString("D");
+            string runId = Guid.NewGuid().ToString("D");
+            string jobId = Guid.NewGuid().ToString("D");
             string createdAt = new DateTimeOffset(2026, 7, 26, 9, 0, 0, TimeSpan.Zero).ToString("O");
             string seedConnectionString = new SqliteConnectionStringBuilder
             {
@@ -77,34 +85,87 @@ public sealed class SqliteCatalogueDatabaseTests
                         created_at_utc TEXT NOT NULL,
                         FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE RESTRICT,
                         UNIQUE (source_id, source_key));
+                    CREATE TABLE asset_revisions (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        asset_id TEXT NOT NULL,
+                        content_sha256 TEXT NOT NULL,
+                        size_bytes INTEGER NOT NULL,
+                        observed_at_utc TEXT NOT NULL,
+                        media_type TEXT NULL,
+                        width INTEGER NULL,
+                        height INTEGER NULL,
+                        FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE CASCADE,
+                        UNIQUE (asset_id, content_sha256));
+                    CREATE TABLE processing_runs (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        status TEXT NOT NULL,
+                        configuration_json TEXT NOT NULL,
+                        started_at_utc TEXT NOT NULL,
+                        completed_at_utc TEXT NULL,
+                        error TEXT NULL);
+                    CREATE TABLE processing_jobs (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        processing_run_id TEXT NOT NULL,
+                        asset_revision_id TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        attempt_count INTEGER NOT NULL DEFAULT 0,
+                        available_at_utc TEXT NOT NULL,
+                        started_at_utc TEXT NULL,
+                        completed_at_utc TEXT NULL,
+                        error TEXT NULL,
+                        FOREIGN KEY (processing_run_id) REFERENCES processing_runs (id) ON DELETE CASCADE,
+                        FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                        UNIQUE (processing_run_id, asset_revision_id));
                     INSERT INTO schema_migrations (version, applied_at_utc) VALUES (1, $created_at);
                     INSERT INTO sources (id, kind, root_locator, created_at_utc)
                         VALUES ($source_id, 'local-folder', 'C:/Photos', $created_at);
                     INSERT INTO assets (id, source_id, source_key, created_at_utc)
                         VALUES ($asset_id, $source_id, 'photo.jpg', $created_at);
+                    INSERT INTO asset_revisions (
+                        id, asset_id, content_sha256, size_bytes, observed_at_utc, media_type)
+                        VALUES ($revision_id, $asset_id, $hash, 123, $created_at, 'image/jpeg');
+                    INSERT INTO processing_runs (
+                        id, status, configuration_json, started_at_utc)
+                        VALUES ($run_id, 'pending', '{}', $created_at);
+                    INSERT INTO processing_jobs (
+                        id, processing_run_id, asset_revision_id, status, attempt_count, available_at_utc)
+                        VALUES ($job_id, $run_id, $revision_id, 'queued', 0, $created_at);
                     PRAGMA user_version = 1;
                     """;
                 command.Parameters.AddWithValue("$created_at", createdAt);
                 command.Parameters.AddWithValue("$source_id", sourceId);
                 command.Parameters.AddWithValue("$asset_id", assetId);
+                command.Parameters.AddWithValue("$revision_id", revisionId);
+                command.Parameters.AddWithValue("$run_id", runId);
+                command.Parameters.AddWithValue("$job_id", jobId);
+                command.Parameters.AddWithValue("$hash", new string('a', 64));
                 await command.ExecuteNonQueryAsync();
             }
 
             SqliteCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
-            await using (SqliteConnection upgraded = await database.OpenConnectionAsync())
-            {
-                Assert.Equal(2, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
-                Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM assets;"));
-                using SqliteCommand read = upgraded.CreateCommand();
-                read.CommandText = "SELECT last_seen_at_utc, deleted_at_utc FROM assets WHERE id = $id;";
-                read.Parameters.AddWithValue("$id", assetId);
-                await using SqliteDataReader reader = await read.ExecuteReaderAsync();
-                Assert.True(await reader.ReadAsync());
-                Assert.Equal(createdAt, reader.GetString(0));
-                Assert.True(reader.IsDBNull(1));
-            }
+            await using SqliteConnection upgraded = await database.OpenConnectionAsync();
+            Assert.Equal(3, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
+            Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM assets;"));
+            Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM processing_jobs;"));
+            using SqliteCommand read = upgraded.CreateCommand();
+            read.CommandText = """
+                SELECT asset.last_seen_at_utc, asset.deleted_at_utc, job.idempotency_key,
+                       job.lease_token, job.checkpoint_json
+                FROM assets AS asset
+                CROSS JOIN processing_jobs AS job
+                WHERE asset.id = $asset_id AND job.id = $job_id;
+                """;
+            read.Parameters.AddWithValue("$asset_id", assetId);
+            read.Parameters.AddWithValue("$job_id", jobId);
+            await using SqliteDataReader reader = await read.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal(createdAt, reader.GetString(0));
+            Assert.True(reader.IsDBNull(1));
+            Assert.Equal($"{runId}:{revisionId}", reader.GetString(2));
+            Assert.True(reader.IsDBNull(3));
+            Assert.True(reader.IsDBNull(4));
         }
         finally
         {
