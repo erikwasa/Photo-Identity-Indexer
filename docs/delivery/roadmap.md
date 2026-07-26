@@ -9,7 +9,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M02 | Local catalogue and jobs | completed |
 | M03 | OneDrive synchronised source | completed |
 | M04 | Minimal review application | completed |
-| M05 | Identity matching | proposed |
+| M05 | Identity matching | ready |
 | M06 | Evaluation harness | proposed |
 | M07 | Portable job bundles | in_progress |
 | M08 | Second model | proposed |
