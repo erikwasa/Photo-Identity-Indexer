@@ -270,9 +270,9 @@ internal interface IOneDriveFileStatusProvider
 
 internal sealed class OneDriveFileAttributeStatusProvider : IOneDriveFileStatusProvider
 {
-    private const FileAttributes RecallOnOpen = (FileAttributes)0x00040000;
-    private const FileAttributes Pinned = (FileAttributes)0x00080000;
-    private const FileAttributes RecallOnDataAccess = (FileAttributes)0x00400000;
+    internal const FileAttributes RecallOnOpen = (FileAttributes)0x00040000;
+    internal const FileAttributes Pinned = (FileAttributes)0x00080000;
+    internal const FileAttributes RecallOnDataAccess = (FileAttributes)0x00400000;
 
     public OneDriveFileStatus GetStatus(string path)
     {
@@ -283,21 +283,24 @@ internal sealed class OneDriveFileAttributeStatusProvider : IOneDriveFileStatusP
 
         try
         {
-            FileAttributes attributes = File.GetAttributes(path);
-            bool contentMissing = (attributes & (FileAttributes.Offline | RecallOnOpen | RecallOnDataAccess)) != 0;
-            if (!contentMissing)
-            {
-                return new OneDriveFileStatus(AssetAvailability.Local);
-            }
-
-            return new OneDriveFileStatus(
-                (attributes & Pinned) != 0
-                    ? AssetAvailability.Downloading
-                    : AssetAvailability.OnlineOnly);
+            return new OneDriveFileStatus(Classify(File.GetAttributes(path)));
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             return new OneDriveFileStatus(AssetAvailability.Error, exception.Message);
         }
+    }
+
+    internal static AssetAvailability Classify(FileAttributes attributes)
+    {
+        bool contentMissing = (attributes & (FileAttributes.Offline | RecallOnOpen | RecallOnDataAccess)) != 0;
+        if (!contentMissing)
+        {
+            return AssetAvailability.Local;
+        }
+
+        return (attributes & Pinned) != 0
+            ? AssetAvailability.Downloading
+            : AssetAvailability.OnlineOnly;
     }
 }
