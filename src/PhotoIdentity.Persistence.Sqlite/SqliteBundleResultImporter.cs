@@ -26,25 +26,35 @@ public sealed class SqliteBundleResultImporter
     }
 
     public async Task<PortableBundleImportResult> ImportAsync(
+        string jobBundlePath,
         string resultBundlePath,
         string outputRoot,
         string workingRoot,
         CancellationToken cancellationToken = default)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobBundlePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(resultBundlePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(workingRoot);
 
-        string extractionDirectory = Path.Combine(
+        string importDirectory = Path.Combine(
             Path.GetFullPath(workingRoot),
-            $"result-{Guid.NewGuid():N}");
+            $"import-{Guid.NewGuid():N}");
+        string jobDirectory = Path.Combine(importDirectory, "job");
+        string resultDirectory = Path.Combine(importDirectory, "result");
         try
         {
+            ExtractedPortableJob job = await PortableBundleArchive.ExtractJobAsync(
+                jobBundlePath,
+                jobDirectory,
+                cancellationToken);
             ExtractedPortableResult extracted = await PortableBundleArchive.ExtractResultAsync(
                 resultBundlePath,
-                extractionDirectory,
+                resultDirectory,
                 cancellationToken);
             PortableResultManifest manifest = extracted.Manifest;
+            ValidateJobLink(job, manifest);
+
             AssetRevisionId revisionId = ParseRevisionId(manifest.AssetRevisionId);
             CatalogueProcessingAssetRevision canonicalRevision = await _assetRepository.GetAssetRevisionAsync(
                 revisionId,
@@ -124,10 +134,25 @@ public sealed class SqliteBundleResultImporter
         }
         finally
         {
-            if (Directory.Exists(extractionDirectory))
+            if (Directory.Exists(importDirectory))
             {
-                Directory.Delete(extractionDirectory, recursive: true);
+                Directory.Delete(importDirectory, recursive: true);
             }
+        }
+    }
+
+    private static void ValidateJobLink(
+        ExtractedPortableJob job,
+        PortableResultManifest result)
+    {
+        if (!string.Equals(result.BundleId, job.Manifest.BundleId, StringComparison.Ordinal) ||
+            !string.Equals(result.JobManifestSha256, job.ManifestHash.ToString(), StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(result.AssetRevisionId, job.Manifest.AssetRevisionId, StringComparison.Ordinal) ||
+            !string.Equals(result.SourceContentSha256, job.Manifest.SourceContentSha256, StringComparison.OrdinalIgnoreCase) ||
+            result.Profile != job.Manifest.Profile)
+        {
+            throw new PortableBundleValidationException(
+                "Result bundle does not match the supplied verified job manifest.");
         }
     }
 
