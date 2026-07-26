@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -65,6 +66,8 @@ public sealed class PortableRecognitionProcessor : IPortableBundleProcessor
     private const string DetectorManifestFile = "yunet-2023mar-fp32.json";
     private const string EmbedderManifestFile = "sface-2021dec-fp32.json";
     private const string CropInputDetectorIdValue = "portable-aligned-face-crop-v1";
+    private const string CropInputPrefix = "inputs/faces/face-";
+    private const string CropInputSuffix = ".png";
 
     private static readonly ModelId CropInputDetectorId = new(CropInputDetectorIdValue);
     private static readonly Sha256Digest CropInputDetectorHash = Digest(Encoding.UTF8.GetBytes(CropInputDetectorIdValue));
@@ -246,28 +249,34 @@ public sealed class PortableRecognitionProcessor : IPortableBundleProcessor
         AlignmentProtocolId protocol,
         CancellationToken cancellationToken)
     {
-        PortableBundleFile[] inputs = job.Manifest.Files
+        FaceCropInput[] inputs = job.Manifest.Files
             .Where(file => file.Role == PortableBundleRoles.FaceCrop)
-            .OrderBy(file => file.Path, StringComparer.Ordinal)
+            .Select(file => new FaceCropInput(ParseCropOrdinal(file.Path), file))
+            .OrderBy(input => input.Ordinal)
             .ToArray();
+        if (inputs.Select(input => input.Ordinal).Distinct().Count() != inputs.Length)
+        {
+            throw new PortableBundleValidationException("Face-crop inputs contain duplicate canonical ordinals.");
+        }
+
         List<PortableProcessedFace> faces = [];
-        for (int index = 0; index < inputs.Length; index++)
+        foreach (FaceCropInput input in inputs)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ImageFrame image = await DecodeAsync(job.ResolveFile(inputs[index]), cancellationToken);
+            ImageFrame image = await DecodeAsync(job.ResolveFile(input.File), cancellationToken);
             if (image.Size != embedder.Descriptor.InputSize)
             {
                 throw new PortableBundleValidationException(
-                    $"Face-crop input '{inputs[index].Path}' must be {embedder.Descriptor.InputSize.Width}x" +
+                    $"Face-crop input '{input.File.Path}' must be {embedder.Descriptor.InputSize.Width}x" +
                     $"{embedder.Descriptor.InputSize.Height}, but is {image.Size.Width}x{image.Size.Height}.");
             }
 
             AlignedFace aligned = new(image, protocol);
             EmbeddingVector embedding = await embedder.EmbedAsync(aligned, cancellationToken);
-            string cropPath = Path.Combine(outputDirectory, $"face-{index + 1:000}.png");
+            string cropPath = Path.Combine(outputDirectory, $"face-{input.Ordinal + 1:000}.png");
             await EncodeAsync(image, cropPath, cancellationToken);
             faces.Add(new PortableProcessedFace(
-                index,
+                input.Ordinal,
                 1,
                 CropInputBoundingBox,
                 CropInputLandmarks,
@@ -285,6 +294,27 @@ public sealed class PortableRecognitionProcessor : IPortableBundleProcessor
             protocol,
             faces,
             _timeProvider.GetUtcNow());
+    }
+
+    private static int ParseCropOrdinal(string path)
+    {
+        if (!path.StartsWith(CropInputPrefix, StringComparison.Ordinal) ||
+            !path.EndsWith(CropInputSuffix, StringComparison.Ordinal))
+        {
+            throw new PortableBundleValidationException(
+                $"Face-crop input path '{path}' must match 'inputs/faces/face-NNN.png'.");
+        }
+
+        string numberText = path[CropInputPrefix.Length..^CropInputSuffix.Length];
+        if (!int.TryParse(numberText, NumberStyles.None, CultureInfo.InvariantCulture, out int faceNumber) ||
+            faceNumber <= 0 ||
+            !string.Equals(path, $"{CropInputPrefix}{faceNumber:000}{CropInputSuffix}", StringComparison.Ordinal))
+        {
+            throw new PortableBundleValidationException(
+                $"Face-crop input path '{path}' does not contain a canonical positive face number.");
+        }
+
+        return checked(faceNumber - 1);
     }
 
     private async Task<ImageFrame> DecodeAsync(string path, CancellationToken cancellationToken)
@@ -348,4 +378,6 @@ public sealed class PortableRecognitionProcessor : IPortableBundleProcessor
 
     private static Sha256Digest Digest(ReadOnlySpan<byte> bytes) =>
         new(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
+
+    private sealed record FaceCropInput(int Ordinal, PortableBundleFile File);
 }
