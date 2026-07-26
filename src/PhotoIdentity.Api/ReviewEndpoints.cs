@@ -79,6 +79,7 @@ public static class ReviewEndpoints
     private static async Task<IResult> GetFaceImageAsync(
         string id,
         SqliteReviewRepository repository,
+        ReviewCropFileResolver cropFileResolver,
         CancellationToken cancellationToken)
     {
         if (!TryFaceOccurrenceId(id, out FaceOccurrenceId faceOccurrenceId))
@@ -87,7 +88,13 @@ public static class ReviewEndpoints
         }
 
         CatalogueReviewFace? face = await repository.GetFaceAsync(faceOccurrenceId, cancellationToken);
-        if (face?.CropStoragePath is not string path || !File.Exists(path))
+        if (face?.CropStoragePath is not string storagePath)
+        {
+            return Results.NotFound();
+        }
+
+        string? path = await cropFileResolver.ResolveAsync(storagePath, cancellationToken);
+        if (path is null)
         {
             return Results.NotFound();
         }
