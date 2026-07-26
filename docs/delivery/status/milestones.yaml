@@ -37,7 +37,7 @@ milestones:
   - WI-0014
 - id: M04
   title: Minimal review application
-  status: in_progress
+  status: completed
   document: ../milestones/M04-review-ui.md
   work_items:
   - WI-0015
