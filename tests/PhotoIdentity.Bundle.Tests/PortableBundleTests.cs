@@ -25,11 +25,14 @@ public sealed class PortableBundleTests
             IReadOnlyList<PortableJobInput> inputs = await CreateInputsAsync(directory, profile);
             string jobPath = Path.Combine(directory, "job.photoid-job");
             string resultPath = Path.Combine(directory, "result.photoid-result");
+            Sha256Digest transportedHash = profile == PortableBundleProfile.FullImage
+                ? Digest(await File.ReadAllBytesAsync(inputs[0].SourcePath))
+                : Digest(sourceBytes);
             PortableJobManifest jobManifest = await PortableBundleArchive.CreateJobAsync(
                 jobPath,
                 new PortableJobBundleRequest(
                     revisionId,
-                    Digest(sourceBytes),
+                    transportedHash,
                     profile,
                     "{\"confidenceThreshold\":0.8}",
                     inputs,
@@ -85,7 +88,7 @@ public sealed class PortableBundleTests
                 original.Delete();
                 ZipArchiveEntry replacement = archive.CreateEntry("inputs/source.jpg");
                 await using Stream output = replacement.Open();
-                await output.WriteAsync([9, 9, 9, 9]);
+                await output.WriteAsync(new byte[] { 9, 9, 9, 9 });
             }
 
             await Assert.ThrowsAsync<PortableBundleValidationException>(() =>
@@ -157,9 +160,9 @@ public sealed class PortableBundleTests
                 new PortableJobBundleRequest(
                     revision.Id,
                     Digest("different-content"u8),
-                    PortableBundleProfile.FullImage,
+                    PortableBundleProfile.ReducedImage,
                     "{}",
-                    [new PortableJobInput(inputPath, "inputs/source.jpg", PortableBundleRoles.SourceImage)],
+                    [new PortableJobInput(inputPath, "inputs/reduced.jpg", PortableBundleRoles.ReducedImage)],
                     now));
             await new PortableBundleWorker(new RecordingProcessor()).ProcessAsync(
                 staleJobPath,
@@ -180,7 +183,7 @@ public sealed class PortableBundleTests
                 original.Delete();
                 ZipArchiveEntry replacement = archive.CreateEntry(corruptCropPath);
                 await using Stream output = replacement.Open();
-                await output.WriteAsync([7, 7, 7]);
+                await output.WriteAsync(new byte[] { 7, 7, 7 });
             }
             await Assert.ThrowsAsync<PortableBundleValidationException>(() => importer.ImportAsync(
                 resultPath,
