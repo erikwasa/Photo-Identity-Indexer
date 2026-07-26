@@ -11,7 +11,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M04 | Minimal review application | in_progress |
 | M05 | Identity matching | proposed |
 | M06 | Evaluation harness | proposed |
-| M07 | Portable job bundles | ready |
+| M07 | Portable job bundles | in_progress |
 | M08 | Second model | proposed |
 | M09 | Azure VM pilot without identities | proposed |
 | M10 | Azure checkpointing | proposed |

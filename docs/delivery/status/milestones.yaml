@@ -55,7 +55,7 @@ milestones:
   - WI-0017
 - id: M07
   title: Portable job bundles
-  status: ready
+  status: in_progress
   document: ../milestones/M07-portable-bundles.md
   work_items:
   - WI-0018
