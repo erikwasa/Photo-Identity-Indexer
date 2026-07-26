@@ -13,5 +13,6 @@
     <ProjectReference Include="../PhotoIdentity.Imaging.OpenCv/PhotoIdentity.Imaging.OpenCv.csproj" />
     <ProjectReference Include="../PhotoIdentity.Recognition.Onnx/PhotoIdentity.Recognition.Onnx.csproj" />
     <ProjectReference Include="../PhotoIdentity.Transfer.Bundles/PhotoIdentity.Transfer.Bundles.csproj" />
+    <ProjectReference Include="../PhotoIdentity.Worker/PhotoIdentity.Worker.csproj" />
   </ItemGroup>
 </Project>
