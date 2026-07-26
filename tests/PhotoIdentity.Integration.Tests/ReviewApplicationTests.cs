@@ -81,7 +81,7 @@ public sealed class ReviewApplicationTests
     }
 
     [Fact]
-    public async Task Review_api_hides_internal_paths_and_streams_faces_through_opaque_urls()
+    public async Task Review_api_hides_internal_paths_streams_opaque_images_and_disables_caching()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -97,7 +97,13 @@ public sealed class ReviewApplicationTests
                 AllowAutoRedirect = false,
             });
 
-            string galleryJson = await client.GetStringAsync("/api/review/faces?state=all");
+            using HttpResponseMessage galleryResponse = await client.GetAsync("/api/review/faces?state=all");
+            galleryResponse.EnsureSuccessStatusCode();
+            Assert.Contains(
+                "no-store",
+                galleryResponse.Headers.CacheControl?.ToString() ?? string.Empty,
+                StringComparison.OrdinalIgnoreCase);
+            string galleryJson = await galleryResponse.Content.ReadAsStringAsync();
             Assert.Contains("secret-photo.jpg", galleryJson, StringComparison.Ordinal);
             Assert.DoesNotContain(seeded.SourceRoot, galleryJson, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(seeded.CropPath, galleryJson, StringComparison.OrdinalIgnoreCase);
@@ -114,13 +120,25 @@ public sealed class ReviewApplicationTests
                 new AssignFaceRequest(person.Id, "pixel-reviewer", "Reviewed on phone."));
             assignResponse.EnsureSuccessStatusCode();
 
-            string detailsJson = await client.GetStringAsync($"/api/review/faces/{seeded.Id}");
+            using HttpResponseMessage detailsResponse = await client.GetAsync($"/api/review/faces/{seeded.Id}");
+            detailsResponse.EnsureSuccessStatusCode();
+            Assert.Contains(
+                "no-store",
+                detailsResponse.Headers.CacheControl?.ToString() ?? string.Empty,
+                StringComparison.OrdinalIgnoreCase);
+            string detailsJson = await detailsResponse.Content.ReadAsStringAsync();
             Assert.Contains("Grace Hopper", detailsJson, StringComparison.Ordinal);
             Assert.Contains("pixel-reviewer", detailsJson, StringComparison.Ordinal);
             Assert.DoesNotContain(seeded.SourceRoot, detailsJson, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(seeded.CropPath, detailsJson, StringComparison.OrdinalIgnoreCase);
 
-            byte[] imageBytes = await client.GetByteArrayAsync($"/api/review/faces/{seeded.Id}/image");
+            using HttpResponseMessage imageResponse = await client.GetAsync($"/api/review/faces/{seeded.Id}/image");
+            imageResponse.EnsureSuccessStatusCode();
+            Assert.Contains(
+                "no-store",
+                imageResponse.Headers.CacheControl?.ToString() ?? string.Empty,
+                StringComparison.OrdinalIgnoreCase);
+            byte[] imageBytes = await imageResponse.Content.ReadAsByteArrayAsync();
             Assert.Equal(seeded.CropBytes, imageBytes);
         }
         finally
