@@ -35,6 +35,13 @@ Install and verify the pinned models, build the solution, run all tests and vali
 ./verify-local.ps1 -InstallModels
 ```
 
+```cmd
+verify-local.cmd                  # equivalent to: verify-local.ps1
+verify-local.cmd --install-models # equivalent to: verify-local.ps1 -InstallModels
+verify-local.cmd --skip-models    # equivalent to: verify-local.ps1 -SkipModels
+verify-local.cmd --debug          # use Debug configuration
+```
+
 Verify real private images without committing them to the repository. Array-valued parameters such as `-Image` must be supplied once with all values:
 
 ```powershell
