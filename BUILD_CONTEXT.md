@@ -8,7 +8,7 @@
 
 **WI-0015 — Build minimal review application**
 
-Status: `in_review`
+Status: `in_progress`
 
 ## Branch and pull request
 
