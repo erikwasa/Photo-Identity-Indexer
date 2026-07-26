@@ -210,6 +210,7 @@ public static class PortableBundleArchive
         Func<TManifest, IReadOnlyList<PortableBundleFile>> getFiles,
         Action<TManifest> validateManifest,
         CancellationToken cancellationToken)
+        where TManifest : class
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(bundlePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationDirectory);
@@ -369,12 +370,14 @@ public static class PortableBundleArchive
             throw new PortableBundleValidationException("Result bundles may contain only declared result crops.");
         }
         HashSet<string> filePaths = new(manifest.Files.Select(file => file.Path), StringComparer.Ordinal);
+        HashSet<string> referencedPaths = new(StringComparer.Ordinal);
         HashSet<int> ordinals = [];
         foreach (PortableFaceResult face in manifest.Faces)
         {
-            if (!ordinals.Add(face.Ordinal) || face.Ordinal < 0 || !filePaths.Contains(face.CropPath))
+            if (!ordinals.Add(face.Ordinal) || face.Ordinal < 0 ||
+                !filePaths.Contains(face.CropPath) || !referencedPaths.Add(face.CropPath))
             {
-                throw new PortableBundleValidationException("Result faces contain duplicate ordinals or undeclared crops.");
+                throw new PortableBundleValidationException("Result faces contain duplicate ordinals, crop references or undeclared crops.");
             }
             _ = face.BoundingBox.ToCore();
             _ = face.Landmarks.ToCore();
@@ -398,7 +401,11 @@ public static class PortableBundleArchive
         ArgumentNullException.ThrowIfNull(files);
         foreach (PortableBundleFile file in files)
         {
-            _ = PortableBundlePath.Normalize(file.Path);
+            string normalizedPath = PortableBundlePath.Normalize(file.Path);
+            if (!string.Equals(normalizedPath, file.Path, StringComparison.Ordinal))
+            {
+                throw new PortableBundleValidationException($"Bundle path '{file.Path}' is not canonical.");
+            }
             _ = Required(file.Role, nameof(file.Role));
             if (file.Length < 0)
             {
@@ -412,11 +419,12 @@ public static class PortableBundleArchive
     private static void EnsureDistinctPaths(IEnumerable<string> paths)
     {
         HashSet<string> unique = new(StringComparer.Ordinal);
+        HashSet<string> portableUnique = new(StringComparer.OrdinalIgnoreCase);
         foreach (string path in paths.Select(PortableBundlePath.Normalize))
         {
-            if (path == ManifestEntryName || !unique.Add(path))
+            if (path == ManifestEntryName || !unique.Add(path) || !portableUnique.Add(path))
             {
-                throw new PortableBundleValidationException($"Bundle path '{path}' is duplicated or reserved.");
+                throw new PortableBundleValidationException($"Bundle path '{path}' is duplicated, non-portable or reserved.");
             }
         }
     }
