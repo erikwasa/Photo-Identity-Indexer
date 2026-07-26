@@ -20,9 +20,9 @@ Implement job and result bundles with manifests, checksums, full-image, reduced-
 - [x] Reimporting the same bundle is harmless.
 - [x] Human labels are unaffected by bundle import.
 - [x] Operator commands export, process and import verified bundles.
-- [ ] A privacy-safe real-image round trip exercises the production commands.
+- [x] A privacy-safe real-image round trip exercises the production commands.
 
-The model-independent and production command paths are automated. The maintainer has exercised export, database-free processing, import, reimport and preservation of an existing human assignment using ignored private media. WI-0018 remains in progress until only a privacy-safe aggregate summary is retained and temporary artefacts are handled under an explicit cleanup and retention decision.
+The automated boundaries and production commands are complete. On 2026-07-27 the maintainer exercised export, database-free processing, import, replay-safe reimport and preservation of an existing human assignment using ignored private media. Only an aggregate summary was retained, and the isolated private verification workspace plus temporary bundle artefacts were removed.
 
 ## Bundle format
 
@@ -109,7 +109,7 @@ A result manifest records the exact raw job-manifest digest, bundle identifier, 
 
 The importer writes only face occurrences, observations, crops and embeddings. It does not write `people`, `person_labels` or `review_actions`. Existing natural keys make replay harmless, and an existing human assignment remains the current review state when a model result for the same face ordinal is imported.
 
-## Validation
+## Validation and completion
 
 Automated coverage includes:
 
@@ -130,14 +130,11 @@ Pull request [#30](https://github.com/erikwasa/Photo-Identity-Indexer/pull/30) m
 
 During the maintainer's real-catalogue verification, pull request [#31](https://github.com/erikwasa/Photo-Identity-Indexer/pull/31) fixed review streaming of batch-relative crop paths at merge commit `7b8e151d74dc1129470e0012ddef20bf609595f7`; workflow run `30221154431` passed.
 
-## Local verification progress
+Pull request [#32](https://github.com/erikwasa/Photo-Identity-Indexer/pull/32) recorded the local acceptance progress and corrected the real-catalogue review launch instructions at merge commit `64e640e08ff6ca0355e7b662d650901c0a360dbf`; workflow run `30223294058` passed.
 
-On 2026-07-27 the maintainer reported that a private real image successfully completed production export, database-free processing, import and replay-safe reimport. The pre-existing human assignment remained current after import. No private image, crop, embedding, local path, content hash or revision identifier is retained in the repository.
+The maintainer then retained a deliberately aggregate summary containing only command success, selected profile, aggregate face count and assignment-preservation outcome. The private source copy, isolated catalogue, job and result archives, disposable processing workspace, imported verification crops and temporary junctions were deleted. No private image, crop, embedding, local path, content hash, bundle identifier or revision identifier is retained in the repository. WI-0018 and M07 completed on 2026-07-27.
 
-## Remaining work
+## Deliberate limitations
 
-- Retain a privacy-safe aggregate summary of the completed private-image round trip, limited to command success, selected profile, aggregate face count and assignment-preservation result.
-- Delete temporary job and result archives plus disposable processing directories when they are no longer needed.
-- Decide whether verified imported crops should remain alongside the catalogue or be removed under a future catalogue cleanup operation.
 - Imported crop bytes are written before the SQLite transaction; a database failure can leave a verified orphan file. Deterministic paths and replay-safe natural keys make recovery unambiguous, but automated orphan cleanup is not included in this slice.
 - ZIP archives are integrity-checked but not encrypted; transport, access control and retention remain operator responsibilities.
