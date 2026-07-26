@@ -42,6 +42,7 @@ public sealed record LocalBatchConfiguration
         SourceRoot = Path.GetFullPath(sourceRoot);
         OutputRoot = Path.GetFullPath(outputRoot);
         RepositoryRoot = Path.GetFullPath(repositoryRoot);
+        EnsureOutsideSource(SourceRoot, OutputRoot);
         ModelDirectory = modelDirectory is null
             ? Path.Combine(RepositoryRoot, "models", "files")
             : Path.GetFullPath(modelDirectory);
@@ -74,6 +75,22 @@ public sealed record LocalBatchConfiguration
                 data.Recursive,
                 data.ConfidenceThreshold,
                 data.PaddingRatio);
+    }
+
+    private static void EnsureOutsideSource(string sourceRoot, string outputRoot)
+    {
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        string sourcePrefix = sourceRoot.EndsWith(Path.DirectorySeparatorChar)
+            ? sourceRoot
+            : sourceRoot + Path.DirectorySeparatorChar;
+        if (outputRoot.Equals(sourceRoot, comparison) || outputRoot.StartsWith(sourcePrefix, comparison))
+        {
+            throw new ArgumentException(
+                "The batch output directory must be outside the source root so generated PNG files are not catalogued as input.",
+                nameof(outputRoot));
+        }
     }
 
     private sealed record LocalBatchConfigurationData(
@@ -126,7 +143,7 @@ public sealed class LocalBatchCoordinator
             now,
             cancellationToken);
         LocalFolderAssetSource source = new(sourceRecord.Id, configuration.SourceRoot);
-        SourceScanOptions scanOptions = new() { Recursive = configuration.Recursive };
+        SourceScanOptions scanOptions = new(Recursive: configuration.Recursive);
         LocalFolderScanReport sourceReport = await source.ScanAsync(scanOptions, cancellationToken);
         SqliteSourceCatalogueScanner scanner = new(_database);
         SourceCatalogueScanSummary scanSummary = await scanner.ScanAsync(
