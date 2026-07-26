@@ -99,7 +99,9 @@ dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
 
-Pull request [#27](https://github.com/erikwasa/Photo-Identity-Indexer/pull/27) merged the schema migration, review repository, same-origin API, responsive client and integration coverage. Draft pull request [#28](https://github.com/erikwasa/Photo-Identity-Indexer/pull/28) adds the isolated device-verification harness.
+Pull request [#27](https://github.com/erikwasa/Photo-Identity-Indexer/pull/27) merged the schema migration, review repository, same-origin API, responsive client and integration coverage at `88f5c2c1b2dbccea9e99870405bbb9e280aa1d00`. Pull request [#28](https://github.com/erikwasa/Photo-Identity-Indexer/pull/28) merged the isolated device-verification harness at `2dbb4de34df81ebfe2b326f0bc4fb48369d46b81`.
+
+GitHub Actions run `30191749014` passed the published hosted-client smoke path, synthetic gallery and image streaming, privacy/cache checks, assignment and undo, documentation validation and the existing Windows mixed-media verification. WI-0015 remains open because this automated evidence does not establish successful interaction on the maintainer's actual Windows and Pixel devices.
 
 ## Deliberate limitations
 
