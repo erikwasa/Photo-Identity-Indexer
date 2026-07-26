@@ -172,11 +172,11 @@ internal static class PortableBundlePath
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         string normalized = path.Replace('\\', '/').Trim('/');
+        string[] segments = normalized.Split('/');
         if (normalized.Length == 0 ||
-            normalized.StartsWith("../", StringComparison.Ordinal) ||
-            normalized.Contains("/../", StringComparison.Ordinal) ||
-            normalized == ".." ||
-            Path.IsPathRooted(normalized))
+            normalized.Contains(':', StringComparison.Ordinal) ||
+            Path.IsPathRooted(normalized) ||
+            segments.Any(segment => segment.Length == 0 || segment is "." or ".."))
         {
             throw new PortableBundleValidationException($"Bundle path '{path}' is unsafe.");
         }
