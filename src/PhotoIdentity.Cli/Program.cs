@@ -77,6 +77,11 @@ public static class Program
         output.WriteLine("""
             Photo Identity Indexer CLI
 
+              batch start --database PATH --source DIR [--output DIR]
+                          [--root PATH] [--model-dir DIR] [--non-recursive]
+                          [--confidence 0..1] [--padding RATIO]
+                          [--max-attempts COUNT]
+              batch resume --database PATH --run RUN_ID [--max-attempts COUNT]
               batch status --database PATH --run RUN_ID
               batch cancel --database PATH --run RUN_ID
 
@@ -87,8 +92,11 @@ public static class Program
                            [--confidence 0..1] [--padding RATIO]
                            [--overwrite] [--verbose]
 
-            The batch status command reports durable progress counts. Batch cancel
-            atomically cancels queued and active work and invalidates active leases.
+            Batch start scans a local folder, creates durable jobs for each current
+            immutable revision and runs the production inspection pipeline until idle.
+            Batch resume reconstructs the saved configuration and continues due work.
+            Batch status reports durable progress counts. Batch cancel atomically
+            cancels queued and active work and invalidates active leases.
 
             The decode command reads JPEG or PNG content, applies EXIF orientation,
             optionally downsizes it, and writes a normalised PNG without modifying the input.
