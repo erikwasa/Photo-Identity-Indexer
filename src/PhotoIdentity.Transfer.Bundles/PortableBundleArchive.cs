@@ -11,6 +11,8 @@ public static class PortableBundleArchive
     public const int CurrentSchemaVersion = 1;
     public const string ManifestEntryName = "manifest.json";
 
+    private static readonly DateTimeOffset ArchiveTimestamp = new(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -175,7 +177,7 @@ public static class PortableBundleArchive
             using (ZipArchive archive = new(stream, ZipArchiveMode.Create, leaveOpen: true))
             {
                 ZipArchiveEntry manifestEntry = archive.CreateEntry(ManifestEntryName, CompressionLevel.Optimal);
-                manifestEntry.LastWriteTime = DateTimeOffset.UnixEpoch;
+                manifestEntry.LastWriteTime = ArchiveTimestamp;
                 await using (Stream entryStream = manifestEntry.Open())
                 {
                     await entryStream.WriteAsync(manifestBytes, cancellationToken);
@@ -184,7 +186,7 @@ public static class PortableBundleArchive
                 foreach ((PortableBundleFile descriptor, string sourcePath) in files.OrderBy(file => file.Descriptor.Path, StringComparer.Ordinal))
                 {
                     ZipArchiveEntry entry = archive.CreateEntry(descriptor.Path, CompressionLevel.Optimal);
-                    entry.LastWriteTime = DateTimeOffset.UnixEpoch;
+                    entry.LastWriteTime = ArchiveTimestamp;
                     await using Stream input = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024, useAsync: true);
                     await using Stream output = entry.Open();
                     await input.CopyToAsync(output, cancellationToken);
@@ -248,6 +250,10 @@ public static class PortableBundleArchive
         {
             ManifestEntryName,
         };
+        if (archive.Entries.GroupBy(entry => entry.FullName, StringComparer.Ordinal).Any(group => group.Count() != 1))
+        {
+            throw new PortableBundleValidationException("Bundle contains duplicate archive entries.");
+        }
         foreach (ZipArchiveEntry entry in archive.Entries)
         {
             if (!expectedEntries.Contains(entry.FullName))
@@ -325,9 +331,22 @@ public static class PortableBundleArchive
             throw new PortableBundleValidationException("Job manifest schema or bundle identifier is invalid.");
         }
         _ = ParseRevisionId(manifest.AssetRevisionId);
-        _ = new Sha256Digest(manifest.SourceContentSha256);
+        Sha256Digest sourceHash = new(manifest.SourceContentSha256);
+        try
+        {
+            using JsonDocument _ = JsonDocument.Parse(manifest.ConfigurationJson);
+        }
+        catch (JsonException exception)
+        {
+            throw new PortableBundleValidationException("Job configuration is not valid JSON.", exception);
+        }
         ValidateFiles(manifest.Files);
         ValidateJobInputs(manifest.Profile, manifest.Files.Select(file => new PortableJobInput(file.Path, file.Path, file.Role)).ToArray());
+        if (manifest.Profile == PortableBundleProfile.FullImage &&
+            !string.Equals(manifest.Files[0].Sha256, sourceHash.ToString(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new PortableBundleValidationException("Full-image payload hash does not match the immutable source content hash.");
+        }
     }
 
     private static void ValidateResultManifest(PortableResultManifest manifest)
@@ -345,6 +364,10 @@ public static class PortableBundleArchive
         _ = new ModelId(manifest.EmbedderModelId);
         _ = new AlignmentProtocolId(manifest.AlignmentProtocol);
         ValidateFiles(manifest.Files);
+        if (manifest.Files.Any(file => file.Role != PortableBundleRoles.ResultCrop))
+        {
+            throw new PortableBundleValidationException("Result bundles may contain only declared result crops.");
+        }
         HashSet<string> filePaths = new(manifest.Files.Select(file => file.Path), StringComparer.Ordinal);
         HashSet<int> ordinals = [];
         foreach (PortableFaceResult face in manifest.Faces)
@@ -363,6 +386,10 @@ public static class PortableBundleArchive
             {
                 throw new PortableBundleValidationException("Result embedding is invalid.");
             }
+        }
+        if (filePaths.Count != manifest.Faces.Count)
+        {
+            throw new PortableBundleValidationException("Every result crop must belong to exactly one face result.");
         }
     }
 
