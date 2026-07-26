@@ -6,7 +6,7 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project is currently in **M02 — Local catalogue and jobs**. M01 single-image inference and WI-0011 SQLite persistence are complete and verified; WI-0012 is adding recursive local-folder catalogue scanning, change detection and deletion markers.
+The project is currently in **M02 — Local catalogue and jobs**. M01 single-image inference, WI-0011 SQLite persistence and WI-0012 local-folder scanning are complete and verified. WI-0013 is adding expiring job leases, checkpoints, cancellation, bounded retries and resumable worker orchestration.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
@@ -65,6 +65,16 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 ```
 
 The inspect output contains an embedded-image annotated SVG, padded and aligned face PNGs, one JSON embedding per face, a reproducibility manifest and stage timings. The command verifies that the original source hash remains unchanged.
+
+Inspect or cancel a durable batch run:
+
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -- `
+  batch status --database "C:\PhotoIdentity\catalogue.db" --run RUN_ID
+
+dotnet run --project src/PhotoIdentity.Cli -- `
+  batch cancel --database "C:\PhotoIdentity\catalogue.db" --run RUN_ID
+```
 
 ## First target demonstration
 
