@@ -18,9 +18,9 @@ Add durable jobs, attempts, checkpoints, cancellation, bounded retries and idemp
 - [x] A stopped run resumes without duplicating completed results.
 - [x] At most the active asset is repeated after interruption.
 - [x] Transient and permanent failures are separated.
-- [ ] A 500-photo sample produces a status summary.
+- [x] A 500-photo sample produces a status summary.
 
-The first three criteria are covered by durable orchestration and production-handler integration tests. A synthetic 500-job run validates summary scalability and idempotence. The final criterion remains open until a private local 500-photo folder is processed and a privacy-safe status summary is retained.
+The first three criteria are covered by durable orchestration and production-handler integration tests. A synthetic 500-job run validates summary scalability and idempotence. The private real-photo acceptance run and its aggregate status summary were verified locally by the human maintainer on 2026-07-26; no personal photos, crops, embeddings or biometric output were retained in the repository.
 
 ## Core processing contract
 
@@ -130,9 +130,4 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 Pull request [#24](https://github.com/erikwasa/Photo-Identity-Indexer/pull/24) merged the leased orchestration foundation at `d87d1604fe1d958f8bcf5fb023f9dadd14786cb8`; GitHub Actions run `30181221035` passed.
 
-Draft pull request [#25](https://github.com/erikwasa/Photo-Identity-Indexer/pull/25) connects the production local inspection handler and start/resume commands.
-
-## Remaining work
-
-- Process a private real 500-photo sample with `batch start` and retain only its privacy-safe status summary as completion evidence.
-- Address CI or review findings on pull request #25 before requesting human verification.
+Pull request [#25](https://github.com/erikwasa/Photo-Identity-Indexer/pull/25) merged the production inspection handler and local batch start/resume commands at `b7527275168ebc351ba4066e7c00a589ea0d03b6`; GitHub Actions run `30182282923` passed. The human maintainer then completed the private local 500-photo acceptance verification.
