@@ -311,26 +311,36 @@ work_items:
 - id: WI-0014
   title: Add OneDrive availability and staging
   milestone: M03
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0014-onedrive-staging.md
   started_at: '2026-07-26'
+  completed_at: '2026-07-26'
+  verified_at: '2026-07-26'
+  verified_by: human
   last_updated_at: '2026-07-26'
   branch: agent/WI-0014-onedrive-staging
   blockers: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/26
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30185278984
+  - type: merge_commit
+    value: b5d2a1ce24629df9fdb516eea12a69534fe257d5
 - id: WI-0015
   title: Build minimal review application
   milestone: M04
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0015-review-ui.md
-  blockers:
-  - WI-0011
-  - WI-0013
-  evidence: []
+  started_at: '2026-07-26'
+  last_updated_at: '2026-07-26'
+  branch: agent/WI-0015-review-app
+  blockers: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/27
 - id: WI-0016
   title: Add identity matcher
   milestone: M05
