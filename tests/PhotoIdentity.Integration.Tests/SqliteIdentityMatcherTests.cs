@@ -159,6 +159,43 @@ public sealed class SqliteIdentityMatcherTests
         }
     }
 
+    [Fact]
+    public async Task Regenerate_removes_rankings_when_a_target_becomes_reviewed()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            DateTimeOffset now = new(2026, 7, 27, 11, 0, 0, TimeSpan.Zero);
+            FaceOccurrenceId target = await SeedFaceAsync(database, [0.95f, 0.3122499f, 0f], 0, now);
+            FaceOccurrenceId exemplar = await SeedFaceAsync(database, [1f, 0f, 0f], 1, now);
+
+            SqliteReviewRepository reviewRepository = new(database);
+            CatalogueReviewPerson person = await reviewRepository.CreatePersonAsync("Confirmed", now);
+            await reviewRepository.AssignAsync(exemplar, person.Id, "human:test", now.AddMinutes(1));
+
+            SqliteIdentityMatcher matcher = new(
+                database,
+                new FixedTimeProvider(now.AddMinutes(2)));
+            IdentityMatchSummary initial = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
+            Assert.Equal(new IdentityMatchSummary(1, 1, 1), initial);
+            Assert.Single(await matcher.GetRankedSuggestionsAsync(target, EmbeddingModelId, EmbeddingModelHash));
+
+            await reviewRepository.AssignAsync(target, person.Id, "human:test", now.AddMinutes(3));
+            IdentityMatchSummary rerun = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
+
+            Assert.Equal(new IdentityMatchSummary(0, 0, 0), rerun);
+            Assert.Empty(await matcher.GetRankedSuggestionsAsync(target, EmbeddingModelId, EmbeddingModelHash));
+            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            Assert.Equal(0, await CountAsync(connection, "identity_suggestion_rankings"));
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
     private static async Task<FaceOccurrenceId> SeedFaceAsync(
         SqliteCatalogueDatabase database,
         float[] vector,
