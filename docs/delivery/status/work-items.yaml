@@ -331,11 +331,14 @@ work_items:
   - id: WI-0015
     title: Build minimal review application
     milestone: M04
-    status: in_progress
+    status: completed
     owner: ai-agent
     document: ../work-items/WI-0015-review-ui.md
     started_at: '2026-07-26'
-    last_updated_at: '2026-07-26'
+    completed_at: '2026-07-27'
+    verified_at: '2026-07-27'
+    verified_by: human
+    last_updated_at: '2026-07-27'
     branch: agent/WI-0015-device-verification
     blockers: []
     evidence:
@@ -351,6 +354,12 @@ work_items:
         value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30191749014
       - type: merge_commit
         value: 2dbb4de34df81ebfe2b326f0bc4fb48369d46b81
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/31
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30221154431
+      - type: merge_commit
+        value: 7b8e151d74dc1129470e0012ddef20bf609595f7
   - id: WI-0016
     title: Add identity matcher
     milestone: M05
