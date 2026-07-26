@@ -153,7 +153,7 @@ public interface IPortableBundleProcessor
         CancellationToken cancellationToken);
 }
 
-public sealed class PortableBundleValidationException : InvalidDataException
+public sealed class PortableBundleValidationException : IOException
 {
     public PortableBundleValidationException(string message)
         : base(message)
