@@ -27,7 +27,7 @@ internal sealed record BundleCommandOptions(
     double ConfidenceThreshold,
     int ReducedMaximumWidth,
     int ReducedMaximumHeight,
-    IReadOnlyList<string> FaceCropPaths)
+    IReadOnlyList<PortableFaceCropExportInput> FaceCrops)
 {
     public static BundleCommandOptions Parse(string[] args)
     {
@@ -60,7 +60,7 @@ internal sealed record BundleCommandOptions(
         int reducedMaximumHeight = 1600;
         bool maximumWidthSpecified = false;
         bool maximumHeightSpecified = false;
-        List<string> cropPaths = [];
+        List<PortableFaceCropExportInput> faceCrops = [];
 
         for (int index = 1; index < args.Length; index++)
         {
@@ -141,8 +141,7 @@ internal sealed record BundleCommandOptions(
                     maximumHeightSpecified = true;
                     break;
                 case "--crop":
-                    ArgumentException.ThrowIfNullOrWhiteSpace(value);
-                    cropPaths.Add(value);
+                    faceCrops.Add(ParseFaceCrop(value, option));
                     break;
                 default:
                     throw new ArgumentException($"Unknown option '{option}'.");
@@ -173,19 +172,30 @@ internal sealed record BundleCommandOptions(
                 {
                     throw new ArgumentException("--max-width and --max-height require the reduced-image profile.");
                 }
-                if (profile == PortableBundleProfile.FaceCrops && cropPaths.Count == 0)
+                if (profile == PortableBundleProfile.FaceCrops && faceCrops.Count == 0)
                 {
-                    throw new ArgumentException("The face-crops profile requires at least one --crop path.");
+                    throw new ArgumentException(
+                        "The face-crops profile requires at least one --crop FACE_NUMBER=PATH value.");
                 }
-                if (profile != PortableBundleProfile.FaceCrops && cropPaths.Count != 0)
+                if (profile != PortableBundleProfile.FaceCrops && faceCrops.Count != 0)
                 {
                     throw new ArgumentException("--crop may be used only with the face-crops profile.");
+                }
+                int duplicateFaceNumber = faceCrops
+                    .GroupBy(crop => crop.Ordinal)
+                    .Where(group => group.Count() > 1)
+                    .Select(group => group.Key + 1)
+                    .FirstOrDefault();
+                if (duplicateFaceNumber != 0)
+                {
+                    throw new ArgumentException(
+                        $"Face number {duplicateFaceNumber} was supplied more than once with --crop.");
                 }
                 break;
             case BundleCommandAction.Process:
                 Require(resultPath, "--result", action);
                 if (databasePath is not null || revisionId is not null || outputRoot is not null ||
-                    profileSpecified || confidenceSpecified || maximumWidthSpecified || maximumHeightSpecified || cropPaths.Count != 0)
+                    profileSpecified || confidenceSpecified || maximumWidthSpecified || maximumHeightSpecified || faceCrops.Count != 0)
                 {
                     throw new ArgumentException(
                         "Bundle process accepts only --job, --result, --work, --root and --model-dir.");
@@ -196,7 +206,7 @@ internal sealed record BundleCommandOptions(
                 Require(resultPath, "--result", action);
                 Require(outputRoot, "--output", action);
                 if (revisionId is not null || repositoryRoot is not null || modelDirectory is not null ||
-                    profileSpecified || confidenceSpecified || maximumWidthSpecified || maximumHeightSpecified || cropPaths.Count != 0)
+                    profileSpecified || confidenceSpecified || maximumWidthSpecified || maximumHeightSpecified || faceCrops.Count != 0)
                 {
                     throw new ArgumentException(
                         "Bundle import accepts only --database, --job, --result, --output and --work.");
@@ -220,7 +230,23 @@ internal sealed record BundleCommandOptions(
             confidenceThreshold,
             reducedMaximumWidth,
             reducedMaximumHeight,
-            cropPaths);
+            faceCrops);
+    }
+
+    private static PortableFaceCropExportInput ParseFaceCrop(string value, string option)
+    {
+        int separator = value.IndexOf('=');
+        if (separator <= 0 || separator == value.Length - 1)
+        {
+            throw new ArgumentException(
+                $"Option '{option}' requires FACE_NUMBER=PATH, for example --crop 3=C:\\Crops\\face-003.png.");
+        }
+
+        string numberText = value[..separator];
+        int faceNumber = PositiveInteger(numberText, option);
+        string path = value[(separator + 1)..];
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        return new PortableFaceCropExportInput(checked(faceNumber - 1), path);
     }
 
     private static PortableBundleProfile ParseProfile(string value) => value.ToLowerInvariant() switch
@@ -303,7 +329,7 @@ internal static class BundleCommandRunner
                 options.ConfidenceThreshold,
                 options.ReducedMaximumWidth,
                 options.ReducedMaximumHeight,
-                options.FaceCropPaths),
+                options.FaceCrops),
             cancellationToken);
 
         output.WriteLine($"bundle: {Path.GetFullPath(options.JobBundlePath)}");
