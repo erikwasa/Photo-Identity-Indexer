@@ -1,0 +1,18 @@
+{
+  "name": "Photo Identity Review",
+  "short_name": "Photo Review",
+  "description": "Local-first review of detected faces and human labels.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f1ea",
+  "theme_color": "#162a2d",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
