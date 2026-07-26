@@ -9,6 +9,7 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M02 — Local catalogue and jobs**: `completed`
 - **M03 — OneDrive synchronised source**: `completed`
 - **M04 — Minimal review application**: `completed`
+- **M05 — Identity matching**: `ready`
 - **M07 — Portable job bundles**: `in_progress`
 
 ## Active work
