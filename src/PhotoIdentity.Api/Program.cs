@@ -23,6 +23,21 @@ public partial class Program
 
         app.UseBlazorFrameworkFiles();
         app.UseStaticFiles();
+        app.Use(async (context, next) =>
+        {
+            if (context.Request.Path.StartsWithSegments("/api/review"))
+            {
+                context.Response.OnStarting(() =>
+                {
+                    context.Response.Headers.CacheControl = "no-store, max-age=0";
+                    context.Response.Headers.Pragma = "no-cache";
+                    context.Response.Headers.Expires = "0";
+                    return Task.CompletedTask;
+                });
+            }
+
+            await next(context);
+        });
 
         app.MapGet("/health", () => Results.Ok(new
         {
