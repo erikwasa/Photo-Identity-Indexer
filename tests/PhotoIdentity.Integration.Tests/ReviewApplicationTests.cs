@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -147,9 +148,39 @@ public sealed class ReviewApplicationTests
         }
     }
 
+    [Fact]
+    public async Task Review_api_streams_batch_relative_crops_from_the_processing_output_root()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            SeededReviewFace seeded = await SeedReviewFaceAsync(
+                database,
+                directory,
+                useBatchRelativeCropPath: true);
+
+            await using ReviewApiFactory factory = new(databasePath);
+            using HttpClient client = factory.CreateClient();
+
+            using HttpResponseMessage imageResponse = await client.GetAsync($"/api/review/faces/{seeded.Id}/image");
+
+            imageResponse.EnsureSuccessStatusCode();
+            Assert.Equal("image/png", imageResponse.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(seeded.CropBytes, await imageResponse.Content.ReadAsByteArrayAsync());
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
     private static async Task<SeededReviewFace> SeedReviewFaceAsync(
         SqliteCatalogueDatabase database,
-        string directory)
+        string directory,
+        bool useBatchRelativeCropPath = false)
     {
         DateTimeOffset now = new(2026, 7, 26, 7, 50, 0, TimeSpan.Zero);
         string sourceRoot = Path.Combine(directory, "private-photos");
@@ -174,9 +205,81 @@ public sealed class ReviewApplicationTests
 
         FaceOccurrenceId occurrenceId = FaceOccurrenceId.New();
         byte[] cropBytes = [137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3, 4];
-        string cropDirectory = Path.Combine(directory, "private-crops");
-        Directory.CreateDirectory(cropDirectory);
-        string cropPath = Path.Combine(cropDirectory, "aligned-face.png");
+        string cropPath;
+        string storedCropPath;
+        if (useBatchRelativeCropPath)
+        {
+            Guid runId = Guid.NewGuid();
+            string outputRoot = Path.Combine(directory, "batch-output");
+            storedCropPath = Path.Combine(
+                    "runs",
+                    runId.ToString(),
+                    "assets",
+                    persistedRevision.Id.ToString(),
+                    "faces",
+                    "face-001",
+                    "aligned.png")
+                .Replace('\\', '/');
+            cropPath = Path.Combine(
+                outputRoot,
+                storedCropPath.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(cropPath)!);
+
+            await using SqliteConnection runConnection = await database.OpenConnectionAsync();
+            using SqliteCommand runCommand = runConnection.CreateCommand();
+            runCommand.CommandText = """
+                INSERT INTO processing_runs (
+                    id,
+                    status,
+                    configuration_json,
+                    started_at_utc,
+                    completed_at_utc)
+                VALUES (
+                    $run_id,
+                    'completed',
+                    $configuration_json,
+                    $created_at_utc,
+                    $created_at_utc);
+
+                INSERT INTO processing_jobs (
+                    id,
+                    processing_run_id,
+                    asset_revision_id,
+                    status,
+                    attempt_count,
+                    available_at_utc,
+                    started_at_utc,
+                    completed_at_utc,
+                    idempotency_key)
+                VALUES (
+                    $job_id,
+                    $run_id,
+                    $revision_id,
+                    'succeeded',
+                    1,
+                    $created_at_utc,
+                    $created_at_utc,
+                    $created_at_utc,
+                    $idempotency_key);
+                """;
+            runCommand.Parameters.AddWithValue("$run_id", runId.ToString());
+            runCommand.Parameters.AddWithValue(
+                "$configuration_json",
+                JsonSerializer.Serialize(new { outputRoot }));
+            runCommand.Parameters.AddWithValue("$created_at_utc", now.ToString("O"));
+            runCommand.Parameters.AddWithValue("$job_id", Guid.NewGuid().ToString());
+            runCommand.Parameters.AddWithValue("$revision_id", persistedRevision.Id.ToString());
+            runCommand.Parameters.AddWithValue("$idempotency_key", $"review-test:{runId}:{persistedRevision.Id}");
+            await runCommand.ExecuteNonQueryAsync();
+        }
+        else
+        {
+            string cropDirectory = Path.Combine(directory, "private-crops");
+            Directory.CreateDirectory(cropDirectory);
+            cropPath = Path.Combine(cropDirectory, "aligned-face.png");
+            storedCropPath = cropPath;
+        }
+
         await File.WriteAllBytesAsync(cropPath, cropBytes);
         string cropHash = Convert.ToHexString(SHA256.HashData(cropBytes)).ToLowerInvariant();
 
@@ -228,7 +331,7 @@ public sealed class ReviewApplicationTests
         command.Parameters.AddWithValue("$model_hash", new string('b', 64));
         command.Parameters.AddWithValue("$crop_id", FaceCropId.New().ToString());
         command.Parameters.AddWithValue("$crop_hash", cropHash);
-        command.Parameters.AddWithValue("$crop_path", cropPath);
+        command.Parameters.AddWithValue("$crop_path", storedCropPath);
         await command.ExecuteNonQueryAsync();
 
         return new SeededReviewFace(occurrenceId, sourceRoot, cropPath, cropBytes);
