@@ -32,7 +32,13 @@ Each target person score is the maximum cosine similarity across that person's e
 
 Suggestions never create, change or delete `person_labels` or `review_actions`. Targets with a current assignment or rejection are skipped. A suggestion explicitly marked `rejected` records a durable face-person exclusion and is not proposed again during later regeneration. Existing reviewed suggestion status is preserved when scores are refreshed.
 
-Ranking metadata is stored separately from canonical labels. The current implementation creates the auxiliary ranking table idempotently inside the SQLite adapter before use, so existing schema-version-4 catalogues can adopt the matcher without changing label or review semantics.
+Regeneration clears the active ranking projection for the selected model revision before rebuilding it, so a face that has since been assigned or rejected cannot retain stale ranked suggestions. Historical suggestion rows with reviewed status remain durable evidence.
+
+## Schema version 5
+
+Schema version 5 adds `identity_suggestion_rankings`, a model-versioned projection that maps rank one or two to an existing `identity_suggestions` row and stores the best-versus-second score margin plus generation time. Ranking rows are separate from canonical labels and cascade with their face occurrence or suggestion.
+
+The migration is forward-only and transactional. Integration coverage verifies fresh schema creation and an upgrade from a version-4 catalogue while preserving an existing rejected suggestion.
 
 ## Validation
 
@@ -43,7 +49,10 @@ Ranking metadata is stored separately from canonical labels. The current impleme
 - exclusion of undone assignments and non-confirmed labels;
 - persistent filtering of rejected face-person pairs;
 - repeated generation without changes to human-label or review-action counts;
+- removal of rankings after a target becomes reviewed;
 - absence of automatic labels on suggestion targets.
+
+`SqliteIdentityMatcherMigrationTests` verifies the version-4 to version-5 upgrade and preservation of existing suggestion state.
 
 Draft pull request [#33](https://github.com/erikwasa/Photo-Identity-Indexer/pull/33) contains the implementation and production-shaped integration coverage. The full repository workflow builds with warnings as errors and runs all tests, documentation checks, review-host smoke verification and Windows mixed-media verification.
 
