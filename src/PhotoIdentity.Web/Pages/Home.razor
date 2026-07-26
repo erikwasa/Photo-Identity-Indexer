@@ -1,0 +1,232 @@
+@page "/"
+@inject HttpClient Http
+
+<PageTitle>Review faces · Photo Identity</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Human review queue</p>
+        <h1>Review detected faces</h1>
+        <p>Assign a person, reject a false detection, or undo the latest decision. Every change is retained in the local audit history.</p>
+    </div>
+
+    <div class="person-creator">
+        <label class="field-label" for="new-person">Create person</label>
+        <div class="inline-field">
+            <input id="new-person" placeholder="Display name" maxlength="200" @bind="NewPersonName" @bind:event="oninput" />
+            <button class="button primary" disabled="@(string.IsNullOrWhiteSpace(NewPersonName) || CreatingPerson)" @onclick="CreatePersonAsync">
+                Add
+            </button>
+        </div>
+    </div>
+</section>
+
+<nav class="filter-tabs" aria-label="Review state">
+    @foreach ((string Value, string Label) filter in Filters)
+    {
+        <button class="filter-tab @(State == filter.Value ? "active" : "")" @onclick="() => ChangeStateAsync(filter.Value)">
+            @filter.Label
+        </button>
+    }
+</nav>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="notice success" role="status">@Message</div>
+}
+
+@if (Loading)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading the review queue…</p>
+    </section>
+}
+else if (Page is null || Page.Items.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No faces in this view</h2>
+        <p>Choose another review state or process additional photos.</p>
+    </section>
+}
+else
+{
+    <div class="gallery-summary">
+        <span>@Page.Total face@(Page.Total == 1 ? "" : "s")</span>
+        <span>Showing @(Page.Offset + 1)–@Math.Min(Page.Offset + Page.Items.Count, Page.Total)</span>
+    </div>
+
+    <section class="face-grid" aria-label="Face review cards">
+        @foreach (ReviewFaceResponse face in Page.Items)
+        {
+            <FaceCard Face="face"
+                      People="People"
+                      AssignRequested="AssignAsync"
+                      RejectRequested="RejectAsync"
+                      UndoRequested="UndoAsync" />
+        }
+    </section>
+
+    <div class="pagination">
+        <button class="button secondary" disabled="@(Page.Offset == 0 || Loading)" @onclick="PreviousPageAsync">Previous</button>
+        <button class="button secondary" disabled="@(Page.Offset + Page.Limit >= Page.Total || Loading)" @onclick="NextPageAsync">Next</button>
+    </div>
+}
+
+@code {
+    private const int PageSize = 40;
+    private const string Actor = "local-reviewer";
+
+    private static readonly (string Value, string Label)[] Filters =
+    [
+        ("unreviewed", "Needs review"),
+        ("assigned", "Assigned"),
+        ("rejected", "Rejected"),
+        ("all", "All"),
+    ];
+
+    private ReviewFacePageResponse? Page { get; set; }
+    private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+    private string State { get; set; } = "unreviewed";
+    private int Offset { get; set; }
+    private string NewPersonName { get; set; } = "";
+    private bool Loading { get; set; }
+    private bool CreatingPerson { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPeopleAsync();
+        await LoadFacesAsync();
+    }
+
+    private async Task LoadPeopleAsync()
+    {
+        People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+    }
+
+    private async Task LoadFacesAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Page = await Http.GetFromJsonAsync<ReviewFacePageResponse>(
+                $"api/review/faces?state={Uri.EscapeDataString(State)}&offset={Offset}&limit={PageSize}");
+        }
+        catch (Exception exception)
+        {
+            Error = $"The review queue could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task ChangeStateAsync(string state)
+    {
+        State = state;
+        Offset = 0;
+        Message = null;
+        await LoadFacesAsync();
+    }
+
+    private async Task CreatePersonAsync()
+    {
+        CreatingPerson = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/review/people",
+                new CreatePersonRequest(NewPersonName));
+            await RequireSuccessAsync(response);
+            string createdName = NewPersonName.Trim();
+            NewPersonName = "";
+            await LoadPeopleAsync();
+            Message = $"Created {createdName}.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            CreatingPerson = false;
+        }
+    }
+
+    private async Task AssignAsync((string FaceId, string PersonId) request)
+    {
+        await ApplyAsync(
+            $"api/review/faces/{request.FaceId}/assign",
+            new AssignFaceRequest(request.PersonId, Actor),
+            "Face assignment saved.");
+    }
+
+    private async Task RejectAsync(string faceId)
+    {
+        await ApplyAsync(
+            $"api/review/faces/{faceId}/reject",
+            new ReviewFaceActionRequest(Actor),
+            "Face rejected.");
+    }
+
+    private async Task UndoAsync(string faceId)
+    {
+        await ApplyAsync(
+            $"api/review/faces/{faceId}/undo",
+            new ReviewFaceActionRequest(Actor),
+            "Latest review action undone.");
+    }
+
+    private async Task ApplyAsync<TRequest>(string url, TRequest request, string successMessage)
+    {
+        Error = null;
+        Message = null;
+        try
+        {
+            HttpResponseMessage response = await Http.PostAsJsonAsync(url, request);
+            await RequireSuccessAsync(response);
+            Message = successMessage;
+            await LoadFacesAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        Offset = Math.Max(0, Offset - PageSize);
+        await LoadFacesAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        Offset += PageSize;
+        await LoadFacesAsync();
+    }
+
+    private static async Task RequireSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string detail = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(detail)
+                ? $"The review action failed with status {(int)response.StatusCode}."
+                : detail);
+    }
+}
