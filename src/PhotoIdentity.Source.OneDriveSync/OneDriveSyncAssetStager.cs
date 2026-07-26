@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
@@ -15,7 +16,7 @@ public sealed class StagingVerificationException : IOException
 }
 
 /// <summary>
-/// Creates content-addressed, independently verified staging copies for locally hydrated
+/// Creates independently verified, content-fingerprinted staging copies for locally hydrated
 /// OneDrive items. Cleanup only removes files carrying a matching verification manifest.
 /// </summary>
 public sealed class OneDriveSyncAssetStager : IAssetStager
@@ -94,14 +95,14 @@ public sealed class OneDriveSyncAssetStager : IAssetStager
             string extension = SafeExtension(Path.GetExtension(sourcePath));
             string destinationPath = Path.Combine(
                 targetDirectory,
-                $"{copied.ContentHash}{extension}");
+                $"{copied.ContentHash}-{SourceFingerprint(asset)}{extension}");
             if (File.Exists(destinationPath))
             {
                 CopyFingerprint existing = await HashFileAsync(destinationPath, cancellationToken);
                 if (existing.SizeBytes != copied.SizeBytes || existing.ContentHash != copied.ContentHash)
                 {
                     throw new StagingVerificationException(
-                        $"Existing staging file '{destinationPath}' does not match its content-addressed name.");
+                        $"Existing staging file '{destinationPath}' does not match its fingerprinted name.");
                 }
 
                 File.Delete(temporaryPath);
@@ -347,6 +348,12 @@ public sealed class OneDriveSyncAssetStager : IAssetStager
         }
 
         return extension.ToLowerInvariant();
+    }
+
+    private static string SourceFingerprint(SourceAssetReference asset)
+    {
+        byte[] input = Encoding.UTF8.GetBytes($"{asset.SourceId}:{asset.ItemKey}");
+        return Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant()[..16];
     }
 
     private static Sha256Digest Digest(ReadOnlySpan<byte> hash) =>
