@@ -48,7 +48,7 @@ The local API provides:
 - assignment, rejection and one-step undo;
 - face-image streaming through an opaque occurrence URL.
 
-Image files are resolved only inside the API process. Missing crop files return not found without exposing their server path.
+Image files are resolved only inside the API process. Missing crop files return not found without exposing their server path. Every `/api/review` response sends `Cache-Control: no-store`, including JSON and face images, so ordinary browser HTTP caching is explicitly disabled.
 
 ## Responsive web application
 
@@ -61,7 +61,7 @@ The hosted Blazor WebAssembly client includes:
 - a details page with privacy-limited photo metadata and the complete review timeline;
 - an installable web manifest.
 
-The service worker excludes every `/api/` request, including face images and review JSON, so the application does not deliberately retain biometric API responses in its cache. The responsive UI can be tested over trusted-network HTTP. PWA installation on a phone generally requires a secure context and is not treated as proof of the core review workflow.
+The service worker excludes every `/api/` request, including face images and review JSON, so the application does not deliberately retain biometric API responses in its cache. Together with the API's `no-store` headers, this prevents both application-managed and ordinary HTTP caching of review responses. The responsive UI can be tested over trusted-network HTTP. PWA installation on a phone generally requires a secure context and is not treated as proof of the core review workflow.
 
 ## Operator command
 
