@@ -6,7 +6,7 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-The project is currently in **M03 — OneDrive synchronised source**. M01 single-image inference and M02 local catalogue, durable jobs and resumable batch processing are complete and verified. WI-0014 is adding explicit OneDrive Files On-Demand availability, user-managed hydration, verified staging fingerprints and guarded cleanup.
+The project is currently in **M04 — Minimal review application**. M01 single-image inference, M02 local catalogue and durable processing, and M03 OneDrive availability and verified staging are complete and verified. WI-0015 is adding a responsive local face-review gallery with durable assignments, rejections, undo and an audit history.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
@@ -18,7 +18,7 @@ The project is currently in **M03 — OneDrive synchronised source**. M01 single
 
 - .NET 10 SDK
 - PowerShell 7 or Windows PowerShell
-- Windows for the current OpenCV native-runtime and OneDrive Files On-Demand verification paths
+- Windows for the current OpenCV native-runtime, OneDrive Files On-Demand and review-host verification paths
 
 ## Build and test
 
@@ -94,6 +94,17 @@ Batch start scans JPEG and PNG files, records unsupported files separately, crea
 ## OneDrive sync-root policy
 
 OneDrive integration uses the local Windows sync folder only. Online-only placeholders are reported without intentionally opening them; hydrate them through the OneDrive client before staging. Verified staging directories must be outside the source root. The adapter does not request Microsoft Graph permissions, OneDrive credentials or access tokens.
+
+## Local review application
+
+Run the same-origin API and responsive Blazor client against an existing catalogue:
+
+```powershell
+$env:PhotoIdentity__DatabasePath = "C:\PhotoIdentity\catalogue.db"
+dotnet run --project src/PhotoIdentity.Api --urls "http://0.0.0.0:5080"
+```
+
+Open `http://localhost:5080` on Windows. A Pixel on the same trusted network can use the computer's LAN address when the Windows Firewall rule permits the port for that network profile. The client receives opaque image URLs and limited metadata; source roots and crop storage paths remain inside the API process. The current trusted-network slice does not include authentication, so do not expose the listener to an untrusted network.
 
 ## First target demonstration
 
