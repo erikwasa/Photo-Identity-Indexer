@@ -114,19 +114,11 @@ public sealed class OneDriveSyncAssetSource : IAssetSource
             throw new DirectoryNotFoundException($"The OneDrive sync directory does not exist: {scanRoot}");
         }
 
-        EnumerationOptions enumerationOptions = new()
-        {
-            RecurseSubdirectories = options.Recursive,
-            IgnoreInaccessible = false,
-            AttributesToSkip = FileAttributes.ReparsePoint,
-            ReturnSpecialDirectories = false,
-        };
-
         List<SourceAsset> assets = [];
         List<OneDriveUnsupportedFile> unsupported = [];
         List<OneDriveAvailabilityFailure> failures = [];
 
-        foreach (string path in Directory.EnumerateFiles(scanRoot, "*", enumerationOptions))
+        foreach (string path in EnumerateFiles(scanRoot, options.Recursive, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             string relativePath = NormalizeRelativePath(Path.GetRelativePath(RootPath, path));
@@ -252,6 +244,42 @@ public sealed class OneDriveSyncAssetSource : IAssetSource
         if (asset.SourceId != SourceId)
         {
             throw new ArgumentException("The asset belongs to a different OneDrive source.", nameof(asset));
+        }
+    }
+
+    internal static bool ShouldTraverseDirectory(FileAttributes attributes) =>
+        (attributes & FileAttributes.ReparsePoint) == 0;
+
+    private static IEnumerable<string> EnumerateFiles(
+        string root,
+        bool recursive,
+        CancellationToken cancellationToken)
+    {
+        Queue<string> directories = new();
+        directories.Enqueue(root);
+
+        while (directories.TryDequeue(out string? directory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (string file in Directory.EnumerateFiles(directory))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return file;
+            }
+
+            if (!recursive)
+            {
+                continue;
+            }
+
+            foreach (string child in Directory.EnumerateDirectories(directory))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (ShouldTraverseDirectory(File.GetAttributes(child)))
+                {
+                    directories.Enqueue(child);
+                }
+            }
         }
     }
 
