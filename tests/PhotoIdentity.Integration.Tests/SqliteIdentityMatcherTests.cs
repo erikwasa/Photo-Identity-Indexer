@@ -121,9 +121,11 @@ public sealed class SqliteIdentityMatcherTests
                 await matcher.GetRankedSuggestionsAsync(target, EmbeddingModelId, EmbeddingModelHash);
             Assert.Equal([firstPerson.Id, secondPerson.Id], firstRun.Select(item => item.SuggestedPersonId));
 
+            IReadOnlyList<CatalogueIdentitySuggestion> initialSuggestions =
+                await identityRepository.GetSuggestionsAsync(target);
             CatalogueIdentitySuggestion rejected = Assert.Single(
-                (await identityRepository.GetSuggestionsAsync(target))
-                    .Where(suggestion => suggestion.SuggestedPersonId == firstPerson.Id));
+                initialSuggestions,
+                suggestion => suggestion.SuggestedPersonId == firstPerson.Id);
             _ = await identityRepository.UpdateSuggestionStatusAsync(rejected.Id, "rejected");
 
             await using SqliteConnection beforeConnection = await database.OpenConnectionAsync();
