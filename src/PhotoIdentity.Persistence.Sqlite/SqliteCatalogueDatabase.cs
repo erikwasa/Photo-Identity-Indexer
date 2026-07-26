@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -182,6 +182,25 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 2;
         """;
 
+    private const string VersionThreeMigration = """
+        ALTER TABLE processing_runs ADD COLUMN cancellation_requested_at_utc TEXT NULL;
+        ALTER TABLE processing_jobs ADD COLUMN idempotency_key TEXT NULL;
+        ALTER TABLE processing_jobs ADD COLUMN lease_token TEXT NULL;
+        ALTER TABLE processing_jobs ADD COLUMN leased_until_utc TEXT NULL;
+        ALTER TABLE processing_jobs ADD COLUMN checkpoint_json TEXT NULL;
+        ALTER TABLE processing_jobs ADD COLUMN last_failure_kind TEXT NULL;
+        UPDATE processing_jobs
+        SET idempotency_key = processing_run_id || ':' || asset_revision_id
+        WHERE idempotency_key IS NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_processing_jobs_idempotency
+            ON processing_jobs (idempotency_key);
+        CREATE INDEX IF NOT EXISTS ix_processing_jobs_claimable
+            ON processing_jobs (processing_run_id, status, available_at_utc, leased_until_utc);
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (3, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 3;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -227,6 +246,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 2)
         {
             await ApplyMigrationAsync(connection, VersionTwoMigration, cancellationToken);
+            version = 2;
+        }
+
+        if (version < 3)
+        {
+            await ApplyMigrationAsync(connection, VersionThreeMigration, cancellationToken);
         }
     }
 
