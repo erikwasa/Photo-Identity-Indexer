@@ -69,6 +69,21 @@ jobs:
       - name: Check generated documentation
         run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- generate --check
 
+      - name: Run review application smoke verification
+        shell: powershell
+        run: ./verify-review.ps1 -Mode Smoke -Configuration Release -SkipBuild -Port 5081
+
+      - name: Upload review verification diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-verification-diagnostics
+          path: |
+            .artifacts/review-verification/verification-report.json
+            .artifacts/review-verification/api.stdout.log
+            .artifacts/review-verification/api.stderr.log
+          retention-days: 1
+
       - name: Prepare Windows PowerShell verification fixtures
         shell: pwsh
         run: |
