@@ -73,8 +73,10 @@ public sealed class SqliteBundleResultImporter
                 StringComparer.Ordinal);
             foreach (PortableFaceResult face in manifest.Faces.OrderBy(face => face.Ordinal))
             {
-                if (!files.TryGetValue(face.CropPath, out PortableBundleFile cropFile) ||
-                    cropFile.Role != PortableBundleRoles.ResultCrop)
+                PortableBundleFile cropFile = files.GetValueOrDefault(face.CropPath)
+                    ?? throw new PortableBundleValidationException(
+                        $"Face {face.Ordinal} does not reference a declared result crop.");
+                if (cropFile.Role != PortableBundleRoles.ResultCrop)
                 {
                     throw new PortableBundleValidationException(
                         $"Face {face.Ordinal} does not reference a declared result crop.");
