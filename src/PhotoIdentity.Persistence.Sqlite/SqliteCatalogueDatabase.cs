@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -241,6 +241,27 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 4;
         """;
 
+    private const string VersionFiveMigration = """
+        CREATE TABLE IF NOT EXISTS identity_suggestion_rankings (
+            face_occurrence_id TEXT NOT NULL,
+            model_id TEXT NOT NULL,
+            model_hash TEXT NOT NULL,
+            rank INTEGER NOT NULL CHECK (rank IN (1, 2)),
+            suggestion_id INTEGER NOT NULL,
+            score_margin REAL NULL CHECK (score_margin IS NULL OR score_margin >= 0),
+            generated_at_utc TEXT NOT NULL,
+            PRIMARY KEY (face_occurrence_id, model_id, model_hash, rank),
+            UNIQUE (suggestion_id),
+            FOREIGN KEY (face_occurrence_id) REFERENCES face_occurrences (id) ON DELETE CASCADE,
+            FOREIGN KEY (suggestion_id) REFERENCES identity_suggestions (id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS ix_identity_suggestion_rankings_model
+            ON identity_suggestion_rankings (model_id, model_hash);
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (5, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 5;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -298,6 +319,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 4)
         {
             await ApplyMigrationAsync(connection, VersionFourMigration, cancellationToken);
+            version = 4;
+        }
+
+        if (version < 5)
+        {
+            await ApplyMigrationAsync(connection, VersionFiveMigration, cancellationToken);
         }
     }
 
