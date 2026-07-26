@@ -4,9 +4,9 @@ Prepares and verifies the local review application with synthetic data.
 
 .DESCRIPTION
 Builds the solution, creates a disposable SQLite catalogue with synthetic coloured
-face crops, starts the review API, performs privacy and mutation smoke checks, and
-prints local/LAN URLs for Windows and Pixel verification. It never changes a real
-catalogue and never creates firewall rules.
+face crops, publishes and starts the review application, performs privacy and
+mutation smoke checks, and prints local/LAN URLs for Windows and Pixel verification.
+It never changes a real catalogue and never creates firewall rules.
 
 .EXAMPLE
 ./verify-review.ps1
@@ -39,8 +39,9 @@ $reportPath = Join-Path $artifactDirectory "verification-report.json"
 $stdoutPath = Join-Path $artifactDirectory "api.stdout.log"
 $stderrPath = Join-Path $artifactDirectory "api.stderr.log"
 $toolAssembly = Join-Path $root "tools/PhotoIdentity.ReviewVerification/bin/$Configuration/net10.0/PhotoIdentity.ReviewVerification.dll"
-$apiAssembly = Join-Path $root "src/PhotoIdentity.Api/bin/$Configuration/net10.0/PhotoIdentity.Api.dll"
-$apiDirectory = Split-Path -Parent $apiAssembly
+$apiProject = Join-Path $root "src/PhotoIdentity.Api/PhotoIdentity.Api.csproj"
+$publishedApiDirectory = Join-Path $artifactDirectory "app"
+$apiAssembly = Join-Path $publishedApiDirectory "PhotoIdentity.Api.dll"
 
 function Invoke-CheckedNative {
     param(
@@ -78,8 +79,8 @@ if (-not $SkipBuild) {
 if (-not (Test-Path -LiteralPath $toolAssembly -PathType Leaf)) {
     throw "Review verification tool was not built: $toolAssembly"
 }
-if (-not (Test-Path -LiteralPath $apiAssembly -PathType Leaf)) {
-    throw "Review API was not built: $apiAssembly"
+if (-not (Test-Path -LiteralPath $apiProject -PathType Leaf)) {
+    throw "Review API project was not found: $apiProject"
 }
 
 New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
@@ -117,6 +118,19 @@ if ($Mode -eq "Prepare") {
     exit 0
 }
 
+Invoke-CheckedNative -FilePath "dotnet" -ArgumentList @(
+    "publish", $apiProject,
+    "--configuration", $Configuration,
+    "--no-build",
+    "--output", $publishedApiDirectory
+)
+if (-not (Test-Path -LiteralPath $apiAssembly -PathType Leaf)) {
+    throw "Published review API was not found: $apiAssembly"
+}
+if (-not (Test-Path -LiteralPath (Join-Path $publishedApiDirectory "wwwroot/index.html") -PathType Leaf)) {
+    throw "Published review client was not found below $publishedApiDirectory."
+}
+
 $previousDatabasePath = $env:PhotoIdentity__DatabasePath
 $process = $null
 try {
@@ -124,7 +138,7 @@ try {
     Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     $argumentString = ('"{0}" --urls "http://{1}:{2}"' -f $apiAssembly, $ListenAddress, $Port)
     $process = Start-Process -FilePath "dotnet" -ArgumentList $argumentString -PassThru `
-        -WorkingDirectory $apiDirectory `
+        -WorkingDirectory $publishedApiDirectory `
         -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
 
     $baseUrl = "http://127.0.0.1:$Port"
@@ -153,7 +167,7 @@ try {
     $clientResponse = Invoke-WebRequest -Uri "$baseUrl/" -UseBasicParsing -TimeoutSec 10
     if ($clientResponse.StatusCode -ne 200 -or
         $clientResponse.Content.IndexOf("blazor.webassembly.js", [StringComparison]::OrdinalIgnoreCase) -lt 0) {
-        throw "Hosted Blazor client was not served from the API output directory."
+        throw "Hosted Blazor client was not served from the published application."
     }
     $report.smoke.hostedClient = "passed"
 
@@ -223,7 +237,7 @@ try {
     Write-Host "`nManual checklist:"
     Write-Host "  1. Confirm the gallery has no horizontal page scrolling."
     Write-Host "  2. Create a person, assign a face, reject another, and undo one action."
-    Write-Host "  3. Restart this script and confirm persisted decisions on a real catalogue separately."
+    Write-Host "  3. Restart the real catalogue host and confirm decisions persist."
     Write-Host "  4. Open details and confirm no local filesystem path is displayed."
     Write-Host "  5. On Pixel, confirm Assign, Reject, Undo and Back are comfortable to tap."
     Write-Host "Report: $reportPath"
