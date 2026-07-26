@@ -16,6 +16,7 @@ public partial class Program
 
         builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
         builder.Services.AddSingleton<SqliteReviewRepository>();
+        builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton(TimeProvider.System);
 
         WebApplication app = builder.Build();
