@@ -9,6 +9,8 @@ using PhotoIdentity.Transfer.Bundles;
 
 namespace PhotoIdentity.Worker;
 
+public sealed record PortableFaceCropExportInput(int Ordinal, string Path);
+
 public sealed record PortableBundleExportOptions(
     AssetRevisionId AssetRevisionId,
     PortableBundleProfile Profile,
@@ -17,7 +19,7 @@ public sealed record PortableBundleExportOptions(
     double ConfidenceThreshold = 0.9,
     int ReducedMaximumWidth = 1600,
     int ReducedMaximumHeight = 1600,
-    IReadOnlyList<string>? FaceCropPaths = null);
+    IReadOnlyList<PortableFaceCropExportInput>? FaceCrops = null);
 
 public sealed record PortableBundleExportResult(
     PortableJobManifest Manifest,
@@ -147,13 +149,17 @@ public sealed class PortableBundleExportCoordinator
         CancellationToken cancellationToken)
     {
         List<PortableJobInput> inputs = [];
-        IReadOnlyList<string> cropPaths = options.FaceCropPaths ?? [];
-        for (int index = 0; index < cropPaths.Count; index++)
+        PortableFaceCropExportInput[] crops = (options.FaceCrops ?? [])
+            .OrderBy(crop => crop.Ordinal)
+            .ToArray();
+        foreach (PortableFaceCropExportInput crop in crops)
         {
-            string sourcePath = Path.GetFullPath(cropPaths[index]);
+            string sourcePath = Path.GetFullPath(crop.Path);
             if (!File.Exists(sourcePath))
             {
-                throw new FileNotFoundException("Face-crop input was not found.", sourcePath);
+                throw new FileNotFoundException(
+                    $"Face-crop input for face {crop.Ordinal + 1} was not found.",
+                    sourcePath);
             }
 
             ImageFrame image;
@@ -170,15 +176,17 @@ public sealed class PortableBundleExportCoordinator
             if (image.Size != OpenCvFaceAligner.AlignedSize)
             {
                 throw new PortableBundleValidationException(
-                    $"Face-crop input {index + 1} must be {OpenCvFaceAligner.AlignedSize.Width}x" +
-                    $"{OpenCvFaceAligner.AlignedSize.Height}, but is {image.Size.Width}x{image.Size.Height}.");
+                    $"Face-crop input for face {crop.Ordinal + 1} must be " +
+                    $"{OpenCvFaceAligner.AlignedSize.Width}x{OpenCvFaceAligner.AlignedSize.Height}, " +
+                    $"but is {image.Size.Width}x{image.Size.Height}.");
             }
 
-            string normalizedPath = Path.Combine(exportDirectory, $"face-{index + 1:000}.png");
+            string faceFileName = $"face-{crop.Ordinal + 1:000}.png";
+            string normalizedPath = Path.Combine(exportDirectory, faceFileName);
             await EncodeAsync(image, normalizedPath, cancellationToken);
             inputs.Add(new PortableJobInput(
                 normalizedPath,
-                $"inputs/faces/face-{index + 1:000}.png",
+                $"inputs/faces/{faceFileName}",
                 PortableBundleRoles.FaceCrop));
         }
 
@@ -197,14 +205,32 @@ public sealed class PortableBundleExportCoordinator
                 "Reduced-image maximum dimensions must be positive.");
         }
 
-        int cropCount = options.FaceCropPaths?.Count ?? 0;
-        if (options.Profile == PortableBundleProfile.FaceCrops && cropCount == 0)
+        IReadOnlyList<PortableFaceCropExportInput> crops = options.FaceCrops ?? [];
+        if (options.Profile == PortableBundleProfile.FaceCrops && crops.Count == 0)
         {
-            throw new ArgumentException("Face-crop export requires at least one crop path.", nameof(options));
+            throw new ArgumentException("Face-crop export requires at least one explicitly numbered crop.", nameof(options));
         }
-        if (options.Profile != PortableBundleProfile.FaceCrops && cropCount != 0)
+        if (options.Profile != PortableBundleProfile.FaceCrops && crops.Count != 0)
         {
-            throw new ArgumentException("Crop paths may be supplied only for the face-crops profile.", nameof(options));
+            throw new ArgumentException("Face crops may be supplied only for the face-crops profile.", nameof(options));
+        }
+
+        HashSet<int> ordinals = [];
+        foreach (PortableFaceCropExportInput crop in crops)
+        {
+            if (crop.Ordinal < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(options),
+                    "Face-crop ordinals must be non-negative.");
+            }
+            ArgumentException.ThrowIfNullOrWhiteSpace(crop.Path);
+            if (!ordinals.Add(crop.Ordinal))
+            {
+                throw new ArgumentException(
+                    $"Face-crop face number {crop.Ordinal + 1} was supplied more than once.",
+                    nameof(options));
+            }
         }
     }
 
