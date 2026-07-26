@@ -19,4 +19,5 @@
   <Project Path="tests/PhotoIdentity.Source.Tests/PhotoIdentity.Source.Tests.csproj" />
   <Project Path="tools/PhotoIdentity.Docs/PhotoIdentity.Docs.csproj" />
   <Project Path="tools/PhotoIdentity.Models/PhotoIdentity.Models.csproj" />
+  <Project Path="tools/PhotoIdentity.ReviewVerification/PhotoIdentity.ReviewVerification.csproj" />
 </Solution>
