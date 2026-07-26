@@ -60,11 +60,8 @@ dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
 
-## Review focus
+Pull request [#23](https://github.com/erikwasa/Photo-Identity-Indexer/pull/23) merged as `5ac2b8263a7b0d82b7a3e23d9dfb676733cc702a` after GitHub Actions run `30179785787` passed dependency audit, Release build, all tests, living-document validation, generated-document checks and Windows mixed-media verification.
 
-- stable and safe path normalisation;
-- the supported-format boundary;
-- content hashing before database transactions;
-- scan-timestamp presence and deletion semantics;
-- preservation of historical identity data;
-- version-one to version-two migration behaviour.
+## Completion
+
+WI-0012 was human verified on 2026-07-26. The local catalogue now provides stable paths, immutable revisions, unsupported-format reporting and non-destructive deletion markers for WI-0013 batch orchestration.

@@ -25,4 +25,4 @@ WI-0011 through WI-0013.
 
 ## Current work
 
-WI-0011 starts M02 by establishing schema version 1, migration behaviour and persistence invariants. Typed repositories follow before local folder scanning begins.
+WI-0011 persistence and WI-0012 local-folder scanning are complete and verified. WI-0013 is adding expiring leases, checkpoints, cancellation, bounded retries and resumable worker orchestration before the production inspection handler and real 500-photo verification complete M02.

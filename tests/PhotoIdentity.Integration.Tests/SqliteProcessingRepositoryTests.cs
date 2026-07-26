@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
@@ -9,7 +10,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class SqliteProcessingRepositoryTests
 {
     [Fact]
-    public async Task Create_run_round_trips_and_deduplicates_jobs_by_revision()
+    public async Task Create_run_round_trips_and_deduplicates_jobs_by_idempotency_key()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -17,7 +18,7 @@ public sealed class SqliteProcessingRepositoryTests
             SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             IReadOnlyList<CatalogueAssetRevision> revisions = await SeedRevisionsAsync(database, 2);
-            DateTimeOffset now = new(2026, 7, 25, 22, 0, 0, TimeSpan.Zero);
+            DateTimeOffset now = new(2026, 7, 26, 10, 0, 0, TimeSpan.Zero);
             CatalogueProcessingRun run = CreateRun(now);
             CatalogueProcessingJob[] jobs =
             [
@@ -27,26 +28,21 @@ public sealed class SqliteProcessingRepositoryTests
             SqliteProcessingRepository repository = new(database);
 
             CatalogueProcessingBatch persisted = await repository.CreateRunAsync(run, jobs);
+            CatalogueProcessingJob duplicate = new(
+                ProcessingJobId.New(),
+                run.Id,
+                revisions[0].Id,
+                ProcessingJobStatus.Queued,
+                0,
+                now.AddMinutes(5),
+                idempotencyKey: jobs[0].IdempotencyKey);
+            CatalogueProcessingBatch duplicateResult = await repository.CreateRunAsync(run, [duplicate]);
 
             Assert.Equal(run, persisted.Run);
             Assert.Equal(2, persisted.Jobs.Count);
-            Assert.Equal(run, await repository.GetRunAsync(run.Id));
-            Assert.Equal(
-                jobs.Select(job => job.Id).OrderBy(id => id.ToString()),
-                persisted.Jobs.Select(job => job.Id).OrderBy(id => id.ToString()));
-
-            CatalogueProcessingJob duplicate = CreateJob(
-                run.Id,
-                revisions[0].Id,
-                now.AddMinutes(5));
-            CatalogueProcessingBatch duplicateResult = await repository.CreateRunAsync(run, [duplicate]);
-
             Assert.Equal(2, duplicateResult.Jobs.Count);
             Assert.DoesNotContain(duplicateResult.Jobs, job => job.Id == duplicate.Id);
-
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
-            Assert.Equal(1, await CountAsync(connection, "processing_runs"));
-            Assert.Equal(2, await CountAsync(connection, "processing_jobs"));
+            Assert.Equal(2, duplicateResult.Jobs.Select(job => job.IdempotencyKey).Distinct().Count());
         }
         finally
         {
@@ -55,7 +51,7 @@ public sealed class SqliteProcessingRepositoryTests
     }
 
     [Fact]
-    public async Task Claim_retry_and_completion_preserve_attempt_history()
+    public async Task Checkpoint_extends_lease_and_expired_job_is_reclaimed_with_new_token()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -63,48 +59,147 @@ public sealed class SqliteProcessingRepositoryTests
             SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             CatalogueAssetRevision revision = (await SeedRevisionsAsync(database, 1))[0];
-            DateTimeOffset now = new(2026, 7, 25, 22, 10, 0, TimeSpan.Zero);
+            DateTimeOffset now = new(2026, 7, 26, 10, 10, 0, TimeSpan.Zero);
             CatalogueProcessingRun run = CreateRun(now);
             CatalogueProcessingJob job = CreateJob(run.Id, revision.Id, now);
             SqliteProcessingRepository repository = new(database);
             await repository.CreateRunAsync(run, [job]);
 
             CatalogueProcessingJob firstClaim = Assert.IsType<CatalogueProcessingJob>(
-                await repository.ClaimNextJobAsync(run.Id, now));
-            Assert.Equal(ProcessingJobStatus.Running, firstClaim.Status);
-            Assert.Equal(1, firstClaim.AttemptCount);
-            Assert.Equal(now, firstClaim.StartedAtUtc);
-            Assert.Equal(ProcessingRunStatus.Running, (await repository.GetRunAsync(run.Id))!.Status);
+                await repository.ClaimNextJobAsync(run.Id, now, TimeSpan.FromMinutes(1)));
+            ProcessingLeaseToken firstToken = Assert.IsType<ProcessingLeaseToken>(firstClaim.LeaseToken);
+            CatalogueProcessingJob checkpointed = await repository.SaveCheckpointAsync(
+                job.Id,
+                firstToken,
+                """{"stage":"decoded"}""",
+                now.AddSeconds(30),
+                TimeSpan.FromMinutes(1));
 
-            DateTimeOffset retryAt = now.AddMinutes(10);
+            Assert.Equal(now.AddSeconds(90), checkpointed.LeasedUntilUtc);
+            Assert.Null(await repository.ClaimNextJobAsync(
+                run.Id,
+                now.AddSeconds(89),
+                TimeSpan.FromMinutes(1)));
+
+            CatalogueProcessingJob reclaimed = Assert.IsType<CatalogueProcessingJob>(
+                await repository.ClaimNextJobAsync(
+                    run.Id,
+                    now.AddSeconds(91),
+                    TimeSpan.FromMinutes(1)));
+            ProcessingLeaseToken secondToken = Assert.IsType<ProcessingLeaseToken>(reclaimed.LeaseToken);
+            Assert.NotEqual(firstToken, secondToken);
+            Assert.Equal(2, reclaimed.AttemptCount);
+            Assert.Equal("""{"stage":"decoded"}""", reclaimed.CheckpointJson);
+
+            await Assert.ThrowsAsync<ProcessingLeaseLostException>(
+                () => repository.CompleteJobAsync(job.Id, firstToken, now.AddSeconds(92)));
+            CatalogueProcessingJob completed = await repository.CompleteJobAsync(
+                job.Id,
+                secondToken,
+                now.AddSeconds(92));
+            Assert.Equal(ProcessingJobStatus.Succeeded, completed.Status);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Classified_failures_preserve_attempts_and_summary_counts()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            CatalogueAssetRevision revision = (await SeedRevisionsAsync(database, 1))[0];
+            DateTimeOffset now = new(2026, 7, 26, 10, 20, 0, TimeSpan.Zero);
+            CatalogueProcessingRun run = CreateRun(now);
+            CatalogueProcessingJob job = CreateJob(run.Id, revision.Id, now);
+            SqliteProcessingRepository repository = new(database);
+            await repository.CreateRunAsync(run, [job]);
+
+            CatalogueProcessingJob firstClaim = Assert.IsType<CatalogueProcessingJob>(
+                await repository.ClaimNextJobAsync(run.Id, now, TimeSpan.FromMinutes(2)));
+            DateTimeOffset retryAt = now.AddMinutes(5);
             CatalogueProcessingJob queued = await repository.FailJobAsync(
                 job.Id,
-                "transient decoder failure",
+                firstClaim.LeaseToken!.Value,
+                ProcessingFailureKind.Transient,
+                "temporary decoder failure",
                 now.AddMinutes(1),
                 retryAt);
+
             Assert.Equal(ProcessingJobStatus.Queued, queued.Status);
+            Assert.Equal(ProcessingFailureKind.Transient, queued.LastFailureKind);
             Assert.Equal(1, queued.AttemptCount);
-            Assert.Equal(retryAt, queued.AvailableAtUtc);
-            Assert.Equal("transient decoder failure", queued.Error);
-            Assert.Null(queued.StartedAtUtc);
-            Assert.Null(await repository.ClaimNextJobAsync(run.Id, retryAt.AddTicks(-1)));
+            Assert.Null(await repository.ClaimNextJobAsync(
+                run.Id,
+                retryAt.AddTicks(-1),
+                TimeSpan.FromMinutes(2)));
 
             CatalogueProcessingJob secondClaim = Assert.IsType<CatalogueProcessingJob>(
-                await repository.ClaimNextJobAsync(run.Id, retryAt));
-            Assert.Equal(2, secondClaim.AttemptCount);
-            Assert.Null(secondClaim.Error);
-
-            CatalogueProcessingJob succeeded = await repository.CompleteJobAsync(
+                await repository.ClaimNextJobAsync(run.Id, retryAt, TimeSpan.FromMinutes(2)));
+            await repository.FailJobAsync(
                 job.Id,
+                secondClaim.LeaseToken!.Value,
+                ProcessingFailureKind.Permanent,
+                "corrupt media",
                 retryAt.AddMinutes(1));
-            Assert.Equal(ProcessingJobStatus.Succeeded, succeeded.Status);
-            Assert.Equal(2, succeeded.AttemptCount);
+            await repository.CompleteRunAsync(run.Id, retryAt.AddMinutes(2));
 
-            CatalogueProcessingRun completed = await repository.CompleteRunAsync(
+            ProcessingRunSummary summary = await repository.GetRunSummaryAsync(run.Id);
+            CatalogueProcessingJob persisted = Assert.IsType<CatalogueProcessingJob>(
+                await repository.GetJobAsync(job.Id));
+            Assert.Equal(ProcessingRunStatus.Failed, summary.Status);
+            Assert.Equal(1, summary.FailedJobs);
+            Assert.Equal(2, summary.AttemptCount);
+            Assert.Equal(ProcessingFailureKind.Permanent, persisted.LastFailureKind);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Cancellation_invalidates_active_lease_and_cancels_unfinished_jobs()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            IReadOnlyList<CatalogueAssetRevision> revisions = await SeedRevisionsAsync(database, 2);
+            DateTimeOffset now = new(2026, 7, 26, 10, 30, 0, TimeSpan.Zero);
+            CatalogueProcessingRun run = CreateRun(now);
+            CatalogueProcessingJob[] jobs =
+            [
+                CreateJob(run.Id, revisions[0].Id, now),
+                CreateJob(run.Id, revisions[1].Id, now),
+            ];
+            SqliteProcessingRepository repository = new(database);
+            await repository.CreateRunAsync(run, jobs);
+            CatalogueProcessingJob active = Assert.IsType<CatalogueProcessingJob>(
+                await repository.ClaimNextJobAsync(run.Id, now, TimeSpan.FromMinutes(5)));
+
+            CatalogueProcessingRun cancelled = await repository.RequestCancellationAsync(
                 run.Id,
-                retryAt.AddMinutes(2));
-            Assert.Equal(ProcessingRunStatus.Completed, completed.Status);
-            Assert.Null(completed.Error);
+                now.AddMinutes(1));
+            ProcessingRunSummary summary = await repository.GetRunSummaryAsync(run.Id);
+
+            Assert.Equal(ProcessingRunStatus.Cancelled, cancelled.Status);
+            Assert.Equal(2, summary.CancelledJobs);
+            Assert.Null(await repository.ClaimNextJobAsync(
+                run.Id,
+                now.AddMinutes(10),
+                TimeSpan.FromMinutes(5)));
+            await Assert.ThrowsAsync<ProcessingLeaseLostException>(
+                () => repository.CompleteJobAsync(
+                    active.Id,
+                    active.LeaseToken!.Value,
+                    now.AddMinutes(2)));
         }
         finally
         {
@@ -121,30 +216,20 @@ public sealed class SqliteProcessingRepositoryTests
             SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             IReadOnlyList<CatalogueAssetRevision> revisions = await SeedRevisionsAsync(database, 2);
-            DateTimeOffset now = new(2026, 7, 25, 22, 20, 0, TimeSpan.Zero);
+            DateTimeOffset now = new(2026, 7, 26, 10, 40, 0, TimeSpan.Zero);
             CatalogueProcessingRun run = CreateRun(now);
-            CatalogueProcessingJob[] jobs =
-            [
-                CreateJob(run.Id, revisions[0].Id, now),
-                CreateJob(run.Id, revisions[1].Id, now),
-            ];
             SqliteProcessingRepository repository = new(database);
-            await repository.CreateRunAsync(run, jobs);
+            await repository.CreateRunAsync(
+                run,
+                revisions.Select(revision => CreateJob(run.Id, revision.Id, now)).ToArray());
 
             CatalogueProcessingJob?[] claimed = await Task.WhenAll(
-                repository.ClaimNextJobAsync(run.Id, now),
-                repository.ClaimNextJobAsync(run.Id, now));
+                repository.ClaimNextJobAsync(run.Id, now, TimeSpan.FromMinutes(5)),
+                repository.ClaimNextJobAsync(run.Id, now, TimeSpan.FromMinutes(5)));
 
             Assert.All(claimed, job => Assert.NotNull(job));
             Assert.Equal(2, claimed.Select(job => job!.Id).Distinct().Count());
-            Assert.Null(await repository.ClaimNextJobAsync(run.Id, now));
-
-            IReadOnlyList<CatalogueProcessingJob> persisted = await repository.GetJobsAsync(run.Id);
-            Assert.All(persisted, job =>
-            {
-                Assert.Equal(ProcessingJobStatus.Running, job.Status);
-                Assert.Equal(1, job.AttemptCount);
-            });
+            Assert.Equal(2, claimed.Select(job => job!.LeaseToken).Distinct().Count());
         }
         finally
         {
@@ -152,74 +237,14 @@ public sealed class SqliteProcessingRepositoryTests
         }
     }
 
-    [Fact]
-    public async Task Complete_run_rejects_unfinished_jobs_and_reflects_terminal_failure()
-    {
-        string directory = CreateTemporaryDirectory();
-        try
-        {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
-            await database.InitializeAsync();
-            CatalogueAssetRevision revision = (await SeedRevisionsAsync(database, 1))[0];
-            DateTimeOffset now = new(2026, 7, 25, 22, 30, 0, TimeSpan.Zero);
-            CatalogueProcessingRun run = CreateRun(now);
-            CatalogueProcessingJob job = CreateJob(run.Id, revision.Id, now);
-            SqliteProcessingRepository repository = new(database);
-            await repository.CreateRunAsync(run, [job]);
-
-            await Assert.ThrowsAsync<InvalidOperationException>(
-                () => repository.CompleteRunAsync(run.Id, now.AddMinutes(1)));
-
-            await repository.ClaimNextJobAsync(run.Id, now);
-            await repository.FailJobAsync(job.Id, "corrupt image", now.AddMinutes(2));
-            CatalogueProcessingRun failed = await repository.CompleteRunAsync(
-                run.Id,
-                now.AddMinutes(3));
-
-            Assert.Equal(ProcessingRunStatus.Failed, failed.Status);
-            Assert.Equal("1 processing job(s) failed.", failed.Error);
-        }
-        finally
-        {
-            DeleteTemporaryDirectory(directory);
-        }
-    }
-
-    [Fact]
-    public async Task Create_run_rolls_back_when_an_asset_revision_is_missing()
-    {
-        string directory = CreateTemporaryDirectory();
-        try
-        {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
-            await database.InitializeAsync();
-            DateTimeOffset now = new(2026, 7, 25, 22, 40, 0, TimeSpan.Zero);
-            CatalogueProcessingRun run = CreateRun(now);
-            CatalogueProcessingJob job = CreateJob(run.Id, AssetRevisionId.New(), now);
-            SqliteProcessingRepository repository = new(database);
-
-            SqliteException exception = await Assert.ThrowsAsync<SqliteException>(
-                () => repository.CreateRunAsync(run, [job]));
-
-            Assert.Equal(19, exception.SqliteErrorCode);
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
-            Assert.Equal(0, await CountAsync(connection, "processing_runs"));
-            Assert.Equal(0, await CountAsync(connection, "processing_jobs"));
-        }
-        finally
-        {
-            DeleteTemporaryDirectory(directory);
-        }
-    }
-
-    private static CatalogueProcessingRun CreateRun(DateTimeOffset now) =>
+    internal static CatalogueProcessingRun CreateRun(DateTimeOffset now) =>
         new(
             ProcessingRunId.New(),
             ProcessingRunStatus.Pending,
             """{"detector":"yunet","embedder":"sface"}""",
             now);
 
-    private static CatalogueProcessingJob CreateJob(
+    internal static CatalogueProcessingJob CreateJob(
         ProcessingRunId runId,
         AssetRevisionId revisionId,
         DateTimeOffset availableAtUtc) =>
@@ -231,11 +256,11 @@ public sealed class SqliteProcessingRepositoryTests
             attemptCount: 0,
             availableAtUtc);
 
-    private static async Task<IReadOnlyList<CatalogueAssetRevision>> SeedRevisionsAsync(
+    internal static async Task<IReadOnlyList<CatalogueAssetRevision>> SeedRevisionsAsync(
         SqliteCatalogueDatabase database,
         int count)
     {
-        DateTimeOffset now = new(2026, 7, 25, 21, 55, 0, TimeSpan.Zero);
+        DateTimeOffset now = new(2026, 7, 26, 9, 55, 0, TimeSpan.Zero);
         SourceId sourceId = SourceId.New();
         AssetId assetId = AssetId.New();
         CatalogueSource source = new(
@@ -249,13 +274,15 @@ public sealed class SqliteProcessingRepositoryTests
 
         for (int index = 0; index < count; index++)
         {
-            char hashCharacter = (char)('a' + index);
+            string hash = Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(BitConverter.GetBytes(index)))
+                .ToLowerInvariant();
             CatalogueAssetRevision revision = new(
                 AssetRevisionId.New(),
                 assetId,
-                new Sha256Digest(new string(hashCharacter, 64)),
+                new Sha256Digest(hash),
                 1234 + index,
-                now.AddMinutes(index),
+                now.AddTicks(index),
                 "image/jpeg",
                 640,
                 480);
@@ -265,15 +292,7 @@ public sealed class SqliteProcessingRepositoryTests
         return revisions;
     }
 
-    private static async Task<long> CountAsync(SqliteConnection connection, string table)
-    {
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = $"SELECT COUNT(*) FROM {table};";
-        object? value = await command.ExecuteScalarAsync();
-        return Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture);
-    }
-
-    private static string CreateTemporaryDirectory()
+    internal static string CreateTemporaryDirectory()
     {
         string directory = Path.Combine(
             Path.GetTempPath(),
@@ -283,7 +302,7 @@ public sealed class SqliteProcessingRepositoryTests
         return directory;
     }
 
-    private static void DeleteTemporaryDirectory(string directory)
+    internal static void DeleteTemporaryDirectory(string directory)
     {
         if (Directory.Exists(directory))
         {

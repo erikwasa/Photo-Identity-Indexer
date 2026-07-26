@@ -99,6 +99,16 @@ public readonly record struct ProcessingJobId
     public override string ToString() => Value.ToString("D");
 }
 
+public readonly record struct ProcessingLeaseToken
+{
+    private ProcessingLeaseToken(Guid value) => Value = StrongIdGuard.NotEmpty(value, nameof(value));
+    public Guid Value { get; }
+    public bool IsEmpty => Value == Guid.Empty;
+    public static ProcessingLeaseToken New() => new(Guid.NewGuid());
+    public static ProcessingLeaseToken From(Guid value) => new(value);
+    public override string ToString() => Value.ToString("D");
+}
+
 public readonly record struct ModelId
 {
     public ModelId(string value) => Value = StrongIdGuard.NotBlank(value, nameof(value));
