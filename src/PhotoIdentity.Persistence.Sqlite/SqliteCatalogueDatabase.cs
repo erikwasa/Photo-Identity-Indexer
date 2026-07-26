@@ -192,6 +192,15 @@ public sealed class SqliteCatalogueDatabase
         UPDATE processing_jobs
         SET idempotency_key = processing_run_id || ':' || asset_revision_id
         WHERE idempotency_key IS NULL;
+        UPDATE processing_jobs
+        SET status = 'queued',
+            started_at_utc = NULL,
+            completed_at_utc = NULL,
+            lease_token = NULL,
+            leased_until_utc = NULL,
+            last_failure_kind = 'transient',
+            error = COALESCE(error, 'Recovered active job during schema version 3 upgrade.')
+        WHERE status = 'running';
         CREATE UNIQUE INDEX IF NOT EXISTS ux_processing_jobs_idempotency
             ON processing_jobs (idempotency_key);
         CREATE INDEX IF NOT EXISTS ix_processing_jobs_claimable
