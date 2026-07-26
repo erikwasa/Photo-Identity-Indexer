@@ -1,0 +1,16 @@
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <PageTitle>Not found · Photo Identity</PageTitle>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <section class="empty-state">
+                <h1>Page not found</h1>
+                <p>The requested review page does not exist.</p>
+                <a class="button primary" href="/">Return to the gallery</a>
+            </section>
+        </LayoutView>
+    </NotFound>
+</Router>
