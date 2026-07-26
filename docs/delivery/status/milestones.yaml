@@ -37,7 +37,7 @@ milestones:
   - WI-0014
 - id: M04
   title: Minimal review application
-  status: proposed
+  status: ready
   document: ../milestones/M04-review-ui.md
   work_items:
   - WI-0015
@@ -55,7 +55,7 @@ milestones:
   - WI-0017
 - id: M07
   title: Portable job bundles
-  status: proposed
+  status: ready
   document: ../milestones/M07-portable-bundles.md
   work_items:
   - WI-0018
