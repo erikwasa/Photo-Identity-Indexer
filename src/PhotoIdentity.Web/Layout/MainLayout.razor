@@ -1,0 +1,22 @@
+@inherits LayoutComponentBase
+
+<div class="app-shell">
+    <header class="topbar">
+        <a class="brand" href="/" aria-label="Photo Identity review gallery">
+            <span class="brand-mark">PI</span>
+            <span>
+                <strong>Photo Identity</strong>
+                <small>Local review</small>
+            </span>
+        </a>
+        <span class="privacy-pill"><span aria-hidden="true">●</span> Local catalogue</span>
+    </header>
+
+    <main class="content">
+        @Body
+    </main>
+
+    <footer class="footer">
+        Review data stays in the configured local catalogue. Browser responses omit source roots and crop storage paths.
+    </footer>
+</div>
