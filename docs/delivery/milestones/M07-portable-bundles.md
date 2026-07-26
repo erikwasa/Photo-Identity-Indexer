@@ -24,19 +24,12 @@ A worker can process self-contained full-image, reduced-image or crop-only bundl
 
 ## Current work
 
-Draft pull request [#29](https://github.com/erikwasa/Photo-Identity-Indexer/pull/29) establishes the model-independent transport and import boundary:
+Pull request [#29](https://github.com/erikwasa/Photo-Identity-Indexer/pull/29) established the model-independent transport and guarded import boundary. Pull request [#30](https://github.com/erikwasa/Photo-Identity-Indexer/pull/30) added production OpenCV, YuNet and SFace processing plus export, process and import commands.
 
-- versioned, checksum-declared job and result archives;
-- full-image, reduced-image and face-crop profiles;
-- a database-free worker contract;
-- exact result-to-job linkage;
-- canonical revision validation before SQLite import;
-- replay-safe face persistence without human-label writes.
-
-Automated round-trip tests cover every profile, corruption, stale and mismatched results, replay, and preservation of an existing human assignment. GitHub Actions run `30201002371` passed the full repository workflow on the implementation head.
+Automated round-trip tests cover every profile, corruption, stale and mismatched results, replay, and preservation of an existing human assignment. The maintainer has now exercised the production commands with ignored private media and confirmed that reimport is harmless and the human assignment remains canonical.
 
 ## Remaining milestone scope
 
-M07 remains in progress. The next slice must connect the production OpenCV/ONNX inspection pipeline to the database-free processor contract and expose local export, process and import commands. Completion also requires a privacy-safe real-image round trip and an explicit bundle-retention policy.
+M07 remains in progress until a privacy-safe aggregate summary is retained and temporary job/result archives plus disposable processing directories are cleaned up according to an explicit local retention decision. The evidence must not contain private paths, photo content, crops, embeddings, hashes or revision identifiers.
 
-M04 remains independently in progress until the maintainer reports successful Windows and Pixel interaction verification for WI-0015.
+M04 completed independently on 2026-07-27 after successful Windows and Pixel trusted-network interaction verification for WI-0015.
