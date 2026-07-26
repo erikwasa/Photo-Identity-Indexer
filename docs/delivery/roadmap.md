@@ -8,7 +8,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M01 | Single-image inference | completed |
 | M02 | Local catalogue and jobs | completed |
 | M03 | OneDrive synchronised source | completed |
-| M04 | Minimal review application | in_progress |
+| M04 | Minimal review application | completed |
 | M05 | Identity matching | proposed |
 | M06 | Evaluation harness | proposed |
 | M07 | Portable job bundles | in_progress |
