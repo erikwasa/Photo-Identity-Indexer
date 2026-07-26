@@ -9,11 +9,12 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M02 — Local catalogue and jobs**: `completed`
 - **M03 — OneDrive synchronised source**: `completed`
 - **M04 — Minimal review application**: `in_progress`
-- **M07 — Portable job bundles**: `ready`
+- **M07 — Portable job bundles**: `in_progress`
 
 ## Active work
 
 - [**WI-0015 — Build minimal review application**](../work-items/WI-0015-review-ui.md) — `in_progress`; owner: `ai-agent`
+- [**WI-0018 — Add portable bundles**](../work-items/WI-0018-portable-bundles.md) — `in_progress`; owner: `ai-agent`
 
 ## Recently completed
 
@@ -23,4 +24,4 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Next ready work
 
-- [**WI-0018 — Add portable bundles**](../work-items/WI-0018-portable-bundles.md) — `proposed`; owner: `unassigned`
+None.
