@@ -8,74 +8,71 @@
 
 **WI-0015 — Build minimal review application**
 
-Status: `in_progress`
+Status: `in_review`
 
 ## Branch and pull request
 
-- Branch: `agent/WI-0015-review-app`
-- Draft pull request: [#27 — Add minimal local face review application](https://github.com/erikwasa/Photo-Identity-Indexer/pull/27)
+- Branch: `agent/WI-0015-device-verification`
+- Draft pull request: [#28 — Add device verification harness for review app](https://github.com/erikwasa/Photo-Identity-Indexer/pull/28)
 
 ## Objective
 
-Provide a local ASP.NET Core API and responsive Blazor WebAssembly review application for face galleries, person creation, assignment, rejection, undo, photo details and an auditable history without exposing sensitive filesystem paths to the browser.
+Complete the Windows and Pixel acceptance path for the merged local ASP.NET Core and Blazor WebAssembly review application without using private photos or risking changes to a real catalogue.
 
 ## Current slice
 
-Implement the complete minimal review workflow. SQLite schema version 4 stores reversible review actions; the API owns database and image access; the same-origin client provides desktop and phone layouts. Automated validation covers restart persistence, audit history, undo ordering and path-redacted responses. Human Windows and Pixel verification remains required before completion.
+Add a repeatable verification harness. A fixture tool creates an isolated SQLite catalogue with synthetic coloured crops and seeded unreviewed, assigned and rejected queues. `verify-review.ps1` starts the real hosted application, checks the privacy and mutation boundaries, prints localhost and LAN URLs and leaves the process running during the manual device review.
 
 ## Relevant files
 
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteCatalogueDatabase.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/ReviewCatalogueRecords.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteReviewRepository.cs`
+- `tools/PhotoIdentity.ReviewVerification/PhotoIdentity.ReviewVerification.csproj`
+- `tools/PhotoIdentity.ReviewVerification/Program.cs`
+- `verify-review.ps1`
+- `.github/workflows/build.yml`
 - `src/PhotoIdentity.Api/Program.cs`
 - `src/PhotoIdentity.Api/ReviewEndpoints.cs`
-- `src/PhotoIdentity.Web/ReviewContracts.cs`
 - `src/PhotoIdentity.Web/Pages/Home.razor`
 - `src/PhotoIdentity.Web/Pages/FaceDetails.razor`
-- `src/PhotoIdentity.Web/Components/FaceCard.razor`
 - `src/PhotoIdentity.Web/wwwroot/css/app.css`
-- `src/PhotoIdentity.Web/wwwroot/service-worker.js`
-- `tests/PhotoIdentity.Integration.Tests/ReviewApplicationTests.cs`
 - `docs/delivery/work-items/WI-0015-review-ui.md`
 - `docs/delivery/status/work-items.yaml`
 
 ## Commands
 
 ```powershell
-dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj
+./verify-review.ps1
+./verify-review.ps1 -Mode Smoke -Configuration Release
+./verify-review.ps1 -Mode Prepare -Configuration Release
+
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
-
-$env:PhotoIdentity__DatabasePath = "C:\PhotoIdentity\catalogue.db"
-dotnet run --project src/PhotoIdentity.Api --urls "http://0.0.0.0:5080"
 ```
 
 ## Acceptance test for this slice
 
-- A paged face gallery loads from the existing catalogue.
-- A human reviewer can create a person, assign a face, reject a face and undo the latest action.
-- Assignment and rejection survive process restart.
-- Every review mutation remains in the audit history and undo does not erase the target action.
-- The browser receives opaque image endpoints instead of crop storage paths.
-- Source roots and crop paths do not appear in gallery or details JSON.
-- API and face-image requests are excluded from service-worker caching.
-- Responsive controls remain usable at Pixel-class widths.
-- The Windows host and Pixel trusted-network workflow are verified manually before completion.
+- The generated catalogue and crops exist only below `.artifacts/review-verification`.
+- The harness never opens or changes a configured real catalogue.
+- The real hosted API returns all synthetic faces and opaque image URLs.
+- Review JSON and image responses include `Cache-Control: no-store`.
+- Person creation, assignment and undo succeed and retain audit history.
+- The API process is stopped after Smoke mode and after Interactive mode exits.
+- No Windows Firewall rule is created automatically.
+- The script prints useful localhost and LAN URLs.
+- A human confirms the gallery, actions, details navigation and touch targets on Windows and Pixel.
 
 ## Verification
 
-WI-0014 completed in pull request #26 at `b5d2a1ce24629df9fdb516eea12a69534fe257d5`. GitHub Actions run `30185278984` passed dependency audit, Release build, all tests, living-document validation, generated-document checks and Windows mixed-media verification. The human maintainer then validated the implementation against a real Personal OneDrive Files On-Demand folder.
+Pull request #27 merged at `88f5c2c1b2dbccea9e99870405bbb9e280aa1d00`. GitHub Actions run `30189387917` passed dependency audit, Release build, all automated tests, schema migrations, path-redaction and cache-control coverage, documentation checks and Windows mixed-media verification. The merged implementation has no review comments or unresolved threads.
 
-Draft pull request #27 relies on GitHub Actions for executable validation because the agent environment does not contain the .NET SDK.
+Draft pull request #28 adds the disposable verification path and a Windows PowerShell smoke gate. WI-0015 remains open because merge evidence does not establish the target-device criterion.
 
 ## Known issues
 
-- The local trusted-network slice has no authentication; the review actor is currently self-reported by the client.
+- The local trusted-network slice has no authentication and uses unencrypted HTTP.
+- LAN access depends on the selected Windows Firewall network profile; the harness deliberately does not change it.
 - Pixel PWA installation requires a secure context, although the responsive review workflow can be exercised over trusted-network HTTP.
-- Person rename, merge and bulk review are outside WI-0015.
-- Historical manual label rows are retained; the current assignment/rejection state is defined by the review-action projection.
+- Automated browser/API checks cannot prove that touch controls are comfortable on the actual Pixel.
 
 ## Next action
 
-Resolve CI and review findings on pull request #27, then verify the gallery, assignment, rejection, undo and details workflow on Windows and a Pixel before marking WI-0015 and M04 completed.
+Resolve CI or review findings on pull request #28. After merge, run `./verify-review.ps1` on Windows, complete the printed Pixel checklist and report that verification before marking WI-0015 and M04 completed or starting WI-0016.
