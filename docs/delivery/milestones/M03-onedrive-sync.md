@@ -21,3 +21,7 @@ The local OneDrive folder can be scanned safely with explicit placeholder availa
 - Hydrated files can be staged and verified.
 - No OneDrive credentials are requested.
 - Temporary staging content can be safely removed.
+
+## Current work
+
+WI-0014 is implementing the complete sync-root boundary. Filesystem placeholder attributes provide point-in-time availability without intentionally opening online-only content. Locally hydrated files are copied to an external staging directory, independently re-hashed and given verification sidecars. Cleanup is restricted to current verified files and never recursively removes directories.

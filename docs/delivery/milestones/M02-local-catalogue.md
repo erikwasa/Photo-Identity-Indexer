@@ -23,6 +23,6 @@ WI-0011 through WI-0013.
 - Changed files create new revisions.
 - Unsupported formats and failures are reported separately.
 
-## Current work
+## Completion
 
-WI-0011 persistence and WI-0012 local-folder scanning are complete and verified. WI-0013 is adding expiring leases, checkpoints, cancellation, bounded retries and resumable worker orchestration before the production inspection handler and real 500-photo verification complete M02.
+WI-0011 established transactional SQLite persistence, migrations and operational policy. WI-0012 added recursive local-folder scanning, immutable revisions and deletion markers. WI-0013 added leased resumable orchestration, production local inspection, start/resume commands and private 500-photo verification. M02 completed on 2026-07-26.

@@ -6,12 +6,12 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 |---|---|---|
 | M00 | Repository and architecture | completed |
 | M01 | Single-image inference | completed |
-| M02 | Local catalogue and jobs | in_progress |
-| M03 | OneDrive synchronised source | proposed |
-| M04 | Minimal review application | proposed |
+| M02 | Local catalogue and jobs | completed |
+| M03 | OneDrive synchronised source | in_progress |
+| M04 | Minimal review application | ready |
 | M05 | Identity matching | proposed |
 | M06 | Evaluation harness | proposed |
-| M07 | Portable job bundles | proposed |
+| M07 | Portable job bundles | ready |
 | M08 | Second model | proposed |
 | M09 | Azure VM pilot without identities | proposed |
 | M10 | Azure checkpointing | proposed |

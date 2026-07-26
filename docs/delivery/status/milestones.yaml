@@ -23,7 +23,7 @@ milestones:
   - WI-0010
 - id: M02
   title: Local catalogue and jobs
-  status: in_progress
+  status: completed
   document: ../milestones/M02-local-catalogue.md
   work_items:
   - WI-0011
@@ -31,13 +31,13 @@ milestones:
   - WI-0013
 - id: M03
   title: OneDrive synchronised source
-  status: proposed
+  status: in_progress
   document: ../milestones/M03-onedrive-sync.md
   work_items:
   - WI-0014
 - id: M04
   title: Minimal review application
-  status: proposed
+  status: ready
   document: ../milestones/M04-review-ui.md
   work_items:
   - WI-0015
@@ -55,7 +55,7 @@ milestones:
   - WI-0017
 - id: M07
   title: Portable job bundles
-  status: proposed
+  status: ready
   document: ../milestones/M07-portable-bundles.md
   work_items:
   - WI-0018
