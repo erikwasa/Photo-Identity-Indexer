@@ -290,11 +290,17 @@ work_items:
   document: ../work-items/WI-0013-resumable-processing.md
   started_at: '2026-07-26'
   last_updated_at: '2026-07-26'
-  branch: agent/WI-0013-resumable-orchestration
+  branch: agent/WI-0013-local-batch-inspection
   blockers: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/24
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30181221035
+  - type: merge_commit
+    value: d87d1604fe1d958f8bcf5fb023f9dadd14786cb8
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/25
 - id: WI-0014
   title: Add OneDrive availability and staging
   milestone: M03
