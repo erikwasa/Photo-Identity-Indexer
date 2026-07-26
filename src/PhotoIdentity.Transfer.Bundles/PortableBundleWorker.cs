@@ -23,6 +23,11 @@ public sealed class PortableBundleWorker
         ArgumentException.ThrowIfNullOrWhiteSpace(resultBundlePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(workingDirectory);
 
+        if (PathsEqual(jobBundlePath, resultBundlePath))
+        {
+            throw new ArgumentException("The result bundle path must differ from the job bundle path.", nameof(resultBundlePath));
+        }
+
         string fullWorkingDirectory = Path.GetFullPath(workingDirectory);
         EnsureOutsideWorkingDirectory(jobBundlePath, fullWorkingDirectory, nameof(jobBundlePath));
         EnsureOutsideWorkingDirectory(resultBundlePath, fullWorkingDirectory, nameof(resultBundlePath));
@@ -44,6 +49,14 @@ public sealed class PortableBundleWorker
             job,
             output,
             cancellationToken);
+    }
+
+    private static bool PathsEqual(string first, string second)
+    {
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        return string.Equals(Path.GetFullPath(first), Path.GetFullPath(second), comparison);
     }
 
     private static void EnsureOutsideWorkingDirectory(string path, string workingDirectory, string parameterName)
