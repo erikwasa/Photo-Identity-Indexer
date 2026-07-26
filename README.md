@@ -6,9 +6,9 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-**M04 — Minimal review application** is complete after automated verification and maintainer-confirmed Windows and Pixel trusted-network interaction. **M07 — Portable job bundles** remains active through WI-0018; verified database-free packages, production processing commands and guarded result import are implemented, with privacy-safe evidence retention and cleanup still required after the real-image round trip.
+**M05 — Identity matching** is active through WI-0016, implementing exact cosine ranking from human-confirmed exemplars without automatic labelling. **M07 — Portable job bundles** is complete after automated verification and a privacy-safe real-image export, process, import and replay round trip.
 
-M01 single-image inference, M02 local catalogue and durable processing, M03 OneDrive availability and verified staging, and M04 local review are complete and verified.
+M01 single-image inference, M02 local catalogue and durable processing, M03 OneDrive availability and verified staging, M04 local review, and M07 portable bundles are complete and verified. M09, the first Azure VM pilot without identities, is also ready but is not the active implementation track.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
