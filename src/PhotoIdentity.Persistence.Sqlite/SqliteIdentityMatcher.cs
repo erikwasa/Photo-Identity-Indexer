@@ -72,6 +72,8 @@ public sealed class SqliteIdentityMatcher
             transaction,
             cancellationToken);
 
+        await ClearRankingsAsync(connection, transaction, modelId, modelHash, cancellationToken);
+
         DateTimeOffset generatedAtUtc = _timeProvider.GetUtcNow().ToUniversalTime();
         int suggestedTargetCount = 0;
         int suggestionCount = 0;
@@ -143,20 +145,22 @@ public sealed class SqliteIdentityMatcher
         command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
 
         List<CatalogueRankedIdentitySuggestion> suggestions = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
+        await using (SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
         {
-            suggestions.Add(new CatalogueRankedIdentitySuggestion(
-                reader.GetInt64(0),
-                FaceOccurrenceId.From(Guid.Parse(reader.GetString(1))),
-                PersonId.From(Guid.Parse(reader.GetString(2))),
-                new ModelId(reader.GetString(3)),
-                new Sha256Digest(reader.GetString(4)),
-                reader.GetInt32(5),
-                reader.GetDouble(6),
-                reader.IsDBNull(7) ? null : reader.GetDouble(7),
-                reader.GetString(8),
-                ParseTimestamp(reader.GetString(9))));
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                suggestions.Add(new CatalogueRankedIdentitySuggestion(
+                    reader.GetInt64(0),
+                    FaceOccurrenceId.From(Guid.Parse(reader.GetString(1))),
+                    PersonId.From(Guid.Parse(reader.GetString(2))),
+                    new ModelId(reader.GetString(3)),
+                    new Sha256Digest(reader.GetString(4)),
+                    reader.GetInt32(5),
+                    reader.GetDouble(6),
+                    reader.IsDBNull(7) ? null : reader.GetDouble(7),
+                    reader.GetString(8),
+                    ParseTimestamp(reader.GetString(9))));
+            }
         }
 
         transaction.Commit();
@@ -185,6 +189,25 @@ public sealed class SqliteIdentityMatcher
                 FOREIGN KEY (suggestion_id) REFERENCES identity_suggestions (id) ON DELETE CASCADE
             );
             """;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task ClearRankingsAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        ModelId modelId,
+        Sha256Digest modelHash,
+        CancellationToken cancellationToken)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            DELETE FROM identity_suggestion_rankings
+            WHERE model_id = $model_id
+              AND model_hash = $model_hash;
+            """;
+        command.Parameters.AddWithValue("$model_id", modelId.ToString());
+        command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -423,19 +446,6 @@ public sealed class SqliteIdentityMatcher
         DateTimeOffset generatedAtUtc,
         CancellationToken cancellationToken)
     {
-        using (SqliteCommand deleteRankings = connection.CreateCommand())
-        {
-            deleteRankings.Transaction = transaction;
-            deleteRankings.CommandText = """
-                DELETE FROM identity_suggestion_rankings
-                WHERE face_occurrence_id = $face_occurrence_id
-                  AND model_id = $model_id
-                  AND model_hash = $model_hash;
-                """;
-            AddVersionParameters(deleteRankings, faceOccurrenceId, modelId, modelHash);
-            await deleteRankings.ExecuteNonQueryAsync(cancellationToken);
-        }
-
         string? firstPersonId = candidates.Count > 0 ? candidates[0].PersonId.ToString() : null;
         string? secondPersonId = candidates.Count > 1 ? candidates[1].PersonId.ToString() : null;
         using (SqliteCommand deleteStale = connection.CreateCommand())
