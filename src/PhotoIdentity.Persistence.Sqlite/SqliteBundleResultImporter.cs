@@ -194,6 +194,7 @@ public sealed class SqliteBundleResultImporter
             await using FileStream output = new(temporaryPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, useAsync: true);
             await input.CopyToAsync(output, cancellationToken);
             await output.FlushAsync(cancellationToken);
+            await output.DisposeAsync();
             File.Move(temporaryPath, destinationPath);
         }
         finally
