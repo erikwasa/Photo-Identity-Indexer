@@ -25,4 +25,12 @@ public sealed class OneDriveFileAttributeStatusProviderTests
                 OneDriveFileAttributeStatusProvider.RecallOnOpen |
                 OneDriveFileAttributeStatusProvider.Pinned));
     }
+
+    [Fact]
+    public void Traversal_skips_reparse_directories_without_filtering_reparse_files()
+    {
+        Assert.True(OneDriveSyncAssetSource.ShouldTraverseDirectory(FileAttributes.Directory));
+        Assert.False(OneDriveSyncAssetSource.ShouldTraverseDirectory(
+            FileAttributes.Directory | FileAttributes.ReparsePoint));
+    }
 }
