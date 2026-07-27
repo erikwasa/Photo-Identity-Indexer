@@ -24,3 +24,19 @@ Exercise the complete baseline system locally on a representative private set of
 - [ ] Database backup, restore and cleanup are exercised before the pilot is accepted.
 - [ ] Defects and usability gaps are documented with severity and a decision to fix, defer or accept each one.
 - [ ] Evidence shared in the repository contains no private images, face crops, embeddings, names or local source paths.
+
+## Matcher regeneration prerequisite
+
+Use the supported operator command with the exact embedding model revision:
+
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -- `
+  match regenerate `
+  --database C:\PhotoIdentityPilot\catalogue.db `
+  --embedder-id sface-2021dec-fp32 `
+  --embedder-hash EMBEDDER_SHA256
+```
+
+The command reports only model provenance and aggregate target/suggestion counts. It rebuilds ranked suggestions from current human-confirmed exemplars, preserves durable rejected face-person exclusions and never creates or changes canonical labels.
+
+During the pilot, reject at least one suggestion, record the aggregate counts, run regeneration again and confirm the rejected pair remains absent while human labels and append-only review history remain unchanged.
