@@ -1,4 +1,5 @@
 @page "/"
+@using System.Net.Http.Json
 @inject HttpClient Http
 
 <PageTitle>Review faces · Photo Identity</PageTitle>
@@ -39,6 +40,105 @@
     <div class="notice success" role="status">@Message</div>
 }
 
+@if (Page is not null && Page.Items.Count > 0)
+{
+    <section class="bulk-review-panel" aria-labelledby="bulk-review-heading">
+        <div class="bulk-review-heading">
+            <div>
+                <p class="eyebrow">Preview before commit</p>
+                <h2 id="bulk-review-heading">Bulk review</h2>
+                <p>Select unreviewed faces on this page. The server recalculates the exact affected set before any change is committed.</p>
+            </div>
+            <div class="bulk-selection-actions">
+                <button class="button secondary"
+                        disabled="@(BulkBusy || PageUnreviewedCount == 0)"
+                        @onclick="SelectCurrentPage">
+                    Select page
+                </button>
+                <button class="button secondary"
+                        disabled="@(BulkBusy || SelectedCount == 0)"
+                        @onclick="ClearSelection">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        @if (SelectedCount == 0)
+        {
+            <p class="bulk-empty">No faces selected. Use the Select control on one or more unreviewed cards.</p>
+        }
+        else
+        {
+            <div class="bulk-review-controls">
+                <div>
+                    <label class="field-label" for="bulk-action">Action</label>
+                    <select id="bulk-action" @bind="BulkAction" @bind:after="InvalidateBulkPreview" disabled="@BulkBusy">
+                        <option value="assign">Assign to one person</option>
+                        <option value="reject">Reject as false detections</option>
+                    </select>
+                </div>
+
+                @if (BulkAction == "assign")
+                {
+                    <div>
+                        <label class="field-label" for="bulk-person">Person</label>
+                        <select id="bulk-person" @bind="BulkPersonId" @bind:after="InvalidateBulkPreview" disabled="@(BulkBusy || People.Count == 0)">
+                            <option value="">Choose a person</option>
+                            @foreach (ReviewPersonResponse person in People)
+                            {
+                                <option value="@person.Id">@person.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                }
+
+                <div>
+                    <label class="field-label" for="bulk-note">Audit note</label>
+                    <input id="bulk-note"
+                           maxlength="1000"
+                           placeholder="Optional note applied to every action"
+                           @bind="BulkNote"
+                           @bind:event="oninput"
+                           @bind:after="InvalidateBulkPreview"
+                           disabled="@BulkBusy" />
+                </div>
+
+                <button class="button primary bulk-preview-button"
+                        disabled="@(!CanPreview)"
+                        @onclick="PreviewBulkAsync">
+                    Preview @SelectedCount selected face@(SelectedCount == 1 ? "" : "s")
+                </button>
+            </div>
+
+            @if (BulkPreview is not null)
+            {
+                <div class="bulk-preview @(BulkPreview.Action == "reject" ? "danger-preview" : "")" role="status">
+                    <div>
+                        <strong>@BulkPreview.AffectedCount face@(BulkPreview.AffectedCount == 1 ? "" : "s") will change</strong>
+                        @if (BulkPreview.Action == "assign")
+                        {
+                            <p>They will be assigned to <strong>@BulkPreview.Person?.DisplayName</strong>.</p>
+                        }
+                        else
+                        {
+                            <p>They will be recorded as rejected face detections.</p>
+                        }
+                        @if (BulkPreview.SkippedCount > 0)
+                        {
+                            <p>@BulkPreview.SkippedCount selected face@(BulkPreview.SkippedCount == 1 ? " is" : "s are") already reviewed and will be skipped.</p>
+                        }
+                    </div>
+                    <button class="button @(BulkPreview.Action == "reject" ? "danger" : "primary")"
+                            disabled="@(BulkBusy || BulkPreview.AffectedCount == 0)"
+                            @onclick="CommitBulkAsync">
+                        Commit @BulkPreview.AffectedCount @BulkCommitNoun
+                    </button>
+                </div>
+            }
+        }
+    </section>
+}
+
 @if (Loading)
 {
     <section class="empty-state" aria-live="polite">
@@ -65,6 +165,9 @@ else
         {
             <FaceCard Face="face"
                       People="People"
+                      Selectable="@(face.State == "unreviewed")"
+                      Selected="@SelectedFaceIds.Contains(face.Id)"
+                      SelectionChanged="SetFaceSelection"
                       AssignRequested="AssignAsync"
                       RejectRequested="RejectAsync"
                       UndoRequested="UndoAsync" />
@@ -91,13 +194,29 @@ else
 
     private ReviewFacePageResponse? Page { get; set; }
     private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+    private HashSet<string> SelectedFaceIds { get; } = new(StringComparer.Ordinal);
+    private BulkReviewPreviewResponse? BulkPreview { get; set; }
     private string State { get; set; } = "unreviewed";
     private int Offset { get; set; }
     private string NewPersonName { get; set; } = "";
+    private string BulkAction { get; set; } = "assign";
+    private string BulkPersonId { get; set; } = "";
+    private string BulkNote { get; set; } = "";
     private bool Loading { get; set; }
     private bool CreatingPerson { get; set; }
+    private bool BulkBusy { get; set; }
     private string? Error { get; set; }
     private string? Message { get; set; }
+
+    private int SelectedCount => SelectedFaceIds.Count;
+    private int PageUnreviewedCount => Page?.Items.Count(face => face.State == "unreviewed") ?? 0;
+    private bool CanPreview =>
+        !BulkBusy &&
+        SelectedCount > 0 &&
+        (BulkAction == "reject" || !string.IsNullOrWhiteSpace(BulkPersonId));
+    private string BulkCommitNoun => BulkPreview?.Action == "reject"
+        ? (BulkPreview.AffectedCount == 1 ? "rejection" : "rejections")
+        : (BulkPreview?.AffectedCount == 1 ? "assignment" : "assignments");
 
     protected override async Task OnInitializedAsync()
     {
@@ -108,6 +227,10 @@ else
     private async Task LoadPeopleAsync()
     {
         People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+        if (People.All(person => person.Id != BulkPersonId))
+        {
+            BulkPersonId = People.FirstOrDefault()?.Id ?? "";
+        }
     }
 
     private async Task LoadFacesAsync()
@@ -118,6 +241,7 @@ else
         {
             Page = await Http.GetFromJsonAsync<ReviewFacePageResponse>(
                 $"api/review/faces?state={Uri.EscapeDataString(State)}&offset={Offset}&limit={PageSize}");
+            ResetBulkSelection();
         }
         catch (Exception exception)
         {
@@ -144,13 +268,18 @@ else
         Message = null;
         try
         {
-            HttpResponseMessage response = await Http.PostAsJsonAsync(
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
                 "api/review/people",
                 new CreatePersonRequest(NewPersonName));
             await RequireSuccessAsync(response);
+            ReviewPersonResponse? created = await response.Content.ReadFromJsonAsync<ReviewPersonResponse>();
             string createdName = NewPersonName.Trim();
             NewPersonName = "";
             await LoadPeopleAsync();
+            if (created is not null)
+            {
+                BulkPersonId = created.Id;
+            }
             Message = $"Created {createdName}.";
         }
         catch (Exception exception)
@@ -160,6 +289,127 @@ else
         finally
         {
             CreatingPerson = false;
+        }
+    }
+
+    private void SetFaceSelection((string FaceId, bool Selected) change)
+    {
+        if (change.Selected)
+        {
+            SelectedFaceIds.Add(change.FaceId);
+        }
+        else
+        {
+            SelectedFaceIds.Remove(change.FaceId);
+        }
+
+        InvalidateBulkPreview();
+    }
+
+    private void SelectCurrentPage()
+    {
+        if (Page is null)
+        {
+            return;
+        }
+
+        foreach (ReviewFaceResponse face in Page.Items.Where(face => face.State == "unreviewed"))
+        {
+            SelectedFaceIds.Add(face.Id);
+        }
+
+        InvalidateBulkPreview();
+    }
+
+    private void ClearSelection()
+    {
+        SelectedFaceIds.Clear();
+        InvalidateBulkPreview();
+    }
+
+    private void ResetBulkSelection()
+    {
+        SelectedFaceIds.Clear();
+        BulkPreview = null;
+    }
+
+    private void InvalidateBulkPreview()
+    {
+        BulkPreview = null;
+        Message = null;
+    }
+
+    private async Task PreviewBulkAsync()
+    {
+        if (!CanPreview)
+        {
+            return;
+        }
+
+        BulkBusy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            BulkReviewPreviewRequest request = new(
+                SelectedFaceIds.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                BulkAction,
+                BulkAction == "assign" ? BulkPersonId : null);
+            using HttpResponseMessage response = await Http.PostAsJsonAsync("api/review/bulk/preview", request);
+            await RequireSuccessAsync(response);
+            BulkPreview = await response.Content.ReadFromJsonAsync<BulkReviewPreviewResponse>()
+                ?? throw new InvalidOperationException("The bulk preview response was empty.");
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+            BulkPreview = null;
+        }
+        finally
+        {
+            BulkBusy = false;
+        }
+    }
+
+    private async Task CommitBulkAsync()
+    {
+        if (BulkPreview is not BulkReviewPreviewResponse preview || preview.AffectedCount == 0)
+        {
+            return;
+        }
+
+        BulkBusy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            BulkReviewCommitRequest request = new(
+                SelectedFaceIds.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+                BulkAction,
+                BulkAction == "assign" ? BulkPersonId : null,
+                preview.AffectedCount,
+                preview.PreviewToken,
+                Confirm: true,
+                Actor,
+                EmptyToNull(BulkNote));
+            using HttpResponseMessage response = await Http.PostAsJsonAsync("api/review/bulk/commit", request);
+            await RequireSuccessAsync(response);
+            BulkReviewCommitResponse result = await response.Content.ReadFromJsonAsync<BulkReviewCommitResponse>()
+                ?? throw new InvalidOperationException("The bulk commit response was empty.");
+            string noun = result.Action == "reject"
+                ? (result.AffectedCount == 1 ? "face rejection" : "face rejections")
+                : (result.AffectedCount == 1 ? "face assignment" : "face assignments");
+            Message = $"Committed {result.AffectedCount} {noun}.";
+            BulkNote = "";
+            await LoadFacesAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            BulkBusy = false;
         }
     }
 
@@ -193,7 +443,7 @@ else
         Message = null;
         try
         {
-            HttpResponseMessage response = await Http.PostAsJsonAsync(url, request);
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(url, request);
             await RequireSuccessAsync(response);
             Message = successMessage;
             await LoadFacesAsync();
@@ -215,6 +465,9 @@ else
         Offset += PageSize;
         await LoadFacesAsync();
     }
+
+    private static string? EmptyToNull(string value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static async Task RequireSuccessAsync(HttpResponseMessage response)
     {
