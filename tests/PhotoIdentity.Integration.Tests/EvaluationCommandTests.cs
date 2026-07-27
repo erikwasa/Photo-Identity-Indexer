@@ -193,7 +193,7 @@ public sealed class EvaluationCommandTests
               "expectedPersonId": null,
               "faceExpected": true,
               "faceDetected": true,
-              "embedding": [0.8, 0.6],
+              "embedding": [0.85, 0.5267827],
               "elapsedMilliseconds": 20.0
             }
           ],
