@@ -26,10 +26,9 @@ Expected evolution:
 ```text
 0.1 local inference and review
 0.2 OneDrive hydration and staging
-0.3 local acceptance and multi-model evaluation
-0.4 comprehensible operator and architecture documentation
-0.5 portable Azure execution without identities
-0.6 budget-controlled archive processing
-0.7 ongoing synchronisation
+0.3 multi-model evaluation
+0.4 portable Azure execution without identities
+0.5 budget-controlled archive processing
+0.6 ongoing synchronisation
 1.0 stable people index and collection API
 ```
