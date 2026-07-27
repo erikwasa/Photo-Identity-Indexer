@@ -106,6 +106,7 @@ $report = [ordered]@{
         hostedClient = "not_run"
         image = "not_run"
         mutation = "not_run"
+        bulkMutation = "not_run"
         cacheControl = "not_run"
     }
     manualVerificationRequired = ($Mode -eq "Interactive")
@@ -223,6 +224,44 @@ try {
         throw "Review assignment and undo did not restore the unreviewed state with audit history."
     }
     $report.smoke.mutation = "passed"
+
+    $bulkFaces = @($unreviewedFaces | Select-Object -First 2)
+    if ($bulkFaces.Count -ne 2) {
+        throw "Review verification catalogue did not contain two faces for bulk review."
+    }
+    $bulkFaceIds = @($bulkFaces | ForEach-Object { $_.id })
+    $bulkPreviewBody = @{
+        faceIds = $bulkFaceIds
+        action = "assign"
+        personId = $person.id
+    } | ConvertTo-Json -Depth 5
+    $bulkPreview = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/review/bulk/preview" `
+        -ContentType "application/json" -Body $bulkPreviewBody -TimeoutSec 10
+    if ($bulkPreview.affectedCount -ne 2 -or $bulkPreview.requestedCount -ne 2) {
+        throw "Bulk review preview did not report the expected affected count."
+    }
+    $bulkCommitBody = @{
+        faceIds = $bulkFaceIds
+        action = "assign"
+        personId = $person.id
+        expectedAffectedCount = $bulkPreview.affectedCount
+        previewToken = $bulkPreview.previewToken
+        confirm = $true
+        actor = "verification:bulk-smoke"
+        note = "Automated preview-first bulk assignment."
+    } | ConvertTo-Json -Depth 5
+    $bulkResult = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/review/bulk/commit" `
+        -ContentType "application/json" -Body $bulkCommitBody -TimeoutSec 10
+    if ($bulkResult.affectedCount -ne 2) {
+        throw "Bulk review commit did not apply the previewed affected count."
+    }
+    foreach ($bulkFace in $bulkFaces) {
+        $bulkDetails = Invoke-RestMethod -Uri "$baseUrl/api/review/faces/$($bulkFace.id)" -TimeoutSec 10
+        if ($bulkDetails.face.state -ne "assigned") {
+            throw "Bulk review did not persist an audited assignment for face $($bulkFace.id)."
+        }
+    }
+    $report.smoke.bulkMutation = "passed"
     $report.result = "passed"
 
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
@@ -237,9 +276,10 @@ try {
     Write-Host "`nManual checklist:"
     Write-Host "  1. Confirm the gallery has no horizontal page scrolling."
     Write-Host "  2. Create a person, assign a face, reject another, and undo one action."
-    Write-Host "  3. Restart the real catalogue host and confirm decisions persist."
-    Write-Host "  4. Open details and confirm no local filesystem path is displayed."
-    Write-Host "  5. On Pixel, confirm Assign, Reject, Undo and Back are comfortable to tap."
+    Write-Host "  3. Select several unreviewed faces and confirm the bulk affected count before commit."
+    Write-Host "  4. Restart the real catalogue host and confirm decisions persist."
+    Write-Host "  5. Open details and confirm no local filesystem path is displayed."
+    Write-Host "  6. On Pixel, confirm Assign, Reject, Undo, bulk preview and Back are comfortable to tap."
     Write-Host "Report: $reportPath"
 
     if ($Mode -eq "Interactive") {
