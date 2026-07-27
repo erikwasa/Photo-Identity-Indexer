@@ -7,7 +7,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class SqliteIdentityMatcherMigrationTests
 {
     [Fact]
-    public async Task Version_four_catalogue_adds_ranked_suggestion_schema_without_changing_existing_suggestions()
+    public async Task Version_four_catalogue_adds_ranked_and_reviewed_suggestion_schema_without_changing_existing_suggestions()
     {
         string directory = Path.Combine(
             Path.GetTempPath(),
@@ -79,8 +79,8 @@ public sealed class SqliteIdentityMatcherMigrationTests
             await database.InitializeAsync();
 
             await using SqliteConnection upgraded = await database.OpenConnectionAsync();
-            Assert.Equal(5, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
-            Assert.Equal(5, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM schema_migrations;"));
+            Assert.Equal(6, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
+            Assert.Equal(6, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM schema_migrations;"));
             Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM identity_suggestions;"));
             Assert.Equal(
                 1,
@@ -97,6 +97,16 @@ public sealed class SqliteIdentityMatcherMigrationTests
                 await ReadInt64Async(
                     upgraded,
                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ix_identity_suggestion_rankings_model';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    upgraded,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'identity_suggestion_review_actions';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    upgraded,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ix_identity_suggestion_review_history';"));
         }
         finally
         {
