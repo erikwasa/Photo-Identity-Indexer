@@ -1,0 +1,36 @@
+.face-card {
+    position: relative;
+}
+
+.face-card.bulk-selected {
+    outline: 3px solid rgba(11, 113, 104, 0.45);
+    outline-offset: 2px;
+}
+
+.face-selector {
+    position: absolute;
+    top: 0.65rem;
+    left: 0.65rem;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 44px;
+    padding: 0.55rem 0.7rem;
+    color: #fff;
+    background: rgba(23, 38, 41, 0.9);
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 14px rgba(16, 27, 29, 0.2);
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 750;
+}
+
+.face-selector input {
+    width: 1.2rem;
+    height: 1.2rem;
+    min-height: 1.2rem;
+    margin: 0;
+    padding: 0;
+    accent-color: #8ed2a3;
+}

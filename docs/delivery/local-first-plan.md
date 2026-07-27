@@ -23,7 +23,9 @@ Record only privacy-safe aggregate counts in the repository. Photos, names, crop
 
 ### WI-0027 — Complete the local review workflow
 
-Expose ranked suggestions in the browser and add the person-maintenance, bulk-review, progress and revision filters needed for sustained review on Windows and Pixel.
+Ranked suggestion display and decisions, durable rejected-pair exclusions, audited person maintenance and preview-first bulk review are implemented. The remaining workflow work is processing-run and model-revision filtering plus final Windows/Pixel usability and smoke verification.
+
+Bulk assignment and face rejection display affected and skipped counts before commit. Commits require the exact server-generated preview token and fail without partial changes when the eligible set becomes stale.
 
 ### WI-0028 — Export reviewed catalogues to model-lab
 

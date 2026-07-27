@@ -1,4 +1,15 @@
-<article class="face-card state-@Face.State">
+<article class="face-card state-@Face.State @(Selected ? "bulk-selected" : "")">
+    @if (Selectable)
+    {
+        <label class="face-selector">
+            <input type="checkbox"
+                   checked="@Selected"
+                   disabled="@Busy"
+                   @onchange="OnSelectionChangedAsync" />
+            <span>Select</span>
+        </label>
+    }
+
     <a class="face-image-link" href="/faces/@Face.Id" aria-label="Open details for @Face.PhotoName face @(Face.FaceOrdinal + 1)">
         <img class="face-image" src="@Face.ImageUrl" alt="Detected face from @Face.PhotoName" loading="lazy" />
     </a>
@@ -57,6 +68,15 @@
     public IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
 
     [Parameter]
+    public bool Selectable { get; set; }
+
+    [Parameter]
+    public bool Selected { get; set; }
+
+    [Parameter]
+    public EventCallback<(string FaceId, bool Selected)> SelectionChanged { get; set; }
+
+    [Parameter]
     public EventCallback<(string FaceId, string PersonId)> AssignRequested { get; set; }
 
     [Parameter]
@@ -81,6 +101,12 @@
         {
             SelectedPersonId = Face.Person.Id;
         }
+    }
+
+    private Task OnSelectionChangedAsync(ChangeEventArgs args)
+    {
+        bool selected = args.Value is bool value && value;
+        return SelectionChanged.InvokeAsync((Face.Id, selected));
     }
 
     private async Task AssignAsync()
