@@ -20,9 +20,9 @@ public sealed class SqliteCatalogueDatabaseTests
 
             Assert.True(File.Exists(databasePath));
             await using SqliteConnection connection = await database.OpenConnectionAsync();
-            Assert.Equal(4, await ReadInt64Async(connection, "PRAGMA user_version;"));
+            Assert.Equal(5, await ReadInt64Async(connection, "PRAGMA user_version;"));
             Assert.Equal(1, await ReadInt64Async(connection, "PRAGMA foreign_keys;"));
-            Assert.Equal(4, await ReadInt64Async(connection, "SELECT COUNT(*) FROM schema_migrations;"));
+            Assert.Equal(5, await ReadInt64Async(connection, "SELECT COUNT(*) FROM schema_migrations;"));
             Assert.Equal(
                 1,
                 await ReadInt64Async(
@@ -43,6 +43,16 @@ public sealed class SqliteCatalogueDatabaseTests
                 await ReadInt64Async(
                     connection,
                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'review_actions';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    connection,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'identity_suggestion_rankings';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    connection,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ix_identity_suggestion_rankings_model';"));
         }
         finally
         {
@@ -151,9 +161,14 @@ public sealed class SqliteCatalogueDatabaseTests
             await database.InitializeAsync();
 
             await using SqliteConnection upgraded = await database.OpenConnectionAsync();
-            Assert.Equal(4, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
+            Assert.Equal(5, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
             Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM assets;"));
             Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM processing_jobs;"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    upgraded,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'identity_suggestion_rankings';"));
             using SqliteCommand read = upgraded.CreateCommand();
             read.CommandText = """
                 SELECT asset.last_seen_at_utc, asset.deleted_at_utc, job.idempotency_key,

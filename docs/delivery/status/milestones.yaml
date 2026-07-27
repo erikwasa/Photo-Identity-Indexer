@@ -43,7 +43,7 @@ milestones:
   - WI-0015
 - id: M05
   title: Identity matching
-  status: ready
+  status: in_progress
   document: ../milestones/M05-identity-matching.md
   work_items:
   - WI-0016
@@ -55,7 +55,7 @@ milestones:
   - WI-0017
 - id: M07
   title: Portable job bundles
-  status: in_progress
+  status: completed
   document: ../milestones/M07-portable-bundles.md
   work_items:
   - WI-0018
@@ -67,7 +67,7 @@ milestones:
   - WI-0019
 - id: M09
   title: Azure VM pilot without identities
-  status: proposed
+  status: ready
   document: ../milestones/M09-azure-pilot.md
   work_items:
   - WI-0020

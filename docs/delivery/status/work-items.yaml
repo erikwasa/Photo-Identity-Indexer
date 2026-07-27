@@ -363,13 +363,18 @@ work_items:
   - id: WI-0016
     title: Add identity matcher
     milestone: M05
-    status: proposed
-    owner: unassigned
+    status: in_progress
+    owner: ai-agent
     document: ../work-items/WI-0016-matcher.md
+    started_at: '2026-07-27'
+    last_updated_at: '2026-07-27'
+    branch: agent/WI-0016-identity-matcher
     blockers:
       - WI-0009
       - WI-0015
-    evidence: []
+    evidence:
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/33
   - id: WI-0017
     title: Add evaluation harness
     milestone: M06
@@ -382,11 +387,14 @@ work_items:
   - id: WI-0018
     title: Add portable bundles
     milestone: M07
-    status: in_progress
+    status: completed
     owner: ai-agent
     document: ../work-items/WI-0018-portable-bundles.md
     started_at: '2026-07-26'
-    last_updated_at: '2026-07-26'
+    completed_at: '2026-07-27'
+    verified_at: '2026-07-27'
+    verified_by: human
+    last_updated_at: '2026-07-27'
     branch: agent/WI-0018-production-portable-cli
     blockers: []
     evidence:
@@ -402,6 +410,14 @@ work_items:
         value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/30
       - type: workflow
         value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30209633129
+      - type: merge_commit
+        value: 16c5d8e9bca30ae4ee0e905e1b7d937f2d9ba6d7
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/32
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30223294058
+      - type: merge_commit
+        value: 64e640e08ff6ca0355e7b662d650901c0a360dbf
   - id: WI-0019
     title: Add a second model adapter
     milestone: M08

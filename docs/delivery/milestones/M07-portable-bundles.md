@@ -22,14 +22,10 @@ A worker can process self-contained full-image, reduced-image or crop-only bundl
 - Changed revisions are rejected.
 - Canonical labels survive imports and reimports.
 
-## Current work
+## Completion
 
 Pull request [#29](https://github.com/erikwasa/Photo-Identity-Indexer/pull/29) established the model-independent transport and guarded import boundary. Pull request [#30](https://github.com/erikwasa/Photo-Identity-Indexer/pull/30) added production OpenCV, YuNet and SFace processing plus export, process and import commands.
 
-Automated round-trip tests cover every profile, corruption, stale and mismatched results, replay, and preservation of an existing human assignment. The maintainer has now exercised the production commands with ignored private media and confirmed that reimport is harmless and the human assignment remains canonical.
+Automated round-trip tests cover every profile, corruption, stale and mismatched results, replay, and preservation of an existing human assignment. The maintainer then exercised the production commands with ignored private media, confirmed that reimport was harmless and the human assignment remained canonical, retained only a privacy-safe aggregate summary, and removed the isolated private verification workspace plus temporary transfer artefacts.
 
-## Remaining milestone scope
-
-M07 remains in progress until a privacy-safe aggregate summary is retained and temporary job/result archives plus disposable processing directories are cleaned up according to an explicit local retention decision. The evidence must not contain private paths, photo content, crops, embeddings, hashes or revision identifiers.
-
-M04 completed independently on 2026-07-27 after successful Windows and Pixel trusted-network interaction verification for WI-0015.
+No private paths, photo content, crops, embeddings, hashes, bundle identifiers or revision identifiers were retained in the repository. WI-0018 and M07 completed on 2026-07-27.

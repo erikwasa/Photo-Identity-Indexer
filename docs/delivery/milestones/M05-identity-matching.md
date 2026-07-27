@@ -21,3 +21,11 @@ Confirmed examples generate ranked, model-versioned identity suggestions for unl
 - Rejected pairs are not immediately repeated.
 - Suggestions never become canonical labels automatically.
 - Only human-confirmed faces become exemplars.
+
+## Current work
+
+Draft pull request [#33](https://github.com/erikwasa/Photo-Identity-Indexer/pull/33) adds an exact local cosine matcher over one explicit embedding model revision. Current active human assignments and legacy `confirmed` labels provide exemplars; undone assignments, non-confirmed labels and merged people are excluded.
+
+Each target records at most the best and second-best distinct people in deterministic score order, including their score margin. Rejected face-person pairs remain durable exclusions, and regeneration does not write or alter canonical labels or review actions.
+
+The first implementation deliberately uses exact scanning to establish correctness. Approximate indexing, threshold calibration and measured false-accept/false-reject performance remain later work.
