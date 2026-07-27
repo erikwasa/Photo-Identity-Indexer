@@ -543,7 +543,7 @@ work_items:
     document: ../work-items/WI-0027-review-workflow.md
     started_at: '2026-07-27'
     last_updated_at: '2026-07-27'
-    branch: agent/WI-0027-person-maintenance
+    branch: agent/WI-0027-review-filters
     blockers:
       - WI-0015
       - WI-0016
@@ -562,17 +562,40 @@ work_items:
         value: 564b283ccdcdadf4f856bee92da062c14d9ac968
       - type: pull_request
         value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/38
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30285389258
+      - type: merge_commit
+        value: 9295869227bdc68e9bd968907dfc507f8c619310
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/39
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30291001128
+      - type: merge_commit
+        value: 343616667e05d55754254789b790e21f38cfde37
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/40
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30292297233
+      - type: merge_commit
+        value: cc457af530bf4ac9f7ad25b5166658229568602f
   - id: WI-0028
     title: Export reviewed catalogues to model-lab
     milestone: M06
-    status: ready
-    owner: unassigned
+    status: in_review
+    owner: ai-agent
     document: ../work-items/WI-0028-catalogue-evaluation-export.md
+    started_at: '2026-07-27'
+    last_updated_at: '2026-07-27'
+    branch: agent/WI-0028-catalogue-evaluation-export
     blockers:
       - WI-0013
       - WI-0015
       - WI-0017
-    evidence: []
+    evidence:
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/41
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30295161772
   - id: WI-0029
     title: Run a 500-image local acceptance pilot
     milestone: M06
