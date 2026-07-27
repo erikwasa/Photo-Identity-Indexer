@@ -31,9 +31,11 @@ The progress view combines review state, processing-run scope and exact ranked-s
 
 ### WI-0028 — Export reviewed catalogues to model-lab
 
-Generate deterministic gallery, validation and held-out test manifests directly from the reviewed SQLite catalogue. This closes the current gap between operational review data and the evaluation harness.
+Deterministic catalogue export is implemented for exact detector and embedder revisions with either processing-run or explicit asset-revision scope. A required recorded seed assigns whole immutable source revisions to gallery, validation or test, preventing photo and face leakage.
 
-These two items can proceed in parallel.
+The manifest uses only active human assignments. Known samples belong to gallery people; unknown samples are human-assigned faces whose people are absent from the gallery. It records model and source revision hashes, pipeline version, split configuration and a canonical catalogue-input digest without source roots or crop paths.
+
+WI-0027 and WI-0028 remain in review and will be exercised together against the private 500-image pilot catalogue on Windows and Pixel before either is marked complete.
 
 ### WI-0029 — Run a 500-image local acceptance pilot
 
