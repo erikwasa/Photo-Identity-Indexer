@@ -21,8 +21,8 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Recently completed
 
-- [**WI-0016 — Add identity matcher**](../work-items/WI-0016-matcher.md) — `completed`; owner: `ai-agent`
 - [**WI-0018 — Add portable bundles**](../work-items/WI-0018-portable-bundles.md) — `completed`; owner: `ai-agent`
+- [**WI-0016 — Add identity matcher**](../work-items/WI-0016-matcher.md) — `completed`; owner: `ai-agent`
 - [**WI-0015 — Build minimal review application**](../work-items/WI-0015-review-ui.md) — `completed`; owner: `ai-agent`
 
 ## Next ready work
