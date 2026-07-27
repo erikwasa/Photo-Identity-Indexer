@@ -20,7 +20,7 @@ These items are intentionally parallel. WI-0029, the 500-image local acceptance 
 ## Planning branch
 
 - Branch: `agent/local-first-delivery-plan`
-- Pull request: pending creation
+- Pull request: [#35 — Replan delivery around local acceptance](https://github.com/erikwasa/Photo-Identity-Indexer/pull/35)
 
 ## Delivery objective
 
