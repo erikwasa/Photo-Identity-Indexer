@@ -24,7 +24,7 @@ Detector and identification models can be compared reproducibly using fixed gall
 
 ## Current work
 
-Draft pull request [#34](https://github.com/erikwasa/Photo-Identity-Indexer/pull/34) adds the schema-versioned model-lab manifest, deterministic `evaluate` command, validation-only threshold policy, held-out test report, confusion rows, throughput and optional archive projections.
+Pull request [#34](https://github.com/erikwasa/Photo-Identity-Indexer/pull/34) adds the schema-versioned model-lab manifest, deterministic `evaluate` command, validation-only threshold policy, held-out test report, confusion rows, throughput and optional archive projections. GitHub Actions run `30254226939` passed the full repository workflow on the review-ready implementation.
 
 The checked-in fixture is synthetic. Real evaluation manifests, embeddings, reports and identity identifiers remain sensitive local data and must not be committed.
 
