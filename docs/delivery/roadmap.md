@@ -9,8 +9,8 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M02 | Local catalogue and jobs | completed |
 | M03 | OneDrive synchronised source | completed |
 | M04 | Minimal review application | completed |
-| M05 | Identity matching | in_progress |
-| M06 | Evaluation harness | proposed |
+| M05 | Identity matching | completed |
+| M06 | Evaluation harness | in_progress |
 | M07 | Portable job bundles | completed |
 | M08 | Second model | proposed |
 | M09 | Azure VM pilot without identities | ready |
