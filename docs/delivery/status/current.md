@@ -10,12 +10,12 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M03 — OneDrive synchronised source**: `completed`
 - **M04 — Minimal review application**: `completed`
 - **M05 — Identity matching**: `completed`
-- **M06 — Local evaluation and acceptance**: `ready`
+- **M06 — Local evaluation and acceptance**: `in_progress`
 - **M07 — Portable job bundles**: `completed`
 
 ## Active work
 
-None.
+- [**WI-0027 — Complete the local review workflow**](../work-items/WI-0027-review-workflow.md) — `in_review`; owner: `ai-agent`
 
 ## Recently completed
 
@@ -25,5 +25,4 @@ None.
 
 ## Next ready work
 
-- [**WI-0027 — Complete the local review workflow**](../work-items/WI-0027-review-workflow.md) — `ready`; owner: `unassigned`
 - [**WI-0028 — Export reviewed catalogues to model-lab**](../work-items/WI-0028-catalogue-evaluation-export.md) — `ready`; owner: `unassigned`
