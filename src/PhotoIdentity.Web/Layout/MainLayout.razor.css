@@ -1,0 +1,38 @@
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.65rem;
+}
+
+.topbar-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.55rem 0.75rem;
+    color: #e8f0ec;
+    border-radius: 0.7rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.topbar-link:hover,
+.topbar-link:focus-visible {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 680px) {
+    .topbar {
+        align-items: flex-start;
+    }
+
+    .topbar-actions {
+        flex-wrap: wrap;
+        gap: 0.35rem;
+    }
+
+    .privacy-pill {
+        width: 100%;
+        justify-content: center;
+    }
+}
