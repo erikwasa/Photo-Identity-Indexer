@@ -14,7 +14,8 @@ public static class ReviewSuggestionEndpoints
 
     private static async Task<IResult> GetSuggestionsAsync(
         string id,
-        SqliteReviewSuggestionRepository repository,
+        SqliteReviewRepository reviewRepository,
+        SqliteReviewSuggestionRepository suggestionRepository,
         CancellationToken cancellationToken)
     {
         if (!TryFaceOccurrenceId(id, out FaceOccurrenceId faceOccurrenceId))
@@ -22,8 +23,16 @@ public static class ReviewSuggestionEndpoints
             return Results.BadRequest(new { error = "The face occurrence identifier is invalid." });
         }
 
+        CatalogueReviewFace? face = await reviewRepository.GetFaceAsync(
+            faceOccurrenceId,
+            cancellationToken);
+        if (face is null)
+        {
+            return Results.NotFound();
+        }
+
         IReadOnlyList<CatalogueReviewIdentitySuggestion> suggestions =
-            await repository.GetSuggestionsAsync(faceOccurrenceId, cancellationToken);
+            await suggestionRepository.GetSuggestionsAsync(faceOccurrenceId, cancellationToken);
         return Results.Ok(suggestions.Select(ToResponse).ToArray());
     }
 
