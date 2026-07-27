@@ -18,7 +18,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M11 | Production model selection | proposed |
 | M12 | Full archive processing | proposed |
 | M13 | Ongoing local synchronisation | proposed |
-| M14 | Collection-ready API | proposed |
+| M14 | Collection-ready API | ready |
 
 Expected evolution:
 
