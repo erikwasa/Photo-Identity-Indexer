@@ -50,12 +50,21 @@ else if (Details is not null)
         </section>
     </div>
 
+    @if (!string.IsNullOrWhiteSpace(ActionError))
+    {
+        <div class="notice error review-notice" role="alert">@ActionError</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <div class="notice success review-notice" role="status">@Message</div>
+    }
+
     <section class="audit-section">
         <div class="section-heading">
             <div>
                 <p class="eyebrow">Advisory model output</p>
                 <h2>Ranked identity suggestions</h2>
-                <p class="suggestion-guidance">Scores never create a label. Identity acceptance remains an explicit human review action.</p>
+                <p class="suggestion-guidance">Scores never create a label. Accepting a suggestion is an explicit human assignment. Rejected face-person pairs remain excluded when suggestions are regenerated.</p>
             </div>
             <span>@Suggestions.Count suggestion@(Suggestions.Count == 1 ? "" : "s")</span>
         </div>
@@ -71,7 +80,7 @@ else if (Details is not null)
                 {
                     <li>
                         <div class="timeline-marker" aria-hidden="true"></div>
-                        <div>
+                        <div class="suggestion-content">
                             <div class="timeline-title">
                                 <strong>Rank @suggestion.Rank · @suggestion.Person.DisplayName</strong>
                                 <span class="state-badge">@SuggestionStatusLabel(suggestion.Status)</span>
@@ -80,6 +89,50 @@ else if (Details is not null)
                             <p>Model <code>@suggestion.ModelId</code></p>
                             <p>Exact revision <code class="model-revision">@suggestion.ModelHash</code></p>
                             <p>Generated @suggestion.GeneratedAtUtc.ToLocalTime().ToString("g")</p>
+
+                            @if (suggestion.LatestAction is not null)
+                            {
+                                <div class="suggestion-decision">
+                                    <strong>@SuggestionActionLabel(suggestion.LatestAction)</strong>
+                                    <p>@suggestion.LatestAction.Actor · @suggestion.LatestAction.CreatedAtUtc.ToLocalTime().ToString("g")</p>
+                                    @if (!string.IsNullOrWhiteSpace(suggestion.LatestAction.Note))
+                                    {
+                                        <blockquote>@suggestion.LatestAction.Note</blockquote>
+                                    }
+                                </div>
+                            }
+
+                            @if (string.Equals(suggestion.Status, "pending", StringComparison.Ordinal))
+                            {
+                                <div class="suggestion-actions">
+                                    @if (ConfirmingRejectSuggestionId == suggestion.Id)
+                                    {
+                                        <button class="button danger"
+                                                disabled="@(ActingSuggestionId is not null)"
+                                                @onclick="() => RejectSuggestionAsync(suggestion.Id)">
+                                            Confirm rejection
+                                        </button>
+                                        <button class="button secondary"
+                                                disabled="@(ActingSuggestionId is not null)"
+                                                @onclick="CancelRejectConfirmation">
+                                            Cancel
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="button primary"
+                                                disabled="@(!CanReviewSuggestions)"
+                                                @onclick="() => AcceptSuggestionAsync(suggestion.Id, suggestion.Person.DisplayName)">
+                                            Accept as @suggestion.Person.DisplayName
+                                        </button>
+                                        <button class="button danger"
+                                                disabled="@(!CanReviewSuggestions)"
+                                                @onclick="() => ConfirmReject(suggestion.Id)">
+                                            Reject match
+                                        </button>
+                                    }
+                                </div>
+                            }
                         </div>
                     </li>
                 }
@@ -129,13 +182,22 @@ else if (Details is not null)
 }
 
 @code {
+    private const string Actor = "local-reviewer";
+
     [Parameter]
     public string Id { get; set; } = "";
 
     private ReviewFaceDetailsResponse? Details { get; set; }
     private IReadOnlyList<ReviewIdentitySuggestionResponse> Suggestions { get; set; } = [];
     private bool Loading { get; set; } = true;
+    private long? ActingSuggestionId { get; set; }
+    private long? ConfirmingRejectSuggestionId { get; set; }
     private string? Error { get; set; }
+    private string? ActionError { get; set; }
+    private string? Message { get; set; }
+
+    private bool CanReviewSuggestions =>
+        ActingSuggestionId is null && string.Equals(Details?.Face.State, "unreviewed", StringComparison.Ordinal);
 
     private string StateLabel => Details?.Face.State switch
     {
@@ -156,20 +218,13 @@ else if (Details is not null)
     {
         Loading = true;
         Error = null;
+        ActionError = null;
+        Message = null;
+        ConfirmingRejectSuggestionId = null;
         Suggestions = [];
         try
         {
-            string escapedId = Uri.EscapeDataString(Id);
-            Details = await Http.GetFromJsonAsync<ReviewFaceDetailsResponse>(
-                $"api/review/faces/{escapedId}");
-            if (Details is null)
-            {
-                Error = "The face occurrence was not found.";
-                return;
-            }
-
-            Suggestions = await Http.GetFromJsonAsync<ReviewIdentitySuggestionResponse[]>(
-                $"api/review/faces/{escapedId}/suggestions") ?? [];
+            await RefreshAsync();
         }
         catch (Exception exception)
         {
@@ -181,11 +236,103 @@ else if (Details is not null)
         }
     }
 
+    private async Task RefreshAsync()
+    {
+        string escapedId = Uri.EscapeDataString(Id);
+        Details = await Http.GetFromJsonAsync<ReviewFaceDetailsResponse>(
+            $"api/review/faces/{escapedId}");
+        if (Details is null)
+        {
+            throw new InvalidOperationException("The face occurrence was not found.");
+        }
+
+        Suggestions = await Http.GetFromJsonAsync<ReviewIdentitySuggestionResponse[]>(
+            $"api/review/faces/{escapedId}/suggestions") ?? [];
+    }
+
+    private async Task AcceptSuggestionAsync(long suggestionId, string displayName)
+    {
+        await ApplySuggestionDecisionAsync(
+            suggestionId,
+            "accept",
+            $"Assigned this face to {displayName}.");
+    }
+
+    private void ConfirmReject(long suggestionId)
+    {
+        ActionError = null;
+        Message = null;
+        ConfirmingRejectSuggestionId = suggestionId;
+    }
+
+    private void CancelRejectConfirmation()
+    {
+        ConfirmingRejectSuggestionId = null;
+    }
+
+    private async Task RejectSuggestionAsync(long suggestionId)
+    {
+        await ApplySuggestionDecisionAsync(
+            suggestionId,
+            "reject",
+            "Rejected face-person pair saved and excluded from future matcher regeneration.");
+    }
+
+    private async Task ApplySuggestionDecisionAsync(
+        long suggestionId,
+        string decision,
+        string successMessage)
+    {
+        ActingSuggestionId = suggestionId;
+        ActionError = null;
+        Message = null;
+        try
+        {
+            string escapedId = Uri.EscapeDataString(Id);
+            HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/review/faces/{escapedId}/suggestions/{suggestionId}/{decision}",
+                new ReviewSuggestionActionRequest(Actor));
+            await RequireSuccessAsync(response);
+            await RefreshAsync();
+            Message = successMessage;
+        }
+        catch (Exception exception)
+        {
+            ActionError = exception.Message;
+        }
+        finally
+        {
+            ActingSuggestionId = null;
+            ConfirmingRejectSuggestionId = null;
+        }
+    }
+
+    private static async Task RequireSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string detail = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(detail)
+                ? $"The suggestion review failed with status {(int)response.StatusCode}."
+                : detail);
+    }
+
     private static string ActionLabel(ReviewActionResponse action) => action.Kind switch
     {
         "assign" when action.Person is not null => $"Assigned to {action.Person.DisplayName}",
         "reject" => "Rejected face",
         "undo" when action.ReversesActionId is long id => $"Undid action #{id}",
+        _ => action.Kind,
+    };
+
+    private static string SuggestionActionLabel(ReviewSuggestionActionResponse action) => action.Kind switch
+    {
+        "accept" => "Accepted suggestion",
+        "reject" => "Rejected match",
         _ => action.Kind,
     };
 
