@@ -1,0 +1,315 @@
+@page "/people"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Maintain people · Photo Identity</PageTitle>
+
+<section class="hero people-hero">
+    <div>
+        <p class="eyebrow">Canonical identity maintenance</p>
+        <h1>Maintain people</h1>
+        <p>Rename a person with reversible audit history, or consolidate duplicates with an explicitly irreversible merge.</p>
+    </div>
+
+    <div class="person-creator">
+        <label class="field-label" for="new-person-maintenance">Create person</label>
+        <div class="inline-field">
+            <input id="new-person-maintenance"
+                   placeholder="Display name"
+                   maxlength="200"
+                   @bind="NewPersonName"
+                   @bind:event="oninput" />
+            <button class="button primary"
+                    disabled="@(string.IsNullOrWhiteSpace(NewPersonName) || Busy)"
+                    @onclick="CreatePersonAsync">
+                Add
+            </button>
+        </div>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="notice success" role="status">@Message</div>
+}
+
+@if (Loading)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading people and maintenance history…</p>
+    </section>
+}
+else if (People.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No active people</h2>
+        <p>Create the first person before assigning or maintaining identities.</p>
+    </section>
+}
+else
+{
+    <section class="people-summary" aria-label="Active people">
+        @foreach (PersonMaintenancePersonResponse person in People)
+        {
+            <article class="person-summary-card">
+                <strong>@person.DisplayName</strong>
+                <span>@person.LabelCount label@(person.LabelCount == 1 ? "" : "s")</span>
+                <span>@person.SuggestionCount suggestion@(person.SuggestionCount == 1 ? "" : "s")</span>
+            </article>
+        }
+    </section>
+
+    <div class="maintenance-grid">
+        <section class="maintenance-card">
+            <p class="eyebrow">Reversible operation</p>
+            <h2>Rename person</h2>
+            <p>Every rename stores both names. Restore an earlier name by applying another audited rename.</p>
+
+            <label class="field-label" for="person-to-maintain">Person</label>
+            <select id="person-to-maintain" @bind="SelectedPersonId" @bind:after="SelectedPersonChanged">
+                @foreach (PersonMaintenancePersonResponse person in People)
+                {
+                    <option value="@person.Id">@person.DisplayName</option>
+                }
+            </select>
+
+            <label class="field-label spaced" for="rename-person">New display name</label>
+            <input id="rename-person"
+                   maxlength="200"
+                   @bind="RenameDisplayName"
+                   @bind:event="oninput" />
+
+            <label class="field-label spaced" for="maintenance-note">Audit note</label>
+            <input id="maintenance-note"
+                   maxlength="1000"
+                   placeholder="Optional reason"
+                   @bind="Note"
+                   @bind:event="oninput" />
+
+            <button class="button primary full-width"
+                    disabled="@(Busy || string.IsNullOrWhiteSpace(RenameDisplayName) || SelectedPerson is null || RenameDisplayName.Trim() == SelectedPerson.DisplayName)"
+                    @onclick="RenameAsync">
+                Save audited rename
+            </button>
+        </section>
+
+        <section class="maintenance-card danger-zone">
+            <p class="eyebrow">Irreversible operation</p>
+            <h2>Merge duplicate people</h2>
+            <p>Labels, reviewed assignments and suggestions move to the surviving person. The source person is permanently retired.</p>
+
+            <label class="field-label" for="merge-target">Surviving person</label>
+            <select id="merge-target" @bind="MergeTargetId" disabled="@(MergeTargets.Count == 0)">
+                @foreach (PersonMaintenancePersonResponse person in MergeTargets)
+                {
+                    <option value="@person.Id">@person.DisplayName</option>
+                }
+            </select>
+
+            <label class="confirmation-row">
+                <input type="checkbox" @bind="ConfirmMerge" />
+                <span>I understand that merging <strong>@(SelectedPerson?.DisplayName ?? "this person")</strong> is irreversible.</span>
+            </label>
+
+            <button class="button danger full-width"
+                    disabled="@(Busy || !ConfirmMerge || string.IsNullOrWhiteSpace(MergeTargetId) || MergeTargets.Count == 0)"
+                    @onclick="MergeAsync">
+                Merge into @MergeTargetName
+            </button>
+        </section>
+    </div>
+
+    <section class="audit-section person-history">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Append-only audit trail</p>
+                <h2>Person maintenance history</h2>
+            </div>
+            <span>@History.Count action@(History.Count == 1 ? "" : "s")</span>
+        </div>
+
+        @if (History.Count == 0)
+        {
+            <div class="empty-state compact"><p>No person maintenance actions have been recorded.</p></div>
+        }
+        else
+        {
+            <ol class="timeline">
+                @foreach (PersonMaintenanceActionResponse action in History)
+                {
+                    <li>
+                        <div class="timeline-marker" aria-hidden="true"></div>
+                        <div>
+                            <div class="timeline-title">
+                                <strong>@ActionLabel(action)</strong>
+                                <span class="state-badge">@(action.Reversible ? "Reversible" : "Irreversible")</span>
+                            </div>
+                            <p>@action.Actor · @action.CreatedAtUtc.ToLocalTime().ToString("g")</p>
+                            @if (!string.IsNullOrWhiteSpace(action.Note))
+                            {
+                                <blockquote>@action.Note</blockquote>
+                            }
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+    </section>
+}
+
+@code {
+    private const string Actor = "local-reviewer";
+
+    private IReadOnlyList<PersonMaintenancePersonResponse> People { get; set; } = [];
+    private IReadOnlyList<PersonMaintenanceActionResponse> History { get; set; } = [];
+    private string SelectedPersonId { get; set; } = "";
+    private string RenameDisplayName { get; set; } = "";
+    private string MergeTargetId { get; set; } = "";
+    private string NewPersonName { get; set; } = "";
+    private string Note { get; set; } = "";
+    private bool ConfirmMerge { get; set; }
+    private bool Loading { get; set; } = true;
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    private PersonMaintenancePersonResponse? SelectedPerson =>
+        People.FirstOrDefault(person => person.Id == SelectedPersonId);
+
+    private IReadOnlyList<PersonMaintenancePersonResponse> MergeTargets =>
+        People.Where(person => person.Id != SelectedPersonId).ToArray();
+
+    private string MergeTargetName =>
+        MergeTargets.FirstOrDefault(person => person.Id == MergeTargetId)?.DisplayName ?? "selected person";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            People = await Http.GetFromJsonAsync<PersonMaintenancePersonResponse[]>(
+                "api/review/people/maintenance") ?? [];
+            History = await Http.GetFromJsonAsync<PersonMaintenanceActionResponse[]>(
+                "api/review/people/maintenance/history?limit=100") ?? [];
+            ResetSelection();
+        }
+        catch (Exception exception)
+        {
+            Error = $"Person maintenance could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private void ResetSelection()
+    {
+        if (People.All(person => person.Id != SelectedPersonId))
+        {
+            SelectedPersonId = People.FirstOrDefault()?.Id ?? "";
+        }
+
+        SelectedPersonChanged();
+    }
+
+    private void SelectedPersonChanged()
+    {
+        RenameDisplayName = SelectedPerson?.DisplayName ?? "";
+        MergeTargetId = MergeTargets.FirstOrDefault()?.Id ?? "";
+        ConfirmMerge = false;
+    }
+
+    private async Task CreatePersonAsync()
+    {
+        string createdName = NewPersonName.Trim();
+        await ApplyAsync(
+            () => Http.PostAsJsonAsync("api/review/people", new CreatePersonRequest(createdName)),
+            $"Created {createdName}.");
+        NewPersonName = "";
+    }
+
+    private async Task RenameAsync()
+    {
+        string personId = SelectedPersonId;
+        string renamedTo = RenameDisplayName.Trim();
+        await ApplyAsync(
+            () => Http.PostAsJsonAsync(
+                $"api/review/people/{Uri.EscapeDataString(personId)}/rename",
+                new RenamePersonRequest(renamedTo, Actor, EmptyToNull(Note))),
+            $"Renamed person to {renamedTo}.");
+    }
+
+    private async Task MergeAsync()
+    {
+        string sourceName = SelectedPerson?.DisplayName ?? "Person";
+        string targetId = MergeTargetId;
+        string targetName = MergeTargetName;
+        await ApplyAsync(
+            () => Http.PostAsJsonAsync(
+                $"api/review/people/{Uri.EscapeDataString(SelectedPersonId)}/merge",
+                new MergePersonRequest(targetId, ConfirmMerge, Actor, EmptyToNull(Note))),
+            $"Merged {sourceName} into {targetName}.");
+        SelectedPersonId = targetId;
+    }
+
+    private async Task ApplyAsync(
+        Func<Task<HttpResponseMessage>> sendAsync,
+        string successMessage)
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await sendAsync();
+            await RequireSuccessAsync(response);
+            Message = successMessage;
+            Note = "";
+            await ReloadAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private static string ActionLabel(PersonMaintenanceActionResponse action) => action.Kind switch
+    {
+        "rename" => $"Renamed {action.PreviousDisplayName} to {action.NewDisplayName}",
+        "merge" => $"Merged {action.PreviousDisplayName} into {action.NewDisplayName}",
+        _ => action.Kind,
+    };
+
+    private static string? EmptyToNull(string value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static async Task RequireSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string detail = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(detail)
+                ? $"The person maintenance action failed with status {(int)response.StatusCode}."
+                : detail);
+    }
+}
