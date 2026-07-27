@@ -56,7 +56,33 @@ public sealed record ReviewFaceDetailsResponse(
     string RevisionHashPrefix,
     IReadOnlyList<ReviewActionResponse> Actions);
 
+public sealed record PersonMaintenancePersonResponse(
+    string Id,
+    string DisplayName,
+    int LabelCount,
+    int SuggestionCount);
+
+public sealed record PersonMaintenanceActionResponse(
+    long Id,
+    string Kind,
+    string PersonId,
+    string PreviousDisplayName,
+    string? TargetPersonId,
+    string NewDisplayName,
+    string Actor,
+    string? Note,
+    DateTimeOffset CreatedAtUtc,
+    bool Reversible);
+
 public sealed record CreatePersonRequest(string DisplayName);
+
+public sealed record RenamePersonRequest(string DisplayName, string Actor, string? Note = null);
+
+public sealed record MergePersonRequest(
+    string TargetPersonId,
+    bool ConfirmIrreversible,
+    string Actor,
+    string? Note = null);
 
 public sealed record AssignFaceRequest(string PersonId, string Actor, string? Note = null);
 
