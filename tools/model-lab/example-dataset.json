@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "synthetic-example",
+  "pipelineVersion": "pipeline-v1",
+  "detector": {
+    "modelId": "yunet",
+    "modelHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "embedder": {
+    "modelId": "sface",
+    "modelHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "dimensions": 2
+  },
+  "thresholds": [0.5, 0.8, 0.95],
+  "gallery": [
+    {
+      "faceId": "gallery-person-1",
+      "personId": "person-1",
+      "embedding": [1.0, 0.0]
+    },
+    {
+      "faceId": "gallery-person-2",
+      "personId": "person-2",
+      "embedding": [0.0, 1.0]
+    }
+  ],
+  "validation": [
+    {
+      "sampleId": "validation-known-1",
+      "expectedPersonId": "person-1",
+      "faceExpected": true,
+      "faceDetected": true,
+      "embedding": [0.9, 0.4358899],
+      "elapsedMilliseconds": 20.0
+    },
+    {
+      "sampleId": "validation-known-2",
+      "expectedPersonId": "person-2",
+      "faceExpected": true,
+      "faceDetected": true,
+      "embedding": [0.1, 0.9949874],
+      "elapsedMilliseconds": 20.0
+    },
+    {
+      "sampleId": "validation-unknown-1",
+      "expectedPersonId": null,
+      "faceExpected": true,
+      "faceDetected": true,
+      "embedding": [0.8, 0.6],
+      "elapsedMilliseconds": 20.0
+    }
+  ],
+  "test": [
+    {
+      "sampleId": "test-known-1",
+      "expectedPersonId": "person-1",
+      "faceExpected": true,
+      "faceDetected": true,
+      "embedding": [0.92, 0.3919184],
+      "elapsedMilliseconds": 25.0
+    },
+    {
+      "sampleId": "test-unknown-1",
+      "expectedPersonId": null,
+      "faceExpected": true,
+      "faceDetected": true,
+      "embedding": [0.7, 0.7141428],
+      "elapsedMilliseconds": 25.0
+    }
+  ]
+}
