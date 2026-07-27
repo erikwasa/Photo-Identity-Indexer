@@ -69,6 +69,10 @@ public static class Program
                     output,
                     error,
                     cancellationToken),
+                "match" => await MatchCommandRunner.RunAsync(
+                    MatchCommandOptions.Parse(args.Skip(1).ToArray()),
+                    output,
+                    cancellationToken),
                 _ => UnknownCommand(args[0], error),
             };
         }
@@ -131,6 +135,9 @@ public static class Program
                            [--confidence 0..1] [--padding RATIO]
                            [--overwrite] [--verbose]
 
+              match regenerate --database PATH --embedder-id ID
+                               --embedder-hash SHA256
+
             Batch start scans a local folder, creates durable jobs for each current
             immutable revision and runs the production inspection pipeline until idle.
             Batch resume reconstructs the saved configuration and continues due work.
@@ -159,6 +166,10 @@ public static class Program
             five-point SFace alignment and embeddings. It writes an annotated SVG,
             per-face outputs, a reproducibility manifest and detailed timings without
             modifying the source image.
+
+            Match regenerate rebuilds ranked suggestions for one exact embedding model
+            revision. It uses current human-confirmed exemplars, preserves rejected
+            face-person exclusions and never creates or changes canonical labels.
             """);
     }
 }
