@@ -13,6 +13,7 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M06 — Evaluation harness**: `in_progress`
 - **M07 — Portable job bundles**: `completed`
 - **M09 — Azure VM pilot without identities**: `ready`
+- **M14 — Collection-ready API**: `ready`
 
 ## Active work
 
@@ -27,3 +28,4 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 ## Next ready work
 
 - [**WI-0020 — Run Azure VM pilot**](../work-items/WI-0020-azure-pilot.md) — `proposed`; owner: `unassigned`
+- [**WI-0025 — Add collection-ready queries**](../work-items/WI-0025-collection-api.md) — `proposed`; owner: `unassigned`
