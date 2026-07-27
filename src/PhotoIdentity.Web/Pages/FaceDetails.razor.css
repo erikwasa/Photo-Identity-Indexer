@@ -1,5 +1,5 @@
 .suggestion-guidance {
-    max-width: 46rem;
+    max-width: 52rem;
     margin: 0.35rem 0 0;
     color: var(--muted);
     line-height: 1.5;
@@ -8,4 +8,47 @@
 .model-revision {
     overflow-wrap: anywhere;
     word-break: break-all;
+}
+
+.review-notice {
+    margin-top: 1rem;
+    margin-bottom: 0;
+}
+
+.suggestion-content {
+    min-width: 0;
+}
+
+.suggestion-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 0.85rem;
+}
+
+.suggestion-decision {
+    margin-top: 0.85rem;
+    padding: 0.8rem;
+    background: #f1f0ea;
+    border: 1px solid #d9d6cc;
+    border-radius: 0.8rem;
+}
+
+.suggestion-decision p {
+    margin: 0.25rem 0 0;
+}
+
+.suggestion-decision blockquote {
+    margin-bottom: 0;
+}
+
+@media (max-width: 620px) {
+    .suggestion-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .suggestion-actions .button {
+        width: 100%;
+    }
 }
