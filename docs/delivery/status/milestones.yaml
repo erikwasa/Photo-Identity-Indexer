@@ -97,7 +97,7 @@ milestones:
   - WI-0024
 - id: M14
   title: Collection-ready API
-  status: proposed
+  status: ready
   document: ../milestones/M14-collection-api.md
   work_items:
   - WI-0025
