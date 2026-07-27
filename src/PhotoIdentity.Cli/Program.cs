@@ -53,6 +53,12 @@ public static class Program
                     output,
                     error,
                     cancellationToken),
+                "evaluate" when args.Length > 1 && args[1] == "export" =>
+                    await CatalogueEvaluationExportCommandRunner.RunAsync(
+                        CatalogueEvaluationExportCommandOptions.Parse(args.Skip(2).ToArray()),
+                        output,
+                        error,
+                        cancellationToken),
                 "evaluate" => await EvaluationCommandRunner.RunAsync(
                     EvaluationCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
@@ -107,6 +113,16 @@ public static class Program
               decode --input PATH --output PATH [--report PATH]
                      [--max-width PIXELS --max-height PIXELS] [--verbose]
 
+              evaluate export --database PATH --output PATH --dataset-id ID
+                              --pipeline-version VERSION --detector-id ID
+                              --detector-hash SHA256 --embedder-id ID
+                              --embedder-hash SHA256 --seed VALUE
+                              (--run RUN_ID | --revision REVISION_ID [...])
+                              [--gallery-per-person COUNT]
+                              [--validation-known-per-person COUNT]
+                              [--test-known-per-person COUNT]
+                              [--validation-unknown COUNT] [--test-unknown COUNT]
+                              [--threshold SCORE ...]
               evaluate --dataset PATH [--output PATH]
                        [--archive-images COUNT]
                        [--hourly-cost AMOUNT] [--currency CODE]
@@ -123,7 +139,7 @@ public static class Program
 
             Bundle export verifies a canonical immutable revision and writes a portable
             full-image, reduced-image or aligned face-crop job. Face-crop exports require
-            each human-facing one-based face number, for example --crop 3=C:\\Crops\\face.png,
+            each human-facing one-based face number, for example --crop 3=C:\Crops\face.png,
             so returned embeddings retain the canonical occurrence ordinal. Bundle process
             runs the database-free OpenCV, YuNet and SFace worker using settings stored in
             the job. Bundle import verifies the exact job/result pair and revision hash
@@ -133,10 +149,11 @@ public static class Program
             The decode command reads JPEG or PNG content, applies EXIF orientation,
             optionally downsizes it, and writes a normalised PNG without modifying the input.
 
-            The evaluate command reads a split evaluation manifest. It chooses an identity
-            threshold from validation data only, evaluates the held-out test split, and writes
-            a deterministic report with detector recall, identification precision, unknown
-            rejection, confusion, model provenance, throughput and optional archive projections.
+            Evaluate export reads only human-assigned catalogue faces for exact detector and
+            embedder revisions. A required seed assigns whole source revisions to gallery,
+            validation or test, preventing photo leakage and recording input provenance.
+            The evaluate command selects a threshold from validation data only and reports
+            held-out identity metrics, model provenance, throughput and optional projections.
 
             The inspect command composes decoding, YuNet detection, padded crops,
             five-point SFace alignment and embeddings. It writes an annotated SVG,
