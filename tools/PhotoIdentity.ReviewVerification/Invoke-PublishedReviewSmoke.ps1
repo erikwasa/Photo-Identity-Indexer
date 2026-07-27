@@ -17,6 +17,16 @@ function Invoke-JsonPost {
         -Body ($Body | ConvertTo-Json -Depth 6) -TimeoutSec 10
 }
 
+function ConvertTo-ObjectArray {
+    param([AllowNull()] $Value)
+
+    $items = [System.Collections.Generic.List[object]]::new()
+    foreach ($item in $Value) {
+        $items.Add($item)
+    }
+    return $items.ToArray()
+}
+
 function Get-RequiredItemById {
     param(
         [Parameter(Mandatory)] [object[]] $Items,
@@ -155,9 +165,10 @@ foreach ($bulkFaceId in $bulkFaceIds) {
 }
 $smoke.bulkMutation = "passed"
 
-$acceptSuggestions = @(Invoke-RestMethod `
+$acceptResponse = Invoke-RestMethod `
     -Uri "$BaseUrl/api/review/faces/$($Manifest.SuggestionAcceptFaceId)/suggestions" `
-    -TimeoutSec 10)
+    -TimeoutSec 10
+$acceptSuggestions = @(ConvertTo-ObjectArray -Value $acceptResponse)
 $acceptSuggestion = $acceptSuggestions | Where-Object { $_.status -eq "pending" } |
     Sort-Object rank | Select-Object -First 1
 if ($null -eq $acceptSuggestion -or
@@ -181,9 +192,10 @@ if ($acceptedSuggestion.status -ne "accepted" -or
 }
 $smoke.suggestionAccept = "passed"
 
-$rejectSuggestions = @(Invoke-RestMethod `
+$rejectResponse = Invoke-RestMethod `
     -Uri "$BaseUrl/api/review/faces/$($Manifest.SuggestionRejectFaceId)/suggestions" `
-    -TimeoutSec 10)
+    -TimeoutSec 10
+$rejectSuggestions = @(ConvertTo-ObjectArray -Value $rejectResponse)
 $rejectSuggestion = $rejectSuggestions | Where-Object { $_.status -eq "pending" } |
     Sort-Object rank | Select-Object -First 1
 if ($null -eq $rejectSuggestion) {
@@ -213,11 +225,13 @@ $renameAction = Invoke-JsonPost -Uri "$BaseUrl/api/review/people/$($Manifest.Ren
         actor = "verification:rename-smoke"
         note = "Automated reversible rename."
     }
-$maintenancePeople = @(Invoke-RestMethod -Uri "$BaseUrl/api/review/people/maintenance" -TimeoutSec 10)
+$maintenanceResponse = Invoke-RestMethod -Uri "$BaseUrl/api/review/people/maintenance" -TimeoutSec 10
+$maintenancePeople = @(ConvertTo-ObjectArray -Value $maintenanceResponse)
 $renamedPerson = Get-RequiredItemById -Items $maintenancePeople -Id $Manifest.RenamePersonId `
     -Description "renamed person"
-$maintenanceHistory = @(Invoke-RestMethod `
-    -Uri "$BaseUrl/api/review/people/maintenance/history?limit=100" -TimeoutSec 10)
+$historyResponse = Invoke-RestMethod `
+    -Uri "$BaseUrl/api/review/people/maintenance/history?limit=100" -TimeoutSec 10
+$maintenanceHistory = @(ConvertTo-ObjectArray -Value $historyResponse)
 if ($renameAction.kind -ne "rename" -or
     $renameAction.previousDisplayName -ne $Manifest.RenameOriginalDisplayName -or
     $renameAction.newDisplayName -ne $renamedDisplayName -or
@@ -235,14 +249,17 @@ $mergeAction = Invoke-JsonPost -Uri "$BaseUrl/api/review/people/$($Manifest.Merg
         actor = "verification:merge-smoke"
         note = "Automated explicitly irreversible merge."
     }
-$peopleAfterMerge = @(Invoke-RestMethod -Uri "$BaseUrl/api/review/people/maintenance" -TimeoutSec 10)
+$peopleAfterMergeResponse = Invoke-RestMethod `
+    -Uri "$BaseUrl/api/review/people/maintenance" -TimeoutSec 10
+$peopleAfterMerge = @(ConvertTo-ObjectArray -Value $peopleAfterMergeResponse)
 $sourceAfterMerge = @($peopleAfterMerge | Where-Object { $_.id -eq $Manifest.MergeSourcePersonId })
 $targetAfterMerge = Get-RequiredItemById -Items $peopleAfterMerge -Id $Manifest.MergeTargetPersonId `
     -Description "merge target person"
 $mergeSourceDetails = Invoke-RestMethod `
     -Uri "$BaseUrl/api/review/faces/$($Manifest.MergeSourceFaceId)" -TimeoutSec 10
-$historyAfterMerge = @(Invoke-RestMethod `
-    -Uri "$BaseUrl/api/review/people/maintenance/history?limit=100" -TimeoutSec 10)
+$historyAfterMergeResponse = Invoke-RestMethod `
+    -Uri "$BaseUrl/api/review/people/maintenance/history?limit=100" -TimeoutSec 10
+$historyAfterMerge = @(ConvertTo-ObjectArray -Value $historyAfterMergeResponse)
 if ($mergeAction.kind -ne "merge" -or
     $mergeAction.targetPersonId -ne $Manifest.MergeTargetPersonId -or
     $mergeAction.reversible -or
