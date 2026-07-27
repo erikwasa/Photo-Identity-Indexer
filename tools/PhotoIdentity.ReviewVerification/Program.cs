@@ -3,7 +3,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
+using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
@@ -12,7 +12,11 @@ namespace PhotoIdentity.ReviewVerification;
 
 public static class Program
 {
-    private const int FaceCount = 8;
+    private const int FaceCount = 12;
+    private static readonly ModelId EmbedderModelId = new("review-verification-embedder");
+    private static readonly Sha256Digest EmbedderModelHash = new(new string('e', 64));
+    private static readonly ModelId DetectorModelId = new("review-verification-detector");
+    private static readonly Sha256Digest DetectorModelHash = new(new string('b', 64));
 
     public static async Task<int> Main(string[] args)
     {
@@ -48,6 +52,7 @@ public static class Program
         SourceId sourceId = SourceId.New();
         CatalogueSource source = new(sourceId, "review-verification", sourceDirectory, now);
         SqliteAssetCatalogueRepository assetRepository = new(database);
+        SqliteFaceCatalogueRepository faceRepository = new(database);
         List<FaceOccurrenceId> faceIds = [];
 
         for (int index = 0; index < FaceCount; index++)
@@ -71,114 +76,134 @@ public static class Program
                 800);
             CatalogueAssetRevision persistedRevision = await assetRepository.SaveRevisionAsync(source, asset, revision);
 
-            FaceOccurrenceId faceId = FaceOccurrenceId.New();
-            faceIds.Add(faceId);
             byte[] cropBytes = DemoPng.Create(112, 112, index);
             string cropPath = Path.Combine(cropDirectory, $"face-{number:D2}.png");
             await File.WriteAllBytesAsync(cropPath, cropBytes);
 
-            await InsertFaceAsync(
-                database,
-                faceId,
-                persistedRevision.Id,
-                index,
-                cropPath,
-                Digest(cropBytes),
-                now.AddSeconds(index));
+            FaceOccurrenceId faceId = FaceOccurrenceId.New();
+            FaceCropId cropId = FaceCropId.New();
+            CatalogueFaceInspection inspection = await faceRepository.SaveInspectionAsync(
+                new CatalogueFaceOccurrence(
+                    faceId,
+                    persistedRevision.Id,
+                    0,
+                    now.AddSeconds(index)),
+                new CatalogueFaceObservation(
+                    faceId,
+                    DetectorModelId,
+                    DetectorModelHash,
+                    0.91 + (index * 0.005),
+                    new NormalizedBoundingBox(0.14, 0.12, 0.72, 0.75),
+                    CreateLandmarks(),
+                    now.AddSeconds(index)),
+                new CatalogueFaceCrop(
+                    cropId,
+                    faceId,
+                    new AlignmentProtocolId("review-verification-v1"),
+                    Digest(cropBytes),
+                    cropPath,
+                    112,
+                    112,
+                    now.AddSeconds(index)),
+                new CatalogueFaceEmbedding(
+                    cropId,
+                    EmbedderModelId,
+                    EmbedderModelHash,
+                    new EmbeddingVector(EmbeddingFor(index)),
+                    now.AddSeconds(index)));
+            faceIds.Add(inspection.Occurrence.Id);
         }
 
         SqliteReviewRepository reviewRepository = new(database);
-        CatalogueReviewPerson demoPerson = await reviewRepository.CreatePersonAsync(
+        CatalogueReviewPerson primaryPerson = await reviewRepository.CreatePersonAsync(
             "Demo Person",
             now.AddMinutes(1));
+        CatalogueReviewPerson secondaryPerson = await reviewRepository.CreatePersonAsync(
+            "Second Demo Person",
+            now.AddMinutes(1).AddSeconds(1));
+        CatalogueReviewPerson mergeSourcePerson = await reviewRepository.CreatePersonAsync(
+            "Merge Source Person",
+            now.AddMinutes(1).AddSeconds(2));
+
         await reviewRepository.AssignAsync(
-            faceIds[^2],
-            demoPerson.Id,
+            faceIds[0],
+            primaryPerson.Id,
             "verification:seed",
             now.AddMinutes(2),
-            "Seeded assignment for the Assigned filter.");
+            "Primary matcher exemplar.");
+        await reviewRepository.AssignAsync(
+            faceIds[1],
+            secondaryPerson.Id,
+            "verification:seed",
+            now.AddMinutes(2).AddSeconds(1),
+            "Secondary matcher exemplar.");
+        await reviewRepository.AssignAsync(
+            faceIds[8],
+            mergeSourcePerson.Id,
+            "verification:seed",
+            now.AddMinutes(2).AddSeconds(2),
+            "Disposable person-merge source assignment.");
         await reviewRepository.RejectAsync(
-            faceIds[^1],
+            faceIds[2],
             "verification:seed",
             now.AddMinutes(3),
             "Seeded rejection for the Rejected filter.");
 
+        IdentityMatchSummary matchSummary = await new SqliteIdentityMatcher(database).RegenerateAsync(
+            EmbedderModelId,
+            EmbedderModelHash);
+        if (matchSummary.SuggestedTargetCount < 2)
+        {
+            throw new InvalidOperationException(
+                "The verification fixture did not generate enough ranked suggestions.");
+        }
+
         return new VerificationManifest(
-            SchemaVersion: 1,
+            SchemaVersion: 2,
             DatabasePath: databasePath,
             ArtifactDirectory: root,
             FaceCount: FaceCount,
-            UnreviewedCount: FaceCount - 2,
-            AssignedCount: 1,
+            UnreviewedCount: FaceCount - 4,
+            AssignedCount: 3,
             RejectedCount: 1,
+            MutationFaceId: faceIds[3].ToString(),
+            BulkFaceIds: [faceIds[4].ToString(), faceIds[5].ToString()],
+            SuggestionAcceptFaceId: faceIds[6].ToString(),
+            SuggestionRejectFaceId: faceIds[7].ToString(),
+            MergeSourceFaceId: faceIds[8].ToString(),
+            RejectionFaceId: faceIds[9].ToString(),
+            RenamePersonId: secondaryPerson.Id.ToString(),
+            RenameOriginalDisplayName: secondaryPerson.DisplayName,
+            MergeSourcePersonId: mergeSourcePerson.Id.ToString(),
+            MergeTargetPersonId: primaryPerson.Id.ToString(),
+            EmbedderModelId: EmbedderModelId.ToString(),
+            EmbedderModelHash: EmbedderModelHash.ToString(),
             GeneratedAtUtc: DateTimeOffset.UtcNow);
     }
 
-    private static async Task InsertFaceAsync(
-        SqliteCatalogueDatabase database,
-        FaceOccurrenceId faceId,
-        AssetRevisionId revisionId,
-        int ordinal,
-        string cropPath,
-        Sha256Digest cropHash,
-        DateTimeOffset createdAtUtc)
+    private static float[] EmbeddingFor(int index) => index switch
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteTransaction transaction = connection.BeginTransaction();
-        using SqliteCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
-            VALUES ($face_id, $revision_id, $ordinal, $created_at_utc);
+        0 => [1f, 0f, 0f],
+        1 => [0f, 1f, 0f],
+        2 => [0f, 0f, 1f],
+        3 => [0.98f, 0.15f, 0f],
+        4 => [0.95f, 0.2f, 0f],
+        5 => [0.2f, 0.95f, 0f],
+        6 => [0.99f, 0.1f, 0f],
+        7 => [0.1f, 0.99f, 0f],
+        8 => [0f, 0f, 1f],
+        9 => [0.7f, 0.7f, 0f],
+        10 => [0.85f, 0.25f, 0f],
+        _ => [0.25f, 0.85f, 0f],
+    };
 
-            INSERT INTO face_observations (
-                face_occurrence_id,
-                detector_model_id,
-                detector_model_hash,
-                confidence,
-                bounding_box_json,
-                landmarks_json,
-                observed_at_utc)
-            VALUES (
-                $face_id,
-                'review-verification-detector',
-                $model_hash,
-                $confidence,
-                '{"x":16,"y":14,"width":80,"height":84}',
-                '[{"x":38,"y":44},{"x":74,"y":44},{"x":56,"y":62},{"x":42,"y":82},{"x":70,"y":82}]',
-                $created_at_utc);
-
-            INSERT INTO face_crops (
-                id,
-                face_occurrence_id,
-                crop_protocol,
-                content_sha256,
-                storage_path,
-                width,
-                height,
-                created_at_utc)
-            VALUES (
-                $crop_id,
-                $face_id,
-                'review-verification-v1',
-                $crop_hash,
-                $crop_path,
-                112,
-                112,
-                $created_at_utc);
-            """;
-        command.Parameters.AddWithValue("$face_id", faceId.ToString());
-        command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
-        command.Parameters.AddWithValue("$ordinal", ordinal);
-        command.Parameters.AddWithValue("$created_at_utc", createdAtUtc.ToUniversalTime().ToString("O"));
-        command.Parameters.AddWithValue("$model_hash", new string('b', 64));
-        command.Parameters.AddWithValue("$confidence", 0.91 + (ordinal * 0.01));
-        command.Parameters.AddWithValue("$crop_id", FaceCropId.New().ToString());
-        command.Parameters.AddWithValue("$crop_hash", cropHash.ToString());
-        command.Parameters.AddWithValue("$crop_path", cropPath);
-        await command.ExecuteNonQueryAsync();
-        transaction.Commit();
-    }
+    private static NormalizedFaceLandmarks CreateLandmarks() =>
+        new(
+            new NormalizedPoint(0.32, 0.34),
+            new NormalizedPoint(0.68, 0.34),
+            new NormalizedPoint(0.50, 0.50),
+            new NormalizedPoint(0.37, 0.69),
+            new NormalizedPoint(0.63, 0.69));
 
     private static Sha256Digest Digest(ReadOnlySpan<byte> bytes) =>
         new(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
@@ -206,6 +231,18 @@ public static class Program
         int UnreviewedCount,
         int AssignedCount,
         int RejectedCount,
+        string MutationFaceId,
+        IReadOnlyList<string> BulkFaceIds,
+        string SuggestionAcceptFaceId,
+        string SuggestionRejectFaceId,
+        string MergeSourceFaceId,
+        string RejectionFaceId,
+        string RenamePersonId,
+        string RenameOriginalDisplayName,
+        string MergeSourcePersonId,
+        string MergeTargetPersonId,
+        string EmbedderModelId,
+        string EmbedderModelHash,
         DateTimeOffset GeneratedAtUtc);
 
     private sealed record VerificationOptions(string OutputDirectory)
