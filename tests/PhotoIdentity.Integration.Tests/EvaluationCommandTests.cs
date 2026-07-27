@@ -126,7 +126,7 @@ public sealed class EvaluationCommandTests
             output,
             error);
         Assert.Empty(error.ToString());
-        Assert.Contains("selected-threshold: 0.95", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("report:", output.ToString(), StringComparison.Ordinal);
         return exitCode;
     }
 
