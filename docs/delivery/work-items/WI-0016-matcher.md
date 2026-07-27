@@ -54,11 +54,15 @@ The migration is forward-only and transactional. Integration coverage verifies f
 
 `SqliteIdentityMatcherMigrationTests` verifies the version-4 to version-5 upgrade and preservation of existing suggestion state.
 
-Draft pull request [#33](https://github.com/erikwasa/Photo-Identity-Indexer/pull/33) contains the implementation and production-shaped integration coverage. The full repository workflow builds with warnings as errors and runs all tests, documentation checks, review-host smoke verification and Windows mixed-media verification.
+Pull request [#33](https://github.com/erikwasa/Photo-Identity-Indexer/pull/33) merged at `50ca5ca422c8a7026120ff303de87b2a52755473`. GitHub Actions run `30225300153` passed dependency restore, Release build with warnings as errors, all tests, documentation validation, generated-document checks, the published review application smoke path and Windows mixed-media verification.
+
+## Completion
+
+WI-0016 and M05 completed on 2026-07-27 after the maintainer merged pull request #33. The exact matcher remains review-only; threshold calibration and held-out performance measurement continue in WI-0017/M06.
 
 ## Deliberate limitations
 
 - Exact scanning establishes correctness before approximate-nearest-neighbour indexing.
-- No threshold is interpreted as acceptance; suggestions remain review-only.
+- No threshold is interpreted as automatic acceptance; suggestions remain review-only.
 - Threshold calibration and measured false-accept/false-reject performance belong to WI-0017/M06.
-- Suggestion presentation through the review UI or a dedicated operator command can be added as the next integration slice if required.
+- Suggestion presentation through the review UI or a dedicated operator command can be added as a later integration slice.

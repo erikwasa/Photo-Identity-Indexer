@@ -6,9 +6,9 @@ The project is a local-first modular .NET application. Personal OneDrive is acce
 
 ## Project status
 
-**M05 — Identity matching** is active through WI-0016, implementing exact cosine ranking from human-confirmed exemplars without automatic labelling. **M07 — Portable job bundles** is complete after automated verification and a privacy-safe real-image export, process, import and replay round trip.
+**M06 — Evaluation harness** is active through WI-0017, adding reproducible gallery, validation and held-out test reporting for the exact matcher. **M05 — Identity matching** and **M07 — Portable job bundles** are complete.
 
-M01 single-image inference, M02 local catalogue and durable processing, M03 OneDrive availability and verified staging, M04 local review, and M07 portable bundles are complete and verified. M09, the first Azure VM pilot without identities, is also ready but is not the active implementation track.
+M01 single-image inference, M02 local catalogue and durable processing, M03 OneDrive availability and verified staging, M04 local review, M05 identity matching, and M07 portable bundles are complete and verified. M09, the first Azure VM pilot without identities, is also ready but is not the active implementation track.
 
 - [Documentation index](docs/index.md)
 - [Current build context](BUILD_CONTEXT.md)
@@ -167,6 +167,24 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 
 The returned result is linked to the exact original job-manifest digest and immutable revision. SQLite import writes only model-derived face data. People, human labels and review actions are outside the import path, and replaying the same result is harmless.
 
+## Model-lab evaluation
+
+Run the synthetic split-disciplined example:
+
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -- `
+  evaluate `
+  --dataset tools/model-lab/example-dataset.json `
+  --output .artifacts/model-lab/example-report.json `
+  --archive-images 100000 `
+  --hourly-cost 1.50 `
+  --currency GBP
+```
+
+The manifest separates gallery, validation and held-out test data. Validation alone selects the identity threshold; the test split reports final detector recall, identification precision, unknown rejection, confusion and throughput. Fixed input produces byte-for-byte identical JSON with exact model hashes and pipeline version.
+
+Real model-lab manifests, embeddings, identity identifiers and reports are sensitive local data. Do not commit them. The checked-in example is synthetic.
+
 ## First target demonstration
 
 1. Run `photoid inspect family-photo.jpg`.
@@ -176,4 +194,4 @@ The returned result is linked to the exact original job-manifest digest and immu
 
 ## Privacy
 
-Do not commit personal photos, face crops, embeddings, model binaries, credentials, SAS tokens, or generated biometric data. See [security and privacy](docs/architecture/security-and-privacy.md).
+Do not commit personal photos, face crops, embeddings, model binaries, credentials, SAS tokens, generated biometric data, real evaluation manifests or model-lab reports. See [security and privacy](docs/architecture/security-and-privacy.md).

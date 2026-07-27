@@ -53,6 +53,11 @@ public static class Program
                     output,
                     error,
                     cancellationToken),
+                "evaluate" => await EvaluationCommandRunner.RunAsync(
+                    EvaluationCommandOptions.Parse(args.Skip(1).ToArray()),
+                    output,
+                    error,
+                    cancellationToken),
                 "inspect" => await InspectCommandRunner.RunAsync(
                     InspectCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
@@ -102,6 +107,10 @@ public static class Program
               decode --input PATH --output PATH [--report PATH]
                      [--max-width PIXELS --max-height PIXELS] [--verbose]
 
+              evaluate --dataset PATH [--output PATH]
+                       [--archive-images COUNT]
+                       [--hourly-cost AMOUNT] [--currency CODE]
+
               inspect PATH [--output DIR] [--root PATH] [--model-dir DIR]
                            [--confidence 0..1] [--padding RATIO]
                            [--overwrite] [--verbose]
@@ -123,6 +132,11 @@ public static class Program
 
             The decode command reads JPEG or PNG content, applies EXIF orientation,
             optionally downsizes it, and writes a normalised PNG without modifying the input.
+
+            The evaluate command reads a split evaluation manifest. It chooses an identity
+            threshold from validation data only, evaluates the held-out test split, and writes
+            a deterministic report with detector recall, identification precision, unknown
+            rejection, confusion, model provenance, throughput and optional archive projections.
 
             The inspect command composes decoding, YuNet detection, padded crops,
             five-point SFace alignment and embeddings. It writes an annotated SVG,
