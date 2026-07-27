@@ -18,6 +18,23 @@ public sealed record ReviewFacePageResponse(
     int Limit,
     int Total);
 
+public sealed record ReviewProcessingRunFilterResponse(
+    string Id,
+    string Status,
+    DateTimeOffset StartedAtUtc,
+    DateTimeOffset? CompletedAtUtc,
+    int FaceCount);
+
+public sealed record ReviewModelRevisionFilterResponse(
+    string ModelId,
+    string ModelHash,
+    DateTimeOffset GeneratedAtUtc,
+    int FaceCount);
+
+public sealed record ReviewFilterOptionsResponse(
+    IReadOnlyList<ReviewProcessingRunFilterResponse> ProcessingRuns,
+    IReadOnlyList<ReviewModelRevisionFilterResponse> ModelRevisions);
+
 public sealed record BulkReviewPreviewRequest(
     IReadOnlyList<string> FaceIds,
     string Action,
