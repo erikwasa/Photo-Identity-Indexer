@@ -44,7 +44,7 @@
         <p>Loading people and maintenance history…</p>
     </section>
 }
-else if (People.Count == 0)
+else if (ActivePeople.Count == 0)
 {
     <section class="empty-state">
         <h2>No active people</h2>
@@ -54,7 +54,7 @@ else if (People.Count == 0)
 else
 {
     <section class="people-summary" aria-label="Active people">
-        @foreach (PersonMaintenancePersonResponse person in People)
+        @foreach (PersonMaintenancePersonResponse person in ActivePeople)
         {
             <article class="person-summary-card">
                 <strong>@person.DisplayName</strong>
@@ -72,7 +72,7 @@ else
 
             <label class="field-label" for="person-to-maintain">Person</label>
             <select id="person-to-maintain" @bind="SelectedPersonId" @bind:after="SelectedPersonChanged">
-                @foreach (PersonMaintenancePersonResponse person in People)
+                @foreach (PersonMaintenancePersonResponse person in ActivePeople)
                 {
                     <option value="@person.Id">@person.DisplayName</option>
                 }
@@ -165,7 +165,7 @@ else
 @code {
     private const string Actor = "local-reviewer";
 
-    private IReadOnlyList<PersonMaintenancePersonResponse> People { get; set; } = [];
+    private IReadOnlyList<PersonMaintenancePersonResponse> ActivePeople { get; set; } = [];
     private IReadOnlyList<PersonMaintenanceActionResponse> History { get; set; } = [];
     private string SelectedPersonId { get; set; } = "";
     private string RenameDisplayName { get; set; } = "";
@@ -179,10 +179,10 @@ else
     private string? Message { get; set; }
 
     private PersonMaintenancePersonResponse? SelectedPerson =>
-        People.FirstOrDefault(person => person.Id == SelectedPersonId);
+        ActivePeople.FirstOrDefault(person => person.Id == SelectedPersonId);
 
     private IReadOnlyList<PersonMaintenancePersonResponse> MergeTargets =>
-        People.Where(person => person.Id != SelectedPersonId).ToArray();
+        ActivePeople.Where(person => person.Id != SelectedPersonId).ToArray();
 
     private string MergeTargetName =>
         MergeTargets.FirstOrDefault(person => person.Id == MergeTargetId)?.DisplayName ?? "selected person";
@@ -198,7 +198,7 @@ else
         Error = null;
         try
         {
-            People = await Http.GetFromJsonAsync<PersonMaintenancePersonResponse[]>(
+            ActivePeople = await Http.GetFromJsonAsync<PersonMaintenancePersonResponse[]>(
                 "api/review/people/maintenance") ?? [];
             History = await Http.GetFromJsonAsync<PersonMaintenanceActionResponse[]>(
                 "api/review/people/maintenance/history?limit=100") ?? [];
@@ -216,9 +216,9 @@ else
 
     private void ResetSelection()
     {
-        if (People.All(person => person.Id != SelectedPersonId))
+        if (ActivePeople.All(person => person.Id != SelectedPersonId))
         {
-            SelectedPersonId = People.FirstOrDefault()?.Id ?? "";
+            SelectedPersonId = ActivePeople.FirstOrDefault()?.Id ?? "";
         }
 
         SelectedPersonChanged();
@@ -262,6 +262,7 @@ else
                 new MergePersonRequest(targetId, ConfirmMerge, Actor, EmptyToNull(Note))),
             $"Merged {sourceName} into {targetName}.");
         SelectedPersonId = targetId;
+        ResetSelection();
     }
 
     private async Task ApplyAsync(
