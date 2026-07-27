@@ -3,20 +3,21 @@ id: WI-0022
 title: Select production models
 milestone: M11
 status_source: ../status/work-items.yaml
-depends_on: [WI-0019, WI-0021]
-affected_modules: [documentation, models]
+depends_on: [WI-0021, WI-0030]
+affected_modules: [tools/model-lab, docs/models, docs/delivery]
 ---
 
 # WI-0022: Select production models
 
 ## Objective
 
-Select the detector, embedder, thresholds and processing profile using private evaluation results, licensing, throughput and Azure-cost evidence.
+Select the production detector, embedder, thresholds and processing profile from the held-out local comparison and measured Azure evidence.
 
 ## Acceptance criteria
 
-- [ ] Precision meets the agreed threshold.
-- [ ] Similar relatives and age gaps are reviewed manually.
-- [ ] Model manifests and licences are frozen.
-- [ ] A reprocessing and migration plan exists.
-- [ ] Projected cost fits the monthly budget or a multi-month schedule.
+- [ ] Selection uses fixed gallery, validation and held-out test splits.
+- [ ] Precision, known recall, unknown rejection and difficult-category confusion meet agreed targets.
+- [ ] Model licences, hashes, dimensions and pipeline versions are recorded.
+- [ ] Local and Azure execution agree within tolerance.
+- [ ] Runtime, storage and cost projections fit the available budget.
+- [ ] The decision identifies rejected alternatives and the evidence supporting the choice.

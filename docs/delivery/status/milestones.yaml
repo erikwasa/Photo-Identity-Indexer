@@ -48,11 +48,14 @@ milestones:
   work_items:
   - WI-0016
 - id: M06
-  title: Evaluation harness
-  status: in_progress
+  title: Local evaluation and acceptance
+  status: ready
   document: ../milestones/M06-evaluation.md
   work_items:
   - WI-0017
+  - WI-0027
+  - WI-0028
+  - WI-0029
 - id: M07
   title: Portable job bundles
   status: completed
@@ -60,14 +63,22 @@ milestones:
   work_items:
   - WI-0018
 - id: M08
-  title: Second model
+  title: Multi-model local evaluation
   status: proposed
   document: ../milestones/M08-second-model.md
   work_items:
   - WI-0019
+  - WI-0030
+- id: M15
+  title: Operator documentation and system guide
+  status: proposed
+  document: ../milestones/M15-documentation.md
+  work_items:
+  - WI-0031
+  - WI-0032
 - id: M09
   title: Azure VM pilot without identities
-  status: ready
+  status: proposed
   document: ../milestones/M09-azure-pilot.md
   work_items:
   - WI-0020
@@ -97,7 +108,7 @@ milestones:
   - WI-0024
 - id: M14
   title: Collection-ready API
-  status: ready
+  status: proposed
   document: ../milestones/M14-collection-api.md
   work_items:
   - WI-0025

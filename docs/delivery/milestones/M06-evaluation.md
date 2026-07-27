@@ -1,33 +1,32 @@
 ---
 id: M06
-title: Evaluation harness
+title: Local evaluation and acceptance
 status_source: ../status/milestones.yaml
-depends_on: [M05]
+depends_on: [M04, M05]
 ---
 
-# M06: Evaluation harness
+# M06: Local evaluation and acceptance
 
 ## Outcome
 
-Detector and identification models can be compared reproducibly using fixed gallery, validation and test sets.
+The complete baseline system is usable locally on a representative private set of approximately 500 images, including processing, matching, browser review on Windows and Pixel, and reproducible evaluation export.
 
 ## Work items
 
 - [WI-0017](../work-items/WI-0017-evaluation.md)
+- [WI-0027](../work-items/WI-0027-review-workflow.md)
+- [WI-0028](../work-items/WI-0028-catalogue-evaluation-export.md)
+- [WI-0029](../work-items/WI-0029-local-acceptance-pilot.md)
 
 ## Exit criteria
 
-- Reports include model hashes and pipeline versions.
-- Threshold selection uses validation data only.
-- Precision, recall, unknown rejection, confusion and throughput are reported.
-- Full-archive time and cost can be projected.
+- A 450–550 image private subset completes batch processing and can resume safely after interruption.
+- The same catalogue is reviewed from Windows and Pixel over a trusted local network.
+- People can be created and maintained; faces can be assigned, rejected, undone and reviewed from ranked suggestions.
+- Human labels and review actions remain canonical when suggestions are regenerated.
+- A reviewed catalogue can produce a reproducible model-lab dataset without manually copying embeddings.
+- The pilot records privacy-safe counts, throughput, usability findings and defects.
 
-## Current work
+## Deliberate boundary
 
-Pull request [#34](https://github.com/erikwasa/Photo-Identity-Indexer/pull/34) adds the schema-versioned model-lab manifest, deterministic `evaluate` command, validation-only threshold policy, held-out test report, confusion rows, throughput and optional archive projections. GitHub Actions run `30254226939` passed the full repository workflow on the review-ready implementation.
-
-The checked-in fixture is synthetic. Real evaluation manifests, embeddings, reports and identity identifiers remain sensitive local data and must not be committed.
-
-## Deliberate boundaries
-
-M06 measures supplied detector outcomes, embeddings and timings. It does not automatically assemble private datasets from source photos, interpret a threshold as permission to auto-label, or claim that a small local dataset is demographically representative. Those decisions require explicit operator review and later model-selection evidence.
+This milestone proves local functional fit and operational usability. A 500-image subset is not large enough by itself to select a production model for the full archive; broader model selection remains M11.

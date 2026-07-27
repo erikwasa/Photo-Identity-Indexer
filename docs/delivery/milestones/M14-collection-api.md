@@ -2,14 +2,14 @@
 id: M14
 title: Collection-ready API
 status_source: ../status/milestones.yaml
-depends_on: [M04, M05]
+depends_on: [M06]
 ---
 
 # M14: Collection-ready API
 
 ## Outcome
 
-Future applications can query photos by one or more people, date ranges and confidence or label status.
+The locally reviewed catalogue can answer practical people-in-photo queries and produce neutral manifests for later collection, slideshow or album tools.
 
 ## Work items
 
@@ -17,4 +17,8 @@ Future applications can query photos by one or more people, date ranges and conf
 
 ## Exit criteria
 
-The API distinguishes any-person and all-person semantics, confirmed-only results and optional high-confidence suggestions. It can export a neutral collection manifest.
+- Any-person and all-person semantics are explicit.
+- Confirmed-only results are supported.
+- Suggestion-backed results are opt-in and model-versioned.
+- Filters and exports can be exercised against the 500-image pilot catalogue.
+- A neutral collection manifest does not expose unnecessary local source paths.
