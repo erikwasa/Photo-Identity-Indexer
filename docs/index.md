@@ -2,12 +2,18 @@
 
 ## Start here
 
+- [README and quick start](../README.md)
+- [Local-first delivery plan](delivery/local-first-plan.md)
+- [Local evaluation workflow](operations/local-evaluation.md)
+- [Architecture overview](architecture/overview.md)
+- [Current status](delivery/status/current.md)
+- [Build context](../BUILD_CONTEXT.md)
+
+## Product
+
 - [Vision](product/vision.md)
 - [Initial scope](product/scope.md)
 - [Success criteria](product/success-criteria.md)
-- [Roadmap](delivery/roadmap.md)
-- [Current status](delivery/status/current.md)
-- [Build context](../BUILD_CONTEXT.md)
 
 ## Architecture
 
@@ -22,6 +28,7 @@
 
 ## Operations
 
+- [Local evaluation workflow](operations/local-evaluation.md)
 - [SQLite persistence operations](operations/sqlite-persistence.md)
 
 ## Sources and processing
@@ -35,14 +42,17 @@
 - [Baseline models](models/baseline-models.md)
 - [Model manifest and licensing](models/model-governance.md)
 
-## Azure
+## Azure — optional and deferred
 
 - [Tenant and identity constraints](azure/constraints.md)
 - [Identity-free execution](azure/identity-free-execution.md)
 - [Cost controls](azure/cost-controls.md)
 
+Azure documentation remains authoritative for the later scale-out phase, but Azure is not required for the current local acceptance or multi-model work.
+
 ## Delivery
 
+- [Local-first delivery plan](delivery/local-first-plan.md)
 - [Roadmap](delivery/roadmap.md)
 - [Milestones](delivery/milestones/)
 - [Work items](delivery/work-items/)

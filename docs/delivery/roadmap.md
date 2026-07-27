@@ -10,24 +10,26 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M03 | OneDrive synchronised source | completed |
 | M04 | Minimal review application | completed |
 | M05 | Identity matching | completed |
-| M06 | Evaluation harness | in_progress |
+| M06 | Local evaluation and acceptance | ready |
 | M07 | Portable job bundles | completed |
-| M08 | Second model | proposed |
-| M09 | Azure VM pilot without identities | ready |
+| M08 | Multi-model local evaluation | proposed |
+| M15 | Operator documentation and system guide | proposed |
+| M09 | Azure VM pilot without identities | proposed |
 | M10 | Azure checkpointing | proposed |
 | M11 | Production model selection | proposed |
 | M12 | Full archive processing | proposed |
 | M13 | Ongoing local synchronisation | proposed |
-| M14 | Collection-ready API | ready |
+| M14 | Collection-ready API | proposed |
 
 Expected evolution:
 
 ```text
 0.1 local inference and review
 0.2 OneDrive hydration and staging
-0.3 multi-model evaluation
-0.4 portable Azure execution without identities
-0.5 budget-controlled archive processing
-0.6 ongoing synchronisation
+0.3 local acceptance and multi-model evaluation
+0.4 comprehensible operator and architecture documentation
+0.5 portable Azure execution without identities
+0.6 budget-controlled archive processing
+0.7 ongoing synchronisation
 1.0 stable people index and collection API
 ```

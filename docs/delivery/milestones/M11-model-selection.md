@@ -9,7 +9,7 @@ depends_on: [M08, M10]
 
 ## Outcome
 
-A detector, embedder, thresholds and processing profile are selected using private evaluation evidence.
+A detector, embedder, thresholds and processing profile are selected using the local multi-model evidence plus measured Azure execution evidence when resources are available.
 
 ## Work items
 
@@ -17,7 +17,8 @@ A detector, embedder, thresholds and processing profile are selected using priva
 
 ## Exit criteria
 
-- Accuracy meets the agreed precision target.
-- Difficult relatives and age gaps are inspected.
-- Licences and model hashes are recorded.
-- Cost fits the monthly credit or is divided across months.
+- Accuracy meets the agreed precision and unknown-rejection targets.
+- Difficult relatives, age gaps and low-quality categories are inspected.
+- Licences, model hashes and pipeline versions are recorded.
+- Local and Azure results are consistent within tolerance.
+- Runtime and cost fit the available budget or are divided into controlled batches.

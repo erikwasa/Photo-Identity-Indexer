@@ -2,83 +2,59 @@
 
 ## Current milestone
 
-**M06 — Evaluation harness**
+**M06 — Local evaluation and acceptance**
 
-## Current work item
+Status: `ready`
 
-**WI-0017 — Add evaluation harness**
+## Next ready work
 
-Status: `in_progress`
+- **WI-0027 — Complete the local review workflow**
+- **WI-0028 — Export reviewed catalogues to model-lab**
 
-## Recently completed milestone
+These items are intentionally parallel. WI-0029, the 500-image local acceptance pilot, starts only after both are complete.
 
-**WI-0016 / M05** completed on 2026-07-27 when pull request #33 merged at `50ca5ca422c8a7026120ff303de87b2a52755473`. The exact matcher ranks at most two distinct people from human-confirmed exemplars, preserves rejected pairs and never changes canonical labels.
+## Recently completed
 
-## Branch and pull request
+**WI-0017 — Add evaluation harness** merged through pull request #34 at `d0093e1a817dd81c905cc3edf908f35e8fe4b65f` on 2026-07-27. The deterministic evaluation command separates gallery, validation and held-out test data, records exact model provenance and reports accuracy, confusion and throughput.
 
-- Implementation branch: `agent/WI-0017-evaluation-harness`
-- Pull request: [#34 — Add reproducible evaluation harness](https://github.com/erikwasa/Photo-Identity-Indexer/pull/34)
+## Planning branch
 
-## Objective
+- Branch: `agent/local-first-delivery-plan`
+- Pull request: pending creation
 
-Create a reproducible model-lab workflow that separates gallery, validation and held-out test data; selects thresholds from validation only; and reports detector recall, identification precision, unknown rejection, confusion, throughput and archive projections with exact model provenance.
+## Delivery objective
 
-## Current slice
+Prove as much of the product as possible without Azure:
 
-Implement a schema-versioned synthetic-safe dataset manifest and a deterministic `photoid evaluate` command. The validation split chooses one cosine threshold under a documented policy. The held-out test split reports final metrics without influencing selection. Fixed manifest bytes must produce byte-for-byte identical JSON.
+1. complete sustained browser review on Windows and Pixel;
+2. export evaluation data from the reviewed catalogue;
+3. run a representative 450–550 image baseline pilot;
+4. add a second model and repeat the same corpus;
+5. exercise practical collection queries; and
+6. rewrite and independently validate the operator and architecture documentation.
 
-## Relevant files
+Azure execution resumes after this phase and only when access is available.
 
-- `src/PhotoIdentity.Cli/EvaluationCommand.cs`
-- `src/PhotoIdentity.Cli/Program.cs`
-- `src/PhotoIdentity.Core/Recognition/EmbeddingVector.cs`
-- `tests/PhotoIdentity.Integration.Tests/EvaluationCommandTests.cs`
-- `tools/model-lab/README.md`
-- `tools/model-lab/example-dataset.json`
-- `docs/delivery/work-items/WI-0017-evaluation.md`
+## Current implementation gaps addressed by the next items
+
+- Ranked suggestions exist in persistence but are not yet an operator workflow in the browser.
+- Person rename/merge, safe bulk review and revision-aware progress are not yet complete.
+- The evaluation harness consumes a prepared manifest but does not yet export one from the catalogue.
+- Multi-model outputs are versioned in the architecture, but a second adapter and revision-aware comparison workflow are not yet implemented.
+
+## Relevant planning files
+
+- `docs/delivery/local-first-plan.md`
+- `docs/operations/local-evaluation.md`
+- `docs/delivery/milestones/M06-evaluation.md`
+- `docs/delivery/milestones/M08-second-model.md`
+- `docs/delivery/milestones/M15-documentation.md`
 - `docs/delivery/status/work-items.yaml`
+- `docs/delivery/status/milestones.yaml`
 
-## Commands
+## Validation for this planning change
 
 ```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  evaluate `
-  --dataset tools/model-lab/example-dataset.json `
-  --output .artifacts/model-lab/example-report.json `
-  --archive-images 100000 `
-  --hourly-cost 1.50 `
-  --currency GBP
-
-dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj
-
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
-
-## Acceptance test for this slice
-
-- Gallery, validation and test identifiers cannot overlap.
-- Known validation and test people must exist in the gallery.
-- Validation alone determines the selected threshold.
-- A test split that prefers another threshold cannot change the selection.
-- Reports identify exact detector and embedder hashes plus pipeline version.
-- Detector recall, identification precision, known recall, unknown rejection, confusion and threshold sweeps are retained.
-- Held-out test throughput can project archive hours and optional GBP-denominated compute cost.
-- Repeated runs over identical manifest bytes produce identical report bytes.
-
-## Verification
-
-Pull request #34 contains the deterministic command, split-leakage guards, synthetic fixture, model-lab operating contract and integration tests. GitHub Actions run `30254226939` passed Release build with warnings as errors, all repository tests, living-document validation, generated-document checks, the published review application smoke path and Windows mixed-media verification.
-
-## Deliberate limitations
-
-- The harness evaluates supplied detector outcomes, embeddings and elapsed timings; it does not automatically assemble private datasets from source images.
-- Split-ID checks cannot detect duplicate private media given different identifiers.
-- The balanced validation objective is a deterministic baseline, not a production risk policy.
-- Thresholds inform review and model comparison only; automatic identity acceptance remains prohibited.
-- Real manifests, embeddings, identity identifiers and reports are sensitive local data and must not be committed.
-- WI-0020/M09 and WI-0025/M14 are the other ready implementation tracks.
-
-## Next action
-
-Review and merge pull request #34. After merge, run the harness on a privacy-reviewed local gallery, validation and test dataset before using its threshold or archive projection for production planning.
