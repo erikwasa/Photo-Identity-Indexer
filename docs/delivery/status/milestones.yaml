@@ -43,13 +43,13 @@ milestones:
   - WI-0015
 - id: M05
   title: Identity matching
-  status: in_progress
+  status: completed
   document: ../milestones/M05-identity-matching.md
   work_items:
   - WI-0016
 - id: M06
   title: Evaluation harness
-  status: proposed
+  status: in_progress
   document: ../milestones/M06-evaluation.md
   work_items:
   - WI-0017
