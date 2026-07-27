@@ -39,6 +39,7 @@ $reportPath = Join-Path $artifactDirectory "verification-report.json"
 $stdoutPath = Join-Path $artifactDirectory "api.stdout.log"
 $stderrPath = Join-Path $artifactDirectory "api.stderr.log"
 $toolAssembly = Join-Path $root "tools/PhotoIdentity.ReviewVerification/bin/$Configuration/net10.0/PhotoIdentity.ReviewVerification.dll"
+$smokeScript = Join-Path $root "tools/PhotoIdentity.ReviewVerification/Invoke-PublishedReviewSmoke.ps1"
 $apiProject = Join-Path $root "src/PhotoIdentity.Api/PhotoIdentity.Api.csproj"
 $publishedApiDirectory = Join-Path $artifactDirectory "app"
 $apiAssembly = Join-Path $publishedApiDirectory "PhotoIdentity.Api.dll"
@@ -76,11 +77,10 @@ if (-not $SkipBuild) {
     )
 }
 
-if (-not (Test-Path -LiteralPath $toolAssembly -PathType Leaf)) {
-    throw "Review verification tool was not built: $toolAssembly"
-}
-if (-not (Test-Path -LiteralPath $apiProject -PathType Leaf)) {
-    throw "Review API project was not found: $apiProject"
+foreach ($requiredFile in @($toolAssembly, $apiProject, $smokeScript)) {
+    if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
+        throw "Required review verification file was not found: $requiredFile"
+    }
 }
 
 New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
@@ -90,8 +90,22 @@ if ($LASTEXITCODE -ne 0) {
 }
 $manifest = ($manifestText -join [Environment]::NewLine) | ConvertFrom-Json
 
+$notRunSmoke = [ordered]@{
+    health = "not_run"
+    gallery = "not_run"
+    hostedClient = "not_run"
+    image = "not_run"
+    assignmentUndo = "not_run"
+    rejection = "not_run"
+    bulkMutation = "not_run"
+    suggestionAccept = "not_run"
+    suggestionReject = "not_run"
+    personRename = "not_run"
+    personMerge = "not_run"
+    cacheControl = "not_run"
+}
 $report = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     result = "prepared"
     mode = $Mode
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
@@ -100,15 +114,7 @@ $report = [ordered]@{
     faceCount = $manifest.FaceCount
     localUrl = "http://localhost:$Port"
     lanUrls = @(Get-LanUrls -SelectedPort $Port)
-    smoke = [ordered]@{
-        health = "not_run"
-        gallery = "not_run"
-        hostedClient = "not_run"
-        image = "not_run"
-        mutation = "not_run"
-        bulkMutation = "not_run"
-        cacheControl = "not_run"
-    }
+    smoke = $notRunSmoke
     manualVerificationRequired = ($Mode -eq "Interactive")
 }
 
@@ -163,107 +169,9 @@ try {
     if (-not $ready) {
         throw "Review API did not become ready at $healthUrl."
     }
-    $report.smoke.health = "passed"
 
-    $clientResponse = Invoke-WebRequest -Uri "$baseUrl/" -UseBasicParsing -TimeoutSec 10
-    if ($clientResponse.StatusCode -ne 200 -or
-        $clientResponse.Content.IndexOf("blazor.webassembly.js", [StringComparison]::OrdinalIgnoreCase) -lt 0) {
-        throw "Hosted Blazor client was not served from the published application."
-    }
-    $report.smoke.hostedClient = "passed"
-
-    $galleryResponse = Invoke-WebRequest -Uri "$baseUrl/api/review/faces?state=all" `
-        -UseBasicParsing -TimeoutSec 10
-    $gallery = $galleryResponse.Content | ConvertFrom-Json
-    if ($gallery.Total -ne $manifest.FaceCount -or @($gallery.Items).Count -ne $manifest.FaceCount) {
-        throw "Review gallery did not return the prepared synthetic faces."
-    }
-    $report.smoke.gallery = "passed"
-
-    $galleryCache = [string]$galleryResponse.Headers["Cache-Control"]
-    if ($galleryCache.IndexOf("no-store", [StringComparison]::OrdinalIgnoreCase) -lt 0) {
-        throw "Review gallery response did not include Cache-Control: no-store."
-    }
-
-    $unreviewedFaces = @($gallery.Items | Where-Object { $_.state -eq "unreviewed" })
-    if ($unreviewedFaces.Count -eq 0) {
-        throw "Review verification catalogue did not contain an unreviewed face."
-    }
-    $firstFace = $unreviewedFaces[0]
-
-    $imageResponse = Invoke-WebRequest -Uri "$baseUrl$($firstFace.ImageUrl)" `
-        -UseBasicParsing -TimeoutSec 10
-    if ($imageResponse.StatusCode -ne 200 -or $imageResponse.RawContentLength -le 0) {
-        throw "Review face image did not return content."
-    }
-    $imageCache = [string]$imageResponse.Headers["Cache-Control"]
-    if ($imageCache.IndexOf("no-store", [StringComparison]::OrdinalIgnoreCase) -lt 0) {
-        throw "Review image response did not include Cache-Control: no-store."
-    }
-    $report.smoke.image = "passed"
-    $report.smoke.cacheControl = "passed"
-
-    $personBody = @{ displayName = "Verification Person" } | ConvertTo-Json
-    $person = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/review/people" `
-        -ContentType "application/json" -Body $personBody -TimeoutSec 10
-    $assignBody = @{
-        personId = $person.id
-        actor = "verification:smoke"
-        note = "Automated assignment followed by undo."
-    } | ConvertTo-Json
-    Invoke-RestMethod -Method Post -Uri "$baseUrl/api/review/faces/$($firstFace.id)/assign" `
-        -ContentType "application/json" -Body $assignBody -TimeoutSec 10 | Out-Null
-    $undoBody = @{
-        actor = "verification:smoke"
-        note = "Automated undo confirms reversibility."
-    } | ConvertTo-Json
-    Invoke-RestMethod -Method Post -Uri "$baseUrl/api/review/faces/$($firstFace.id)/undo" `
-        -ContentType "application/json" -Body $undoBody -TimeoutSec 10 | Out-Null
-    $details = Invoke-RestMethod -Uri "$baseUrl/api/review/faces/$($firstFace.id)" -TimeoutSec 10
-    if (@($details.actions).Count -lt 2 -or $details.face.state -ne "unreviewed") {
-        throw "Review assignment and undo did not restore the unreviewed state with audit history."
-    }
-    $report.smoke.mutation = "passed"
-
-    $bulkFaces = @($unreviewedFaces | Select-Object -First 2)
-    if ($bulkFaces.Count -ne 2) {
-        throw "Review verification catalogue did not contain two faces for bulk review."
-    }
-    $bulkFaceIds = @($bulkFaces | ForEach-Object { $_.id })
-    $bulkPreviewBody = @{
-        faceIds = $bulkFaceIds
-        action = "assign"
-        personId = $person.id
-    } | ConvertTo-Json -Depth 5
-    $bulkPreview = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/review/bulk/preview" `
-        -ContentType "application/json" -Body $bulkPreviewBody -TimeoutSec 10
-    if ($bulkPreview.affectedCount -ne 2 -or $bulkPreview.requestedCount -ne 2) {
-        throw "Bulk review preview did not report the expected affected count."
-    }
-    $bulkCommitBody = @{
-        faceIds = $bulkFaceIds
-        action = "assign"
-        personId = $person.id
-        expectedAffectedCount = $bulkPreview.affectedCount
-        previewToken = $bulkPreview.previewToken
-        confirm = $true
-        actor = "verification:bulk-smoke"
-        note = "Automated preview-first bulk assignment."
-    } | ConvertTo-Json -Depth 5
-    $bulkResult = Invoke-RestMethod -Method Post -Uri "$baseUrl/api/review/bulk/commit" `
-        -ContentType "application/json" -Body $bulkCommitBody -TimeoutSec 10
-    if ($bulkResult.affectedCount -ne 2) {
-        throw "Bulk review commit did not apply the previewed affected count."
-    }
-    foreach ($bulkFace in $bulkFaces) {
-        $bulkDetails = Invoke-RestMethod -Uri "$baseUrl/api/review/faces/$($bulkFace.id)" -TimeoutSec 10
-        if ($bulkDetails.face.state -ne "assigned") {
-            throw "Bulk review did not persist an audited assignment for face $($bulkFace.id)."
-        }
-    }
-    $report.smoke.bulkMutation = "passed"
+    $report.smoke = & $smokeScript -BaseUrl $baseUrl -Manifest $manifest
     $report.result = "passed"
-
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 
     Write-Host "`nReview verification smoke checks passed."
@@ -275,11 +183,13 @@ try {
     Write-Warning "The review listener is unauthenticated HTTP; do not expose it to an untrusted network."
     Write-Host "`nManual checklist:"
     Write-Host "  1. Confirm the gallery has no horizontal page scrolling."
-    Write-Host "  2. Create a person, assign a face, reject another, and undo one action."
-    Write-Host "  3. Select several unreviewed faces and confirm the bulk affected count before commit."
-    Write-Host "  4. Restart the real catalogue host and confirm decisions persist."
-    Write-Host "  5. Open details and confirm no local filesystem path is displayed."
-    Write-Host "  6. On Pixel, confirm Assign, Reject, Undo, bulk preview and Back are comfortable to tap."
+    Write-Host "  2. Confirm Assign, Reject, Undo and Back are comfortable to use."
+    Write-Host "  3. Confirm the bulk affected count is clear before commit."
+    Write-Host "  4. Confirm suggestion scores, margins and exact model revision are readable."
+    Write-Host "  5. Confirm rename and irreversible merge warnings are clear before commit."
+    Write-Host "  6. Restart the real catalogue host and confirm decisions persist."
+    Write-Host "  7. Open details and confirm no local filesystem path is displayed."
+    Write-Host "  8. Repeat the interaction checks on Pixel using only a trusted private network."
     Write-Host "Report: $reportPath"
 
     if ($Mode -eq "Interactive") {
