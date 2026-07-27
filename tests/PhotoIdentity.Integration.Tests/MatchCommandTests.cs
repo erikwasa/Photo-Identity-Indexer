@@ -107,6 +107,30 @@ public sealed class MatchCommandTests
         Assert.Contains("64-character SHA-256", error.ToString(), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Regenerate_command_does_not_create_a_missing_catalogue()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "missing.db");
+            StringWriter output = new();
+            StringWriter error = new();
+
+            FileNotFoundException exception = await Assert.ThrowsAsync<FileNotFoundException>(
+                () => RunAsync(databasePath, output, error));
+
+            Assert.Contains("will not create an empty catalogue", exception.Message, StringComparison.Ordinal);
+            Assert.False(File.Exists(databasePath));
+            Assert.Empty(output.ToString());
+            Assert.Empty(error.ToString());
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
     private static Task<int> RunAsync(string databasePath, TextWriter output, TextWriter error) =>
         PhotoIdentity.Cli.Program.RunAsync(
             [
