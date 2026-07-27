@@ -57,9 +57,8 @@ public sealed class EvaluationCommandTests
                 .GetProperty("balancedIdentityScore")
                 .GetDouble();
             JsonElement testPreferredPoint = Assert.Single(
-                root.GetProperty("testThresholdSweep")
-                    .EnumerateArray()
-                    .Where(item => Math.Abs(item.GetProperty("threshold").GetDouble() - 0.8) < 0.000001));
+                root.GetProperty("testThresholdSweep").EnumerateArray(),
+                item => Math.Abs(item.GetProperty("threshold").GetDouble() - 0.8) < 0.000001);
             double testPreferredScore = testPreferredPoint
                 .GetProperty("metrics")
                 .GetProperty("balancedIdentityScore")
