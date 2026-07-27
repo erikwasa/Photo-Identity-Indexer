@@ -16,6 +16,7 @@ public partial class Program
 
         builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
         builder.Services.AddSingleton<SqliteReviewRepository>();
+        builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton(TimeProvider.System);
 
@@ -46,6 +47,7 @@ public partial class Program
             schemaVersion = SqliteCatalogueDatabase.CurrentSchemaVersion,
         }));
         app.MapReviewEndpoints();
+        app.MapReviewSuggestionEndpoints();
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();

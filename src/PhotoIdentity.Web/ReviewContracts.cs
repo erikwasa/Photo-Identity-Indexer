@@ -28,6 +28,17 @@ public sealed record ReviewActionResponse(
     bool Reversed,
     long? ReversesActionId);
 
+public sealed record ReviewIdentitySuggestionResponse(
+    long Id,
+    ReviewPersonResponse Person,
+    string ModelId,
+    string ModelHash,
+    int Rank,
+    double Score,
+    double? ScoreMargin,
+    string Status,
+    DateTimeOffset GeneratedAtUtc);
+
 public sealed record ReviewFaceDetailsResponse(
     ReviewFaceResponse Face,
     string MediaType,

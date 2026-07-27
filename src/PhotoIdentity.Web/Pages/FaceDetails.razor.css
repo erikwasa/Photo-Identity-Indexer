@@ -1,0 +1,11 @@
+.suggestion-guidance {
+    max-width: 46rem;
+    margin: 0.35rem 0 0;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.model-revision {
+    overflow-wrap: anywhere;
+    word-break: break-all;
+}
