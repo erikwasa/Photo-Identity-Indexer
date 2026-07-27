@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 7;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -285,6 +285,34 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 6;
         """;
 
+    private const string VersionSevenMigration = """
+        CREATE TABLE IF NOT EXISTS person_maintenance_actions (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            action_kind TEXT NOT NULL CHECK (action_kind IN ('rename', 'merge')),
+            person_id TEXT NOT NULL,
+            previous_display_name TEXT NOT NULL,
+            target_person_id TEXT NULL,
+            new_display_name TEXT NOT NULL,
+            actor TEXT NOT NULL,
+            note TEXT NULL,
+            created_at_utc TEXT NOT NULL,
+            reversible INTEGER NOT NULL CHECK (reversible IN (0, 1)),
+            FOREIGN KEY (person_id) REFERENCES people (id) ON DELETE RESTRICT,
+            FOREIGN KEY (target_person_id) REFERENCES people (id) ON DELETE RESTRICT,
+            CHECK (
+                (action_kind = 'rename' AND target_person_id IS NULL AND reversible = 1)
+                OR (action_kind = 'merge' AND target_person_id IS NOT NULL AND reversible = 0)
+            )
+        );
+        CREATE INDEX IF NOT EXISTS ix_person_maintenance_history
+            ON person_maintenance_actions (id DESC);
+        CREATE INDEX IF NOT EXISTS ix_person_maintenance_person
+            ON person_maintenance_actions (person_id, id DESC);
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (7, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 7;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -354,6 +382,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 6)
         {
             await ApplyMigrationAsync(connection, VersionSixMigration, cancellationToken);
+            version = 6;
+        }
+
+        if (version < 7)
+        {
+            await ApplyMigrationAsync(connection, VersionSevenMigration, cancellationToken);
         }
     }
 

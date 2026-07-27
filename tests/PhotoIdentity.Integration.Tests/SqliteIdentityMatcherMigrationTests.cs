@@ -7,7 +7,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class SqliteIdentityMatcherMigrationTests
 {
     [Fact]
-    public async Task Version_four_catalogue_adds_ranked_and_reviewed_suggestion_schema_without_changing_existing_suggestions()
+    public async Task Version_four_catalogue_adds_review_and_person_maintenance_schema_without_changing_existing_suggestions()
     {
         string directory = Path.Combine(
             Path.GetTempPath(),
@@ -35,6 +35,11 @@ public sealed class SqliteIdentityMatcherMigrationTests
                     CREATE TABLE schema_migrations (
                         version INTEGER NOT NULL PRIMARY KEY,
                         applied_at_utc TEXT NOT NULL);
+                    CREATE TABLE people (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        display_name TEXT NULL,
+                        created_at_utc TEXT NOT NULL,
+                        merged_into_person_id TEXT NULL);
                     CREATE TABLE face_occurrences (
                         id TEXT NOT NULL PRIMARY KEY);
                     CREATE TABLE identity_suggestions (
@@ -49,6 +54,8 @@ public sealed class SqliteIdentityMatcherMigrationTests
                         UNIQUE (face_occurrence_id, suggested_person_id, model_id, model_hash));
                     INSERT INTO schema_migrations (version, applied_at_utc)
                         VALUES (1, $now), (2, $now), (3, $now), (4, $now);
+                    INSERT INTO people (id, display_name, created_at_utc, merged_into_person_id)
+                        VALUES ($person_id, 'Ada', $now, NULL);
                     INSERT INTO face_occurrences (id) VALUES ($face_id);
                     INSERT INTO identity_suggestions (
                         face_occurrence_id,
@@ -79,8 +86,8 @@ public sealed class SqliteIdentityMatcherMigrationTests
             await database.InitializeAsync();
 
             await using SqliteConnection upgraded = await database.OpenConnectionAsync();
-            Assert.Equal(6, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
-            Assert.Equal(6, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM schema_migrations;"));
+            Assert.Equal(7, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
+            Assert.Equal(7, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM schema_migrations;"));
             Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM identity_suggestions;"));
             Assert.Equal(
                 1,
@@ -107,6 +114,16 @@ public sealed class SqliteIdentityMatcherMigrationTests
                 await ReadInt64Async(
                     upgraded,
                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ix_identity_suggestion_review_history';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    upgraded,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'person_maintenance_actions';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    upgraded,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ix_person_maintenance_history';"));
         }
         finally
         {
