@@ -23,9 +23,11 @@ Record only privacy-safe aggregate counts in the repository. Photos, names, crop
 
 ### WI-0027 — Complete the local review workflow
 
-Ranked suggestion display and decisions, durable rejected-pair exclusions, audited person maintenance and preview-first bulk review are implemented. The remaining workflow work is processing-run and model-revision filtering plus final Windows/Pixel usability and smoke verification.
+Ranked suggestion display and decisions, durable rejected-pair exclusions, audited person maintenance, preview-first bulk review and combined progress filters are implemented. The remaining workflow work is final Windows/Pixel usability and complete smoke verification.
 
 Bulk assignment and face rejection display affected and skipped counts before commit. Commits require the exact server-generated preview token and fail without partial changes when the eligible set becomes stale.
+
+The progress view combines review state, processing-run scope and exact ranked-suggestion model ID and SHA-256 revision. It exposes aggregate counts and opaque identifiers without source roots, crop paths or embeddings.
 
 ### WI-0028 — Export reviewed catalogues to model-lab
 

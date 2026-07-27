@@ -16,6 +16,7 @@ public partial class Program
 
         builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
         builder.Services.AddSingleton<SqliteReviewRepository>();
+        builder.Services.AddSingleton<SqliteReviewFilterRepository>();
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
         builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();

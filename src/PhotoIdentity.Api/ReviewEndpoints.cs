@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -11,6 +12,7 @@ public static class ReviewEndpoints
         RouteGroupBuilder group = endpoints.MapGroup("/api/review");
 
         group.MapGet("/faces", GetFacesAsync);
+        group.MapGet("/filters", GetFiltersAsync);
         group.MapGet("/faces/{id}", GetFaceAsync);
         group.MapGet("/faces/{id}/image", GetFaceImageAsync);
         group.MapGet("/people", GetPeopleAsync);
@@ -23,18 +25,30 @@ public static class ReviewEndpoints
     }
 
     private static async Task<IResult> GetFacesAsync(
-        SqliteReviewRepository repository,
+        SqliteReviewFilterRepository repository,
         int offset = 0,
         int limit = 40,
         string state = CatalogueReviewStates.Unreviewed,
+        string? processingRunId = null,
+        string? modelId = null,
+        string? modelHash = null,
         CancellationToken cancellationToken = default)
     {
+        if (!TryProcessingRunId(processingRunId, out ProcessingRunId? parsedRunId) ||
+            !TryModelRevision(modelId, modelHash, out ModelId? parsedModelId, out Sha256Digest? parsedModelHash))
+        {
+            return BadRequest("The processing run or model revision filter is invalid.");
+        }
+
         try
         {
             CatalogueReviewFacePage page = await repository.GetFacesAsync(
                 offset,
                 limit,
                 state,
+                parsedRunId,
+                parsedModelId,
+                parsedModelHash,
                 cancellationToken);
             return Results.Ok(new ReviewFacePageResponse(
                 page.Items.Select(ToResponse).ToArray(),
@@ -46,6 +60,25 @@ public static class ReviewEndpoints
         {
             return BadRequest(exception.Message);
         }
+    }
+
+    private static async Task<IResult> GetFiltersAsync(
+        SqliteReviewFilterRepository repository,
+        CancellationToken cancellationToken)
+    {
+        CatalogueReviewFilterOptions options = await repository.GetOptionsAsync(cancellationToken);
+        return Results.Ok(new ReviewFilterOptionsResponse(
+            options.ProcessingRuns.Select(run => new ReviewProcessingRunFilterResponse(
+                run.Id.ToString(),
+                run.Status,
+                run.StartedAtUtc,
+                run.CompletedAtUtc,
+                run.FaceCount)).ToArray(),
+            options.ModelRevisions.Select(model => new ReviewModelRevisionFilterResponse(
+                model.ModelId.ToString(),
+                model.ModelHash.ToString(),
+                model.GeneratedAtUtc,
+                model.FaceCount)).ToArray()));
     }
 
     private static async Task<IResult> GetFaceAsync(
@@ -283,5 +316,52 @@ public static class ReviewEndpoints
 
         id = PersonId.From(parsed);
         return true;
+    }
+
+    private static bool TryProcessingRunId(string? value, out ProcessingRunId? id)
+    {
+        id = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (!Guid.TryParse(value, out Guid parsed) || parsed == Guid.Empty)
+        {
+            return false;
+        }
+
+        id = ProcessingRunId.From(parsed);
+        return true;
+    }
+
+    private static bool TryModelRevision(
+        string? modelId,
+        string? modelHash,
+        out ModelId? parsedModelId,
+        out Sha256Digest? parsedModelHash)
+    {
+        parsedModelId = null;
+        parsedModelHash = null;
+        if (string.IsNullOrWhiteSpace(modelId) && string.IsNullOrWhiteSpace(modelHash))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(modelId) || string.IsNullOrWhiteSpace(modelHash))
+        {
+            return false;
+        }
+
+        try
+        {
+            parsedModelId = new ModelId(modelId);
+            parsedModelHash = new Sha256Digest(modelHash);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 }

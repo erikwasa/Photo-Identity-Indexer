@@ -1,0 +1,262 @@
+@page "/progress"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Review progress · Photo Identity</PageTitle>
+
+<section class="hero progress-hero">
+    <div>
+        <p class="eyebrow">Catalogue progress</p>
+        <h1>Filter review progress</h1>
+        <p>Scope the face catalogue by review state, processing run, and the exact ranked-suggestion model revision.</p>
+    </div>
+    <a class="button secondary" href="/">Return to review</a>
+</section>
+
+<section class="progress-filters" aria-labelledby="progress-filter-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Combined filters</p>
+            <h2 id="progress-filter-heading">Progress scope</h2>
+        </div>
+        <button class="button secondary" disabled="@(!HasActiveScope || Loading)" @onclick="ClearFiltersAsync">
+            Clear filters
+        </button>
+    </div>
+
+    <div class="filter-grid">
+        <div>
+            <label class="field-label" for="progress-state">Review state</label>
+            <select id="progress-state" @bind="State" @bind:after="ApplyFiltersAsync" disabled="@Loading">
+                <option value="all">All states</option>
+                <option value="unreviewed">Needs review</option>
+                <option value="assigned">Assigned</option>
+                <option value="rejected">Rejected</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="field-label" for="progress-run">Processing run</label>
+            <select id="progress-run" @bind="SelectedProcessingRunId" @bind:after="ApplyFiltersAsync" disabled="@(Loading || Options.ProcessingRuns.Count == 0)">
+                <option value="">All processing runs</option>
+                @foreach (ReviewProcessingRunFilterResponse run in Options.ProcessingRuns)
+                {
+                    <option value="@run.Id">@RunLabel(run)</option>
+                }
+            </select>
+        </div>
+
+        <div>
+            <label class="field-label" for="progress-model">Suggestion model revision</label>
+            <select id="progress-model" @bind="SelectedModelIndex" @bind:after="ApplyFiltersAsync" disabled="@(Loading || Options.ModelRevisions.Count == 0)">
+                <option value="">All model revisions</option>
+                @for (int index = 0; index < Options.ModelRevisions.Count; index++)
+                {
+                    ReviewModelRevisionFilterResponse model = Options.ModelRevisions[index];
+                    <option value="@index">@ModelLabel(model)</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (SelectedRun is not null || SelectedModel is not null)
+    {
+        <dl class="active-scope">
+            @if (SelectedRun is ReviewProcessingRunFilterResponse run)
+            {
+                <div>
+                    <dt>Processing run</dt>
+                    <dd><code>@run.Id</code></dd>
+                </div>
+            }
+            @if (SelectedModel is ReviewModelRevisionFilterResponse model)
+            {
+                <div>
+                    <dt>Model ID</dt>
+                    <dd>@model.ModelId</dd>
+                </div>
+                <div>
+                    <dt>Exact model hash</dt>
+                    <dd><code>@model.ModelHash</code></dd>
+                </div>
+            }
+        </dl>
+    }
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+
+@if (Loading)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading review progress…</p>
+    </section>
+}
+else if (Page is null || Page.Items.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No faces match this scope</h2>
+        <p>Change one or more filters or return to the full review queue.</p>
+    </section>
+}
+else
+{
+    <div class="progress-summary" role="status">
+        <strong>@Page.Total matching face@(Page.Total == 1 ? "" : "s")</strong>
+        <span>Showing @(Page.Offset + 1)–@Math.Min(Page.Offset + Page.Items.Count, Page.Total)</span>
+    </div>
+
+    <section class="progress-grid" aria-label="Filtered review progress">
+        @foreach (ReviewFaceResponse face in Page.Items)
+        {
+            <article class="progress-card state-@face.State">
+                <a class="progress-image-link" href="/faces/@face.Id" aria-label="Open details for @face.PhotoName face @(face.FaceOrdinal + 1)">
+                    <img src="@face.ImageUrl" alt="Detected face from @face.PhotoName" loading="lazy" />
+                </a>
+                <div>
+                    <div class="progress-card-heading">
+                        <strong>@face.PhotoName</strong>
+                        <span class="state-badge">@StateLabel(face.State)</span>
+                    </div>
+                    <p>Face @(face.FaceOrdinal + 1)</p>
+                    @if (face.Person is not null)
+                    {
+                        <p>Person: <strong>@face.Person.DisplayName</strong></p>
+                    }
+                    <a class="details-link" href="/faces/@face.Id">Open details →</a>
+                </div>
+            </article>
+        }
+    </section>
+
+    <div class="pagination">
+        <button class="button secondary" disabled="@(Page.Offset == 0 || Loading)" @onclick="PreviousPageAsync">Previous</button>
+        <button class="button secondary" disabled="@(Page.Offset + Page.Limit >= Page.Total || Loading)" @onclick="NextPageAsync">Next</button>
+    </div>
+}
+
+@code {
+    private const int PageSize = 40;
+
+    private ReviewFilterOptionsResponse Options { get; set; } = new([], []);
+    private ReviewFacePageResponse? Page { get; set; }
+    private string State { get; set; } = "all";
+    private string SelectedProcessingRunId { get; set; } = "";
+    private string SelectedModelIndex { get; set; } = "";
+    private int Offset { get; set; }
+    private bool Loading { get; set; }
+    private string? Error { get; set; }
+
+    private ReviewProcessingRunFilterResponse? SelectedRun =>
+        Options.ProcessingRuns.FirstOrDefault(run => run.Id == SelectedProcessingRunId);
+
+    private ReviewModelRevisionFilterResponse? SelectedModel =>
+        int.TryParse(SelectedModelIndex, out int index) &&
+        index >= 0 &&
+        index < Options.ModelRevisions.Count
+            ? Options.ModelRevisions[index]
+            : null;
+
+    private bool HasActiveScope =>
+        State != "all" ||
+        !string.IsNullOrWhiteSpace(SelectedProcessingRunId) ||
+        SelectedModel is not null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadOptionsAsync();
+        await LoadFacesAsync();
+    }
+
+    private async Task LoadOptionsAsync()
+    {
+        try
+        {
+            Options = await Http.GetFromJsonAsync<ReviewFilterOptionsResponse>("api/review/filters")
+                ?? new ReviewFilterOptionsResponse([], []);
+        }
+        catch (Exception exception)
+        {
+            Error = $"Review filter options could not be loaded: {exception.Message}";
+        }
+    }
+
+    private async Task LoadFacesAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            List<string> query =
+            [
+                $"state={Uri.EscapeDataString(State)}",
+                $"offset={Offset}",
+                $"limit={PageSize}",
+            ];
+            if (!string.IsNullOrWhiteSpace(SelectedProcessingRunId))
+            {
+                query.Add($"processingRunId={Uri.EscapeDataString(SelectedProcessingRunId)}");
+            }
+
+            if (SelectedModel is ReviewModelRevisionFilterResponse model)
+            {
+                query.Add($"modelId={Uri.EscapeDataString(model.ModelId)}");
+                query.Add($"modelHash={Uri.EscapeDataString(model.ModelHash)}");
+            }
+
+            Page = await Http.GetFromJsonAsync<ReviewFacePageResponse>(
+                $"api/review/faces?{string.Join("&", query)}");
+        }
+        catch (Exception exception)
+        {
+            Error = $"Review progress could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        Offset = 0;
+        await LoadFacesAsync();
+    }
+
+    private async Task ClearFiltersAsync()
+    {
+        State = "all";
+        SelectedProcessingRunId = "";
+        SelectedModelIndex = "";
+        await ApplyFiltersAsync();
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        Offset = Math.Max(0, Offset - PageSize);
+        await LoadFacesAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        Offset += PageSize;
+        await LoadFacesAsync();
+    }
+
+    private static string RunLabel(ReviewProcessingRunFilterResponse run) =>
+        $"{run.StartedAtUtc.ToLocalTime():g} · {run.Status} · {run.FaceCount} face{(run.FaceCount == 1 ? "" : "s")}";
+
+    private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
+        $"{model.ModelId} · {model.ModelHash[..12]} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+
+    private static string StateLabel(string state) => state switch
+    {
+        "assigned" => "Assigned",
+        "rejected" => "Rejected",
+        _ => "Needs review",
+    };
+}
