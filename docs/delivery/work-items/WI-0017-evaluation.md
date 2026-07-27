@@ -96,7 +96,7 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 - throughput-driven archive time and GBP cost projection;
 - rejection of sample identifiers reused across splits.
 
-Draft pull request [#34](https://github.com/erikwasa/Photo-Identity-Indexer/pull/34) contains the implementation, synthetic fixture, operator documentation and integration coverage.
+Pull request [#34](https://github.com/erikwasa/Photo-Identity-Indexer/pull/34) contains the implementation, synthetic fixture, operator documentation and integration coverage. GitHub Actions run `30254226939` passed dependency restore, Release build with warnings as errors, all tests, living-document validation, generated-document checks, the published review application smoke path and Windows mixed-media verification.
 
 ## Deliberate limitations
 
