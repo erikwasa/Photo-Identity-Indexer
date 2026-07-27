@@ -88,6 +88,13 @@ internal static class MatchCommandRunner
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(output);
 
+        if (!File.Exists(options.DatabasePath))
+        {
+            throw new FileNotFoundException(
+                "The catalogue database was not found; matcher regeneration will not create an empty catalogue.",
+                options.DatabasePath);
+        }
+
         SqliteCatalogueDatabase database = new(options.DatabasePath);
         SqliteIdentityMatcher matcher = new(database);
         IdentityMatchSummary summary = await matcher.RegenerateAsync(
