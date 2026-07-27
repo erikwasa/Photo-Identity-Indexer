@@ -91,8 +91,7 @@ internal static class MatchCommandRunner
         if (!File.Exists(options.DatabasePath))
         {
             throw new FileNotFoundException(
-                "The catalogue database was not found; matcher regeneration will not create an empty catalogue.",
-                options.DatabasePath);
+                "The catalogue database was not found; matcher regeneration will not create an empty catalogue.");
         }
 
         SqliteCatalogueDatabase database = new(options.DatabasePath);
