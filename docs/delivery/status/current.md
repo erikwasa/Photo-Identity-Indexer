@@ -16,6 +16,7 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 ## Active work
 
 - [**WI-0027 — Complete the local review workflow**](../work-items/WI-0027-review-workflow.md) — `in_review`; owner: `ai-agent`
+- [**WI-0028 — Export reviewed catalogues to model-lab**](../work-items/WI-0028-catalogue-evaluation-export.md) — `in_review`; owner: `ai-agent`
 
 ## Recently completed
 
@@ -25,4 +26,4 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Next ready work
 
-- [**WI-0028 — Export reviewed catalogues to model-lab**](../work-items/WI-0028-catalogue-evaluation-export.md) — `ready`; owner: `unassigned`
+None.
