@@ -17,7 +17,7 @@ Status: `in_progress`
 ## Branch and pull request
 
 - Implementation branch: `agent/WI-0017-evaluation-harness`
-- Draft pull request: [#34 — Add reproducible evaluation harness](https://github.com/erikwasa/Photo-Identity-Indexer/pull/34)
+- Pull request: [#34 — Add reproducible evaluation harness](https://github.com/erikwasa/Photo-Identity-Indexer/pull/34)
 
 ## Objective
 
@@ -68,7 +68,7 @@ dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 
 ## Verification
 
-Pull request #34 contains the deterministic command, split-leakage guards, synthetic fixture, model-lab operating contract and integration tests. GitHub Actions builds with warnings as errors and runs all repository tests, living-document validation, generated-document checks, the published review application smoke path and Windows mixed-media verification.
+Pull request #34 contains the deterministic command, split-leakage guards, synthetic fixture, model-lab operating contract and integration tests. GitHub Actions run `30254226939` passed Release build with warnings as errors, all repository tests, living-document validation, generated-document checks, the published review application smoke path and Windows mixed-media verification.
 
 ## Deliberate limitations
 
@@ -77,8 +77,8 @@ Pull request #34 contains the deterministic command, split-leakage guards, synth
 - The balanced validation objective is a deterministic baseline, not a production risk policy.
 - Thresholds inform review and model comparison only; automatic identity acceptance remains prohibited.
 - Real manifests, embeddings, identity identifiers and reports are sensitive local data and must not be committed.
-- WI-0020/M09 remains the other ready implementation track.
+- WI-0020/M09 and WI-0025/M14 are the other ready implementation tracks.
 
 ## Next action
 
-Finish CI and review for pull request #34. After merge, run the harness on a privacy-reviewed local gallery, validation and test dataset before using its threshold or archive projection for production planning.
+Review and merge pull request #34. After merge, run the harness on a privacy-reviewed local gallery, validation and test dataset before using its threshold or archive projection for production planning.
