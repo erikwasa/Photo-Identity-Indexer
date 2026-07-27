@@ -18,6 +18,36 @@ public sealed record ReviewFacePageResponse(
     int Limit,
     int Total);
 
+public sealed record BulkReviewPreviewRequest(
+    IReadOnlyList<string> FaceIds,
+    string Action,
+    string? PersonId = null);
+
+public sealed record BulkReviewCommitRequest(
+    IReadOnlyList<string> FaceIds,
+    string Action,
+    string? PersonId,
+    int ExpectedAffectedCount,
+    string PreviewToken,
+    bool Confirm,
+    string Actor,
+    string? Note = null);
+
+public sealed record BulkReviewPreviewResponse(
+    string Action,
+    int RequestedCount,
+    int AffectedCount,
+    int SkippedCount,
+    string PreviewToken,
+    ReviewPersonResponse? Person);
+
+public sealed record BulkReviewCommitResponse(
+    string Action,
+    int RequestedCount,
+    int AffectedCount,
+    ReviewPersonResponse? Person,
+    DateTimeOffset CreatedAtUtc);
+
 public sealed record ReviewActionResponse(
     long Id,
     string Kind,
