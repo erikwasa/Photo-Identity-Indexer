@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 5;
+    public const int CurrentSchemaVersion = 6;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -262,6 +262,29 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 5;
         """;
 
+    private const string VersionSixMigration = """
+        CREATE TABLE IF NOT EXISTS identity_suggestion_review_actions (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            suggestion_id INTEGER NOT NULL,
+            action_kind TEXT NOT NULL CHECK (action_kind IN ('accept', 'reject')),
+            review_action_id INTEGER NULL,
+            actor TEXT NOT NULL,
+            note TEXT NULL,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (suggestion_id) REFERENCES identity_suggestions (id) ON DELETE CASCADE,
+            FOREIGN KEY (review_action_id) REFERENCES review_actions (id) ON DELETE RESTRICT,
+            CHECK (
+                (action_kind = 'accept' AND review_action_id IS NOT NULL)
+                OR (action_kind = 'reject' AND review_action_id IS NULL)
+            )
+        );
+        CREATE INDEX IF NOT EXISTS ix_identity_suggestion_review_history
+            ON identity_suggestion_review_actions (suggestion_id, id DESC);
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (6, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 6;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -325,6 +348,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 5)
         {
             await ApplyMigrationAsync(connection, VersionFiveMigration, cancellationToken);
+            version = 5;
+        }
+
+        if (version < 6)
+        {
+            await ApplyMigrationAsync(connection, VersionSixMigration, cancellationToken);
         }
     }
 
