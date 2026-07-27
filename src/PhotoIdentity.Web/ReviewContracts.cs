@@ -28,6 +28,14 @@ public sealed record ReviewActionResponse(
     bool Reversed,
     long? ReversesActionId);
 
+public sealed record ReviewSuggestionActionResponse(
+    long Id,
+    string Kind,
+    string Actor,
+    string? Note,
+    DateTimeOffset CreatedAtUtc,
+    long? ReviewActionId);
+
 public sealed record ReviewIdentitySuggestionResponse(
     long Id,
     ReviewPersonResponse Person,
@@ -37,7 +45,8 @@ public sealed record ReviewIdentitySuggestionResponse(
     double Score,
     double? ScoreMargin,
     string Status,
-    DateTimeOffset GeneratedAtUtc);
+    DateTimeOffset GeneratedAtUtc,
+    ReviewSuggestionActionResponse? LatestAction);
 
 public sealed record ReviewFaceDetailsResponse(
     ReviewFaceResponse Face,
@@ -52,3 +61,5 @@ public sealed record CreatePersonRequest(string DisplayName);
 public sealed record AssignFaceRequest(string PersonId, string Actor, string? Note = null);
 
 public sealed record ReviewFaceActionRequest(string Actor, string? Note = null);
+
+public sealed record ReviewSuggestionActionRequest(string Actor, string? Note = null);
