@@ -51,7 +51,7 @@ internal static class CatalogueEvaluationSplitPlanner
         {
             if (TryAllocatePerson(person, groups, assignments, options, out PersonAllocation? allocation))
             {
-                known.Add(allocation);
+                known.Add(allocation!);
             }
         }
 
