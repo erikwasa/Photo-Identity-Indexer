@@ -25,8 +25,8 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - [x] Accepting a suggestion advances to the next eligible face without returning to the gallery or skipping a face when queue membership changes.
 - [x] Gallery cards expose the rank-one pending suggestion, score, margin and exact active model revision without per-card HTTP or database queries.
 - [x] The queue can be ordered by suggested person, score margin, score and absence of suggestions, with stable deterministic tie-breaking.
-- [ ] An operator can open one person and review every active assigned face with pagination and audit links.
-- [ ] Person audit can surface assignments whose current top suggestion disagrees with the assigned person without changing canonical labels automatically.
+- [x] An operator can open one person and review every active assigned face with pagination and audit links.
+- [x] Person audit can surface assignments whose current top suggestion disagrees with the assigned person without changing canonical labels automatically.
 - [ ] Suggestion-oriented bulk review groups likely same-person faces, previews the exact affected count and requires explicit confirmation.
 - [ ] Bulk suggestion acceptance records both the normal assignment action and the linked suggestion-acceptance action for every affected face.
 - [ ] The revised workflow remains touch-usable and privacy-limited on Windows and Pixel.
@@ -50,6 +50,15 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - Cards support explicit acceptance through the existing audited suggestion endpoint, while ambiguous cases open an ordered quick-details queue with Previous, Next and automatic advance.
 - The workspace can retain an optional processing-run scope while keeping faces with no suggestion visible.
 - Integration coverage protects exact-model requirements, all ordering modes, mutation-stable queue navigation and privacy-limited responses.
+
+## Implemented slice: per-person identity audit
+
+- A dedicated Audit workspace lets the operator select one active person and page through every active assigned face.
+- Each face links to the existing append-only face audit history, where an incorrect assignment can be undone or corrected through the normal reviewed workflow.
+- The workspace can compare assignments with rank-one pending or accepted suggestions from one exact model revision.
+- Disagreement filtering and disagreement-first ordering are advisory only; rejected suggestions are excluded and no canonical label changes automatically.
+- Lowest-confidence and assignment-time ordering help identify likely review mistakes without exposing source roots, crop paths or embeddings.
+- Integration coverage protects active-assignment semantics, stable pagination, exact-model disagreement counts and privacy-limited responses.
 
 The completed interaction criteria still require final Windows and Pixel verification as part of the cross-device acceptance gate.
 
