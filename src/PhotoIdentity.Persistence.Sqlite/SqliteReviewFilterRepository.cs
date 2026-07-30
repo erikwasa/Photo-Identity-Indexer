@@ -10,7 +10,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteReviewFilterRepository
 {
-    private const string ReviewFaceSelect = """
+    private const string ReviewFaceCtes = """
         WITH latest_action AS (
             SELECT
                 review_actions.*,
@@ -37,21 +37,26 @@ public sealed class SqliteReviewFilterRepository
                     ORDER BY observed_at_utc DESC, detector_model_id, detector_model_hash) AS row_number
             FROM face_observations
         )
-        SELECT
-            face_occurrences.id,
-            face_occurrences.ordinal,
-            face_occurrences.created_at_utc,
-            assets.source_key,
-            COALESCE(asset_revisions.media_type, 'application/octet-stream'),
-            asset_revisions.width,
-            asset_revisions.height,
-            asset_revisions.content_sha256,
-            latest_crop.storage_path,
-            latest_observation.confidence,
-            latest_action.id,
-            latest_action.action_kind,
-            latest_action.person_id,
-            people.display_name
+        """;
+
+    private const string ReviewFaceColumns = """
+        face_occurrences.id,
+        face_occurrences.ordinal,
+        face_occurrences.created_at_utc,
+        assets.source_key,
+        COALESCE(asset_revisions.media_type, 'application/octet-stream'),
+        asset_revisions.width,
+        asset_revisions.height,
+        asset_revisions.content_sha256,
+        latest_crop.storage_path,
+        latest_observation.confidence,
+        latest_action.id,
+        latest_action.action_kind,
+        latest_action.person_id,
+        people.display_name
+        """;
+
+    private const string ReviewFaceFrom = """
         FROM face_occurrences
         INNER JOIN asset_revisions
             ON asset_revisions.id = face_occurrences.asset_revision_id
@@ -85,6 +90,7 @@ public sealed class SqliteReviewFilterRepository
         ProcessingRunId? processingRunId = null,
         ModelId? modelId = null,
         Sha256Digest? modelHash = null,
+        string sort = CatalogueReviewSorts.CreatedDescending,
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
@@ -93,45 +99,24 @@ public sealed class SqliteReviewFilterRepository
             throw new ArgumentOutOfRangeException(nameof(limit), "Review page size must be between 1 and 200.");
         }
 
-        if ((modelId is null) != (modelHash is null))
-        {
-            throw new ArgumentException("Model ID and model hash must be supplied together.");
-        }
+        ValidateScope(modelId, modelHash);
+        string orderBy = SortExpression(sort);
+        string predicate = BuildPredicate(state, processingRunId, modelId, modelHash);
 
-        List<string> predicates = [StatePredicate(state)];
-        if (processingRunId is not null)
-        {
-            predicates.Add("""
-                EXISTS (
-                    SELECT 1
-                    FROM processing_jobs
-                    WHERE processing_jobs.asset_revision_id = face_occurrences.asset_revision_id
-                      AND processing_jobs.processing_run_id = $processing_run_id)
-                """);
-        }
-
-        if (modelId is not null && modelHash is not null)
-        {
-            predicates.Add("""
-                EXISTS (
-                    SELECT 1
-                    FROM identity_suggestion_rankings
-                    WHERE identity_suggestion_rankings.face_occurrence_id = face_occurrences.id
-                      AND identity_suggestion_rankings.model_id = $model_id
-                      AND identity_suggestion_rankings.model_hash = $model_hash)
-                """);
-        }
-
-        string predicate = string.Join(" AND ", predicates.Select(value => $"({value})"));
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = $"""
-            {ReviewFaceSelect}
+            {ReviewFaceCtes}
+            SELECT
+                {ReviewFaceColumns}
+            {ReviewFaceFrom}
             WHERE {predicate}
-            ORDER BY face_occurrences.created_at_utc DESC, face_occurrences.id
+            ORDER BY {orderBy}
             LIMIT $limit OFFSET $offset;
             """;
-        AddParameters(command, offset, limit, processingRunId, modelId, modelHash);
+        AddScopeParameters(command, processingRunId, modelId, modelHash);
+        command.Parameters.AddWithValue("$limit", limit);
+        command.Parameters.AddWithValue("$offset", offset);
 
         List<CatalogueReviewFace> items = [];
         await using (SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
@@ -144,19 +129,73 @@ public sealed class SqliteReviewFilterRepository
 
         using SqliteCommand countCommand = connection.CreateCommand();
         countCommand.CommandText = $"""
+            {ReviewFaceCtes}
             SELECT COUNT(*)
-            FROM (
-                {ReviewFaceSelect}
-                WHERE {predicate}
-            );
+            {ReviewFaceFrom}
+            WHERE {predicate};
             """;
-        AddParameters(countCommand, offset, limit, processingRunId, modelId, modelHash);
+        AddScopeParameters(countCommand, processingRunId, modelId, modelHash);
         object? count = await countCommand.ExecuteScalarAsync(cancellationToken);
         return new CatalogueReviewFacePage(
             items,
             offset,
             limit,
             Convert.ToInt32(count, CultureInfo.InvariantCulture));
+    }
+
+    public async Task<CatalogueReviewFaceNavigation?> GetNavigationAsync(
+        FaceOccurrenceId faceOccurrenceId,
+        string state = "all",
+        ProcessingRunId? processingRunId = null,
+        ModelId? modelId = null,
+        Sha256Digest? modelHash = null,
+        string sort = CatalogueReviewSorts.CreatedDescending,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateScope(modelId, modelHash);
+        string normalizedSort = NormalizeSort(sort);
+        string orderBy = SortExpression(normalizedSort);
+        string predicate = BuildPredicate(state, processingRunId, modelId, modelHash);
+
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = $"""
+            {ReviewFaceCtes},
+            scoped_faces AS (
+                SELECT
+                    face_occurrences.id,
+                    LAG(face_occurrences.id) OVER (ORDER BY {orderBy}) AS previous_face_id,
+                    LEAD(face_occurrences.id) OVER (ORDER BY {orderBy}) AS next_face_id,
+                    ROW_NUMBER() OVER (ORDER BY {orderBy}) AS position,
+                    COUNT(*) OVER () AS total
+                {ReviewFaceFrom}
+                WHERE {predicate}
+            )
+            SELECT previous_face_id, next_face_id, position, total
+            FROM scoped_faces
+            WHERE id = $face_occurrence_id;
+            """;
+        AddScopeParameters(command, processingRunId, modelId, modelHash);
+        command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
+
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        FaceOccurrenceId? previous = reader.IsDBNull(0)
+            ? null
+            : FaceOccurrenceId.From(Guid.Parse(reader.GetString(0)));
+        FaceOccurrenceId? next = reader.IsDBNull(1)
+            ? null
+            : FaceOccurrenceId.From(Guid.Parse(reader.GetString(1)));
+        return new CatalogueReviewFaceNavigation(
+            previous,
+            next,
+            checked((int)reader.GetInt64(2)),
+            checked((int)reader.GetInt64(3)),
+            normalizedSort);
     }
 
     public async Task<CatalogueReviewFilterOptions> GetOptionsAsync(
@@ -224,16 +263,53 @@ public sealed class SqliteReviewFilterRepository
         return new CatalogueReviewFilterOptions(runs, models);
     }
 
-    private static void AddParameters(
-        SqliteCommand command,
-        int offset,
-        int limit,
+    private static string BuildPredicate(
+        string state,
         ProcessingRunId? processingRunId,
         ModelId? modelId,
         Sha256Digest? modelHash)
     {
-        command.Parameters.AddWithValue("$limit", limit);
-        command.Parameters.AddWithValue("$offset", offset);
+        List<string> predicates = [StatePredicate(state)];
+        if (processingRunId is not null)
+        {
+            predicates.Add("""
+                EXISTS (
+                    SELECT 1
+                    FROM processing_jobs
+                    WHERE processing_jobs.asset_revision_id = face_occurrences.asset_revision_id
+                      AND processing_jobs.processing_run_id = $processing_run_id)
+                """);
+        }
+
+        if (modelId is not null && modelHash is not null)
+        {
+            predicates.Add("""
+                EXISTS (
+                    SELECT 1
+                    FROM identity_suggestion_rankings
+                    WHERE identity_suggestion_rankings.face_occurrence_id = face_occurrences.id
+                      AND identity_suggestion_rankings.model_id = $model_id
+                      AND identity_suggestion_rankings.model_hash = $model_hash)
+                """);
+        }
+
+        return string.Join(" AND ", predicates.Select(value => $"({value})"));
+    }
+
+    private static void ValidateScope(ModelId? modelId, Sha256Digest? modelHash)
+    {
+        if ((modelId is null) != (modelHash is null))
+        {
+            throw new ArgumentException("Model ID and model hash must be supplied together.");
+        }
+    }
+
+    private static void AddScopeParameters(
+        SqliteCommand command,
+        ProcessingRunId? processingRunId,
+        ModelId? modelId,
+        Sha256Digest? modelHash)
+    {
         if (processingRunId is ProcessingRunId runId)
         {
             command.Parameters.AddWithValue("$processing_run_id", runId.ToString());
@@ -260,6 +336,25 @@ public sealed class SqliteReviewFilterRepository
             _ => throw new ArgumentException($"Unsupported review state '{state}'.", nameof(state)),
         };
     }
+
+    private static string NormalizeSort(string sort)
+    {
+        string normalized = string.IsNullOrWhiteSpace(sort)
+            ? CatalogueReviewSorts.CreatedDescending
+            : sort.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            CatalogueReviewSorts.CreatedDescending => normalized,
+            _ => throw new ArgumentException($"Unsupported review sort '{sort}'.", nameof(sort)),
+        };
+    }
+
+    private static string SortExpression(string sort) => NormalizeSort(sort) switch
+    {
+        CatalogueReviewSorts.CreatedDescending =>
+            "face_occurrences.created_at_utc DESC, face_occurrences.id",
+        _ => throw new ArgumentOutOfRangeException(nameof(sort)),
+    };
 
     private static CatalogueReviewFace ReadFace(SqliteDataReader reader)
     {
