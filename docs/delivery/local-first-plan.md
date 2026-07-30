@@ -41,7 +41,9 @@ Work is in progress. Native Enter submission, scope-aware Previous and Next cont
 
 The suggestion-gallery slice adds a dedicated exact-model workspace. It returns the rank-one pending suggestion, score, margin and full model revision in one paged response, supports task-oriented ordering by suggested person, margin, score or missing suggestion, and allows clear matches to be accepted directly from cards. Ambiguous cases retain the same ordering in a continuous quick-details queue.
 
-Remaining slices add per-person assigned-face audit, add preview-first grouped suggestion acceptance with linked audit actions, extend published smoke coverage, and measure a fresh 50–100-face queue on Windows and Pixel.
+The person-audit slice adds a dedicated read-only workspace for paging every active face assigned to one person. Exact-model comparison can place likely disagreements first or show only disagreements, while rejected suggestions remain excluded and canonical labels never change automatically. Every face links back to its append-only audit history for correction through the existing workflow.
+
+Remaining slices add preview-first grouped suggestion acceptance with linked audit actions, extend published smoke coverage, and measure a fresh 50–100-face queue on Windows and Pixel.
 
 The improved workflow must retain explicit human confirmation, append-only assignment and suggestion audit actions, exact model provenance and privacy-limited DTOs.
 

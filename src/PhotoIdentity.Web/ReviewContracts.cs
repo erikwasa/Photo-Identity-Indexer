@@ -141,6 +141,28 @@ public sealed record PersonMaintenanceActionResponse(
     DateTimeOffset CreatedAtUtc,
     bool Reversible);
 
+public sealed record PersonAuditFaceResponse(
+    string Id,
+    string ImageUrl,
+    string PhotoName,
+    int FaceOrdinal,
+    double? Confidence,
+    DateTimeOffset FaceCreatedAtUtc,
+    DateTimeOffset AssignedAtUtc,
+    long AssignmentActionId,
+    ReviewPersonResponse AssignedPerson,
+    ReviewTopSuggestionResponse? TopSuggestion,
+    bool SuggestionDisagrees);
+
+public sealed record PersonAuditPageResponse(
+    ReviewPersonResponse Person,
+    IReadOnlyList<PersonAuditFaceResponse> Items,
+    int Offset,
+    int Limit,
+    int Total,
+    int DisagreementCount,
+    string Sort);
+
 public sealed record CreatePersonRequest(string DisplayName);
 
 public sealed record RenamePersonRequest(string DisplayName, string Actor, string? Note = null);
