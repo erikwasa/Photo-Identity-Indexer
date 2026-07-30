@@ -22,6 +22,7 @@ public partial class Program
         builder.Services.AddSingleton<SqlitePersonAuditRepository>();
         builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();
+        builder.Services.AddSingleton<SqliteBulkSuggestionReviewRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton(TimeProvider.System);
 
@@ -57,6 +58,7 @@ public partial class Program
         app.MapPersonAuditEndpoints();
         app.MapPersonMaintenanceEndpoints();
         app.MapBulkReviewEndpoints();
+        app.MapBulkSuggestionReviewEndpoints();
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();
