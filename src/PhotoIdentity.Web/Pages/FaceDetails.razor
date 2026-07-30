@@ -390,7 +390,7 @@ else if (Details is not null)
 
     private static bool IsSafeRelativeUrl(string? value) =>
         !string.IsNullOrWhiteSpace(value) &&
-        value.StartsWith('/', StringComparison.Ordinal) &&
+        value.StartsWith("/", StringComparison.Ordinal) &&
         !value.StartsWith("//", StringComparison.Ordinal);
 
     private static async Task RequireSuccessAsync(HttpResponseMessage response)
