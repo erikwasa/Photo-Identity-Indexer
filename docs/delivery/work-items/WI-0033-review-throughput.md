@@ -23,8 +23,8 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - [x] Face details preserve the originating review state, processing-run scope, exact suggestion model revision and sort mode.
 - [x] Previous and Next controls navigate within the preserved queue on Windows and Pixel.
 - [x] Accepting a suggestion advances to the next eligible face without returning to the gallery or skipping a face when queue membership changes.
-- [ ] Gallery cards expose the rank-one pending suggestion, score, margin and exact active model revision without per-card HTTP or database queries.
-- [ ] The queue can be ordered by suggested person, score margin, score and absence of suggestions, with stable deterministic tie-breaking.
+- [x] Gallery cards expose the rank-one pending suggestion, score, margin and exact active model revision without per-card HTTP or database queries.
+- [x] The queue can be ordered by suggested person, score margin, score and absence of suggestions, with stable deterministic tie-breaking.
 - [ ] An operator can open one person and review every active assigned face with pagination and audit links.
 - [ ] Person audit can surface assignments whose current top suggestion disagrees with the assigned person without changing canonical labels automatically.
 - [ ] Suggestion-oriented bulk review groups likely same-person faces, previews the exact affected count and requires explicit confirmation.
@@ -42,7 +42,16 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - Suggestion acceptance captures the next eligible face before mutation and navigates to it with browser-history replacement; accepting the last face returns to the originating queue.
 - Integration coverage proves exact scope preservation, deterministic ordering, invalid-sort rejection, privacy boundaries and no skipped face after the current face leaves the unreviewed queue.
 
-The four completed criteria still require final Windows and Pixel interaction verification as part of the work item's cross-device acceptance gate.
+## Implemented slice: suggestion-aware gallery
+
+- A dedicated Suggestions workspace selects one exact ranked-suggestion model revision and returns every card's rank-one pending suggestion in the same paged response.
+- The SQLite query joins suggested person, score, margin and exact model provenance once per page; the browser performs no per-card suggestion request.
+- Operators can order the queue by suggested person, high or low score margin, score, missing suggestion or creation time with deterministic face-ID tie-breaking.
+- Cards support explicit acceptance through the existing audited suggestion endpoint, while ambiguous cases open an ordered quick-details queue with Previous, Next and automatic advance.
+- The workspace can retain an optional processing-run scope while keeping faces with no suggestion visible.
+- Integration coverage protects exact-model requirements, all ordering modes, mutation-stable queue navigation and privacy-limited responses.
+
+The completed interaction criteria still require final Windows and Pixel verification as part of the cross-device acceptance gate.
 
 ## Delivery slices
 
