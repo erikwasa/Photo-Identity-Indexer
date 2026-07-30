@@ -18,6 +18,13 @@ public sealed record ReviewFacePageResponse(
     int Limit,
     int Total);
 
+public sealed record ReviewFaceNavigationResponse(
+    string? PreviousFaceId,
+    string? NextFaceId,
+    int Position,
+    int Total,
+    string Sort);
+
 public sealed record ReviewProcessingRunFilterResponse(
     string Id,
     string Status,
@@ -101,7 +108,8 @@ public sealed record ReviewFaceDetailsResponse(
     int? PhotoWidth,
     int? PhotoHeight,
     string RevisionHashPrefix,
-    IReadOnlyList<ReviewActionResponse> Actions);
+    IReadOnlyList<ReviewActionResponse> Actions,
+    ReviewFaceNavigationResponse? Navigation);
 
 public sealed record PersonMaintenancePersonResponse(
     string Id,
