@@ -37,9 +37,11 @@ The pilot classified sustained review speed as an S3 usability defect with dispo
 
 ### WI-0033 — Accelerate the human review workflow
 
-Remove the pilot's review-throughput bottleneck before starting second-model work. Add native Enter submission for person creation, queue-aware Previous and Next navigation, automatic advance after suggestion acceptance, top-suggestion summaries in the gallery, per-person assigned-face audit and suggestion-aware grouping for preview-first bulk review.
+Work is in progress. The first slice adds native Enter submission for person creation, scope-aware Previous and Next controls, and automatic advance after suggestion acceptance. Queue neighbours are calculated from the same state, processing-run, exact model revision and deterministic sort scope as the originating view; the next face is captured before mutation so removing the current face cannot shift an offset and skip work.
 
-The improved workflow must retain explicit human confirmation, append-only assignment and suggestion audit actions, exact model provenance and privacy-limited DTOs. Verify it on a fresh 50–100-face queue and record faces per minute and interaction counts on both Windows and Pixel.
+Remaining slices expose top suggestions and suggestion-aware ordering in the gallery, add per-person assigned-face audit, add preview-first grouped suggestion acceptance with linked audit actions, and measure a fresh 50–100-face queue on Windows and Pixel.
+
+The improved workflow must retain explicit human confirmation, append-only assignment and suggestion audit actions, exact model provenance and privacy-limited DTOs.
 
 ## Phase B — repeat the workflow with multiple models
 

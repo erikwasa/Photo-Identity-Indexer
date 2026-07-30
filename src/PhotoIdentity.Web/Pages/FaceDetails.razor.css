@@ -1,3 +1,37 @@
+.review-navigation {
+    position: sticky;
+    top: 5.4rem;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: minmax(7rem, 1fr) auto minmax(7rem, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 0 1rem;
+    padding: 0.65rem;
+    background: rgba(255, 253, 248, 0.96);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(12px);
+}
+
+.review-navigation .button:last-child {
+    justify-self: end;
+}
+
+.review-navigation .disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.review-position {
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 750;
+    text-align: center;
+    white-space: nowrap;
+}
+
 .suggestion-guidance {
     max-width: 52rem;
     margin: 0.35rem 0 0;
@@ -43,6 +77,24 @@
 }
 
 @media (max-width: 620px) {
+    .review-navigation {
+        top: auto;
+        bottom: calc(0.55rem + env(safe-area-inset-bottom));
+        grid-template-columns: 1fr auto 1fr;
+        gap: 0.45rem;
+        padding: 0.55rem;
+    }
+
+    .review-navigation .button {
+        min-height: 48px;
+        padding-left: 0.55rem;
+        padding-right: 0.55rem;
+    }
+
+    .review-position {
+        font-size: 0.8rem;
+    }
+
     .suggestion-actions {
         display: grid;
         grid-template-columns: 1fr;

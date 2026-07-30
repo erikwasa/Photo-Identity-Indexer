@@ -11,15 +11,22 @@
         <p>Assign a person, reject a false detection, or undo the latest decision. Every change is retained in the local audit history.</p>
     </div>
 
-    <div class="person-creator">
+    <form class="person-creator" @onsubmit="CreatePersonAsync" @onsubmit:preventDefault>
         <label class="field-label" for="new-person">Create person</label>
         <div class="inline-field">
-            <input id="new-person" placeholder="Display name" maxlength="200" @bind="NewPersonName" @bind:event="oninput" />
-            <button class="button primary" disabled="@(string.IsNullOrWhiteSpace(NewPersonName) || CreatingPerson)" @onclick="CreatePersonAsync">
+            <input id="new-person"
+                   placeholder="Display name"
+                   maxlength="200"
+                   autocomplete="off"
+                   @bind="NewPersonName"
+                   @bind:event="oninput" />
+            <button type="submit"
+                    class="button primary"
+                    disabled="@(string.IsNullOrWhiteSpace(NewPersonName) || CreatingPerson)">
                 Add
             </button>
         </div>
-    </div>
+    </form>
 </section>
 
 <nav class="filter-tabs" aria-label="Review state">
@@ -165,6 +172,7 @@ else
         {
             <FaceCard Face="face"
                       People="People"
+                      DetailsUrl="@BuildDetailsUrl(face.Id)"
                       Selectable="@(face.State == "unreviewed")"
                       Selected="@SelectedFaceIds.Contains(face.Id)"
                       SelectionChanged="SetFaceSelection"
@@ -183,6 +191,7 @@ else
 @code {
     private const int PageSize = 40;
     private const string Actor = "local-reviewer";
+    private const string DefaultSort = "created-desc";
 
     private static readonly (string Value, string Label)[] Filters =
     [
@@ -192,12 +201,19 @@ else
         ("all", "All"),
     ];
 
+    [Parameter, SupplyParameterFromQuery(Name = "state")]
+    public string State { get; set; } = "unreviewed";
+
+    [Parameter, SupplyParameterFromQuery(Name = "offset")]
+    public int Offset { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "sort")]
+    public string Sort { get; set; } = DefaultSort;
+
     private ReviewFacePageResponse? Page { get; set; }
     private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
     private HashSet<string> SelectedFaceIds { get; } = new(StringComparer.Ordinal);
     private BulkReviewPreviewResponse? BulkPreview { get; set; }
-    private string State { get; set; } = "unreviewed";
-    private int Offset { get; set; }
     private string NewPersonName { get; set; } = "";
     private string BulkAction { get; set; } = "assign";
     private string BulkPersonId { get; set; } = "";
@@ -220,6 +236,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        State = Filters.Any(filter => filter.Value == State) ? State : "unreviewed";
+        Offset = Math.Max(0, Offset);
+        Sort = string.Equals(Sort, DefaultSort, StringComparison.Ordinal) ? Sort : DefaultSort;
         await LoadPeopleAsync();
         await LoadFacesAsync();
     }
@@ -240,7 +259,7 @@ else
         try
         {
             Page = await Http.GetFromJsonAsync<ReviewFacePageResponse>(
-                $"api/review/faces?state={Uri.EscapeDataString(State)}&offset={Offset}&limit={PageSize}");
+                $"api/review/faces?state={Uri.EscapeDataString(State)}&offset={Offset}&limit={PageSize}&sort={Uri.EscapeDataString(Sort)}");
             ResetBulkSelection();
         }
         catch (Exception exception)
@@ -263,17 +282,22 @@ else
 
     private async Task CreatePersonAsync()
     {
+        if (CreatingPerson || string.IsNullOrWhiteSpace(NewPersonName))
+        {
+            return;
+        }
+
         CreatingPerson = true;
         Error = null;
         Message = null;
+        string createdName = NewPersonName.Trim();
         try
         {
             using HttpResponseMessage response = await Http.PostAsJsonAsync(
                 "api/review/people",
-                new CreatePersonRequest(NewPersonName));
+                new CreatePersonRequest(createdName));
             await RequireSuccessAsync(response);
             ReviewPersonResponse? created = await response.Content.ReadFromJsonAsync<ReviewPersonResponse>();
-            string createdName = NewPersonName.Trim();
             NewPersonName = "";
             await LoadPeopleAsync();
             if (created is not null)
@@ -290,6 +314,15 @@ else
         {
             CreatingPerson = false;
         }
+    }
+
+    private string BuildDetailsUrl(string faceId)
+    {
+        string returnUrl = $"/?state={Uri.EscapeDataString(State)}&offset={Offset}&sort={Uri.EscapeDataString(Sort)}";
+        return $"/faces/{Uri.EscapeDataString(faceId)}" +
+               $"?state={Uri.EscapeDataString(State)}" +
+               $"&sort={Uri.EscapeDataString(Sort)}" +
+               $"&returnUrl={Uri.EscapeDataString(returnUrl)}";
     }
 
     private void SetFaceSelection((string FaceId, bool Selected) change)

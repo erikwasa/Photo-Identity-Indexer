@@ -17,6 +17,11 @@ public static class CatalogueReviewActionKinds
     public const string Undo = "undo";
 }
 
+public static class CatalogueReviewSorts
+{
+    public const string CreatedDescending = "created-desc";
+}
+
 public sealed record CatalogueReviewPerson(PersonId Id, string DisplayName);
 
 public sealed record CatalogueReviewAction(
@@ -52,3 +57,10 @@ public sealed record CatalogueReviewFacePage(
     int Offset,
     int Limit,
     int Total);
+
+public sealed record CatalogueReviewFaceNavigation(
+    FaceOccurrenceId? PreviousFaceId,
+    FaceOccurrenceId? NextFaceId,
+    int Position,
+    int Total,
+    string Sort);

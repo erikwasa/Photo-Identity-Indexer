@@ -1,5 +1,6 @@
 @page "/faces/{Id}"
 @inject HttpClient Http
+@inject NavigationManager Navigation
 
 <PageTitle>Face details · Photo Identity</PageTitle>
 
@@ -15,12 +16,37 @@ else if (!string.IsNullOrWhiteSpace(Error))
     <section class="empty-state">
         <h1>Face details unavailable</h1>
         <p>@Error</p>
-        <a class="button primary" href="/">Return to gallery</a>
+        <a class="button primary" href="@SafeReturnUrl">Return to queue</a>
     </section>
 }
 else if (Details is not null)
 {
-    <a class="back-link" href="/">← Back to review gallery</a>
+    <a class="back-link" href="@SafeReturnUrl">← Back to review queue</a>
+
+    @if (Details.Navigation is ReviewFaceNavigationResponse queue)
+    {
+        <nav class="review-navigation" aria-label="Review queue navigation">
+            @if (queue.PreviousFaceId is string previousFaceId)
+            {
+                <a class="button secondary" href="@BuildFaceUrl(previousFaceId)">← Previous</a>
+            }
+            else
+            {
+                <span class="button secondary disabled" aria-disabled="true">← Previous</span>
+            }
+
+            <span class="review-position">@queue.Position of @queue.Total</span>
+
+            @if (queue.NextFaceId is string nextFaceId)
+            {
+                <a class="button secondary" href="@BuildFaceUrl(nextFaceId)">Next →</a>
+            }
+            else
+            {
+                <span class="button secondary disabled" aria-disabled="true">Next →</span>
+            }
+        </nav>
+    }
 
     <section class="details-header">
         <div>
@@ -183,9 +209,28 @@ else if (Details is not null)
 
 @code {
     private const string Actor = "local-reviewer";
+    private const string DefaultSort = "created-desc";
 
     [Parameter]
     public string Id { get; set; } = "";
+
+    [Parameter, SupplyParameterFromQuery(Name = "state")]
+    public string QueueState { get; set; } = "all";
+
+    [Parameter, SupplyParameterFromQuery(Name = "processingRunId")]
+    public string? ProcessingRunId { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelId")]
+    public string? ModelId { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelHash")]
+    public string? ModelHash { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "sort")]
+    public string Sort { get; set; } = DefaultSort;
+
+    [Parameter, SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
 
     private ReviewFaceDetailsResponse? Details { get; set; }
     private IReadOnlyList<ReviewIdentitySuggestionResponse> Suggestions { get; set; } = [];
@@ -198,6 +243,8 @@ else if (Details is not null)
 
     private bool CanReviewSuggestions =>
         ActingSuggestionId is null && string.Equals(Details?.Face.State, "unreviewed", StringComparison.Ordinal);
+
+    private string SafeReturnUrl => IsSafeRelativeUrl(ReturnUrl) ? ReturnUrl! : "/";
 
     private string StateLabel => Details?.Face.State switch
     {
@@ -240,7 +287,7 @@ else if (Details is not null)
     {
         string escapedId = Uri.EscapeDataString(Id);
         Details = await Http.GetFromJsonAsync<ReviewFaceDetailsResponse>(
-            $"api/review/faces/{escapedId}");
+            $"api/review/faces/{escapedId}?{BuildScopeQuery()}");
         if (Details is null)
         {
             throw new InvalidOperationException("The face occurrence was not found.");
@@ -286,13 +333,22 @@ else if (Details is not null)
         ActingSuggestionId = suggestionId;
         ActionError = null;
         Message = null;
+        string? nextFaceId = Details?.Navigation?.NextFaceId;
         try
         {
             string escapedId = Uri.EscapeDataString(Id);
-            HttpResponseMessage response = await Http.PostAsJsonAsync(
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
                 $"api/review/faces/{escapedId}/suggestions/{suggestionId}/{decision}",
                 new ReviewSuggestionActionRequest(Actor));
             await RequireSuccessAsync(response);
+
+            if (string.Equals(decision, "accept", StringComparison.Ordinal))
+            {
+                string destination = nextFaceId is null ? SafeReturnUrl : BuildFaceUrl(nextFaceId);
+                Navigation.NavigateTo(destination, replace: true);
+                return;
+            }
+
             await RefreshAsync();
             Message = successMessage;
         }
@@ -306,6 +362,36 @@ else if (Details is not null)
             ConfirmingRejectSuggestionId = null;
         }
     }
+
+    private string BuildFaceUrl(string faceId) =>
+        $"/faces/{Uri.EscapeDataString(faceId)}?{BuildScopeQuery()}&returnUrl={Uri.EscapeDataString(SafeReturnUrl)}";
+
+    private string BuildScopeQuery()
+    {
+        List<string> query =
+        [
+            $"state={Uri.EscapeDataString(QueueState)}",
+            $"sort={Uri.EscapeDataString(Sort)}",
+        ];
+        if (!string.IsNullOrWhiteSpace(ProcessingRunId))
+        {
+            query.Add($"processingRunId={Uri.EscapeDataString(ProcessingRunId)}");
+        }
+        if (!string.IsNullOrWhiteSpace(ModelId))
+        {
+            query.Add($"modelId={Uri.EscapeDataString(ModelId)}");
+        }
+        if (!string.IsNullOrWhiteSpace(ModelHash))
+        {
+            query.Add($"modelHash={Uri.EscapeDataString(ModelHash)}");
+        }
+        return string.Join("&", query);
+    }
+
+    private static bool IsSafeRelativeUrl(string? value) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        value.StartsWith("/", StringComparison.Ordinal) &&
+        !value.StartsWith("//", StringComparison.Ordinal);
 
     private static async Task RequireSuccessAsync(HttpResponseMessage response)
     {

@@ -113,8 +113,9 @@ else
     <section class="progress-grid" aria-label="Filtered review progress">
         @foreach (ReviewFaceResponse face in Page.Items)
         {
+            string detailsUrl = BuildDetailsUrl(face.Id);
             <article class="progress-card state-@face.State">
-                <a class="progress-image-link" href="/faces/@face.Id" aria-label="Open details for @face.PhotoName face @(face.FaceOrdinal + 1)">
+                <a class="progress-image-link" href="@detailsUrl" aria-label="Open details for @face.PhotoName face @(face.FaceOrdinal + 1)">
                     <img src="@face.ImageUrl" alt="Detected face from @face.PhotoName" loading="lazy" />
                 </a>
                 <div>
@@ -127,7 +128,7 @@ else
                     {
                         <p>Person: <strong>@face.Person.DisplayName</strong></p>
                     }
-                    <a class="details-link" href="/faces/@face.Id">Open details →</a>
+                    <a class="details-link" href="@detailsUrl">Open details →</a>
                 </div>
             </article>
         }
@@ -141,13 +142,26 @@ else
 
 @code {
     private const int PageSize = 40;
+    private const string DefaultSort = "created-desc";
+
+    [Parameter, SupplyParameterFromQuery(Name = "state")]
+    public string State { get; set; } = "all";
+
+    [Parameter, SupplyParameterFromQuery(Name = "processingRunId")]
+    public string SelectedProcessingRunId { get; set; } = "";
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelId")]
+    public string SelectedModelId { get; set; } = "";
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelHash")]
+    public string SelectedModelHash { get; set; } = "";
+
+    [Parameter, SupplyParameterFromQuery(Name = "offset")]
+    public int Offset { get; set; }
 
     private ReviewFilterOptionsResponse Options { get; set; } = new([], []);
     private ReviewFacePageResponse? Page { get; set; }
-    private string State { get; set; } = "all";
-    private string SelectedProcessingRunId { get; set; } = "";
     private string SelectedModelIndex { get; set; } = "";
-    private int Offset { get; set; }
     private bool Loading { get; set; }
     private string? Error { get; set; }
 
@@ -168,7 +182,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Offset = Math.Max(0, Offset);
         await LoadOptionsAsync();
+        RestoreSelectedModel();
         await LoadFacesAsync();
     }
 
@@ -185,29 +201,30 @@ else
         }
     }
 
+    private void RestoreSelectedModel()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedModelId) || string.IsNullOrWhiteSpace(SelectedModelHash))
+        {
+            SelectedModelIndex = "";
+            return;
+        }
+
+        int index = Options.ModelRevisions
+            .Select((model, index) => (model, index))
+            .Where(item => item.model.ModelId == SelectedModelId && item.model.ModelHash == SelectedModelHash)
+            .Select(item => item.index)
+            .DefaultIfEmpty(-1)
+            .First();
+        SelectedModelIndex = index < 0 ? "" : index.ToString();
+    }
+
     private async Task LoadFacesAsync()
     {
         Loading = true;
         Error = null;
         try
         {
-            List<string> query =
-            [
-                $"state={Uri.EscapeDataString(State)}",
-                $"offset={Offset}",
-                $"limit={PageSize}",
-            ];
-            if (!string.IsNullOrWhiteSpace(SelectedProcessingRunId))
-            {
-                query.Add($"processingRunId={Uri.EscapeDataString(SelectedProcessingRunId)}");
-            }
-
-            if (SelectedModel is ReviewModelRevisionFilterResponse model)
-            {
-                query.Add($"modelId={Uri.EscapeDataString(model.ModelId)}");
-                query.Add($"modelHash={Uri.EscapeDataString(model.ModelHash)}");
-            }
-
+            List<string> query = BuildScopeQuery(includePaging: true);
             Page = await Http.GetFromJsonAsync<ReviewFacePageResponse>(
                 $"api/review/faces?{string.Join("&", query)}");
         }
@@ -224,6 +241,16 @@ else
     private async Task ApplyFiltersAsync()
     {
         Offset = 0;
+        if (SelectedModel is ReviewModelRevisionFilterResponse model)
+        {
+            SelectedModelId = model.ModelId;
+            SelectedModelHash = model.ModelHash;
+        }
+        else
+        {
+            SelectedModelId = "";
+            SelectedModelHash = "";
+        }
         await LoadFacesAsync();
     }
 
@@ -231,8 +258,42 @@ else
     {
         State = "all";
         SelectedProcessingRunId = "";
+        SelectedModelId = "";
+        SelectedModelHash = "";
         SelectedModelIndex = "";
         await ApplyFiltersAsync();
+    }
+
+    private string BuildDetailsUrl(string faceId)
+    {
+        string returnUrl = $"/progress?{string.Join("&", BuildScopeQuery(includePaging: true))}";
+        List<string> scope = BuildScopeQuery(includePaging: false);
+        scope.Add($"returnUrl={Uri.EscapeDataString(returnUrl)}");
+        return $"/faces/{Uri.EscapeDataString(faceId)}?{string.Join("&", scope)}";
+    }
+
+    private List<string> BuildScopeQuery(bool includePaging)
+    {
+        List<string> query =
+        [
+            $"state={Uri.EscapeDataString(State)}",
+            $"sort={Uri.EscapeDataString(DefaultSort)}",
+        ];
+        if (includePaging)
+        {
+            query.Add($"offset={Offset}");
+            query.Add($"limit={PageSize}");
+        }
+        if (!string.IsNullOrWhiteSpace(SelectedProcessingRunId))
+        {
+            query.Add($"processingRunId={Uri.EscapeDataString(SelectedProcessingRunId)}");
+        }
+        if (SelectedModel is ReviewModelRevisionFilterResponse model)
+        {
+            query.Add($"modelId={Uri.EscapeDataString(model.ModelId)}");
+            query.Add($"modelHash={Uri.EscapeDataString(model.ModelHash)}");
+        }
+        return query;
     }
 
     private async Task PreviousPageAsync()

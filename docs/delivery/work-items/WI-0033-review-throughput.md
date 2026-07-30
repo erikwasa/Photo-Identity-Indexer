@@ -19,10 +19,10 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 
 ## Acceptance criteria
 
-- [ ] Creating a person can be submitted with Enter on Windows and the mobile keyboard action on Pixel without duplicate creation.
-- [ ] Face details preserve the originating review state, processing-run scope, exact suggestion model revision and sort mode.
-- [ ] Previous and Next controls navigate within the preserved queue on Windows and Pixel.
-- [ ] Accepting a suggestion advances to the next eligible face without returning to the gallery or skipping a face when queue membership changes.
+- [x] Creating a person can be submitted with Enter on Windows and the mobile keyboard action on Pixel without duplicate creation.
+- [x] Face details preserve the originating review state, processing-run scope, exact suggestion model revision and sort mode.
+- [x] Previous and Next controls navigate within the preserved queue on Windows and Pixel.
+- [x] Accepting a suggestion advances to the next eligible face without returning to the gallery or skipping a face when queue membership changes.
 - [ ] Gallery cards expose the rank-one pending suggestion, score, margin and exact active model revision without per-card HTTP or database queries.
 - [ ] The queue can be ordered by suggested person, score margin, score and absence of suggestions, with stable deterministic tie-breaking.
 - [ ] An operator can open one person and review every active assigned face with pagination and audit links.
@@ -32,6 +32,17 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - [ ] The revised workflow remains touch-usable and privacy-limited on Windows and Pixel.
 - [ ] Published-application smoke coverage protects person creation submission, queue navigation, auto-advance, suggestion summaries, person filtering and bulk suggestion acceptance.
 - [ ] A fresh 50–100-face local queue records active review time, faces per minute, explicit actions per accepted suggestion, returns to the gallery and immediately undone decisions on both device types.
+
+## Implemented slice: queue-aware details review
+
+- Person creation on both the review and maintenance pages uses native form submission, so Enter and the mobile keyboard action share the same guarded create path as the Add button.
+- Gallery and progress links carry a privacy-limited queue scope consisting of review state, optional processing run, optional exact model ID/hash, deterministic sort and a validated relative return URL.
+- The filtered SQLite repository calculates Previous and Next IDs, one-based position and total from the same scope and order used by the queue.
+- Details navigation uses server-calculated neighbour IDs rather than mutable offsets.
+- Suggestion acceptance captures the next eligible face before mutation and navigates to it with browser-history replacement; accepting the last face returns to the originating queue.
+- Integration coverage proves exact scope preservation, deterministic ordering, invalid-sort rejection, privacy boundaries and no skipped face after the current face leaves the unreviewed queue.
+
+The four completed criteria still require final Windows and Pixel interaction verification as part of the work item's cross-device acceptance gate.
 
 ## Delivery slices
 

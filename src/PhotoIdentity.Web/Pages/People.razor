@@ -11,21 +11,22 @@
         <p>Rename a person with reversible audit history, or consolidate duplicates with an explicitly irreversible merge.</p>
     </div>
 
-    <div class="person-creator">
+    <form class="person-creator" @onsubmit="CreatePersonAsync" @onsubmit:preventDefault>
         <label class="field-label" for="new-person-maintenance">Create person</label>
         <div class="inline-field">
             <input id="new-person-maintenance"
                    placeholder="Display name"
                    maxlength="200"
+                   autocomplete="off"
                    @bind="NewPersonName"
                    @bind:event="oninput" />
-            <button class="button primary"
-                    disabled="@(string.IsNullOrWhiteSpace(NewPersonName) || Busy)"
-                    @onclick="CreatePersonAsync">
+            <button type="submit"
+                    class="button primary"
+                    disabled="@(string.IsNullOrWhiteSpace(NewPersonName) || Busy)">
                 Add
             </button>
         </div>
-    </div>
+    </form>
 </section>
 
 @if (!string.IsNullOrWhiteSpace(Error))
@@ -233,11 +234,19 @@ else
 
     private async Task CreatePersonAsync()
     {
+        if (Busy || string.IsNullOrWhiteSpace(NewPersonName))
+        {
+            return;
+        }
+
         string createdName = NewPersonName.Trim();
         await ApplyAsync(
             () => Http.PostAsJsonAsync("api/review/people", new CreatePersonRequest(createdName)),
             $"Created {createdName}.");
-        NewPersonName = "";
+        if (string.IsNullOrWhiteSpace(Error))
+        {
+            NewPersonName = "";
+        }
     }
 
     private async Task RenameAsync()
