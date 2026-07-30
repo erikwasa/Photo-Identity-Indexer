@@ -1,0 +1,104 @@
+name: update-wi0033-status
+
+on:
+  push:
+    branches:
+      - agent/WI-0033-queue-navigation
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wi0033-status-builder
+  cancel-in-progress: true
+
+jobs:
+  update-status:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Apply final source and registry edits
+        shell: pwsh
+        run: |
+          $detailsPath = "src/PhotoIdentity.Web/Pages/FaceDetails.razor"
+          $details = Get-Content $detailsPath -Raw
+          $details = $details.Replace(
+              "value.StartsWith('/', StringComparison.Ordinal)",
+              "value.StartsWith(\"/\", StringComparison.Ordinal)")
+          [System.IO.File]::WriteAllText($detailsPath, $details, [System.Text.UTF8Encoding]::new($false))
+
+          $testPath = "tests/PhotoIdentity.Integration.Tests/ReviewQueueNavigationApplicationTests.cs"
+          $test = Get-Content $testPath -Raw
+          $test = $test.Replace(
+              "Assert.Equal(`n                [seeded.NewestFaceId, seeded.MiddleFaceId, seeded.OldestFaceId],",
+              "Assert.Equal(`n                new[] { seeded.NewestFaceId, seeded.MiddleFaceId, seeded.OldestFaceId },")
+          [System.IO.File]::WriteAllText($testPath, $test, [System.Text.UTF8Encoding]::new($false))
+
+          $statusPath = "docs/delivery/status/work-items.yaml"
+          $status = Get-Content $statusPath -Raw
+          $old = @"
+            - id: WI-0033
+              title: Accelerate the human review workflow
+              milestone: M06
+              status: ready
+              owner: ai-agent
+              document: ../work-items/WI-0033-review-throughput.md
+              last_updated_at: '2026-07-30'
+              blockers:
+                - WI-0027
+                - WI-0029
+              evidence: []
+          "@.Replace("          ", "")
+          $new = @"
+            - id: WI-0033
+              title: Accelerate the human review workflow
+              milestone: M06
+              status: in_progress
+              owner: ai-agent
+              document: ../work-items/WI-0033-review-throughput.md
+              started_at: '2026-07-30'
+              last_updated_at: '2026-07-30'
+              branch: agent/WI-0033-queue-navigation
+              blockers:
+                - WI-0027
+                - WI-0029
+              evidence: []
+          "@.Replace("          ", "")
+          if ($status.Contains($old)) {
+              $status = $status.Replace($old, $new)
+          }
+          elseif (-not $status.Contains("status: in_progress") -or -not $status.Contains("branch: agent/WI-0033-queue-navigation")) {
+              throw "WI-0033 registry block was not in the expected ready or in-progress state."
+          }
+          [System.IO.File]::WriteAllText($statusPath, $status, [System.Text.UTF8Encoding]::new($false))
+
+      - name: Generate and validate delivery status
+        shell: pwsh
+        run: |
+          dotnet run --project tools/PhotoIdentity.Docs -- generate
+          dotnet run --project tools/PhotoIdentity.Docs -- validate
+          dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+
+      - name: Commit generated status
+        shell: pwsh
+        run: |
+          git rm .github/workflows/update-wi0033-status.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/PhotoIdentity.Web/Pages/FaceDetails.razor `
+                  tests/PhotoIdentity.Integration.Tests/ReviewQueueNavigationApplicationTests.cs `
+                  docs/delivery/status/work-items.yaml `
+                  docs/delivery/status/milestones.yaml `
+                  docs/delivery/status/current.md `
+                  docs/delivery/roadmap.md
+          git commit -m "Start WI-0033 queue navigation"
+          git pull --rebase origin agent/WI-0033-queue-navigation
+          git push origin HEAD:agent/WI-0033-queue-navigation
