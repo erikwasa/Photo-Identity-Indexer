@@ -32,7 +32,7 @@ public sealed class ReviewQueueNavigationApplicationTests
                 await client.GetFromJsonAsync<ReviewFacePageResponse>(
                     $"/api/review/faces?{scope}&limit=10"));
             Assert.Equal(
-                [seeded.NewestFaceId, seeded.MiddleFaceId, seeded.OldestFaceId],
+                new[] { seeded.NewestFaceId, seeded.MiddleFaceId, seeded.OldestFaceId },
                 page.Items.Select(face => face.Id).ToArray());
 
             ReviewFaceDetailsResponse middle = Assert.IsType<ReviewFaceDetailsResponse>(
