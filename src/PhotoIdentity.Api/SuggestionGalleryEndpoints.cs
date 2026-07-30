@@ -10,7 +10,7 @@ public static class SuggestionGalleryEndpoints
     public static IEndpointRouteBuilder MapSuggestionGalleryEndpoints(this IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/review/suggestion-faces");
-        group.MapGet("/", GetFacesAsync);
+        group.MapGet("", GetFacesAsync);
         group.MapGet("/{id}", GetFaceAsync);
         return endpoints;
     }
