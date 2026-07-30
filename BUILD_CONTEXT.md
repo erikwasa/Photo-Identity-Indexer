@@ -10,21 +10,24 @@ Status: `in_progress`
 
 - **WI-0033 — Accelerate the human review workflow**
 
-The first delivery slice is in progress on `agent/WI-0033-queue-navigation`. It replaces pointer-only person creation with native form submission and turns face details into a continuous, scope-aware review queue.
+Queue-aware details review is merged. The next slice is on `agent/WI-0033-suggestion-gallery` and adds a dedicated exact-model suggestion workspace for scanning, ordering and accepting top matches without opening every face.
 
-## Implemented in the current slice
+## Implemented WI-0033 slices
 
 - Enter and the Pixel mobile keyboard action submit person creation through the same guarded path as the Add button.
 - Gallery and progress links preserve review state, processing run, exact suggestion model revision, deterministic sort and a safe relative return target.
 - The API returns server-calculated Previous and Next face IDs plus queue position and total.
 - Accepting a suggestion captures the next eligible face before mutation and advances without returning to the gallery or skipping work.
-- Integration coverage protects scope intersection, mutation-stable navigation, invalid-sort rejection and privacy-limited responses.
+- The Suggestions workspace returns rank-one pending matches, scores, margins and exact model provenance in one paged response.
+- Suggestion review can be ordered by suggested person, high or low score margin, score, missing suggestion or creation time with stable tie-breaking.
+- Clear matches can be accepted directly from cards; ambiguous matches open an ordered quick-details queue.
+- Integration coverage protects exact-model requirements, scoped ordering, mutation-stable navigation and privacy-limited responses.
 
 ## Remaining WI-0033 slices
 
-1. expose top suggestions and suggestion-aware ordering in the gallery;
-2. add per-person assigned-face audit;
-3. add preview-first grouped suggestion acceptance with linked audit actions; and
+1. add per-person assigned-face audit;
+2. add preview-first grouped suggestion acceptance with linked audit actions;
+3. extend published-application smoke coverage across the completed workflow; and
 4. measure a fresh 50–100-face queue on Windows and Pixel.
 
 ## Recently completed
