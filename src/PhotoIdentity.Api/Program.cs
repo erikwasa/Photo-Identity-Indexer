@@ -18,6 +18,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteReviewRepository>();
         builder.Services.AddSingleton<SqliteReviewFilterRepository>();
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
+        builder.Services.AddSingleton<SqliteSuggestionGalleryRepository>();
         builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
@@ -51,6 +52,7 @@ public partial class Program
         }));
         app.MapReviewEndpoints();
         app.MapReviewSuggestionEndpoints();
+        app.MapSuggestionGalleryEndpoints();
         app.MapPersonMaintenanceEndpoints();
         app.MapBulkReviewEndpoints();
         app.MapFallbackToFile("index.html");
