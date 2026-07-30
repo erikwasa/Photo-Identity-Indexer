@@ -10,20 +10,19 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M03 — OneDrive synchronised source**: `completed`
 - **M04 — Minimal review application**: `completed`
 - **M05 — Identity matching**: `completed`
-- **M06 — Local evaluation and acceptance**: `in_progress`
+- **M06 — Local evaluation and acceptance**: `ready`
 - **M07 — Portable job bundles**: `completed`
 
 ## Active work
 
-- [**WI-0027 — Complete the local review workflow**](../work-items/WI-0027-review-workflow.md) — `in_review`; owner: `ai-agent`
-- [**WI-0028 — Export reviewed catalogues to model-lab**](../work-items/WI-0028-catalogue-evaluation-export.md) — `in_review`; owner: `ai-agent`
+None.
 
 ## Recently completed
 
-- [**WI-0018 — Add portable bundles**](../work-items/WI-0018-portable-bundles.md) — `completed`; owner: `ai-agent`
-- [**WI-0017 — Add evaluation harness**](../work-items/WI-0017-evaluation.md) — `completed`; owner: `ai-agent`
-- [**WI-0016 — Add identity matcher**](../work-items/WI-0016-matcher.md) — `completed`; owner: `ai-agent`
+- [**WI-0029 — Run a 500-image local acceptance pilot**](../work-items/WI-0029-local-acceptance-pilot.md) — `completed`; owner: `human-maintainer`
+- [**WI-0028 — Export reviewed catalogues to model-lab**](../work-items/WI-0028-catalogue-evaluation-export.md) — `completed`; owner: `ai-agent`
+- [**WI-0027 — Complete the local review workflow**](../work-items/WI-0027-review-workflow.md) — `completed`; owner: `ai-agent`
 
 ## Next ready work
 
-None.
+- [**WI-0033 — Accelerate the human review workflow**](../work-items/WI-0033-review-throughput.md) — `ready`; owner: `ai-agent`

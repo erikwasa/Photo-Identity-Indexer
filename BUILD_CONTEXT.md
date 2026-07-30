@@ -8,45 +8,46 @@ Status: `ready`
 
 ## Next ready work
 
-- **WI-0027 — Complete the local review workflow**
-- **WI-0028 — Export reviewed catalogues to model-lab**
+- **WI-0033 — Accelerate the human review workflow**
 
-These items are intentionally parallel. WI-0029, the 500-image local acceptance pilot, starts only after both are complete.
+The 500-image baseline pilot passed, but sustained review was too click-heavy on Windows and Pixel. WI-0033 is the explicit fix-before-proceeding gate before adding a second model or collection-ready queries.
 
 ## Recently completed
 
-**WI-0017 — Add evaluation harness** merged through pull request #34 at `d0093e1a817dd81c905cc3edf908f35e8fe4b65f` on 2026-07-27. The deterministic evaluation command separates gallery, validation and held-out test data, records exact model provenance and reports accuracy, confusion and throughput.
+- **WI-0029 — Run a 500-image local acceptance pilot** was human-verified on 2026-07-30. Batch restart/resume, cross-device review, matcher invariants, deterministic export/evaluation, aggregate measurements, backup, restore and cleanup passed on a private representative subset.
+- **WI-0028 — Export reviewed catalogues to model-lab** was human-verified against the private reviewed catalogue on 2026-07-30.
+- **WI-0027 — Complete the local review workflow** was human-verified on Windows and Pixel on 2026-07-30.
 
-## Planning branch
+Only privacy-safe conclusions are retained in the repository. Private photos, names, crops, embeddings, databases, raw manifests, reports and local paths remain local.
 
-- Branch: `agent/local-first-delivery-plan`
-- Pull request: [#35 — Replan delivery around local acceptance](https://github.com/erikwasa/Photo-Identity-Indexer/pull/35)
+## Accepted pilot finding
+
+The product is functionally correct, but review is too slow because:
+
+- creating a person requires a pointer/touch action rather than native form submission;
+- accepting a suggestion reloads the same details page instead of advancing;
+- details pages do not preserve queue position or provide Previous and Next navigation;
+- gallery cards do not expose top suggestions;
+- assigned faces cannot be audited by person; and
+- bulk review is not organised around suggestion groups.
+
+Elapsed review time was not captured, so WI-0033 includes a fresh 50–100-face throughput measurement on both device types.
 
 ## Delivery objective
 
 Prove as much of the product as possible without Azure:
 
-1. complete sustained browser review on Windows and Pixel;
-2. export evaluation data from the reviewed catalogue;
-3. run a representative 450–550 image baseline pilot;
-4. add a second model and repeat the same corpus;
-5. exercise practical collection queries; and
-6. rewrite and independently validate the operator and architecture documentation.
-
-Azure execution resumes after this phase and only when access is available.
-
-## Current implementation gaps addressed by the next items
-
-- Ranked suggestions exist in persistence but are not yet an operator workflow in the browser.
-- Person rename/merge, safe bulk review and revision-aware progress are not yet complete.
-- The evaluation harness consumes a prepared manifest but does not yet export one from the catalogue.
-- Multi-model outputs are versioned in the architecture, but a second adapter and revision-aware comparison workflow are not yet implemented.
+1. close the baseline review-throughput gap;
+2. add a second model and repeat the same corpus;
+3. exercise practical collection queries;
+4. rewrite and independently validate the operator and architecture documentation; and
+5. resume Azure execution only when access is available.
 
 ## Relevant planning files
 
 - `docs/delivery/local-first-plan.md`
-- `docs/operations/local-evaluation.md`
 - `docs/delivery/milestones/M06-evaluation.md`
+- `docs/delivery/work-items/WI-0033-review-throughput.md`
 - `docs/delivery/milestones/M08-second-model.md`
 - `docs/delivery/milestones/M15-documentation.md`
 - `docs/delivery/status/work-items.yaml`

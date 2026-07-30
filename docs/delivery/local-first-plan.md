@@ -23,31 +23,29 @@ Record only privacy-safe aggregate counts in the repository. Photos, names, crop
 
 ### WI-0027 — Complete the local review workflow
 
-Ranked suggestion display and decisions, durable rejected-pair exclusions, audited person maintenance, preview-first bulk review and combined progress filters are implemented. The remaining workflow work is final Windows/Pixel usability and complete smoke verification.
-
-Bulk assignment and face rejection display affected and skipped counts before commit. Commits require the exact server-generated preview token and fail without partial changes when the eligible set becomes stale.
-
-The progress view combines review state, processing-run scope and exact ranked-suggestion model ID and SHA-256 revision. It exposes aggregate counts and opaque identifiers without source roots, crop paths or embeddings.
+Completed and human-verified on Windows and Pixel on 2026-07-30. Ranked suggestion decisions, durable rejected-pair exclusions, audited person maintenance, preview-first bulk review, combined progress filters and published-application smoke coverage all passed against the local workflow.
 
 ### WI-0028 — Export reviewed catalogues to model-lab
 
-Deterministic catalogue export is implemented for exact detector and embedder revisions with either processing-run or explicit asset-revision scope. A required recorded seed assigns whole immutable source revisions to gallery, validation or test, preventing photo and face leakage.
-
-The manifest uses only active human assignments. Known samples belong to gallery people; unknown samples are human-assigned faces whose people are absent from the gallery. It records model and source revision hashes, pipeline version, split configuration and a canonical catalogue-input digest without source roots or crop paths.
-
-WI-0027 and WI-0028 remain in review and will be exercised together against the private 500-image pilot catalogue on Windows and Pixel before either is marked complete.
+Completed and human-verified against the private reviewed catalogue on 2026-07-30. Repeated export and evaluation produced deterministic bytes, preserved source-photo split isolation and kept real manifests and local paths outside the repository.
 
 ### WI-0029 — Run a 500-image local acceptance pilot
 
-After WI-0027 and WI-0028, process and review the baseline corpus end to end. Exercise restart, resume, backup, restore, matcher regeneration, suggestion acceptance/rejection, person maintenance, evaluation export and privacy-safe evidence capture.
+Completed on 2026-07-30. The representative private subset passed batch restart/resume, Windows and Pixel review, matcher regeneration, deterministic evaluation, storage and aggregate metric capture, backup, restore and cleanup. No private media or biometric artefacts were committed.
 
-The pilot is complete only when every observed defect or usability gap has an explicit fix, defer or accept decision.
+The pilot classified sustained review speed as an S3 usability defect with disposition **fix before proceeding**. Elapsed review time was not captured, but the operator found the click-heavy workflow too slow on both device types.
+
+### WI-0033 — Accelerate the human review workflow
+
+Remove the pilot's review-throughput bottleneck before starting second-model work. Add native Enter submission for person creation, queue-aware Previous and Next navigation, automatic advance after suggestion acceptance, top-suggestion summaries in the gallery, per-person assigned-face audit and suggestion-aware grouping for preview-first bulk review.
+
+The improved workflow must retain explicit human confirmation, append-only assignment and suggestion audit actions, exact model provenance and privacy-limited DTOs. Verify it on a fresh 50–100-face queue and record faces per minute and interaction counts on both Windows and Pixel.
 
 ## Phase B — repeat the workflow with multiple models
 
 ### WI-0019 — Add a second model adapter
 
-Add one candidate detector or embedder through the neutral contracts. Keep baseline and candidate results separate by model ID and hash while sharing canonical people and human review history.
+Add one candidate detector or embedder through the neutral contracts after WI-0033 closes the baseline review-throughput gate. Keep baseline and candidate results separate by model ID and hash while sharing canonical people and human review history.
 
 ### WI-0030 — Run a multi-model local comparison
 
@@ -59,7 +57,7 @@ This phase produces a recommendation, not necessarily a final production-model d
 
 ### WI-0025 — Add collection-ready queries
 
-Use the accepted pilot catalogue to prove any-person, all-person, confirmed-only and opt-in suggestion queries, plus a neutral collection manifest.
+Use the accepted pilot catalogue after the review-throughput gate to prove any-person, all-person, confirmed-only and opt-in suggestion queries, plus a neutral collection manifest.
 
 ### WI-0031 — Rewrite operator and architecture documentation
 
@@ -73,7 +71,7 @@ Follow the rewritten documentation from a clean Windows checkout and repeat the 
 
 WI-0020 and the later Azure milestones remain part of the architecture, but WI-0020 now depends on WI-0032. Azure work resumes only after:
 
-1. the baseline 500-image pilot is accepted;
+1. the baseline 500-image pilot and review-throughput follow-up are accepted;
 2. the multi-model local comparison is complete;
 3. collection queries are exercised; and
 4. the documentation is validated from a clean setup.
@@ -82,10 +80,9 @@ This is a delivery gate, not a statement that Azure is technically required by t
 
 ## Recommended execution order
 
-1. WI-0027 and WI-0028 in parallel.
-2. WI-0029.
-3. WI-0019.
-4. WI-0030 and then WI-0025.
-5. WI-0031.
-6. WI-0032.
-7. WI-0020 when Azure access is available.
+1. WI-0033.
+2. WI-0019.
+3. WI-0030 and then WI-0025.
+4. WI-0031.
+5. WI-0032.
+6. WI-0020 when Azure access is available.

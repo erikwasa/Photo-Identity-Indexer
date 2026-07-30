@@ -3,7 +3,7 @@ id: WI-0019
 title: Add a second model adapter
 milestone: M08
 status_source: ../status/work-items.yaml
-depends_on: [WI-0017, WI-0018, WI-0029]
+depends_on: [WI-0017, WI-0018, WI-0029, WI-0033]
 affected_modules: [PhotoIdentity.Recognition.Onnx, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Worker, tools/model-lab]
 ---
 
