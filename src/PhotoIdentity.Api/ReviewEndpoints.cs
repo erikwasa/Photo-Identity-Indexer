@@ -32,6 +32,7 @@ public static class ReviewEndpoints
         string? processingRunId = null,
         string? modelId = null,
         string? modelHash = null,
+        string sort = CatalogueReviewSorts.CreatedDescending,
         CancellationToken cancellationToken = default)
     {
         if (!TryProcessingRunId(processingRunId, out ProcessingRunId? parsedRunId) ||
@@ -49,6 +50,7 @@ public static class ReviewEndpoints
                 parsedRunId,
                 parsedModelId,
                 parsedModelHash,
+                sort,
                 cancellationToken);
             return Results.Ok(new ReviewFacePageResponse(
                 page.Items.Select(ToResponse).ToArray(),
@@ -84,11 +86,23 @@ public static class ReviewEndpoints
     private static async Task<IResult> GetFaceAsync(
         string id,
         SqliteReviewRepository repository,
-        CancellationToken cancellationToken)
+        SqliteReviewFilterRepository filterRepository,
+        string state = "all",
+        string? processingRunId = null,
+        string? modelId = null,
+        string? modelHash = null,
+        string sort = CatalogueReviewSorts.CreatedDescending,
+        CancellationToken cancellationToken = default)
     {
         if (!TryFaceOccurrenceId(id, out FaceOccurrenceId faceOccurrenceId))
         {
             return BadRequest("The face occurrence identifier is invalid.");
+        }
+
+        if (!TryProcessingRunId(processingRunId, out ProcessingRunId? parsedRunId) ||
+            !TryModelRevision(modelId, modelHash, out ModelId? parsedModelId, out Sha256Digest? parsedModelHash))
+        {
+            return BadRequest("The processing run or model revision filter is invalid.");
         }
 
         CatalogueReviewFace? face = await repository.GetFaceAsync(faceOccurrenceId, cancellationToken);
@@ -97,16 +111,39 @@ public static class ReviewEndpoints
             return Results.NotFound();
         }
 
-        IReadOnlyList<CatalogueReviewAction> actions = await repository.GetActionsAsync(
-            faceOccurrenceId,
-            cancellationToken);
-        return Results.Ok(new ReviewFaceDetailsResponse(
-            ToResponse(face),
-            face.MediaType,
-            face.PhotoWidth,
-            face.PhotoHeight,
-            face.RevisionHash.ToString()[..12],
-            actions.Select(ToResponse).ToArray()));
+        try
+        {
+            IReadOnlyList<CatalogueReviewAction> actions = await repository.GetActionsAsync(
+                faceOccurrenceId,
+                cancellationToken);
+            CatalogueReviewFaceNavigation? navigation = await filterRepository.GetNavigationAsync(
+                faceOccurrenceId,
+                state,
+                parsedRunId,
+                parsedModelId,
+                parsedModelHash,
+                sort,
+                cancellationToken);
+            return Results.Ok(new ReviewFaceDetailsResponse(
+                ToResponse(face),
+                face.MediaType,
+                face.PhotoWidth,
+                face.PhotoHeight,
+                face.RevisionHash.ToString()[..12],
+                actions.Select(ToResponse).ToArray(),
+                navigation is null
+                    ? null
+                    : new ReviewFaceNavigationResponse(
+                        navigation.PreviousFaceId?.ToString(),
+                        navigation.NextFaceId?.ToString(),
+                        navigation.Position,
+                        navigation.Total,
+                        navigation.Sort)));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
     }
 
     private static async Task<IResult> GetFaceImageAsync(
