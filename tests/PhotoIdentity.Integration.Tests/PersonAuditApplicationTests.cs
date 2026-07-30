@@ -263,12 +263,11 @@ public sealed class PersonAuditApplicationTests
         for (int index = 0; index < names.Length; index++)
         {
             string name = names[index];
-            string revisionId = Guid.NewGuid().ToString("D");
             command.Parameters.AddWithValue($"${name}_asset_id", Guid.NewGuid().ToString("D"));
-            command.Parameters.AddWithValue($"${name}_revision_id", revisionId);
-            command.Parameters.AddWithValue($"${name}_hash", new string((char)('e' + index), 64));
+            command.Parameters.AddWithValue($"${name}_revision_id", Guid.NewGuid().ToString("D"));
+            command.Parameters.AddWithValue($"${name}_hash", new string("bcd"[index], 64));
             command.Parameters.AddWithValue($"${name}_crop_id", Guid.NewGuid().ToString("D"));
-            command.Parameters.AddWithValue($"${name}_crop_hash", new string((char)('h' + index), 64));
+            command.Parameters.AddWithValue($"${name}_crop_hash", new string("def"[index], 64));
             command.Parameters.AddWithValue(
                 $"${name}_crop_path",
                 Path.Combine(cropStorageRoot, $"{name}.png"));
