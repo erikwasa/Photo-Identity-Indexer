@@ -1,0 +1,179 @@
+<article class="suggestion-face-card state-@Face.State">
+    <a class="suggestion-image-link" href="@DetailsUrl" aria-label="Open quick review for @Face.PhotoName face @(Face.FaceOrdinal + 1)">
+        <img src="@Face.ImageUrl" alt="Detected face from @Face.PhotoName" loading="lazy" />
+    </a>
+
+    <div class="suggestion-card-body">
+        <div class="suggestion-card-heading">
+            <div>
+                <strong>@Face.PhotoName</strong>
+                <small>Face @(Face.FaceOrdinal + 1)</small>
+            </div>
+            <span class="state-badge">@StateLabel</span>
+        </div>
+
+        @if (Face.TopSuggestion is ReviewTopSuggestionResponse suggestion)
+        {
+            <section class="top-suggestion" aria-label="Top identity suggestion">
+                <p class="eyebrow">Top suggestion</p>
+                <strong>@suggestion.Person.DisplayName</strong>
+                <p>Score @suggestion.Score.ToString("F4") · Margin @MarginLabel(suggestion.ScoreMargin)</p>
+                <details>
+                    <summary>@suggestion.ModelId · exact revision</summary>
+                    <code>@suggestion.ModelHash</code>
+                </details>
+                @if (Face.State == "unreviewed")
+                {
+                    <button class="button primary full-width"
+                            disabled="@Busy"
+                            @onclick="AcceptTopSuggestionAsync">
+                        Accept @suggestion.Person.DisplayName
+                    </button>
+                }
+            </section>
+        }
+        else
+        {
+            <p class="no-suggestion">No pending top suggestion for the active model.</p>
+        }
+
+        @if (Face.Person is not null)
+        {
+            <p class="current-person">Assigned to <strong>@Face.Person.DisplayName</strong></p>
+        }
+
+        <label class="field-label" for="suggestion-person-@Face.Id">Manual person</label>
+        <select id="suggestion-person-@Face.Id" @bind="SelectedPersonId" disabled="@(People.Count == 0 || Busy)">
+            <option value="">Choose a person</option>
+            @foreach (ReviewPersonResponse person in People)
+            {
+                <option value="@person.Id">@person.DisplayName</option>
+            }
+        </select>
+
+        <div class="suggestion-card-actions">
+            <button class="button secondary"
+                    disabled="@(string.IsNullOrWhiteSpace(SelectedPersonId) || Busy)"
+                    @onclick="AssignAsync">
+                Assign
+            </button>
+            <button class="button danger" disabled="@Busy" @onclick="RejectAsync">
+                Reject face
+            </button>
+            <button class="button secondary"
+                    disabled="@(Face.State == "unreviewed" || Busy)"
+                    @onclick="UndoAsync">
+                Undo
+            </button>
+        </div>
+
+        <a class="details-link" href="@DetailsUrl">Quick suggestion review →</a>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public ReviewFaceResponse Face { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public string DetailsUrl { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<(string FaceId, long SuggestionId)> AcceptSuggestionRequested { get; set; }
+
+    [Parameter]
+    public EventCallback<(string FaceId, string PersonId)> AssignRequested { get; set; }
+
+    [Parameter]
+    public EventCallback<string> RejectRequested { get; set; }
+
+    [Parameter]
+    public EventCallback<string> UndoRequested { get; set; }
+
+    private string SelectedPersonId { get; set; } = "";
+    private bool Busy { get; set; }
+
+    private string StateLabel => Face.State switch
+    {
+        "assigned" => "Assigned",
+        "rejected" => "Rejected",
+        _ => "Needs review",
+    };
+
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedPersonId) && Face.Person is not null)
+        {
+            SelectedPersonId = Face.Person.Id;
+        }
+    }
+
+    private async Task AcceptTopSuggestionAsync()
+    {
+        if (Face.TopSuggestion is not ReviewTopSuggestionResponse suggestion)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            await AcceptSuggestionRequested.InvokeAsync((Face.Id, suggestion.Id));
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task AssignAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedPersonId))
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            await AssignRequested.InvokeAsync((Face.Id, SelectedPersonId));
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RejectAsync()
+    {
+        Busy = true;
+        try
+        {
+            await RejectRequested.InvokeAsync(Face.Id);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task UndoAsync()
+    {
+        Busy = true;
+        try
+        {
+            await UndoRequested.InvokeAsync(Face.Id);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private static string MarginLabel(double? margin) => margin is double value
+        ? value.ToString("F4")
+        : "—";
+}
