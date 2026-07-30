@@ -10,7 +10,7 @@
         </label>
     }
 
-    <a class="face-image-link" href="/faces/@Face.Id" aria-label="Open details for @Face.PhotoName face @(Face.FaceOrdinal + 1)">
+    <a class="face-image-link" href="@ResolvedDetailsUrl" aria-label="Open details for @Face.PhotoName face @(Face.FaceOrdinal + 1)">
         <img class="face-image" src="@Face.ImageUrl" alt="Detected face from @Face.PhotoName" loading="lazy" />
     </a>
 
@@ -56,7 +56,7 @@
             </button>
         </div>
 
-        <a class="details-link" href="/faces/@Face.Id">Photo details and audit history →</a>
+        <a class="details-link" href="@ResolvedDetailsUrl">Photo details and audit history →</a>
     </div>
 </article>
 
@@ -66,6 +66,9 @@
 
     [Parameter, EditorRequired]
     public IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+
+    [Parameter]
+    public string? DetailsUrl { get; set; }
 
     [Parameter]
     public bool Selectable { get; set; }
@@ -87,6 +90,10 @@
 
     private string SelectedPersonId { get; set; } = "";
     private bool Busy { get; set; }
+
+    private string ResolvedDetailsUrl => string.IsNullOrWhiteSpace(DetailsUrl)
+        ? $"/faces/{Uri.EscapeDataString(Face.Id)}"
+        : DetailsUrl;
 
     private string StateLabel => Face.State switch
     {
