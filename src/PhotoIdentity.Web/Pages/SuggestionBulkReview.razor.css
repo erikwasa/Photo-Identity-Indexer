@@ -1,0 +1,125 @@
+.bulk-suggestion-hero {
+    align-items: center;
+}
+
+.bulk-suggestion-panel,
+.suggestion-person-group {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: rgba(255, 253, 248, 0.92);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: var(--shadow);
+}
+
+.bulk-suggestion-panel-heading,
+.suggestion-person-group-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.bulk-suggestion-panel-heading h2,
+.suggestion-person-group-heading h2 {
+    margin: 0.15rem 0 0.35rem;
+}
+
+.bulk-suggestion-panel-heading p:not(.eyebrow),
+.suggestion-person-group-heading span {
+    color: var(--muted);
+}
+
+.suggestion-group-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.65rem;
+    margin-top: 1rem;
+}
+
+.suggestion-group-button {
+    display: grid;
+    gap: 0.2rem;
+    min-height: 4.25rem;
+    padding: 0.75rem;
+    text-align: left;
+    color: inherit;
+    background: #f5f2e9;
+    border: 1px solid var(--line);
+    border-radius: 0.8rem;
+    cursor: pointer;
+}
+
+.suggestion-group-button.active {
+    background: #e7f1eb;
+    border-color: var(--accent);
+}
+
+.suggestion-group-button span {
+    color: var(--muted);
+    font-size: 0.84rem;
+}
+
+.bulk-suggestion-controls {
+    display: grid;
+    grid-template-columns: minmax(12rem, 0.8fr) minmax(16rem, 1.4fr) auto;
+    gap: 0.8rem;
+    align-items: end;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--line);
+}
+
+.bulk-suggestion-controls strong {
+    display: block;
+}
+
+.bulk-suggestion-preview {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #edf4ef;
+    border: 1px solid #cbded3;
+    border-radius: 0.85rem;
+}
+
+.bulk-suggestion-preview p {
+    margin: 0.35rem 0 0;
+    color: #526568;
+}
+
+.bulk-suggestion-preview code {
+    overflow-wrap: anywhere;
+    word-break: break-all;
+    font-size: 0.75rem;
+}
+
+.suggestion-person-group-heading {
+    margin-bottom: 0.9rem;
+}
+
+.suggestion-bulk-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: 0.8rem;
+}
+
+@media (max-width: 760px) {
+    .bulk-suggestion-panel-heading,
+    .suggestion-person-group-heading,
+    .bulk-suggestion-preview {
+        display: grid;
+    }
+
+    .bulk-suggestion-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .bulk-suggestion-preview .button,
+    .suggestion-person-group-heading .button {
+        width: 100%;
+    }
+}
