@@ -10,7 +10,7 @@ Status: `in_progress`
 
 - **WI-0033 — Accelerate the human review workflow**
 
-Queue-aware details review is merged. The next slice is on `agent/WI-0033-suggestion-gallery` and adds a dedicated exact-model suggestion workspace for scanning, ordering and accepting top matches without opening every face.
+Queue-aware details review and the suggestion-aware workspace are merged. The next slice is on `agent/WI-0033-person-audit` and adds a dedicated read-only identity audit workspace for reviewing all active assignments for one person.
 
 ## Implemented WI-0033 slices
 
@@ -21,14 +21,15 @@ Queue-aware details review is merged. The next slice is on `agent/WI-0033-sugges
 - The Suggestions workspace returns rank-one pending matches, scores, margins and exact model provenance in one paged response.
 - Suggestion review can be ordered by suggested person, high or low score margin, score, missing suggestion or creation time with stable tie-breaking.
 - Clear matches can be accepted directly from cards; ambiguous matches open an ordered quick-details queue.
-- Integration coverage protects exact-model requirements, scoped ordering, mutation-stable navigation and privacy-limited responses.
+- The Audit workspace pages every active assignment for one person and links each face to append-only review history.
+- Exact-model disagreement signals compare the assigned person with rank-one pending or accepted suggestions without changing canonical labels.
+- Integration coverage protects exact-model requirements, scoped ordering, mutation-stable navigation, active-assignment audit semantics and privacy-limited responses.
 
 ## Remaining WI-0033 slices
 
-1. add per-person assigned-face audit;
-2. add preview-first grouped suggestion acceptance with linked audit actions;
-3. extend published-application smoke coverage across the completed workflow; and
-4. measure a fresh 50–100-face queue on Windows and Pixel.
+1. add preview-first grouped suggestion acceptance with linked audit actions;
+2. extend published-application smoke coverage across the completed workflow; and
+3. measure a fresh 50–100-face queue on Windows and Pixel.
 
 ## Recently completed
 
