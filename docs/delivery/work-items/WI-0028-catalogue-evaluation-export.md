@@ -36,4 +36,4 @@ The manifest includes exact detector and embedder hashes, embedding dimensions, 
 
 ## Verification state
 
-Automated coverage protects run and explicit-revision scopes, deterministic bytes, source-photo isolation, canonical face uniqueness, evaluator compatibility, privacy and insufficient-unknown errors. WI-0027 and WI-0028 remain in review until they are exercised together against the private local pilot catalogue on Windows and Pixel.
+Automated coverage protects run and explicit-revision scopes, deterministic bytes, source-photo isolation, canonical face uniqueness, evaluator compatibility, privacy and insufficient-unknown errors. The human maintainer then exercised export and evaluation against the private pilot catalogue on 2026-07-30. Repeated manifests and reports were byte-for-byte identical, split-isolation and privacy checks passed, and real manifests remained outside the repository.

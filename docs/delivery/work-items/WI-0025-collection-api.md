@@ -3,7 +3,7 @@ id: WI-0025
 title: Add collection-ready queries
 milestone: M14
 status_source: ../status/work-items.yaml
-depends_on: [WI-0015, WI-0016, WI-0029]
+depends_on: [WI-0015, WI-0016, WI-0029, WI-0033]
 affected_modules: [PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Sqlite]
 ---
 

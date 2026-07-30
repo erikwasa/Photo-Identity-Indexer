@@ -447,6 +447,7 @@ work_items:
       - WI-0017
       - WI-0018
       - WI-0029
+      - WI-0033
     evidence: []
   - id: WI-0020
     title: Run Azure VM pilot
@@ -506,6 +507,7 @@ work_items:
       - WI-0015
       - WI-0016
       - WI-0029
+      - WI-0033
     evidence: []
   - id: WI-0026
     title: Add local developer verification
@@ -538,12 +540,15 @@ work_items:
   - id: WI-0027
     title: Complete the local review workflow
     milestone: M06
-    status: in_review
+    status: completed
     owner: ai-agent
     document: ../work-items/WI-0027-review-workflow.md
     started_at: '2026-07-27'
-    last_updated_at: '2026-07-27'
-    branch: agent/WI-0027-review-filters
+    completed_at: '2026-07-30'
+    verified_at: '2026-07-30'
+    verified_by: human
+    last_updated_at: '2026-07-30'
+    branch: agent/WI-0027-review-smoke-coverage
     blockers:
       - WI-0015
       - WI-0016
@@ -578,14 +583,25 @@ work_items:
         value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30292297233
       - type: merge_commit
         value: cc457af530bf4ac9f7ad25b5166658229568602f
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/43
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30306834009
+      - type: merge_commit
+        value: d1730135e196913c5f2dbeb8c56647bd4894b4d0
+      - type: human_verification
+        value: Windows and Pixel trusted-network review verification completed locally on 2026-07-30.
   - id: WI-0028
     title: Export reviewed catalogues to model-lab
     milestone: M06
-    status: in_review
+    status: completed
     owner: ai-agent
     document: ../work-items/WI-0028-catalogue-evaluation-export.md
     started_at: '2026-07-27'
-    last_updated_at: '2026-07-27'
+    completed_at: '2026-07-30'
+    verified_at: '2026-07-30'
+    verified_by: human
+    last_updated_at: '2026-07-30'
     branch: agent/WI-0028-catalogue-evaluation-export
     blockers:
       - WI-0013
@@ -596,16 +612,26 @@ work_items:
         value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/41
       - type: workflow
         value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30295161772
+      - type: human_verification
+        value: Reproducible private-catalogue export and evaluation verified locally on 2026-07-30.
   - id: WI-0029
     title: Run a 500-image local acceptance pilot
     milestone: M06
-    status: proposed
-    owner: unassigned
+    status: completed
+    owner: human-maintainer
     document: ../work-items/WI-0029-local-acceptance-pilot.md
+    started_at: '2026-07-30'
+    completed_at: '2026-07-30'
+    verified_at: '2026-07-30'
+    verified_by: human
+    last_updated_at: '2026-07-30'
+    branch: agent/WI-0029-completion-and-review-speed
     blockers:
       - WI-0027
       - WI-0028
-    evidence: []
+    evidence:
+      - type: human_verification
+        value: Private 450-550 image pilot completed locally on Windows and Pixel on 2026-07-30; only privacy-safe aggregate findings were retained.
   - id: WI-0030
     title: Run a multi-model local comparison
     milestone: M08
@@ -634,4 +660,15 @@ work_items:
     document: ../work-items/WI-0032-documentation-validation.md
     blockers:
       - WI-0031
+    evidence: []
+  - id: WI-0033
+    title: Accelerate the human review workflow
+    milestone: M06
+    status: ready
+    owner: ai-agent
+    document: ../work-items/WI-0033-review-throughput.md
+    last_updated_at: '2026-07-30'
+    blockers:
+      - WI-0027
+      - WI-0029
     evidence: []

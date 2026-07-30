@@ -21,7 +21,7 @@ Make the browser review application complete enough for sustained review of appr
 - [x] Person rename and merge are supported with auditable, reversible or explicitly irreversible semantics.
 - [x] Safe bulk actions reduce repetitive assignment and rejection work while showing the affected count before commit.
 - [x] Review progress can be filtered by processing run, model revision and review state.
-- [ ] Windows and Pixel trusted-network interaction remains usable with touch-sized controls and privacy-limited DTOs.
+- [x] Windows and Pixel trusted-network interaction remains usable with touch-sized controls and privacy-limited DTOs.
 - [x] Automated smoke coverage protects assignment, rejection, undo, suggestion review and person maintenance.
 
 ## Implemented slices
@@ -36,8 +36,12 @@ Make the browser review application complete enough for sustained review of appr
 - A dedicated progress view combines review state, processing run and ranked-suggestion model revision filters.
 - Processing-run scope is derived from jobs for the face's asset revision; model scope requires the exact model ID and full SHA-256 revision hash.
 - Filter DTOs expose opaque run IDs, status, timestamps, exact model provenance and aggregate counts without source roots, crop paths or embeddings.
-- The published-application smoke fixture now carries exact embeddings and deterministic test identities. `verify-review.ps1 -Mode Smoke` covers assignment plus undo, direct rejection, preview-first bulk assignment, suggestion accept and reject, reversible rename and explicitly irreversible merge against the hosted API.
+- The published-application smoke fixture carries exact embeddings and deterministic test identities. `verify-review.ps1 -Mode Smoke` covers assignment plus undo, direct rejection, preview-first bulk assignment, suggestion accept and reject, reversible rename and explicitly irreversible merge against the hosted API.
 - Suggestion rejection is asserted to leave the face unreviewed and create no canonical review action, while merge verification confirms the source identity is retired and its assignment moves to the surviving person.
+
+## Local verification
+
+The human maintainer completed the Windows and Pixel trusted-network verification on 2026-07-30 while executing the private acceptance workflow. Functional and touch usability passed, privacy-limited responses exposed no local storage paths, and decisions survived restart. The pilot separately identified sustained review throughput as too slow because the current workflow requires excessive navigation and does not surface suggestion context in the gallery; that usability improvement is tracked by [WI-0033](WI-0033-review-throughput.md).
 
 ## Safety boundary
 

@@ -10,7 +10,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M03 | OneDrive synchronised source | completed |
 | M04 | Minimal review application | completed |
 | M05 | Identity matching | completed |
-| M06 | Local evaluation and acceptance | in_progress |
+| M06 | Local evaluation and acceptance | ready |
 | M07 | Portable job bundles | completed |
 | M08 | Multi-model local evaluation | proposed |
 | M15 | Operator documentation and system guide | proposed |

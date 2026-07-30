@@ -49,13 +49,14 @@ milestones:
   - WI-0016
 - id: M06
   title: Local evaluation and acceptance
-  status: in_progress
+  status: ready
   document: ../milestones/M06-evaluation.md
   work_items:
   - WI-0017
   - WI-0027
   - WI-0028
   - WI-0029
+  - WI-0033
 - id: M07
   title: Portable job bundles
   status: completed
