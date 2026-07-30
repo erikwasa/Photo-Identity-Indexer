@@ -1,0 +1,450 @@
+@page "/suggestions"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Suggestion review · Photo Identity</PageTitle>
+
+<section class="hero suggestion-hero">
+    <div>
+        <p class="eyebrow">Suggestion-aware queue</p>
+        <h1>Review top identity suggestions</h1>
+        <p>See the highest-ranked pending match on every card, accept clear matches directly, and order ambiguous or missing suggestions for focused review.</p>
+    </div>
+    <a class="button secondary" href="/">Return to all faces</a>
+</section>
+
+<section class="progress-filters" aria-labelledby="suggestion-scope-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Exact model scope</p>
+            <h2 id="suggestion-scope-heading">Suggestion queue</h2>
+        </div>
+    </div>
+
+    <div class="filter-grid">
+        <div>
+            <label class="field-label" for="suggestion-state">Review state</label>
+            <select id="suggestion-state" @bind="State" @bind:after="ApplyFiltersAsync" disabled="@Loading">
+                <option value="unreviewed">Needs review</option>
+                <option value="assigned">Assigned</option>
+                <option value="rejected">Rejected</option>
+                <option value="all">All states</option>
+            </select>
+        </div>
+
+        <div>
+            <label class="field-label" for="suggestion-run">Processing run</label>
+            <select id="suggestion-run" @bind="SelectedRunIndex" @bind:after="ApplyRunAsync" disabled="@(Loading || Options.ProcessingRuns.Count == 0)">
+                <option value="">All processing runs</option>
+                @for (int index = 0; index < Options.ProcessingRuns.Count; index++)
+                {
+                    ReviewProcessingRunFilterResponse run = Options.ProcessingRuns[index];
+                    <option value="@index">@RunLabel(run)</option>
+                }
+            </select>
+        </div>
+
+        <div>
+            <label class="field-label" for="suggestion-model">Suggestion model revision</label>
+            <select id="suggestion-model" @bind="SelectedModelIndex" @bind:after="ApplyModelAsync" disabled="@(Loading || Options.ModelRevisions.Count == 0)">
+                @if (Options.ModelRevisions.Count == 0)
+                {
+                    <option value="">No ranked suggestions available</option>
+                }
+                else
+                {
+                    @for (int index = 0; index < Options.ModelRevisions.Count; index++)
+                    {
+                        ReviewModelRevisionFilterResponse model = Options.ModelRevisions[index];
+                        <option value="@index">@ModelLabel(model)</option>
+                    }
+                }
+            </select>
+        </div>
+
+        <div>
+            <label class="field-label" for="suggestion-sort">Order</label>
+            <select id="suggestion-sort" @bind="Sort" @bind:after="ApplyFiltersAsync" disabled="@(Loading || SelectedModel is null)">
+                @foreach ((string Value, string Label) option in SortOptions)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    @if (SelectedModel is ReviewModelRevisionFilterResponse activeModel)
+    {
+        <dl class="active-scope">
+            @if (SelectedRun is ReviewProcessingRunFilterResponse activeRun)
+            {
+                <div><dt>Processing run</dt><dd><code>@activeRun.Id</code></dd></div>
+            }
+            <div><dt>Model ID</dt><dd>@activeModel.ModelId</dd></div>
+            <div><dt>Exact model hash</dt><dd><code>@activeModel.ModelHash</code></dd></div>
+        </dl>
+    }
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="notice success" role="status">@Message</div>
+}
+
+@if (Loading)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading suggestion review…</p>
+    </section>
+}
+else if (SelectedModel is null)
+{
+    <section class="empty-state">
+        <h2>No ranked suggestion model is available</h2>
+        <p>Generate identity suggestions before using this queue.</p>
+    </section>
+}
+else if (Page is null || Page.Items.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No faces match this suggestion scope</h2>
+        <p>Change the state, processing run, model revision, or ordering.</p>
+    </section>
+}
+else
+{
+    <div class="gallery-summary" role="status">
+        <span>@Page.Total face@(Page.Total == 1 ? "" : "s")</span>
+        <span>Showing @(Page.Offset + 1)–@Math.Min(Page.Offset + Page.Items.Count, Page.Total)</span>
+    </div>
+
+    <section class="face-grid" aria-label="Suggestion review cards">
+        @foreach (ReviewFaceResponse face in Page.Items)
+        {
+            <SuggestionFaceCard Face="face"
+                                People="People"
+                                DetailsUrl="@BuildDetailsUrl(face.Id)"
+                                AcceptSuggestionRequested="AcceptSuggestionAsync"
+                                AssignRequested="AssignAsync"
+                                RejectRequested="RejectAsync"
+                                UndoRequested="UndoAsync" />
+        }
+    </section>
+
+    <div class="pagination">
+        <button class="button secondary" disabled="@(Page.Offset == 0 || Loading)" @onclick="PreviousPageAsync">Previous</button>
+        <button class="button secondary" disabled="@(Page.Offset + Page.Limit >= Page.Total || Loading)" @onclick="NextPageAsync">Next</button>
+    </div>
+}
+
+@code {
+    private const int PageSize = 40;
+    private const string Actor = "local-reviewer";
+    private const string DefaultSort = "suggested-person";
+
+    private static readonly (string Value, string Label)[] SortOptions =
+    [
+        ("suggested-person", "Suggested person"),
+        ("margin-desc", "Easiest suggestions"),
+        ("margin-asc", "Most ambiguous suggestions"),
+        ("score-desc", "Highest score"),
+        ("no-suggestion-first", "No suggestion first"),
+        ("created-desc", "Newest first"),
+    ];
+
+    [Parameter, SupplyParameterFromQuery(Name = "state")]
+    public string State { get; set; } = "unreviewed";
+
+    [Parameter, SupplyParameterFromQuery(Name = "offset")]
+    public int Offset { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "sort")]
+    public string Sort { get; set; } = DefaultSort;
+
+    [Parameter, SupplyParameterFromQuery(Name = "processingRunId")]
+    public string ProcessingRunId { get; set; } = "";
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelId")]
+    public string ModelId { get; set; } = "";
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelHash")]
+    public string ModelHash { get; set; } = "";
+
+    private ReviewFilterOptionsResponse Options { get; set; } = new([], []);
+    private ReviewFacePageResponse? Page { get; set; }
+    private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+    private string SelectedRunIndex { get; set; } = "";
+    private string SelectedModelIndex { get; set; } = "";
+    private bool Loading { get; set; } = true;
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    private ReviewProcessingRunFilterResponse? SelectedRun =>
+        int.TryParse(SelectedRunIndex, out int runIndex) &&
+        runIndex >= 0 &&
+        runIndex < Options.ProcessingRuns.Count
+            ? Options.ProcessingRuns[runIndex]
+            : null;
+
+    private ReviewModelRevisionFilterResponse? SelectedModel =>
+        int.TryParse(SelectedModelIndex, out int modelIndex) &&
+        modelIndex >= 0 &&
+        modelIndex < Options.ModelRevisions.Count
+            ? Options.ModelRevisions[modelIndex]
+            : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        State = State is "unreviewed" or "assigned" or "rejected" or "all"
+            ? State
+            : "unreviewed";
+        Offset = Math.Max(0, Offset);
+        Sort = SortOptions.Any(option => option.Value == Sort) ? Sort : DefaultSort;
+        await LoadOptionsAsync();
+        ResolveSelections();
+        await LoadPeopleAsync();
+        await LoadFacesAsync();
+    }
+
+    private async Task LoadOptionsAsync()
+    {
+        try
+        {
+            Options = await Http.GetFromJsonAsync<ReviewFilterOptionsResponse>("api/review/filters")
+                ?? new ReviewFilterOptionsResponse([], []);
+        }
+        catch (Exception exception)
+        {
+            Error = $"Suggestion filter options could not be loaded: {exception.Message}";
+        }
+    }
+
+    private async Task LoadPeopleAsync()
+    {
+        try
+        {
+            People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+        }
+        catch (Exception exception)
+        {
+            Error = $"People could not be loaded: {exception.Message}";
+        }
+    }
+
+    private void ResolveSelections()
+    {
+        int runIndex = Options.ProcessingRuns
+            .Select((run, index) => (run, index))
+            .Where(item => item.run.Id == ProcessingRunId)
+            .Select(item => item.index)
+            .DefaultIfEmpty(-1)
+            .First();
+        SelectedRunIndex = runIndex >= 0 ? runIndex.ToString() : "";
+        ApplySelectedRun();
+
+        int modelIndex = Options.ModelRevisions
+            .Select((model, index) => (model, index))
+            .Where(item => item.model.ModelId == ModelId && item.model.ModelHash == ModelHash)
+            .Select(item => item.index)
+            .DefaultIfEmpty(-1)
+            .First();
+        if (modelIndex < 0 && Options.ModelRevisions.Count > 0)
+        {
+            modelIndex = 0;
+        }
+        SelectedModelIndex = modelIndex >= 0 ? modelIndex.ToString() : "";
+        ApplySelectedModel();
+    }
+
+    private void ApplySelectedRun()
+    {
+        ProcessingRunId = SelectedRun?.Id ?? "";
+    }
+
+    private void ApplySelectedModel()
+    {
+        ModelId = SelectedModel?.ModelId ?? "";
+        ModelHash = SelectedModel?.ModelHash ?? "";
+    }
+
+    private async Task LoadFacesAsync()
+    {
+        if (SelectedModel is not ReviewModelRevisionFilterResponse model)
+        {
+            Page = null;
+            Loading = false;
+            return;
+        }
+
+        Loading = true;
+        Error = null;
+        try
+        {
+            List<string> query =
+            [
+                $"state={Uri.EscapeDataString(State)}",
+                $"offset={Offset}",
+                $"limit={PageSize}",
+                $"sort={Uri.EscapeDataString(Sort)}",
+                $"modelId={Uri.EscapeDataString(model.ModelId)}",
+                $"modelHash={Uri.EscapeDataString(model.ModelHash)}",
+            ];
+            if (SelectedRun is ReviewProcessingRunFilterResponse run)
+            {
+                query.Add($"processingRunId={Uri.EscapeDataString(run.Id)}");
+            }
+
+            Page = await Http.GetFromJsonAsync<ReviewFacePageResponse>(
+                $"api/review/suggestion-faces?{string.Join("&", query)}");
+            if (Page is not null && Page.Items.Count == 0 && Offset > 0)
+            {
+                Offset = Math.Max(0, Offset - PageSize);
+                await LoadFacesAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = $"Suggestion review could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task ApplyRunAsync()
+    {
+        ApplySelectedRun();
+        await ApplyFiltersAsync();
+    }
+
+    private async Task ApplyModelAsync()
+    {
+        ApplySelectedModel();
+        await ApplyFiltersAsync();
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        Offset = 0;
+        Message = null;
+        await LoadFacesAsync();
+    }
+
+    private string BuildDetailsUrl(string faceId)
+    {
+        ReviewModelRevisionFilterResponse model = SelectedModel
+            ?? throw new InvalidOperationException("A model revision is required.");
+        List<string> scope =
+        [
+            $"state={Uri.EscapeDataString(State)}",
+            $"sort={Uri.EscapeDataString(Sort)}",
+            $"modelId={Uri.EscapeDataString(model.ModelId)}",
+            $"modelHash={Uri.EscapeDataString(model.ModelHash)}",
+        ];
+        List<string> returnScope =
+        [
+            $"state={Uri.EscapeDataString(State)}",
+            $"offset={Offset}",
+            $"sort={Uri.EscapeDataString(Sort)}",
+            $"modelId={Uri.EscapeDataString(model.ModelId)}",
+            $"modelHash={Uri.EscapeDataString(model.ModelHash)}",
+        ];
+        if (SelectedRun is ReviewProcessingRunFilterResponse run)
+        {
+            string runScope = $"processingRunId={Uri.EscapeDataString(run.Id)}";
+            scope.Add(runScope);
+            returnScope.Add(runScope);
+        }
+
+        string returnUrl = $"/suggestions?{string.Join("&", returnScope)}";
+        return $"/suggestion-faces/{Uri.EscapeDataString(faceId)}?{string.Join("&", scope)}" +
+               $"&returnUrl={Uri.EscapeDataString(returnUrl)}";
+    }
+
+    private async Task AcceptSuggestionAsync((string FaceId, long SuggestionId) request)
+    {
+        await ApplyActionAsync(
+            $"api/review/faces/{Uri.EscapeDataString(request.FaceId)}/suggestions/{request.SuggestionId}/accept",
+            new ReviewSuggestionActionRequest(Actor),
+            "Suggestion accepted.");
+    }
+
+    private async Task AssignAsync((string FaceId, string PersonId) request)
+    {
+        await ApplyActionAsync(
+            $"api/review/faces/{Uri.EscapeDataString(request.FaceId)}/assign",
+            new AssignFaceRequest(request.PersonId, Actor),
+            "Face assignment saved.");
+    }
+
+    private async Task RejectAsync(string faceId)
+    {
+        await ApplyActionAsync(
+            $"api/review/faces/{Uri.EscapeDataString(faceId)}/reject",
+            new ReviewFaceActionRequest(Actor),
+            "Face rejected.");
+    }
+
+    private async Task UndoAsync(string faceId)
+    {
+        await ApplyActionAsync(
+            $"api/review/faces/{Uri.EscapeDataString(faceId)}/undo",
+            new ReviewFaceActionRequest(Actor),
+            "Latest review action undone.");
+    }
+
+    private async Task ApplyActionAsync<TRequest>(string url, TRequest request, string successMessage)
+    {
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(url, request);
+            await RequireSuccessAsync(response);
+            Message = successMessage;
+            await LoadFacesAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        Offset = Math.Max(0, Offset - PageSize);
+        await LoadFacesAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        Offset += PageSize;
+        await LoadFacesAsync();
+    }
+
+    private static string RunLabel(ReviewProcessingRunFilterResponse run) =>
+        $"{run.StartedAtUtc.ToLocalTime():g} · {run.Status} · {run.FaceCount} face{(run.FaceCount == 1 ? "" : "s")}";
+
+    private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
+        $"{model.ModelId} · {model.ModelHash[..12]} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+
+    private static async Task RequireSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string detail = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(detail)
+                ? $"The review action failed with status {(int)response.StatusCode}."
+                : detail);
+    }
+}

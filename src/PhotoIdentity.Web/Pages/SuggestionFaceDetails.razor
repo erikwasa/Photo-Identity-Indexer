@@ -1,0 +1,407 @@
+@page "/suggestion-faces/{Id}"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Suggestion details · Photo Identity</PageTitle>
+
+@if (Loading)
+{
+    <section class="empty-state">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading suggestion details…</p>
+    </section>
+}
+else if (!string.IsNullOrWhiteSpace(Error))
+{
+    <section class="empty-state">
+        <h1>Suggestion details unavailable</h1>
+        <p>@Error</p>
+        <a class="button primary" href="@SafeReturnUrl">Return to suggestion queue</a>
+    </section>
+}
+else if (Details is not null)
+{
+    <nav class="suggestion-queue-nav" aria-label="Suggestion queue navigation">
+        @if (Details.Navigation?.PreviousFaceId is string previousId)
+        {
+            <a class="button secondary" href="@BuildFaceUrl(previousId)">← Previous</a>
+        }
+        else
+        {
+            <button class="button secondary" disabled>← Previous</button>
+        }
+
+        <span>
+            @if (Details.Navigation is ReviewFaceNavigationResponse navigation)
+            {
+                <strong>@navigation.Position of @navigation.Total</strong>
+            }
+            else
+            {
+                <strong>Outside active queue</strong>
+            }
+        </span>
+
+        @if (Details.Navigation?.NextFaceId is string nextId)
+        {
+            <a class="button secondary" href="@BuildFaceUrl(nextId)">Next →</a>
+        }
+        else
+        {
+            <button class="button secondary" disabled>Next →</button>
+        }
+    </nav>
+
+    <div class="suggestion-detail-links">
+        <a class="back-link" href="@SafeReturnUrl">← Back to suggestion queue</a>
+        <a class="details-link" href="@BuildFullAuditUrl()">Open full metadata and audit history →</a>
+    </div>
+
+    <section class="details-header">
+        <div>
+            <p class="eyebrow">Continuous suggestion review</p>
+            <h1>@Details.Face.PhotoName · face @(Details.Face.FaceOrdinal + 1)</h1>
+            <p>Accepting a suggestion advances to the next face in the selected model, processing-run, state, and sort scope.</p>
+        </div>
+        <span class="state-badge large">@StateLabel</span>
+    </section>
+
+    <div class="details-grid">
+        <section class="details-image-panel">
+            <img class="details-image" src="@Details.Face.ImageUrl" alt="Detected face from @Details.Face.PhotoName" />
+        </section>
+
+        <section class="metadata-card suggestion-scope-card">
+            <h2>Active suggestion scope</h2>
+            <dl>
+                <div><dt>Review state</dt><dd>@StateLabel</dd></div>
+                <div><dt>Model ID</dt><dd>@ModelId</dd></div>
+                <div><dt>Exact model hash</dt><dd><code>@ModelHash</code></dd></div>
+                <div><dt>Order</dt><dd>@SortLabel</dd></div>
+                @if (!string.IsNullOrWhiteSpace(ProcessingRunId))
+                {
+                    <div><dt>Processing run</dt><dd><code>@ProcessingRunId</code></dd></div>
+                }
+            </dl>
+        </section>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(ActionError))
+    {
+        <div class="notice error review-notice" role="alert">@ActionError</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <div class="notice success review-notice" role="status">@Message</div>
+    }
+
+    <section class="audit-section">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Exact model output</p>
+                <h2>Ranked identity suggestions</h2>
+                <p class="suggestion-guidance">Scores remain advisory. Every acceptance is an explicit human assignment with the existing append-only audit semantics.</p>
+            </div>
+            <span>@Suggestions.Count suggestion@(Suggestions.Count == 1 ? "" : "s")</span>
+        </div>
+
+        @if (Suggestions.Count == 0)
+        {
+            <div class="empty-state compact">
+                <p>No pending or reviewed suggestions from this exact model revision are available for the face.</p>
+            </div>
+        }
+        else
+        {
+            <ol class="timeline">
+                @foreach (ReviewIdentitySuggestionResponse suggestion in Suggestions)
+                {
+                    <li>
+                        <div class="timeline-marker" aria-hidden="true"></div>
+                        <div class="suggestion-content">
+                            <div class="timeline-title">
+                                <strong>Rank @suggestion.Rank · @suggestion.Person.DisplayName</strong>
+                                <span class="state-badge">@SuggestionStatusLabel(suggestion.Status)</span>
+                            </div>
+                            <p>Score @suggestion.Score.ToString("F4") · Margin @MarginLabel(suggestion.ScoreMargin)</p>
+
+                            @if (suggestion.LatestAction is not null)
+                            {
+                                <div class="suggestion-decision">
+                                    <strong>@SuggestionActionLabel(suggestion.LatestAction)</strong>
+                                    <p>@suggestion.LatestAction.Actor · @suggestion.LatestAction.CreatedAtUtc.ToLocalTime().ToString("g")</p>
+                                </div>
+                            }
+
+                            @if (suggestion.Status == "pending")
+                            {
+                                <div class="suggestion-actions">
+                                    @if (ConfirmingRejectSuggestionId == suggestion.Id)
+                                    {
+                                        <button class="button danger"
+                                                disabled="@(ActingSuggestionId is not null)"
+                                                @onclick="() => RejectSuggestionAsync(suggestion.Id)">
+                                            Confirm rejection
+                                        </button>
+                                        <button class="button secondary"
+                                                disabled="@(ActingSuggestionId is not null)"
+                                                @onclick="CancelRejectConfirmation">
+                                            Cancel
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="button primary"
+                                                disabled="@(!CanReviewSuggestions)"
+                                                @onclick="() => AcceptSuggestionAsync(suggestion.Id)">
+                                            Accept as @suggestion.Person.DisplayName
+                                        </button>
+                                        <button class="button danger"
+                                                disabled="@(!CanReviewSuggestions)"
+                                                @onclick="() => ConfirmReject(suggestion.Id)">
+                                            Reject match
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </li>
+                }
+            </ol>
+        }
+    </section>
+}
+
+@code {
+    private const string Actor = "local-reviewer";
+
+    [Parameter]
+    public string Id { get; set; } = "";
+
+    [Parameter, SupplyParameterFromQuery(Name = "state")]
+    public string QueueState { get; set; } = "unreviewed";
+
+    [Parameter, SupplyParameterFromQuery(Name = "processingRunId")]
+    public string ProcessingRunId { get; set; } = "";
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelId")]
+    public string ModelId { get; set; } = "";
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelHash")]
+    public string ModelHash { get; set; } = "";
+
+    [Parameter, SupplyParameterFromQuery(Name = "sort")]
+    public string Sort { get; set; } = "suggested-person";
+
+    [Parameter, SupplyParameterFromQuery(Name = "returnUrl")]
+    public string ReturnUrl { get; set; } = "/suggestions";
+
+    private ReviewFaceDetailsResponse? Details { get; set; }
+    private IReadOnlyList<ReviewIdentitySuggestionResponse> Suggestions { get; set; } = [];
+    private bool Loading { get; set; } = true;
+    private long? ActingSuggestionId { get; set; }
+    private long? ConfirmingRejectSuggestionId { get; set; }
+    private string? Error { get; set; }
+    private string? ActionError { get; set; }
+    private string? Message { get; set; }
+
+    private string SafeReturnUrl => IsSafeRelativeUrl(ReturnUrl) ? ReturnUrl : "/suggestions";
+
+    private bool CanReviewSuggestions =>
+        ActingSuggestionId is null && Details?.Face.State == "unreviewed";
+
+    private string StateLabel => Details?.Face.State switch
+    {
+        "assigned" => "Assigned",
+        "rejected" => "Rejected",
+        _ => "Needs review",
+    };
+
+    private string SortLabel => Sort switch
+    {
+        "suggested-person" => "Suggested person",
+        "margin-desc" => "Easiest suggestions",
+        "margin-asc" => "Most ambiguous suggestions",
+        "score-desc" => "Highest score",
+        "no-suggestion-first" => "No suggestion first",
+        _ => "Newest first",
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Loading = true;
+        Error = null;
+        ActionError = null;
+        Message = null;
+        ConfirmingRejectSuggestionId = null;
+        Suggestions = [];
+        try
+        {
+            await RefreshAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ModelId) || string.IsNullOrWhiteSpace(ModelHash))
+        {
+            throw new InvalidOperationException("An exact suggestion model revision is required.");
+        }
+
+        string escapedId = Uri.EscapeDataString(Id);
+        Details = await Http.GetFromJsonAsync<ReviewFaceDetailsResponse>(
+            $"api/review/suggestion-faces/{escapedId}?{BuildScopeQuery()}");
+        if (Details is null)
+        {
+            throw new InvalidOperationException("The face occurrence was not found.");
+        }
+
+        ReviewIdentitySuggestionResponse[] allSuggestions =
+            await Http.GetFromJsonAsync<ReviewIdentitySuggestionResponse[]>(
+                $"api/review/faces/{escapedId}/suggestions") ?? [];
+        Suggestions = allSuggestions
+            .Where(suggestion => suggestion.ModelId == ModelId && suggestion.ModelHash == ModelHash)
+            .OrderBy(suggestion => suggestion.Rank)
+            .ThenBy(suggestion => suggestion.Id)
+            .ToArray();
+    }
+
+    private async Task AcceptSuggestionAsync(long suggestionId)
+    {
+        string? nextFaceId = Details?.Navigation?.NextFaceId;
+        ActingSuggestionId = suggestionId;
+        ActionError = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/review/faces/{Uri.EscapeDataString(Id)}/suggestions/{suggestionId}/accept",
+                new ReviewSuggestionActionRequest(Actor));
+            await RequireSuccessAsync(response);
+            Navigation.NavigateTo(
+                nextFaceId is null ? SafeReturnUrl : BuildFaceUrl(nextFaceId),
+                replace: true);
+        }
+        catch (Exception exception)
+        {
+            ActionError = exception.Message;
+        }
+        finally
+        {
+            ActingSuggestionId = null;
+            ConfirmingRejectSuggestionId = null;
+        }
+    }
+
+    private void ConfirmReject(long suggestionId)
+    {
+        ActionError = null;
+        Message = null;
+        ConfirmingRejectSuggestionId = suggestionId;
+    }
+
+    private void CancelRejectConfirmation()
+    {
+        ConfirmingRejectSuggestionId = null;
+    }
+
+    private async Task RejectSuggestionAsync(long suggestionId)
+    {
+        ActingSuggestionId = suggestionId;
+        ActionError = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/review/faces/{Uri.EscapeDataString(Id)}/suggestions/{suggestionId}/reject",
+                new ReviewSuggestionActionRequest(Actor));
+            await RequireSuccessAsync(response);
+            await RefreshAsync();
+            Message = "Rejected face-person pair saved and excluded from future matcher regeneration.";
+        }
+        catch (Exception exception)
+        {
+            ActionError = exception.Message;
+        }
+        finally
+        {
+            ActingSuggestionId = null;
+            ConfirmingRejectSuggestionId = null;
+        }
+    }
+
+    private string BuildFaceUrl(string faceId) =>
+        $"/suggestion-faces/{Uri.EscapeDataString(faceId)}?{BuildScopeQuery()}" +
+        $"&returnUrl={Uri.EscapeDataString(SafeReturnUrl)}";
+
+    private string BuildFullAuditUrl()
+    {
+        string returnUrl = $"/suggestion-faces/{Uri.EscapeDataString(Id)}?{BuildScopeQuery()}" +
+                           $"&returnUrl={Uri.EscapeDataString(SafeReturnUrl)}";
+        return $"/faces/{Uri.EscapeDataString(Id)}?state=all&sort=created-desc" +
+               $"&returnUrl={Uri.EscapeDataString(returnUrl)}";
+    }
+
+    private string BuildScopeQuery()
+    {
+        List<string> query =
+        [
+            $"state={Uri.EscapeDataString(QueueState)}",
+            $"sort={Uri.EscapeDataString(Sort)}",
+            $"modelId={Uri.EscapeDataString(ModelId)}",
+            $"modelHash={Uri.EscapeDataString(ModelHash)}",
+        ];
+        if (!string.IsNullOrWhiteSpace(ProcessingRunId))
+        {
+            query.Add($"processingRunId={Uri.EscapeDataString(ProcessingRunId)}");
+        }
+        return string.Join("&", query);
+    }
+
+    private static bool IsSafeRelativeUrl(string? value) =>
+        !string.IsNullOrWhiteSpace(value) &&
+        value.StartsWith("/", StringComparison.Ordinal) &&
+        !value.StartsWith("//", StringComparison.Ordinal);
+
+    private static async Task RequireSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string detail = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(detail)
+                ? $"The suggestion review failed with status {(int)response.StatusCode}."
+                : detail);
+    }
+
+    private static string SuggestionActionLabel(ReviewSuggestionActionResponse action) => action.Kind switch
+    {
+        "accept" => "Accepted suggestion",
+        "reject" => "Rejected match",
+        _ => action.Kind,
+    };
+
+    private static string SuggestionStatusLabel(string status) => status switch
+    {
+        "pending" => "Pending review",
+        "rejected" => "Rejected",
+        "accepted" => "Accepted",
+        _ => status,
+    };
+
+    private static string MarginLabel(double? margin) => margin is double value
+        ? value.ToString("F4")
+        : "—";
+}

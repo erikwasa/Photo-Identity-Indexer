@@ -2,6 +2,17 @@ namespace PhotoIdentity.Web.Contracts;
 
 public sealed record ReviewPersonResponse(string Id, string DisplayName);
 
+public sealed record ReviewTopSuggestionResponse(
+    long Id,
+    ReviewPersonResponse Person,
+    string ModelId,
+    string ModelHash,
+    int Rank,
+    double Score,
+    double? ScoreMargin,
+    string Status,
+    DateTimeOffset GeneratedAtUtc);
+
 public sealed record ReviewFaceResponse(
     string Id,
     string ImageUrl,
@@ -10,7 +21,8 @@ public sealed record ReviewFaceResponse(
     double? Confidence,
     string State,
     ReviewPersonResponse? Person,
-    DateTimeOffset CreatedAtUtc);
+    DateTimeOffset CreatedAtUtc,
+    ReviewTopSuggestionResponse? TopSuggestion = null);
 
 public sealed record ReviewFacePageResponse(
     IReadOnlyList<ReviewFaceResponse> Items,
