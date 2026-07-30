@@ -37,7 +37,7 @@ public sealed class ReviewSuggestionGalleryApplicationTests
                 byPerson.Items[0].TopSuggestion);
             Assert.Equal("Ada", adaSuggestion.Person.DisplayName);
             Assert.Equal(0.91, adaSuggestion.Score, 6);
-            Assert.Equal(0.20, adaSuggestion.ScoreMargin);
+            Assert.Equal(0.20, Assert.IsType<double>(adaSuggestion.ScoreMargin), 6);
             Assert.Equal("sface", adaSuggestion.ModelId);
             Assert.Equal(seeded.ModelHash, adaSuggestion.ModelHash);
             Assert.Null(byPerson.Items[2].TopSuggestion);
@@ -85,13 +85,14 @@ public sealed class ReviewSuggestionGalleryApplicationTests
 
             await using ReviewApiFactory factory = new(databasePath);
             using HttpClient client = factory.CreateClient();
-            string scope =
-                $"state=unreviewed&modelId=sface&modelHash={seeded.ModelHash}" +
-                $"&processingRunId={seeded.RunId}&sort=suggested-person";
+            string modelScope =
+                $"modelId=sface&modelHash={seeded.ModelHash}" +
+                $"&processingRunId={seeded.RunId}";
+            string detailsScope = $"state=unreviewed&{modelScope}&sort=suggested-person";
 
             ReviewFaceDetailsResponse bobDetails = Assert.IsType<ReviewFaceDetailsResponse>(
                 await client.GetFromJsonAsync<ReviewFaceDetailsResponse>(
-                    $"/api/review/suggestion-faces/{seeded.BobFaceId}?{scope}"));
+                    $"/api/review/suggestion-faces/{seeded.BobFaceId}?{detailsScope}"));
             ReviewFaceNavigationResponse navigation = Assert.IsType<ReviewFaceNavigationResponse>(
                 bobDetails.Navigation);
             Assert.Equal(seeded.AdaFaceId, navigation.PreviousFaceId);
@@ -100,10 +101,9 @@ public sealed class ReviewSuggestionGalleryApplicationTests
             Assert.Equal(3, navigation.Total);
             Assert.Equal("suggested-person", navigation.Sort);
 
+            ReviewFacePageResponse page = await GetPageAsync(client, modelScope, "suggested-person");
             ReviewTopSuggestionResponse bobSuggestion = Assert.IsType<ReviewTopSuggestionResponse>(
-                (await GetPageAsync(client, scope[("state=unreviewed&").Length..], "suggested-person"))
-                    .Items.Single(face => face.Id == seeded.BobFaceId)
-                    .TopSuggestion);
+                page.Items.Single(face => face.Id == seeded.BobFaceId).TopSuggestion);
             using HttpResponseMessage accepted = await client.PostAsJsonAsync(
                 $"/api/review/faces/{seeded.BobFaceId}/suggestions/{bobSuggestion.Id}/accept",
                 new ReviewSuggestionActionRequest("suggestion-gallery:test"));
@@ -111,7 +111,7 @@ public sealed class ReviewSuggestionGalleryApplicationTests
 
             ReviewFaceDetailsResponse noSuggestionDetails = Assert.IsType<ReviewFaceDetailsResponse>(
                 await client.GetFromJsonAsync<ReviewFaceDetailsResponse>(
-                    $"/api/review/suggestion-faces/{seeded.NoSuggestionFaceId}?{scope}"));
+                    $"/api/review/suggestion-faces/{seeded.NoSuggestionFaceId}?{detailsScope}"));
             ReviewFaceNavigationResponse afterMutation = Assert.IsType<ReviewFaceNavigationResponse>(
                 noSuggestionDetails.Navigation);
             Assert.Equal(seeded.AdaFaceId, afterMutation.PreviousFaceId);
