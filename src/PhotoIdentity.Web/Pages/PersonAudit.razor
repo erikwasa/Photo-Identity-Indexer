@@ -1,0 +1,447 @@
+@page "/audit"
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Audit assigned faces · Photo Identity</PageTitle>
+
+<section class="hero audit-hero">
+    <div>
+        <p class="eyebrow">Identity verification</p>
+        <h1>Audit assigned faces</h1>
+        <p>Review every active face assigned to one person. Suggestion disagreements are advisory and never change canonical labels.</p>
+    </div>
+
+    <div class="audit-selectors">
+        <div>
+            <label class="field-label" for="audit-person">Person</label>
+            <select id="audit-person"
+                    @bind="SelectedPersonId"
+                    @bind:after="PersonChanged"
+                    disabled="@(Loading || People.Count == 0)">
+                @foreach (PersonMaintenancePersonResponse person in People)
+                {
+                    <option value="@person.Id">@person.DisplayName (@person.LabelCount)</option>
+                }
+            </select>
+        </div>
+
+        <div>
+            <label class="field-label" for="audit-model">Suggestion model</label>
+            <select id="audit-model"
+                    @bind="SelectedModelKey"
+                    @bind:after="ModelChanged"
+                    disabled="@(Loading || ModelRevisions.Count == 0)">
+                @if (ModelRevisions.Count == 0)
+                {
+                    <option value="">No ranked model available</option>
+                }
+                else
+                {
+                    @foreach (ReviewModelRevisionFilterResponse model in ModelRevisions)
+                    {
+                        <option value="@ModelKey(model)">
+                            @model.ModelId · @HashPrefix(model.ModelHash)
+                        </option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+</section>
+
+<section class="audit-controls" aria-label="Person audit controls">
+    <div>
+        <label class="field-label" for="audit-sort">Order</label>
+        <select id="audit-sort"
+                @bind="Sort"
+                @bind:after="SortChanged"
+                disabled="@Loading">
+            <option value="assigned-desc">Newest assignment</option>
+            <option value="assigned-asc">Oldest assignment</option>
+            <option value="confidence-asc">Lowest detector confidence</option>
+            <option value="disagreement-first" disabled="@(!HasModel)">Suggestion disagreements first</option>
+        </select>
+    </div>
+
+    <label class="disagreement-toggle">
+        <input type="checkbox"
+               @bind="DisagreementsOnly"
+               @bind:after="DisagreementFilterChanged"
+               disabled="@(Loading || !HasModel)" />
+        <span>Show only top-suggestion disagreements</span>
+    </label>
+
+    @if (SelectedModel is not null)
+    {
+        <div class="model-provenance">
+            <span>Exact model</span>
+            <code>@SelectedModel.ModelId</code>
+            <code>@SelectedModel.ModelHash</code>
+        </div>
+    }
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+
+@if (Loading)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading assigned faces…</p>
+    </section>
+}
+else if (People.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No active people</h2>
+        <p>Create and assign a person before using identity audit.</p>
+    </section>
+}
+else if (Page is null || Page.Total == 0)
+{
+    <section class="empty-state">
+        <h2>No assigned faces in this view</h2>
+        <p>@EmptyMessage</p>
+    </section>
+}
+else
+{
+    <section class="audit-summary" aria-label="Audit summary">
+        <div>
+            <strong>@Page.Person.DisplayName</strong>
+            <span>@Page.Total active assignment@(Page.Total == 1 ? "" : "s") in this view</span>
+        </div>
+        <div>
+            <strong>@Page.DisagreementCount</strong>
+            <span>top-suggestion disagreement@(Page.DisagreementCount == 1 ? "" : "s") for the selected model</span>
+        </div>
+        <div>
+            <strong>@(Page.Offset + 1)–@Math.Min(Page.Offset + Page.Items.Count, Page.Total)</strong>
+            <span>currently shown</span>
+        </div>
+    </section>
+
+    <section class="audit-grid" aria-label="Assigned face audit cards">
+        @foreach (PersonAuditFaceResponse face in Page.Items)
+        {
+            <article class="audit-card @(face.SuggestionDisagrees ? "has-disagreement" : "")">
+                <a class="audit-image-link"
+                   href="@BuildDetailsUrl(face.Id)"
+                   aria-label="Open audit history for @face.PhotoName face @(face.FaceOrdinal + 1)">
+                    <img src="@face.ImageUrl"
+                         alt="Assigned face from @face.PhotoName"
+                         loading="lazy" />
+                </a>
+
+                <div class="audit-card-body">
+                    <div class="audit-card-heading">
+                        <div>
+                            <strong>@face.PhotoName</strong>
+                            <small>Face @(face.FaceOrdinal + 1)</small>
+                        </div>
+                        @if (face.SuggestionDisagrees)
+                        {
+                            <span class="disagreement-badge">Check assignment</span>
+                        }
+                        else
+                        {
+                            <span class="state-badge">Assigned</span>
+                        }
+                    </div>
+
+                    <p class="assignment-meta">
+                        Assigned to <strong>@face.AssignedPerson.DisplayName</strong>
+                        on @face.AssignedAtUtc.ToLocalTime().ToString("g")
+                    </p>
+
+                    @if (face.Confidence is double confidence)
+                    {
+                        <p class="confidence-meta">Detector confidence: @confidence.ToString("P0")</p>
+                    }
+
+                    @if (face.TopSuggestion is null)
+                    {
+                        <div class="suggestion-note neutral">
+                            No pending or accepted top suggestion exists for the selected model.
+                        </div>
+                    }
+                    else if (face.SuggestionDisagrees)
+                    {
+                        <div class="suggestion-note warning">
+                            <strong>Top suggestion: @face.TopSuggestion.Person.DisplayName</strong>
+                            <span>
+                                score @face.TopSuggestion.Score.ToString("0.0000")
+                                @if (face.TopSuggestion.ScoreMargin is double margin)
+                                {
+                                    <text> · margin @margin.ToString("0.0000")</text>
+                                }
+                            </span>
+                            <small>@face.TopSuggestion.Status · @face.TopSuggestion.ModelId · @HashPrefix(face.TopSuggestion.ModelHash)</small>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="suggestion-note agrees">
+                            <strong>Top suggestion agrees: @face.TopSuggestion.Person.DisplayName</strong>
+                            <span>
+                                score @face.TopSuggestion.Score.ToString("0.0000")
+                                @if (face.TopSuggestion.ScoreMargin is double margin)
+                                {
+                                    <text> · margin @margin.ToString("0.0000")</text>
+                                }
+                            </span>
+                        </div>
+                    }
+
+                    <a class="details-link" href="@BuildDetailsUrl(face.Id)">
+                        Audit history and correct assignment →
+                    </a>
+                </div>
+            </article>
+        }
+    </section>
+
+    <div class="pagination">
+        <button class="button secondary"
+                disabled="@(Page.Offset == 0 || Loading)"
+                @onclick="PreviousPage">
+            Previous
+        </button>
+        <button class="button secondary"
+                disabled="@(Page.Offset + Page.Limit >= Page.Total || Loading)"
+                @onclick="NextPage">
+            Next
+        </button>
+    </div>
+}
+
+@code {
+    private const int PageSize = 40;
+    private const string DefaultSort = "assigned-desc";
+
+    [Parameter, SupplyParameterFromQuery(Name = "personId")]
+    public string? PersonId { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelId")]
+    public string? ModelId { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelHash")]
+    public string? ModelHash { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "sort")]
+    public string Sort { get; set; } = DefaultSort;
+
+    [Parameter, SupplyParameterFromQuery(Name = "offset")]
+    public int Offset { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "disagreementsOnly")]
+    public bool DisagreementsOnly { get; set; }
+
+    private IReadOnlyList<PersonMaintenancePersonResponse> People { get; set; } = [];
+    private IReadOnlyList<ReviewModelRevisionFilterResponse> ModelRevisions { get; set; } = [];
+    private PersonAuditPageResponse? Page { get; set; }
+    private string SelectedPersonId { get; set; } = "";
+    private string SelectedModelKey { get; set; } = "";
+    private bool Loading { get; set; }
+    private string? Error { get; set; }
+
+    private ReviewModelRevisionFilterResponse? SelectedModel =>
+        ModelRevisions.FirstOrDefault(model => ModelKey(model) == SelectedModelKey);
+
+    private bool HasModel => SelectedModel is not null;
+
+    private string EmptyMessage =>
+        DisagreementsOnly
+            ? "No active assignment disagrees with the selected model's current top suggestion."
+            : "The selected person has no active assigned faces.";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadOptionsAsync();
+        NormalizeSelection();
+        await LoadPageAsync();
+    }
+
+    private async Task LoadOptionsAsync()
+    {
+        if (People.Count > 0 || ModelRevisions.Count > 0)
+        {
+            return;
+        }
+
+        People = await Http.GetFromJsonAsync<PersonMaintenancePersonResponse[]>(
+            "api/review/people/maintenance") ?? [];
+        ReviewFilterOptionsResponse options =
+            await Http.GetFromJsonAsync<ReviewFilterOptionsResponse>("api/review/filters")
+            ?? new ReviewFilterOptionsResponse([], []);
+        ModelRevisions = options.ModelRevisions;
+    }
+
+    private void NormalizeSelection()
+    {
+        SelectedPersonId = People.Any(person => person.Id == PersonId)
+            ? PersonId!
+            : People.FirstOrDefault()?.Id ?? "";
+        PersonId = SelectedPersonId;
+
+        ReviewModelRevisionFilterResponse? selectedModel =
+            ModelRevisions.FirstOrDefault(model =>
+                model.ModelId == ModelId && model.ModelHash == ModelHash)
+            ?? ModelRevisions.FirstOrDefault();
+        SelectedModelKey = selectedModel is null ? "" : ModelKey(selectedModel);
+        ModelId = selectedModel?.ModelId;
+        ModelHash = selectedModel?.ModelHash;
+
+        string[] allowedSorts =
+        [
+            "assigned-desc",
+            "assigned-asc",
+            "confidence-asc",
+            "disagreement-first",
+        ];
+        Sort = allowedSorts.Contains(Sort, StringComparer.Ordinal)
+            ? Sort
+            : DefaultSort;
+        if (!HasModel && Sort == "disagreement-first")
+        {
+            Sort = DefaultSort;
+        }
+
+        if (!HasModel)
+        {
+            DisagreementsOnly = false;
+        }
+
+        Offset = Math.Max(0, Offset);
+    }
+
+    private async Task LoadPageAsync()
+    {
+        Page = null;
+        Error = null;
+        if (string.IsNullOrWhiteSpace(SelectedPersonId))
+        {
+            return;
+        }
+
+        Loading = true;
+        try
+        {
+            Page = await Http.GetFromJsonAsync<PersonAuditPageResponse>(
+                BuildApiUrl());
+        }
+        catch (Exception exception)
+        {
+            Error = $"Assigned-face audit could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private string BuildApiUrl()
+    {
+        List<string> query =
+        [
+            $"offset={Offset}",
+            $"limit={PageSize}",
+            $"sort={Uri.EscapeDataString(Sort)}",
+            $"disagreementsOnly={DisagreementsOnly.ToString().ToLowerInvariant()}",
+        ];
+        if (SelectedModel is not null)
+        {
+            query.Add($"modelId={Uri.EscapeDataString(SelectedModel.ModelId)}");
+            query.Add($"modelHash={Uri.EscapeDataString(SelectedModel.ModelHash)}");
+        }
+
+        return $"api/review/people/{Uri.EscapeDataString(SelectedPersonId)}/assigned-faces?{string.Join("&", query)}";
+    }
+
+    private string BuildPageUrl()
+    {
+        List<string> query =
+        [
+            $"personId={Uri.EscapeDataString(SelectedPersonId)}",
+            $"offset={Offset}",
+            $"sort={Uri.EscapeDataString(Sort)}",
+            $"disagreementsOnly={DisagreementsOnly.ToString().ToLowerInvariant()}",
+        ];
+        if (SelectedModel is not null)
+        {
+            query.Add($"modelId={Uri.EscapeDataString(SelectedModel.ModelId)}");
+            query.Add($"modelHash={Uri.EscapeDataString(SelectedModel.ModelHash)}");
+        }
+
+        return $"/audit?{string.Join("&", query)}";
+    }
+
+    private string BuildDetailsUrl(string faceId)
+    {
+        string returnUrl = BuildPageUrl();
+        return $"/faces/{Uri.EscapeDataString(faceId)}" +
+               $"?state=all&returnUrl={Uri.EscapeDataString(returnUrl)}";
+    }
+
+    private void PersonChanged()
+    {
+        PersonId = SelectedPersonId;
+        Offset = 0;
+        NavigateToCurrent();
+    }
+
+    private void ModelChanged()
+    {
+        ReviewModelRevisionFilterResponse? model = SelectedModel;
+        ModelId = model?.ModelId;
+        ModelHash = model?.ModelHash;
+        if (model is null)
+        {
+            DisagreementsOnly = false;
+            if (Sort == "disagreement-first")
+            {
+                Sort = DefaultSort;
+            }
+        }
+
+        Offset = 0;
+        NavigateToCurrent();
+    }
+
+    private void SortChanged()
+    {
+        Offset = 0;
+        NavigateToCurrent();
+    }
+
+    private void DisagreementFilterChanged()
+    {
+        Offset = 0;
+        NavigateToCurrent();
+    }
+
+    private void PreviousPage()
+    {
+        Offset = Math.Max(0, Offset - PageSize);
+        NavigateToCurrent();
+    }
+
+    private void NextPage()
+    {
+        Offset += PageSize;
+        NavigateToCurrent();
+    }
+
+    private void NavigateToCurrent() =>
+        Navigation.NavigateTo(BuildPageUrl(), replace: true);
+
+    private static string ModelKey(ReviewModelRevisionFilterResponse model) =>
+        $"{model.ModelId}::{model.ModelHash}";
+
+    private static string HashPrefix(string hash) =>
+        hash[..Math.Min(12, hash.Length)];
+}
