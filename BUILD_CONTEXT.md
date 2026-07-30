@@ -4,13 +4,28 @@
 
 **M06 — Local evaluation and acceptance**
 
-Status: `ready`
+Status: `in_progress`
 
-## Next ready work
+## Current work
 
 - **WI-0033 — Accelerate the human review workflow**
 
-The 500-image baseline pilot passed, but sustained review was too click-heavy on Windows and Pixel. WI-0033 is the explicit fix-before-proceeding gate before adding a second model or collection-ready queries.
+The first delivery slice is in progress on `agent/WI-0033-queue-navigation`. It replaces pointer-only person creation with native form submission and turns face details into a continuous, scope-aware review queue.
+
+## Implemented in the current slice
+
+- Enter and the Pixel mobile keyboard action submit person creation through the same guarded path as the Add button.
+- Gallery and progress links preserve review state, processing run, exact suggestion model revision, deterministic sort and a safe relative return target.
+- The API returns server-calculated Previous and Next face IDs plus queue position and total.
+- Accepting a suggestion captures the next eligible face before mutation and advances without returning to the gallery or skipping work.
+- Integration coverage protects scope intersection, mutation-stable navigation, invalid-sort rejection and privacy-limited responses.
+
+## Remaining WI-0033 slices
+
+1. expose top suggestions and suggestion-aware ordering in the gallery;
+2. add per-person assigned-face audit;
+3. add preview-first grouped suggestion acceptance with linked audit actions; and
+4. measure a fresh 50–100-face queue on Windows and Pixel.
 
 ## Recently completed
 
@@ -19,19 +34,6 @@ The 500-image baseline pilot passed, but sustained review was too click-heavy on
 - **WI-0027 — Complete the local review workflow** was human-verified on Windows and Pixel on 2026-07-30.
 
 Only privacy-safe conclusions are retained in the repository. Private photos, names, crops, embeddings, databases, raw manifests, reports and local paths remain local.
-
-## Accepted pilot finding
-
-The product is functionally correct, but review is too slow because:
-
-- creating a person requires a pointer/touch action rather than native form submission;
-- accepting a suggestion reloads the same details page instead of advancing;
-- details pages do not preserve queue position or provide Previous and Next navigation;
-- gallery cards do not expose top suggestions;
-- assigned faces cannot be audited by person; and
-- bulk review is not organised around suggestion groups.
-
-Elapsed review time was not captured, so WI-0033 includes a fresh 50–100-face throughput measurement on both device types.
 
 ## Delivery objective
 
@@ -53,9 +55,11 @@ Prove as much of the product as possible without Azure:
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/status/milestones.yaml`
 
-## Validation for this planning change
+## Validation
 
 ```powershell
+dotnet test
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+./verify-review.ps1 -Mode Smoke -Configuration Release
 ```
