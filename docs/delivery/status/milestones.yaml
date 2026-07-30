@@ -49,7 +49,7 @@ milestones:
   - WI-0016
 - id: M06
   title: Local evaluation and acceptance
-  status: ready
+  status: in_progress
   document: ../milestones/M06-evaluation.md
   work_items:
   - WI-0017

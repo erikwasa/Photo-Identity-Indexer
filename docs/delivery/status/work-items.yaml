@@ -664,10 +664,12 @@ work_items:
   - id: WI-0033
     title: Accelerate the human review workflow
     milestone: M06
-    status: ready
+    status: in_progress
     owner: ai-agent
     document: ../work-items/WI-0033-review-throughput.md
+    started_at: '2026-07-30'
     last_updated_at: '2026-07-30'
+    branch: agent/WI-0033-queue-navigation
     blockers:
       - WI-0027
       - WI-0029
