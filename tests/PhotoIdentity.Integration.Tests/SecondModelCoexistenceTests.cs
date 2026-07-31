@@ -123,7 +123,7 @@ public sealed class SecondModelCoexistenceTests
                     .GetHumanLabelsAsync(occurrence.Id);
             CatalogueHumanLabel label = Assert.Single(labels);
             Assert.Equal(person.Id, label.PersonId);
-            Assert.Equal("confirmed", label.LabelKind);
+            Assert.Equal("manual", label.LabelKind);
 
             FaceCropId cropId = await ReadOnlyCropIdAsync(connection);
             Assert.NotNull(await faceRepository.GetEmbeddingAsync(
