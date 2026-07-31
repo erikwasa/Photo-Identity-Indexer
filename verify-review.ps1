@@ -40,6 +40,8 @@ $stdoutPath = Join-Path $artifactDirectory "api.stdout.log"
 $stderrPath = Join-Path $artifactDirectory "api.stderr.log"
 $toolAssembly = Join-Path $root "tools/PhotoIdentity.ReviewVerification/bin/$Configuration/net10.0/PhotoIdentity.ReviewVerification.dll"
 $smokeScript = Join-Path $root "tools/PhotoIdentity.ReviewVerification/Invoke-PublishedReviewSmoke.ps1"
+$sessionScript = Join-Path $root "record-review-session.ps1"
+$manualGuide = Join-Path $root "docs/delivery/verification/WI-0033-manual-verification.md"
 $apiProject = Join-Path $root "src/PhotoIdentity.Api/PhotoIdentity.Api.csproj"
 $publishedApiDirectory = Join-Path $artifactDirectory "app"
 $apiAssembly = Join-Path $publishedApiDirectory "PhotoIdentity.Api.dll"
@@ -77,7 +79,7 @@ if (-not $SkipBuild) {
     )
 }
 
-foreach ($requiredFile in @($toolAssembly, $apiProject, $smokeScript)) {
+foreach ($requiredFile in @($toolAssembly, $apiProject, $smokeScript, $sessionScript, $manualGuide)) {
     if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
         throw "Required review verification file was not found: $requiredFile"
     }
@@ -92,12 +94,17 @@ $manifest = ($manifestText -join [Environment]::NewLine) | ConvertFrom-Json
 
 $notRunSmoke = [ordered]@{
     health = "not_run"
-    gallery = "not_run"
     hostedClient = "not_run"
+    workflowPages = "not_run"
+    gallery = "not_run"
+    suggestionGallery = "not_run"
+    queueNavigation = "not_run"
     image = "not_run"
     assignmentUndo = "not_run"
     rejection = "not_run"
     bulkMutation = "not_run"
+    personAudit = "not_run"
+    bulkSuggestionMutation = "not_run"
     suggestionAccept = "not_run"
     suggestionReject = "not_run"
     personRename = "not_run"
@@ -105,7 +112,7 @@ $notRunSmoke = [ordered]@{
     cacheControl = "not_run"
 }
 $report = [ordered]@{
-    schemaVersion = 2
+    schemaVersion = 3
     result = "prepared"
     mode = $Mode
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
@@ -115,6 +122,8 @@ $report = [ordered]@{
     localUrl = "http://localhost:$Port"
     lanUrls = @(Get-LanUrls -SelectedPort $Port)
     smoke = $notRunSmoke
+    manualVerificationGuide = "docs/delivery/verification/WI-0033-manual-verification.md"
+    manualSessionReporter = "record-review-session.ps1"
     manualVerificationRequired = ($Mode -eq "Interactive")
 }
 
@@ -122,6 +131,7 @@ if ($Mode -eq "Prepare") {
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
     Write-Host "Prepared synthetic review catalogue: $($manifest.DatabasePath)"
     Write-Host "Report: $reportPath"
+    Write-Host "Manual guide: $manualGuide"
     exit 0
 }
 
@@ -181,15 +191,11 @@ try {
     }
     Write-Warning "No firewall rule was created. Permit TCP $Port only on the intended private network profile."
     Write-Warning "The review listener is unauthenticated HTTP; do not expose it to an untrusted network."
-    Write-Host "`nManual checklist:"
-    Write-Host "  1. Confirm the gallery has no horizontal page scrolling."
-    Write-Host "  2. Confirm Assign, Reject, Undo and Back are comfortable to use."
-    Write-Host "  3. Confirm the bulk affected count is clear before commit."
-    Write-Host "  4. Confirm suggestion scores, margins and exact model revision are readable."
-    Write-Host "  5. Confirm rename and irreversible merge warnings are clear before commit."
-    Write-Host "  6. Restart the real catalogue host and confirm decisions persist."
-    Write-Host "  7. Open details and confirm no local filesystem path is displayed."
-    Write-Host "  8. Repeat the interaction checks on Pixel using only a trusted private network."
+    Write-Host "`nBefore closing WI-0033:"
+    Write-Host "  1. Follow $manualGuide on Windows and Pixel."
+    Write-Host "  2. Use a like-for-like fresh 50-100-face queue for each device run."
+    Write-Host "  3. Record each result with $sessionScript; reports stay below .artifacts."
+    Write-Host "  4. Do not mark touch usability or throughput accepted from automated smoke alone."
     Write-Host "Report: $reportPath"
 
     if ($Mode -eq "Interactive") {
