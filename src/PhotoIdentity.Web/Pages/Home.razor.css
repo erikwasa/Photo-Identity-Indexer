@@ -1,4 +1,6 @@
+.review-filter-panel,
 .bulk-review-panel {
+    min-width: 0;
     margin: 0 0 1.2rem;
     padding: clamp(1rem, 2vw, 1.35rem);
     background: rgba(255, 253, 248, 0.94);
@@ -7,16 +9,38 @@
     box-shadow: var(--shadow);
 }
 
+.review-filter-panel h2,
+.bulk-review-heading h2 {
+    margin: 0.15rem 0 0.35rem;
+    font-size: clamp(1.35rem, 3vw, 2rem);
+}
+
+.review-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin-top: 1rem;
+}
+
+.model-summary {
+    max-width: 100%;
+    color: var(--muted);
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+}
+
 .bulk-review-heading {
     display: flex;
+    min-width: 0;
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
 }
 
-.bulk-review-heading h2 {
-    margin: 0.15rem 0 0.35rem;
-    font-size: clamp(1.35rem, 3vw, 2rem);
+.bulk-review-heading > div,
+.bulk-preview > div,
+.bulk-review-controls > div {
+    min-width: 0;
 }
 
 .bulk-review-heading p:not(.eyebrow),
@@ -33,13 +57,6 @@
     gap: 0.55rem;
 }
 
-.bulk-empty {
-    margin-top: 1rem;
-    padding: 0.9rem 1rem;
-    background: #f1f0ea;
-    border-radius: 0.8rem;
-}
-
 .bulk-review-controls {
     display: grid;
     grid-template-columns: minmax(12rem, 0.8fr) minmax(14rem, 1fr) minmax(16rem, 1.4fr) auto;
@@ -48,12 +65,27 @@
     margin-top: 1rem;
 }
 
+.bulk-suggestion-person {
+    align-self: stretch;
+    padding: 0.75rem;
+    background: #edf4ef;
+    border: 1px solid #cbded3;
+    border-radius: 0.75rem;
+}
+
+.bulk-suggestion-person strong,
+.bulk-suggestion-person span {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
 .bulk-preview-button {
     min-width: 12rem;
 }
 
 .bulk-preview {
     display: flex;
+    min-width: 0;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
@@ -72,25 +104,49 @@
 .bulk-preview strong {
     display: block;
     margin-bottom: 0.2rem;
+    overflow-wrap: anywhere;
 }
 
 .bulk-preview p + p {
     margin-top: 0.25rem;
 }
 
+.infinite-loading {
+    display: flex;
+    min-height: 5rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: var(--muted);
+}
+
+.infinite-loading .spinner {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.end-of-queue {
+    margin: 1.5rem 0 0;
+    color: var(--muted);
+    text-align: center;
+}
+
 @media (max-width: 960px) {
+    .review-filter-grid,
     .bulk-review-controls {
         grid-template-columns: 1fr 1fr;
     }
 }
 
 @media (max-width: 680px) {
+    .review-filter-panel .section-heading,
     .bulk-review-heading,
     .bulk-preview {
         align-items: stretch;
         flex-direction: column;
     }
 
+    .review-filter-grid,
     .bulk-review-controls {
         grid-template-columns: 1fr;
     }
@@ -99,5 +155,9 @@
     .bulk-selection-actions .button,
     .bulk-preview .button {
         width: 100%;
+    }
+
+    .bulk-preview-button {
+        min-width: 0;
     }
 }
