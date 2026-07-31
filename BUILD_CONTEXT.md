@@ -10,7 +10,7 @@ Status: `in_progress`
 
 - **WI-0033 — Accelerate the human review workflow**
 
-Queue-aware details review, the suggestion-aware workspace and per-person audit are merged. The next slice is on `agent/WI-0033-bulk-suggestion-acceptance` and adds preview-first grouped acceptance for rank-one suggestions from one exact model revision.
+All implementation slices are merged. The final preparation branch is `agent/WI-0033-final-verification-prep`; after it merges, WI-0033 is waiting only for the documented Windows and Pixel manual verification sessions.
 
 ## Implemented WI-0033 slices
 
@@ -25,12 +25,18 @@ Queue-aware details review, the suggestion-aware workspace and per-person audit 
 - Exact-model disagreement signals compare the assigned person with rank-one pending or accepted suggestions without changing canonical labels.
 - The Bulk suggestions workspace groups rank-one matches by person, previews the exact eligible set and requires explicit confirmation.
 - Group commits write both normal assignment actions and linked suggestion-acceptance actions atomically for every affected face.
-- Integration coverage protects exact-model requirements, scoped ordering, mutation-stable navigation, active-assignment audit semantics, stale group previews and privacy-limited responses.
+- Published smoke covers all workflow routes, exact-model suggestion summaries, queue navigation, person audit, grouped suggestion commit, linked audit rows and privacy-limited responses.
+- `record-review-session.ps1` creates privacy-safe per-device metrics and a two-device summary below `.artifacts`.
 
-## Remaining WI-0033 slices
+## Remaining WI-0033 gate
 
-1. extend published-application smoke coverage across the completed workflow; and
-2. measure a fresh 50–100-face queue on Windows and Pixel.
+Follow `docs/delivery/verification/WI-0033-manual-verification.md`:
+
+1. complete the synthetic interaction checklist on Windows and Pixel;
+2. run a like-for-like fresh 50–100-face real queue on Windows;
+3. restore the same starting snapshot and repeat on Pixel;
+4. record both sessions with `record-review-session.ps1`; and
+5. mark WI-0033 complete only when both reports pass or after fixing and rerunning failed checks.
 
 ## Recently completed
 
@@ -55,6 +61,7 @@ Prove as much of the product as possible without Azure:
 - `docs/delivery/local-first-plan.md`
 - `docs/delivery/milestones/M06-evaluation.md`
 - `docs/delivery/work-items/WI-0033-review-throughput.md`
+- `docs/delivery/verification/WI-0033-manual-verification.md`
 - `docs/delivery/milestones/M08-second-model.md`
 - `docs/delivery/milestones/M15-documentation.md`
 - `docs/delivery/status/work-items.yaml`
