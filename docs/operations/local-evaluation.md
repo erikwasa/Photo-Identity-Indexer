@@ -1,6 +1,6 @@
 # Local evaluation workflow
 
-This runbook describes the local acceptance path for the baseline model and reviewed catalogue.
+This runbook describes the local acceptance path for the baseline and candidate models over one reviewed catalogue.
 
 ## 1. Prepare an isolated workspace
 
@@ -28,17 +28,21 @@ Copy or stage 450–550 representative private images into `$source`. Do not pla
 
 Expected success signals include model hash verification, Release build success, passing tests, valid living documentation and passing disposable review-application smoke checks.
 
-## 3. Process the subset
+## 3. Process the baseline subset
+
+The default detector and embedder remain YuNet FP32 and SFace FP32. They can also be named explicitly:
 
 ```powershell
 dotnet run --project src/PhotoIdentity.Cli -- `
   batch start `
   --database $db `
   --source $source `
-  --output $output
+  --output $output `
+  --detector-model yunet-2023mar-fp32 `
+  --embedder-model sface-2021dec-fp32
 ```
 
-Record the printed run ID. Exercise status and resume before accepting the pilot:
+The command prints and persists both selected model IDs. Record the printed run ID. Exercise status and resume before accepting the pilot:
 
 ```powershell
 dotnet run --project src/PhotoIdentity.Cli -- `
@@ -47,6 +51,8 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 dotnet run --project src/PhotoIdentity.Cli -- `
   batch resume --database $db --run RUN_ID
 ```
+
+Resume loads the model IDs from the saved run configuration; do not supply a different model on resume. Runs created before explicit model selection remain compatible and default to the baseline IDs.
 
 Use `--max-attempts COUNT` on start or resume when intentionally proving bounded restart and resume behavior.
 
@@ -88,7 +94,7 @@ The command prints the exact model revision plus target and suggestion counts. I
 
 During acceptance testing, reject at least one suggestion, run regeneration again and verify that the rejected pair does not reappear. Also verify that accepted assignments and append-only review history remain unchanged.
 
-## 6. Export evaluation data
+## 6. Export baseline evaluation data
 
 ```powershell
 $detector = Get-Content `
@@ -118,7 +124,7 @@ dotnet run --project src/PhotoIdentity.Cli -- `
 
 Validation chooses thresholds; the held-out test split only reports final metrics. Repeat both commands with unchanged inputs and compare SHA-256 hashes to prove deterministic manifest and report bytes.
 
-## 7. Capture pilot evidence — WI-0029
+## 7. Capture baseline evidence — WI-0029 and WI-0033
 
 Record privacy-safe aggregate evidence:
 
@@ -132,12 +138,72 @@ Record privacy-safe aggregate evidence:
 - defects, severity and disposition;
 - backup and restore result.
 
-Do not commit the database, images, crops, embeddings, names, real manifests or real reports.
+Do not commit the database, images, crops, embeddings, names, real manifests, reports or local review-time files.
 
-## 8. Repeat with a candidate model — WI-0019 and WI-0030
+## 8. Process the same revisions with SFace INT8 — WI-0019
 
-Process the same immutable revisions with the baseline and candidate model. Never overwrite baseline results. Use the same reviewed people and the same fixed evaluation split, and make the selected model revision explicit in both UI and reports.
+Install the pinned candidate without replacing the baseline file:
+
+```powershell
+./models/install-models.ps1 -Id sface-2021dec-int8
+```
+
+Use the same `$source` and `$db`, but a separate output root:
+
+```powershell
+$candidateOutput = Join-Path $root "outputs-sface-int8"
+
+dotnet run --project src/PhotoIdentity.Cli -- `
+  batch start `
+  --database $db `
+  --source $source `
+  --output $candidateOutput `
+  --detector-model yunet-2023mar-fp32 `
+  --embedder-model sface-2021dec-int8
+```
+
+Record `CANDIDATE_RUN_ID`. The unchanged detector and alignment protocol resolve to the existing face-occurrence and crop natural keys. The candidate embedding is inserted under its own model ID and exact hash, so baseline embeddings, people, labels and review actions remain intact.
+
+Regenerate candidate suggestions with its exact manifest:
+
+```powershell
+$candidateEmbedder = Get-Content `
+  .\models\manifests\sface-2021dec-int8.json -Raw | ConvertFrom-Json
+
+dotnet run --project src/PhotoIdentity.Cli -- `
+  match regenerate `
+  --database $db `
+  --embedder-id $candidateEmbedder.modelId `
+  --embedder-hash $candidateEmbedder.sha256
+```
+
+Export the same fixed split with separate candidate paths and identifiers:
+
+```powershell
+$candidateManifest = Join-Path $evaluation "sface-int8.json"
+$candidateReport = Join-Path $evaluation "sface-int8-report.json"
+
+dotnet run --project src/PhotoIdentity.Cli -- `
+  evaluate export `
+  --database $db `
+  --output $candidateManifest `
+  --dataset-id private-baseline-v1 `
+  --pipeline-version local-pipeline-v1 `
+  --detector-id $detector.modelId `
+  --detector-hash $detector.sha256 `
+  --embedder-id $candidateEmbedder.modelId `
+  --embedder-hash $candidateEmbedder.sha256 `
+  --seed private-baseline-split-v1 `
+  --run CANDIDATE_RUN_ID
+
+dotnet run --project src/PhotoIdentity.Cli -- `
+  evaluate `
+  --dataset $candidateManifest `
+  --output $candidateReport
+```
+
+Keep the same dataset ID, seed, source revisions and reviewed people. Compare the two exact model revisions in WI-0030 rather than treating candidate scores as interchangeable with baseline scores.
 
 ## 9. Cleanup and retention
 
-Keep the canonical pilot database and privacy-reviewed aggregate notes only as long as they remain useful. Remove temporary publish directories, transfer archives and redundant derived outputs after confirming backups. Original photos must remain unchanged throughout the workflow.
+Keep the canonical pilot database and privacy-reviewed aggregate notes only as long as they remain useful. Remove temporary publish directories, transfer archives and redundant derived outputs after confirming backups. Candidate model removal prevents future candidate inference but does not make persisted baseline results unreadable. Original photos must remain unchanged throughout the workflow.
