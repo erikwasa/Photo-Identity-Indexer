@@ -2,48 +2,49 @@
 
 ## Current milestone
 
-**M06 — Local evaluation and acceptance**
+**M08 — Multi-model local evaluation**
 
 Status: `in_progress`
 
 ## Current work
 
-- **WI-0033 — Accelerate the human review workflow**
+- **WI-0019 — Add a second model adapter**
 
-The first real Windows and Pixel verification completed on 2026-07-31 and confirmed that manual review is improved. PR #50 merged the unified continuous review UI and the first defect corrections. The active focused follow-up is `agent/WI-0033-details-auto-advance`, based on additional interactive verification findings.
+WI-0033 completed human verification on Windows and Pixel on 2026-08-01. The review workflow works as intended, the operator confirmed that sustained manual review is improved, and privacy-sensitive timing reports remain outside Git.
 
-## Implemented WI-0033 slices
+The active branch is `agent/WI-0019-second-embedder`.
 
-- Enter and the Pixel mobile keyboard action submit person creation through the same guarded path as the Add button.
-- Queue-aware details preserve review state, processing run, exact suggestion model revision, deterministic sort and a safe relative return target.
-- Accepting a suggestion captures the next eligible face before mutation and advances without returning to the gallery or skipping work.
-- Rank-one suggestion person, score and margin are available in the paged query without per-card requests.
-- Suggestion review supports ordering by suggested person, margin, score, missing suggestion or creation time with stable tie-breaking.
-- Audit pages every active assignment for one person and provides advisory exact-model disagreement signals.
-- Preview-first grouped acceptance writes normal assignment actions and linked suggestion-acceptance actions atomically.
-- Faces now combines ordinary review, suggestion ordering and grouped suggestion acceptance with continuous loading.
-- Published smoke covers route/API invariants, linked audit rows and privacy-limited responses.
-- `record-review-session.ps1` creates privacy-safe per-device metrics below `.artifacts`.
+## Completed baseline gate
 
-## Active focused follow-up
+- The 450–550-image local pilot passed restart/resume, cross-device review, matcher invariants, deterministic export/evaluation, backup and restore.
+- Queue-aware Faces review combines continuous loading, exact-model suggestion ordering, automatic advance, any-person correction, create-and-assign, person audit and preview-first grouped acceptance.
+- Windows and Pixel corrective verification passed without horizontal overflow or lost queue navigation.
+- Published review smoke protects routes, mutation/audit invariants, privacy boundaries and a multi-page disposable fixture.
+- Local review-time and interaction measurements were captured for both devices and retained outside the repository.
 
-- Capture queue navigation before manual assignment and advance to the captured next face after success.
-- Treat new-person creation in details as create-and-assign, then advance without leaving the current face unresolved.
-- Use the shorter confirmation text `Created <name>` when details remain on the same face.
-- Constrain expanded active-model and ranked-suggestion provenance so long hashes cannot create Pixel horizontal scrolling.
-- Increase spacing between the top-suggestion action and detector-confidence bar.
-- Expand the disposable interactive fixture beyond one 40-card page and make smoke assert that continuous loading can be exercised.
+## Active WI-0019 slice
 
-## Remaining WI-0033 gate
+- Add the pinned `sface-2021dec-int8` candidate manifest with immutable source, size, SHA-256, input/output contract, alignment and licence records.
+- Persist explicit detector and embedder model IDs in every new batch run while defaulting older saved runs to YuNet FP32 and SFace FP32.
+- Add `--detector-model` and `--embedder-model` to `batch start`; resume always reloads the saved exact selection.
+- Resolve production manifests by selected model ID and validate the required role before opening model files.
+- Reuse unchanged face-occurrence/crop natural keys while storing baseline and candidate embeddings under distinct model ID/hash keys.
+- Prove through integration coverage that candidate processing leaves people, confirmed labels and review actions unchanged.
+- Document installation, processing, matcher regeneration and same-split evaluation commands.
 
-1. merge the focused follow-up after green build, tests, documentation checks and published smoke;
-2. rerun manual assignment, create-and-assign, continuous loading and Pixel expanded-provenance checks;
-3. retain only privacy-safe aggregate evidence; and
-4. mark WI-0033 complete only after the focused corrective verification passes.
+## Remaining WI-0019 gate
+
+1. merge the selectable-candidate slice after green build, tests and documentation checks;
+2. install the pinned candidate model locally;
+3. process at least one immutable revision with `--embedder-model sface-2021dec-int8` and confirm exact-model coexistence; and
+4. retain only privacy-safe success/failure evidence.
+
+The full baseline-versus-candidate corpus comparison belongs to WI-0030.
 
 ## Recently completed
 
-- **WI-0029 — Run a 500-image local acceptance pilot** was human-verified on 2026-07-30. Batch restart/resume, cross-device review, matcher invariants, deterministic export/evaluation, aggregate measurements, backup, restore and cleanup passed on a private representative subset.
+- **WI-0033 — Accelerate the human review workflow** was human-verified on Windows and Pixel on 2026-08-01.
+- **WI-0029 — Run a 500-image local acceptance pilot** was human-verified on 2026-07-30.
 - **WI-0028 — Export reviewed catalogues to model-lab** was human-verified against the private reviewed catalogue on 2026-07-30.
 - **WI-0027 — Complete the local review workflow** was human-verified on Windows and Pixel on 2026-07-30.
 
@@ -53,20 +54,19 @@ Only privacy-safe conclusions are retained in the repository. Private photos, na
 
 Prove as much of the product as possible without Azure:
 
-1. close the baseline review-throughput gap;
-2. add a second model and repeat the same corpus;
-3. exercise practical collection queries;
-4. rewrite and independently validate the operator and architecture documentation; and
-5. resume Azure execution only when access is available.
+1. add a second model and repeat the same corpus;
+2. exercise practical collection queries;
+3. rewrite and independently validate the operator and architecture documentation; and
+4. resume Azure execution only when access is available.
 
 ## Relevant planning files
 
 - `docs/delivery/local-first-plan.md`
-- `docs/delivery/milestones/M06-evaluation.md`
-- `docs/delivery/work-items/WI-0033-review-throughput.md`
-- `docs/delivery/verification/WI-0033-manual-verification.md`
 - `docs/delivery/milestones/M08-second-model.md`
-- `docs/delivery/milestones/M15-documentation.md`
+- `docs/delivery/work-items/WI-0019-second-model.md`
+- `docs/delivery/work-items/WI-0030-multi-model-comparison.md`
+- `docs/models/candidate-models.md`
+- `docs/operations/local-evaluation.md`
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/status/milestones.yaml`
 

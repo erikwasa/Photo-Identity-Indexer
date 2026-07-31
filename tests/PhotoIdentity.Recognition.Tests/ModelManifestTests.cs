@@ -16,9 +16,10 @@ public sealed class ModelManifestTests
         IReadOnlyList<ModelManifest> manifests = await loader.LoadDirectoryAsync(
             Path.Combine(root, "models", "manifests"));
 
-        Assert.Equal(2, manifests.Count);
+        Assert.Equal(3, manifests.Count);
         Assert.Contains(manifests, value => value.ModelId == "yunet-2023mar-fp32");
         Assert.Contains(manifests, value => value.ModelId == "sface-2021dec-fp32");
+        Assert.Contains(manifests, value => value.ModelId == "sface-2021dec-int8");
 
         ModelDescriptor yunet = manifests
             .Single(value => value.ModelId == "yunet-2023mar-fp32")
@@ -27,14 +28,19 @@ public sealed class ModelManifestTests
         Assert.Equal(ModelRole.FaceDetection, yunet.Role);
         Assert.Equal(new ImageSize(640, 640), yunet.InputSize);
 
-        ModelDescriptor sface = manifests
-            .Single(value => value.ModelId == "sface-2021dec-fp32")
-            .ToDescriptor();
+        ModelManifest baselineManifest = manifests
+            .Single(value => value.ModelId == "sface-2021dec-fp32");
+        ModelManifest candidateManifest = manifests
+            .Single(value => value.ModelId == "sface-2021dec-int8");
+        ModelDescriptor baseline = baselineManifest.ToDescriptor();
+        ModelDescriptor candidate = candidateManifest.ToDescriptor();
 
-        Assert.Equal(ModelRole.FaceEmbedding, sface.Role);
-        Assert.Equal(128, sface.OutputDimensions);
-        Assert.Equal(DistanceMetric.Cosine, sface.DistanceMetric);
-        Assert.Equal("Apache-2.0", sface.Licence);
+        AssertSFaceDescriptor(baseline);
+        AssertSFaceDescriptor(candidate);
+        Assert.NotEqual(baseline.ModelHash, candidate.ModelHash);
+        Assert.Equal(38_696_353, baselineManifest.SizeBytes);
+        Assert.Equal(9_896_933, candidateManifest.SizeBytes);
+        Assert.Contains("INT8", candidateManifest.Output.Semantics, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -75,6 +81,16 @@ public sealed class ModelManifestTests
 
         Assert.Throws<ModelManifestException>(
             () => ModelManifestValidator.Validate(manifest));
+    }
+
+    private static void AssertSFaceDescriptor(ModelDescriptor descriptor)
+    {
+        Assert.Equal(ModelRole.FaceEmbedding, descriptor.Role);
+        Assert.Equal(new ImageSize(112, 112), descriptor.InputSize);
+        Assert.Equal(128, descriptor.OutputDimensions);
+        Assert.Equal(DistanceMetric.Cosine, descriptor.DistanceMetric);
+        Assert.Equal("sface-five-point-v1", descriptor.AlignmentProtocol?.ToString());
+        Assert.Equal("Apache-2.0", descriptor.Licence);
     }
 
     private static ModelManifest ValidEmbeddingManifest() =>

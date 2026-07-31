@@ -440,9 +440,12 @@ work_items:
   - id: WI-0019
     title: Add a second model adapter
     milestone: M08
-    status: proposed
-    owner: unassigned
+    status: in_progress
+    owner: ai-agent
     document: ../work-items/WI-0019-second-model.md
+    started_at: '2026-08-01'
+    last_updated_at: '2026-08-01'
+    branch: agent/WI-0019-second-embedder
     blockers:
       - WI-0017
       - WI-0018
@@ -664,13 +667,30 @@ work_items:
   - id: WI-0033
     title: Accelerate the human review workflow
     milestone: M06
-    status: in_progress
+    status: completed
     owner: ai-agent
     document: ../work-items/WI-0033-review-throughput.md
     started_at: '2026-07-30'
-    last_updated_at: '2026-07-30'
-    branch: agent/WI-0033-queue-navigation
+    completed_at: '2026-08-01'
+    verified_at: '2026-08-01'
+    verified_by: human
+    last_updated_at: '2026-08-01'
+    branch: agent/WI-0033-details-auto-advance
     blockers:
       - WI-0027
       - WI-0029
-    evidence: []
+    evidence:
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/50
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30640702799
+      - type: merge_commit
+        value: f677ce233934a8ffe54c1761a2fe488f46f7cc5c
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/51
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30664945020
+      - type: merge_commit
+        value: 6108de30fa69e87300bc5b6f0594f3a5d67049b0
+      - type: human_verification
+        value: Windows and Pixel corrective verification passed on 2026-08-01; privacy-safe aggregate review timing remains outside Git.

@@ -40,6 +40,7 @@
 
 - [Evaluation method](models/evaluation-method.md)
 - [Baseline models](models/baseline-models.md)
+- [Candidate models](models/candidate-models.md)
 - [Model manifest and licensing](models/model-governance.md)
 
 ## Azure — optional and deferred

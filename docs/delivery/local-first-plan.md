@@ -37,21 +37,23 @@ The pilot classified sustained review speed as an S3 usability defect with dispo
 
 ### WI-0033 — Accelerate the human review workflow
 
-Work is in progress. Queue-aware details, automatic advance, suggestion-aware ordering, person audit, grouped acceptance, expanded published smoke and privacy-safe session reporting are implemented.
+Completed and human-verified on Windows and Pixel on 2026-08-01. Queue-aware details, automatic advance, suggestion-aware ordering, person audit, grouped acceptance, continuous loading, expanded published smoke and privacy-safe session reporting are implemented.
 
-The first real Windows and Pixel verification completed on 2026-07-31 and confirmed that the revised manual-review process is improved. The run also exposed correctness defects and unnecessary complexity: missing optional query values could crash Audit details and initial Progress loading; undo did not restore accepted suggestions to the active gallery; details could not assign an unlisted person or create a person; and full hashes plus image names created horizontal overflow on Pixel.
+Two device-led corrective passes fixed Audit and Progress query crashes, restored accepted suggestions after undo, added any-person and create-and-assign correction, consolidated suggestion review into Faces, removed mobile overflow and ensured manual assignment advances without losing queue scope. The operator confirmed that WI-0033 works as intended and that manual reviewing is improved.
 
-The active corrective slice consolidates ordinary Faces, suggestion review and grouped suggestion acceptance into one continuously loaded Faces workspace. It retains preview-first confirmation and linked audit semantics while removing separate Suggestions and Bulk suggestions navigation. Cards keep state plus top suggestion name, score and margin, but hide image name, face ordinal, selection text and full model revision. Legacy URLs redirect into the unified workflow.
-
-Undo now restores a suggestion-backed assignment's exact suggestion to pending in the same SQLite transaction. Face details normalize all optional queue values, select suggestion-aware navigation only when an exact model scope is present, support assignment to any named person and allow inline person creation. Progress normalizes its initial filter state before URL construction.
-
-WI-0033 remains open until the corrective PR is green and the affected Windows/Pixel checks are rerun, especially Audit navigation, initial Progress loading, accept→undo restoration, any-person assignment, inline person creation and portrait overflow. Explicit human confirmation, append-only assignment and suggestion audit actions, exact model provenance and privacy-limited DTOs remain mandatory.
+The required 50–100-face review-time and interaction evidence was captured locally for both devices and retained outside Git. Only the privacy-safe completion conclusion is recorded in the repository.
 
 ## Phase B — repeat the workflow with multiple models
 
 ### WI-0019 — Add a second model adapter
 
-Add one candidate detector or embedder through the neutral contracts after WI-0033 closes the baseline review-throughput gate. Keep baseline and candidate results separate by model ID and hash while sharing canonical people and human review history.
+Work is in progress on `agent/WI-0019-second-embedder`.
+
+The first candidate is the pinned upstream `sface-2021dec-int8` embedder. It deliberately retains YuNet detection, SFace five-point alignment, 112×112 input and 128-dimensional cosine embeddings so the later comparison isolates the quantised embedding revision.
+
+Batch runs now persist explicit detector and embedder model IDs. New runs can select `--embedder-model sface-2021dec-int8`; resume reloads the saved exact selection. The same immutable revision reuses its face occurrence and aligned crop while baseline and candidate embeddings coexist by model ID and exact hash. Integration coverage protects people, labels and review actions from candidate processing.
+
+The remaining WI-0019 gate is a local installation and one candidate processing run using the pinned model file. Full-corpus measurements are deferred to WI-0030.
 
 ### WI-0030 — Run a multi-model local comparison
 
