@@ -374,6 +374,23 @@ public sealed class SqliteReviewRepository
             }
         }
 
+        using (SqliteCommand restoreSuggestionCommand = connection.CreateCommand())
+        {
+            restoreSuggestionCommand.Transaction = transaction;
+            restoreSuggestionCommand.CommandText = """
+                UPDATE identity_suggestions
+                SET status = 'pending'
+                WHERE status = 'accepted'
+                  AND id IN (
+                    SELECT suggestion_id
+                    FROM identity_suggestion_review_actions
+                    WHERE action_kind = 'accept'
+                      AND review_action_id = $review_action_id);
+                """;
+            restoreSuggestionCommand.Parameters.AddWithValue("$review_action_id", latest.Id);
+            await restoreSuggestionCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         long undoId = await InsertActionAsync(
             connection,
             transaction,
@@ -632,7 +649,7 @@ public sealed class SqliteReviewRepository
         string normalized = value.Trim();
         if (normalized.Length > 1000)
         {
-            throw new ArgumentException("A review note cannot exceed 1000 characters.", nameof(value));
+            throw new ArgumentException("The value cannot exceed 1000 characters.", nameof(value));
         }
 
         return normalized;
