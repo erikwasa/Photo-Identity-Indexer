@@ -13,6 +13,7 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M06 — Local evaluation and acceptance**: `completed`
 - **M07 — Portable job bundles**: `completed`
 - **M08 — Multi-model local evaluation**: `in_progress`
+- **M14 — Collection-ready API**: `ready`
 
 ## Active work
 
