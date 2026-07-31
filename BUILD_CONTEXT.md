@@ -10,33 +10,37 @@ Status: `in_progress`
 
 - **WI-0033 — Accelerate the human review workflow**
 
-All implementation slices are merged. The final preparation branch is `agent/WI-0033-final-verification-prep`; after it merges, WI-0033 is waiting only for the documented Windows and Pixel manual verification sessions.
+The first real Windows and Pixel verification completed on 2026-07-31 and confirmed that manual review is improved. It also exposed correctness defects and mobile overflow. The active corrective branch is `agent/WI-0033-unified-review-ui`.
 
 ## Implemented WI-0033 slices
 
 - Enter and the Pixel mobile keyboard action submit person creation through the same guarded path as the Add button.
-- Gallery and progress links preserve review state, processing run, exact suggestion model revision, deterministic sort and a safe relative return target.
-- The API returns server-calculated Previous and Next face IDs plus queue position and total.
+- Queue-aware details preserve review state, processing run, exact suggestion model revision, deterministic sort and a safe relative return target.
 - Accepting a suggestion captures the next eligible face before mutation and advances without returning to the gallery or skipping work.
-- The Suggestions workspace returns rank-one pending matches, scores, margins and exact model provenance in one paged response.
-- Suggestion review can be ordered by suggested person, high or low score margin, score, missing suggestion or creation time with stable tie-breaking.
-- Clear matches can be accepted directly from cards; ambiguous matches open an ordered quick-details queue.
-- The Audit workspace pages every active assignment for one person and links each face to append-only review history.
-- Exact-model disagreement signals compare the assigned person with rank-one pending or accepted suggestions without changing canonical labels.
-- The Bulk suggestions workspace groups rank-one matches by person, previews the exact eligible set and requires explicit confirmation.
-- Group commits write both normal assignment actions and linked suggestion-acceptance actions atomically for every affected face.
-- Published smoke covers all workflow routes, exact-model suggestion summaries, queue navigation, person audit, grouped suggestion commit, linked audit rows and privacy-limited responses.
-- `record-review-session.ps1` creates privacy-safe per-device metrics and a two-device summary below `.artifacts`.
+- Rank-one suggestion person, score and margin are available in the paged query without per-card requests.
+- Suggestion review supports ordering by suggested person, margin, score, missing suggestion or creation time with stable tie-breaking.
+- Audit pages every active assignment for one person and provides advisory exact-model disagreement signals.
+- Preview-first grouped acceptance writes normal assignment actions and linked suggestion-acceptance actions atomically.
+- Published smoke covers route/API invariants, linked audit rows and privacy-limited responses.
+- `record-review-session.ps1` creates privacy-safe per-device metrics below `.artifacts`.
+
+## Active corrective slice
+
+- Normalize missing query values so Audit details and initial Progress loading cannot pass null to URL encoding.
+- Restore accepted suggestions to pending atomically when their assignment is undone.
+- Add any-person assignment and inline person creation to face details.
+- Consolidate ordinary review, suggestion sorting and grouped suggestion acceptance into Faces.
+- Append results continuously instead of using numbered pages in the primary review workspace.
+- Remove visible image names, face ordinals, selection text and model hashes from review cards.
+- Redirect legacy Suggestions, Bulk suggestions and quick-details URLs into the unified workflow.
+- Prevent full hashes or long private image names from creating horizontal overflow on Pixel.
 
 ## Remaining WI-0033 gate
 
-Follow `docs/delivery/verification/WI-0033-manual-verification.md`:
-
-1. complete the synthetic interaction checklist on Windows and Pixel;
-2. run a like-for-like fresh 50–100-face real queue on Windows;
-3. restore the same starting snapshot and repeat on Pixel;
-4. record both sessions with `record-review-session.ps1`; and
-5. mark WI-0033 complete only when both reports pass or after fixing and rerunning failed checks.
+1. merge the corrective slice after green build, tests, documentation checks and published smoke;
+2. rerun the affected Windows and Pixel interaction checks, especially Audit links, Progress initial load, accept→undo restoration, manual assignment/person creation and portrait overflow;
+3. retain only privacy-safe aggregate evidence; and
+4. mark WI-0033 complete only after the corrective verification passes.
 
 ## Recently completed
 
