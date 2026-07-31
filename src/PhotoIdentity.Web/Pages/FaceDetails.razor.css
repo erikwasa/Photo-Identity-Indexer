@@ -37,38 +37,54 @@
 .metadata-card,
 .audit-section,
 .suggestion-content,
-.identity-assignment-grid > * {
+.identity-assignment-grid > *,
+.timeline li,
+.timeline li > * {
     min-width: 0;
+}
+
+.timeline li {
+    grid-template-columns: 1.25rem minmax(0, 1fr);
 }
 
 .breakable,
 .model-provenance-details code,
 .timeline code {
+    max-inline-size: 100%;
     overflow-wrap: anywhere;
-    word-break: break-word;
+    word-break: break-all;
 }
 
 .model-provenance-details {
-    max-width: 100%;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
     margin-top: 1rem;
     padding: 0.75rem;
+    overflow: hidden;
     background: #f1f0ea;
     border-radius: 0.75rem;
 }
 
 .model-provenance-details summary {
+    max-inline-size: 100%;
+    min-inline-size: 0;
     cursor: pointer;
     color: #355b56;
     font-size: 0.82rem;
     font-weight: 750;
     overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .model-provenance-details code {
     display: block;
-    max-width: 100%;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
     margin-top: 0.5rem;
-    white-space: normal;
+    overflow: hidden;
+    white-space: pre-wrap;
 }
 
 .compact-provenance {
