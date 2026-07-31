@@ -118,12 +118,12 @@ public sealed class SecondModelCoexistenceTests
                 ],
                 persistedModels);
 
-            IReadOnlyList<HumanLabelAssignment> labels =
+            IReadOnlyList<CatalogueHumanLabel> labels =
                 await new SqliteIdentityCatalogueRepository(database)
                     .GetHumanLabelsAsync(occurrence.Id);
-            HumanLabelAssignment label = Assert.Single(labels);
+            CatalogueHumanLabel label = Assert.Single(labels);
             Assert.Equal(person.Id, label.PersonId);
-            Assert.Equal("confirmed", label.Source);
+            Assert.Equal("confirmed", label.LabelKind);
 
             FaceCropId cropId = await ReadOnlyCropIdAsync(connection);
             Assert.NotNull(await faceRepository.GetEmbeddingAsync(
