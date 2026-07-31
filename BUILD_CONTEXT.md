@@ -10,7 +10,7 @@ Status: `in_progress`
 
 - **WI-0033 — Accelerate the human review workflow**
 
-The first real Windows and Pixel verification completed on 2026-07-31 and confirmed that manual review is improved. It also exposed correctness defects and mobile overflow. The active corrective branch is `agent/WI-0033-unified-review-ui`.
+The first real Windows and Pixel verification completed on 2026-07-31 and confirmed that manual review is improved. PR #50 merged the unified continuous review UI and the first defect corrections. The active focused follow-up is `agent/WI-0033-details-auto-advance`, based on additional interactive verification findings.
 
 ## Implemented WI-0033 slices
 
@@ -21,26 +21,25 @@ The first real Windows and Pixel verification completed on 2026-07-31 and confir
 - Suggestion review supports ordering by suggested person, margin, score, missing suggestion or creation time with stable tie-breaking.
 - Audit pages every active assignment for one person and provides advisory exact-model disagreement signals.
 - Preview-first grouped acceptance writes normal assignment actions and linked suggestion-acceptance actions atomically.
+- Faces now combines ordinary review, suggestion ordering and grouped suggestion acceptance with continuous loading.
 - Published smoke covers route/API invariants, linked audit rows and privacy-limited responses.
 - `record-review-session.ps1` creates privacy-safe per-device metrics below `.artifacts`.
 
-## Active corrective slice
+## Active focused follow-up
 
-- Normalize missing query values so Audit details and initial Progress loading cannot pass null to URL encoding.
-- Restore accepted suggestions to pending atomically when their assignment is undone.
-- Add any-person assignment and inline person creation to face details.
-- Consolidate ordinary review, suggestion sorting and grouped suggestion acceptance into Faces.
-- Append results continuously instead of using numbered pages in the primary review workspace.
-- Remove visible image names, face ordinals, selection text and model hashes from review cards.
-- Redirect legacy Suggestions, Bulk suggestions and quick-details URLs into the unified workflow.
-- Prevent full hashes or long private image names from creating horizontal overflow on Pixel.
+- Capture queue navigation before manual assignment and advance to the captured next face after success.
+- Treat new-person creation in details as create-and-assign, then advance without leaving the current face unresolved.
+- Use the shorter confirmation text `Created <name>` when details remain on the same face.
+- Constrain expanded active-model and ranked-suggestion provenance so long hashes cannot create Pixel horizontal scrolling.
+- Increase spacing between the top-suggestion action and detector-confidence bar.
+- Expand the disposable interactive fixture beyond one 40-card page and make smoke assert that continuous loading can be exercised.
 
 ## Remaining WI-0033 gate
 
-1. merge the corrective slice after green build, tests, documentation checks and published smoke;
-2. rerun the affected Windows and Pixel interaction checks, especially Audit links, Progress initial load, accept→undo restoration, manual assignment/person creation and portrait overflow;
+1. merge the focused follow-up after green build, tests, documentation checks and published smoke;
+2. rerun manual assignment, create-and-assign, continuous loading and Pixel expanded-provenance checks;
 3. retain only privacy-safe aggregate evidence; and
-4. mark WI-0033 complete only after the corrective verification passes.
+4. mark WI-0033 complete only after the focused corrective verification passes.
 
 ## Recently completed
 
