@@ -98,7 +98,11 @@ foreach ($route in @("/suggestions", "/bulk-suggestions", "/audit", "/progress",
 }
 $smoke.workflowPages = "passed"
 
-$galleryResponse = Invoke-WebRequest -Uri "$BaseUrl/api/review/faces?state=all" `
+if ([int]$Manifest.UnreviewedCount -le 40) {
+    throw "The interactive fixture must contain more than one 40-card review page."
+}
+
+$galleryResponse = Invoke-WebRequest -Uri "$BaseUrl/api/review/faces?state=all&offset=0&limit=200" `
     -UseBasicParsing -TimeoutSec 10
 $gallery = $galleryResponse.Content | ConvertFrom-Json
 $galleryItems = @($gallery.Items)
