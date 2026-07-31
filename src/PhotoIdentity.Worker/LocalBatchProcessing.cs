@@ -9,6 +9,9 @@ namespace PhotoIdentity.Worker;
 
 public sealed record LocalBatchConfiguration
 {
+    public const string DefaultDetectorModelId = "yunet-2023mar-fp32";
+    public const string DefaultEmbedderModelId = "sface-2021dec-fp32";
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -22,11 +25,15 @@ public sealed record LocalBatchConfiguration
         string? modelDirectory = null,
         bool recursive = true,
         double confidenceThreshold = 0.9,
-        double paddingRatio = 0.25)
+        double paddingRatio = 0.25,
+        string detectorModelId = DefaultDetectorModelId,
+        string embedderModelId = DefaultEmbedderModelId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
+        ArgumentException.ThrowIfNullOrWhiteSpace(detectorModelId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(embedderModelId);
         if (!double.IsFinite(confidenceThreshold) || confidenceThreshold is < 0 or > 1)
         {
             throw new ArgumentOutOfRangeException(
@@ -49,6 +56,8 @@ public sealed record LocalBatchConfiguration
         Recursive = recursive;
         ConfidenceThreshold = confidenceThreshold;
         PaddingRatio = paddingRatio;
+        DetectorModelId = detectorModelId.Trim();
+        EmbedderModelId = embedderModelId.Trim();
     }
 
     public string SourceRoot { get; }
@@ -58,6 +67,8 @@ public sealed record LocalBatchConfiguration
     public bool Recursive { get; }
     public double ConfidenceThreshold { get; }
     public double PaddingRatio { get; }
+    public string DetectorModelId { get; }
+    public string EmbedderModelId { get; }
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 
@@ -74,7 +85,9 @@ public sealed record LocalBatchConfiguration
                 data.ModelDirectory,
                 data.Recursive,
                 data.ConfidenceThreshold,
-                data.PaddingRatio);
+                data.PaddingRatio,
+                data.DetectorModelId ?? DefaultDetectorModelId,
+                data.EmbedderModelId ?? DefaultEmbedderModelId);
     }
 
     private static void EnsureOutsideSource(string sourceRoot, string outputRoot)
@@ -100,7 +113,9 @@ public sealed record LocalBatchConfiguration
         string? ModelDirectory,
         bool Recursive,
         double ConfidenceThreshold,
-        double PaddingRatio);
+        double PaddingRatio,
+        string? DetectorModelId,
+        string? EmbedderModelId);
 }
 
 public sealed record LocalBatchStartResult(
@@ -200,7 +215,10 @@ public sealed class LocalBatchCoordinator
         _ = await repository.GetRunAsync(runId, cancellationToken)
             ?? throw new KeyNotFoundException($"Processing run {runId} was not found.");
         ResumableBatchProcessor processor = new(repository, handler, _timeProvider);
-        return await processor.RunUntilIdleAsync(runId, processorOptions, cancellationToken);
+        return await processor.RunUntilIdleAsync(
+            runId,
+            processorOptions,
+            cancellationToken);
     }
 
     public async Task<LocalBatchConfiguration> GetConfigurationAsync(
