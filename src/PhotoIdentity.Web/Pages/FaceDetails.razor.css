@@ -32,6 +32,50 @@
     white-space: nowrap;
 }
 
+.details-grid,
+.details-grid > *,
+.metadata-card,
+.audit-section,
+.suggestion-content,
+.identity-assignment-grid > * {
+    min-width: 0;
+}
+
+.breakable,
+.model-provenance-details code,
+.timeline code {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.model-provenance-details {
+    max-width: 100%;
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: #f1f0ea;
+    border-radius: 0.75rem;
+}
+
+.model-provenance-details summary {
+    cursor: pointer;
+    color: #355b56;
+    font-size: 0.82rem;
+    font-weight: 750;
+    overflow-wrap: anywhere;
+}
+
+.model-provenance-details code {
+    display: block;
+    max-width: 100%;
+    margin-top: 0.5rem;
+    white-space: normal;
+}
+
+.compact-provenance {
+    margin-top: 0.55rem;
+    padding: 0.55rem 0.7rem;
+}
+
 .suggestion-guidance {
     max-width: 52rem;
     margin: 0.35rem 0 0;
@@ -39,18 +83,28 @@
     line-height: 1.5;
 }
 
-.model-revision {
-    overflow-wrap: anywhere;
-    word-break: break-all;
-}
-
 .review-notice {
     margin-top: 1rem;
     margin-bottom: 0;
 }
 
-.suggestion-content {
-    min-width: 0;
+.identity-assignment-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.identity-assignment-grid .button {
+    margin-top: 0.65rem;
+}
+
+.details-person-creator {
+    padding: 0;
+}
+
+.full-width {
+    width: 100%;
 }
 
 .suggestion-actions {
@@ -74,6 +128,12 @@
 
 .suggestion-decision blockquote {
     margin-bottom: 0;
+}
+
+@media (max-width: 760px) {
+    .identity-assignment-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 620px) {
@@ -102,5 +162,10 @@
 
     .suggestion-actions .button {
         width: 100%;
+    }
+
+    .details-header {
+        align-items: flex-start;
+        flex-direction: column;
     }
 }
