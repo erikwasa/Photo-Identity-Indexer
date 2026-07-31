@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "modelId": "sface-2021dec-int8",
+  "role": "faceEmbedding",
+  "format": "onnx",
+  "fileName": "face_recognition_sface_2021dec_int8.onnx",
+  "downloadUri": "https://huggingface.co/opencv/face_recognition_sface/resolve/89e1f6f89ab68a12ab974b5b65162abf464a461f/face_recognition_sface_2021dec_int8.onnx?download=true",
+  "sha256": "2b0e941e6f16cc048c20aee0c8e31f569118f65d702914540f7bfdc14048d78a",
+  "sizeBytes": 9896933,
+  "runtime": "onnxruntime",
+  "sourceVersion": "opencv/face_recognition_sface@89e1f6f89ab68a12ab974b5b65162abf464a461f",
+  "input": {
+    "width": 112,
+    "height": 112,
+    "colourOrder": "RGB",
+    "dataType": "float32",
+    "normalisation": {
+      "scale": 1.0,
+      "mean": [0.0, 0.0, 0.0]
+    }
+  },
+  "output": {
+    "kind": "embedding",
+    "dimensions": 128,
+    "normalisation": "l2-by-adapter",
+    "distanceMetric": "cosine",
+    "semantics": "One 128-dimensional face embedding from the upstream INT8-quantised SFace weights. The ONNX graph retains the float32 external tensor contract used by the baseline adapter. Input follows OpenCV FaceRecognizerSF preprocessing: aligned BGR pixels are converted to RGB float32 without scaling or mean subtraction. The application adapter L2-normalises the output before persistence and comparison."
+  },
+  "alignmentProtocol": "sface-five-point-v1",
+  "licences": {
+    "code": {
+      "spdx": "Apache-2.0",
+      "source": "https://github.com/opencv/opencv_zoo/blob/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface/LICENSE"
+    },
+    "weights": {
+      "spdx": "Apache-2.0",
+      "source": "https://github.com/opencv/opencv_zoo/blob/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface/LICENSE"
+    },
+    "trainingData": {
+      "name": "See SFace upstream paper and repository",
+      "licence": "not asserted by this project",
+      "notes": "The upstream model documentation describes MobileFaceNet instances trained with SFace loss. Review source-dataset terms before model training or redistribution."
+    }
+  }
+}
