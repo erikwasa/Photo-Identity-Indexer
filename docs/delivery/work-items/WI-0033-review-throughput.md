@@ -15,7 +15,7 @@ Reduce the interaction cost of sustained human review on Windows and Pixel witho
 
 ## Pilot finding
 
-The 500-image acceptance pilot completed successfully, but review was too slow on both device types. The first WI-0033 device run confirmed that the revised interaction flow is faster, while also identifying correctness defects and unnecessary page separation that must be fixed before the work item can close.
+The 500-image acceptance pilot completed successfully, but review was too slow on both device types. WI-0033 replaced the click-heavy workflow with continuous, queue-aware review and used repeated Windows and Pixel verification to correct defects before acceptance.
 
 ## Acceptance criteria
 
@@ -31,15 +31,15 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - [x] Person audit can surface assignments whose current top suggestion disagrees with the assigned person without changing canonical labels automatically.
 - [x] Suggestion-oriented bulk review groups likely same-person faces, previews the exact affected count and requires explicit confirmation.
 - [x] Bulk suggestion acceptance records both the normal assignment action and the linked suggestion-acceptance action for every affected face.
-- [ ] The revised workflow remains touch-usable and privacy-limited on Windows and Pixel after the corrective UI slices.
+- [x] The revised workflow remains touch-usable and privacy-limited on Windows and Pixel after the corrective UI slices.
 - [x] Published-application smoke coverage protects queue navigation, suggestion summaries, person filtering and bulk suggestion acceptance; person-creation keyboard submission, browser auto-advance and touch comfort remain explicit manual checks.
-- [ ] A fresh 50–100-face local queue records active review time, faces per minute, explicit actions per accepted suggestion, returns to the gallery and immediately undone decisions on both device types.
+- [x] A fresh 50–100-face local queue records active review time, faces per minute, explicit actions per accepted suggestion, returns to the gallery and immediately undone decisions on both device types.
 - [x] Missing optional queue query values cannot crash Audit details or initial Progress loading.
 - [x] Undoing an accepted suggestion restores the exact suggestion, score and margin to the active review queue.
 - [x] Face details allow assignment to any active named person and create-and-assign for a new person.
 - [x] Faces, suggestion ordering and grouped suggestion acceptance share one continuously loaded workspace; legacy suggestion URLs redirect to it.
 - [x] The disposable interactive fixture contains more than one 40-card page so continuous loading can be manually exercised.
-- [ ] The unified Faces and details views, including expanded model provenance, have no horizontal overflow on Pixel portrait orientation.
+- [x] The unified Faces and details views, including expanded model provenance, have no horizontal overflow on Pixel portrait orientation.
 
 ## Implemented slice: queue-aware details review
 
@@ -79,28 +79,25 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - `record-review-session.ps1` records privacy-safe aggregate metrics for one Windows or Pixel session and creates a two-device summary after both reports exist.
 - `docs/delivery/verification/WI-0033-manual-verification.md` defines like-for-like catalogue reset, trusted-network setup, metric definitions, mandatory failures and completion evidence.
 
-## Corrective slice after device verification
+## Corrective slices after device verification
 
-The first real Windows and Pixel verification completed on 2026-07-31 and confirmed that manual review is improved. It also found correctness defects and mobile overflow in the separated suggestion surfaces.
+The first real Windows and Pixel verification confirmed that manual review was improved and identified correctness defects and mobile overflow. Two focused corrective passes then completed the workflow:
 
 - Query-bound state and sort values are normalized before URL encoding, preventing missing-query crashes from Audit and Progress.
 - Undo restores a suggestion-backed assignment's exact suggestion to pending in the same transaction, preserving score and margin in the queue.
-- One face-details page supports suggestion review, any-person assignment and inline person creation.
+- One face-details page supports suggestion review, any-person assignment and create-and-assign.
 - Faces is the single review workspace for ordinary state review, suggestion context, suggestion-aware ordering and preview-first grouped acceptance.
 - Results append through an intersection-observer sentinel instead of numbered pages.
 - Cards hide image names, face ordinals, selection text and full model hashes; they retain state and concise top-suggestion evidence.
 - Legacy Suggestions, Bulk suggestions and quick-details routes redirect into the unified workflow so saved links continue to work.
+- Queue-aware manual assignment and new-person assignment capture the next face before mutation and advance safely.
+- Expanded active-model and per-suggestion provenance constrain the details element, timeline track and digest text to the available Pixel width.
+- The disposable fixture prepares 64 faces, and smoke fails if the unreviewed set does not exceed one 40-card page.
 - Regression coverage protects accept-then-undo suggestion restoration.
 
-## Focused follow-up from interactive verification
+## Completion evidence
 
-- Queue-aware manual assignment captures the current next-face ID before mutation and advances to that face after success; the final face returns to its originating queue.
-- New-person details submission creates and assigns the person in one operator action before using the same advance rule. When details stay on the current face, the confirmation is shortened to `Created <name>`.
-- Expanded active-model and per-suggestion provenance constrain the details element, timeline track and hash code to the available inline width, with break-all wrapping for uninterrupted digests.
-- The top-suggestion card has more separation before the detector-confidence bar.
-- The disposable fixture now prepares 64 faces, and smoke fails if the unreviewed set does not exceed one 40-card page.
-
-WI-0033 remains `in_progress` until this follow-up is merged and manual assignment, create-and-assign, continuous loading and Pixel overflow are rerun. Only privacy-safe conclusions may be retained; local reports, photos, names, paths, databases, crops and embeddings remain local.
+Human verification on Windows and Pixel passed on 2026-08-01. The operator confirmed that WI-0033 works as intended and that the revised manual-review process is improved. The required local review-time and interaction measurements were captured and retained outside Git; no private timing report, photo, name, path, catalogue, crop or embedding was committed.
 
 ## Delivery slices
 
