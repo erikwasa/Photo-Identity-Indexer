@@ -1,0 +1,64 @@
+<article class="bulk-suggestion-card @(Selected ? "selected" : "")">
+    <label class="bulk-suggestion-select">
+        <input type="checkbox"
+               checked="@Selected"
+               disabled="@(!SelectionEnabled)"
+               @onchange="SelectionChangedAsync" />
+        <span>@(Selected ? "Selected" : "Select")</span>
+    </label>
+
+    <a class="bulk-suggestion-image" href="@DetailsUrl" aria-label="Open suggestion details for @Face.PhotoName face @(Face.FaceOrdinal + 1)">
+        <img src="@Face.ImageUrl" alt="Detected face from @Face.PhotoName" loading="lazy" />
+    </a>
+
+    <div class="bulk-suggestion-body">
+        <strong>@Face.PhotoName</strong>
+        <small>Face @(Face.FaceOrdinal + 1)</small>
+
+        @if (Face.TopSuggestion is ReviewTopSuggestionResponse suggestion)
+        {
+            <p class="bulk-suggestion-person">@suggestion.Person.DisplayName</p>
+            <p>Score @suggestion.Score.ToString("F4") · Margin @MarginLabel(suggestion.ScoreMargin)</p>
+            <details>
+                <summary>@suggestion.ModelId · exact revision</summary>
+                <code>@suggestion.ModelHash</code>
+            </details>
+        }
+
+        <a class="details-link" href="@DetailsUrl">Review details →</a>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public ReviewFaceResponse Face { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string DetailsUrl { get; set; } = "";
+
+    [Parameter]
+    public bool Selected { get; set; }
+
+    [Parameter]
+    public bool SelectionEnabled { get; set; } = true;
+
+    [Parameter]
+    public EventCallback<(long SuggestionId, bool Selected)> SelectionChanged { get; set; }
+
+    private async Task SelectionChangedAsync(ChangeEventArgs args)
+    {
+        if (Face.TopSuggestion is not ReviewTopSuggestionResponse suggestion)
+        {
+            return;
+        }
+
+        bool selected = args.Value is bool value
+            ? value
+            : bool.TryParse(args.Value?.ToString(), out bool parsed) && parsed;
+        await SelectionChanged.InvokeAsync((suggestion.Id, selected));
+    }
+
+    private static string MarginLabel(double? margin) => margin is double value
+        ? value.ToString("F4")
+        : "—";
+}

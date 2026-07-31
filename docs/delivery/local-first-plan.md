@@ -43,7 +43,9 @@ The suggestion-gallery slice adds a dedicated exact-model workspace. It returns 
 
 The person-audit slice adds a dedicated read-only workspace for paging every active face assigned to one person. Exact-model comparison can place likely disagreements first or show only disagreements, while rejected suggestions remain excluded and canonical labels never change automatically. Every face links back to its append-only audit history for correction through the existing workflow.
 
-Remaining slices add preview-first grouped suggestion acceptance with linked audit actions, extend published smoke coverage, and measure a fresh 50–100-face queue on Windows and Pixel.
+The grouped-acceptance slice adds a dedicated Bulk suggestions workspace. It groups current-page rank-one pending suggestions by person for one exact model revision, allows one complete group or a subset to be selected, previews the exact eligible set and requires explicit confirmation. A successful commit writes the normal manual label and assignment action plus a linked suggestion-acceptance action for every affected face in one transaction. Mixed-person groups, stale model scope and changed eligibility fail without partial changes.
+
+Remaining slices extend published smoke coverage and measure a fresh 50–100-face queue on Windows and Pixel.
 
 The improved workflow must retain explicit human confirmation, append-only assignment and suggestion audit actions, exact model provenance and privacy-limited DTOs.
 

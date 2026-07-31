@@ -10,7 +10,7 @@ Status: `in_progress`
 
 - **WI-0033 — Accelerate the human review workflow**
 
-Queue-aware details review and the suggestion-aware workspace are merged. The next slice is on `agent/WI-0033-person-audit` and adds a dedicated read-only identity audit workspace for reviewing all active assignments for one person.
+Queue-aware details review, the suggestion-aware workspace and per-person audit are merged. The next slice is on `agent/WI-0033-bulk-suggestion-acceptance` and adds preview-first grouped acceptance for rank-one suggestions from one exact model revision.
 
 ## Implemented WI-0033 slices
 
@@ -23,13 +23,14 @@ Queue-aware details review and the suggestion-aware workspace are merged. The ne
 - Clear matches can be accepted directly from cards; ambiguous matches open an ordered quick-details queue.
 - The Audit workspace pages every active assignment for one person and links each face to append-only review history.
 - Exact-model disagreement signals compare the assigned person with rank-one pending or accepted suggestions without changing canonical labels.
-- Integration coverage protects exact-model requirements, scoped ordering, mutation-stable navigation, active-assignment audit semantics and privacy-limited responses.
+- The Bulk suggestions workspace groups rank-one matches by person, previews the exact eligible set and requires explicit confirmation.
+- Group commits write both normal assignment actions and linked suggestion-acceptance actions atomically for every affected face.
+- Integration coverage protects exact-model requirements, scoped ordering, mutation-stable navigation, active-assignment audit semantics, stale group previews and privacy-limited responses.
 
 ## Remaining WI-0033 slices
 
-1. add preview-first grouped suggestion acceptance with linked audit actions;
-2. extend published-application smoke coverage across the completed workflow; and
-3. measure a fresh 50–100-face queue on Windows and Pixel.
+1. extend published-application smoke coverage across the completed workflow; and
+2. measure a fresh 50–100-face queue on Windows and Pixel.
 
 ## Recently completed
 

@@ -27,8 +27,8 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - [x] The queue can be ordered by suggested person, score margin, score and absence of suggestions, with stable deterministic tie-breaking.
 - [x] An operator can open one person and review every active assigned face with pagination and audit links.
 - [x] Person audit can surface assignments whose current top suggestion disagrees with the assigned person without changing canonical labels automatically.
-- [ ] Suggestion-oriented bulk review groups likely same-person faces, previews the exact affected count and requires explicit confirmation.
-- [ ] Bulk suggestion acceptance records both the normal assignment action and the linked suggestion-acceptance action for every affected face.
+- [x] Suggestion-oriented bulk review groups likely same-person faces, previews the exact affected count and requires explicit confirmation.
+- [x] Bulk suggestion acceptance records both the normal assignment action and the linked suggestion-acceptance action for every affected face.
 - [ ] The revised workflow remains touch-usable and privacy-limited on Windows and Pixel.
 - [ ] Published-application smoke coverage protects person creation submission, queue navigation, auto-advance, suggestion summaries, person filtering and bulk suggestion acceptance.
 - [ ] A fresh 50–100-face local queue records active review time, faces per minute, explicit actions per accepted suggestion, returns to the gallery and immediately undone decisions on both device types.
@@ -59,6 +59,16 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - Disagreement filtering and disagreement-first ordering are advisory only; rejected suggestions are excluded and no canonical label changes automatically.
 - Lowest-confidence and assignment-time ordering help identify likely review mistakes without exposing source roots, crop paths or embeddings.
 - Integration coverage protects active-assignment semantics, stable pagination, exact-model disagreement counts and privacy-limited responses.
+
+## Implemented slice: grouped suggestion acceptance
+
+- A dedicated Bulk suggestions workspace groups current-page rank-one pending matches by suggested person for one exact model revision and optional processing run.
+- Operators can select a complete group or individual faces within one group; selecting across different suggested people is prevented before preview.
+- Preview recalculates the exact eligible set and binds the requested suggestion IDs, common person, exact model revision and eligible face IDs into a deterministic token.
+- Commit requires explicit confirmation, revalidates the preview token and applies the entire eligible set in one SQLite transaction.
+- Every affected face receives a normal manual person label and assignment action plus a suggestion-acceptance action linked to that review action.
+- Mixed-person groups, stale rank-one scope and changed eligibility are rejected without partial changes.
+- Integration coverage protects confirmation, stale-preview rollback, linked audit actions and privacy-limited responses.
 
 The completed interaction criteria still require final Windows and Pixel verification as part of the cross-device acceptance gate.
 
