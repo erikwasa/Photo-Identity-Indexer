@@ -15,7 +15,7 @@ Reduce the interaction cost of sustained human review on Windows and Pixel witho
 
 ## Pilot finding
 
-The 500-image acceptance pilot completed successfully, but review was too slow on both device types. The current gallery does not expose suggestion context, details pages do not preserve queue position, suggestion acceptance reloads the same face, and people cannot be audited through their assigned-face set. The pilot did not capture elapsed review time, so this work item must establish a repeatable throughput measurement while implementing the improvements.
+The 500-image acceptance pilot completed successfully, but review was too slow on both device types. The first WI-0033 device run confirmed that the revised interaction flow is faster, while also identifying correctness defects and unnecessary page separation that must be fixed before the work item can close.
 
 ## Acceptance criteria
 
@@ -29,9 +29,14 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - [x] Person audit can surface assignments whose current top suggestion disagrees with the assigned person without changing canonical labels automatically.
 - [x] Suggestion-oriented bulk review groups likely same-person faces, previews the exact affected count and requires explicit confirmation.
 - [x] Bulk suggestion acceptance records both the normal assignment action and the linked suggestion-acceptance action for every affected face.
-- [ ] The revised workflow remains touch-usable and privacy-limited on Windows and Pixel.
+- [ ] The revised workflow remains touch-usable and privacy-limited on Windows and Pixel after the corrective UI slice.
 - [x] Published-application smoke coverage protects queue navigation, suggestion summaries, person filtering and bulk suggestion acceptance; person-creation keyboard submission, browser auto-advance and touch comfort remain explicit manual checks.
 - [ ] A fresh 50–100-face local queue records active review time, faces per minute, explicit actions per accepted suggestion, returns to the gallery and immediately undone decisions on both device types.
+- [x] Missing optional queue query values cannot crash Audit details or initial Progress loading.
+- [x] Undoing an accepted suggestion restores the exact suggestion, score and margin to the active review queue.
+- [x] Face details allow assignment to any active named person and creation of a new person without leaving the face.
+- [x] Faces, suggestion ordering and grouped suggestion acceptance share one continuously loaded workspace; legacy suggestion URLs redirect to it.
+- [ ] The unified Faces and details views have no horizontal overflow on Pixel portrait orientation.
 
 ## Implemented slice: queue-aware details review
 
@@ -44,49 +49,57 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 
 ## Implemented slice: suggestion-aware gallery
 
-- A dedicated Suggestions workspace selects one exact ranked-suggestion model revision and returns every card's rank-one pending suggestion in the same paged response.
-- The SQLite query joins suggested person, score, margin and exact model provenance once per page; the browser performs no per-card suggestion request.
+- The exact-model suggestion query returns every card's rank-one pending suggestion, score, margin and model provenance in the same paged response.
+- The SQLite query joins suggestion context once per page; the browser performs no per-card suggestion request.
 - Operators can order the queue by suggested person, high or low score margin, score, missing suggestion or creation time with deterministic face-ID tie-breaking.
-- Cards support explicit acceptance through the existing audited suggestion endpoint, while ambiguous cases open an ordered quick-details queue with Previous, Next and automatic advance.
-- The workspace can retain an optional processing-run scope while keeping faces with no suggestion visible.
-- Integration coverage protects exact-model requirements, all ordering modes, mutation-stable queue navigation and privacy-limited responses.
+- Clear matches can be accepted directly from cards, while ambiguous cases use queue-aware details with Previous, Next and automatic advance.
+- The queue can retain an optional processing-run scope while keeping faces with no suggestion visible.
 
 ## Implemented slice: per-person identity audit
 
-- A dedicated Audit workspace lets the operator select one active person and page through every active assigned face.
-- Each face links to the existing append-only face audit history, where an incorrect assignment can be undone or corrected through the normal reviewed workflow.
-- The workspace can compare assignments with rank-one pending or accepted suggestions from one exact model revision.
-- Disagreement filtering and disagreement-first ordering are advisory only; rejected suggestions are excluded and no canonical label changes automatically.
-- Lowest-confidence and assignment-time ordering help identify likely review mistakes without exposing source roots, crop paths or embeddings.
-- Integration coverage protects active-assignment semantics, stable pagination, exact-model disagreement counts and privacy-limited responses.
+- Audit lets the operator select one active person and page through every active assigned face.
+- Each face links to append-only face audit history, where an incorrect assignment can be undone or corrected through the normal workflow.
+- Exact-model comparison can show advisory rank-one disagreement counts, disagreement-only filtering and disagreement-first ordering.
+- Rejected suggestions are excluded and no canonical label changes automatically.
 
 ## Implemented slice: grouped suggestion acceptance
 
-- A dedicated Bulk suggestions workspace groups current-page rank-one pending matches by suggested person for one exact model revision and optional processing run.
-- Operators can select a complete group or individual faces within one group; selecting across different suggested people is prevented before preview.
-- Preview recalculates the exact eligible set and binds the requested suggestion IDs, common person, exact model revision and eligible face IDs into a deterministic token.
-- Commit requires explicit confirmation, revalidates the preview token and applies the entire eligible set in one SQLite transaction.
-- Every affected face receives a normal manual person label and assignment action plus a suggestion-acceptance action linked to that review action.
+- Rank-one pending matches can be selected for one suggested person and previewed before commit.
+- Preview binds the requested suggestion IDs, common person, exact model revision and eligible face IDs into a deterministic token.
+- Commit requires explicit confirmation, revalidates the token and applies the entire eligible set in one SQLite transaction.
+- Every affected face receives a normal manual assignment action and a linked suggestion-acceptance action.
 - Mixed-person groups, stale rank-one scope and changed eligibility are rejected without partial changes.
-- Integration coverage protects confirmation, stale-preview rollback, linked audit actions and privacy-limited responses.
 
 ## Implemented slice: final verification preparation
 
-- Published smoke now exercises every workflow route, exact-model suggestion summaries, queue navigation metadata, person audit, grouped suggestion preview/commit, linked assignment and suggestion audit rows, and privacy-limited responses.
-- `verify-review.ps1` reports the expanded smoke matrix and points operators to the final device procedure instead of implying automated checks prove touch usability.
-- `record-review-session.ps1` records only privacy-safe aggregate metrics for one 50–100-face Windows or Pixel session and creates a two-device summary after both reports exist.
-- `docs/delivery/verification/WI-0033-manual-verification.md` defines like-for-like catalogue reset, trusted-network setup, synthetic interaction checks, real throughput sessions, metric definitions, mandatory failures and completion evidence.
+- Published smoke exercises workflow routes, exact-model suggestion summaries, queue navigation metadata, person audit, grouped suggestion preview/commit, linked audit rows and privacy-limited responses.
+- `record-review-session.ps1` records privacy-safe aggregate metrics for one Windows or Pixel session and creates a two-device summary after both reports exist.
+- `docs/delivery/verification/WI-0033-manual-verification.md` defines like-for-like catalogue reset, trusted-network setup, metric definitions, mandatory failures and completion evidence.
 
-All implementation and automated-verification criteria are complete. WI-0033 remains open only for the human Windows and Pixel sessions.
+## Corrective slice after device verification
+
+The first real Windows and Pixel verification completed on 2026-07-31 and confirmed that manual review is improved. It also found four correctness defects and mobile overflow in the separated suggestion surfaces.
+
+- Query-bound state and sort values are normalized before URL encoding, preventing missing-query crashes from Audit and Progress.
+- Undo restores a suggestion-backed assignment's exact suggestion to pending in the same transaction, preserving score and margin in the queue.
+- One face-details page now supports suggestion review, any-person assignment and inline person creation.
+- Faces becomes the single review workspace for ordinary state review, suggestion context, suggestion-aware ordering and preview-first grouped acceptance.
+- Results append through an intersection-observer sentinel instead of numbered pages.
+- Cards hide image names, face ordinals, selection text and full model hashes; they retain state and concise top-suggestion evidence.
+- Legacy Suggestions, Bulk suggestions and quick-details routes redirect into the unified workflow so saved links continue to work.
+- Regression coverage protects accept-then-undo suggestion restoration.
+
+WI-0033 remains `in_progress` until this corrective slice is merged and the affected Windows/Pixel checks are rerun. Only privacy-safe conclusions may be retained; local reports, photos, names, paths, databases, crops and embeddings remain local.
 
 ## Delivery slices
 
 1. Native person-creation form submission and queue-aware details navigation.
-2. Top-suggestion summaries and suggestion-aware ordering in the gallery.
+2. Top-suggestion summaries and suggestion-aware ordering.
 3. Per-person assigned-face audit.
 4. Preview-first grouped suggestion acceptance with linked audit actions.
 5. Published workflow smoke, local session reporting and Windows/Pixel manual verification.
+6. Device-found defect correction and unified continuous review UI.
 
 ## Safety boundary
 
-Suggestion scores and grouping may reduce navigation and selection work, but no score or threshold may create a canonical label. Every individual or bulk acceptance remains an explicit human commit with normal audit semantics. New DTOs may expose image endpoints, opaque identifiers, scores and exact model provenance, but never source roots, crop paths or embeddings.
+Suggestion scores and grouping may reduce navigation and selection work, but no score or threshold may create a canonical label. Every individual or grouped acceptance remains an explicit human commit with normal audit semantics. DTOs may expose image endpoints, opaque identifiers, scores and exact model provenance, but never source roots, crop paths or embeddings.

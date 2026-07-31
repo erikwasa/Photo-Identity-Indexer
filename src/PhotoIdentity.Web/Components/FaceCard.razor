@@ -1,27 +1,40 @@
 <article class="face-card state-@Face.State @(Selected ? "bulk-selected" : "")">
     @if (Selectable)
     {
-        <label class="face-selector">
+        <label class="face-selector" aria-label="Select face for bulk review">
             <input type="checkbox"
                    checked="@Selected"
                    disabled="@Busy"
                    @onchange="OnSelectionChangedAsync" />
-            <span>Select</span>
+            <span class="visually-hidden">Select face</span>
         </label>
     }
 
-    <a class="face-image-link" href="@ResolvedDetailsUrl" aria-label="Open details for @Face.PhotoName face @(Face.FaceOrdinal + 1)">
-        <img class="face-image" src="@Face.ImageUrl" alt="Detected face from @Face.PhotoName" loading="lazy" />
+    <a class="face-image-link" href="@ResolvedDetailsUrl" aria-label="Open face details">
+        <img class="face-image" src="@Face.ImageUrl" alt="Detected face" loading="lazy" />
     </a>
 
     <div class="face-card-body">
         <div class="face-heading">
-            <div>
-                <strong>@Face.PhotoName</strong>
-                <small>Face @(Face.FaceOrdinal + 1)</small>
-            </div>
             <span class="state-badge">@StateLabel</span>
         </div>
+
+        @if (Face.TopSuggestion is ReviewTopSuggestionResponse suggestion)
+        {
+            <section class="top-suggestion" aria-label="Top identity suggestion">
+                <p class="eyebrow">Top suggestion</p>
+                <strong>@suggestion.Person.DisplayName</strong>
+                <p>Score @suggestion.Score.ToString("F4") · Margin @MarginLabel(suggestion.ScoreMargin)</p>
+                @if (CanAcceptTopSuggestion)
+                {
+                    <button class="button primary full-width"
+                            disabled="@Busy"
+                            @onclick="AcceptTopSuggestionAsync">
+                        Accept @suggestion.Person.DisplayName
+                    </button>
+                }
+            </section>
+        }
 
         @if (Face.Confidence is double confidence)
         {
@@ -56,7 +69,7 @@
             </button>
         </div>
 
-        <a class="details-link" href="@ResolvedDetailsUrl">Photo details and audit history →</a>
+        <a class="details-link" href="@ResolvedDetailsUrl">Details and audit history →</a>
     </div>
 </article>
 
@@ -80,6 +93,9 @@
     public EventCallback<(string FaceId, bool Selected)> SelectionChanged { get; set; }
 
     [Parameter]
+    public EventCallback<(string FaceId, long SuggestionId)> AcceptSuggestionRequested { get; set; }
+
+    [Parameter]
     public EventCallback<(string FaceId, string PersonId)> AssignRequested { get; set; }
 
     [Parameter]
@@ -95,6 +111,10 @@
         ? $"/faces/{Uri.EscapeDataString(Face.Id)}"
         : DetailsUrl;
 
+    private bool CanAcceptTopSuggestion =>
+        Face.State == "unreviewed" &&
+        Face.TopSuggestion is { Status: "pending" };
+
     private string StateLabel => Face.State switch
     {
         "assigned" => "Assigned",
@@ -104,9 +124,13 @@
 
     protected override void OnParametersSet()
     {
-        if (string.IsNullOrWhiteSpace(SelectedPersonId) && Face.Person is not null)
+        if (Face.Person is not null)
         {
             SelectedPersonId = Face.Person.Id;
+        }
+        else if (People.All(person => person.Id != SelectedPersonId))
+        {
+            SelectedPersonId = "";
         }
     }
 
@@ -114,6 +138,24 @@
     {
         bool selected = args.Value is bool value && value;
         return SelectionChanged.InvokeAsync((Face.Id, selected));
+    }
+
+    private async Task AcceptTopSuggestionAsync()
+    {
+        if (Face.TopSuggestion is not ReviewTopSuggestionResponse suggestion)
+        {
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            await AcceptSuggestionRequested.InvokeAsync((Face.Id, suggestion.Id));
+        }
+        finally
+        {
+            Busy = false;
+        }
     }
 
     private async Task AssignAsync()
@@ -159,4 +201,8 @@
             Busy = false;
         }
     }
+
+    private static string MarginLabel(double? margin) => margin is double value
+        ? value.ToString("F4")
+        : "—";
 }

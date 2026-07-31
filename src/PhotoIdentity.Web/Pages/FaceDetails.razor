@@ -1,4 +1,5 @@
 @page "/faces/{Id}"
+@using System.Net.Http.Json
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
@@ -51,15 +52,15 @@ else if (Details is not null)
     <section class="details-header">
         <div>
             <p class="eyebrow">Photo details</p>
-            <h1>@Details.Face.PhotoName · face @(Details.Face.FaceOrdinal + 1)</h1>
-            <p>The browser receives a face image endpoint and privacy-limited metadata, never the source root or crop storage path.</p>
+            <h1>Face details</h1>
+            <p>Review model suggestions or explicitly assign any named person. Browser responses remain privacy-limited.</p>
         </div>
         <span class="state-badge large">@StateLabel</span>
     </section>
 
     <div class="details-grid">
         <section class="details-image-panel">
-            <img class="details-image" src="@Details.Face.ImageUrl" alt="Detected face from @Details.Face.PhotoName" />
+            <img class="details-image" src="@Details.Face.ImageUrl" alt="Detected face" />
         </section>
 
         <section class="metadata-card">
@@ -68,11 +69,20 @@ else if (Details is not null)
                 <div><dt>Review state</dt><dd>@StateLabel</dd></div>
                 <div><dt>Assigned person</dt><dd>@(Details.Face.Person?.DisplayName ?? "—")</dd></div>
                 <div><dt>Detector confidence</dt><dd>@ConfidenceLabel</dd></div>
+                <div><dt>Photo</dt><dd class="breakable">@Details.Face.PhotoName</dd></div>
                 <div><dt>Media type</dt><dd>@Details.MediaType</dd></div>
                 <div><dt>Photo dimensions</dt><dd>@DimensionLabel</dd></div>
                 <div><dt>Revision fingerprint</dt><dd><code>@Details.RevisionHashPrefix…</code></dd></div>
                 <div><dt>Occurrence ID</dt><dd><code>@Details.Face.Id</code></dd></div>
             </dl>
+
+            @if (UsesSuggestionNavigation)
+            {
+                <details class="model-provenance-details">
+                    <summary>Active model: @NormalizedModelId · @HashPrefix(NormalizedModelHash)</summary>
+                    <code>@NormalizedModelHash</code>
+                </details>
+            }
         </section>
     </div>
 
@@ -85,12 +95,57 @@ else if (Details is not null)
         <div class="notice success review-notice" role="status">@Message</div>
     }
 
+    <section class="audit-section identity-assignment-section">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Explicit correction</p>
+                <h2>Assign any person</h2>
+                <p class="suggestion-guidance">Use this when the correct person is absent from the ranked suggestions.</p>
+            </div>
+        </div>
+
+        <div class="identity-assignment-grid">
+            <div>
+                <label class="field-label" for="details-person">Named person</label>
+                <select id="details-person"
+                        @bind="SelectedPersonId"
+                        disabled="@(ActionBusy || People.Count == 0)">
+                    <option value="">Choose a person</option>
+                    @foreach (ReviewPersonResponse person in People)
+                    {
+                        <option value="@person.Id">@person.DisplayName</option>
+                    }
+                </select>
+                <button class="button primary full-width"
+                        disabled="@(ActionBusy || string.IsNullOrWhiteSpace(SelectedPersonId))"
+                        @onclick="AssignSelectedPersonAsync">
+                    Assign selected person
+                </button>
+            </div>
+
+            <form class="details-person-creator" @onsubmit="CreatePersonAsync" @onsubmit:preventDefault>
+                <label class="field-label" for="details-new-person">Create and select person</label>
+                <input id="details-new-person"
+                       placeholder="Display name"
+                       maxlength="200"
+                       autocomplete="off"
+                       @bind="NewPersonName"
+                       @bind:event="oninput" />
+                <button type="submit"
+                        class="button secondary full-width"
+                        disabled="@(ActionBusy || string.IsNullOrWhiteSpace(NewPersonName))">
+                    Create person
+                </button>
+            </form>
+        </div>
+    </section>
+
     <section class="audit-section">
         <div class="section-heading">
             <div>
                 <p class="eyebrow">Advisory model output</p>
                 <h2>Ranked identity suggestions</h2>
-                <p class="suggestion-guidance">Scores never create a label. Accepting a suggestion is an explicit human assignment. Rejected face-person pairs remain excluded when suggestions are regenerated.</p>
+                <p class="suggestion-guidance">Scores never create a label. Accepting a suggestion remains an explicit human assignment.</p>
             </div>
             <span>@Suggestions.Count suggestion@(Suggestions.Count == 1 ? "" : "s")</span>
         </div>
@@ -112,8 +167,10 @@ else if (Details is not null)
                                 <span class="state-badge">@SuggestionStatusLabel(suggestion.Status)</span>
                             </div>
                             <p>Score @suggestion.Score.ToString("F4") · Margin @MarginLabel(suggestion.ScoreMargin)</p>
-                            <p>Model <code>@suggestion.ModelId</code></p>
-                            <p>Exact revision <code class="model-revision">@suggestion.ModelHash</code></p>
+                            <details class="model-provenance-details compact-provenance">
+                                <summary>@suggestion.ModelId · @HashPrefix(suggestion.ModelHash)</summary>
+                                <code>@suggestion.ModelHash</code>
+                            </details>
                             <p>Generated @suggestion.GeneratedAtUtc.ToLocalTime().ToString("g")</p>
 
                             @if (suggestion.LatestAction is not null)
@@ -134,12 +191,12 @@ else if (Details is not null)
                                     @if (ConfirmingRejectSuggestionId == suggestion.Id)
                                     {
                                         <button class="button danger"
-                                                disabled="@(ActingSuggestionId is not null)"
+                                                disabled="@ActionBusy"
                                                 @onclick="() => RejectSuggestionAsync(suggestion.Id)">
                                             Confirm rejection
                                         </button>
                                         <button class="button secondary"
-                                                disabled="@(ActingSuggestionId is not null)"
+                                                disabled="@ActionBusy"
                                                 @onclick="CancelRejectConfirmation">
                                             Cancel
                                         </button>
@@ -215,7 +272,7 @@ else if (Details is not null)
     public string Id { get; set; } = "";
 
     [Parameter, SupplyParameterFromQuery(Name = "state")]
-    public string QueueState { get; set; } = "all";
+    public string? QueueState { get; set; }
 
     [Parameter, SupplyParameterFromQuery(Name = "processingRunId")]
     public string? ProcessingRunId { get; set; }
@@ -227,23 +284,39 @@ else if (Details is not null)
     public string? ModelHash { get; set; }
 
     [Parameter, SupplyParameterFromQuery(Name = "sort")]
-    public string Sort { get; set; } = DefaultSort;
+    public string? Sort { get; set; }
 
     [Parameter, SupplyParameterFromQuery(Name = "returnUrl")]
     public string? ReturnUrl { get; set; }
 
+    [Parameter, SupplyParameterFromQuery(Name = "suggestionQueue")]
+    public bool SuggestionQueue { get; set; }
+
     private ReviewFaceDetailsResponse? Details { get; set; }
     private IReadOnlyList<ReviewIdentitySuggestionResponse> Suggestions { get; set; } = [];
+    private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+    private string SelectedPersonId { get; set; } = "";
+    private string NewPersonName { get; set; } = "";
     private bool Loading { get; set; } = true;
-    private long? ActingSuggestionId { get; set; }
+    private bool ActionBusy { get; set; }
     private long? ConfirmingRejectSuggestionId { get; set; }
     private string? Error { get; set; }
     private string? ActionError { get; set; }
     private string? Message { get; set; }
 
+    private string NormalizedQueueState => QueueState is "unreviewed" or "assigned" or "rejected" or "all"
+        ? QueueState
+        : "all";
+    private string NormalizedSort => string.IsNullOrWhiteSpace(Sort) ? DefaultSort : Sort.Trim();
+    private string NormalizedProcessingRunId => ProcessingRunId?.Trim() ?? "";
+    private string NormalizedModelId => ModelId?.Trim() ?? "";
+    private string NormalizedModelHash => ModelHash?.Trim() ?? "";
+    private bool UsesSuggestionNavigation =>
+        SuggestionQueue &&
+        !string.IsNullOrWhiteSpace(NormalizedModelId) &&
+        !string.IsNullOrWhiteSpace(NormalizedModelHash);
     private bool CanReviewSuggestions =>
-        ActingSuggestionId is null && string.Equals(Details?.Face.State, "unreviewed", StringComparison.Ordinal);
-
+        !ActionBusy && string.Equals(Details?.Face.State, "unreviewed", StringComparison.Ordinal);
     private string SafeReturnUrl => IsSafeRelativeUrl(ReturnUrl) ? ReturnUrl! : "/";
 
     private string StateLabel => Details?.Face.State switch
@@ -285,9 +358,11 @@ else if (Details is not null)
 
     private async Task RefreshAsync()
     {
-        string escapedId = Uri.EscapeDataString(Id);
-        Details = await Http.GetFromJsonAsync<ReviewFaceDetailsResponse>(
-            $"api/review/faces/{escapedId}?{BuildScopeQuery()}");
+        string escapedId = Uri.EscapeDataString(Id ?? string.Empty);
+        string detailsEndpoint = UsesSuggestionNavigation
+            ? $"api/review/suggestion-faces/{escapedId}?{BuildScopeQuery()}"
+            : $"api/review/faces/{escapedId}?{BuildScopeQuery()}";
+        Details = await Http.GetFromJsonAsync<ReviewFaceDetailsResponse>(detailsEndpoint);
         if (Details is null)
         {
             throw new InvalidOperationException("The face occurrence was not found.");
@@ -295,14 +370,120 @@ else if (Details is not null)
 
         Suggestions = await Http.GetFromJsonAsync<ReviewIdentitySuggestionResponse[]>(
             $"api/review/faces/{escapedId}/suggestions") ?? [];
+        People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+
+        if (Details.Face.Person is not null)
+        {
+            SelectedPersonId = Details.Face.Person.Id;
+        }
+        else if (People.All(person => person.Id != SelectedPersonId))
+        {
+            SelectedPersonId = "";
+        }
+    }
+
+    private async Task AssignSelectedPersonAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedPersonId))
+        {
+            return;
+        }
+
+        await ApplyFaceActionAsync(
+            $"api/review/faces/{Uri.EscapeDataString(Id)}/assign",
+            new AssignFaceRequest(SelectedPersonId, Actor),
+            "Face assignment saved.");
+    }
+
+    private async Task CreatePersonAsync()
+    {
+        if (ActionBusy || string.IsNullOrWhiteSpace(NewPersonName))
+        {
+            return;
+        }
+
+        ActionBusy = true;
+        ActionError = null;
+        Message = null;
+        string displayName = NewPersonName.Trim();
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/review/people",
+                new CreatePersonRequest(displayName));
+            await RequireSuccessAsync(response);
+            ReviewPersonResponse created = await response.Content.ReadFromJsonAsync<ReviewPersonResponse>()
+                ?? throw new InvalidOperationException("The person creation response was empty.");
+            People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+            SelectedPersonId = created.Id;
+            NewPersonName = "";
+            Message = $"Created and selected {created.DisplayName}.";
+        }
+        catch (Exception exception)
+        {
+            ActionError = exception.Message;
+        }
+        finally
+        {
+            ActionBusy = false;
+        }
+    }
+
+    private async Task ApplyFaceActionAsync<TRequest>(string url, TRequest request, string successMessage)
+    {
+        ActionBusy = true;
+        ActionError = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(url, request);
+            await RequireSuccessAsync(response);
+            await RefreshAsync();
+            Message = successMessage;
+        }
+        catch (Exception exception)
+        {
+            ActionError = exception.Message;
+        }
+        finally
+        {
+            ActionBusy = false;
+        }
     }
 
     private async Task AcceptSuggestionAsync(long suggestionId, string displayName)
     {
-        await ApplySuggestionDecisionAsync(
-            suggestionId,
-            "accept",
-            $"Assigned this face to {displayName}.");
+        ActionBusy = true;
+        ActionError = null;
+        Message = null;
+        string? nextFaceId = Details?.Navigation?.NextFaceId;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/review/faces/{Uri.EscapeDataString(Id)}/suggestions/{suggestionId}/accept",
+                new ReviewSuggestionActionRequest(Actor));
+            await RequireSuccessAsync(response);
+
+            if (UsesSuggestionNavigation)
+            {
+                Navigation.NavigateTo(
+                    nextFaceId is null ? SafeReturnUrl : BuildFaceUrl(nextFaceId),
+                    replace: true);
+                return;
+            }
+
+            await RefreshAsync();
+            Message = $"Assigned this face to {displayName}.";
+        }
+        catch (Exception exception)
+        {
+            ActionError = exception.Message;
+        }
+        finally
+        {
+            ActionBusy = false;
+            ConfirmingRejectSuggestionId = null;
+        }
     }
 
     private void ConfirmReject(long suggestionId)
@@ -319,38 +500,17 @@ else if (Details is not null)
 
     private async Task RejectSuggestionAsync(long suggestionId)
     {
-        await ApplySuggestionDecisionAsync(
-            suggestionId,
-            "reject",
-            "Rejected face-person pair saved and excluded from future matcher regeneration.");
-    }
-
-    private async Task ApplySuggestionDecisionAsync(
-        long suggestionId,
-        string decision,
-        string successMessage)
-    {
-        ActingSuggestionId = suggestionId;
+        ActionBusy = true;
         ActionError = null;
         Message = null;
-        string? nextFaceId = Details?.Navigation?.NextFaceId;
         try
         {
-            string escapedId = Uri.EscapeDataString(Id);
             using HttpResponseMessage response = await Http.PostAsJsonAsync(
-                $"api/review/faces/{escapedId}/suggestions/{suggestionId}/{decision}",
+                $"api/review/faces/{Uri.EscapeDataString(Id)}/suggestions/{suggestionId}/reject",
                 new ReviewSuggestionActionRequest(Actor));
             await RequireSuccessAsync(response);
-
-            if (string.Equals(decision, "accept", StringComparison.Ordinal))
-            {
-                string destination = nextFaceId is null ? SafeReturnUrl : BuildFaceUrl(nextFaceId);
-                Navigation.NavigateTo(destination, replace: true);
-                return;
-            }
-
             await RefreshAsync();
-            Message = successMessage;
+            Message = "Rejected face-person pair saved and excluded from future matcher regeneration.";
         }
         catch (Exception exception)
         {
@@ -358,40 +518,50 @@ else if (Details is not null)
         }
         finally
         {
-            ActingSuggestionId = null;
+            ActionBusy = false;
             ConfirmingRejectSuggestionId = null;
         }
     }
 
-    private string BuildFaceUrl(string faceId) =>
-        $"/faces/{Uri.EscapeDataString(faceId)}?{BuildScopeQuery()}&returnUrl={Uri.EscapeDataString(SafeReturnUrl)}";
+    private string BuildFaceUrl(string faceId)
+    {
+        List<string> query = BuildScopeParts();
+        if (UsesSuggestionNavigation)
+        {
+            query.Add("suggestionQueue=true");
+        }
+        query.Add($"returnUrl={Uri.EscapeDataString(SafeReturnUrl)}");
+        return $"/faces/{Uri.EscapeDataString(faceId)}?{string.Join("&", query)}";
+    }
 
-    private string BuildScopeQuery()
+    private string BuildScopeQuery() => string.Join("&", BuildScopeParts());
+
+    private List<string> BuildScopeParts()
     {
         List<string> query =
         [
-            $"state={Uri.EscapeDataString(QueueState)}",
-            $"sort={Uri.EscapeDataString(Sort)}",
+            $"state={Uri.EscapeDataString(NormalizedQueueState)}",
+            $"sort={Uri.EscapeDataString(NormalizedSort)}",
         ];
-        if (!string.IsNullOrWhiteSpace(ProcessingRunId))
+        if (!string.IsNullOrWhiteSpace(NormalizedProcessingRunId))
         {
-            query.Add($"processingRunId={Uri.EscapeDataString(ProcessingRunId)}");
+            query.Add($"processingRunId={Uri.EscapeDataString(NormalizedProcessingRunId)}");
         }
-        if (!string.IsNullOrWhiteSpace(ModelId))
+        if (!string.IsNullOrWhiteSpace(NormalizedModelId) && !string.IsNullOrWhiteSpace(NormalizedModelHash))
         {
-            query.Add($"modelId={Uri.EscapeDataString(ModelId)}");
+            query.Add($"modelId={Uri.EscapeDataString(NormalizedModelId)}");
+            query.Add($"modelHash={Uri.EscapeDataString(NormalizedModelHash)}");
         }
-        if (!string.IsNullOrWhiteSpace(ModelHash))
-        {
-            query.Add($"modelHash={Uri.EscapeDataString(ModelHash)}");
-        }
-        return string.Join("&", query);
+        return query;
     }
 
     private static bool IsSafeRelativeUrl(string? value) =>
         !string.IsNullOrWhiteSpace(value) &&
         value.StartsWith("/", StringComparison.Ordinal) &&
         !value.StartsWith("//", StringComparison.Ordinal);
+
+    private static string HashPrefix(string hash) =>
+        string.IsNullOrEmpty(hash) ? "—" : hash[..Math.Min(12, hash.Length)];
 
     private static async Task RequireSuccessAsync(HttpResponseMessage response)
     {
@@ -403,7 +573,7 @@ else if (Details is not null)
         string detail = await response.Content.ReadAsStringAsync();
         throw new InvalidOperationException(
             string.IsNullOrWhiteSpace(detail)
-                ? $"The suggestion review failed with status {(int)response.StatusCode}."
+                ? $"The review action failed with status {(int)response.StatusCode}."
                 : detail);
     }
 

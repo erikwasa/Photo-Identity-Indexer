@@ -8,7 +8,7 @@
     <div>
         <p class="eyebrow">Catalogue progress</p>
         <h1>Filter review progress</h1>
-        <p>Scope the face catalogue by review state, processing run, and the exact ranked-suggestion model revision.</p>
+        <p>Scope the face catalogue by review state, processing run, and exact ranked-suggestion model revision.</p>
     </div>
     <a class="button secondary" href="/">Return to review</a>
 </section>
@@ -72,12 +72,8 @@
             @if (SelectedModel is ReviewModelRevisionFilterResponse model)
             {
                 <div>
-                    <dt>Model ID</dt>
-                    <dd>@model.ModelId</dd>
-                </div>
-                <div>
-                    <dt>Exact model hash</dt>
-                    <dd><code>@model.ModelHash</code></dd>
+                    <dt>Suggestion model</dt>
+                    <dd>@model.ModelId · <code>@HashPrefix(model.ModelHash)</code></dd>
                 </div>
             }
         </dl>
@@ -115,15 +111,13 @@ else
         {
             string detailsUrl = BuildDetailsUrl(face.Id);
             <article class="progress-card state-@face.State">
-                <a class="progress-image-link" href="@detailsUrl" aria-label="Open details for @face.PhotoName face @(face.FaceOrdinal + 1)">
-                    <img src="@face.ImageUrl" alt="Detected face from @face.PhotoName" loading="lazy" />
+                <a class="progress-image-link" href="@detailsUrl" aria-label="Open face details">
+                    <img src="@face.ImageUrl" alt="Detected face" loading="lazy" />
                 </a>
                 <div>
                     <div class="progress-card-heading">
-                        <strong>@face.PhotoName</strong>
                         <span class="state-badge">@StateLabel(face.State)</span>
                     </div>
-                    <p>Face @(face.FaceOrdinal + 1)</p>
                     @if (face.Person is not null)
                     {
                         <p>Person: <strong>@face.Person.DisplayName</strong></p>
@@ -145,16 +139,16 @@ else
     private const string DefaultSort = "created-desc";
 
     [Parameter, SupplyParameterFromQuery(Name = "state")]
-    public string State { get; set; } = "all";
+    public string? State { get; set; }
 
     [Parameter, SupplyParameterFromQuery(Name = "processingRunId")]
-    public string SelectedProcessingRunId { get; set; } = "";
+    public string? SelectedProcessingRunId { get; set; }
 
     [Parameter, SupplyParameterFromQuery(Name = "modelId")]
-    public string SelectedModelId { get; set; } = "";
+    public string? SelectedModelId { get; set; }
 
     [Parameter, SupplyParameterFromQuery(Name = "modelHash")]
-    public string SelectedModelHash { get; set; } = "";
+    public string? SelectedModelHash { get; set; }
 
     [Parameter, SupplyParameterFromQuery(Name = "offset")]
     public int Offset { get; set; }
@@ -165,8 +159,15 @@ else
     private bool Loading { get; set; }
     private string? Error { get; set; }
 
+    private string NormalizedState => State is "all" or "unreviewed" or "assigned" or "rejected"
+        ? State
+        : "all";
+    private string NormalizedProcessingRunId => SelectedProcessingRunId?.Trim() ?? "";
+    private string NormalizedModelId => SelectedModelId?.Trim() ?? "";
+    private string NormalizedModelHash => SelectedModelHash?.Trim() ?? "";
+
     private ReviewProcessingRunFilterResponse? SelectedRun =>
-        Options.ProcessingRuns.FirstOrDefault(run => run.Id == SelectedProcessingRunId);
+        Options.ProcessingRuns.FirstOrDefault(run => run.Id == NormalizedProcessingRunId);
 
     private ReviewModelRevisionFilterResponse? SelectedModel =>
         int.TryParse(SelectedModelIndex, out int index) &&
@@ -176,12 +177,16 @@ else
             : null;
 
     private bool HasActiveScope =>
-        State != "all" ||
-        !string.IsNullOrWhiteSpace(SelectedProcessingRunId) ||
+        NormalizedState != "all" ||
+        !string.IsNullOrWhiteSpace(NormalizedProcessingRunId) ||
         SelectedModel is not null;
 
     protected override async Task OnInitializedAsync()
     {
+        State = NormalizedState;
+        SelectedProcessingRunId = NormalizedProcessingRunId;
+        SelectedModelId = NormalizedModelId;
+        SelectedModelHash = NormalizedModelHash;
         Offset = Math.Max(0, Offset);
         await LoadOptionsAsync();
         RestoreSelectedModel();
@@ -203,7 +208,7 @@ else
 
     private void RestoreSelectedModel()
     {
-        if (string.IsNullOrWhiteSpace(SelectedModelId) || string.IsNullOrWhiteSpace(SelectedModelHash))
+        if (string.IsNullOrWhiteSpace(NormalizedModelId) || string.IsNullOrWhiteSpace(NormalizedModelHash))
         {
             SelectedModelIndex = "";
             return;
@@ -211,7 +216,7 @@ else
 
         int index = Options.ModelRevisions
             .Select((model, index) => (model, index))
-            .Where(item => item.model.ModelId == SelectedModelId && item.model.ModelHash == SelectedModelHash)
+            .Where(item => item.model.ModelId == NormalizedModelId && item.model.ModelHash == NormalizedModelHash)
             .Select(item => item.index)
             .DefaultIfEmpty(-1)
             .First();
@@ -240,6 +245,8 @@ else
 
     private async Task ApplyFiltersAsync()
     {
+        State = NormalizedState;
+        SelectedProcessingRunId = NormalizedProcessingRunId;
         Offset = 0;
         if (SelectedModel is ReviewModelRevisionFilterResponse model)
         {
@@ -276,7 +283,7 @@ else
     {
         List<string> query =
         [
-            $"state={Uri.EscapeDataString(State)}",
+            $"state={Uri.EscapeDataString(NormalizedState)}",
             $"sort={Uri.EscapeDataString(DefaultSort)}",
         ];
         if (includePaging)
@@ -284,9 +291,9 @@ else
             query.Add($"offset={Offset}");
             query.Add($"limit={PageSize}");
         }
-        if (!string.IsNullOrWhiteSpace(SelectedProcessingRunId))
+        if (!string.IsNullOrWhiteSpace(NormalizedProcessingRunId))
         {
-            query.Add($"processingRunId={Uri.EscapeDataString(SelectedProcessingRunId)}");
+            query.Add($"processingRunId={Uri.EscapeDataString(NormalizedProcessingRunId)}");
         }
         if (SelectedModel is ReviewModelRevisionFilterResponse model)
         {
@@ -312,7 +319,10 @@ else
         $"{run.StartedAtUtc.ToLocalTime():g} · {run.Status} · {run.FaceCount} face{(run.FaceCount == 1 ? "" : "s")}";
 
     private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
-        $"{model.ModelId} · {model.ModelHash[..12]} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+        $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+
+    private static string HashPrefix(string hash) =>
+        string.IsNullOrEmpty(hash) ? "—" : hash[..Math.Min(12, hash.Length)];
 
     private static string StateLabel(string state) => state switch
     {
