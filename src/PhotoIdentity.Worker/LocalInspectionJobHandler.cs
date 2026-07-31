@@ -17,9 +17,6 @@ namespace PhotoIdentity.Worker;
 /// </summary>
 public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposable
 {
-    private const string DetectorManifestFile = "yunet-2023mar-fp32.json";
-    private const string EmbedderManifestFile = "sface-2021dec-fp32.json";
-
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -73,12 +70,17 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
     {
         string manifestDirectory = Path.Combine(configuration.RepositoryRoot, "models", "manifests");
         ModelManifestLoader loader = new();
-        ModelManifest detectorManifest = await loader.LoadAsync(
-            Path.Combine(manifestDirectory, DetectorManifestFile),
+        IReadOnlyList<ModelManifest> manifests = await loader.LoadDirectoryAsync(
+            manifestDirectory,
             cancellationToken);
-        ModelManifest embedderManifest = await loader.LoadAsync(
-            Path.Combine(manifestDirectory, EmbedderManifestFile),
-            cancellationToken);
+        ModelManifest detectorManifest = RequireManifest(
+            manifests,
+            configuration.DetectorModelId,
+            "faceDetection");
+        ModelManifest embedderManifest = RequireManifest(
+            manifests,
+            configuration.EmbedderModelId,
+            "faceEmbedding");
         string detectorPath = RequireModelFile(configuration.ModelDirectory, detectorManifest);
         string embedderPath = RequireModelFile(configuration.ModelDirectory, embedderManifest);
 
@@ -390,6 +392,32 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
                 File.Delete(temporaryPath);
             }
         }
+    }
+
+    private static ModelManifest RequireManifest(
+        IReadOnlyList<ModelManifest> manifests,
+        string modelId,
+        string role)
+    {
+        ModelManifest[] matches = manifests
+            .Where(value => string.Equals(value.ModelId, modelId, StringComparison.Ordinal))
+            .ToArray();
+        if (matches.Length != 1)
+        {
+            throw new ModelManifestException(
+                matches.Length == 0
+                    ? $"Model manifest '{modelId}' was not found."
+                    : $"Model manifest ID '{modelId}' is duplicated.");
+        }
+
+        ModelManifest manifest = matches[0];
+        if (!string.Equals(manifest.Role, role, StringComparison.Ordinal))
+        {
+            throw new ModelManifestException(
+                $"Model '{modelId}' has role '{manifest.Role}', but role '{role}' is required.");
+        }
+
+        return manifest;
     }
 
     private static string RequireModelFile(string modelDirectory, ModelManifest manifest)
