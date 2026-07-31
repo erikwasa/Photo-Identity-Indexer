@@ -37,19 +37,15 @@ The pilot classified sustained review speed as an S3 usability defect with dispo
 
 ### WI-0033 — Accelerate the human review workflow
 
-Work is in progress. Native Enter submission, scope-aware Previous and Next controls, and automatic advance after suggestion acceptance are merged. Queue neighbours are calculated from the same state, processing-run, exact model revision and deterministic sort scope as the originating view; the next face is captured before mutation so removing the current face cannot shift an offset and skip work.
+Work is in progress. Queue-aware details, automatic advance, suggestion-aware ordering, person audit, grouped acceptance, expanded published smoke and privacy-safe session reporting are implemented.
 
-The suggestion-gallery slice adds a dedicated exact-model workspace. It returns the rank-one pending suggestion, score, margin and full model revision in one paged response, supports task-oriented ordering by suggested person, margin, score or missing suggestion, and allows clear matches to be accepted directly from cards. Ambiguous cases retain the same ordering in a continuous quick-details queue.
+The first real Windows and Pixel verification completed on 2026-07-31 and confirmed that the revised manual-review process is improved. The run also exposed correctness defects and unnecessary complexity: missing optional query values could crash Audit details and initial Progress loading; undo did not restore accepted suggestions to the active gallery; details could not assign an unlisted person or create a person; and full hashes plus image names created horizontal overflow on Pixel.
 
-The person-audit slice adds a dedicated read-only workspace for paging every active face assigned to one person. Exact-model comparison can place likely disagreements first or show only disagreements, while rejected suggestions remain excluded and canonical labels never change automatically. Every face links back to its append-only audit history for correction through the existing workflow.
+The active corrective slice consolidates ordinary Faces, suggestion review and grouped suggestion acceptance into one continuously loaded Faces workspace. It retains preview-first confirmation and linked audit semantics while removing separate Suggestions and Bulk suggestions navigation. Cards keep state plus top suggestion name, score and margin, but hide image name, face ordinal, selection text and full model revision. Legacy URLs redirect into the unified workflow.
 
-The grouped-acceptance slice adds a dedicated Bulk suggestions workspace. It groups current-page rank-one pending suggestions by person for one exact model revision, allows one complete group or a subset to be selected, previews the exact eligible set and requires explicit confirmation. A successful commit writes the normal manual label and assignment action plus a linked suggestion-acceptance action for every affected face in one transaction. Mixed-person groups, stale model scope and changed eligibility fail without partial changes.
+Undo now restores a suggestion-backed assignment's exact suggestion to pending in the same SQLite transaction. Face details normalize all optional queue values, select suggestion-aware navigation only when an exact model scope is present, support assignment to any named person and allow inline person creation. Progress normalizes its initial filter state before URL construction.
 
-The final preparation slice expands published smoke across the workflow routes, suggestion summaries, queue navigation, person audit and grouped suggestion commit, including linked audit and privacy checks. It also adds a privacy-safe session reporter and a detailed like-for-like Windows/Pixel verification procedure.
-
-All implementation and automated-verification work is complete. WI-0033 remains open only for the documented synthetic interaction checks and real 50–100-face sessions on Windows and Pixel. Both runs must start from the same catalogue snapshot and produce passing local aggregate reports before the work item can close.
-
-The improved workflow must retain explicit human confirmation, append-only assignment and suggestion audit actions, exact model provenance and privacy-limited DTOs.
+WI-0033 remains open until the corrective PR is green and the affected Windows/Pixel checks are rerun, especially Audit navigation, initial Progress loading, accept→undo restoration, any-person assignment, inline person creation and portrait overflow. Explicit human confirmation, append-only assignment and suggestion audit actions, exact model provenance and privacy-limited DTOs remain mandatory.
 
 ## Phase B — repeat the workflow with multiple models
 
@@ -87,12 +83,3 @@ WI-0020 and the later Azure milestones remain part of the architecture, but WI-0
 4. the documentation is validated from a clean setup.
 
 This is a delivery gate, not a statement that Azure is technically required by the local system. The canonical database, review application, model evaluation and collection queries all remain local-first.
-
-## Recommended execution order
-
-1. WI-0033.
-2. WI-0019.
-3. WI-0030 and then WI-0025.
-4. WI-0031.
-5. WI-0032.
-6. WI-0020 when Azure access is available.
