@@ -100,7 +100,7 @@ else if (Details is not null)
             <div>
                 <p class="eyebrow">Explicit correction</p>
                 <h2>Assign any person</h2>
-                <p class="suggestion-guidance">Use this when the correct person is absent from the ranked suggestions.</p>
+                <p class="suggestion-guidance">Use this when the correct person is absent from the ranked suggestions. A successful queue assignment advances to the next face.</p>
             </div>
         </div>
 
@@ -123,8 +123,8 @@ else if (Details is not null)
                 </button>
             </div>
 
-            <form class="details-person-creator" @onsubmit="CreatePersonAsync" @onsubmit:preventDefault>
-                <label class="field-label" for="details-new-person">Create and select person</label>
+            <form class="details-person-creator" @onsubmit="CreateAndAssignPersonAsync" @onsubmit:preventDefault>
+                <label class="field-label" for="details-new-person">Create and assign person</label>
                 <input id="details-new-person"
                        placeholder="Display name"
                        maxlength="200"
@@ -134,7 +134,7 @@ else if (Details is not null)
                 <button type="submit"
                         class="button secondary full-width"
                         disabled="@(ActionBusy || string.IsNullOrWhiteSpace(NewPersonName))">
-                    Create person
+                    Create and assign
                 </button>
             </form>
         </div>
@@ -389,55 +389,29 @@ else if (Details is not null)
             return;
         }
 
-        await ApplyFaceActionAsync(
-            $"api/review/faces/{Uri.EscapeDataString(Id)}/assign",
-            new AssignFaceRequest(SelectedPersonId, Actor),
-            "Face assignment saved.");
+        await AssignPersonAsync(SelectedPersonId, "Face assignment saved.");
     }
 
-    private async Task CreatePersonAsync()
+    private async Task AssignPersonAsync(string personId, string successMessage)
     {
-        if (ActionBusy || string.IsNullOrWhiteSpace(NewPersonName))
-        {
-            return;
-        }
-
+        bool shouldAdvance = Details?.Navigation is not null;
+        string? nextFaceId = Details?.Navigation?.NextFaceId;
         ActionBusy = true;
         ActionError = null;
         Message = null;
-        string displayName = NewPersonName.Trim();
         try
         {
             using HttpResponseMessage response = await Http.PostAsJsonAsync(
-                "api/review/people",
-                new CreatePersonRequest(displayName));
+                $"api/review/faces/{Uri.EscapeDataString(Id)}/assign",
+                new AssignFaceRequest(personId, Actor));
             await RequireSuccessAsync(response);
-            ReviewPersonResponse created = await response.Content.ReadFromJsonAsync<ReviewPersonResponse>()
-                ?? throw new InvalidOperationException("The person creation response was empty.");
-            People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
-            SelectedPersonId = created.Id;
-            NewPersonName = "";
-            Message = $"Created and selected {created.DisplayName}.";
-        }
-        catch (Exception exception)
-        {
-            ActionError = exception.Message;
-        }
-        finally
-        {
-            ActionBusy = false;
-        }
-    }
 
-    private async Task ApplyFaceActionAsync<TRequest>(string url, TRequest request, string successMessage)
-    {
-        ActionBusy = true;
-        ActionError = null;
-        Message = null;
-        try
-        {
-            using HttpResponseMessage response = await Http.PostAsJsonAsync(url, request);
-            await RequireSuccessAsync(response);
+            if (shouldAdvance)
+            {
+                NavigateAfterQueueMutation(nextFaceId);
+                return;
+            }
+
             await RefreshAsync();
             Message = successMessage;
         }
@@ -451,12 +425,68 @@ else if (Details is not null)
         }
     }
 
-    private async Task AcceptSuggestionAsync(long suggestionId, string displayName)
+    private async Task CreateAndAssignPersonAsync()
     {
+        if (ActionBusy || string.IsNullOrWhiteSpace(NewPersonName))
+        {
+            return;
+        }
+
+        bool shouldAdvance = Details?.Navigation is not null;
+        string? nextFaceId = Details?.Navigation?.NextFaceId;
         ActionBusy = true;
         ActionError = null;
         Message = null;
+        string displayName = NewPersonName.Trim();
+        try
+        {
+            using HttpResponseMessage createResponse = await Http.PostAsJsonAsync(
+                "api/review/people",
+                new CreatePersonRequest(displayName));
+            await RequireSuccessAsync(createResponse);
+            ReviewPersonResponse created = await createResponse.Content.ReadFromJsonAsync<ReviewPersonResponse>()
+                ?? throw new InvalidOperationException("The person creation response was empty.");
+
+            People = People
+                .Append(created)
+                .OrderBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(person => person.Id, StringComparer.Ordinal)
+                .ToArray();
+            SelectedPersonId = created.Id;
+            NewPersonName = "";
+            Message = $"Created {created.DisplayName}";
+
+            using HttpResponseMessage assignResponse = await Http.PostAsJsonAsync(
+                $"api/review/faces/{Uri.EscapeDataString(Id)}/assign",
+                new AssignFaceRequest(created.Id, Actor));
+            await RequireSuccessAsync(assignResponse);
+
+            if (shouldAdvance)
+            {
+                NavigateAfterQueueMutation(nextFaceId);
+                return;
+            }
+
+            await RefreshAsync();
+            Message = $"Created {created.DisplayName}";
+        }
+        catch (Exception exception)
+        {
+            ActionError = exception.Message;
+        }
+        finally
+        {
+            ActionBusy = false;
+        }
+    }
+
+    private async Task AcceptSuggestionAsync(long suggestionId, string displayName)
+    {
+        bool shouldAdvance = Details?.Navigation is not null;
         string? nextFaceId = Details?.Navigation?.NextFaceId;
+        ActionBusy = true;
+        ActionError = null;
+        Message = null;
         try
         {
             using HttpResponseMessage response = await Http.PostAsJsonAsync(
@@ -464,11 +494,9 @@ else if (Details is not null)
                 new ReviewSuggestionActionRequest(Actor));
             await RequireSuccessAsync(response);
 
-            if (UsesSuggestionNavigation)
+            if (shouldAdvance)
             {
-                Navigation.NavigateTo(
-                    nextFaceId is null ? SafeReturnUrl : BuildFaceUrl(nextFaceId),
-                    replace: true);
+                NavigateAfterQueueMutation(nextFaceId);
                 return;
             }
 
@@ -484,6 +512,13 @@ else if (Details is not null)
             ActionBusy = false;
             ConfirmingRejectSuggestionId = null;
         }
+    }
+
+    private void NavigateAfterQueueMutation(string? nextFaceId)
+    {
+        Navigation.NavigateTo(
+            nextFaceId is null ? SafeReturnUrl : BuildFaceUrl(nextFaceId),
+            replace: true);
     }
 
     private void ConfirmReject(long suggestionId)
