@@ -1,0 +1,77 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="infinite-scroll-trigger" @ref="TriggerElement" aria-live="polite">
+    @if (Busy)
+    {
+        <div class="spinner" aria-hidden="true"></div>
+        <span>Loading more faces…</span>
+    }
+    else
+    {
+        <span>More faces load automatically</span>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public bool Enabled { get; set; } = true;
+
+    [Parameter]
+    public bool Busy { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback LoadMore { get; set; }
+
+    private ElementReference TriggerElement { get; set; }
+    private IJSObjectReference? Module { get; set; }
+    private IJSObjectReference? Observer { get; set; }
+    private DotNetObjectReference<InfiniteScrollTrigger>? SelfReference { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || !Enabled)
+        {
+            return;
+        }
+
+        Module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/infinite-scroll.js");
+        SelfReference = DotNetObjectReference.Create(this);
+        Observer = await Module.InvokeAsync<IJSObjectReference>(
+            "observe",
+            TriggerElement,
+            SelfReference);
+    }
+
+    [JSInvokable]
+    public async Task OnIntersectingAsync()
+    {
+        if (Enabled && !Busy)
+        {
+            await LoadMore.InvokeAsync();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Observer is not null)
+        {
+            try
+            {
+                await Observer.InvokeVoidAsync("dispose");
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+
+            await Observer.DisposeAsync();
+        }
+
+        if (Module is not null)
+        {
+            await Module.DisposeAsync();
+        }
+
+        SelfReference?.Dispose();
+    }
+}
