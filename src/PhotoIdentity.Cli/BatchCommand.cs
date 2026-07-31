@@ -21,6 +21,8 @@ internal sealed record BatchCommandOptions(
     string? OutputRoot,
     string? RepositoryRoot,
     string? ModelDirectory,
+    string DetectorModelId,
+    string EmbedderModelId,
     bool Recursive,
     double ConfidenceThreshold,
     double PaddingRatio,
@@ -48,6 +50,10 @@ internal sealed record BatchCommandOptions(
         string? outputRoot = null;
         string? repositoryRoot = null;
         string? modelDirectory = null;
+        string detectorModelId = LocalBatchConfiguration.DefaultDetectorModelId;
+        string embedderModelId = LocalBatchConfiguration.DefaultEmbedderModelId;
+        bool detectorModelSupplied = false;
+        bool embedderModelSupplied = false;
         bool recursive = true;
         double confidence = 0.9;
         double padding = 0.25;
@@ -99,6 +105,24 @@ internal sealed record BatchCommandOptions(
                 case "--model-dir":
                     modelDirectory = Single(modelDirectory, value, option);
                     break;
+                case "--detector-model":
+                    if (detectorModelSupplied)
+                    {
+                        throw new ArgumentException($"Option '{option}' may be supplied only once.");
+                    }
+
+                    detectorModelId = Required(value, option);
+                    detectorModelSupplied = true;
+                    break;
+                case "--embedder-model":
+                    if (embedderModelSupplied)
+                    {
+                        throw new ArgumentException($"Option '{option}' may be supplied only once.");
+                    }
+
+                    embedderModelId = Required(value, option);
+                    embedderModelSupplied = true;
+                    break;
                 case "--confidence":
                     confidence = UnitInterval(value, option);
                     break;
@@ -140,6 +164,8 @@ internal sealed record BatchCommandOptions(
             outputRoot,
             repositoryRoot,
             modelDirectory,
+            detectorModelId,
+            embedderModelId,
             recursive,
             confidence,
             padding,
@@ -153,8 +179,17 @@ internal sealed record BatchCommandOptions(
             throw new ArgumentException($"Option '{option}' may be supplied only once.");
         }
 
-        ArgumentException.ThrowIfNullOrWhiteSpace(value);
-        return value;
+        return Required(value, option);
+    }
+
+    private static string Required(string value, string option)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException($"Option '{option}' requires a non-empty value.");
+        }
+
+        return value.Trim();
     }
 
     private static double UnitInterval(string value, string option)
@@ -235,7 +270,9 @@ internal static class BatchCommandRunner
             options.ModelDirectory,
             options.Recursive,
             options.ConfidenceThreshold,
-            options.PaddingRatio);
+            options.PaddingRatio,
+            options.DetectorModelId,
+            options.EmbedderModelId);
         using LocalInspectionJobHandler handler = await LocalInspectionJobHandler.CreateAsync(
             database,
             configuration,
@@ -248,6 +285,8 @@ internal static class BatchCommandRunner
                 maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
             cancellationToken);
 
+        output.WriteLine($"detector-model: {configuration.DetectorModelId}");
+        output.WriteLine($"embedder-model: {configuration.EmbedderModelId}");
         output.WriteLine($"scan-supported: {result.ScanSummary.SupportedFileCount}");
         output.WriteLine($"scan-new-revisions: {result.ScanSummary.NewRevisionCount}");
         output.WriteLine($"scan-unchanged: {result.ScanSummary.UnchangedFileCount}");
@@ -277,6 +316,8 @@ internal static class BatchCommandRunner
             new ResumableBatchProcessorOptions(
                 maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
             cancellationToken);
+        output.WriteLine($"detector-model: {configuration.DetectorModelId}");
+        output.WriteLine($"embedder-model: {configuration.EmbedderModelId}");
         WriteSummary(result.Summary, output);
         return result.Summary.FailedJobs == 0 ? 0 : 1;
     }
