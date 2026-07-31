@@ -49,7 +49,7 @@ milestones:
   - WI-0016
 - id: M06
   title: Local evaluation and acceptance
-  status: in_progress
+  status: completed
   document: ../milestones/M06-evaluation.md
   work_items:
   - WI-0017
@@ -65,7 +65,7 @@ milestones:
   - WI-0018
 - id: M08
   title: Multi-model local evaluation
-  status: proposed
+  status: in_progress
   document: ../milestones/M08-second-model.md
   work_items:
   - WI-0019
