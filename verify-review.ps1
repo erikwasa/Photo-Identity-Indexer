@@ -181,6 +181,28 @@ try {
     }
 
     $report.smoke = & $smokeScript -BaseUrl $baseUrl -Manifest $manifest
+
+    if ($Mode -eq "Smoke") {
+        $selfTestRelativeDirectory = ".artifacts/review-verification/session-reporter-self-test"
+        $selfTestDirectory = Join-Path $root $selfTestRelativeDirectory
+        Remove-Item -LiteralPath $selfTestDirectory -Recurse -Force -ErrorAction SilentlyContinue
+        & $sessionScript -Device Windows -FacesReviewed 50 -ActiveMinutes 10 `
+            -AcceptedSuggestions 40 -ExplicitActions 50 -GalleryReturns 0 -ImmediateUndos 1 `
+            -Notes "Automated session reporter self-test." -OutputDirectory $selfTestRelativeDirectory
+        & $sessionScript -Device Pixel -FacesReviewed 50 -ActiveMinutes 12.5 `
+            -AcceptedSuggestions 40 -ExplicitActions 52 -GalleryReturns 0 -ImmediateUndos 1 `
+            -Notes "Automated session reporter self-test." -OutputDirectory $selfTestRelativeDirectory
+        $selfTestSummaryPath = Join-Path $selfTestDirectory "manual-verification-summary.json"
+        if (-not (Test-Path -LiteralPath $selfTestSummaryPath -PathType Leaf)) {
+            throw "The manual session reporter did not create a two-device summary."
+        }
+        $selfTestSummary = Get-Content -LiteralPath $selfTestSummaryPath -Raw | ConvertFrom-Json
+        if ($selfTestSummary.result -ne "passed" -or @($selfTestSummary.devices).Count -ne 2) {
+            throw "The manual session reporter self-test summary was invalid."
+        }
+        Remove-Item -LiteralPath $selfTestDirectory -Recurse -Force
+    }
+
     $report.result = "passed"
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 
