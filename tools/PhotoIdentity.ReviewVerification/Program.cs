@@ -12,7 +12,7 @@ namespace PhotoIdentity.ReviewVerification;
 
 public static class Program
 {
-    private const int FaceCount = 12;
+    private const int FaceCount = 64;
     private static readonly ModelId EmbedderModelId = new("review-verification-embedder");
     private static readonly Sha256Digest EmbedderModelHash = new(new string('e', 64));
     private static readonly ModelId DetectorModelId = new("review-verification-detector");
@@ -92,7 +92,7 @@ public static class Program
                     faceId,
                     DetectorModelId,
                     DetectorModelHash,
-                    0.91 + (index * 0.005),
+                    0.91 + (index * 0.001),
                     new NormalizedBoundingBox(0.14, 0.12, 0.72, 0.75),
                     CreateLandmarks(),
                     now.AddSeconds(index)),
@@ -194,7 +194,7 @@ public static class Program
         8 => [0f, 0f, 1f],
         9 => [0.7f, 0.7f, 0f],
         10 => [0.85f, 0.25f, 0f],
-        _ => [0.25f, 0.85f, 0f],
+        _ => index % 2 == 0 ? [0.9f, 0.3f, 0f] : [0.3f, 0.9f, 0f],
     };
 
     private static NormalizedFaceLandmarks CreateLandmarks() =>
