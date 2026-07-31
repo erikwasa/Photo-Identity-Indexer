@@ -45,7 +45,9 @@ The person-audit slice adds a dedicated read-only workspace for paging every act
 
 The grouped-acceptance slice adds a dedicated Bulk suggestions workspace. It groups current-page rank-one pending suggestions by person for one exact model revision, allows one complete group or a subset to be selected, previews the exact eligible set and requires explicit confirmation. A successful commit writes the normal manual label and assignment action plus a linked suggestion-acceptance action for every affected face in one transaction. Mixed-person groups, stale model scope and changed eligibility fail without partial changes.
 
-Remaining slices extend published smoke coverage and measure a fresh 50–100-face queue on Windows and Pixel.
+The final preparation slice expands published smoke across the workflow routes, suggestion summaries, queue navigation, person audit and grouped suggestion commit, including linked audit and privacy checks. It also adds a privacy-safe session reporter and a detailed like-for-like Windows/Pixel verification procedure.
+
+All implementation and automated-verification work is complete. WI-0033 remains open only for the documented synthetic interaction checks and real 50–100-face sessions on Windows and Pixel. Both runs must start from the same catalogue snapshot and produce passing local aggregate reports before the work item can close.
 
 The improved workflow must retain explicit human confirmation, append-only assignment and suggestion audit actions, exact model provenance and privacy-limited DTOs.
 
