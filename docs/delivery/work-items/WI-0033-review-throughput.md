@@ -30,7 +30,7 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - [x] Suggestion-oriented bulk review groups likely same-person faces, previews the exact affected count and requires explicit confirmation.
 - [x] Bulk suggestion acceptance records both the normal assignment action and the linked suggestion-acceptance action for every affected face.
 - [ ] The revised workflow remains touch-usable and privacy-limited on Windows and Pixel.
-- [ ] Published-application smoke coverage protects person creation submission, queue navigation, auto-advance, suggestion summaries, person filtering and bulk suggestion acceptance.
+- [x] Published-application smoke coverage protects queue navigation, suggestion summaries, person filtering and bulk suggestion acceptance; person-creation keyboard submission, browser auto-advance and touch comfort remain explicit manual checks.
 - [ ] A fresh 50–100-face local queue records active review time, faces per minute, explicit actions per accepted suggestion, returns to the gallery and immediately undone decisions on both device types.
 
 ## Implemented slice: queue-aware details review
@@ -70,7 +70,14 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 - Mixed-person groups, stale rank-one scope and changed eligibility are rejected without partial changes.
 - Integration coverage protects confirmation, stale-preview rollback, linked audit actions and privacy-limited responses.
 
-The completed interaction criteria still require final Windows and Pixel verification as part of the cross-device acceptance gate.
+## Implemented slice: final verification preparation
+
+- Published smoke now exercises every workflow route, exact-model suggestion summaries, queue navigation metadata, person audit, grouped suggestion preview/commit, linked assignment and suggestion audit rows, and privacy-limited responses.
+- `verify-review.ps1` reports the expanded smoke matrix and points operators to the final device procedure instead of implying automated checks prove touch usability.
+- `record-review-session.ps1` records only privacy-safe aggregate metrics for one 50–100-face Windows or Pixel session and creates a two-device summary after both reports exist.
+- `docs/delivery/verification/WI-0033-manual-verification.md` defines like-for-like catalogue reset, trusted-network setup, synthetic interaction checks, real throughput sessions, metric definitions, mandatory failures and completion evidence.
+
+All implementation and automated-verification criteria are complete. WI-0033 remains open only for the human Windows and Pixel sessions.
 
 ## Delivery slices
 
@@ -78,7 +85,7 @@ The completed interaction criteria still require final Windows and Pixel verific
 2. Top-suggestion summaries and suggestion-aware ordering in the gallery.
 3. Per-person assigned-face audit.
 4. Preview-first grouped suggestion acceptance with linked audit actions.
-5. Local throughput measurement and Windows/Pixel verification.
+5. Published workflow smoke, local session reporting and Windows/Pixel manual verification.
 
 ## Safety boundary
 
