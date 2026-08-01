@@ -47,19 +47,23 @@ The required 50–100-face review-time and interaction evidence was captured loc
 
 ### WI-0019 — Add a second model adapter
 
-Work is in progress on `agent/WI-0019-second-embedder`.
+Completed and human-verified locally on Windows on 2026-08-01 after PR #52 merged.
 
-The first candidate is the pinned upstream `sface-2021dec-int8` embedder. It deliberately retains YuNet detection, SFace five-point alignment, 112×112 input and 128-dimensional cosine embeddings so the later comparison isolates the quantised embedding revision.
+The first candidate is the pinned upstream `sface-2021dec-int8` embedder. It deliberately retains YuNet detection, SFace five-point alignment, 112×112 input and 128-dimensional cosine embeddings so the comparison isolates the quantised embedding revision.
 
-Batch runs now persist explicit detector and embedder model IDs. New runs can select `--embedder-model sface-2021dec-int8`; resume reloads the saved exact selection. The same immutable revision reuses its face occurrence and aligned crop while baseline and candidate embeddings coexist by model ID and exact hash. Integration coverage protects people, labels and review actions from candidate processing.
+Batch runs persist explicit detector and embedder model IDs. New runs can select `--embedder-model sface-2021dec-int8`; resume reloads the saved exact selection. The same immutable revision reuses its face occurrence and aligned crop while baseline and candidate embeddings coexist by model ID and exact hash. Integration coverage protects people, labels and review actions from candidate processing.
 
-The remaining WI-0019 gate is a local installation and one candidate processing run using the pinned model file. Full-corpus measurements are deferred to WI-0030.
+Local verification confirmed the pinned model file, same-revision processing, exact-model coexistence, persisted resume selection, baseline readability without the candidate file and unchanged human review data. Only the privacy-safe conclusion is retained in Git.
 
 ### WI-0030 — Run a multi-model local comparison
 
-Process the same immutable corpus with baseline and candidate revisions. Compare detections, suggestions, held-out metrics, confusion, unknown rejection, throughput, storage and review effort. The web application must make the active model revision unmistakable.
+Work is in progress on `agent/WI-0030-multi-model-comparison`.
 
-This phase produces a recommendation, not necessarily a final production-model decision. A larger evaluation set may still be required in M11.
+Process the complete accepted immutable corpus with baseline and candidate revisions. Keep one canonical catalogue and separate model provenance, suggestions, manifests and reports. Use the same dataset ID, pipeline version, split seed, source scope and split settings for both exports.
+
+Compare detections, identification metrics, unknown rejection, confusion, throughput, storage and review effort. Verify the web application makes the active model revision unmistakable and cannot mix or overwrite suggestions from another revision. Review representative disagreements manually without using held-out test results to tune thresholds.
+
+This phase produces a privacy-safe recommendation, remaining uncertainty and a decision about whether M11 needs a larger or more diverse evaluation set. It does not automatically select a production model.
 
 ## Phase C — expose useful catalogue outputs and rewrite the documentation
 
