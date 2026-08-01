@@ -57,19 +57,21 @@ Local verification confirmed the pinned model file, same-revision processing, ex
 
 ### WI-0030 — Run a multi-model local comparison
 
-Work is in progress on `agent/WI-0030-multi-model-comparison`.
+Completed and human-verified on 2026-08-01.
 
-Process the complete accepted immutable corpus with baseline and candidate revisions. Keep one canonical catalogue and separate model provenance, suggestions, manifests and reports. Use the same dataset ID, pipeline version, split seed, source scope and split settings for both exports.
+The reproducible workflow processed and evaluated `sface-2021dec-fp32` and `sface-2021dec-int8` over the same accepted immutable source scope while keeping the detector, alignment protocol, dataset ID, pipeline version, split seed and split settings fixed. Detector counts, source revisions and deterministic evaluation splits matched, and each model retained separate exact provenance, suggestions, manifests and reports.
 
-Compare detections, identification metrics, unknown rejection, confusion, throughput, storage and review effort. Verify the web application makes the active model revision unmistakable and cannot mix or overwrite suggestions from another revision. Review representative disagreements manually without using held-out test results to tune thresholds.
+The review application distinguished the exact FP32 and INT8 suggestion contexts without changing canonical people, assignments, rejections or append-only audit history. A private manual review of 20 representative faces found both revisions correct in every case. No top-person disagreement or material review difference was observed; all practical differences were neutral score or margin changes.
 
-This phase produces a privacy-safe recommendation, remaining uncertainty and a decision about whether M11 needs a larger or more diverse evaluation set. It does not automatically select a production model.
+The recommendation is to retain `sface-2021dec-fp32` as the current default embedding model. The INT8 candidate remains a valid governed revision but did not demonstrate a material product advantage on the accepted corpus. No larger local comparison is required before continuing to collection-ready queries. Final production selection remains deferred to M11, where Azure consistency, deployment cost and broader diversity can be considered.
+
+Detailed photos, identities, local paths, databases, manifests, reports and the manual review record remain outside Git.
 
 ## Phase C — expose useful catalogue outputs and rewrite the documentation
 
 ### WI-0025 — Add collection-ready queries
 
-Use the accepted pilot catalogue after the review-throughput gate to prove any-person, all-person, confirmed-only and opt-in suggestion queries, plus a neutral collection manifest.
+This is the next ready work item. Use the accepted pilot catalogue after the completed review and multi-model gates to prove any-person, all-person, confirmed-only and opt-in suggestion queries, plus a neutral collection manifest.
 
 ### WI-0031 — Rewrite operator and architecture documentation
 
