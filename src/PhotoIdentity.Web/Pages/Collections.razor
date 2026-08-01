@@ -78,7 +78,7 @@ else
         <div class="collection-filter-grid">
             <div>
                 <label class="field-label" for="collection-match">People match</label>
-                <select id="collection-match" @bind="MatchMode" disabled="@LoadingResults">
+                <select id="collection-match" @bind="MatchMode" @bind:after="ClearResults" disabled="@LoadingResults">
                     <option value="all">All selected people</option>
                     <option value="any">Any selected person</option>
                 </select>
@@ -98,12 +98,20 @@ else
 
             <div>
                 <label class="field-label" for="collection-from">From local date</label>
-                <input id="collection-from" type="date" @bind="FromDate" disabled="@LoadingResults" />
+                <input id="collection-from"
+                       type="date"
+                       value="@FormatDate(FromDate)"
+                       disabled="@LoadingResults"
+                       @onchange="SetFromDate" />
             </div>
 
             <div>
                 <label class="field-label" for="collection-to">To local date</label>
-                <input id="collection-to" type="date" @bind="ToDate" disabled="@LoadingResults" />
+                <input id="collection-to"
+                       type="date"
+                       value="@FormatDate(ToDate)"
+                       disabled="@LoadingResults"
+                       @onchange="SetToDate" />
             </div>
 
             <div>
@@ -116,6 +124,7 @@ else
                        step="0.01"
                        placeholder="Optional, 0–1"
                        @bind="MinimumConfidence"
+                       @bind:after="ClearResults"
                        disabled="@LoadingResults" />
             </div>
 
@@ -123,6 +132,7 @@ else
                 <label class="field-label" for="collection-model">Suggestion model revision</label>
                 <select id="collection-model"
                         @bind="SelectedModelIndex"
+                        @bind:after="ClearResults"
                         disabled="@(!UsesSuggestions || LoadingResults || Options.ModelRevisions.Count == 0)">
                     @if (Options.ModelRevisions.Count == 0)
                     {
@@ -148,6 +158,7 @@ else
                        max="1"
                        step="0.01"
                        @bind="MinimumSuggestionScore"
+                       @bind:after="ClearResults"
                        disabled="@(!UsesSuggestions || LoadingResults)" />
             </div>
         </div>
@@ -172,18 +183,18 @@ else
         </button>
     </section>
 
-    @if (Results is CollectionPhotoPageResponse page)
+    @if (Results is CollectionPhotoPageResponse resultPage)
     {
         <section class="collection-results" aria-labelledby="collection-results-heading">
             <div class="section-heading">
                 <div>
                     <p class="eyebrow">Manifest results</p>
-                    <h2 id="collection-results-heading">@page.Total photo@(page.Total == 1 ? "" : "s")</h2>
+                    <h2 id="collection-results-heading">@(resultPage.Total) photo@(resultPage.Total == 1 ? "" : "s")</h2>
                 </div>
-                <span>@EvidenceLabel(page.Query)</span>
+                <span>@EvidenceLabel(resultPage.Query)</span>
             </div>
 
-            @if (page.Items.Count == 0)
+            @if (resultPage.Items.Count == 0)
             {
                 <div class="empty-state compact">
                     <p>No photos matched the selected people and filters.</p>
@@ -192,7 +203,7 @@ else
             else
             {
                 <div class="collection-grid">
-                    @foreach (CollectionPhotoResponse photo in page.Items)
+                    @foreach (CollectionPhotoResponse photo in resultPage.Items)
                     {
                         <article class="collection-card">
                             <div class="collection-media-summary" aria-label="Photo media metadata">
@@ -222,13 +233,13 @@ else
 
                 <nav class="pagination" aria-label="Collection result pages">
                     <button class="button secondary"
-                            disabled="@(LoadingResults || page.Offset == 0)"
+                            disabled="@(LoadingResults || resultPage.Offset == 0)"
                             @onclick="PreviousPageAsync">
                         Previous
                     </button>
                     <span>Showing @FirstResult–@LastResult</span>
                     <button class="button secondary"
-                            disabled="@(LoadingResults || page.Offset + page.Items.Count >= page.Total)"
+                            disabled="@(LoadingResults || resultPage.Offset + resultPage.Items.Count >= resultPage.Total)"
                             @onclick="NextPageAsync">
                         Next
                     </button>
@@ -248,8 +259,8 @@ else
     private string MatchMode { get; set; } = "all";
     private string ReviewState { get; set; } = "assigned";
     private string SelectedModelIndex { get; set; } = "";
-    private string FromDate { get; set; } = "";
-    private string ToDate { get; set; } = "";
+    private DateOnly? FromDate { get; set; }
+    private DateOnly? ToDate { get; set; }
     private string MinimumConfidence { get; set; } = "";
     private string MinimumSuggestionScore { get; set; } = "0.9";
     private string? AppliedQuery { get; set; }
@@ -301,13 +312,14 @@ else
         {
             SelectedPersonIds.Add(person.Id);
         }
+
+        ClearResults();
     }
 
     private void ClearPeople()
     {
         SelectedPersonIds.Clear();
-        Results = null;
-        AppliedQuery = null;
+        ClearResults();
     }
 
     private void SetPersonSelection(string personId, ChangeEventArgs eventArgs)
@@ -321,13 +333,55 @@ else
         {
             SelectedPersonIds.Remove(personId);
         }
+
+        ClearResults();
     }
 
     private void ReviewStateChanged()
     {
+        Error = null;
+        ClearResults();
+    }
+
+    private void SetFromDate(ChangeEventArgs eventArgs)
+    {
+        FromDate = ParseBrowserDate(eventArgs.Value?.ToString(), "start");
+        ClearResults();
+    }
+
+    private void SetToDate(ChangeEventArgs eventArgs)
+    {
+        ToDate = ParseBrowserDate(eventArgs.Value?.ToString(), "end");
+        ClearResults();
+    }
+
+    private DateOnly? ParseBrowserDate(string? value, string label)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            Error = null;
+            return null;
+        }
+
+        if (DateOnly.TryParseExact(
+                value,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out DateOnly parsed))
+        {
+            Error = null;
+            return parsed;
+        }
+
+        Error = $"The {label} date is invalid.";
+        return null;
+    }
+
+    private void ClearResults()
+    {
         Results = null;
         AppliedQuery = null;
-        Error = null;
     }
 
     private async Task RunQueryAsync()
@@ -402,13 +456,8 @@ else
             return false;
         }
 
-        if (!TryDateBoundary(FromDate, endOfDay: false, out DateTimeOffset? fromUtc, out string? dateError) ||
-            !TryDateBoundary(ToDate, endOfDay: true, out DateTimeOffset? toUtc, out dateError))
-        {
-            Error = dateError;
-            return false;
-        }
-
+        DateTimeOffset? fromUtc = ToUtcBoundary(FromDate, endOfDay: false);
+        DateTimeOffset? toUtc = ToUtcBoundary(ToDate, endOfDay: true);
         if (fromUtc is not null && toUtc is not null && fromUtc > toUtc)
         {
             Error = "The start date cannot be later than the end date.";
@@ -499,39 +548,24 @@ else
         return true;
     }
 
-    private static bool TryDateBoundary(
-        string value,
-        bool endOfDay,
-        out DateTimeOffset? utc,
-        out string? error)
+    private static DateTimeOffset? ToUtcBoundary(DateOnly? date, bool endOfDay)
     {
-        utc = null;
-        error = null;
-        if (string.IsNullOrWhiteSpace(value))
+        if (date is null)
         {
-            return true;
+            return null;
         }
 
-        if (!DateOnly.TryParseExact(
-                value,
-                "yyyy-MM-dd",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out DateOnly date))
-        {
-            error = "Dates must use the browser date picker.";
-            return false;
-        }
-
-        DateTime local = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        DateTime local = date.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         if (endOfDay)
         {
             local = local.AddDays(1).AddTicks(-1);
         }
 
-        utc = new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)).ToUniversalTime();
-        return true;
+        return new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)).ToUniversalTime();
     }
+
+    private static string FormatDate(DateOnly? value) =>
+        value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
 
     private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
         $"{model.ModelId} · {model.ModelHash[..Math.Min(12, model.ModelHash.Length)]}";
