@@ -205,12 +205,14 @@ public sealed class CollectionQueryApplicationTests
             CollectionPhotoResponse photo = Assert.Single(suggestedPage.Items);
             Assert.Equal(mixedEvidence.RevisionId.ToString(), photo.RevisionId);
             CollectionPersonMatchResponse adaMatch = Assert.Single(
-                photo.People.Where(person => person.Id == ada.Id.ToString()));
+                photo.People,
+                person => person.Id == ada.Id.ToString());
             Assert.Equal(1, adaMatch.ConfirmedFaceCount);
             Assert.Equal(0, adaMatch.SuggestedFaceCount);
             Assert.Null(adaMatch.MaximumSuggestionScore);
             CollectionPersonMatchResponse graceMatch = Assert.Single(
-                photo.People.Where(person => person.Id == grace.Id.ToString()));
+                photo.People,
+                person => person.Id == grace.Id.ToString());
             Assert.Equal(0, graceMatch.ConfirmedFaceCount);
             Assert.Equal(1, graceMatch.SuggestedFaceCount);
             Assert.Equal(0.92, Assert.IsType<double>(graceMatch.MaximumSuggestionScore), 6);
