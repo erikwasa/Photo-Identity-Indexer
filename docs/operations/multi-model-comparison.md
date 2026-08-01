@@ -29,12 +29,12 @@ Copy the example outside the repository:
 ```powershell
 Copy-Item `
   .\docs\operations\examples\multi-model-comparison.example.json `
-  C:\PhotoIdentityPilot\wi-0030.json
+  C:\PhotoIdentityPilot500\wi-0030.json
 
-notepad C:\PhotoIdentityPilot\wi-0030.json
+notepad C:\PhotoIdentityPilot500\wi-0030.json
 ```
 
-Set `sourcePath`, `databasePath` and a new `workspacePath` outside the source tree. Preserve the accepted dataset ID, pipeline version, split seed, split counts and threshold sweep.
+The directory name is only an example. Set `sourcePath`, `databasePath` and a new `workspacePath` to the actual private pilot directories. The workspace must remain outside the source tree. Preserve the accepted dataset ID, pipeline version, split seed, split counts and threshold sweep.
 
 Add more models by appending entries:
 
@@ -45,7 +45,7 @@ Add more models by appending entries:
 }
 ```
 
-Every model ID must have a checked-in manifest under `models/manifests`.
+Every model ID must have a checked-in manifest under `models/manifests`. Detector manifests use role `faceDetection`; embedder manifests use role `faceEmbedding`.
 
 ## Run
 
@@ -53,12 +53,14 @@ Stop any process writing to the catalogue, then run from the repository root:
 
 ```powershell
 .\Invoke-MultiModelComparison.ps1 `
-  -ConfigPath C:\PhotoIdentityPilot\wi-0030.json `
+  -ConfigPath C:\PhotoIdentityPilot500\wi-0030.json `
   -InstallModels `
   -RunPreflight
 ```
 
 The configured workspace receives the source snapshot, database backup, per-model outputs and logs, raw manifests and reports, `comparison-summary.json`, and `manual-verification.md`. Keep the whole workspace outside Git.
+
+ONNX Runtime can write optimization warnings to native stderr while still exiting successfully. The workflow records those warnings in the model log and uses the native process exit code to decide success; a warning alone must not terminate Windows PowerShell 5.1.
 
 ## Resume
 
@@ -66,11 +68,15 @@ After an interruption, run:
 
 ```powershell
 .\Invoke-MultiModelComparison.ps1 `
-  -ConfigPath C:\PhotoIdentityPilot\wi-0030.json `
+  -ConfigPath C:\PhotoIdentityPilot500\wi-0030.json `
   -Resume
 ```
 
-Completed per-model state is reused. The source snapshot, immutable processing scope, detector counts and evaluation split are checked again.
+Completed per-model phases are reused. When a batch was interrupted before `state.json` was written, the workflow can recover exactly one run directory under that model's private output root and resume the persisted run configuration. It refuses automatic recovery when multiple run directories make the intended run ambiguous.
+
+The source snapshot, exact model provenance, immutable processing scope, detector counts and evaluation split are checked again.
+
+To abandon an interrupted comparison instead, stop all writers, restore `backup\catalogue.db` and its optional `-wal`/`-shm` sidecars, remove the comparison workspace, and start again without `-Resume`.
 
 ## Complete the human gates
 
@@ -92,4 +98,4 @@ powershell.exe -NoProfile -File .\Invoke-MultiModelComparison.ps1 -SelfTest
 pwsh -NoProfile -File .\Invoke-MultiModelComparison.ps1 -SelfTest
 ```
 
-Repository CI runs the Windows PowerShell self-test so the original `GetRelativePath` failure cannot regress unnoticed.
+The self-test verifies relative paths, directory sizing, real manifest roles and successful native commands that write warning text to stderr. Repository CI runs it under both Windows PowerShell 5.1 and PowerShell 7.
