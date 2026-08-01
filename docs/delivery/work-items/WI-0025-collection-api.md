@@ -52,7 +52,7 @@ Suggestion parameters are rejected unless the opt-in flag is present, and incomp
 
 ## Review-state filter slice
 
-The active slice is on `agent/WI-0025-review-state-filters`.
+PR #59 added explicit review-state filtering.
 
 The collection endpoint accepts `reviewState` with these semantics:
 
@@ -66,6 +66,22 @@ The collection endpoint accepts `reviewState` with these semantics:
 
 Person IDs, `match=any|all`, UTC date bounds and minimum detector confidence are applied to the selected review-state evidence in the same query. The response echoes the effective review state so callers do not need to infer which evidence was used.
 
-The API continues to return `Cache-Control: no-store` because collection membership can reveal private identity information even when filesystem paths are omitted.
+## Local collection workspace slice
 
-The local web workspace, neutral content delivery/export and private-pilot verification remain later slices.
+The active slice is on `agent/WI-0025-collection-workspace`.
+
+The Blazor application adds a `/collections` workspace linked from the primary navigation. It provides:
+
+- multi-person selection with explicit any-person or all-person matching;
+- confirmed-only, suggestion-only and combined evidence choices;
+- exact suggestion model revision and threshold controls when advisory evidence is selected;
+- local-date and detector-confidence filters;
+- stable previous/next pagination;
+- visible evidence counts and maximum suggestion scores per matched person; and
+- path-free manifest cards showing observation time, media type, dimensions and opaque asset/revision identifiers.
+
+The layout collapses to one-column controls and result cards at phone widths, while the existing header wraps navigation below 680 pixels. The implementation deliberately does not invent photo-content delivery before the neutral export/content slice exists.
+
+The Windows and Pixel acceptance checkbox remains open until the workspace is exercised against the accepted local catalogue on both devices. Neutral content delivery/export and private-pilot count verification also remain later slices.
+
+The API continues to return `Cache-Control: no-store` because collection membership can reveal private identity information even when filesystem paths are omitted.
