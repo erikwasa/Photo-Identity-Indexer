@@ -11,6 +11,13 @@ public static class CatalogueCollectionMatchModes
     public const string All = "all";
 }
 
+public static class CatalogueCollectionReviewStates
+{
+    public const string Assigned = CatalogueReviewStates.Assigned;
+    public const string Unreviewed = CatalogueReviewStates.Unreviewed;
+    public const string All = "all";
+}
+
 public sealed record CatalogueCollectionSuggestionPolicy(
     ModelId ModelId,
     Sha256Digest ModelHash,
@@ -38,6 +45,7 @@ public sealed record CatalogueCollectionPhotoPage(
     int Limit,
     int Total,
     string MatchMode,
+    string ReviewState,
     CatalogueCollectionSuggestionPolicy? SuggestionPolicy);
 
 /// <summary>
@@ -109,7 +117,8 @@ public sealed class SqliteCollectionQueryRepository
             LEFT JOIN latest_observation
                 ON latest_observation.face_occurrence_id = face_occurrences.id
                AND latest_observation.row_number = 1
-            WHERE latest_action.person_id IN ({0})
+            WHERE $include_assigned = 1
+              AND latest_action.person_id IN ({0})
               AND ($from_utc IS NULL OR asset_revisions.observed_at_utc >= $from_utc)
               AND ($to_utc IS NULL OR asset_revisions.observed_at_utc <= $to_utc)
               AND ($min_confidence IS NULL OR latest_observation.confidence >= $min_confidence)
@@ -140,7 +149,7 @@ public sealed class SqliteCollectionQueryRepository
             LEFT JOIN latest_observation
                 ON latest_observation.face_occurrence_id = face_occurrences.id
                AND latest_observation.row_number = 1
-            WHERE $include_suggestions = 1
+            WHERE $include_unreviewed = 1
               AND latest_action.id IS NULL
               AND top_suggestion.suggested_person_id IN ({0})
               AND top_suggestion.score >= $min_suggestion_score
@@ -188,18 +197,20 @@ public sealed class SqliteCollectionQueryRepository
         QueryPhotosAsync(
             personIds,
             matchMode,
-            null,
-            fromUtc,
-            toUtc,
-            minimumConfidence,
-            offset,
-            limit,
-            cancellationToken);
+            suggestionPolicy: null,
+            reviewState: CatalogueCollectionReviewStates.Assigned,
+            fromUtc: fromUtc,
+            toUtc: toUtc,
+            minimumConfidence: minimumConfidence,
+            offset: offset,
+            limit: limit,
+            cancellationToken: cancellationToken);
 
     public async Task<CatalogueCollectionPhotoPage> QueryPhotosAsync(
         IReadOnlyCollection<PersonId> personIds,
         string matchMode = CatalogueCollectionMatchModes.All,
         CatalogueCollectionSuggestionPolicy? suggestionPolicy = null,
+        string? reviewState = null,
         DateTimeOffset? fromUtc = null,
         DateTimeOffset? toUtc = null,
         double? minimumConfidence = null,
@@ -243,6 +254,7 @@ public sealed class SqliteCollectionQueryRepository
                 "Minimum suggestion score must be a finite cosine similarity between -1 and 1.");
         }
 
+        string normalizedReviewState = NormalizeReviewState(reviewState, suggestionPolicy);
         string[] personParameters = distinctPeople
             .Select((_, index) => $"$person_{index}")
             .ToArray();
@@ -269,6 +281,7 @@ public sealed class SqliteCollectionQueryRepository
                 countCommand,
                 distinctPeople,
                 suggestionPolicy,
+                normalizedReviewState,
                 fromUtc,
                 toUtc,
                 minimumConfidence);
@@ -316,7 +329,14 @@ public sealed class SqliteCollectionQueryRepository
                 matched_faces.display_name,
                 matched_faces.person_id;
             """;
-        AddParameters(command, distinctPeople, suggestionPolicy, fromUtc, toUtc, minimumConfidence);
+        AddParameters(
+            command,
+            distinctPeople,
+            suggestionPolicy,
+            normalizedReviewState,
+            fromUtc,
+            toUtc,
+            minimumConfidence);
         command.Parameters.AddWithValue("$limit", limit);
         command.Parameters.AddWithValue("$offset", offset);
 
@@ -361,6 +381,7 @@ public sealed class SqliteCollectionQueryRepository
             limit,
             total,
             normalizedMatchMode,
+            normalizedReviewState,
             suggestionPolicy);
     }
 
@@ -368,6 +389,7 @@ public sealed class SqliteCollectionQueryRepository
         SqliteCommand command,
         IReadOnlyList<PersonId> personIds,
         CatalogueCollectionSuggestionPolicy? suggestionPolicy,
+        string reviewState,
         DateTimeOffset? fromUtc,
         DateTimeOffset? toUtc,
         double? minimumConfidence)
@@ -378,7 +400,12 @@ public sealed class SqliteCollectionQueryRepository
         }
 
         command.Parameters.AddWithValue("$person_count", personIds.Count);
-        command.Parameters.AddWithValue("$include_suggestions", suggestionPolicy is null ? 0 : 1);
+        command.Parameters.AddWithValue(
+            "$include_assigned",
+            reviewState is CatalogueCollectionReviewStates.Assigned or CatalogueCollectionReviewStates.All ? 1 : 0);
+        command.Parameters.AddWithValue(
+            "$include_unreviewed",
+            reviewState is CatalogueCollectionReviewStates.Unreviewed or CatalogueCollectionReviewStates.All ? 1 : 0);
         command.Parameters.AddWithValue(
             "$suggestion_model_id",
             suggestionPolicy is null ? DBNull.Value : suggestionPolicy.ModelId.ToString());
@@ -412,6 +439,44 @@ public sealed class SqliteCollectionQueryRepository
                 $"Unsupported collection match mode '{matchMode}'. Use 'any' or 'all'.",
                 nameof(matchMode)),
         };
+    }
+
+    private static string NormalizeReviewState(
+        string? reviewState,
+        CatalogueCollectionSuggestionPolicy? suggestionPolicy)
+    {
+        string normalized = string.IsNullOrWhiteSpace(reviewState)
+            ? suggestionPolicy is null
+                ? CatalogueCollectionReviewStates.Assigned
+                : CatalogueCollectionReviewStates.All
+            : reviewState.Trim().ToLowerInvariant();
+
+        if (normalized is not (
+            CatalogueCollectionReviewStates.Assigned or
+            CatalogueCollectionReviewStates.Unreviewed or
+            CatalogueCollectionReviewStates.All))
+        {
+            throw new ArgumentException(
+                $"Unsupported collection review state '{reviewState}'. Use 'assigned', 'unreviewed' or 'all'.",
+                nameof(reviewState));
+        }
+
+        if (normalized == CatalogueCollectionReviewStates.Assigned && suggestionPolicy is not null)
+        {
+            throw new ArgumentException(
+                "The 'assigned' review state cannot be combined with suggestion parameters. " +
+                "Omit 'includeSuggestions' or use reviewState=unreviewed/all.",
+                nameof(reviewState));
+        }
+
+        if (normalized != CatalogueCollectionReviewStates.Assigned && suggestionPolicy is null)
+        {
+            throw new ArgumentException(
+                $"The '{normalized}' review state requires includeSuggestions=true with exact model and threshold parameters.",
+                nameof(reviewState));
+        }
+
+        return normalized;
     }
 
     private static DateTimeOffset Parse(string value) => DateTimeOffset.Parse(
