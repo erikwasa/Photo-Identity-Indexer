@@ -649,16 +649,21 @@ work_items:
   - id: WI-0030
     title: Run a multi-model local comparison
     milestone: M08
-    status: in_progress
+    status: completed
     owner: ai-agent
     document: ../work-items/WI-0030-multi-model-comparison.md
     started_at: '2026-08-01'
+    completed_at: '2026-08-01'
+    verified_at: '2026-08-01'
+    verified_by: human
     last_updated_at: '2026-08-01'
-    branch: agent/WI-0030-multi-model-comparison
+    branch: agent/WI-0030-completion
     blockers:
       - WI-0019
       - WI-0029
-    evidence: []
+    evidence:
+      - type: human_verification
+        value: Private same-corpus FP32-versus-INT8 comparison and manual suggestion review completed locally on 2026-08-01. Twenty representative faces were correct under both exact revisions with no material practical difference; retain the FP32 baseline. The detailed record remains private.
   - id: WI-0031
     title: Rewrite operator and architecture documentation
     milestone: M15

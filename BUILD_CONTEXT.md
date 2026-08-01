@@ -2,17 +2,15 @@
 
 ## Current milestone
 
-**M08 — Multi-model local evaluation**
+**M14 — Collection-ready API**
 
-Status: `in_progress`
+Status: `ready`
 
 ## Current work
 
-- **WI-0030 — Run a multi-model local comparison**
+No work item is active.
 
-WI-0019 completed local human verification on Windows on 2026-08-01 after PR #52 merged. The pinned SFace INT8 model passed exact installation checks, processed the same immutable revision as the FP32 baseline, coexisted by exact model ID/hash and left canonical people, labels and review history unchanged.
-
-The active branch is `agent/WI-0030-multi-model-comparison`.
+The next ready item is **WI-0025 — Add collection-ready queries**. It can use the accepted pilot catalogue now that the local review, throughput and multi-model comparison gates are complete.
 
 ## Completed gates
 
@@ -22,50 +20,46 @@ The active branch is `agent/WI-0030-multi-model-comparison`.
 - Published review smoke protects routes, mutation/audit invariants, privacy boundaries and a multi-page disposable fixture.
 - The selectable `sface-2021dec-int8` candidate is pinned, locally installed and verified against a real immutable revision.
 - Baseline and candidate embeddings coexist while sharing one canonical catalogue and human review history.
+- The same-corpus FP32-versus-INT8 workflow passed exact-provenance, same-source, same-detector-count, deterministic-export and same-split checks.
+- A private manual review of 20 representative faces found both revisions correct in every case and no material practical difference.
 
-## Active WI-0030 slice
+## WI-0030 outcome
 
-- Back up the accepted pilot catalogue and retain the same immutable source scope.
-- Process the complete corpus with `sface-2021dec-int8` into a separate output root while using the existing catalogue.
-- Regenerate suggestions independently for exact FP32 and INT8 model revisions.
-- Verify the browser makes the active suggestion revision unmistakable and cannot overwrite another revision's suggestions or human decisions.
-- Export and evaluate both models with the same dataset ID, pipeline version, split seed, source scope and split settings.
-- Compare detector counts, identification metrics, unknown rejection, confusion, throughput, storage and operator review effort.
-- Review representative disagreements without using held-out test results to tune thresholds.
-- Record a privacy-safe recommendation, remaining uncertainty and whether M11 needs a larger evaluation set.
+WI-0030 and M08 completed on 2026-08-01.
 
-## Remaining WI-0030 gate
+The private comparison kept `yunet-2023mar-fp32`, SFace five-point alignment, the immutable source scope, dataset ID, pipeline version, split seed and split settings fixed while comparing:
 
-1. complete candidate processing over the accepted corpus;
-2. prove same-split deterministic exports and reports for both exact revisions;
-3. verify exact-model distinction in the Windows and Pixel review workflow;
-4. review representative disagreements and aggregate practical impact; and
-5. retain only privacy-safe comparison evidence and the final recommendation.
+- baseline: `sface-2021dec-fp32`;
+- candidate: `sface-2021dec-int8`.
+
+Exact-model suggestions remained distinguishable and could not overwrite one another or alter people, assignments, rejections or append-only audit history. The operator retained the detailed workbook and raw comparison artefacts outside Git.
+
+The recommendation is to retain `sface-2021dec-fp32` as the current default embedding model. INT8 remains a governed candidate, but it did not demonstrate a material identification or review-quality advantage on the accepted private corpus. No larger local evaluation is required before proceeding to collection-ready queries. Final production model selection remains deferred to M11 and later Azure consistency, cost and broader-diversity evidence.
 
 ## Recently completed
 
+- **WI-0030 — Run a multi-model local comparison** was human-verified on 2026-08-01; M08 is completed.
 - **WI-0019 — Add a second model adapter** was human-verified locally on Windows on 2026-08-01.
 - **WI-0033 — Accelerate the human review workflow** was human-verified on Windows and Pixel on 2026-08-01.
 - **WI-0029 — Run a 500-image local acceptance pilot** was human-verified on 2026-07-30.
-- **WI-0028 — Export reviewed catalogues to model-lab** was human-verified against the private reviewed catalogue on 2026-07-30.
 
-Only privacy-safe conclusions are retained in the repository. Private photos, names, crops, embeddings, databases, raw manifests, reports and local paths remain local.
+Only privacy-safe conclusions are retained in the repository. Private photos, names, crops, embeddings, databases, raw manifests, reports, local paths and manual review records remain local.
 
 ## Delivery objective
 
 Prove as much of the product as possible without Azure:
 
-1. repeat the accepted corpus with the second model and record a recommendation;
-2. exercise practical collection queries;
-3. rewrite and independently validate the operator and architecture documentation; and
-4. resume Azure execution only when access is available.
+1. exercise practical collection queries against the accepted catalogue;
+2. rewrite and independently validate the operator and architecture documentation; and
+3. resume Azure execution only when access is available.
 
 ## Relevant planning files
 
 - `docs/delivery/local-first-plan.md`
 - `docs/delivery/milestones/M08-second-model.md`
-- `docs/delivery/work-items/WI-0019-second-model.md`
+- `docs/delivery/milestones/M14-collection-api.md`
 - `docs/delivery/work-items/WI-0030-multi-model-comparison.md`
+- `docs/delivery/work-items/WI-0025-collection-api.md`
 - `docs/models/candidate-models.md`
 - `docs/operations/local-evaluation.md`
 - `docs/delivery/status/work-items.yaml`

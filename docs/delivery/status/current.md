@@ -12,18 +12,18 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M05 — Identity matching**: `completed`
 - **M06 — Local evaluation and acceptance**: `completed`
 - **M07 — Portable job bundles**: `completed`
-- **M08 — Multi-model local evaluation**: `in_progress`
+- **M08 — Multi-model local evaluation**: `completed`
 - **M14 — Collection-ready API**: `ready`
 
 ## Active work
 
-- [**WI-0030 — Run a multi-model local comparison**](../work-items/WI-0030-multi-model-comparison.md) — `in_progress`; owner: `ai-agent`
+None.
 
 ## Recently completed
 
 - [**WI-0033 — Accelerate the human review workflow**](../work-items/WI-0033-review-throughput.md) — `completed`; owner: `ai-agent`
+- [**WI-0030 — Run a multi-model local comparison**](../work-items/WI-0030-multi-model-comparison.md) — `completed`; owner: `ai-agent`
 - [**WI-0019 — Add a second model adapter**](../work-items/WI-0019-second-model.md) — `completed`; owner: `ai-agent`
-- [**WI-0029 — Run a 500-image local acceptance pilot**](../work-items/WI-0029-local-acceptance-pilot.md) — `completed`; owner: `human-maintainer`
 
 ## Next ready work
 
