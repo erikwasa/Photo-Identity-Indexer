@@ -1,0 +1,38 @@
+{
+  "sourcePath": "C:\\PhotoIdentityPilot\\source",
+  "databasePath": "C:\\PhotoIdentityPilot\\catalogue.db",
+  "workspacePath": "C:\\PhotoIdentityPilot\\comparisons\\sface-fp32-vs-int8",
+  "detectorModelId": "yunet-2023mar-fp32",
+  "models": [
+    {
+      "name": "baseline",
+      "modelId": "sface-2021dec-fp32"
+    },
+    {
+      "name": "candidate-int8",
+      "modelId": "sface-2021dec-int8"
+    }
+  ],
+  "evaluation": {
+    "datasetId": "private-baseline-v1",
+    "pipelineVersion": "local-pipeline-v1",
+    "seed": "private-baseline-split-v1",
+    "galleryPerPerson": 1,
+    "validationKnownPerPerson": 1,
+    "testKnownPerPerson": 1,
+    "validationUnknown": 1,
+    "testUnknown": 1,
+    "thresholds": [
+      0.2,
+      0.3,
+      0.4,
+      0.5,
+      0.6,
+      0.7,
+      0.8,
+      0.9
+    ]
+  },
+  "requireExistingSourceRevisions": true,
+  "requireMeasuredTiming": true
+}
