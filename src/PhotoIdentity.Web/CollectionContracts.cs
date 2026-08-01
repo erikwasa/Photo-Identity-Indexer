@@ -3,7 +3,9 @@ namespace PhotoIdentity.Web.Contracts;
 public sealed record CollectionPersonMatchResponse(
     string Id,
     string DisplayName,
-    int ConfirmedFaceCount);
+    int ConfirmedFaceCount,
+    int SuggestedFaceCount,
+    double? MaximumSuggestionScore);
 
 public sealed record CollectionPhotoResponse(
     string RevisionId,
@@ -14,10 +16,16 @@ public sealed record CollectionPhotoResponse(
     int? Height,
     IReadOnlyList<CollectionPersonMatchResponse> People);
 
+public sealed record CollectionSuggestionPolicyResponse(
+    string ModelId,
+    string ModelHash,
+    double MinimumScore);
+
 public sealed record CollectionQueryResponse(
     IReadOnlyList<string> PersonIds,
     string MatchMode,
     bool ConfirmedOnly,
+    CollectionSuggestionPolicyResponse? SuggestionPolicy,
     DateTimeOffset? FromUtc,
     DateTimeOffset? ToUtc,
     double? MinimumConfidence);
