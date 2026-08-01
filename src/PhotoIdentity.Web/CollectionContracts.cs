@@ -10,7 +10,6 @@ public sealed record CollectionPersonMatchResponse(
 public sealed record CollectionPhotoResponse(
     string RevisionId,
     string AssetId,
-    string ThumbnailUrl,
     string ContentUrl,
     DateTimeOffset ObservedAtUtc,
     string? MediaType,
