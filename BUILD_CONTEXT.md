@@ -10,22 +10,20 @@ Status: `in_progress`
 
 **WI-0025 — Add collection-ready queries** remains active.
 
-PRs #57–#59 established confirmed, suggestion-backed and explicit review-state collection queries. PR #60 added the first local `/collections` workspace. PR #61 corrected the long people list, misleading catalogue-observation dates and text-only results by adding a searchable selector and opaque local photo delivery.
+PRs #57–#59 established confirmed, suggestion-backed and explicit review-state collection queries. PR #60 added the first local `/collections` workspace. PR #61 added the searchable people selector and opaque local photo delivery. PR #62 restored Blazor component-scoped styles across the application and changed collection cards to fixed 480 × 320 server-generated thumbnails.
 
-The next real Windows attempt found that the host linked only `css/app.css`; the generated `PhotoIdentity.Web.styles.css` bundle was absent, so component-scoped styles across the application were not applied. It also showed that the collection grid requested original image bytes, which was unnecessary and allowed large unstyled images to cause horizontal overflow.
+The active slice is `agent/WI-0025-neutral-manifest`.
 
-The active correction is `agent/WI-0025-css-thumbnails`.
-
-It links the Blazor isolated-style bundle globally, verifies the bundle through the hosted application, changes collection preview URLs to a server-generated fixed 480 × 320 JPEG thumbnail, and hardens the grid/card/image width constraints. Original files remain server-side and are not downloaded by the result grid.
+It adds a versioned, complete collection manifest for later slideshow and album consumers. The manifest accepts the same query policy as the browser/API, pages internally across the 200-item repository boundary, and returns opaque IDs, matched-person evidence, bounded-thumbnail URLs and original-content URLs without source roots, source keys or filenames.
 
 ## Next concrete step
 
 1. Run the full Release build, integration suite, living-document validation and published Windows smoke path in GitHub Actions.
-2. Merge the CSS and thumbnail correction after CI passes.
-3. Re-publish the application and hard-refresh or clear the old service worker before retesting.
+2. Verify the 201-photo integration fixture returns one complete version-1 manifest with the vendor media type and `no-store` cache policy.
+3. Merge the neutral-manifest slice after CI passes.
 4. Re-run `/collections` on Windows and Pixel against the accepted private catalogue.
 5. Record isolated-style loading, selector usability, fixed-size thumbnails, no horizontal overflow, any/all counts and representative-result evidence.
-6. Complete WI-0025 only after device acceptance, neutral-consumer verification and pilot count checks all pass.
+6. Complete WI-0025 only after the device and pilot-count criteria pass.
 
 ## Completed gates
 

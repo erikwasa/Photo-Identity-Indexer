@@ -20,7 +20,7 @@ Expose stable local queries and neutral exports for photos containing one or mor
 - [x] Suggestion-backed results are opt-in and identify their model revision and threshold.
 - [x] Date, confidence, review-state and person filters can be combined predictably.
 - [ ] Results can be inspected through the local web interface on Windows and Pixel.
-- [ ] A neutral collection manifest can feed later slideshow or album applications without exposing unnecessary local paths.
+- [x] A neutral collection manifest can feed later slideshow or album applications without exposing unnecessary local paths.
 - [ ] Query counts and representative results are checked against the pilot catalogue.
 
 ## Confirmed-query foundation
@@ -85,7 +85,7 @@ The first device acceptance attempt found three usability blockers:
 
 The same attempt also established that the date controls were misleading. `asset_revisions.observed_at_utc` is the time the catalogue scan first observed that content revision. It is not the photo capture time and is not specifically the face-analysis time. The API retains date bounds for machine consumers and predictable query composition, but the local browser no longer presents them as a primary collection control.
 
-## Usability and content correction slice
+## Usability and content correction slices
 
 PR #61 replaced the people grid with a searchable, scroll-contained dropdown with checkboxes, filtered selection and removable selected-person chips. It also added opaque local photo delivery while preserving the path-free browser contract.
 
@@ -94,10 +94,28 @@ The next Windows acceptance attempt exposed two additional defects:
 - the host document linked only `css/app.css`, so the generated `PhotoIdentity.Web.styles.css` bundle was never loaded and all component-scoped `.razor.css` selectors were inactive; and
 - result cards requested the original image bytes, allowing large source dimensions to control the unstyled layout and wasting trusted-LAN bandwidth.
 
-The active correction is on `agent/WI-0025-css-thumbnails`.
+PR #62 linked the generated Blazor isolated-style bundle from `index.html`, restoring component styles across the entire web application. Hosted integration coverage verifies that the bundle is linked, served and contains representative collection selectors.
 
-It links the generated Blazor isolated-style bundle from `index.html`, restoring component styles across the entire web application. Hosted integration coverage verifies that the bundle is linked, served and contains representative collection selectors.
+Collection result URLs now target `/api/collections/photos/{revisionId}/thumbnail`. The API resolves and validates the original through the existing private source boundary, decodes it server-side and returns a fixed 480 × 320 JPEG preview with `Cache-Control: no-store`. The original content route remains available for neutral consumers, but the collection grid does not download original image bytes. Result cards use a matching 3:2 fixed viewport, constrain every grid/card/image layer to the available width and keep opaque identifiers wrapped.
 
-Collection result URLs now target `/api/collections/photos/{revisionId}/thumbnail`. The API resolves and validates the original through the existing private source boundary, decodes it server-side and returns a fixed 480 × 320 JPEG preview with `Cache-Control: no-store`. The original content route remains available for later neutral consumers, but the collection grid does not download original image bytes. Result cards use a matching 3:2 fixed viewport, constrain every grid/card/image layer to the available width and keep opaque identifiers wrapped.
+## Neutral manifest slice
 
-The Windows and Pixel acceptance checkbox remains open until this corrected workspace is exercised against the accepted private catalogue on both devices. The neutral consumer criterion and pilot-count criterion also remain open until their final verification evidence is recorded.
+`GET /api/collections/manifest` accepts the same people, match, review-state, date, confidence and exact suggestion-policy parameters as the paginated photo query.
+
+The response media type is `application/vnd.photoidentity.collection-manifest+json`. Schema version 1 contains:
+
+- the stable format identifier `photoidentity.collection-manifest`;
+- the effective query policy, including exact model revision and threshold when suggestions are enabled;
+- the complete ordered result count and photo list;
+- opaque asset and immutable revision identifiers;
+- media type and dimensions when known;
+- matched-person evidence; and
+- absolute thumbnail and original-content URLs derived from the host used to request the manifest.
+
+The endpoint pages through the repository internally in batches of 200 and returns one complete document. Integration coverage uses 201 confirmed photos to prove the page boundary is crossed. It also verifies `Cache-Control: no-store`, the vendor media type, ordering, complete counts, usable thumbnail/content URLs and the absence of source roots, source keys and filenames.
+
+No generated manifest or thumbnail is persisted. A slideshow or album client can request the manifest from the Windows host, render the bounded thumbnail URLs and open or stream the original-content URLs without learning filesystem paths.
+
+## Remaining verification
+
+The Windows and Pixel acceptance checkbox remains open until the corrected workspace is exercised against the accepted private catalogue on both devices. The final pilot-count criterion remains open until any/all counts and representative results are recorded against that catalogue.
