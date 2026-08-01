@@ -133,7 +133,6 @@ public static class CollectionEndpoints
         photo.RevisionId.ToString(),
         photo.AssetId.ToString(),
         $"/api/collections/photos/{photo.RevisionId}/thumbnail",
-        $"/api/collections/photos/{photo.RevisionId}/content",
         photo.ObservedAtUtc,
         photo.MediaType,
         photo.Width,
