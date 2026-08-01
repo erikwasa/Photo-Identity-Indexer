@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -10,6 +11,7 @@ public static class CollectionEndpoints
     public static IEndpointRouteBuilder MapCollectionEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/collections/photos", GetPhotosAsync);
+        endpoints.MapGet("/api/collections/photos/{revisionId}/thumbnail", GetPhotoThumbnailAsync);
         endpoints.MapGet("/api/collections/photos/{revisionId}/content", GetPhotoContentAsync);
         return endpoints;
     }
@@ -88,19 +90,40 @@ public static class CollectionEndpoints
         }
     }
 
+    private static async Task<IResult> GetPhotoThumbnailAsync(
+        string revisionId,
+        CollectionPhotoFileResolver resolver,
+        OpenCvThumbnailRenderer renderer,
+        CancellationToken cancellationToken)
+    {
+        if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
+        {
+            return Results.BadRequest(new { error = "The asset revision identifier is invalid." });
+        }
+
+        CollectionPhotoFile? file = await resolver.ResolveAsync(parsedRevisionId, cancellationToken);
+        if (file is null)
+        {
+            return Results.NotFound();
+        }
+
+        EncodedThumbnail? thumbnail = await renderer.RenderAsync(file.Path, cancellationToken);
+        return thumbnail is null
+            ? Results.NotFound()
+            : Results.File(thumbnail.Content, thumbnail.ContentType);
+    }
+
     private static async Task<IResult> GetPhotoContentAsync(
         string revisionId,
         CollectionPhotoFileResolver resolver,
         CancellationToken cancellationToken)
     {
-        if (!Guid.TryParse(revisionId, out Guid parsedRevisionId) || parsedRevisionId == Guid.Empty)
+        if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
         {
             return Results.BadRequest(new { error = "The asset revision identifier is invalid." });
         }
 
-        CollectionPhotoFile? file = await resolver.ResolveAsync(
-            AssetRevisionId.From(parsedRevisionId),
-            cancellationToken);
+        CollectionPhotoFile? file = await resolver.ResolveAsync(parsedRevisionId, cancellationToken);
         return file is null
             ? Results.NotFound()
             : Results.File(file.Path, file.ContentType, enableRangeProcessing: true);
@@ -109,7 +132,7 @@ public static class CollectionEndpoints
     private static CollectionPhotoResponse ToResponse(CatalogueCollectionPhoto photo) => new(
         photo.RevisionId.ToString(),
         photo.AssetId.ToString(),
-        $"/api/collections/photos/{photo.RevisionId}/content",
+        $"/api/collections/photos/{photo.RevisionId}/thumbnail",
         photo.ObservedAtUtc,
         photo.MediaType,
         photo.Width,
@@ -120,6 +143,18 @@ public static class CollectionEndpoints
             person.ConfirmedFaceCount,
             person.SuggestedFaceCount,
             person.MaximumSuggestionScore)).ToArray());
+
+    private static bool TryRevisionId(string value, out AssetRevisionId revisionId)
+    {
+        revisionId = default;
+        if (!Guid.TryParse(value, out Guid parsed) || parsed == Guid.Empty)
+        {
+            return false;
+        }
+
+        revisionId = AssetRevisionId.From(parsed);
+        return true;
+    }
 
     private static bool TryPeople(string? value, out PersonId[] personIds)
     {

@@ -232,25 +232,32 @@
 }
 
 .collection-results {
+    min-width: 0;
+    max-width: 100%;
     margin-top: 1.4rem;
 }
 
 .collection-grid {
+    min-width: 0;
+    max-width: 100%;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
     gap: 1rem;
     margin-top: 0.9rem;
 }
 
 .collection-card {
     min-width: 0;
+    max-width: 100%;
     overflow: hidden;
 }
 
 .collection-photo-link {
     position: relative;
+    width: 100%;
+    max-width: 100%;
     display: block;
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 3 / 2;
     overflow: hidden;
     background:
         linear-gradient(135deg, rgba(11, 113, 104, 0.2), rgba(22, 42, 45, 0.38)),
@@ -259,6 +266,7 @@
 
 .collection-photo {
     width: 100%;
+    max-width: 100%;
     height: 100%;
     display: block;
     object-fit: cover;
@@ -271,6 +279,7 @@
 }
 
 .collection-card-body {
+    min-width: 0;
     padding: 1rem;
 }
 
@@ -325,6 +334,7 @@
 
 .collection-identifiers code {
     display: block;
+    max-width: 100%;
     margin-top: 0.45rem;
     overflow-wrap: anywhere;
 }
@@ -363,7 +373,7 @@
 
     .collection-filter-grid,
     .collection-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .collection-panel {

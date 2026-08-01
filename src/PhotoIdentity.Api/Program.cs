@@ -1,3 +1,4 @@
+using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
@@ -27,6 +28,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();
+        builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
 
         WebApplication app = builder.Build();

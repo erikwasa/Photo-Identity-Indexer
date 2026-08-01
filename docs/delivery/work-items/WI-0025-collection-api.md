@@ -87,12 +87,17 @@ The same attempt also established that the date controls were misleading. `asset
 
 ## Usability and content correction slice
 
-The active correction is on `agent/WI-0025-collection-usability-content`.
+PR #61 replaced the people grid with a searchable, scroll-contained dropdown with checkboxes, filtered selection and removable selected-person chips. It also added opaque local photo delivery while preserving the path-free browser contract.
 
-The browser now uses a searchable, scroll-contained dropdown with checkboxes, filtered selection and removable selected-person chips. Checkbox sizing and flex behavior are explicit so the control remains beside the name on Windows and Pixel.
+The next Windows acceptance attempt exposed two additional defects:
 
-Collection responses include an opaque content URL derived only from the revision ID. `/api/collections/photos/{revisionId}/content` resolves the source file inside the API process, requires the persisted `local-folder` source kind, rejects root escapes and reparse-point files, verifies the persisted byte length, whitelists supported image media types and returns not found when the content is unavailable. Source roots and source keys never enter the browser contract.
+- the host document linked only `css/app.css`, so the generated `PhotoIdentity.Web.styles.css` bundle was never loaded and all component-scoped `.razor.css` selectors were inactive; and
+- result cards requested the original image bytes, allowing large source dimensions to control the unstyled layout and wasting trusted-LAN bandwidth.
 
-Result cards lazy-load the photo, link to the full local stream, omit the low-value catalogue-observation timestamp and only show dimensions when known. The API continues to return `Cache-Control: no-store` for collection JSON and image content because collection membership can reveal private identity information.
+The active correction is on `agent/WI-0025-css-thumbnails`.
+
+It links the generated Blazor isolated-style bundle from `index.html`, restoring component styles across the entire web application. Hosted integration coverage verifies that the bundle is linked, served and contains representative collection selectors.
+
+Collection result URLs now target `/api/collections/photos/{revisionId}/thumbnail`. The API resolves and validates the original through the existing private source boundary, decodes it server-side and returns a fixed 480 × 320 JPEG preview with `Cache-Control: no-store`. The original content route remains available for later neutral consumers, but the collection grid does not download original image bytes. Result cards use a matching 3:2 fixed viewport, constrain every grid/card/image layer to the available width and keep opaque identifiers wrapped.
 
 The Windows and Pixel acceptance checkbox remains open until this corrected workspace is exercised against the accepted private catalogue on both devices. The neutral consumer criterion and pilot-count criterion also remain open until their final verification evidence is recorded.
