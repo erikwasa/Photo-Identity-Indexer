@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+    <PackageReference Include="OpenCvSharp4.runtime.win" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
+    <ProjectReference Include="../PhotoIdentity.Imaging.OpenCv/PhotoIdentity.Imaging.OpenCv.csproj" />
     <ProjectReference Include="../PhotoIdentity.Persistence.Sqlite/PhotoIdentity.Persistence.Sqlite.csproj" />
     <ProjectReference Include="../PhotoIdentity.Web/PhotoIdentity.Web.csproj" />
   </ItemGroup>
