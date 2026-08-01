@@ -8,45 +8,46 @@ Status: `in_progress`
 
 ## Current work
 
-- **WI-0019 — Add a second model adapter**
+- **WI-0030 — Run a multi-model local comparison**
 
-WI-0033 completed human verification on Windows and Pixel on 2026-08-01. The review workflow works as intended, the operator confirmed that sustained manual review is improved, and privacy-sensitive timing reports remain outside Git.
+WI-0019 completed local human verification on Windows on 2026-08-01 after PR #52 merged. The pinned SFace INT8 model passed exact installation checks, processed the same immutable revision as the FP32 baseline, coexisted by exact model ID/hash and left canonical people, labels and review history unchanged.
 
-The active branch is `agent/WI-0019-second-embedder`.
+The active branch is `agent/WI-0030-multi-model-comparison`.
 
-## Completed baseline gate
+## Completed gates
 
-- The 450–550-image local pilot passed restart/resume, cross-device review, matcher invariants, deterministic export/evaluation, backup and restore.
+- The 450–550-image baseline pilot passed restart/resume, cross-device review, matcher invariants, deterministic export/evaluation, backup and restore.
 - Queue-aware Faces review combines continuous loading, exact-model suggestion ordering, automatic advance, any-person correction, create-and-assign, person audit and preview-first grouped acceptance.
 - Windows and Pixel corrective verification passed without horizontal overflow or lost queue navigation.
 - Published review smoke protects routes, mutation/audit invariants, privacy boundaries and a multi-page disposable fixture.
-- Local review-time and interaction measurements were captured for both devices and retained outside the repository.
+- The selectable `sface-2021dec-int8` candidate is pinned, locally installed and verified against a real immutable revision.
+- Baseline and candidate embeddings coexist while sharing one canonical catalogue and human review history.
 
-## Active WI-0019 slice
+## Active WI-0030 slice
 
-- Add the pinned `sface-2021dec-int8` candidate manifest with immutable source, size, SHA-256, input/output contract, alignment and licence records.
-- Persist explicit detector and embedder model IDs in every new batch run while defaulting older saved runs to YuNet FP32 and SFace FP32.
-- Add `--detector-model` and `--embedder-model` to `batch start`; resume always reloads the saved exact selection.
-- Resolve production manifests by selected model ID and validate the required role before opening model files.
-- Reuse unchanged face-occurrence/crop natural keys while storing baseline and candidate embeddings under distinct model ID/hash keys.
-- Prove through integration coverage that candidate processing leaves people, confirmed labels and review actions unchanged.
-- Document installation, processing, matcher regeneration and same-split evaluation commands.
+- Back up the accepted pilot catalogue and retain the same immutable source scope.
+- Process the complete corpus with `sface-2021dec-int8` into a separate output root while using the existing catalogue.
+- Regenerate suggestions independently for exact FP32 and INT8 model revisions.
+- Verify the browser makes the active suggestion revision unmistakable and cannot overwrite another revision's suggestions or human decisions.
+- Export and evaluate both models with the same dataset ID, pipeline version, split seed, source scope and split settings.
+- Compare detector counts, identification metrics, unknown rejection, confusion, throughput, storage and operator review effort.
+- Review representative disagreements without using held-out test results to tune thresholds.
+- Record a privacy-safe recommendation, remaining uncertainty and whether M11 needs a larger evaluation set.
 
-## Remaining WI-0019 gate
+## Remaining WI-0030 gate
 
-1. merge the selectable-candidate slice after green build, tests and documentation checks;
-2. install the pinned candidate model locally;
-3. process at least one immutable revision with `--embedder-model sface-2021dec-int8` and confirm exact-model coexistence; and
-4. retain only privacy-safe success/failure evidence.
-
-The full baseline-versus-candidate corpus comparison belongs to WI-0030.
+1. complete candidate processing over the accepted corpus;
+2. prove same-split deterministic exports and reports for both exact revisions;
+3. verify exact-model distinction in the Windows and Pixel review workflow;
+4. review representative disagreements and aggregate practical impact; and
+5. retain only privacy-safe comparison evidence and the final recommendation.
 
 ## Recently completed
 
+- **WI-0019 — Add a second model adapter** was human-verified locally on Windows on 2026-08-01.
 - **WI-0033 — Accelerate the human review workflow** was human-verified on Windows and Pixel on 2026-08-01.
 - **WI-0029 — Run a 500-image local acceptance pilot** was human-verified on 2026-07-30.
 - **WI-0028 — Export reviewed catalogues to model-lab** was human-verified against the private reviewed catalogue on 2026-07-30.
-- **WI-0027 — Complete the local review workflow** was human-verified on Windows and Pixel on 2026-07-30.
 
 Only privacy-safe conclusions are retained in the repository. Private photos, names, crops, embeddings, databases, raw manifests, reports and local paths remain local.
 
@@ -54,7 +55,7 @@ Only privacy-safe conclusions are retained in the repository. Private photos, na
 
 Prove as much of the product as possible without Azure:
 
-1. add a second model and repeat the same corpus;
+1. repeat the accepted corpus with the second model and record a recommendation;
 2. exercise practical collection queries;
 3. rewrite and independently validate the operator and architecture documentation; and
 4. resume Azure execution only when access is available.
