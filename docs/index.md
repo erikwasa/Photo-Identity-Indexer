@@ -2,18 +2,19 @@
 
 ## Start here
 
-- [README and quick start](../README.md)
-- [Local-first delivery plan](delivery/local-first-plan.md)
-- [Local evaluation workflow](operations/local-evaluation.md)
+- [README and project orientation](../README.md)
+- [Local operator guide](operations/local-operator-guide.md)
 - [Architecture overview](architecture/overview.md)
-- [Current status](delivery/status/current.md)
+- [Current delivery status](delivery/status/current.md)
 - [Build context](../BUILD_CONTEXT.md)
 
-## Product
+The local operator guide is the authoritative end-to-end command sequence. Specialized documents explain individual subsystems and must not duplicate or contradict that path.
 
-- [Vision](product/vision.md)
-- [Initial scope](product/scope.md)
-- [Success criteria](product/success-criteria.md)
+## Operations
+
+- [Local operator guide](operations/local-operator-guide.md)
+- [Local evaluation and multi-model workflow](operations/local-evaluation.md)
+- [SQLite persistence operations](operations/sqlite-persistence.md)
 
 ## Architecture
 
@@ -26,10 +27,11 @@
 - [Portable processing bundles](architecture/portable-bundles.md)
 - [Security and privacy](architecture/security-and-privacy.md)
 
-## Operations
+## Product
 
-- [Local evaluation workflow](operations/local-evaluation.md)
-- [SQLite persistence operations](operations/sqlite-persistence.md)
+- [Vision](product/vision.md)
+- [Initial scope](product/scope.md)
+- [Success criteria](product/success-criteria.md)
 
 ## Sources and processing
 
@@ -49,7 +51,7 @@
 - [Identity-free execution](azure/identity-free-execution.md)
 - [Cost controls](azure/cost-controls.md)
 
-Azure documentation remains authoritative for the later scale-out phase, but Azure is not required for the current local acceptance or multi-model work.
+Azure is not required for the accepted local workflow. It remains an optional later scale-out path after clean-setup documentation validation.
 
 ## Delivery
 
