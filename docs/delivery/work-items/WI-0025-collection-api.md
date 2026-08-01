@@ -18,7 +18,7 @@ Expose stable local queries and neutral exports for photos containing one or mor
 - [x] Any-person and all-person semantics are explicit.
 - [x] Confirmed-only results are supported and are the safe default.
 - [x] Suggestion-backed results are opt-in and identify their model revision and threshold.
-- [ ] Date, confidence, review-state and person filters can be combined predictably.
+- [x] Date, confidence, review-state and person filters can be combined predictably.
 - [ ] Results can be inspected through the local web interface on Windows and Pixel.
 - [ ] A neutral collection manifest can feed later slideshow or album applications without exposing unnecessary local paths.
 - [ ] Query counts and representative results are checked against the pilot catalogue.
@@ -37,7 +37,7 @@ Confirmed-only remains the default and requires no model parameters.
 
 ## Suggestion-query slice
 
-The active slice is on `agent/WI-0025-suggestion-queries`.
+PR #58 added explicitly scoped suggestion evidence.
 
 Suggestion-backed results require all of these explicit query parameters:
 
@@ -48,7 +48,23 @@ Suggestion-backed results require all of these explicit query parameters:
 
 Confirmed assignments remain authoritative. The advisory path considers only rank-one pending suggestions for unreviewed faces. Assigned and rejected faces cannot enter through suggestion evidence. The response reports the exact model revision and threshold and separates confirmed-face counts from suggested-face counts and maximum suggestion score for every matched person.
 
-Suggestion parameters are rejected unless the opt-in flag is present, and incomplete model or threshold scope is rejected rather than inferred. Date, confidence, person and `any`/`all` filters apply to both confirmed and explicitly enabled suggestion evidence.
+Suggestion parameters are rejected unless the opt-in flag is present, and incomplete model or threshold scope is rejected rather than inferred.
+
+## Review-state filter slice
+
+The active slice is on `agent/WI-0025-review-state-filters`.
+
+The collection endpoint accepts `reviewState` with these semantics:
+
+- omitted without suggestion scope: `assigned`;
+- omitted with explicit suggestion scope: `all`;
+- `assigned`: active confirmed assignments only, without suggestion parameters;
+- `unreviewed`: exact-model rank-one pending suggestions only, requiring suggestion scope; and
+- `all`: confirmed assignments plus qualifying unreviewed suggestions, requiring suggestion scope.
+
+`rejected` is not a collection match state because a rejected face does not positively identify one of the selected people. Unsupported or incompatible combinations are rejected instead of being ignored.
+
+Person IDs, `match=any|all`, UTC date bounds and minimum detector confidence are applied to the selected review-state evidence in the same query. The response echoes the effective review state so callers do not need to infer which evidence was used.
 
 The API continues to return `Cache-Control: no-store` because collection membership can reveal private identity information even when filesystem paths are omitted.
 
