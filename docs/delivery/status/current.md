@@ -17,13 +17,13 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Active work
 
-- [**WI-0019 — Add a second model adapter**](../work-items/WI-0019-second-model.md) — `in_progress`; owner: `ai-agent`
+- [**WI-0030 — Run a multi-model local comparison**](../work-items/WI-0030-multi-model-comparison.md) — `in_progress`; owner: `ai-agent`
 
 ## Recently completed
 
+- [**WI-0019 — Add a second model adapter**](../work-items/WI-0019-second-model.md) — `completed`; owner: `ai-agent`
 - [**WI-0033 — Accelerate the human review workflow**](../work-items/WI-0033-review-throughput.md) — `completed`; owner: `ai-agent`
 - [**WI-0029 — Run a 500-image local acceptance pilot**](../work-items/WI-0029-local-acceptance-pilot.md) — `completed`; owner: `human-maintainer`
-- [**WI-0028 — Export reviewed catalogues to model-lab**](../work-items/WI-0028-catalogue-evaluation-export.md) — `completed`; owner: `ai-agent`
 
 ## Next ready work
 
