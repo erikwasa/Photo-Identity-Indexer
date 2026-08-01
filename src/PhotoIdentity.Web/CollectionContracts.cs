@@ -24,6 +24,7 @@ public sealed record CollectionSuggestionPolicyResponse(
 public sealed record CollectionQueryResponse(
     IReadOnlyList<string> PersonIds,
     string MatchMode,
+    string ReviewState,
     bool ConfirmedOnly,
     CollectionSuggestionPolicyResponse? SuggestionPolicy,
     DateTimeOffset? FromUtc,

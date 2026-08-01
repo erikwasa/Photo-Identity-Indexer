@@ -92,6 +92,7 @@ public sealed class CollectionQueryApplicationTests
             CollectionPhotoPageResponse defaultPage = Assert.IsType<CollectionPhotoPageResponse>(
                 await defaultResponse.Content.ReadFromJsonAsync<CollectionPhotoPageResponse>());
             Assert.Equal(CatalogueCollectionMatchModes.All, defaultPage.Query.MatchMode);
+            Assert.Equal(CatalogueCollectionReviewStates.Assigned, defaultPage.Query.ReviewState);
             Assert.True(defaultPage.Query.ConfirmedOnly);
             Assert.Null(defaultPage.Query.SuggestionPolicy);
             CollectionPhotoResponse onlyTogether = Assert.Single(defaultPage.Items);
@@ -110,6 +111,7 @@ public sealed class CollectionQueryApplicationTests
             CollectionPhotoPageResponse anyPage = Assert.IsType<CollectionPhotoPageResponse>(
                 await anyResponse.Content.ReadFromJsonAsync<CollectionPhotoPageResponse>());
             Assert.Equal(CatalogueCollectionMatchModes.Any, anyPage.Query.MatchMode);
+            Assert.Equal(CatalogueCollectionReviewStates.Assigned, anyPage.Query.ReviewState);
             Assert.Equal(3, anyPage.Total);
             Assert.Equal(3, anyPage.Items.Count);
 
@@ -184,6 +186,7 @@ public sealed class CollectionQueryApplicationTests
                 await client.GetFromJsonAsync<CollectionPhotoPageResponse>(
                     $"/api/collections/photos?people={people}&match=all")
                 ?? throw new InvalidOperationException("The confirmed collection response was empty.");
+            Assert.Equal(CatalogueCollectionReviewStates.Assigned, confirmedOnly.Query.ReviewState);
             Assert.True(confirmedOnly.Query.ConfirmedOnly);
             Assert.Empty(confirmedOnly.Items);
 
@@ -195,6 +198,7 @@ public sealed class CollectionQueryApplicationTests
             CollectionPhotoPageResponse suggestedPage = Assert.IsType<CollectionPhotoPageResponse>(
                 await suggestedResponse.Content.ReadFromJsonAsync<CollectionPhotoPageResponse>());
 
+            Assert.Equal(CatalogueCollectionReviewStates.All, suggestedPage.Query.ReviewState);
             Assert.False(suggestedPage.Query.ConfirmedOnly);
             CollectionSuggestionPolicyResponse policy = Assert.IsType<CollectionSuggestionPolicyResponse>(
                 suggestedPage.Query.SuggestionPolicy);
@@ -245,7 +249,98 @@ public sealed class CollectionQueryApplicationTests
     }
 
     [Fact]
-    public async Task Collection_query_rejects_missing_people_unsupported_modes_and_implicit_suggestion_scope()
+    public async Task Review_state_combines_with_person_date_and_confidence_filters_predictably()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+
+            DateTimeOffset now = new(2026, 8, 1, 19, 0, 0, TimeSpan.Zero);
+            SqliteReviewRepository reviewRepository = new(database);
+            CatalogueReviewPerson ada = await reviewRepository.CreatePersonAsync("Ada Lovelace", now);
+            CatalogueReviewPerson grace = await reviewRepository.CreatePersonAsync("Grace Hopper", now.AddSeconds(1));
+            CatalogueSource source = new(SourceId.New(), "local-folder", Path.Combine(directory, "private"), now);
+
+            SeededPhoto mixedEvidence = await SeedPhotoAsync(
+                database,
+                source,
+                "family/mixed.jpg",
+                'f',
+                now.AddMinutes(10),
+                0.98,
+                0.96);
+            await reviewRepository.AssignAsync(
+                mixedEvidence.Faces[0],
+                ada.Id,
+                "human:test",
+                now.AddMinutes(11));
+
+            string modelId = "sface-baseline";
+            string modelHash = new('e', 64);
+            await SeedSuggestionAsync(
+                database,
+                mixedEvidence.Faces[1],
+                grace.Id,
+                modelId,
+                modelHash,
+                score: 0.93,
+                scoreMargin: 0.10,
+                now.AddMinutes(12));
+
+            await using CollectionApiFactory factory = new(databasePath);
+            using HttpClient client = factory.CreateClient();
+            string fromUtc = Uri.EscapeDataString(now.AddMinutes(9).ToString("O"));
+            string toUtc = Uri.EscapeDataString(now.AddMinutes(10).ToString("O"));
+
+            CollectionPhotoPageResponse assignedPage =
+                await client.GetFromJsonAsync<CollectionPhotoPageResponse>(
+                    $"/api/collections/photos?people={ada.Id}&reviewState=assigned" +
+                    $"&fromUtc={fromUtc}&toUtc={toUtc}&minimumConfidence=0.97")
+                ?? throw new InvalidOperationException("The assigned-state response was empty.");
+            Assert.Equal(CatalogueCollectionReviewStates.Assigned, assignedPage.Query.ReviewState);
+            Assert.True(assignedPage.Query.ConfirmedOnly);
+            CollectionPhotoResponse assignedPhoto = Assert.Single(assignedPage.Items);
+            CollectionPersonMatchResponse assignedMatch = Assert.Single(assignedPhoto.People);
+            Assert.Equal(ada.Id.ToString(), assignedMatch.Id);
+            Assert.Equal(1, assignedMatch.ConfirmedFaceCount);
+            Assert.Equal(0, assignedMatch.SuggestedFaceCount);
+
+            CollectionPhotoPageResponse unreviewedPage =
+                await client.GetFromJsonAsync<CollectionPhotoPageResponse>(
+                    $"/api/collections/photos?people={grace.Id}&reviewState=unreviewed" +
+                    $"&includeSuggestions=true&suggestionModelId={modelId}" +
+                    $"&suggestionModelHash={modelHash}&minimumSuggestionScore=0.9" +
+                    $"&fromUtc={fromUtc}&toUtc={toUtc}&minimumConfidence=0.95")
+                ?? throw new InvalidOperationException("The unreviewed-state response was empty.");
+            Assert.Equal(CatalogueCollectionReviewStates.Unreviewed, unreviewedPage.Query.ReviewState);
+            Assert.False(unreviewedPage.Query.ConfirmedOnly);
+            CollectionPhotoResponse unreviewedPhoto = Assert.Single(unreviewedPage.Items);
+            CollectionPersonMatchResponse unreviewedMatch = Assert.Single(unreviewedPhoto.People);
+            Assert.Equal(grace.Id.ToString(), unreviewedMatch.Id);
+            Assert.Equal(0, unreviewedMatch.ConfirmedFaceCount);
+            Assert.Equal(1, unreviewedMatch.SuggestedFaceCount);
+            Assert.Equal(0.93, Assert.IsType<double>(unreviewedMatch.MaximumSuggestionScore), 6);
+
+            CollectionPhotoPageResponse confidenceExcluded =
+                await client.GetFromJsonAsync<CollectionPhotoPageResponse>(
+                    $"/api/collections/photos?people={grace.Id}&reviewState=unreviewed" +
+                    $"&includeSuggestions=true&suggestionModelId={modelId}" +
+                    $"&suggestionModelHash={modelHash}&minimumSuggestionScore=0.9" +
+                    $"&fromUtc={fromUtc}&toUtc={toUtc}&minimumConfidence=0.97")
+                ?? throw new InvalidOperationException("The confidence-filtered response was empty.");
+            Assert.Empty(confidenceExcluded.Items);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Collection_query_rejects_missing_people_unsupported_modes_and_incompatible_review_scope()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -264,19 +359,34 @@ public sealed class CollectionQueryApplicationTests
                 $"/api/collections/photos?people={PersonId.New()}&match=some");
             Assert.Equal(HttpStatusCode.BadRequest, invalidMatch.StatusCode);
 
+            using HttpResponseMessage invalidReviewState = await client.GetAsync(
+                $"/api/collections/photos?people={PersonId.New()}&reviewState=rejected");
+            Assert.Equal(HttpStatusCode.BadRequest, invalidReviewState.StatusCode);
+
             using HttpResponseMessage missingSuggestionScope = await client.GetAsync(
                 $"/api/collections/photos?people={PersonId.New()}&includeSuggestions=true");
             Assert.Equal(HttpStatusCode.BadRequest, missingSuggestionScope.StatusCode);
 
+            using HttpResponseMessage unreviewedWithoutSuggestions = await client.GetAsync(
+                $"/api/collections/photos?people={PersonId.New()}&reviewState=unreviewed");
+            Assert.Equal(HttpStatusCode.BadRequest, unreviewedWithoutSuggestions.StatusCode);
+
+            string modelHash = new('b', 64);
+            using HttpResponseMessage assignedWithSuggestions = await client.GetAsync(
+                $"/api/collections/photos?people={PersonId.New()}&reviewState=assigned" +
+                $"&includeSuggestions=true&suggestionModelId=sface-baseline&suggestionModelHash={modelHash}" +
+                "&minimumSuggestionScore=0.9");
+            Assert.Equal(HttpStatusCode.BadRequest, assignedWithSuggestions.StatusCode);
+
             using HttpResponseMessage implicitSuggestions = await client.GetAsync(
                 $"/api/collections/photos?people={PersonId.New()}" +
-                $"&suggestionModelId=sface-baseline&suggestionModelHash={new string('b', 64)}" +
+                $"&suggestionModelId=sface-baseline&suggestionModelHash={modelHash}" +
                 "&minimumSuggestionScore=0.9");
             Assert.Equal(HttpStatusCode.BadRequest, implicitSuggestions.StatusCode);
 
             using HttpResponseMessage invalidThreshold = await client.GetAsync(
                 $"/api/collections/photos?people={PersonId.New()}&includeSuggestions=true" +
-                $"&suggestionModelId=sface-baseline&suggestionModelHash={new string('b', 64)}" +
+                $"&suggestionModelId=sface-baseline&suggestionModelHash={modelHash}" +
                 "&minimumSuggestionScore=1.1");
             Assert.Equal(HttpStatusCode.BadRequest, invalidThreshold.StatusCode);
         }

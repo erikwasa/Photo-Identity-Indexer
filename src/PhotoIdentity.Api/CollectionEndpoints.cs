@@ -17,6 +17,7 @@ public static class CollectionEndpoints
         SqliteCollectionQueryRepository repository,
         string? people = null,
         string match = CatalogueCollectionMatchModes.All,
+        string? reviewState = null,
         bool includeSuggestions = false,
         string? suggestionModelId = null,
         string? suggestionModelHash = null,
@@ -53,6 +54,7 @@ public static class CollectionEndpoints
                 personIds,
                 match,
                 suggestionPolicy,
+                reviewState,
                 fromUtc,
                 toUtc,
                 minimumConfidence,
@@ -67,7 +69,8 @@ public static class CollectionEndpoints
                 new CollectionQueryResponse(
                     personIds.Select(value => value.ToString()).ToArray(),
                     page.MatchMode,
-                    ConfirmedOnly: page.SuggestionPolicy is null,
+                    page.ReviewState,
+                    page.ReviewState == CatalogueCollectionReviewStates.Assigned,
                     page.SuggestionPolicy is null
                         ? null
                         : new CollectionSuggestionPolicyResponse(
