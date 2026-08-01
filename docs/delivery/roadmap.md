@@ -12,7 +12,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M05 | Identity matching | completed |
 | M06 | Local evaluation and acceptance | completed |
 | M07 | Portable job bundles | completed |
-| M08 | Multi-model local evaluation | in_progress |
+| M08 | Multi-model local evaluation | completed |
 | M15 | Operator documentation and system guide | proposed |
 | M09 | Azure VM pilot without identities | proposed |
 | M10 | Azure checkpointing | proposed |
