@@ -1,0 +1,569 @@
+@page "/collections"
+@using System.Globalization
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Browse collections · Photo Identity</PageTitle>
+
+<section class="hero collection-hero">
+    <div>
+        <p class="eyebrow">Collection workspace</p>
+        <h1>Find photos by person</h1>
+        <p>Build a path-free collection manifest from confirmed assignments, or explicitly include exact-model suggestions.</p>
+    </div>
+
+    <aside class="collection-safety-card">
+        <strong>Private by default</strong>
+        <p>Confirmed assignments are the safe default. Results expose opaque identifiers and media metadata, not source roots or filenames.</p>
+    </aside>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+
+@if (LoadingOptions)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading people and collection filters…</p>
+    </section>
+}
+else if (People.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No people are available</h2>
+        <p>Create and review people before building a collection.</p>
+        <a class="button primary" href="/people">Maintain people</a>
+    </section>
+}
+else
+{
+    <section class="collection-panel" aria-labelledby="collection-people-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">People</p>
+                <h2 id="collection-people-heading">Choose collection members</h2>
+            </div>
+            <div class="collection-inline-actions">
+                <button class="button secondary" disabled="@LoadingResults" @onclick="SelectAllPeople">Select all</button>
+                <button class="button secondary" disabled="@(LoadingResults || SelectedPersonIds.Count == 0)" @onclick="ClearPeople">Clear</button>
+            </div>
+        </div>
+
+        <div class="collection-person-picker" role="group" aria-label="People included in the collection query">
+            @foreach (ReviewPersonResponse person in People)
+            {
+                <label class="collection-person-option @(SelectedPersonIds.Contains(person.Id) ? "selected" : "")">
+                    <input type="checkbox"
+                           checked="@SelectedPersonIds.Contains(person.Id)"
+                           disabled="@LoadingResults"
+                           @onchange="eventArgs => SetPersonSelection(person.Id, eventArgs)" />
+                    <span>@person.DisplayName</span>
+                </label>
+            }
+        </div>
+    </section>
+
+    <section class="collection-panel" aria-labelledby="collection-filter-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Query policy</p>
+                <h2 id="collection-filter-heading">Match and evidence</h2>
+            </div>
+            <span>@SelectedPersonIds.Count selected</span>
+        </div>
+
+        <div class="collection-filter-grid">
+            <div>
+                <label class="field-label" for="collection-match">People match</label>
+                <select id="collection-match" @bind="MatchMode" disabled="@LoadingResults">
+                    <option value="all">All selected people</option>
+                    <option value="any">Any selected person</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="field-label" for="collection-review-state">Identity evidence</label>
+                <select id="collection-review-state"
+                        @bind="ReviewState"
+                        @bind:after="ReviewStateChanged"
+                        disabled="@LoadingResults">
+                    <option value="assigned">Confirmed assignments only</option>
+                    <option value="all">Confirmed + unreviewed suggestions</option>
+                    <option value="unreviewed">Unreviewed suggestions only</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="field-label" for="collection-from">From local date</label>
+                <input id="collection-from" type="date" @bind="FromDate" disabled="@LoadingResults" />
+            </div>
+
+            <div>
+                <label class="field-label" for="collection-to">To local date</label>
+                <input id="collection-to" type="date" @bind="ToDate" disabled="@LoadingResults" />
+            </div>
+
+            <div>
+                <label class="field-label" for="collection-confidence">Minimum face confidence</label>
+                <input id="collection-confidence"
+                       type="number"
+                       inputmode="decimal"
+                       min="0"
+                       max="1"
+                       step="0.01"
+                       placeholder="Optional, 0–1"
+                       @bind="MinimumConfidence"
+                       disabled="@LoadingResults" />
+            </div>
+
+            <div>
+                <label class="field-label" for="collection-model">Suggestion model revision</label>
+                <select id="collection-model"
+                        @bind="SelectedModelIndex"
+                        disabled="@(!UsesSuggestions || LoadingResults || Options.ModelRevisions.Count == 0)">
+                    @if (Options.ModelRevisions.Count == 0)
+                    {
+                        <option value="">No ranked suggestions available</option>
+                    }
+                    else
+                    {
+                        @for (int index = 0; index < Options.ModelRevisions.Count; index++)
+                        {
+                            ReviewModelRevisionFilterResponse model = Options.ModelRevisions[index];
+                            <option value="@index">@ModelLabel(model)</option>
+                        }
+                    }
+                </select>
+            </div>
+
+            <div>
+                <label class="field-label" for="collection-suggestion-score">Minimum suggestion score</label>
+                <input id="collection-suggestion-score"
+                       type="number"
+                       inputmode="decimal"
+                       min="-1"
+                       max="1"
+                       step="0.01"
+                       @bind="MinimumSuggestionScore"
+                       disabled="@(!UsesSuggestions || LoadingResults)" />
+            </div>
+        </div>
+
+        <div class="collection-policy-note">
+            @if (UsesSuggestions)
+            {
+                <strong>Advisory results are enabled.</strong>
+                <span>Only rank-one pending suggestions from the exact selected model revision and threshold can qualify.</span>
+            }
+            else
+            {
+                <strong>Confirmed-only mode.</strong>
+                <span>No model or threshold is inferred.</span>
+            }
+        </div>
+
+        <button class="button primary collection-run-button"
+                disabled="@(LoadingResults || SelectedPersonIds.Count == 0)"
+                @onclick="RunQueryAsync">
+            @(LoadingResults ? "Building collection…" : "Build collection")
+        </button>
+    </section>
+
+    @if (Results is CollectionPhotoPageResponse page)
+    {
+        <section class="collection-results" aria-labelledby="collection-results-heading">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Manifest results</p>
+                    <h2 id="collection-results-heading">@page.Total photo@(page.Total == 1 ? "" : "s")</h2>
+                </div>
+                <span>@EvidenceLabel(page.Query)</span>
+            </div>
+
+            @if (page.Items.Count == 0)
+            {
+                <div class="empty-state compact">
+                    <p>No photos matched the selected people and filters.</p>
+                </div>
+            }
+            else
+            {
+                <div class="collection-grid">
+                    @foreach (CollectionPhotoResponse photo in page.Items)
+                    {
+                        <article class="collection-card">
+                            <div class="collection-media-summary" aria-label="Photo media metadata">
+                                <span>@(photo.MediaType ?? "Unknown media type")</span>
+                                <strong>@Dimensions(photo)</strong>
+                            </div>
+                            <div class="collection-card-body">
+                                <time datetime="@photo.ObservedAtUtc.ToString("O")">@photo.ObservedAtUtc.ToLocalTime().ToString("g")</time>
+                                <ul class="collection-match-list">
+                                    @foreach (CollectionPersonMatchResponse match in photo.People)
+                                    {
+                                        <li>
+                                            <strong>@match.DisplayName</strong>
+                                            <span>@EvidenceSummary(match)</span>
+                                        </li>
+                                    }
+                                </ul>
+                                <details class="collection-identifiers">
+                                    <summary>Manifest identifiers</summary>
+                                    <code>asset @photo.AssetId</code>
+                                    <code>revision @photo.RevisionId</code>
+                                </details>
+                            </div>
+                        </article>
+                    }
+                </div>
+
+                <nav class="pagination" aria-label="Collection result pages">
+                    <button class="button secondary"
+                            disabled="@(LoadingResults || page.Offset == 0)"
+                            @onclick="PreviousPageAsync">
+                        Previous
+                    </button>
+                    <span>Showing @FirstResult–@LastResult</span>
+                    <button class="button secondary"
+                            disabled="@(LoadingResults || page.Offset + page.Items.Count >= page.Total)"
+                            @onclick="NextPageAsync">
+                        Next
+                    </button>
+                </nav>
+            }
+        </section>
+    }
+}
+
+@code {
+    private const int PageSize = 40;
+
+    private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+    private ReviewFilterOptionsResponse Options { get; set; } = new([], []);
+    private HashSet<string> SelectedPersonIds { get; } = new(StringComparer.Ordinal);
+    private CollectionPhotoPageResponse? Results { get; set; }
+    private string MatchMode { get; set; } = "all";
+    private string ReviewState { get; set; } = "assigned";
+    private string SelectedModelIndex { get; set; } = "";
+    private string FromDate { get; set; } = "";
+    private string ToDate { get; set; } = "";
+    private string MinimumConfidence { get; set; } = "";
+    private string MinimumSuggestionScore { get; set; } = "0.9";
+    private string? AppliedQuery { get; set; }
+    private bool LoadingOptions { get; set; } = true;
+    private bool LoadingResults { get; set; }
+    private string? Error { get; set; }
+
+    private bool UsesSuggestions => ReviewState is "all" or "unreviewed";
+
+    private ReviewModelRevisionFilterResponse? SelectedModel =>
+        int.TryParse(SelectedModelIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out int index) &&
+        index >= 0 && index < Options.ModelRevisions.Count
+            ? Options.ModelRevisions[index]
+            : null;
+
+    private int FirstResult => Results is null || Results.Items.Count == 0 ? 0 : Results.Offset + 1;
+    private int LastResult => Results is null ? 0 : Results.Offset + Results.Items.Count;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Task<ReviewPersonResponse[]?> peopleTask =
+                Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people");
+            Task<ReviewFilterOptionsResponse?> optionsTask =
+                Http.GetFromJsonAsync<ReviewFilterOptionsResponse>("api/review/filters");
+            await Task.WhenAll(peopleTask, optionsTask);
+
+            People = (await peopleTask) ?? [];
+            Options = (await optionsTask) ?? new([], []);
+            if (Options.ModelRevisions.Count > 0)
+            {
+                SelectedModelIndex = "0";
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = $"Collection filters could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            LoadingOptions = false;
+        }
+    }
+
+    private void SelectAllPeople()
+    {
+        foreach (ReviewPersonResponse person in People)
+        {
+            SelectedPersonIds.Add(person.Id);
+        }
+    }
+
+    private void ClearPeople()
+    {
+        SelectedPersonIds.Clear();
+        Results = null;
+        AppliedQuery = null;
+    }
+
+    private void SetPersonSelection(string personId, ChangeEventArgs eventArgs)
+    {
+        bool selected = eventArgs.Value is bool value && value;
+        if (selected)
+        {
+            SelectedPersonIds.Add(personId);
+        }
+        else
+        {
+            SelectedPersonIds.Remove(personId);
+        }
+    }
+
+    private void ReviewStateChanged()
+    {
+        Results = null;
+        AppliedQuery = null;
+        Error = null;
+    }
+
+    private async Task RunQueryAsync()
+    {
+        Error = null;
+        Results = null;
+        AppliedQuery = null;
+
+        if (!TryBuildQuery(out string query))
+        {
+            return;
+        }
+
+        AppliedQuery = query;
+        await LoadPageAsync(0);
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        if (Results is not null)
+        {
+            await LoadPageAsync(Math.Max(0, Results.Offset - PageSize));
+        }
+    }
+
+    private async Task NextPageAsync()
+    {
+        if (Results is not null)
+        {
+            await LoadPageAsync(Results.Offset + PageSize);
+        }
+    }
+
+    private async Task LoadPageAsync(int offset)
+    {
+        if (string.IsNullOrWhiteSpace(AppliedQuery))
+        {
+            return;
+        }
+
+        LoadingResults = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.GetAsync(
+                $"api/collections/photos?{AppliedQuery}&offset={offset}&limit={PageSize}");
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = $"The collection query failed with status {(int)response.StatusCode}.";
+                return;
+            }
+
+            Results = await response.Content.ReadFromJsonAsync<CollectionPhotoPageResponse>()
+                ?? throw new InvalidOperationException("The collection response was empty.");
+        }
+        catch (Exception exception)
+        {
+            Error = $"The collection could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            LoadingResults = false;
+        }
+    }
+
+    private bool TryBuildQuery(out string query)
+    {
+        query = "";
+        if (SelectedPersonIds.Count == 0)
+        {
+            Error = "Choose at least one person.";
+            return false;
+        }
+
+        if (!TryDateBoundary(FromDate, endOfDay: false, out DateTimeOffset? fromUtc, out string? dateError) ||
+            !TryDateBoundary(ToDate, endOfDay: true, out DateTimeOffset? toUtc, out dateError))
+        {
+            Error = dateError;
+            return false;
+        }
+
+        if (fromUtc is not null && toUtc is not null && fromUtc > toUtc)
+        {
+            Error = "The start date cannot be later than the end date.";
+            return false;
+        }
+
+        if (!TryOptionalDouble(MinimumConfidence, 0, 1, "Minimum face confidence", out double? confidence))
+        {
+            return false;
+        }
+
+        List<string> parameters =
+        [
+            $"people={Uri.EscapeDataString(string.Join(',', SelectedPersonIds.OrderBy(value => value, StringComparer.Ordinal)))}",
+            $"match={Uri.EscapeDataString(MatchMode)}",
+            $"reviewState={Uri.EscapeDataString(ReviewState)}",
+        ];
+
+        if (fromUtc is DateTimeOffset from)
+        {
+            parameters.Add($"fromUtc={Uri.EscapeDataString(from.ToString("O", CultureInfo.InvariantCulture))}");
+        }
+
+        if (toUtc is DateTimeOffset to)
+        {
+            parameters.Add($"toUtc={Uri.EscapeDataString(to.ToString("O", CultureInfo.InvariantCulture))}");
+        }
+
+        if (confidence is double minimumConfidence)
+        {
+            parameters.Add($"minimumConfidence={minimumConfidence.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        if (UsesSuggestions)
+        {
+            if (SelectedModel is not ReviewModelRevisionFilterResponse model)
+            {
+                Error = "Choose an exact suggestion model revision.";
+                return false;
+            }
+
+            if (!TryOptionalDouble(
+                    MinimumSuggestionScore,
+                    -1,
+                    1,
+                    "Minimum suggestion score",
+                    out double? suggestionScore) ||
+                suggestionScore is null)
+            {
+                Error ??= "Supply a minimum suggestion score.";
+                return false;
+            }
+
+            parameters.Add("includeSuggestions=true");
+            parameters.Add($"suggestionModelId={Uri.EscapeDataString(model.ModelId)}");
+            parameters.Add($"suggestionModelHash={Uri.EscapeDataString(model.ModelHash)}");
+            parameters.Add($"minimumSuggestionScore={suggestionScore.Value.ToString(CultureInfo.InvariantCulture)}");
+        }
+
+        query = string.Join('&', parameters);
+        return true;
+    }
+
+    private bool TryOptionalDouble(
+        string value,
+        double minimum,
+        double maximum,
+        string label,
+        out double? parsed)
+    {
+        parsed = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double result) ||
+            double.IsNaN(result) ||
+            double.IsInfinity(result) ||
+            result < minimum ||
+            result > maximum)
+        {
+            Error = $"{label} must be between {minimum} and {maximum}.";
+            return false;
+        }
+
+        parsed = result;
+        return true;
+    }
+
+    private static bool TryDateBoundary(
+        string value,
+        bool endOfDay,
+        out DateTimeOffset? utc,
+        out string? error)
+    {
+        utc = null;
+        error = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (!DateOnly.TryParseExact(
+                value,
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out DateOnly date))
+        {
+            error = "Dates must use the browser date picker.";
+            return false;
+        }
+
+        DateTime local = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        if (endOfDay)
+        {
+            local = local.AddDays(1).AddTicks(-1);
+        }
+
+        utc = new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)).ToUniversalTime();
+        return true;
+    }
+
+    private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
+        $"{model.ModelId} · {model.ModelHash[..Math.Min(12, model.ModelHash.Length)]}";
+
+    private static string Dimensions(CollectionPhotoResponse photo) =>
+        photo.Width is int width && photo.Height is int height
+            ? $"{width} × {height}"
+            : "Dimensions unavailable";
+
+    private static string EvidenceSummary(CollectionPersonMatchResponse match)
+    {
+        List<string> evidence = [];
+        if (match.ConfirmedFaceCount > 0)
+        {
+            evidence.Add($"{match.ConfirmedFaceCount} confirmed");
+        }
+
+        if (match.SuggestedFaceCount > 0)
+        {
+            string score = match.MaximumSuggestionScore is double value
+                ? $", max {value:F3}"
+                : "";
+            evidence.Add($"{match.SuggestedFaceCount} suggested{score}");
+        }
+
+        return evidence.Count == 0 ? "No qualifying evidence" : string.Join(" · ", evidence);
+    }
+
+    private static string EvidenceLabel(CollectionQueryResponse query) => query.ReviewState switch
+    {
+        "assigned" => "Confirmed assignments",
+        "unreviewed" => "Unreviewed suggestions",
+        _ => "Confirmed + suggested",
+    };
+}
