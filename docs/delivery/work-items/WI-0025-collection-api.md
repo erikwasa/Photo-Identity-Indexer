@@ -68,20 +68,31 @@ Person IDs, `match=any|all`, UTC date bounds and minimum detector confidence are
 
 ## Local collection workspace slice
 
-The active slice is on `agent/WI-0025-collection-workspace`.
-
-The Blazor application adds a `/collections` workspace linked from the primary navigation. It provides:
+PR #60 added a `/collections` workspace linked from the primary navigation. It provides:
 
 - multi-person selection with explicit any-person or all-person matching;
 - confirmed-only, suggestion-only and combined evidence choices;
 - exact suggestion model revision and threshold controls when advisory evidence is selected;
-- local-date and detector-confidence filters;
-- stable previous/next pagination;
-- visible evidence counts and maximum suggestion scores per matched person; and
-- path-free manifest cards showing observation time, media type, dimensions and opaque asset/revision identifiers.
+- detector-confidence filtering;
+- stable previous/next pagination; and
+- visible evidence counts and maximum suggestion scores per matched person.
 
-The layout collapses to one-column controls and result cards at phone widths, while the existing header wraps navigation below 680 pixels. The implementation deliberately does not invent photo-content delivery before the neutral export/content slice exists.
+The first device acceptance attempt found three usability blockers:
 
-The Windows and Pixel acceptance checkbox remains open until the workspace is exercised against the accepted local catalogue on both devices. Neutral content delivery/export and private-pilot count verification also remain later slices.
+- the full people list consumed too much page space;
+- browser checkboxes could render above rather than beside names; and
+- manifest-only cards did not provide a useful photo-browsing experience.
 
-The API continues to return `Cache-Control: no-store` because collection membership can reveal private identity information even when filesystem paths are omitted.
+The same attempt also established that the date controls were misleading. `asset_revisions.observed_at_utc` is the time the catalogue scan first observed that content revision. It is not the photo capture time and is not specifically the face-analysis time. The API retains date bounds for machine consumers and predictable query composition, but the local browser no longer presents them as a primary collection control.
+
+## Usability and content correction slice
+
+The active correction is on `agent/WI-0025-collection-usability-content`.
+
+The browser now uses a searchable, scroll-contained dropdown with checkboxes, filtered selection and removable selected-person chips. Checkbox sizing and flex behavior are explicit so the control remains beside the name on Windows and Pixel.
+
+Collection responses include an opaque content URL derived only from the revision ID. `/api/collections/photos/{revisionId}/content` resolves the source file inside the API process, requires the persisted `local-folder` source kind, rejects root escapes and reparse-point files, verifies the persisted byte length, whitelists supported image media types and returns not found when the content is unavailable. Source roots and source keys never enter the browser contract.
+
+Result cards lazy-load the photo, link to the full local stream, omit the low-value catalogue-observation timestamp and only show dimensions when known. The API continues to return `Cache-Control: no-store` for collection JSON and image content because collection membership can reveal private identity information.
+
+The Windows and Pixel acceptance checkbox remains open until this corrected workspace is exercised against the accepted private catalogue on both devices. The neutral consumer criterion and pilot-count criterion also remain open until their final verification evidence is recorded.

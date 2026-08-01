@@ -4,13 +4,24 @@
 
 **M14 — Collection-ready API**
 
-Status: `ready`
+Status: `in_progress`
 
 ## Current work
 
-No work item is active.
+**WI-0025 — Add collection-ready queries** remains active.
 
-The next ready item is **WI-0025 — Add collection-ready queries**. It can use the accepted pilot catalogue now that the local review, throughput and multi-model comparison gates are complete.
+PRs #57–#59 established confirmed, suggestion-backed and explicit review-state collection queries. PR #60 added the first local `/collections` workspace. Its build passed, but the first real Windows acceptance attempt identified usability blockers: the people list was too long, checkbox alignment was poor, scan-observation dates were misleading, and text-only manifest cards were not useful for browsing photos.
+
+The active correction is `agent/WI-0025-collection-usability-content`.
+
+It replaces the people grid with a searchable checkbox dropdown, removes catalogue-observation dates from the browser, streams locally available photos through opaque revision URLs, and renders responsive photo cards without exposing source paths. The API retains date filtering for programmatic consumers because `asset_revisions.observed_at_utc` is catalogue observation time rather than capture time.
+
+## Next concrete step
+
+1. Run the full Release build, integration suite, living-document validation and published Windows smoke path in GitHub Actions.
+2. Re-run `/collections` on Windows and Pixel against the accepted private catalogue.
+3. Record any/all counts, representative results, photo loading, selector usability and no-horizontal-overflow evidence.
+4. Complete WI-0025 only after device acceptance, neutral-consumer verification and pilot count checks all pass.
 
 ## Completed gates
 
@@ -36,15 +47,6 @@ Exact-model suggestions remained distinguishable and could not overwrite one ano
 
 The recommendation is to retain `sface-2021dec-fp32` as the current default embedding model. INT8 remains a governed candidate, but it did not demonstrate a material identification or review-quality advantage on the accepted private corpus. No larger local evaluation is required before proceeding to collection-ready queries. Final production model selection remains deferred to M11 and later Azure consistency, cost and broader-diversity evidence.
 
-## Recently completed
-
-- **WI-0030 — Run a multi-model local comparison** was human-verified on 2026-08-01; M08 is completed.
-- **WI-0019 — Add a second model adapter** was human-verified locally on Windows on 2026-08-01.
-- **WI-0033 — Accelerate the human review workflow** was human-verified on Windows and Pixel on 2026-08-01.
-- **WI-0029 — Run a 500-image local acceptance pilot** was human-verified on 2026-07-30.
-
-Only privacy-safe conclusions are retained in the repository. Private photos, names, crops, embeddings, databases, raw manifests, reports, local paths and manual review records remain local.
-
 ## Delivery objective
 
 Prove as much of the product as possible without Azure:
@@ -56,12 +58,8 @@ Prove as much of the product as possible without Azure:
 ## Relevant planning files
 
 - `docs/delivery/local-first-plan.md`
-- `docs/delivery/milestones/M08-second-model.md`
 - `docs/delivery/milestones/M14-collection-api.md`
-- `docs/delivery/work-items/WI-0030-multi-model-comparison.md`
 - `docs/delivery/work-items/WI-0025-collection-api.md`
-- `docs/models/candidate-models.md`
-- `docs/operations/local-evaluation.md`
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/status/milestones.yaml`
 

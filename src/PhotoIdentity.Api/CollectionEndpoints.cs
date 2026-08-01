@@ -10,6 +10,7 @@ public static class CollectionEndpoints
     public static IEndpointRouteBuilder MapCollectionEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/collections/photos", GetPhotosAsync);
+        endpoints.MapGet("/api/collections/photos/{revisionId}/content", GetPhotoContentAsync);
         return endpoints;
     }
 
@@ -87,9 +88,28 @@ public static class CollectionEndpoints
         }
     }
 
+    private static async Task<IResult> GetPhotoContentAsync(
+        string revisionId,
+        CollectionPhotoFileResolver resolver,
+        CancellationToken cancellationToken)
+    {
+        if (!Guid.TryParse(revisionId, out Guid parsedRevisionId) || parsedRevisionId == Guid.Empty)
+        {
+            return Results.BadRequest(new { error = "The asset revision identifier is invalid." });
+        }
+
+        CollectionPhotoFile? file = await resolver.ResolveAsync(
+            AssetRevisionId.From(parsedRevisionId),
+            cancellationToken);
+        return file is null
+            ? Results.NotFound()
+            : Results.File(file.Path, file.ContentType, enableRangeProcessing: true);
+    }
+
     private static CollectionPhotoResponse ToResponse(CatalogueCollectionPhoto photo) => new(
         photo.RevisionId.ToString(),
         photo.AssetId.ToString(),
+        $"/api/collections/photos/{photo.RevisionId}/content",
         photo.ObservedAtUtc,
         photo.MediaType,
         photo.Width,

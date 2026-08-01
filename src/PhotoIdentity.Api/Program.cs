@@ -24,7 +24,9 @@ public partial class Program
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();
         builder.Services.AddSingleton<SqliteBulkSuggestionReviewRepository>();
         builder.Services.AddSingleton<SqliteCollectionQueryRepository>();
+        builder.Services.AddSingleton<SqliteLocalBatchRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
+        builder.Services.AddSingleton<CollectionPhotoFileResolver>();
         builder.Services.AddSingleton(TimeProvider.System);
 
         WebApplication app = builder.Build();
