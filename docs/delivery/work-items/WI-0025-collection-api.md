@@ -19,9 +19,9 @@ Expose stable local queries and neutral exports for photos containing one or mor
 - [x] Confirmed-only results are supported and are the safe default.
 - [x] Suggestion-backed results are opt-in and identify their model revision and threshold.
 - [x] Date, confidence, review-state and person filters can be combined predictably.
-- [ ] Results can be inspected through the local web interface on Windows and Pixel.
+- [x] Results can be inspected through the local web interface on Windows and Pixel.
 - [x] A neutral collection manifest can feed later slideshow or album applications without exposing unnecessary local paths.
-- [ ] Query counts and representative results are checked against the pilot catalogue.
+- [x] Query counts and representative results are checked against the pilot catalogue.
 
 ## Confirmed-query foundation
 
@@ -100,7 +100,7 @@ Collection result URLs now target `/api/collections/photos/{revisionId}/thumbnai
 
 ## Neutral manifest slice
 
-`GET /api/collections/manifest` accepts the same people, match, review-state, date, confidence and exact suggestion-policy parameters as the paginated photo query.
+PR #63 added `GET /api/collections/manifest`, accepting the same people, match, review-state, date, confidence and exact suggestion-policy parameters as the paginated photo query.
 
 The response media type is `application/vnd.photoidentity.collection-manifest+json`. Schema version 1 contains:
 
@@ -116,6 +116,10 @@ The endpoint pages through the repository internally in batches of 200 and retur
 
 No generated manifest or thumbnail is persisted. A slideshow or album client can request the manifest from the Windows host, render the bounded thumbnail URLs and open or stream the original-content URLs without learning filesystem paths.
 
-## Remaining verification
+## Completion verification
 
-The Windows and Pixel acceptance checkbox remains open until the corrected workspace is exercised against the accepted private catalogue on both devices. The final pilot-count criterion remains open until any/all counts and representative results are recorded against that catalogue.
+GitHub Actions build #401 passed the Release build, automated tests, documentation validation, generated-document checks, published application smoke verification and Windows PowerShell verification for the final manifest slice.
+
+On 2026-08-02, the operator verified the completed collection workspace against the accepted private catalogue on Windows and Pixel. The verification covered the people selector, checkbox alignment, responsive layout, fixed-size thumbnails, absence of horizontal overflow, pagination, any-person and all-person counts, representative confirmed and advisory results, and the neutral manifest consumer boundary.
+
+Detailed private names, counts and representative-result notes remain outside Git. The canonical status registry records only the privacy-safe completion statement.
