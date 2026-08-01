@@ -72,7 +72,7 @@ milestones:
   - WI-0030
 - id: M15
   title: Operator documentation and system guide
-  status: proposed
+  status: in_progress
   document: ../milestones/M15-documentation.md
   work_items:
   - WI-0031
@@ -109,7 +109,7 @@ milestones:
   - WI-0024
 - id: M14
   title: Collection-ready API
-  status: ready
+  status: completed
   document: ../milestones/M14-collection-api.md
   work_items:
   - WI-0025
