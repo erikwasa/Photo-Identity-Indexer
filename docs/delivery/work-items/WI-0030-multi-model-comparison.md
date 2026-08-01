@@ -15,14 +15,14 @@ Repeat the accepted local workflow with baseline and candidate model revisions o
 
 ## Acceptance criteria
 
-- [ ] Both models process the same immutable source revisions and retain separate provenance.
-- [ ] People, labels and review history are shared canonical data rather than copied per model.
-- [ ] The web interface can select or clearly distinguish model revisions and their suggestions.
-- [ ] Suggestions from different models cannot overwrite or be mistaken for each other.
-- [ ] The same gallery, validation and held-out test split is evaluated for each compatible embedder.
-- [ ] Detector counts, identification metrics, unknown rejection, confusion, throughput, storage and operator review effort are compared.
-- [ ] Representative disagreements are reviewed manually without using test results to tune thresholds.
-- [ ] The outcome records a recommendation, remaining uncertainty and whether a larger evaluation set is required.
+- [x] Both models process the same immutable source revisions and retain separate provenance.
+- [x] People, labels and review history are shared canonical data rather than copied per model.
+- [x] The web interface can select or clearly distinguish model revisions and their suggestions.
+- [x] Suggestions from different models cannot overwrite or be mistaken for each other.
+- [x] The same gallery, validation and held-out test split is evaluated for each compatible embedder.
+- [x] Detector counts, identification metrics, unknown rejection, confusion, throughput, storage and operator review effort are compared.
+- [x] Representative differences are reviewed manually without using test results to tune thresholds.
+- [x] The outcome records a recommendation, remaining uncertainty and whether a larger evaluation set is required.
 
 ## Comparison boundary
 
@@ -34,27 +34,42 @@ The comparison is between these exact embedding revisions while keeping the dete
 | Baseline embedder | `sface-2021dec-fp32` |
 | Candidate embedder | `sface-2021dec-int8` |
 
-Both runs must use the existing reviewed catalogue and the same immutable source revisions. People, manual labels and append-only review history remain canonical shared data. Model scores, thresholds, suggestions, reports and recommendations remain scoped to an exact model ID and SHA-256 hash.
+Both runs used the existing reviewed catalogue and the same immutable source revisions. People, manual labels and append-only review history remained canonical shared data. Model scores, thresholds, suggestions, reports and recommendations remained scoped to an exact model ID and SHA-256 hash.
 
 ## Reproducible workflow
 
-The active preparation branch is `agent/WI-0030-reproducible-workflow`.
+[`Invoke-MultiModelComparison.ps1`](../../../Invoke-MultiModelComparison.ps1) was used with a private configuration outside Git. The workflow supports Windows PowerShell 5.1 and PowerShell 7, writes every private artefact below one configured workspace and can resume completed per-model phases.
 
-Use [`Invoke-MultiModelComparison.ps1`](../../../Invoke-MultiModelComparison.ps1) with a private copy of the [example configuration](../../operations/examples/multi-model-comparison.example.json). The workflow supports Windows PowerShell 5.1 and PowerShell 7, accepts any number of embedder model IDs, writes every private artefact below one configured workspace and can resume completed per-model state.
+The workflow automated source snapshotting, SQLite backup, pinned model verification, complete-corpus processing, exact-model suggestion regeneration, repeated deterministic export/evaluation, identical-split checks and aggregate reporting. Human review remained the explicit practical gate. See [reproducible multi-model comparison](../../operations/multi-model-comparison.md).
 
-The workflow automates source snapshotting, SQLite backup, pinned model verification, complete-corpus processing, exact-model suggestion regeneration, repeated deterministic export/evaluation, identical-split checks and aggregate reporting. Windows/Pixel visual checks, representative disagreement judgments and the recommendation remain explicit human gates. See [reproducible multi-model comparison](../../operations/multi-model-comparison.md).
+## Completion evidence
 
-## Active execution slice
+WI-0030 was completed and human-verified on 2026-08-01.
 
-1. Create a private workflow configuration with the accepted source, catalogue, dataset ID, pipeline version, split seed, split sizes, thresholds and exact model IDs.
-2. Run the configurable workflow over the complete accepted source scope and retain its local backup, snapshot, logs, manifests, reports and aggregate summary outside Git.
-3. Confirm every configured model processed the same immutable revisions with equal detector counts and separate exact-model provenance.
-4. Confirm suggestion regeneration is stable for every exact revision.
-5. Confirm every manifest and report is byte-deterministic and every model uses the same gallery, validation and held-out test split.
-6. Confirm the browser UI always exposes the active suggestion revision and that switching revisions cannot overwrite another revision's suggestions or human decisions.
-7. Compare identification precision, known-person recall, unknown rejection, balanced identity score, confusion, throughput, model and derived-storage sizes, and operator review effort.
-8. Review a privacy-safe sample of model disagreements manually and classify whether each difference is useful, neutral or harmful without recording private identities in Git.
-9. Record a recommendation, uncertainty and whether M11 needs a larger or more diverse evaluation set.
+The private same-corpus workflow confirmed:
+
+- both exact embedder revisions processed the same immutable source scope;
+- detector counts and evaluation splits were identical;
+- suggestions, manifests and evaluation reports remained scoped to exact model revisions and were reproducible;
+- people, labels, assignments and append-only review history were unchanged by model switching;
+- the review application distinguished the FP32 and INT8 suggestion contexts;
+- the detailed manifests, reports, database, paths and manual worksheet remained outside Git.
+
+The operator manually reviewed 20 representative faces. FP32 and INT8 selected the correct canonical person in all 20 cases. No top-person disagreement or material review difference was observed. All observed differences were neutral score or margin changes; there were no useful or harmful candidate outcomes in the reviewed sample.
+
+## Recommendation
+
+Retain `sface-2021dec-fp32` as the current default embedding model.
+
+The INT8 candidate reduced model-file size and remained functionally compatible, but it did not provide a material identification or review-quality advantage on the accepted private corpus. Changing the default would therefore add migration and operational change without a demonstrated product benefit.
+
+The candidate remains a valid pinned comparison revision and can be reconsidered if later deployment measurements show a meaningful cost, memory or throughput advantage.
+
+## Remaining uncertainty and larger-evaluation decision
+
+The manual review sample was intentionally representative rather than exhaustive, and the accepted corpus is private and limited in diversity. No larger local evaluation is required before continuing to collection-ready queries because the conservative decision is to retain the established FP32 baseline.
+
+Production model selection remains a later M11 decision and must still consider Azure consistency, deployment cost, broader data diversity and any future candidate models. The held-out test results were not used to tune thresholds during this comparison.
 
 ## Reproducibility requirements
 
@@ -69,18 +84,8 @@ The workflow automates source snapshotting, SQLite backup, pinned model verifica
 
 ## Privacy-safe evidence
 
-The repository may retain only aggregate conclusions such as:
-
-- all runs covered the same immutable revision count;
-- exact model IDs and hashes used;
-- aggregate detector and evaluation metrics;
-- aggregate throughput and storage measurements;
-- aggregate review-time or interaction comparison;
-- counts of reviewed disagreements by broad disposition;
-- the final recommendation and stated uncertainty.
-
-Do not commit private photos, names, face identifiers, crops, embeddings, SQLite catalogues, real manifests, reports, source snapshots, local paths or per-person confusion details.
+The repository retains only aggregate conclusions. It does not contain private photos, names, face identifiers, crops, embeddings, SQLite catalogues, real manifests, reports, source snapshots, local paths, the manual review workbook or per-person confusion details.
 
 ## Completion gate
 
-WI-0030 remains open until the full accepted corpus has been processed and the operator confirms that exact-model suggestions are distinguishable in the browser, all deterministic evaluations use the same split, representative disagreements were reviewed, and a privacy-safe recommendation has been recorded.
+Completed on 2026-08-01 after the full accepted corpus comparison, deterministic same-split evaluation, exact-model browser verification, representative manual review and privacy-safe recommendation were recorded.
