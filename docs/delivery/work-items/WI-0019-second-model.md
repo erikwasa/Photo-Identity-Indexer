@@ -46,13 +46,14 @@ See [candidate models](../../models/candidate-models.md) for immutable identity,
 
 Quantisation is a material model change. Candidate scores and thresholds must never be mixed with the FP32 baseline, and neither revision may create canonical labels automatically.
 
-## Remaining verification gate
+## Local verification
 
-After this slice merges:
+Completed on Windows on 2026-08-01 after PR #52 merged.
 
-1. install `sface-2021dec-int8` with the checked-in model installer;
-2. process at least one immutable local revision into a disposable or backed-up catalogue using `--embedder-model sface-2021dec-int8`;
-3. confirm the candidate run reports the exact model ID/hash and baseline review data remains readable; and
-4. retain only privacy-safe success/failure evidence.
+The operator verified the pinned candidate file by exact byte size and SHA-256, processed the same immutable revision with both FP32 and INT8 embedders, confirmed separate exact-model embeddings, confirmed resume reloaded the saved INT8 model selection, and confirmed existing people, manual labels and review actions remained unchanged. Baseline embeddings remained readable while the candidate model file was temporarily unavailable.
 
-The full 500-image baseline-versus-candidate measurement belongs to WI-0030.
+Only this privacy-safe conclusion is retained in Git. Local photos, names, crops, embeddings, catalogues, command transcripts and evidence files remain outside the repository.
+
+## Outcome
+
+WI-0019 is complete. The candidate adapter is available for the full same-corpus comparison in WI-0030; no claim about comparative accuracy, throughput or production suitability is made by this work item.
