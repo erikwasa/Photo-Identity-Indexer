@@ -65,7 +65,7 @@ milestones:
   - WI-0018
 - id: M08
   title: Multi-model local evaluation
-  status: in_progress
+  status: completed
   document: ../milestones/M08-second-model.md
   work_items:
   - WI-0019
