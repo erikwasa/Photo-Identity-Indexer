@@ -10,18 +10,22 @@ Status: `in_progress`
 
 **WI-0025 — Add collection-ready queries** remains active.
 
-PRs #57–#59 established confirmed, suggestion-backed and explicit review-state collection queries. PR #60 added the first local `/collections` workspace. Its build passed, but the first real Windows acceptance attempt identified usability blockers: the people list was too long, checkbox alignment was poor, scan-observation dates were misleading, and text-only manifest cards were not useful for browsing photos.
+PRs #57–#59 established confirmed, suggestion-backed and explicit review-state collection queries. PR #60 added the first local `/collections` workspace. PR #61 corrected the long people list, misleading catalogue-observation dates and text-only results by adding a searchable selector and opaque local photo delivery.
 
-The active correction is `agent/WI-0025-collection-usability-content`.
+The next real Windows attempt found that the host linked only `css/app.css`; the generated `PhotoIdentity.Web.styles.css` bundle was absent, so component-scoped styles across the application were not applied. It also showed that the collection grid requested original image bytes, which was unnecessary and allowed large unstyled images to cause horizontal overflow.
 
-It replaces the people grid with a searchable checkbox dropdown, removes catalogue-observation dates from the browser, streams locally available photos through opaque revision URLs, and renders responsive photo cards without exposing source paths. The API retains date filtering for programmatic consumers because `asset_revisions.observed_at_utc` is catalogue observation time rather than capture time.
+The active correction is `agent/WI-0025-css-thumbnails`.
+
+It links the Blazor isolated-style bundle globally, verifies the bundle through the hosted application, changes collection preview URLs to a server-generated fixed 480 × 320 JPEG thumbnail, and hardens the grid/card/image width constraints. Original files remain server-side and are not downloaded by the result grid.
 
 ## Next concrete step
 
 1. Run the full Release build, integration suite, living-document validation and published Windows smoke path in GitHub Actions.
-2. Re-run `/collections` on Windows and Pixel against the accepted private catalogue.
-3. Record any/all counts, representative results, photo loading, selector usability and no-horizontal-overflow evidence.
-4. Complete WI-0025 only after device acceptance, neutral-consumer verification and pilot count checks all pass.
+2. Merge the CSS and thumbnail correction after CI passes.
+3. Re-publish the application and hard-refresh or clear the old service worker before retesting.
+4. Re-run `/collections` on Windows and Pixel against the accepted private catalogue.
+5. Record isolated-style loading, selector usability, fixed-size thumbnails, no horizontal overflow, any/all counts and representative-result evidence.
+6. Complete WI-0025 only after device acceptance, neutral-consumer verification and pilot count checks all pass.
 
 ## Completed gates
 
