@@ -21,8 +21,8 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Recently completed
 
-- [**WI-0019 — Add a second model adapter**](../work-items/WI-0019-second-model.md) — `completed`; owner: `ai-agent`
 - [**WI-0033 — Accelerate the human review workflow**](../work-items/WI-0033-review-throughput.md) — `completed`; owner: `ai-agent`
+- [**WI-0019 — Add a second model adapter**](../work-items/WI-0019-second-model.md) — `completed`; owner: `ai-agent`
 - [**WI-0029 — Run a 500-image local acceptance pilot**](../work-items/WI-0029-local-acceptance-pilot.md) — `completed`; owner: `human-maintainer`
 
 ## Next ready work
