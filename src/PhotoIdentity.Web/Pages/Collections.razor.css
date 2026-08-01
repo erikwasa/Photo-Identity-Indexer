@@ -1,0 +1,230 @@
+.collection-hero {
+    align-items: stretch;
+}
+
+.collection-safety-card,
+.collection-panel,
+.collection-card {
+    background: rgba(255, 253, 248, 0.94);
+    border: 1px solid var(--line);
+    border-radius: 1.2rem;
+    box-shadow: var(--shadow);
+}
+
+.collection-safety-card {
+    align-self: end;
+    padding: 1rem;
+}
+
+.collection-safety-card strong,
+.collection-safety-card p {
+    display: block;
+}
+
+.collection-safety-card p {
+    margin: 0.4rem 0 0;
+    color: var(--muted);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.collection-panel {
+    margin-top: 1rem;
+    padding: 1.1rem;
+}
+
+.collection-panel h2,
+.collection-results h2 {
+    margin: 0;
+}
+
+.collection-inline-actions {
+    display: flex;
+    gap: 0.55rem;
+}
+
+.collection-person-picker {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 0.65rem;
+    margin-top: 1rem;
+}
+
+.collection-person-option {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.7rem 0.8rem;
+    background: #f5f3ed;
+    border: 1px solid #d5d2c9;
+    border-radius: 0.8rem;
+    cursor: pointer;
+}
+
+.collection-person-option.selected {
+    background: #e3f0eb;
+    border-color: #80b7aa;
+}
+
+.collection-person-option input {
+    width: 1.15rem;
+    min-height: 1.15rem;
+    margin: 0;
+    accent-color: var(--accent);
+}
+
+.collection-person-option span {
+    overflow-wrap: anywhere;
+    font-weight: 700;
+}
+
+.collection-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.85rem;
+    margin-top: 1rem;
+}
+
+.collection-policy-note {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.55rem;
+    margin-top: 1rem;
+    padding: 0.8rem 0.9rem;
+    color: #46575a;
+    background: #f1efe8;
+    border-radius: 0.8rem;
+    font-size: 0.9rem;
+}
+
+.collection-run-button {
+    width: 100%;
+    margin-top: 1rem;
+}
+
+.collection-results {
+    margin-top: 1.4rem;
+}
+
+.collection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-top: 0.9rem;
+}
+
+.collection-card {
+    overflow: hidden;
+}
+
+.collection-media-summary {
+    min-height: 9rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    padding: 1rem;
+    color: #dce8e4;
+    background:
+        linear-gradient(135deg, rgba(11, 113, 104, 0.85), rgba(22, 42, 45, 0.95)),
+        #173033;
+    text-align: center;
+}
+
+.collection-media-summary span {
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.collection-media-summary strong {
+    color: #fff;
+    font-size: 1.25rem;
+}
+
+.collection-card-body {
+    padding: 1rem;
+}
+
+.collection-card time {
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+
+.collection-match-list {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0.9rem 0;
+    padding: 0;
+    list-style: none;
+}
+
+.collection-match-list li {
+    padding-top: 0.65rem;
+    border-top: 1px solid #e2dfd7;
+}
+
+.collection-match-list strong,
+.collection-match-list span {
+    display: block;
+}
+
+.collection-match-list span {
+    margin-top: 0.18rem;
+    color: var(--muted);
+    font-size: 0.84rem;
+}
+
+.collection-identifiers {
+    color: var(--muted);
+    font-size: 0.82rem;
+}
+
+.collection-identifiers summary {
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.collection-identifiers code {
+    display: block;
+    margin-top: 0.45rem;
+    overflow-wrap: anywhere;
+}
+
+.pagination {
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.pagination span {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+@media (max-width: 1000px) {
+    .collection-filter-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .collection-inline-actions {
+        width: 100%;
+    }
+
+    .collection-inline-actions .button {
+        flex: 1;
+    }
+
+    .collection-person-picker,
+    .collection-filter-grid,
+    .collection-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .collection-panel {
+        padding: 0.9rem;
+    }
+}
