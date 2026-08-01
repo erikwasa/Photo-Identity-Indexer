@@ -23,6 +23,7 @@ public partial class Program
         builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();
         builder.Services.AddSingleton<SqliteBulkSuggestionReviewRepository>();
+        builder.Services.AddSingleton<SqliteCollectionQueryRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton(TimeProvider.System);
 
@@ -33,7 +34,8 @@ public partial class Program
         app.UseStaticFiles();
         app.Use(async (context, next) =>
         {
-            if (context.Request.Path.StartsWithSegments("/api/review"))
+            if (context.Request.Path.StartsWithSegments("/api/review") ||
+                context.Request.Path.StartsWithSegments("/api/collections"))
             {
                 context.Response.OnStarting(() =>
                 {
@@ -59,6 +61,7 @@ public partial class Program
         app.MapPersonMaintenanceEndpoints();
         app.MapBulkReviewEndpoints();
         app.MapBulkSuggestionReviewEndpoints();
+        app.MapCollectionEndpoints();
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();
