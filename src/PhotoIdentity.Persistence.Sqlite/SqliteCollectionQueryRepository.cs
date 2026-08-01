@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -10,10 +11,17 @@ public static class CatalogueCollectionMatchModes
     public const string All = "all";
 }
 
+public sealed record CatalogueCollectionSuggestionPolicy(
+    ModelId ModelId,
+    Sha256Digest ModelHash,
+    double MinimumScore);
+
 public sealed record CatalogueCollectionPersonMatch(
     PersonId PersonId,
     string DisplayName,
-    int ConfirmedFaceCount);
+    int ConfirmedFaceCount,
+    int SuggestedFaceCount,
+    double? MaximumSuggestionScore);
 
 public sealed record CatalogueCollectionPhoto(
     AssetRevisionId RevisionId,
@@ -29,14 +37,16 @@ public sealed record CatalogueCollectionPhotoPage(
     int Offset,
     int Limit,
     int Total,
-    string MatchMode);
+    string MatchMode,
+    CatalogueCollectionSuggestionPolicy? SuggestionPolicy);
 
 /// <summary>
-/// Queries path-free photo manifests from active, confirmed human assignments.
+/// Queries path-free photo manifests from active confirmed assignments and, only when explicitly enabled,
+/// top-ranked pending suggestions from one exact model revision.
 /// </summary>
 public sealed class SqliteCollectionQueryRepository
 {
-    private const string AssignedFaceCtes = """
+    private const string MatchingFaceCtes = """
         WITH latest_action AS (
             SELECT
                 review_actions.*,
@@ -55,6 +65,23 @@ public sealed class SqliteCollectionQueryRepository
                     ORDER BY observed_at_utc DESC, detector_model_id, detector_model_hash) AS row_number
             FROM face_observations
         ),
+        top_suggestion AS (
+            SELECT
+                rankings.face_occurrence_id,
+                suggestions.suggested_person_id,
+                suggested_people.display_name,
+                suggestions.score
+            FROM identity_suggestion_rankings AS rankings
+            INNER JOIN identity_suggestions AS suggestions
+                ON suggestions.id = rankings.suggestion_id
+            INNER JOIN people AS suggested_people
+                ON suggested_people.id = suggestions.suggested_person_id
+               AND suggested_people.merged_into_person_id IS NULL
+            WHERE rankings.rank = 1
+              AND suggestions.status = 'pending'
+              AND rankings.model_id = $suggestion_model_id
+              AND rankings.model_hash = $suggestion_model_hash
+        ),
         matched_faces AS (
             SELECT
                 asset_revisions.id AS revision_id,
@@ -65,7 +92,10 @@ public sealed class SqliteCollectionQueryRepository
                 asset_revisions.height,
                 face_occurrences.id AS face_id,
                 latest_action.person_id,
-                people.display_name
+                confirmed_people.display_name,
+                1 AS confirmed_evidence,
+                0 AS suggested_evidence,
+                NULL AS suggestion_score
             FROM asset_revisions
             INNER JOIN face_occurrences
                 ON face_occurrences.asset_revision_id = asset_revisions.id
@@ -73,12 +103,47 @@ public sealed class SqliteCollectionQueryRepository
                 ON latest_action.face_occurrence_id = face_occurrences.id
                AND latest_action.row_number = 1
                AND latest_action.action_kind = 'assign'
-            INNER JOIN people
-                ON people.id = latest_action.person_id
+            INNER JOIN people AS confirmed_people
+                ON confirmed_people.id = latest_action.person_id
+               AND confirmed_people.merged_into_person_id IS NULL
             LEFT JOIN latest_observation
                 ON latest_observation.face_occurrence_id = face_occurrences.id
                AND latest_observation.row_number = 1
             WHERE latest_action.person_id IN ({0})
+              AND ($from_utc IS NULL OR asset_revisions.observed_at_utc >= $from_utc)
+              AND ($to_utc IS NULL OR asset_revisions.observed_at_utc <= $to_utc)
+              AND ($min_confidence IS NULL OR latest_observation.confidence >= $min_confidence)
+
+            UNION ALL
+
+            SELECT
+                asset_revisions.id AS revision_id,
+                asset_revisions.asset_id,
+                asset_revisions.observed_at_utc,
+                asset_revisions.media_type,
+                asset_revisions.width,
+                asset_revisions.height,
+                face_occurrences.id AS face_id,
+                top_suggestion.suggested_person_id AS person_id,
+                top_suggestion.display_name,
+                0 AS confirmed_evidence,
+                1 AS suggested_evidence,
+                top_suggestion.score AS suggestion_score
+            FROM asset_revisions
+            INNER JOIN face_occurrences
+                ON face_occurrences.asset_revision_id = asset_revisions.id
+            LEFT JOIN latest_action
+                ON latest_action.face_occurrence_id = face_occurrences.id
+               AND latest_action.row_number = 1
+            INNER JOIN top_suggestion
+                ON top_suggestion.face_occurrence_id = face_occurrences.id
+            LEFT JOIN latest_observation
+                ON latest_observation.face_occurrence_id = face_occurrences.id
+               AND latest_observation.row_number = 1
+            WHERE $include_suggestions = 1
+              AND latest_action.id IS NULL
+              AND top_suggestion.suggested_person_id IN ({0})
+              AND top_suggestion.score >= $min_suggestion_score
               AND ($from_utc IS NULL OR asset_revisions.observed_at_utc >= $from_utc)
               AND ($to_utc IS NULL OR asset_revisions.observed_at_utc <= $to_utc)
               AND ($min_confidence IS NULL OR latest_observation.confidence >= $min_confidence)
@@ -111,9 +176,30 @@ public sealed class SqliteCollectionQueryRepository
         _database = database;
     }
 
-    public async Task<CatalogueCollectionPhotoPage> QueryConfirmedPhotosAsync(
+    public Task<CatalogueCollectionPhotoPage> QueryConfirmedPhotosAsync(
         IReadOnlyCollection<PersonId> personIds,
         string matchMode = CatalogueCollectionMatchModes.All,
+        DateTimeOffset? fromUtc = null,
+        DateTimeOffset? toUtc = null,
+        double? minimumConfidence = null,
+        int offset = 0,
+        int limit = 40,
+        CancellationToken cancellationToken = default) =>
+        QueryPhotosAsync(
+            personIds,
+            matchMode,
+            null,
+            fromUtc,
+            toUtc,
+            minimumConfidence,
+            offset,
+            limit,
+            cancellationToken);
+
+    public async Task<CatalogueCollectionPhotoPage> QueryPhotosAsync(
+        IReadOnlyCollection<PersonId> personIds,
+        string matchMode = CatalogueCollectionMatchModes.All,
+        CatalogueCollectionSuggestionPolicy? suggestionPolicy = null,
         DateTimeOffset? fromUtc = null,
         DateTimeOffset? toUtc = null,
         double? minimumConfidence = null,
@@ -147,6 +233,16 @@ public sealed class SqliteCollectionQueryRepository
                 "Minimum confidence must be between 0 and 1.");
         }
 
+        if (suggestionPolicy is not null &&
+            (double.IsNaN(suggestionPolicy.MinimumScore) ||
+             double.IsInfinity(suggestionPolicy.MinimumScore) ||
+             suggestionPolicy.MinimumScore is < -1 or > 1))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(suggestionPolicy),
+                "Minimum suggestion score must be a finite cosine similarity between -1 and 1.");
+        }
+
         string[] personParameters = distinctPeople
             .Select((_, index) => $"$person_{index}")
             .ToArray();
@@ -155,7 +251,7 @@ public sealed class SqliteCollectionQueryRepository
             : "COUNT(DISTINCT person_id) >= 1";
         string ctes = string.Format(
             CultureInfo.InvariantCulture,
-            AssignedFaceCtes,
+            MatchingFaceCtes,
             string.Join(", ", personParameters),
             having);
 
@@ -172,6 +268,7 @@ public sealed class SqliteCollectionQueryRepository
             AddParameters(
                 countCommand,
                 distinctPeople,
+                suggestionPolicy,
                 fromUtc,
                 toUtc,
                 minimumConfidence);
@@ -198,7 +295,9 @@ public sealed class SqliteCollectionQueryRepository
                 paged_revisions.height,
                 matched_faces.person_id,
                 matched_faces.display_name,
-                COUNT(DISTINCT matched_faces.face_id) AS confirmed_face_count
+                SUM(matched_faces.confirmed_evidence) AS confirmed_face_count,
+                SUM(matched_faces.suggested_evidence) AS suggested_face_count,
+                MAX(matched_faces.suggestion_score) AS maximum_suggestion_score
             FROM paged_revisions
             INNER JOIN matched_faces
                 ON matched_faces.revision_id = paged_revisions.revision_id
@@ -217,7 +316,7 @@ public sealed class SqliteCollectionQueryRepository
                 matched_faces.display_name,
                 matched_faces.person_id;
             """;
-        AddParameters(command, distinctPeople, fromUtc, toUtc, minimumConfidence);
+        AddParameters(command, distinctPeople, suggestionPolicy, fromUtc, toUtc, minimumConfidence);
         command.Parameters.AddWithValue("$limit", limit);
         command.Parameters.AddWithValue("$offset", offset);
 
@@ -246,7 +345,9 @@ public sealed class SqliteCollectionQueryRepository
             current.People.Add(new CatalogueCollectionPersonMatch(
                 PersonId.From(Guid.Parse(reader.GetString(6))),
                 reader.GetString(7),
-                reader.GetInt32(8)));
+                checked((int)reader.GetInt64(8)),
+                checked((int)reader.GetInt64(9)),
+                reader.IsDBNull(10) ? null : reader.GetDouble(10)));
         }
 
         if (current is not null)
@@ -254,12 +355,19 @@ public sealed class SqliteCollectionQueryRepository
             items.Add(current.Build());
         }
 
-        return new CatalogueCollectionPhotoPage(items, offset, limit, total, normalizedMatchMode);
+        return new CatalogueCollectionPhotoPage(
+            items,
+            offset,
+            limit,
+            total,
+            normalizedMatchMode,
+            suggestionPolicy);
     }
 
     private static void AddParameters(
         SqliteCommand command,
         IReadOnlyList<PersonId> personIds,
+        CatalogueCollectionSuggestionPolicy? suggestionPolicy,
         DateTimeOffset? fromUtc,
         DateTimeOffset? toUtc,
         double? minimumConfidence)
@@ -270,6 +378,16 @@ public sealed class SqliteCollectionQueryRepository
         }
 
         command.Parameters.AddWithValue("$person_count", personIds.Count);
+        command.Parameters.AddWithValue("$include_suggestions", suggestionPolicy is null ? 0 : 1);
+        command.Parameters.AddWithValue(
+            "$suggestion_model_id",
+            suggestionPolicy is null ? DBNull.Value : suggestionPolicy.ModelId.ToString());
+        command.Parameters.AddWithValue(
+            "$suggestion_model_hash",
+            suggestionPolicy is null ? DBNull.Value : suggestionPolicy.ModelHash.ToString());
+        command.Parameters.AddWithValue(
+            "$min_suggestion_score",
+            suggestionPolicy is null ? DBNull.Value : suggestionPolicy.MinimumScore);
         command.Parameters.AddWithValue(
             "$from_utc",
             fromUtc is null ? DBNull.Value : fromUtc.Value.ToUniversalTime().ToString("O"));
