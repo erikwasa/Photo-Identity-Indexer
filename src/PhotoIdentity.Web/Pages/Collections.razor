@@ -9,12 +9,12 @@
     <div>
         <p class="eyebrow">Collection workspace</p>
         <h1>Find photos by person</h1>
-        <p>Build a path-free collection manifest from confirmed assignments, or explicitly include exact-model suggestions.</p>
+        <p>Choose one or more people and browse the matching photos from the private local catalogue.</p>
     </div>
 
     <aside class="collection-safety-card">
         <strong>Private by default</strong>
-        <p>Confirmed assignments are the safe default. Results expose opaque identifiers and media metadata, not source roots or filenames.</p>
+        <p>Photos are streamed through opaque local URLs. Source roots and filenames stay on the Windows host.</p>
     </aside>
 </section>
 
@@ -46,24 +46,81 @@ else
                 <p class="eyebrow">People</p>
                 <h2 id="collection-people-heading">Choose collection members</h2>
             </div>
-            <div class="collection-inline-actions">
-                <button class="button secondary" disabled="@LoadingResults" @onclick="SelectAllPeople">Select all</button>
-                <button class="button secondary" disabled="@(LoadingResults || SelectedPersonIds.Count == 0)" @onclick="ClearPeople">Clear</button>
-            </div>
+            <span>@SelectedPersonIds.Count selected</span>
         </div>
 
-        <div class="collection-person-picker" role="group" aria-label="People included in the collection query">
-            @foreach (ReviewPersonResponse person in People)
-            {
-                <label class="collection-person-option @(SelectedPersonIds.Contains(person.Id) ? "selected" : "")">
-                    <input type="checkbox"
-                           checked="@SelectedPersonIds.Contains(person.Id)"
-                           disabled="@LoadingResults"
-                           @onchange="eventArgs => SetPersonSelection(person.Id, eventArgs)" />
-                    <span>@person.DisplayName</span>
+        <details class="collection-person-dropdown">
+            <summary>
+                <span class="collection-person-summary-label">People</span>
+                <strong>@PersonSelectionSummary</strong>
+                <span class="collection-person-chevron" aria-hidden="true">⌄</span>
+            </summary>
+
+            <div class="collection-person-menu">
+                <label class="collection-person-search" for="collection-person-search">
+                    <span class="field-label">Search people</span>
+                    <input id="collection-person-search"
+                           type="search"
+                           placeholder="Type a name"
+                           autocomplete="off"
+                           @bind="PersonSearch"
+                           @bind:event="oninput"
+                           disabled="@LoadingResults" />
                 </label>
-            }
-        </div>
+
+                <div class="collection-inline-actions">
+                    <button type="button"
+                            class="button secondary"
+                            disabled="@(LoadingResults || FilteredPeople.Count == 0)"
+                            @onclick="SelectVisiblePeople">
+                        Select filtered
+                    </button>
+                    <button type="button"
+                            class="button secondary"
+                            disabled="@(LoadingResults || SelectedPersonIds.Count == 0)"
+                            @onclick="ClearPeople">
+                        Clear selection
+                    </button>
+                </div>
+
+                <div class="collection-person-picker" role="group" aria-label="People included in the collection query">
+                    @if (FilteredPeople.Count == 0)
+                    {
+                        <p class="collection-person-empty">No people match this search.</p>
+                    }
+                    else
+                    {
+                        @foreach (ReviewPersonResponse person in FilteredPeople)
+                        {
+                            <label class="collection-person-option @(SelectedPersonIds.Contains(person.Id) ? "selected" : "")">
+                                <input type="checkbox"
+                                       checked="@SelectedPersonIds.Contains(person.Id)"
+                                       disabled="@LoadingResults"
+                                       @onchange="eventArgs => SetPersonSelection(person.Id, eventArgs)" />
+                                <span>@person.DisplayName</span>
+                            </label>
+                        }
+                    }
+                </div>
+            </div>
+        </details>
+
+        @if (SelectedPeople.Count > 0)
+        {
+            <div class="collection-selected-people" aria-label="Selected people">
+                @foreach (ReviewPersonResponse person in SelectedPeople)
+                {
+                    <button type="button"
+                            class="collection-person-chip"
+                            disabled="@LoadingResults"
+                            aria-label="@RemovePersonLabel(person)"
+                            @onclick="() => RemovePerson(person.Id)">
+                        <span>@person.DisplayName</span>
+                        <span aria-hidden="true">×</span>
+                    </button>
+                }
+            </div>
+        }
     </section>
 
     <section class="collection-panel" aria-labelledby="collection-filter-heading">
@@ -78,7 +135,10 @@ else
         <div class="collection-filter-grid">
             <div>
                 <label class="field-label" for="collection-match">People match</label>
-                <select id="collection-match" @bind="MatchMode" @bind:after="ClearResults" disabled="@LoadingResults">
+                <select id="collection-match"
+                        @bind="MatchMode"
+                        @bind:after="ClearResults"
+                        disabled="@LoadingResults">
                     <option value="all">All selected people</option>
                     <option value="any">Any selected person</option>
                 </select>
@@ -97,24 +157,6 @@ else
             </div>
 
             <div>
-                <label class="field-label" for="collection-from">From local date</label>
-                <input id="collection-from"
-                       type="date"
-                       value="@FormatDate(FromDate)"
-                       disabled="@LoadingResults"
-                       @onchange="SetFromDate" />
-            </div>
-
-            <div>
-                <label class="field-label" for="collection-to">To local date</label>
-                <input id="collection-to"
-                       type="date"
-                       value="@FormatDate(ToDate)"
-                       disabled="@LoadingResults"
-                       @onchange="SetToDate" />
-            </div>
-
-            <div>
                 <label class="field-label" for="collection-confidence">Minimum face confidence</label>
                 <input id="collection-confidence"
                        type="number"
@@ -126,6 +168,7 @@ else
                        @bind="MinimumConfidence"
                        @bind:after="ClearResults"
                        disabled="@LoadingResults" />
+                <small class="collection-field-help">Filters by detector confidence, not identity-match confidence.</small>
             </div>
 
             <div>
@@ -176,7 +219,8 @@ else
             }
         </div>
 
-        <button class="button primary collection-run-button"
+        <button type="button"
+                class="button primary collection-run-button"
                 disabled="@(LoadingResults || SelectedPersonIds.Count == 0)"
                 @onclick="RunQueryAsync">
             @(LoadingResults ? "Building collection…" : "Build collection")
@@ -188,7 +232,7 @@ else
         <section class="collection-results" aria-labelledby="collection-results-heading">
             <div class="section-heading">
                 <div>
-                    <p class="eyebrow">Manifest results</p>
+                    <p class="eyebrow">Photo results</p>
                     <h2 id="collection-results-heading">@(resultPage.Total) photo@(resultPage.Total == 1 ? "" : "s")</h2>
                 </div>
                 <span>@EvidenceLabel(resultPage.Query)</span>
@@ -206,12 +250,27 @@ else
                     @foreach (CollectionPhotoResponse photo in resultPage.Items)
                     {
                         <article class="collection-card">
-                            <div class="collection-media-summary" aria-label="Photo media metadata">
-                                <span>@(photo.MediaType ?? "Unknown media type")</span>
-                                <strong>@Dimensions(photo)</strong>
-                            </div>
+                            <a class="collection-photo-link"
+                               href="@photo.ContentUrl"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               aria-label="@OpenPhotoLabel(photo)">
+                                <img class="collection-photo"
+                                     src="@photo.ContentUrl"
+                                     alt="@PhotoAltText(photo)"
+                                     loading="lazy"
+                                     decoding="async" />
+                            </a>
+
                             <div class="collection-card-body">
-                                <time datetime="@photo.ObservedAtUtc.ToString("O")">@photo.ObservedAtUtc.ToLocalTime().ToString("g")</time>
+                                <div class="collection-media-meta">
+                                    <span>@MediaLabel(photo.MediaType)</span>
+                                    @if (photo.Width is int width && photo.Height is int height)
+                                    {
+                                        <span>@width × @height</span>
+                                    }
+                                </div>
+
                                 <ul class="collection-match-list">
                                     @foreach (CollectionPersonMatchResponse match in photo.People)
                                     {
@@ -221,6 +280,7 @@ else
                                         </li>
                                     }
                                 </ul>
+
                                 <details class="collection-identifiers">
                                     <summary>Manifest identifiers</summary>
                                     <code>asset @photo.AssetId</code>
@@ -232,13 +292,15 @@ else
                 </div>
 
                 <nav class="pagination" aria-label="Collection result pages">
-                    <button class="button secondary"
+                    <button type="button"
+                            class="button secondary"
                             disabled="@(LoadingResults || resultPage.Offset == 0)"
                             @onclick="PreviousPageAsync">
                         Previous
                     </button>
                     <span>Showing @FirstResult–@LastResult</span>
-                    <button class="button secondary"
+                    <button type="button"
+                            class="button secondary"
                             disabled="@(LoadingResults || resultPage.Offset + resultPage.Items.Count >= resultPage.Total)"
                             @onclick="NextPageAsync">
                         Next
@@ -256,11 +318,10 @@ else
     private ReviewFilterOptionsResponse Options { get; set; } = new([], []);
     private HashSet<string> SelectedPersonIds { get; } = new(StringComparer.Ordinal);
     private CollectionPhotoPageResponse? Results { get; set; }
+    private string PersonSearch { get; set; } = "";
     private string MatchMode { get; set; } = "all";
     private string ReviewState { get; set; } = "assigned";
     private string SelectedModelIndex { get; set; } = "";
-    private DateOnly? FromDate { get; set; }
-    private DateOnly? ToDate { get; set; }
     private string MinimumConfidence { get; set; } = "";
     private string MinimumSuggestionScore { get; set; } = "0.9";
     private string? AppliedQuery { get; set; }
@@ -269,6 +330,25 @@ else
     private string? Error { get; set; }
 
     private bool UsesSuggestions => ReviewState is "all" or "unreviewed";
+
+    private IReadOnlyList<ReviewPersonResponse> FilteredPeople => People
+        .Where(person =>
+            string.IsNullOrWhiteSpace(PersonSearch) ||
+            person.DisplayName.Contains(PersonSearch.Trim(), StringComparison.OrdinalIgnoreCase))
+        .OrderBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    private IReadOnlyList<ReviewPersonResponse> SelectedPeople => People
+        .Where(person => SelectedPersonIds.Contains(person.Id))
+        .OrderBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    private string PersonSelectionSummary => SelectedPersonIds.Count switch
+    {
+        0 => "Choose people",
+        1 => "1 person selected",
+        _ => $"{SelectedPersonIds.Count} people selected",
+    };
 
     private ReviewModelRevisionFilterResponse? SelectedModel =>
         int.TryParse(SelectedModelIndex, NumberStyles.Integer, CultureInfo.InvariantCulture, out int index) &&
@@ -306,9 +386,9 @@ else
         }
     }
 
-    private void SelectAllPeople()
+    private void SelectVisiblePeople()
     {
-        foreach (ReviewPersonResponse person in People)
+        foreach (ReviewPersonResponse person in FilteredPeople)
         {
             SelectedPersonIds.Add(person.Id);
         }
@@ -319,6 +399,12 @@ else
     private void ClearPeople()
     {
         SelectedPersonIds.Clear();
+        ClearResults();
+    }
+
+    private void RemovePerson(string personId)
+    {
+        SelectedPersonIds.Remove(personId);
         ClearResults();
     }
 
@@ -341,41 +427,6 @@ else
     {
         Error = null;
         ClearResults();
-    }
-
-    private void SetFromDate(ChangeEventArgs eventArgs)
-    {
-        FromDate = ParseBrowserDate(eventArgs.Value?.ToString(), "start");
-        ClearResults();
-    }
-
-    private void SetToDate(ChangeEventArgs eventArgs)
-    {
-        ToDate = ParseBrowserDate(eventArgs.Value?.ToString(), "end");
-        ClearResults();
-    }
-
-    private DateOnly? ParseBrowserDate(string? value, string label)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            Error = null;
-            return null;
-        }
-
-        if (DateOnly.TryParseExact(
-                value,
-                "yyyy-MM-dd",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out DateOnly parsed))
-        {
-            Error = null;
-            return parsed;
-        }
-
-        Error = $"The {label} date is invalid.";
-        return null;
     }
 
     private void ClearResults()
@@ -456,14 +507,6 @@ else
             return false;
         }
 
-        DateTimeOffset? fromUtc = ToUtcBoundary(FromDate, endOfDay: false);
-        DateTimeOffset? toUtc = ToUtcBoundary(ToDate, endOfDay: true);
-        if (fromUtc is not null && toUtc is not null && fromUtc > toUtc)
-        {
-            Error = "The start date cannot be later than the end date.";
-            return false;
-        }
-
         if (!TryOptionalDouble(MinimumConfidence, 0, 1, "Minimum face confidence", out double? confidence))
         {
             return false;
@@ -475,16 +518,6 @@ else
             $"match={Uri.EscapeDataString(MatchMode)}",
             $"reviewState={Uri.EscapeDataString(ReviewState)}",
         ];
-
-        if (fromUtc is DateTimeOffset from)
-        {
-            parameters.Add($"fromUtc={Uri.EscapeDataString(from.ToString("O", CultureInfo.InvariantCulture))}");
-        }
-
-        if (toUtc is DateTimeOffset to)
-        {
-            parameters.Add($"toUtc={Uri.EscapeDataString(to.ToString("O", CultureInfo.InvariantCulture))}");
-        }
 
         if (confidence is double minimumConfidence)
         {
@@ -548,32 +581,8 @@ else
         return true;
     }
 
-    private static DateTimeOffset? ToUtcBoundary(DateOnly? date, bool endOfDay)
-    {
-        if (date is null)
-        {
-            return null;
-        }
-
-        DateTime local = date.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-        if (endOfDay)
-        {
-            local = local.AddDays(1).AddTicks(-1);
-        }
-
-        return new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local)).ToUniversalTime();
-    }
-
-    private static string FormatDate(DateOnly? value) =>
-        value?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
-
     private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
         $"{model.ModelId} · {model.ModelHash[..Math.Min(12, model.ModelHash.Length)]}";
-
-    private static string Dimensions(CollectionPhotoResponse photo) =>
-        photo.Width is int width && photo.Height is int height
-            ? $"{width} × {height}"
-            : "Dimensions unavailable";
 
     private static string EvidenceSummary(CollectionPersonMatchResponse match)
     {
@@ -600,4 +609,21 @@ else
         "unreviewed" => "Unreviewed suggestions",
         _ => "Confirmed + suggested",
     };
+
+    private static string MediaLabel(string? mediaType) => mediaType?.ToLowerInvariant() switch
+    {
+        "image/jpeg" => "JPEG",
+        "image/png" => "PNG",
+        "image/webp" => "WebP",
+        _ => "Photo",
+    };
+
+    private static string PhotoAltText(CollectionPhotoResponse photo) =>
+        $"Photo matching {string.Join(", ", photo.People.Select(person => person.DisplayName))}";
+
+    private static string OpenPhotoLabel(CollectionPhotoResponse photo) =>
+        $"Open photo matching {string.Join(", ", photo.People.Select(person => person.DisplayName))}";
+
+    private static string RemovePersonLabel(ReviewPersonResponse person) =>
+        $"Remove {person.DisplayName} from the collection";
 }
