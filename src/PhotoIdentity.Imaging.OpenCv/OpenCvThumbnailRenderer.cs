@@ -74,12 +74,12 @@ public sealed class OpenCvThumbnailRenderer
             resized.CopyTo(target);
 
             cancellationToken.ThrowIfCancellationRequested();
-            bool encoded = Cv2.ImEncode(
+            Cv2.ImEncode(
                 ".jpg",
                 canvas,
                 out byte[] thumbnail,
                 new ImageEncodingParam(ImwriteFlags.JpegQuality, JpegQuality));
-            if (!encoded || thumbnail.Length == 0)
+            if (thumbnail.Length == 0)
             {
                 return null;
             }
