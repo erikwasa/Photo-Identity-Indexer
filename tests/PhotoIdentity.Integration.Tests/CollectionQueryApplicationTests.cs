@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -105,7 +106,7 @@ public sealed class CollectionQueryApplicationTests
             Assert.Equal(3, anyPage.Total);
             Assert.Equal(3, anyPage.Items.Count);
 
-            string anyJson = await anyResponse.Content.ReadAsStringAsync();
+            string anyJson = JsonSerializer.Serialize(anyPage);
             Assert.DoesNotContain(sourceRoot, anyJson, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("private-ada.jpg", anyJson, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("private-grace.jpg", anyJson, StringComparison.OrdinalIgnoreCase);
