@@ -51,7 +51,7 @@ The local verification paths use synthetic fixtures or explicitly supplied priva
 Keep the output outside the source directory:
 
 ```powershell
-$root = "C:\PhotoIdentityPilot"
+$root = "C:\PhotoIdentityPilot500"
 $source = Join-Path $root "source"
 $output = Join-Path $root "outputs"
 $db = Join-Path $root "catalogue.db"

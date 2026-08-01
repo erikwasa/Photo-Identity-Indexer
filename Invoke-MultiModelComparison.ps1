@@ -32,7 +32,16 @@ function Get-RelativePathCompat([string] $BasePath, [string] $TargetPath) {
 }
 
 function Read-Json([string] $Path) {
-    Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    $value = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+
+    if ($value -is [Array]) {
+        foreach ($item in $value) {
+            Write-Output -NoEnumerate $item
+        }
+        return
+    }
+
+    Write-Output -NoEnumerate $value
 }
 
 function Write-Json([object] $Value, [string] $Path) {
