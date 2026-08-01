@@ -514,15 +514,41 @@ work_items:
   - id: WI-0025
     title: Add collection-ready queries
     milestone: M14
-    status: proposed
-    owner: unassigned
+    status: completed
+    owner: ai-agent
     document: ../work-items/WI-0025-collection-api.md
+    started_at: '2026-08-01'
+    completed_at: '2026-08-02'
+    verified_at: '2026-08-02'
+    verified_by: human
+    last_updated_at: '2026-08-02'
+    branch: agent/WI-0025-neutral-manifest
     blockers:
       - WI-0015
       - WI-0016
       - WI-0029
       - WI-0033
-    evidence: []
+    evidence:
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/57
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/58
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/59
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/60
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/61
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/62
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/63
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30722490454
+      - type: merge_commit
+        value: e9c25b74f76402f8818983f35b43c82fbf373e83
+      - type: human_verification
+        value: Private-catalogue collection queries, Windows and Pixel UI, any/all semantics, fixed thumbnails, responsive layout, representative results and the neutral manifest were verified on 2026-08-02; detailed evidence remains outside Git.
   - id: WI-0026
     title: Add local developer verification
     milestone: M01
@@ -667,9 +693,12 @@ work_items:
   - id: WI-0031
     title: Rewrite operator and architecture documentation
     milestone: M15
-    status: proposed
-    owner: unassigned
+    status: in_progress
+    owner: ai-agent
     document: ../work-items/WI-0031-documentation-rewrite.md
+    started_at: '2026-08-02'
+    last_updated_at: '2026-08-02'
+    branch: agent/WI-0031-documentation-rewrite
     blockers:
       - WI-0025
       - WI-0030
