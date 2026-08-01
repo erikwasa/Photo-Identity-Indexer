@@ -38,3 +38,20 @@ public sealed record CollectionPhotoPageResponse(
     int Limit,
     int Total,
     CollectionQueryResponse Query);
+
+public sealed record CollectionManifestPhotoResponse(
+    string RevisionId,
+    string AssetId,
+    string ThumbnailUrl,
+    string ContentUrl,
+    string? MediaType,
+    int? Width,
+    int? Height,
+    IReadOnlyList<CollectionPersonMatchResponse> People);
+
+public sealed record CollectionManifestResponse(
+    string Format,
+    int Version,
+    int Total,
+    CollectionQueryResponse Query,
+    IReadOnlyList<CollectionManifestPhotoResponse> Photos);
