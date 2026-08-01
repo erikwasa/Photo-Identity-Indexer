@@ -1,0 +1,33 @@
+name: multi-model workflow
+
+on:
+  pull_request:
+    paths:
+      - Invoke-MultiModelComparison.ps1
+      - .github/workflows/multi-model-workflow.yml
+      - docs/operations/multi-model-comparison.md
+      - docs/operations/examples/multi-model-comparison.example.json
+  push:
+    branches:
+      - main
+    paths:
+      - Invoke-MultiModelComparison.ps1
+      - .github/workflows/multi-model-workflow.yml
+
+permissions:
+  contents: read
+
+jobs:
+  powershell-compatibility:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Windows PowerShell 5.1 self-test
+        shell: powershell
+        run: ./Invoke-MultiModelComparison.ps1 -SelfTest
+
+      - name: PowerShell 7 self-test
+        shell: pwsh
+        run: ./Invoke-MultiModelComparison.ps1 -SelfTest
