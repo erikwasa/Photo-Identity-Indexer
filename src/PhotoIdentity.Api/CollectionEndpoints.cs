@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -16,6 +17,10 @@ public static class CollectionEndpoints
         SqliteCollectionQueryRepository repository,
         string? people = null,
         string match = CatalogueCollectionMatchModes.All,
+        bool includeSuggestions = false,
+        string? suggestionModelId = null,
+        string? suggestionModelHash = null,
+        double? minimumSuggestionScore = null,
         DateTimeOffset? fromUtc = null,
         DateTimeOffset? toUtc = null,
         double? minimumConfidence = null,
@@ -31,11 +36,23 @@ public static class CollectionEndpoints
             });
         }
 
+        if (!TrySuggestionPolicy(
+                includeSuggestions,
+                suggestionModelId,
+                suggestionModelHash,
+                minimumSuggestionScore,
+                out CatalogueCollectionSuggestionPolicy? suggestionPolicy,
+                out string? suggestionError))
+        {
+            return Results.BadRequest(new { error = suggestionError });
+        }
+
         try
         {
-            CatalogueCollectionPhotoPage page = await repository.QueryConfirmedPhotosAsync(
+            CatalogueCollectionPhotoPage page = await repository.QueryPhotosAsync(
                 personIds,
                 match,
+                suggestionPolicy,
                 fromUtc,
                 toUtc,
                 minimumConfidence,
@@ -50,7 +67,13 @@ public static class CollectionEndpoints
                 new CollectionQueryResponse(
                     personIds.Select(value => value.ToString()).ToArray(),
                     page.MatchMode,
-                    ConfirmedOnly: true,
+                    ConfirmedOnly: page.SuggestionPolicy is null,
+                    page.SuggestionPolicy is null
+                        ? null
+                        : new CollectionSuggestionPolicyResponse(
+                            page.SuggestionPolicy.ModelId.ToString(),
+                            page.SuggestionPolicy.ModelHash.ToString(),
+                            page.SuggestionPolicy.MinimumScore),
                     fromUtc?.ToUniversalTime(),
                     toUtc?.ToUniversalTime(),
                     minimumConfidence)));
@@ -71,7 +94,9 @@ public static class CollectionEndpoints
         photo.People.Select(person => new CollectionPersonMatchResponse(
             person.PersonId.ToString(),
             person.DisplayName,
-            person.ConfirmedFaceCount)).ToArray());
+            person.ConfirmedFaceCount,
+            person.SuggestedFaceCount,
+            person.MaximumSuggestionScore)).ToArray());
 
     private static bool TryPeople(string? value, out PersonId[] personIds)
     {
@@ -94,5 +119,54 @@ public static class CollectionEndpoints
 
         personIds = parsed.Distinct().ToArray();
         return personIds.Length > 0;
+    }
+
+    private static bool TrySuggestionPolicy(
+        bool includeSuggestions,
+        string? modelId,
+        string? modelHash,
+        double? minimumScore,
+        out CatalogueCollectionSuggestionPolicy? policy,
+        out string? error)
+    {
+        policy = null;
+        error = null;
+
+        bool suppliedAny =
+            !string.IsNullOrWhiteSpace(modelId) ||
+            !string.IsNullOrWhiteSpace(modelHash) ||
+            minimumScore is not null;
+        if (!includeSuggestions)
+        {
+            if (suppliedAny)
+            {
+                error = "Set 'includeSuggestions=true' before supplying suggestion model or threshold parameters.";
+                return false;
+            }
+
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(modelId) ||
+            string.IsNullOrWhiteSpace(modelHash) ||
+            minimumScore is null)
+        {
+            error = "Suggestion-backed queries require 'suggestionModelId', 'suggestionModelHash' and 'minimumSuggestionScore'.";
+            return false;
+        }
+
+        try
+        {
+            policy = new CatalogueCollectionSuggestionPolicy(
+                new ModelId(modelId),
+                new Sha256Digest(modelHash),
+                minimumScore.Value);
+            return true;
+        }
+        catch (ArgumentException exception)
+        {
+            error = exception.Message;
+            return false;
+        }
     }
 }
