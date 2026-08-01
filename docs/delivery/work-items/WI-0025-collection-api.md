@@ -15,10 +15,24 @@ Expose stable local queries and neutral exports for photos containing one or mor
 
 ## Acceptance criteria
 
-- [ ] Any-person and all-person semantics are explicit.
-- [ ] Confirmed-only results are supported and are the safe default.
+- [x] Any-person and all-person semantics are explicit.
+- [x] Confirmed-only results are supported and are the safe default.
 - [ ] Suggestion-backed results are opt-in and identify their model revision and threshold.
 - [ ] Date, confidence, review-state and person filters can be combined predictably.
 - [ ] Results can be inspected through the local web interface on Windows and Pixel.
 - [ ] A neutral collection manifest can feed later slideshow or album applications without exposing unnecessary local paths.
 - [ ] Query counts and representative results are checked against the pilot catalogue.
+
+## First implementation slice
+
+The first slice is on `agent/WI-0025-collection-queries`.
+
+It adds a confirmed-only `/api/collections/photos` query with:
+
+- one or more comma-separated person IDs;
+- explicit `match=any` and `match=all` semantics, with `all` as the default;
+- optional UTC date bounds and minimum detector confidence;
+- stable pagination and total counts; and
+- a neutral response containing opaque asset/revision IDs, media metadata and matched people, without source roots, source keys or crop paths.
+
+Suggestion-backed results, the local web workspace, content delivery and private-pilot verification remain later slices. The API continues to return `Cache-Control: no-store` because collection membership can reveal private identity information even when filesystem paths are omitted.
