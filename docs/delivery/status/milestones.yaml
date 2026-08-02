@@ -77,6 +77,16 @@ milestones:
   work_items:
   - WI-0031
   - WI-0032
+- id: M16
+  title: Face detection recall
+  status: ready
+  document: ../milestones/M16-detector-recall.md
+  work_items:
+  - WI-0034
+  - WI-0035
+  - WI-0036
+  - WI-0037
+  - WI-0038
 - id: M09
   title: Azure VM pilot without identities
   status: proposed
