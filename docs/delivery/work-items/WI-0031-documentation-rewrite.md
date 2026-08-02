@@ -4,7 +4,7 @@ title: Rewrite operator and architecture documentation
 milestone: M15
 status_source: ../status/work-items.yaml
 depends_on: [WI-0025, WI-0030]
-affected_modules: [README.md, docs/architecture, docs/operations, docs/models, docs/delivery]
+affected_modules: [README.md, docs/architecture, docs/operations, docs/models, docs/delivery, PowerShell scripts]
 ---
 
 # WI-0031: Rewrite operator and architecture documentation
@@ -75,6 +75,18 @@ The architecture set now describes the implemented system rather than roadmap-er
 `docs/glossary.md` defines the common catalogue, revision, occurrence, exemplar, suggestion, assignment, model-revision and bundle terms plus related operational vocabulary.
 
 The documentation index separates the authoritative operator sequence from specialized evaluation, persistence, model and architecture references. Roadmap-era statements about planned modules, initial screens and future resumability were removed or replaced with current behavior.
+
+## Final script and verification housekeeping
+
+After PR #65 merged and both build #406 and multi-model workflow #6 passed, the PowerShell entry points received one final stale-text and behavior audit:
+
+- the completed WI-0033 manual-verification directory and its one-off session reporter were removed;
+- `verify-review.ps1` now reports only the disposable fixture, published-application smoke checks and optional interactive URLs that it actually provides;
+- `Invoke-MultiModelComparison.ps1` now produces a general `multi-model-comparison` report and checklist rather than WI-0030-labelled evidence;
+- `build.ps1`, `test.ps1` and `models/install-models.ps1` default to Release and explicitly fail on non-zero native exit codes; and
+- `verify-local.ps1` and the published smoke script were reviewed and retained because their descriptions and output remain current and work-item-neutral.
+
+The retired WI-0033 work-item page records why the temporary acceptance artifacts no longer remain in the repository.
 
 ## Review boundary
 
