@@ -13,11 +13,21 @@ The project measures detector recall on a bounded 100-photo sample and improves 
 
 ## Work items
 
-- [WI-0034](../work-items/WI-0034-detector-recall-baseline.md) — measure the current detector on 100 photos
+- [WI-0034](../work-items/WI-0034-detector-recall-baseline.md) — measure the current detector on 100 photos and establish reusable photo-level review
 - [WI-0035](../work-items/WI-0035-yunet-threshold-sweep.md) — tune confidence only when the baseline gate fails
 - [WI-0036](../work-items/WI-0036-multiscale-yunet.md) — add multi-scale YuNet only when threshold tuning is insufficient
 - [WI-0037](../work-items/WI-0037-detector-candidate.md) — evaluate another detector only when YuNet remains insufficient
 - [WI-0038](../work-items/WI-0038-detector-rollout.md) — safely roll out any changed detector pipeline
+
+## Current implementation decision
+
+The maintainer retained the 50 mechanically selected representative pilot photos and supplemented the difficult half with archive-relevant external photos that cover conditions missing from the original pilot. The exact 100-photo set is staged privately and the isolated YuNet confidence-0.9 batch has completed.
+
+Reviewing individual aligned face crops is not efficient or complete for detector evaluation because it obscures image categories and entirely hides photos with zero detections. M16 therefore adds a reusable, read-only detector evaluation workspace before repeated threshold comparisons. The first implementation slice reads one processing run, lists every photo in stable order, serves the original photo locally and overlays persisted normalized detections. Later slices will import private sample metadata, record face-level ground truth and automatically match later detector runs so the operator reviews only misses, false positives, duplicates and ambiguous matches.
+
+This evaluation data is separate from canonical identity review. Detector judgements must not create person assignments, rejection actions or synthetic identities.
+
+See [M16 detector evaluation workspace status](../status/M16-detector-evaluation-workspace.md).
 
 ## Conditional execution
 
@@ -46,6 +56,9 @@ The pilot also records an optional count of correctly detected faces that appear
 ## Exit criteria
 
 - A fixed counting rule and sample-selection method are recorded before measurement.
+- The photo-level workspace shows the full source image and every persisted detector box, including photos with no detections.
+- Private source-group and category metadata can be applied consistently across repeated detector runs.
+- Reusable face-level ground truth prevents full manual recounting for every threshold or detector candidate.
 - Privacy-safe aggregate recall, false-detection and likely-background evidence is retained.
 - The first pipeline meeting the decision target is selected without unnecessary later work.
 - Any changed detector pipeline has explicit provenance and a safe canonical-catalogue rollout plan.
