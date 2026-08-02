@@ -18,15 +18,17 @@ The project measures detector recall on a bounded 100-photo sample and improves 
 - [WI-0036](../work-items/WI-0036-multiscale-yunet.md) — add multi-scale YuNet only when threshold tuning is insufficient
 - [WI-0037](../work-items/WI-0037-detector-candidate.md) — evaluate another detector only when YuNet remains insufficient
 - [WI-0038](../work-items/WI-0038-detector-rollout.md) — safely roll out any changed detector pipeline
+- [WI-0039](../work-items/WI-0039-detector-aware-model-comparison.md) — rerun embedding-model comparison when the detector materially expands the face population
 
 ## Conditional execution
 
 This milestone is intentionally allowed to finish without completing every proposed work item.
 
-- If WI-0034 meets the decision target, cancel WI-0035 through WI-0038 and complete M16.
-- If WI-0035 meets the target, cancel WI-0036 and WI-0037, then complete WI-0038.
-- If WI-0036 meets the target, cancel WI-0037, then complete WI-0038.
+- If WI-0034 meets the decision target without a detector-pipeline change, cancel WI-0035 through WI-0039 and complete M16.
+- If WI-0035 meets the target, cancel WI-0036 and WI-0037, then complete WI-0038 and WI-0039.
+- If WI-0036 meets the target, cancel WI-0037, then complete WI-0038 and WI-0039.
 - WI-0037 is required only when the governed YuNet options remain below target.
+- WI-0039 is required whenever the accepted detector pipeline materially changes which faces enter evaluation, because the harder face population can change the embedding-model conclusion.
 
 Cancelled work items mean the evidence showed that the work was unnecessary; they are not failures.
 
@@ -40,6 +42,7 @@ Cancelled work items mean the evidence showed that the work was unnecessary; the
 ## Exit criteria
 
 - A fixed counting rule and sample-selection method are recorded before measurement.
-- Privacy-safe aggregate recall and false-detection evidence is retained.
+- Privacy-safe aggregate recall, false-detection and likely background or unknown-face evidence is retained.
 - The first pipeline meeting the decision target is selected without unnecessary later work.
 - Any changed detector pipeline has explicit provenance and a safe canonical-catalogue rollout plan.
+- Any materially expanded face population is evaluated under the exact-model comparison workflow before the embedding recommendation is reaffirmed.
