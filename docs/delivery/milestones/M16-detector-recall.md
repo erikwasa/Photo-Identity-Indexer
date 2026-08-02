@@ -13,7 +13,8 @@ The project measures detector recall on a bounded 100-photo sample and improves 
 
 ## Work items
 
-- [WI-0034](../work-items/WI-0034-detector-recall-baseline.md) — measure the current detector on 100 photos and establish reusable photo-level review
+- [WI-0039](../work-items/WI-0039-detector-evaluation-workspace.md) — build reusable photo-level detector evaluation before repeated manual review
+- [WI-0034](../work-items/WI-0034-detector-recall-baseline.md) — measure the current detector on 100 photos
 - [WI-0035](../work-items/WI-0035-yunet-threshold-sweep.md) — tune confidence only when the baseline gate fails
 - [WI-0036](../work-items/WI-0036-multiscale-yunet.md) — add multi-scale YuNet only when threshold tuning is insufficient
 - [WI-0037](../work-items/WI-0037-detector-candidate.md) — evaluate another detector only when YuNet remains insufficient
@@ -23,7 +24,7 @@ The project measures detector recall on a bounded 100-photo sample and improves 
 
 The maintainer retained the 50 mechanically selected representative pilot photos and supplemented the difficult half with archive-relevant external photos that cover conditions missing from the original pilot. The exact 100-photo set is staged privately and the isolated YuNet confidence-0.9 batch has completed.
 
-Reviewing individual aligned face crops is not efficient or complete for detector evaluation because it obscures image categories and entirely hides photos with zero detections. M16 therefore adds a reusable, read-only detector evaluation workspace before repeated threshold comparisons. The first implementation slice reads one processing run, lists every photo in stable order, serves the original photo locally and overlays persisted normalized detections. Later slices will import private sample metadata, record face-level ground truth and automatically match later detector runs so the operator reviews only misses, false positives, duplicates and ambiguous matches.
+Reviewing individual aligned face crops is not efficient or complete for detector evaluation because it obscures image categories and entirely hides photos with zero detections. M16 therefore adds WI-0039, a reusable, read-only detector evaluation workspace before repeated threshold comparisons. The first implementation slice reads one processing run, lists every photo in stable order, serves the original photo locally and overlays persisted normalized detections. Later slices will import private sample metadata, record face-level ground truth and automatically match later detector runs so the operator reviews only misses, false positives, duplicates and ambiguous matches.
 
 This evaluation data is separate from canonical identity review. Detector judgements must not create person assignments, rejection actions or synthetic identities.
 
@@ -33,6 +34,7 @@ See [M16 detector evaluation workspace status](../status/M16-detector-evaluation
 
 This milestone is intentionally allowed to finish without completing every proposed work item.
 
+- WI-0039 must provide the reusable review path before WI-0034 completes.
 - If WI-0034 meets the decision target, cancel WI-0035 through WI-0038 and complete M16.
 - If WI-0035 meets the target, cancel WI-0036 and WI-0037, then complete WI-0038.
 - If WI-0036 meets the target, cancel WI-0037, then complete WI-0038.
