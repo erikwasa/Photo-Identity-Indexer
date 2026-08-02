@@ -8,28 +8,46 @@ Status: `in_progress`
 
 ## Current work
 
-**WI-0032 — Validate documentation from a clean setup** is active under the human maintainer. Repository-side preparation is on `agent/WI-0032-validation-prep`.
+**WI-0032 — Validate documentation from a clean setup** is active under the human maintainer. The current documentation correction is on `agent/WI-0032-powershell-optional`.
 
-WI-0031 completed on 2026-08-02 after PRs #64–#66 merged. The completed implementation includes the current README and local operator guide, exact-revision evaluation and multi-model runbooks, implemented-system architecture, aligned model and persistence guidance, shared glossary, stale-guidance removal and permanent work-item-neutral PowerShell entry points.
+WI-0031 completed on 2026-08-02 after PRs #64–#66 merged. PR #67 then closed the implementation item, started WI-0032 and added the clean-environment validation checklist.
 
-Build #408 and multi-model workflow #7 passed the final documentation and script gates: Release build, full tests, registry/link validation, generated-document consistency, published review smoke, Windows PowerShell mixed-media verification and PowerShell 5.1/7 comparison-script self-tests.
+## Validation progress
+
+The maintainer ran the first automated validation phase on Windows:
+
+- documentation registry and link validation passed;
+- generated-document checking passed;
+- the comparison self-test passed under Windows PowerShell `5.1.26100.8875`; and
+- PowerShell 7 was not installed, so the literal `pwsh` command failed before the script could run.
+
+That result exposed a documentation inconsistency rather than a product failure. The checklist described PowerShell 7 or Windows PowerShell 5.1 as sufficient, but later invoked both executables unconditionally.
+
+The correction now states:
+
+- at least one supported PowerShell edition is required;
+- Windows PowerShell 5.1 is sufficient for local validation;
+- PowerShell 7 is optional locally;
+- every installed supported edition must pass; and
+- repository CI remains responsible for continuously testing both editions.
+
+The maintainer also reported executing the baseline build, test, model-installation and review-smoke commands. Their final pass/fail states must be included in the WI-0032 completion summary.
 
 ## Remaining milestone gate
 
-Only independent clean-environment and trusted-network human verification remains. The expanded `docs/delivery/work-items/WI-0032-documentation-validation.md` is the authoritative checklist.
+Only independent clean-environment and trusted-network human verification remains. `docs/delivery/work-items/WI-0032-documentation-validation.md` is the authoritative checklist.
 
-The maintainer must:
+The remaining work is to:
 
-1. use a clean Windows checkout and isolated workspace without old build output or repository models;
-2. start at README and follow the operator documentation without filling gaps from project memory;
-3. run Release build, tests, model installation, documentation checks and synthetic review smoke;
-4. process a representative 450–550-image private set, including interruption, status and resume;
-5. verify the review, suggestion, evaluation, collection and neutral-manifest workflows on Windows;
-6. verify the browser workflow on Pixel over a trusted private network;
-7. validate deterministic export/evaluation, stopped-state backup/restore and documented recovery paths;
-8. inspect the multi-model procedure and run its PowerShell 5.1 and 7 self-tests;
-9. perform a second reading pass and report every confusing or hidden prerequisite; and
-10. return only the privacy-safe summary template from WI-0032.
+1. merge the optional-PowerShell documentation correction;
+2. confirm pass/fail for the baseline build, tests, model installation and review smoke;
+3. process a representative 450–550-image private set, including interruption, status and resume;
+4. verify review, suggestion, evaluation, collection and neutral-manifest workflows on Windows;
+5. verify the browser workflow on Pixel over a trusted private network;
+6. validate deterministic export/evaluation, stopped-state backup/restore and documented recovery paths;
+7. inspect the multi-model procedure, using Windows PowerShell 5.1 and PowerShell 7 only when installed;
+8. perform the second reading pass and correct every confusing or hidden prerequisite; and
+9. return only the privacy-safe summary template from WI-0032.
 
 Any documentation defect found during validation must be corrected and merged before WI-0032 and M15 complete.
 
@@ -70,5 +88,8 @@ Any documentation defect found during validation must be corrected and merged be
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 powershell.exe -NoProfile -File ./Invoke-MultiModelComparison.ps1 -SelfTest
-pwsh -NoProfile -File ./Invoke-MultiModelComparison.ps1 -SelfTest
+
+if (Get-Command pwsh -ErrorAction SilentlyContinue) {
+    pwsh -NoProfile -File ./Invoke-MultiModelComparison.ps1 -SelfTest
+}
 ```
