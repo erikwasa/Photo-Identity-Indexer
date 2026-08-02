@@ -14,12 +14,13 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M07 — Portable job bundles**: `completed`
 - **M08 — Multi-model local evaluation**: `completed`
 - **M15 — Operator documentation and system guide**: `in_progress`
-- **M16 — Face detection recall**: `ready`
+- **M16 — Face detection recall**: `in_progress`
 - **M14 — Collection-ready API**: `completed`
 
 ## Active work
 
 - [**WI-0032 — Validate documentation from a clean setup**](../work-items/WI-0032-documentation-validation.md) — `in_progress`; owner: `human-maintainer`
+- [**WI-0039 — Build detector evaluation workspace**](../work-items/WI-0039-detector-evaluation-workspace.md) — `in_progress`; owner: `ai-agent`
 
 ## Recently completed
 
@@ -29,4 +30,4 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Next ready work
 
-- [**WI-0034 — Measure baseline detector recall**](../work-items/WI-0034-detector-recall-baseline.md) — `ready`; owner: `human-maintainer`
+None.
