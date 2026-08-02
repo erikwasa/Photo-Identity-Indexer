@@ -13,13 +13,13 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M06 | Local evaluation and acceptance | completed |
 | M07 | Portable job bundles | completed |
 | M08 | Multi-model local evaluation | completed |
-| M15 | Operator documentation and system guide | proposed |
+| M15 | Operator documentation and system guide | in_progress |
 | M09 | Azure VM pilot without identities | proposed |
 | M10 | Azure checkpointing | proposed |
 | M11 | Production model selection | proposed |
 | M12 | Full archive processing | proposed |
 | M13 | Ongoing local synchronisation | proposed |
-| M14 | Collection-ready API | ready |
+| M14 | Collection-ready API | completed |
 
 Expected evolution:
 

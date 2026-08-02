@@ -1,41 +1,40 @@
 # Photo Identity Indexer
 
-A private, local-first system for detecting and identifying people in a personal photo archive.
+Photo Identity Indexer is a private, local-first system for detecting, reviewing and finding people in a personal photo archive.
 
-The Windows computer is the trusted control plane. It owns the SQLite catalogue, people, human review history and derived artefacts; runs the CLI, worker, API and browser UI; and can perform the complete functional workflow without Azure. Optional Azure compute is limited to explicit portable processing bundles and never authenticates to personal OneDrive.
-
-## Current direction
-
-The evaluation harness from WI-0017 is complete. Delivery is now intentionally focused on local acceptance because Azure resources will be unavailable for a period.
-
-The next ready items are:
-
-- **WI-0027 — Complete the local review workflow**: expose ranked suggestions, person maintenance, bulk review, progress and model-revision filters in the Windows/Pixel browser UI.
-- **WI-0028 — Export reviewed catalogues to model-lab**: produce reproducible gallery, validation and held-out test manifests from the SQLite catalogue.
-
-After those items, the project will run a 450–550 image baseline pilot, add a second model, repeat the same corpus for comparison, exercise collection queries, and rewrite and validate the documentation. Azure work is deferred until that local phase is complete and access is available.
-
-Read the [local-first delivery plan](docs/delivery/local-first-plan.md) for the complete sequence and acceptance boundaries.
+The Windows computer is the trusted control plane. It owns the SQLite catalogue, people, append-only human review history and derived artefacts; runs the CLI, worker, API and browser UI; and can perform the complete workflow without Azure. Optional Azure compute is limited to explicit portable processing bundles and never authenticates to personal OneDrive.
 
 ## Start here
 
+Follow the [local operator guide](docs/operations/local-operator-guide.md) to install the pinned models, process a representative photo set, review identities, regenerate suggestions, evaluate model revisions, browse collections, back up the catalogue and clean up temporary artefacts.
+
+Use these references when you need more detail:
+
 - [Documentation index](docs/index.md)
-- [Local evaluation workflow](docs/operations/local-evaluation.md)
-- [Local-first delivery plan](docs/delivery/local-first-plan.md)
 - [Architecture overview](docs/architecture/overview.md)
+- [Local evaluation and multi-model workflow](docs/operations/local-evaluation.md)
+- [SQLite backup, restore and concurrency policy](docs/operations/sqlite-persistence.md)
+- [Security and privacy](docs/architecture/security-and-privacy.md)
 - [Current delivery status](docs/delivery/status/current.md)
-- [Build context](BUILD_CONTEXT.md)
+
+## Current status
+
+The complete local workflow has been exercised against a private 450–550-image catalogue on Windows and a Pixel over a trusted private network. This includes resumable processing, human review, exact-model suggestions, deterministic evaluation, multi-model coexistence, backup and restore, responsive collection browsing, and a neutral path-free collection manifest.
+
+M15 is now rewriting and independently validating the operator and architecture documentation. Azure work remains optional and deferred until the clean-setup documentation validation is complete and access is available.
 
 ## Prerequisites
 
 - Windows
 - .NET 10 SDK
 - PowerShell 7 or Windows PowerShell
-- Local disk space for SQLite, aligned crops, embeddings and reports
-- A trusted private network for Pixel browser testing
-- Personal photos kept outside the repository
+- Local disk space for SQLite, crops, embeddings, publish output and reports
+- A trusted private network for optional Pixel browser access
+- Personal photos and all generated biometric data kept outside the repository
 
-## Build and synthetic verification
+## Verify the repository
+
+From the repository root:
 
 ```powershell
 ./build.ps1
@@ -44,80 +43,27 @@ Read the [local-first delivery plan](docs/delivery/local-first-plan.md) for the 
 ./verify-review.ps1 -Mode Smoke -Configuration Release
 ```
 
-The local verification paths use synthetic fixtures or explicitly supplied private files. Generated biometric data must not be committed.
+Expected success signals are a Release build, passing automated tests, verified model hashes, valid living documentation and a passing disposable hosted-application smoke test.
 
-## Process a local subset
+## Supported local workflow
 
-Keep the output outside the source directory:
+The accepted workflow is:
 
-```powershell
-$root = "C:\PhotoIdentityPilot500"
-$source = Join-Path $root "source"
-$output = Join-Path $root "outputs"
-$db = Join-Path $root "catalogue.db"
+1. stage a local or OneDrive-synchronised source outside the repository;
+2. process immutable photo revisions with the pinned YuNet detector and SFace embedder;
+3. review faces and maintain people through the local browser application;
+4. regenerate ranked suggestions for one exact embedding-model revision;
+5. export and evaluate deterministic reviewed-catalogue splits;
+6. optionally process the same revisions with another pinned model revision;
+7. browse any-person or all-person collections and request a neutral manifest; and
+8. stop writers before backing up the SQLite catalogue and referenced artefacts.
 
-New-Item -ItemType Directory -Force -Path $source,$output | Out-Null
+The [local operator guide](docs/operations/local-operator-guide.md) is the authoritative command sequence. Other documents explain individual subsystems rather than duplicating that sequence.
 
-dotnet run --project src/PhotoIdentity.Cli -- `
-  batch start `
-  --database $db `
-  --source $source `
-  --output $output
-```
+## Privacy boundary
 
-Use the printed run ID for status and resume:
+Do not commit personal photos, names, face crops, embeddings, SQLite catalogues, model binaries, credentials, tokens, real evaluation manifests, reports or private paths.
 
-```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  batch status --database $db --run RUN_ID
+The browser application is unauthenticated. Bind it only to localhost or a trusted private network, restrict any firewall rule to the intended private profile, and never expose it to the public internet.
 
-dotnet run --project src/PhotoIdentity.Cli -- `
-  batch resume --database $db --run RUN_ID
-```
-
-Batch processing scans current immutable revisions, records unsupported or unavailable media, and persists faces and embeddings without modifying the source files.
-
-## Run the browser review application
-
-Publish the hosted Blazor client and API before running against the catalogue:
-
-```powershell
-$publish = Join-Path $root "review-app"
-Remove-Item $publish -Recurse -Force -ErrorAction SilentlyContinue
-
-dotnet publish `
-  .\src\PhotoIdentity.Api\PhotoIdentity.Api.csproj `
-  --configuration Release `
-  --output $publish
-
-$env:PhotoIdentity__DatabasePath = $db
-Push-Location $publish
-dotnet .\PhotoIdentity.Api.dll --urls "http://0.0.0.0:5080"
-```
-
-Open `http://localhost:5080` on Windows. A Pixel on the same trusted private network can use the computer's LAN address when the firewall permits the port for that private profile.
-
-The current UI supports gallery filters, person creation, assignment, rejection, undo and privacy-limited details. Ranked suggestion review, person rename/merge, bulk actions and model-revision filters are planned in WI-0027. The application is unauthenticated; do not expose it to an untrusted network.
-
-## Run the current evaluation harness
-
-The checked-in fixture is synthetic:
-
-```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  evaluate `
-  --dataset tools/model-lab/example-dataset.json `
-  --output .artifacts/model-lab/example-report.json
-```
-
-Validation selects thresholds and the held-out test split reports final metrics. The current command consumes a prepared manifest. WI-0028 will generate that manifest deterministically from a reviewed catalogue.
-
-## Portable processing bundles
-
-Portable bundles are complete and can run on another local machine now or on Azure later. Export, process and import remain model-derived operations; people and human review history never enter the worker bundle.
-
-See [portable processing bundles](docs/architecture/portable-bundles.md). Azure execution is optional and deliberately deferred while access is unavailable.
-
-## Privacy
-
-Do not commit personal photos, names, face crops, embeddings, SQLite catalogues, model binaries, credentials, SAS tokens, real evaluation manifests or model-lab reports. See [security and privacy](docs/architecture/security-and-privacy.md).
+Original photos are read-only inputs and must not be modified.

@@ -2,28 +2,26 @@
 
 ## Current milestone
 
-**M14 — Collection-ready API**
+**M15 — Operator documentation and system guide**
 
 Status: `in_progress`
 
 ## Current work
 
-**WI-0025 — Add collection-ready queries** remains active.
+**WI-0031 — Rewrite operator and architecture documentation** is active on `agent/WI-0031-documentation-rewrite`.
 
-PRs #57–#59 established confirmed, suggestion-backed and explicit review-state collection queries. PR #60 added the first local `/collections` workspace. PR #61 added the searchable people selector and opaque local photo delivery. PR #62 restored Blazor component-scoped styles across the application and changed collection cards to fixed 480 × 320 server-generated thumbnails.
+M14 and WI-0025 completed on 2026-08-02. PRs #57–#63 delivered confirmed and exact-model advisory collection queries, explicit any/all and review-state semantics, the responsive Windows/Pixel collection workspace, fixed 480 × 320 server-generated thumbnails, and the complete version-1 neutral manifest. GitHub Actions build #401 passed, and the operator retained detailed private-catalogue counts and representative-result evidence outside Git.
 
-The active slice is `agent/WI-0025-neutral-manifest`.
-
-It adds a versioned, complete collection manifest for later slideshow and album consumers. The manifest accepts the same query policy as the browser/API, pages internally across the 200-item repository boundary, and returns opaque IDs, matched-person evidence, bounded-thumbnail URLs and original-content URLs without source roots, source keys or filenames.
+The first WI-0031 slice replaces the stale README direction with one current start-here path and adds `docs/operations/local-operator-guide.md` as the authoritative end-to-end local workflow. The documentation index now treats evaluation, persistence, model and architecture documents as specialized references rather than competing runbooks.
 
 ## Next concrete step
 
-1. Run the full Release build, integration suite, living-document validation and published Windows smoke path in GitHub Actions.
-2. Verify the 201-photo integration fixture returns one complete version-1 manifest with the vendor media type and `no-store` cache policy.
-3. Merge the neutral-manifest slice after CI passes.
-4. Re-run `/collections` on Windows and Pixel against the accepted private catalogue.
-5. Record isolated-style loading, selector usability, fixed-size thumbnails, no horizontal overflow, any/all counts and representative-result evidence.
-6. Complete WI-0025 only after the device and pilot-count criteria pass.
+1. Rewrite the multi-model runbook around installing, processing and comparing exact FP32 and INT8 revisions while retaining the accepted FP32 recommendation.
+2. Reconcile architecture documentation for executables, module boundaries, canonical data, derived artefacts, model revisions, append-only review history and optional Azure scale-out.
+3. Add a shared glossary for catalogue, revision, occurrence, exemplar, suggestion, assignment, model revision and bundle.
+4. Remove or redirect stale and duplicated guidance.
+5. Run `PhotoIdentity.Docs validate`, `generate --check` and the normal CI workflow.
+6. Move WI-0031 to review only after all rewrite acceptance criteria are satisfied; WI-0032 will then validate the instructions from a clean Windows setup and trusted-network Pixel path.
 
 ## Completed gates
 
@@ -35,33 +33,22 @@ It adds a versioned, complete collection manifest for later slideshow and album 
 - Baseline and candidate embeddings coexist while sharing one canonical catalogue and human review history.
 - The same-corpus FP32-versus-INT8 workflow passed exact-provenance, same-source, same-detector-count, deterministic-export and same-split checks.
 - A private manual review of 20 representative faces found both revisions correct in every case and no material practical difference.
-
-## WI-0030 outcome
-
-WI-0030 and M08 completed on 2026-08-01.
-
-The private comparison kept `yunet-2023mar-fp32`, SFace five-point alignment, the immutable source scope, dataset ID, pipeline version, split seed and split settings fixed while comparing:
-
-- baseline: `sface-2021dec-fp32`;
-- candidate: `sface-2021dec-int8`.
-
-Exact-model suggestions remained distinguishable and could not overwrite one another or alter people, assignments, rejections or append-only audit history. The operator retained the detailed workbook and raw comparison artefacts outside Git.
-
-The recommendation is to retain `sface-2021dec-fp32` as the current default embedding model. INT8 remains a governed candidate, but it did not demonstrate a material identification or review-quality advantage on the accepted private corpus. No larger local evaluation is required before proceeding to collection-ready queries. Final production model selection remains deferred to M11 and later Azure consistency, cost and broader-diversity evidence.
+- Collection queries and the neutral manifest passed automated validation plus private Windows/Pixel and pilot-catalogue verification.
 
 ## Delivery objective
 
 Prove as much of the product as possible without Azure:
 
-1. exercise practical collection queries against the accepted catalogue;
+1. maintain the accepted local processing, review, evaluation and collection workflows;
 2. rewrite and independently validate the operator and architecture documentation; and
-3. resume Azure execution only when access is available.
+3. resume Azure execution only after documentation validation and when access is available.
 
 ## Relevant planning files
 
 - `docs/delivery/local-first-plan.md`
-- `docs/delivery/milestones/M14-collection-api.md`
-- `docs/delivery/work-items/WI-0025-collection-api.md`
+- `docs/delivery/milestones/M15-documentation.md`
+- `docs/delivery/work-items/WI-0031-documentation-rewrite.md`
+- `docs/delivery/work-items/WI-0032-documentation-validation.md`
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/status/milestones.yaml`
 
