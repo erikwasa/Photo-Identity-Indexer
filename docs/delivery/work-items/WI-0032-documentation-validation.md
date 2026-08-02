@@ -37,14 +37,16 @@ Confirm these prerequisites without consulting old project notes:
 
 - Git;
 - .NET 10 SDK;
-- PowerShell 7 or Windows PowerShell 5.1;
+- at least one supported PowerShell edition: Windows PowerShell 5.1 or PowerShell 7;
 - enough local disk space for model files, catalogue, crops, published application and reports; and
 - a Pixel browser on the same trusted private network for the later device check.
+
+Windows PowerShell 5.1 is sufficient for local validation. PowerShell 7 is optional. When both editions are installed, run the self-test under both. Repository CI remains responsible for continuously proving compatibility with both editions.
 
 Record:
 
 - Windows version;
-- PowerShell edition and version;
+- installed PowerShell edition or editions and versions;
 - `dotnet --info` summary;
 - whether the checkout and workspace were genuinely clean; and
 - the commit being validated.
@@ -62,13 +64,22 @@ Run the documented baseline commands from the repository root:
 ./verify-review.ps1 -Mode Smoke -Configuration Release
 ```
 
-Also run the documentation and cross-PowerShell checks explicitly:
+Also run the documentation checks and the comparison self-test under every installed PowerShell edition:
 
 ```powershell
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
-powershell.exe -NoProfile -File ./Invoke-MultiModelComparison.ps1 -SelfTest
-pwsh -NoProfile -File ./Invoke-MultiModelComparison.ps1 -SelfTest
+
+powershell.exe -NoProfile `
+  -File ./Invoke-MultiModelComparison.ps1 -SelfTest
+
+if (Get-Command pwsh -ErrorAction SilentlyContinue) {
+    pwsh -NoProfile `
+      -File ./Invoke-MultiModelComparison.ps1 -SelfTest
+}
+else {
+    Write-Host "PowerShell 7 is not installed; optional pwsh self-test skipped."
+}
 ```
 
 Pass criteria:
@@ -79,9 +90,21 @@ Pass criteria:
 - documentation links and registries validate;
 - generated documents are current;
 - the disposable published review smoke passes; and
-- the multi-model script self-test passes under every installed PowerShell edition.
+- the multi-model script self-test passes under every installed supported PowerShell edition.
 
-Record any command that requires an undocumented working directory, environment variable, tool, permission or manual correction.
+The absence of optional PowerShell 7 is not a validation failure when Windows PowerShell 5.1 passes. Record any command that requires an undocumented working directory, environment variable, required tool, permission or manual correction.
+
+## Validation progress recorded on 2026-08-02
+
+The maintainer reported the following clean-validation results:
+
+- documentation registry and link validation passed;
+- generated-document checking passed;
+- the comparison self-test passed on Windows PowerShell `5.1.26100.8875`;
+- `pwsh` was not installed; this exposed the unconditional optional-tool command and prompted the correction above; and
+- the baseline build, test, model-installation and review-smoke commands were executed, with their final pass/fail states to be included in the completion summary.
+
+This is partial WI-0032 evidence only. The catalogue, Windows/Pixel, deterministic evaluation, collection, backup/restore and second-reading gates remain open.
 
 ## Phase 3: isolated catalogue workspace
 
@@ -171,11 +194,19 @@ Pass criteria include:
 
 The accepted FP32-versus-INT8 comparison has already been completed; WI-0032 does not require another costly full comparison unless a documentation defect makes rerunning it necessary.
 
-Validate the procedure by:
+Validate the procedure under every installed supported PowerShell edition:
 
 ```powershell
-powershell.exe -NoProfile -File ./Invoke-MultiModelComparison.ps1 -SelfTest
-pwsh -NoProfile -File ./Invoke-MultiModelComparison.ps1 -SelfTest
+powershell.exe -NoProfile `
+  -File ./Invoke-MultiModelComparison.ps1 -SelfTest
+
+if (Get-Command pwsh -ErrorAction SilentlyContinue) {
+    pwsh -NoProfile `
+      -File ./Invoke-MultiModelComparison.ps1 -SelfTest
+}
+else {
+    Write-Host "PowerShell 7 is not installed; optional pwsh self-test skipped."
+}
 ```
 
 Then read `docs/operations/multi-model-comparison.md` and confirm that a new operator can identify, without project memory:
@@ -239,7 +270,8 @@ Build and tests: pass/fail
 Model install and verification: pass/fail
 Documentation validate/generate check: pass/fail
 Synthetic review smoke: pass/fail
-PowerShell comparison self-tests: pass/fail
+Windows PowerShell comparison self-test: pass/fail
+PowerShell 7 comparison self-test: pass/fail/not installed
 450-550 image processing: pass/fail; aggregate completed/failed counts
 Interrupt and resume: pass/fail
 Windows review workflow: pass/fail
