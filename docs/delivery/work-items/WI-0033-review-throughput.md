@@ -76,8 +76,9 @@ The 500-image acceptance pilot completed successfully, but review was too slow o
 ## Implemented slice: final verification preparation
 
 - Published smoke exercises workflow routes, exact-model suggestion summaries, queue navigation metadata, person audit, grouped suggestion preview/commit, linked audit rows and privacy-limited responses.
-- `record-review-session.ps1` records privacy-safe aggregate metrics for one Windows or Pixel session and creates a two-device summary after both reports exist.
-- `docs/delivery/verification/WI-0033-manual-verification.md` defines like-for-like catalogue reset, trusted-network setup, metric definitions, mandatory failures and completion evidence.
+- A temporary local session reporter captured privacy-safe aggregate metrics for the required Windows and Pixel acceptance sessions.
+- A temporary manual procedure defined like-for-like catalogue reset, trusted-network setup, metric definitions, mandatory failures and completion evidence.
+- The one-off reporter and manual procedure were retired after WI-0033 completed. Permanent synthetic smoke coverage remains in `verify-review.ps1` and `PhotoIdentity.ReviewVerification`.
 
 ## Corrective slices after device verification
 
@@ -105,7 +106,7 @@ Human verification on Windows and Pixel passed on 2026-08-01. The operator confi
 2. Top-suggestion summaries and suggestion-aware ordering.
 3. Per-person assigned-face audit.
 4. Preview-first grouped suggestion acceptance with linked audit actions.
-5. Published workflow smoke, local session reporting and Windows/Pixel manual verification.
+5. Published workflow smoke and completed Windows/Pixel manual verification.
 6. Device-found defect correction and unified continuous review UI.
 7. Queue-aware details auto-advance, expanded provenance containment and multi-page interactive fixture.
 

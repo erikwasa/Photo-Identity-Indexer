@@ -4,15 +4,19 @@ Prepares and verifies the local review application with synthetic data.
 
 .DESCRIPTION
 Builds the solution, creates a disposable SQLite catalogue with synthetic coloured
-face crops, publishes and starts the review application, performs privacy and
-mutation smoke checks, and prints local/LAN URLs for Windows and Pixel verification.
-It never changes a real catalogue and never creates firewall rules.
+face crops, publishes and starts the review application, and performs privacy and
+mutation smoke checks. Interactive mode prints local and LAN URLs for optional
+browser inspection. The script never changes a real catalogue and never creates
+firewall rules.
 
 .EXAMPLE
 ./verify-review.ps1
 
 .EXAMPLE
 ./verify-review.ps1 -Mode Smoke -Configuration Release
+
+.EXAMPLE
+./verify-review.ps1 -Mode Prepare -SkipBuild
 #>
 [CmdletBinding()]
 param(
@@ -40,8 +44,6 @@ $stdoutPath = Join-Path $artifactDirectory "api.stdout.log"
 $stderrPath = Join-Path $artifactDirectory "api.stderr.log"
 $toolAssembly = Join-Path $root "tools/PhotoIdentity.ReviewVerification/bin/$Configuration/net10.0/PhotoIdentity.ReviewVerification.dll"
 $smokeScript = Join-Path $root "tools/PhotoIdentity.ReviewVerification/Invoke-PublishedReviewSmoke.ps1"
-$sessionScript = Join-Path $root "record-review-session.ps1"
-$manualGuide = Join-Path $root "docs/delivery/verification/WI-0033-manual-verification.md"
 $apiProject = Join-Path $root "src/PhotoIdentity.Api/PhotoIdentity.Api.csproj"
 $publishedApiDirectory = Join-Path $artifactDirectory "app"
 $apiAssembly = Join-Path $publishedApiDirectory "PhotoIdentity.Api.dll"
@@ -79,7 +81,7 @@ if (-not $SkipBuild) {
     )
 }
 
-foreach ($requiredFile in @($toolAssembly, $apiProject, $smokeScript, $sessionScript, $manualGuide)) {
+foreach ($requiredFile in @($toolAssembly, $apiProject, $smokeScript)) {
     if (-not (Test-Path -LiteralPath $requiredFile -PathType Leaf)) {
         throw "Required review verification file was not found: $requiredFile"
     }
@@ -112,7 +114,7 @@ $notRunSmoke = [ordered]@{
     cacheControl = "not_run"
 }
 $report = [ordered]@{
-    schemaVersion = 3
+    schemaVersion = 4
     result = "prepared"
     mode = $Mode
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
@@ -122,16 +124,14 @@ $report = [ordered]@{
     localUrl = "http://localhost:$Port"
     lanUrls = @(Get-LanUrls -SelectedPort $Port)
     smoke = $notRunSmoke
-    manualVerificationGuide = "docs/delivery/verification/WI-0033-manual-verification.md"
-    manualSessionReporter = "record-review-session.ps1"
-    manualVerificationRequired = ($Mode -eq "Interactive")
+    usesDisposableCatalogue = $true
+    createsFirewallRule = $false
 }
 
 if ($Mode -eq "Prepare") {
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
     Write-Host "Prepared synthetic review catalogue: $($manifest.DatabasePath)"
     Write-Host "Report: $reportPath"
-    Write-Host "Manual guide: $manualGuide"
     exit 0
 }
 
@@ -181,43 +181,18 @@ try {
     }
 
     $report.smoke = & $smokeScript -BaseUrl $baseUrl -Manifest $manifest
-
-    if ($Mode -eq "Smoke") {
-        $selfTestRelativeDirectory = ".artifacts/review-verification/session-reporter-self-test"
-        $selfTestDirectory = Join-Path $root $selfTestRelativeDirectory
-        Remove-Item -LiteralPath $selfTestDirectory -Recurse -Force -ErrorAction SilentlyContinue
-        & $sessionScript -Device Windows -FacesReviewed 50 -ActiveMinutes 10 `
-            -AcceptedSuggestions 40 -ExplicitActions 50 -GalleryReturns 0 -ImmediateUndos 1 `
-            -Notes "Automated session reporter self-test." -OutputDirectory $selfTestRelativeDirectory
-        & $sessionScript -Device Pixel -FacesReviewed 50 -ActiveMinutes 12.5 `
-            -AcceptedSuggestions 40 -ExplicitActions 52 -GalleryReturns 0 -ImmediateUndos 1 `
-            -Notes "Automated session reporter self-test." -OutputDirectory $selfTestRelativeDirectory
-        $selfTestSummaryPath = Join-Path $selfTestDirectory "manual-verification-summary.json"
-        if (-not (Test-Path -LiteralPath $selfTestSummaryPath -PathType Leaf)) {
-            throw "The manual session reporter did not create a two-device summary."
-        }
-        $selfTestSummary = Get-Content -LiteralPath $selfTestSummaryPath -Raw | ConvertFrom-Json
-        if ($selfTestSummary.result -ne "passed" -or @($selfTestSummary.devices).Count -ne 2) {
-            throw "The manual session reporter self-test summary was invalid."
-        }
-        Remove-Item -LiteralPath $selfTestDirectory -Recurse -Force
-    }
-
     $report.result = "passed"
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 
-    Write-Host "`nReview verification smoke checks passed."
-    Write-Host "Windows URL: $($report.localUrl)"
+    Write-Host "`nReview application verification passed."
+    Write-Host "Mode: $Mode"
+    Write-Host "Windows/local URL: $($report.localUrl)"
     foreach ($url in $report.lanUrls) {
-        Write-Host "Pixel/LAN URL: $url"
+        Write-Host "Trusted-LAN URL: $url"
     }
     Write-Warning "No firewall rule was created. Permit TCP $Port only on the intended private network profile."
     Write-Warning "The review listener is unauthenticated HTTP; do not expose it to an untrusted network."
-    Write-Host "`nBefore closing WI-0033:"
-    Write-Host "  1. Follow $manualGuide on Windows and Pixel."
-    Write-Host "  2. Use a like-for-like fresh 50-100-face queue for each device run."
-    Write-Host "  3. Record each result with $sessionScript; reports stay below .artifacts."
-    Write-Host "  4. Do not mark touch usability or throughput accepted from automated smoke alone."
+    Write-Host "The synthetic fixture and generated logs remain below .artifacts/review-verification."
     Write-Host "Report: $reportPath"
 
     if ($Mode -eq "Interactive") {

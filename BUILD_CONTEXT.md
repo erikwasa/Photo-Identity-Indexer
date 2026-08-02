@@ -8,28 +8,28 @@ Status: `in_progress`
 
 ## Current work
 
-**WI-0031 — Rewrite operator and architecture documentation** is active on `agent/WI-0031-architecture-glossary`.
+**WI-0031 — Rewrite operator and architecture documentation** is in its final housekeeping pass on `agent/general-housekeeping`.
 
 M14 and WI-0025 completed on 2026-08-02. The collection API, responsive Windows/Pixel workspace, fixed thumbnails and version-1 neutral manifest passed automated and private-catalogue acceptance.
 
-PR #64 delivered the first WI-0031 slice: a concise README, one authoritative local operator guide and a documentation index that separates the end-to-end command sequence from specialized references.
+PR #64 delivered the concise README, authoritative local operator guide and documentation routing. PR #65 delivered the exact-revision evaluation and multi-model runbooks, implemented-system architecture, aligned model/persistence guidance and shared glossary. Build #406 and multi-model workflow #6 passed before PR #65 merged.
 
-The current slice completes the remaining rewrite acceptance criteria:
+The final housekeeping pass removes temporary completed-work-item artifacts and makes the PowerShell entry points describe their permanent supported behavior:
 
-- exact-revision single-model evaluation guidance;
-- an automated, resumable FP32-versus-INT8 comparison runbook with the accepted FP32 recommendation;
-- reconciled application, module, data, matching and portable-compute architecture;
-- aligned baseline, candidate and model-governance pages;
-- updated SQLite backup, locking and accepted-resume guidance; and
-- a shared glossary plus explicit documentation routing.
+- remove the retired `docs/delivery/verification` WI-0033 procedure;
+- remove the one-off WI-0033 review-session reporter;
+- decouple `verify-review.ps1` from completed work-item output and report fields;
+- generalize multi-model comparison reports and generated manual checklists;
+- make build, test and model-install wrappers Release-first with explicit native exit-code handling; and
+- retain `verify-local.ps1` and the published review smoke script after confirming their output is current and work-item-neutral.
 
 ## Next concrete step
 
-1. Run the full GitHub Actions workflow.
-2. Require `PhotoIdentity.Docs validate` and `generate --check` to pass with no stale links or generated files.
-3. Review the documentation diff for privacy, command consistency and duplicated guidance.
-4. Move WI-0031 to `in_review` with PR/CI evidence after validation passes.
-5. Merge the documentation rewrite.
+1. Run the main build and multi-model workflow against the housekeeping branch.
+2. Require Release build, all tests, documentation validation, generated-document checks, review smoke and Windows PowerShell verification to pass.
+3. Confirm no repository references remain to the deleted WI-0033 guide or reporter.
+4. Move WI-0031 to `in_review` with PR and workflow evidence.
+5. Merge the housekeeping slice.
 6. Start WI-0032 to exercise the instructions from a clean Windows setup and trusted-network Pixel path.
 
 ## Completed gates
@@ -41,8 +41,9 @@ The current slice completes the remaining rewrite acceptance criteria:
 - The same-corpus comparison passed source, detector-count, deterministic-export and split-equality checks.
 - A private manual review of 20 representative faces found both revisions correct with no material practical difference; FP32 remains the local default.
 - Collection queries and the neutral manifest passed automated validation plus private Windows/Pixel verification.
-- The README and local operator guide now provide one current PowerShell-first path.
-- The architecture and model documentation now describe implemented behavior rather than roadmap-era plans.
+- The README and local operator guide provide one current PowerShell-first path.
+- The architecture and model documentation describe implemented behavior rather than roadmap-era plans.
+- All WI-0031 documentation acceptance criteria are checked.
 
 ## Delivery objective
 
@@ -65,4 +66,6 @@ dotnet test
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ./verify-review.ps1 -Mode Smoke -Configuration Release
+powershell.exe -NoProfile -File ./Invoke-MultiModelComparison.ps1 -SelfTest
+pwsh -NoProfile -File ./Invoke-MultiModelComparison.ps1 -SelfTest
 ```
