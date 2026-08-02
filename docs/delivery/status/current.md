@@ -20,6 +20,7 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 ## Active work
 
 - [**WI-0032 — Validate documentation from a clean setup**](../work-items/WI-0032-documentation-validation.md) — `in_progress`; owner: `human-maintainer`
+- [**WI-0034 — Measure baseline detector recall**](../work-items/WI-0034-detector-recall-baseline.md) — `blocked`; owner: `human-maintainer`
 - [**WI-0039 — Build detector evaluation workspace**](../work-items/WI-0039-detector-evaluation-workspace.md) — `in_progress`; owner: `ai-agent`
 
 ## Recently completed
