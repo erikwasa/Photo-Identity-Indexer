@@ -1,10 +1,12 @@
 <#
 .SYNOPSIS
-Runs the repeatable WI-0030 comparison steps from one JSON configuration.
+Runs a repeatable exact-revision model comparison from one JSON configuration.
 
 .DESCRIPTION
 Compatible with Windows PowerShell 5.1 and PowerShell 7. The configured workspace
-must remain outside the source tree and must not be committed.
+must remain outside the source tree and must not be committed. The workflow keeps
+source scope, detector revision, evaluation split and canonical review state fixed
+while comparing two or more embedding-model revisions.
 #>
 [CmdletBinding()]
 param(
@@ -655,8 +657,8 @@ Assert-Same "Source after comparison" `
 
 $summaryPath = Join-Path $workspace "comparison-summary.json"
 Write-Json ([ordered]@{
-    schemaVersion = 2
-    workItem = "WI-0030"
+    schemaVersion = 3
+    reportType = "multi-model-comparison"
     generatedAtUtc = [DateTime]::UtcNow.ToString("O")
     sourceFiles = $snapshot.Count
     detector = [ordered]@{
@@ -677,7 +679,7 @@ Write-Json ([ordered]@{
 
 $manualPath = Join-Path $workspace "manual-verification.md"
 @"
-# WI-0030 manual verification
+# Multi-model comparison manual verification
 
 Automated comparison passed. Publish the review application against:
 
