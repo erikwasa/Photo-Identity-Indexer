@@ -3,7 +3,7 @@ id: WI-0040
 title: Define non-identity face states
 milestone: M17
 status_source: ../status/work-items.yaml
-depends_on: [WI-0039]
+depends_on: [WI-0034]
 affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Sqlite, Documentation]
 ---
 
