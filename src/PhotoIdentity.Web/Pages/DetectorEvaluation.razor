@@ -1,0 +1,257 @@
+@page "/detector-evaluation"
+@using System.Globalization
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Detector evaluation · Photo Identity</PageTitle>
+
+<section class="detector-evaluation-hero">
+    <div>
+        <p class="eyebrow">Photo-level detector review</p>
+        <h1>Evaluate detections in context</h1>
+        <p>
+            Browse complete source photos in stable filename order with every persisted detector box overlaid.
+            Photos with zero detections remain visible, so missed-face review does not disappear from the workflow.
+        </p>
+    </div>
+
+    <aside class="detector-evaluation-note">
+        <strong>Read-only first slice</strong>
+        <p>
+            This page does not assign identities or change review state. Private sample categories and reusable
+            ground-truth annotations will be added separately.
+        </p>
+    </aside>
+</section>
+
+<section class="detector-evaluation-controls" aria-label="Detector evaluation controls">
+    <div>
+        <label class="field-label" for="evaluation-run">Processing run</label>
+        <select id="evaluation-run"
+                @bind="SelectedRunId"
+                @bind:after="ChangeRunAsync"
+                disabled="@(Loading || Runs.Count == 0)">
+            @foreach (DetectorEvaluationRunResponse run in Runs)
+            {
+                <option value="@run.Id">@RunLabel(run)</option>
+            }
+        </select>
+    </div>
+
+    @if (SelectedRun is DetectorEvaluationRunResponse selectedRun)
+    {
+        <div class="detector-run-summary">
+            <span><strong>@selectedRun.PhotoCount</strong> photos</span>
+            <span><strong>@selectedRun.DetectionCount</strong> detections</span>
+            <span class="state-badge">@selectedRun.Status</span>
+        </div>
+    }
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+
+@if (Loading)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading detector evaluation photos…</p>
+    </section>
+}
+else if (Runs.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No processing runs</h2>
+        <p>Process an isolated evaluation set, then reopen this page.</p>
+    </section>
+}
+else if (Photos.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No photos in this run</h2>
+        <p>Select another processing run or inspect the batch status.</p>
+    </section>
+}
+else
+{
+    <div class="detector-page-summary" role="status">
+        <span>@PageLabel</span>
+        <span>Boxes use normalized coordinates from the persisted detector observations.</span>
+    </div>
+
+    <section class="detector-photo-list" aria-label="Photos with detector overlays">
+        @foreach (DetectorEvaluationPhotoResponse photo in Photos)
+        {
+            <article class="detector-photo-card">
+                <header>
+                    <div>
+                        <h2>@photo.PhotoName</h2>
+                        <p>
+                            @DimensionLabel(photo) · @photo.Detections.Count detection@(photo.Detections.Count == 1 ? "" : "s")
+                        </p>
+                    </div>
+                    <span class="state-badge">@photo.JobStatus</span>
+                </header>
+
+                <div class="detector-photo-stage">
+                    <img src="@photo.ContentUrl"
+                         alt="Source photo @photo.PhotoName with detector overlays"
+                         loading="lazy" />
+                    @foreach (DetectorEvaluationDetectionResponse detection in photo.Detections)
+                    {
+                        <div class="detector-box"
+                             style="@BoxStyle(detection.BoundingBox)"
+                             title="Detection @detection.FaceNumber, confidence @ConfidenceLabel(detection.Confidence)">
+                            <span>@detection.FaceNumber · @ConfidenceLabel(detection.Confidence)</span>
+                        </div>
+                    }
+                </div>
+
+                <footer>
+                    <span>Revision <code>@photo.RevisionHashPrefix…</code></span>
+                    <a href="@photo.ContentUrl" target="_blank" rel="noopener">Open original</a>
+                </footer>
+            </article>
+        }
+    </section>
+
+    <nav class="pagination" aria-label="Detector evaluation pagination">
+        <button class="button secondary"
+                disabled="@(Loading || Offset == 0)"
+                @onclick="PreviousPageAsync">
+            Previous photos
+        </button>
+        <button class="button primary"
+                disabled="@(Loading || Offset + Photos.Count >= Total)"
+                @onclick="NextPageAsync">
+            Next photos
+        </button>
+    </nav>
+}
+
+@code {
+    private const int PageSize = 8;
+
+    private List<DetectorEvaluationRunResponse> Runs { get; } = [];
+    private List<DetectorEvaluationPhotoResponse> Photos { get; } = [];
+    private string SelectedRunId { get; set; } = string.Empty;
+    private int Offset { get; set; }
+    private int Total { get; set; }
+    private bool Loading { get; set; }
+    private string? Error { get; set; }
+
+    private DetectorEvaluationRunResponse? SelectedRun =>
+        Runs.FirstOrDefault(run => string.Equals(run.Id, SelectedRunId, StringComparison.Ordinal));
+
+    private string PageLabel => Total == 0
+        ? "No photos"
+        : $"Photos {Offset + 1}–{Math.Min(Offset + Photos.Count, Total)} of {Total}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRunsAsync();
+    }
+
+    private async Task LoadRunsAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            DetectorEvaluationRunResponse[]? runs = await Http.GetFromJsonAsync<DetectorEvaluationRunResponse[]>(
+                "/api/detector-evaluation/runs");
+            Runs.Clear();
+            if (runs is not null)
+            {
+                Runs.AddRange(runs);
+            }
+
+            DetectorEvaluationRunResponse? preferred = Runs.FirstOrDefault(
+                run => string.Equals(run.Status, "completed", StringComparison.OrdinalIgnoreCase));
+            SelectedRunId = preferred?.Id ?? Runs.FirstOrDefault()?.Id ?? string.Empty;
+            Offset = 0;
+
+            if (!string.IsNullOrWhiteSpace(SelectedRunId))
+            {
+                await LoadPhotosCoreAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task ChangeRunAsync()
+    {
+        Offset = 0;
+        await LoadPhotosAsync();
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        Offset = Math.Max(0, Offset - PageSize);
+        await LoadPhotosAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        Offset += PageSize;
+        await LoadPhotosAsync();
+    }
+
+    private async Task LoadPhotosAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            await LoadPhotosCoreAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task LoadPhotosCoreAsync()
+    {
+        string url = $"/api/detector-evaluation/photos?runId={Uri.EscapeDataString(SelectedRunId)}&offset={Offset}&limit={PageSize}";
+        DetectorEvaluationPhotoPageResponse? page = await Http.GetFromJsonAsync<DetectorEvaluationPhotoPageResponse>(url);
+        Photos.Clear();
+        if (page is not null)
+        {
+            Photos.AddRange(page.Items);
+            Total = page.Total;
+        }
+        else
+        {
+            Total = 0;
+        }
+    }
+
+    private static string RunLabel(DetectorEvaluationRunResponse run) =>
+        $"{run.StartedAtUtc.ToLocalTime():g} · {run.Status} · {run.PhotoCount} photos";
+
+    private static string DimensionLabel(DetectorEvaluationPhotoResponse photo) =>
+        photo.Width is int width && photo.Height is int height
+            ? $"{width} × {height}"
+            : photo.MediaType;
+
+    private static string ConfidenceLabel(double confidence) =>
+        confidence.ToString("P1", CultureInfo.InvariantCulture);
+
+    private static string BoxStyle(DetectorEvaluationBoundingBoxResponse box) =>
+        FormattableString.Invariant(
+            $"left:{box.X * 100:0.####}%;top:{box.Y * 100:0.####}%;width:{box.Width * 100:0.####}%;height:{box.Height * 100:0.####}%;");
+}
