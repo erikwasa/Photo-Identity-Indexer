@@ -1,88 +1,58 @@
 # Local evaluation workflow
 
-This runbook describes the local acceptance path for the baseline and candidate models over one reviewed catalogue.
+This specialized runbook evaluates one exact detector/embedder revision from an already reviewed local catalogue. Use the [local operator guide](local-operator-guide.md) for setup, processing, browser review, suggestion regeneration, collections, backup and cleanup.
 
-## 1. Prepare an isolated workspace
+For a same-corpus comparison between model revisions, use the [multi-model comparison workflow](multi-model-comparison.md).
 
-Use paths outside the photo source root so outputs cannot be scanned as inputs.
+## Evaluation boundary
+
+An accepted evaluation identifies and fixes:
+
+- the canonical SQLite catalogue;
+- immutable source and asset revisions;
+- detector model ID and SHA-256;
+- embedder model ID and SHA-256;
+- alignment and preprocessing contracts;
+- dataset ID and pipeline version;
+- split seed and split counts; and
+- the processing run that produced the selected embeddings.
+
+Human-confirmed assignments are canonical. Suggestions and evaluation outputs are derived, model-versioned evidence.
+
+## 1. Define private paths and exact revisions
+
+Run from the repository root:
 
 ```powershell
 $root = "C:\PhotoIdentityPilot"
-$source = Join-Path $root "source"
-$output = Join-Path $root "outputs"
 $db = Join-Path $root "catalogue.db"
-$publish = Join-Path $root "review-app"
 $evaluation = Join-Path $root "model-lab"
+$runId = "REPLACE_WITH_RUN_ID"
 
-New-Item -ItemType Directory -Force -Path $source,$output,$evaluation | Out-Null
-```
+New-Item -ItemType Directory -Force -Path $evaluation | Out-Null
 
-Copy or stage 450–550 representative private images into `$source`. Do not place private files under the repository.
-
-## 2. Verify the installation
-
-```powershell
-./verify-local.ps1 -InstallModels
-./verify-review.ps1 -Mode Smoke -Configuration Release
-```
-
-Expected success signals include model hash verification, Release build success, passing tests, valid living documentation and passing disposable review-application smoke checks.
-
-## 3. Process the baseline subset
-
-The default detector and embedder remain YuNet FP32 and SFace FP32. They can also be named explicitly:
-
-```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  batch start `
-  --database $db `
-  --source $source `
-  --output $output `
-  --detector-model yunet-2023mar-fp32 `
-  --embedder-model sface-2021dec-fp32
-```
-
-The command prints and persists both selected model IDs. Record the printed run ID. Exercise status and resume before accepting the pilot:
-
-```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  batch status --database $db --run RUN_ID
-
-dotnet run --project src/PhotoIdentity.Cli -- `
-  batch resume --database $db --run RUN_ID
-```
-
-Resume loads the model IDs from the saved run configuration; do not supply a different model on resume. Runs created before explicit model selection remain compatible and default to the baseline IDs.
-
-Use `--max-attempts COUNT` on start or resume when intentionally proving bounded restart and resume behavior.
-
-## 4. Publish and run the browser application
-
-```powershell
-Remove-Item $publish -Recurse -Force -ErrorAction SilentlyContinue
-
-dotnet publish `
-  .\src\PhotoIdentity.Api\PhotoIdentity.Api.csproj `
-  --configuration Release `
-  --output $publish
-
-$env:PhotoIdentity__DatabasePath = $db
-Push-Location $publish
-dotnet .\PhotoIdentity.Api.dll --urls "http://0.0.0.0:5080"
-```
-
-Use `http://localhost:5080` on Windows. On a trusted private network, use the computer's LAN address from the Pixel and restrict any firewall rule to the intended private profile. The application is unauthenticated and must not be exposed to an untrusted network.
-
-Exercise individual assignment, rejection and undo; ranked suggestion review; person rename and merge; preview-first bulk actions; and combined progress filters. No threshold may create a label automatically.
-
-## 5. Regenerate ranked identity suggestions
-
-Stop or leave the review host running, then regenerate suggestions from another PowerShell window against the same catalogue. Supply the exact embedding model ID and SHA-256 revision used by the processed faces.
-
-```powershell
+$detector = Get-Content `
+  .\models\manifests\yunet-2023mar-fp32.json -Raw | ConvertFrom-Json
 $embedder = Get-Content `
   .\models\manifests\sface-2021dec-fp32.json -Raw | ConvertFrom-Json
+```
 
+Confirm the saved batch run before export:
+
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -- `
+  batch status --database $db --run $runId
+```
+
+Expected success signals:
+
+- the run reports the intended detector and embedder IDs;
+- the intended immutable revisions are complete or have recorded unsupported/unavailable outcomes; and
+- the selected model files match their pinned manifests.
+
+## 2. Regenerate suggestions for the exact embedder
+
+```powershell
 dotnet run --project src/PhotoIdentity.Cli -- `
   match regenerate `
   --database $db `
@@ -90,120 +60,103 @@ dotnet run --project src/PhotoIdentity.Cli -- `
   --embedder-hash $embedder.sha256
 ```
 
-The command prints the exact model revision plus target and suggestion counts. It rebuilds ranked suggestions from current human-confirmed exemplars, preserves rejected face-person exclusions and never creates or changes canonical labels.
+Expected success signals:
 
-During acceptance testing, reject at least one suggestion, run regeneration again and verify that the rejected pair does not reappear. Also verify that accepted assignments and append-only review history remain unchanged.
+- the exact model ID and hash are echoed;
+- target and suggestion counts are reported;
+- confirmed assignments and append-only review history remain unchanged; and
+- rejected face-person pairs remain excluded.
 
-## 6. Export baseline evaluation data
+Regeneration prepares exact-model advisory evidence; it does not create canonical labels.
+
+## 3. Export a deterministic reviewed-catalogue split
+
+Define output and fixed provenance:
 
 ```powershell
-$detector = Get-Content `
-  .\models\manifests\yunet-2023mar-fp32.json -Raw | ConvertFrom-Json
-
 $manifest = Join-Path $evaluation "baseline.json"
 $report = Join-Path $evaluation "baseline-report.json"
+$datasetId = "private-baseline-v1"
+$pipelineVersion = "local-pipeline-v1"
+$splitSeed = "private-baseline-split-v1"
+```
 
+Export:
+
+```powershell
 dotnet run --project src/PhotoIdentity.Cli -- `
   evaluate export `
   --database $db `
   --output $manifest `
-  --dataset-id private-baseline-v1 `
-  --pipeline-version local-pipeline-v1 `
+  --dataset-id $datasetId `
+  --pipeline-version $pipelineVersion `
   --detector-id $detector.modelId `
   --detector-hash $detector.sha256 `
   --embedder-id $embedder.modelId `
   --embedder-hash $embedder.sha256 `
-  --seed private-baseline-split-v1 `
-  --run RUN_ID
+  --seed $splitSeed `
+  --run $runId
+```
 
+Expected success signals:
+
+- export reports the exact detector and embedder revisions;
+- the source and processing-run scope is explicit;
+- gallery, validation and held-out test splits are created under the fixed seed; and
+- no private path or report is written under the repository.
+
+## 4. Evaluate without changing the split
+
+```powershell
 dotnet run --project src/PhotoIdentity.Cli -- `
   evaluate `
   --dataset $manifest `
   --output $report
 ```
 
-Validation chooses thresholds; the held-out test split only reports final metrics. Repeat both commands with unchanged inputs and compare SHA-256 hashes to prove deterministic manifest and report bytes.
+Validation selects thresholds. The held-out test split reports final results and must not select a replacement threshold.
 
-## 7. Capture baseline evidence — WI-0029 and WI-0033
+Expected success signals:
 
-Record privacy-safe aggregate evidence:
+- the report preserves dataset and exact-model provenance;
+- validation and held-out results are separated;
+- unknown-rejection and identification results are present; and
+- the command completes without changing the canonical catalogue.
 
-- image, revision, face and review-state counts;
-- unsupported or unavailable media counts;
-- batch and inference throughput;
-- database and artefact-store sizes;
-- review time and repetitive-action observations;
-- suggestion precision, unknown rejection and confusion summaries;
-- matcher regeneration counts and rejected-pair preservation;
-- defects, severity and disposition;
-- backup and restore result.
+## 5. Prove deterministic bytes
 
-Do not commit the database, images, crops, embeddings, names, real manifests, reports or local review-time files.
-
-## 8. Process the same revisions with SFace INT8 — WI-0019
-
-Install the pinned candidate without replacing the baseline file:
+Repeat export and evaluation with unchanged inputs, then compare hashes:
 
 ```powershell
-./models/install-models.ps1 -Id sface-2021dec-int8
+Get-FileHash $manifest -Algorithm SHA256
+Get-FileHash $report -Algorithm SHA256
 ```
 
-Use the same `$source` and `$db`, but a separate output root:
+The repeated manifest and report hashes must match their previous values. A mismatch means the input scope, provenance, ordering or implementation changed and must be investigated before comparing results.
 
-```powershell
-$candidateOutput = Join-Path $root "outputs-sface-int8"
+## 6. Interpret and retain evidence
 
-dotnet run --project src/PhotoIdentity.Cli -- `
-  batch start `
-  --database $db `
-  --source $source `
-  --output $candidateOutput `
-  --detector-model yunet-2023mar-fp32 `
-  --embedder-model sface-2021dec-int8
-```
+Record private evidence outside Git:
 
-Record `CANDIDATE_RUN_ID`. The unchanged detector and alignment protocol resolve to the existing face-occurrence and crop natural keys. The candidate embedding is inserted under its own model ID and exact hash, so baseline embeddings, people, labels and review actions remain intact.
+- exact detector and embedder IDs and hashes;
+- immutable revision and evaluated-face counts;
+- split identity and selected thresholds;
+- held-out identification and unknown-rejection metrics;
+- confusion and representative error review;
+- processing/evaluation throughput when measured; and
+- defects, uncertainty and recommendation.
 
-Regenerate candidate suggestions with its exact manifest:
+Do not commit the catalogue, images, crops, embeddings, names, real manifests, reports or per-person results.
 
-```powershell
-$candidateEmbedder = Get-Content `
-  .\models\manifests\sface-2021dec-int8.json -Raw | ConvertFrom-Json
+## Multi-model evaluation
 
-dotnet run --project src/PhotoIdentity.Cli -- `
-  match regenerate `
-  --database $db `
-  --embedder-id $candidateEmbedder.modelId `
-  --embedder-hash $candidateEmbedder.sha256
-```
+Do not duplicate this procedure manually for a candidate model. The [multi-model comparison workflow](multi-model-comparison.md) automates fixed-scope processing, exact-model suggestion regeneration, deterministic export/evaluation, split equality checks, resumability and private summary generation.
 
-Export the same fixed split with separate candidate paths and identifiers:
+## Related references
 
-```powershell
-$candidateManifest = Join-Path $evaluation "sface-int8.json"
-$candidateReport = Join-Path $evaluation "sface-int8-report.json"
-
-dotnet run --project src/PhotoIdentity.Cli -- `
-  evaluate export `
-  --database $db `
-  --output $candidateManifest `
-  --dataset-id private-baseline-v1 `
-  --pipeline-version local-pipeline-v1 `
-  --detector-id $detector.modelId `
-  --detector-hash $detector.sha256 `
-  --embedder-id $candidateEmbedder.modelId `
-  --embedder-hash $candidateEmbedder.sha256 `
-  --seed private-baseline-split-v1 `
-  --run CANDIDATE_RUN_ID
-
-dotnet run --project src/PhotoIdentity.Cli -- `
-  evaluate `
-  --dataset $candidateManifest `
-  --output $candidateReport
-```
-
-Keep the same dataset ID, seed, source revisions and reviewed people. Compare the two exact model revisions in WI-0030 rather than treating candidate scores as interchangeable with baseline scores.
-
-## 9. Cleanup and retention
-
-Keep the canonical pilot database and privacy-reviewed aggregate notes only as long as they remain useful. Remove temporary publish directories, transfer archives and redundant derived outputs after confirming backups. Candidate model removal prevents future candidate inference but does not make persisted baseline results unreadable. Original photos must remain unchanged throughout the workflow.
+- [Local operator guide](local-operator-guide.md)
+- [Multi-model comparison workflow](multi-model-comparison.md)
+- [Evaluation method](../models/evaluation-method.md)
+- [Model manifests and governance](../models/model-governance.md)
+- [Recognition and identity matching](../architecture/identity-matching.md)
+- [Glossary](../glossary.md)

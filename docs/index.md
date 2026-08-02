@@ -5,6 +5,7 @@
 - [README and project orientation](../README.md)
 - [Local operator guide](operations/local-operator-guide.md)
 - [Architecture overview](architecture/overview.md)
+- [Glossary](glossary.md)
 - [Current delivery status](delivery/status/current.md)
 - [Build context](../BUILD_CONTEXT.md)
 
@@ -13,7 +14,8 @@ The local operator guide is the authoritative end-to-end command sequence. Speci
 ## Operations
 
 - [Local operator guide](operations/local-operator-guide.md)
-- [Local evaluation and multi-model workflow](operations/local-evaluation.md)
+- [Single-revision local evaluation](operations/local-evaluation.md)
+- [Multi-model comparison workflow](operations/multi-model-comparison.md)
 - [SQLite persistence operations](operations/sqlite-persistence.md)
 
 ## Architecture
@@ -43,7 +45,7 @@ The local operator guide is the authoritative end-to-end command sequence. Speci
 - [Evaluation method](models/evaluation-method.md)
 - [Baseline models](models/baseline-models.md)
 - [Candidate models](models/candidate-models.md)
-- [Model manifest and licensing](models/model-governance.md)
+- [Model manifests and governance](models/model-governance.md)
 
 ## Azure — optional and deferred
 
