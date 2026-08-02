@@ -2,7 +2,7 @@
 
 Use this procedure to measure face-detection recall without reviewing the complete archive. The sample contains 100 unique photos: 50 representative photos selected mechanically and 50 deliberately difficult photos.
 
-Keep the completed tally outside Git because filenames, notes and counts may reveal private archive information. Only privacy-safe aggregate totals belong in milestone evidence.
+Keep the completed tally outside Git because image names, notes and counts may reveal private archive information. Only privacy-safe aggregate totals belong in milestone evidence.
 
 ## Decision target
 
@@ -57,10 +57,11 @@ Record excluded screen, poster or reflection faces separately when they occur. D
 
 ## Step 4: create the tally
 
-Use a private spreadsheet or text file with one row per photo and these columns:
+Use the private detector-recall spreadsheet with one row per photo and these fields:
 
 ```text
 sample_id
+image_name
 sample_group
 primary_category
 countable_faces
@@ -68,10 +69,15 @@ correct_detections
 missed_faces
 false_detections
 duplicate_detections
+likely_background_or_unknown_detections
+miss_reason
 notes
+row_check
 ```
 
-Use neutral sample IDs such as `R001` to `R050` and `D001` to `D050`. Keep private filenames in a separate local mapping only when needed.
+Use neutral sample IDs such as `R001` to `R050` and `D001` to `D050`. Enter the real image name in the private workbook, but do not commit the completed workbook.
+
+`likely_background_or_unknown_detections` is optional. It estimates how many correctly detected faces are likely to create review work without becoming named identities. It is not a person assignment and does not require deciding exactly who somebody is.
 
 ## Step 5: review each photo
 
@@ -85,10 +91,11 @@ For each of the 100 photos:
 6. Record one `missed_face` for each countable face with no matching detection.
 7. Record a `false_detection` for a detector result that is not a countable human face.
 8. When the same face is detected more than once, count one correct detection and record every additional result as a duplicate.
-9. Add a short neutral note for the reason a face appears missed, such as `small`, `profile`, `occluded`, `blur`, `low_light` or `scan`.
-10. Verify that `countable_faces = correct_detections + missed_faces` before moving to the next photo.
+9. Optionally count correctly detected faces that appear to be background people or people the operator does not know. Do not name or assign them during this pass.
+10. Add a short neutral note for the reason a face appears missed, such as `small`, `profile`, `occluded`, `blur`, `low_light` or `scan`.
+11. Verify that `countable_faces = correct_detections + missed_faces` before moving to the next photo.
 
-Do not identify people during this pass. The task is only to determine whether a face was found.
+Do not identify people during this pass. The task is only to determine whether a face was found and to estimate later background-face workload.
 
 ## Step 6: calculate the results
 
@@ -98,6 +105,7 @@ Calculate:
 overall_recall = total_correct_detections / total_countable_faces
 group_recall = group_correct_detections / group_countable_faces
 false_or_duplicate_total = total_false_detections + total_duplicate_detections
+background_or_unknown_share = likely_background_or_unknown_detections / total_correct_detections
 ```
 
 Also calculate recall separately for:
@@ -115,6 +123,8 @@ Also calculate recall separately for:
 - When threshold tuning is insufficient and misses are mainly small faces, continue to WI-0036 for multi-scale YuNet detection.
 - When multi-scale YuNet remains insufficient, continue to WI-0037 for another governed detector candidate.
 - Any changed detector pipeline must complete WI-0038 before it is used with the canonical reviewed catalogue.
+- When the accepted detector pipeline materially expands the face population, rerun the exact-model embedding comparison using the same new detections and aligned crops for every embedder.
+- Use the likely-background-or-unknown total to decide the priority of a later non-identity workflow with `Unknown person`, `Background / ignore`, `Not a face` and `Deferred` outcomes.
 
 ## Privacy-safe result template
 
@@ -129,6 +139,8 @@ Overall recall: N%
 Five-or-more-face recall: N%
 False detections: N
 Duplicate detections: N
+Likely background or unknown detections: N
+Likely background or unknown share: N%
 Representative recall: N%
 Group recall: N%
 Small/distant recall: N%
@@ -137,4 +149,6 @@ Scanned/old/low-resolution recall: N%
 Decision target: pass/fail
 Dominant privacy-safe miss categories:
 Next action: stop / threshold sweep / multi-scale YuNet / alternate detector
+Model comparison rerun required: yes/no
+Unknown/background workflow priority: low/medium/high
 ```
