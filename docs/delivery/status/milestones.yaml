@@ -87,15 +87,6 @@ milestones:
   - WI-0036
   - WI-0037
   - WI-0038
-  - WI-0039
-- id: M17
-  title: Unknown and background face handling
-  status: proposed
-  document: ../milestones/M17-unknown-background-faces.md
-  work_items:
-  - WI-0040
-  - WI-0041
-  - WI-0042
 - id: M09
   title: Azure VM pilot without identities
   status: proposed
