@@ -88,6 +88,14 @@ After PR #65 merged and both build #406 and multi-model workflow #6 passed, the 
 
 The retired WI-0033 work-item page records why the temporary acceptance artifacts no longer remain in the repository.
 
-## Review boundary
+## Completion evidence
 
-WI-0031 is implementation-complete after documentation validation, generated-file checks and the normal CI workflow pass. WI-0032 will independently exercise the runbooks from a clean Windows setup and trusted-network Pixel path before M15 completes.
+WI-0031 completed on 2026-08-02 through three reviewed and merged slices:
+
+- PR #64 established the current README, authoritative local operator guide and documentation routing;
+- PR #65 completed the multi-model, architecture, model-governance, persistence and glossary rewrite; and
+- PR #66 removed retired verification artifacts and made permanent PowerShell entry points work-item-neutral and Release-first.
+
+The final automated gates passed in build #408 and multi-model workflow #7, covering Release build, full tests, documentation validation, generated-document consistency, published review smoke, Windows PowerShell media verification and PowerShell 5.1/7 comparison-script self-tests.
+
+Independent clean-environment and trusted-network device validation remains explicitly scoped to WI-0032; it is not claimed by this completion record.

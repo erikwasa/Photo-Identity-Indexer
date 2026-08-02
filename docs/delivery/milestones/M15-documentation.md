@@ -13,8 +13,14 @@ A new operator can understand the system, run the complete local workflow, compa
 
 ## Work items
 
-- [WI-0031](../work-items/WI-0031-documentation-rewrite.md)
-- [WI-0032](../work-items/WI-0032-documentation-validation.md)
+- [WI-0031](../work-items/WI-0031-documentation-rewrite.md) — completed
+- [WI-0032](../work-items/WI-0032-documentation-validation.md) — independent clean-setup validation in progress
+
+## Current gate
+
+The documentation rewrite, architecture reconciliation, glossary, PowerShell cleanup and automated documentation validation are complete. M15 now depends only on a human maintainer following the documented workflow from a clean Windows checkout and validating the trusted-network Pixel path without relying on project memory.
+
+Any confusing instruction, hidden prerequisite or failed command discovered during WI-0032 must be corrected and merged before the milestone completes. Azure access is not required; Azure remains explicitly optional and deferred.
 
 ## Exit criteria
 

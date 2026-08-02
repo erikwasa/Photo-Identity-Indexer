@@ -8,29 +8,30 @@ Status: `in_progress`
 
 ## Current work
 
-**WI-0031 — Rewrite operator and architecture documentation** is in its final housekeeping pass on `agent/general-housekeeping`.
+**WI-0032 — Validate documentation from a clean setup** is active under the human maintainer. Repository-side preparation is on `agent/WI-0032-validation-prep`.
 
-M14 and WI-0025 completed on 2026-08-02. The collection API, responsive Windows/Pixel workspace, fixed thumbnails and version-1 neutral manifest passed automated and private-catalogue acceptance.
+WI-0031 completed on 2026-08-02 after PRs #64–#66 merged. The completed implementation includes the current README and local operator guide, exact-revision evaluation and multi-model runbooks, implemented-system architecture, aligned model and persistence guidance, shared glossary, stale-guidance removal and permanent work-item-neutral PowerShell entry points.
 
-PR #64 delivered the concise README, authoritative local operator guide and documentation routing. PR #65 delivered the exact-revision evaluation and multi-model runbooks, implemented-system architecture, aligned model/persistence guidance and shared glossary. Build #406 and multi-model workflow #6 passed before PR #65 merged.
+Build #408 and multi-model workflow #7 passed the final documentation and script gates: Release build, full tests, registry/link validation, generated-document consistency, published review smoke, Windows PowerShell mixed-media verification and PowerShell 5.1/7 comparison-script self-tests.
 
-The final housekeeping pass removes temporary completed-work-item artifacts and makes the PowerShell entry points describe their permanent supported behavior:
+## Remaining milestone gate
 
-- remove the retired `docs/delivery/verification` WI-0033 procedure;
-- remove the one-off WI-0033 review-session reporter;
-- decouple `verify-review.ps1` from completed work-item output and report fields;
-- generalize multi-model comparison reports and generated manual checklists;
-- make build, test and model-install wrappers Release-first with explicit native exit-code handling; and
-- retain `verify-local.ps1` and the published review smoke script after confirming their output is current and work-item-neutral.
+Only independent clean-environment and trusted-network human verification remains. The expanded `docs/delivery/work-items/WI-0032-documentation-validation.md` is the authoritative checklist.
 
-## Next concrete step
+The maintainer must:
 
-1. Run the main build and multi-model workflow against the housekeeping branch.
-2. Require Release build, all tests, documentation validation, generated-document checks, review smoke and Windows PowerShell verification to pass.
-3. Confirm no repository references remain to the deleted WI-0033 guide or reporter.
-4. Move WI-0031 to `in_review` with PR and workflow evidence.
-5. Merge the housekeeping slice.
-6. Start WI-0032 to exercise the instructions from a clean Windows setup and trusted-network Pixel path.
+1. use a clean Windows checkout and isolated workspace without old build output or repository models;
+2. start at README and follow the operator documentation without filling gaps from project memory;
+3. run Release build, tests, model installation, documentation checks and synthetic review smoke;
+4. process a representative 450–550-image private set, including interruption, status and resume;
+5. verify the review, suggestion, evaluation, collection and neutral-manifest workflows on Windows;
+6. verify the browser workflow on Pixel over a trusted private network;
+7. validate deterministic export/evaluation, stopped-state backup/restore and documented recovery paths;
+8. inspect the multi-model procedure and run its PowerShell 5.1 and 7 self-tests;
+9. perform a second reading pass and report every confusing or hidden prerequisite; and
+10. return only the privacy-safe summary template from WI-0032.
+
+Any documentation defect found during validation must be corrected and merged before WI-0032 and M15 complete.
 
 ## Completed gates
 
@@ -43,12 +44,12 @@ The final housekeeping pass removes temporary completed-work-item artifacts and 
 - Collection queries and the neutral manifest passed automated validation plus private Windows/Pixel verification.
 - The README and local operator guide provide one current PowerShell-first path.
 - The architecture and model documentation describe implemented behavior rather than roadmap-era plans.
-- All WI-0031 documentation acceptance criteria are checked.
+- All WI-0031 acceptance criteria and automated validation gates are complete.
 
 ## Delivery objective
 
 1. maintain the accepted local processing, review, evaluation and collection workflows;
-2. rewrite and independently validate the operator and architecture documentation; and
+2. independently validate the operator and architecture documentation from a clean setup; and
 3. resume Azure execution only after documentation validation and when access is available.
 
 ## Relevant planning files
@@ -59,13 +60,15 @@ The final housekeeping pass removes temporary completed-work-item artifacts and 
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/status/milestones.yaml`
 
-## Validation
+## Automated validation
 
 ```powershell
-dotnet test
+./build.ps1
+./test.ps1
+./verify-local.ps1 -InstallModels
+./verify-review.ps1 -Mode Smoke -Configuration Release
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
-./verify-review.ps1 -Mode Smoke -Configuration Release
 powershell.exe -NoProfile -File ./Invoke-MultiModelComparison.ps1 -SelfTest
 pwsh -NoProfile -File ./Invoke-MultiModelComparison.ps1 -SelfTest
 ```
