@@ -1,15 +1,26 @@
 # Candidate models
 
+Candidate models are installed and evaluated alongside the accepted baseline. They do not replace canonical people, assignments, rejections or review history, and they are never promoted from score evidence alone.
+
 ## Current candidate: SFace INT8
 
-The first candidate is the upstream INT8-quantised revision of the same December 2021 SFace embedder used by the baseline. This deliberately keeps face detection, five-point alignment, input dimensions and output semantics constant while isolating the effect of the quantised embedding model.
+The first governed candidate is the upstream INT8-quantised revision of the December 2021 SFace embedder.
 
-The candidate is not assumed to be more accurate. It is included to compare local CPU throughput, model-file size, embedding quality, unknown rejection and review effort against the FP32 baseline on the same immutable corpus and reviewed split.
+It deliberately keeps the following fixed relative to the FP32 baseline:
+
+- YuNet detector revision;
+- five-point alignment protocol;
+- 112 × 112 external input contract;
+- 128-dimensional embedding output semantics;
+- immutable source scope; and
+- canonical people and human review history.
+
+This isolates the effect of the quantised embedding model.
 
 ## Immutable identity
 
 | Property | Value |
-| --- | --- |
+|---|---|
 | Model ID | `sface-2021dec-int8` |
 | Role | Face embedding |
 | Format/runtime | ONNX / ONNX Runtime |
@@ -17,58 +28,70 @@ The candidate is not assumed to be more accurate. It is included to compare loca
 | Source revision | `opencv/face_recognition_sface@89e1f6f89ab68a12ab974b5b65162abf464a461f` |
 | SHA-256 | `2b0e941e6f16cc048c20aee0c8e31f569118f65d702914540f7bfdc14048d78a` |
 | Size | 9,896,933 bytes |
-| Input | 112×112 RGB float32; scale 1.0; zero mean |
+| Input | 112 × 112 RGB float32; scale 1.0; zero mean |
 | Alignment | `sface-five-point-v1` |
 | Output | 128-dimensional embedding, adapter-owned L2 normalisation, cosine distance |
 
-The INT8 graph retains the same external float32 tensor contract used by the existing SFace adapter. Quantisation is part of model identity, so candidate and baseline always use different model IDs and hashes.
+The INT8 graph retains the same external float32 tensor contract used by the SFace adapter. Quantisation is part of model identity, so INT8 and FP32 always use different model IDs and hashes.
 
 ## Licence and provenance
 
 The manifest records Apache-2.0 for the OpenCV Zoo code and distributed weights, with pinned upstream licence references. The project does not assert a training-dataset licence; consult the upstream SFace paper and repository before training or redistributing derived weights.
 
-Model files remain outside Git. `models/install-models.ps1` verifies the exact byte size and SHA-256 before a model becomes available to a run.
+Model files remain outside Git. Installation verifies exact byte size and SHA-256 before the model becomes available.
 
-## Install
-
-From the repository root:
+## Install and verify
 
 ```powershell
 ./models/install-models.ps1 -Id sface-2021dec-int8
+./verify-local.ps1
 ```
 
-The FP32 baseline remains the default. Installing or deleting the candidate file does not alter persisted baseline embeddings, people, labels or review actions.
+Expected success signals:
 
-## Run the same source with the candidate
+- the installed file matches the checked-in manifest size and hash;
+- the baseline FP32 file remains installed and unchanged; and
+- the candidate is listed as a separate exact model revision.
 
-Use a separate output root for clarity while keeping the same catalogue and immutable source root:
+## Processing and coexistence
 
-```powershell
-$candidateOutput = "C:\PhotoIdentityPilot\outputs-sface-int8"
+Use the [multi-model comparison workflow](../operations/multi-model-comparison.md) rather than manually creating a separate candidate catalogue.
 
-dotnet run --project src/PhotoIdentity.Cli -- `
-  batch start `
-  --database $db `
-  --source $source `
-  --output $candidateOutput `
-  --embedder-model sface-2021dec-int8
-```
+The workflow processes the same source and canonical database with the fixed YuNet detector and candidate embedder. Existing detector-derived face occurrence and crop identities are reused where their natural keys match. Candidate embeddings are inserted under the INT8 model ID and exact hash.
 
-The batch configuration persists the selected detector and embedder IDs. Resume therefore uses the exact same model selection automatically:
+Baseline and candidate embeddings and suggestions therefore coexist. Installing, running or removing the candidate does not alter persisted baseline embeddings, people, assignments, rejections or append-only review history.
 
-```powershell
-dotnet run --project src/PhotoIdentity.Cli -- `
-  batch resume --database $db --run CANDIDATE_RUN_ID
-```
+## Exact-model selection
 
-With the default YuNet detector and the same alignment protocol, the catalogue reuses the existing face-occurrence and crop natural keys and inserts the candidate embedding under its own model ID and exact hash. Baseline and candidate embeddings therefore coexist rather than overwrite one another.
+Suggestion regeneration, browser filtering, collection advisory evidence and evaluation must select `sface-2021dec-int8` together with its exact hash.
 
-## Evaluation boundary
+Do not:
 
-After candidate processing:
+- apply a FP32 threshold to INT8 scores;
+- mix candidate and baseline embeddings in one similarity calculation;
+- infer a model revision from a display name alone; or
+- promote candidate suggestions to labels automatically.
 
-1. regenerate suggestions for the candidate model ID and hash;
-2. export the same fixed evaluation split using the candidate revision;
-3. retain baseline and candidate manifests/reports separately;
-4. compare accuracy, unknown rejection, confusion, throughput, storage and review effort in WI-0030; and
-5. do not change canonical labels automatically from either model's score.
+## Accepted comparison outcome
+
+The accepted private same-corpus comparison held detector, source revisions, alignment, dataset, split and human review state fixed. A manual review of 20 representative faces found both FP32 and INT8 correct in every case, with no material practical identification or review-quality advantage for INT8.
+
+The current recommendation is:
+
+- retain `sface-2021dec-fp32` as the default embedder; and
+- keep `sface-2021dec-int8` as a governed candidate for later runtime, Azure-consistency, cost or broader-corpus evidence.
+
+No larger local evaluation is required before the documentation and optional Azure phases. Final production selection remains deferred.
+
+## Adding another candidate
+
+A new candidate requires:
+
+1. a checked-in immutable manifest and licence/provenance review;
+2. local installation with size and hash verification;
+3. an explicit model ID distinct from existing revisions;
+4. processing under fixed comparison scope;
+5. deterministic exact-model suggestion and evaluation evidence; and
+6. human review and a documented recommendation.
+
+See [Model manifests and governance](model-governance.md), [Recognition and identity matching](../architecture/identity-matching.md) and the [Glossary](../glossary.md).
