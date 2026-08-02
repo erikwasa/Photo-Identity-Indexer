@@ -14,6 +14,7 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M07 — Portable job bundles**: `completed`
 - **M08 — Multi-model local evaluation**: `completed`
 - **M15 — Operator documentation and system guide**: `in_progress`
+- **M16 — Face detection recall**: `ready`
 - **M14 — Collection-ready API**: `completed`
 
 ## Active work
@@ -28,4 +29,4 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Next ready work
 
-None.
+- [**WI-0034 — Measure baseline detector recall**](../work-items/WI-0034-detector-recall-baseline.md) — `ready`; owner: `human-maintainer`

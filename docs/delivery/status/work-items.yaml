@@ -770,3 +770,48 @@ work_items:
         value: 6108de30fa69e87300bc5b6f0594f3a5d67049b0
       - type: human_verification
         value: Windows and Pixel corrective verification passed on 2026-08-01; privacy-safe aggregate review timing remains outside Git.
+  - id: WI-0034
+    title: Measure baseline detector recall
+    milestone: M16
+    status: ready
+    owner: human-maintainer
+    document: ../work-items/WI-0034-detector-recall-baseline.md
+    blockers:
+      - WI-0029
+    evidence: []
+  - id: WI-0035
+    title: Tune YuNet confidence threshold
+    milestone: M16
+    status: proposed
+    owner: unassigned
+    document: ../work-items/WI-0035-yunet-threshold-sweep.md
+    blockers:
+      - WI-0034
+    evidence: []
+  - id: WI-0036
+    title: Add multi-scale YuNet detection
+    milestone: M16
+    status: proposed
+    owner: unassigned
+    document: ../work-items/WI-0036-multiscale-yunet.md
+    blockers:
+      - WI-0035
+    evidence: []
+  - id: WI-0037
+    title: Evaluate another face detector
+    milestone: M16
+    status: proposed
+    owner: unassigned
+    document: ../work-items/WI-0037-detector-candidate.md
+    blockers:
+      - WI-0036
+    evidence: []
+  - id: WI-0038
+    title: Roll out the selected detector pipeline
+    milestone: M16
+    status: proposed
+    owner: unassigned
+    document: ../work-items/WI-0038-detector-rollout.md
+    blockers:
+      - WI-0035
+    evidence: []
