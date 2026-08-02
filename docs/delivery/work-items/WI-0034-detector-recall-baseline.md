@@ -3,8 +3,8 @@ id: WI-0034
 title: Measure baseline detector recall
 milestone: M16
 status_source: ../status/work-items.yaml
-depends_on: [WI-0029]
-affected_modules: [PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Integration.Tests, Human verification]
+depends_on: [WI-0029, WI-0039]
+affected_modules: [Human verification]
 ---
 
 # WI-0034: Measure baseline detector recall
@@ -23,14 +23,7 @@ The accepted sample design retains the 50 representative pilot photos. The diffi
 
 The maintainer has staged the fixed 100-photo set, retained the 50 representative pilot photos, added approximately 20 external difficult photos, and completed the isolated YuNet confidence-0.9 batch on Windows PowerShell 5.1. Private filenames, paths and per-photo counts remain outside Git.
 
-The identity-oriented face queue is not an acceptable detector-recall review surface. It hides photos with zero detections and requires the operator to reconstruct photo context from individual aligned crops. Before completing the manual tally or starting repeated threshold runs, add a read-only photo-level detector evaluation workspace that:
-
-- selects one processing run;
-- lists every processing-job photo in stable filename order, including zero-detection photos;
-- serves the original photo through the existing path-safe local resolver;
-- overlays persisted normalized detector boxes and confidence values;
-- does not create identity assignments or review actions; and
-- establishes the API and UI boundary for later private category import, ground-truth annotation, automatic detection matching and comparison export.
+The identity-oriented face queue is not an acceptable detector-recall review surface. It hides photos with zero detections and requires the operator to reconstruct photo context from individual aligned crops. [WI-0039](WI-0039-detector-evaluation-workspace.md) therefore provides the reusable photo-level review and ground-truth path required to finish this work item and any later threshold comparison.
 
 Implementation status and scope are recorded in [M16 detector evaluation workspace status](../status/M16-detector-evaluation-workspace.md).
 
@@ -40,7 +33,7 @@ Implementation status and scope are recorded in [M16 detector evaluation workspa
 - [ ] Every photo has countable, correctly detected, missed, false and duplicate totals.
 - [ ] Per-photo arithmetic is checked before aggregation.
 - [ ] Overall, source-group and category recall are calculated.
-- [ ] A photo-level review surface includes successful photos with zero detections.
+- [ ] The reusable photo-level review and ground-truth path from WI-0039 is used.
 - [ ] Detector evaluation remains separate from identity assignment and rejection history.
 - [ ] The M16 decision target is evaluated without changing it after seeing the result.
 - [ ] Only the privacy-safe aggregate summary is added to repository evidence.
