@@ -1,0 +1,118 @@
+name: Complete M16 follow-up planning
+
+on:
+  push:
+    branches:
+      - agent/M16-detector-recall
+
+permissions:
+  contents: write
+
+jobs:
+  update-planning:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/M16-detector-recall
+          fetch-depth: 0
+
+      - name: Update registries and guidance
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          work_path = Path('docs/delivery/status/work-items.yaml')
+          work = work_path.read_text(encoding='utf-8')
+          if '  - id: WI-0039\n' not in work:
+              work += '''
+  - id: WI-0039
+    title: Rerun model comparison after detector expansion
+    milestone: M16
+    status: proposed
+    owner: unassigned
+    document: ../work-items/WI-0039-detector-aware-model-comparison.md
+    blockers:
+      - WI-0038
+      - WI-0030
+    evidence: []
+  - id: WI-0040
+    title: Define non-identity face states
+    milestone: M17
+    status: proposed
+    owner: unassigned
+    document: ../work-items/WI-0040-non-identity-face-states.md
+    blockers:
+      - WI-0034
+    evidence: []
+  - id: WI-0041
+    title: Add unknown and background face review
+    milestone: M17
+    status: proposed
+    owner: unassigned
+    document: ../work-items/WI-0041-background-face-review.md
+    blockers:
+      - WI-0040
+    evidence: []
+  - id: WI-0042
+    title: Validate unknown and background face handling
+    milestone: M17
+    status: proposed
+    owner: unassigned
+    document: ../work-items/WI-0042-background-face-validation.md
+    blockers:
+      - WI-0041
+    evidence: []
+'''
+              work_path.write_text(work, encoding='utf-8', newline='\n')
+
+          roadmap_path = Path('docs/delivery/roadmap.md')
+          roadmap = roadmap_path.read_text(encoding='utf-8')
+          marker = '| M16 | Face detection recall | ready |\n'
+          row = '| M17 | Unknown and background face handling | proposed |\n'
+          if row not in roadmap:
+              roadmap = roadmap.replace(marker, marker + row)
+              roadmap_path.write_text(roadmap, encoding='utf-8', newline='\n')
+
+          pilot_path = Path('docs/operations/detector-recall-pilot.md')
+          pilot = pilot_path.read_text(encoding='utf-8')
+          pilot = pilot.replace(
+              'sample_id\nsample_group\nprimary_category\ncountable_faces\ncorrect_detections\nmissed_faces\nfalse_detections\nduplicate_detections\nnotes',
+              'sample_id\nimage_name\nsample_group\nprimary_category\ncountable_faces\ncorrect_detections\nmissed_faces\nfalse_detections\nduplicate_detections\nlikely_background_or_unknown_detections\nnotes')
+          pilot = pilot.replace(
+              'Use neutral sample IDs such as `R001` to `R050` and `D001` to `D050`. Keep private filenames in a separate local mapping only when needed.',
+              'Use neutral sample IDs such as `R001` to `R050` and `D001` to `D050`. The private workbook may contain the real image name, but it must remain outside Git. The optional likely-background-or-unknown count estimates later review burden; it is not an identity decision.')
+          pilot = pilot.replace(
+              '9. Add a short neutral note for the reason a face appears missed, such as `small`, `profile`, `occluded`, `blur`, `low_light` or `scan`.\n10. Verify that `countable_faces = correct_detections + missed_faces` before moving to the next photo.',
+              '9. Optionally count correctly detected faces that appear to be background people or people the operator does not know. Do not name or assign them during this pass.\n10. Add a short neutral note for the reason a face appears missed, such as `small`, `profile`, `occluded`, `blur`, `low_light` or `scan`.\n11. Verify that `countable_faces = correct_detections + missed_faces` before moving to the next photo.')
+          pilot = pilot.replace(
+              'false_or_duplicate_total = total_false_detections + total_duplicate_detections',
+              'false_or_duplicate_total = total_false_detections + total_duplicate_detections\nbackground_or_unknown_share = likely_background_or_unknown_detections / total_correct_detections')
+          pilot = pilot.replace(
+              '- Any changed detector pipeline must complete WI-0038 before it is used with the canonical reviewed catalogue.',
+              '- Any changed detector pipeline must complete WI-0038 before it is used with the canonical reviewed catalogue.\n- When the changed pipeline materially expands the face population, complete WI-0039 and rerun the exact-model embedding comparison on the same new detections and crops.\n- If the baseline passes without changing the detector pipeline, cancel WI-0039 as unnecessary.\n- The likely-background-or-unknown total informs M17, which adds non-identity states so real background faces do not have to become named people.')
+          pilot = pilot.replace(
+              'Duplicate detections: N\nRepresentative recall:',
+              'Duplicate detections: N\nLikely background or unknown detections: N\nLikely background or unknown share: N%\nRepresentative recall:')
+          pilot = pilot.replace(
+              'Next action: stop / threshold sweep / multi-scale YuNet / alternate detector',
+              'Next action: stop / threshold sweep / multi-scale YuNet / alternate detector\nModel comparison rerun required: yes/no\nUnknown/background workflow priority: low/medium/high')
+          pilot_path.write_text(pilot, encoding='utf-8', newline='\n')
+          PY
+
+      - name: Remove one-time workflow
+        shell: bash
+        run: |
+          rm -f .github/workflows/complete-m16-followup-planning.yml
+          rm -f .github/m16-followup-trigger.txt
+
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Complete detector follow-up planning"
+          git push
