@@ -96,15 +96,17 @@ public sealed class DetectorEvaluationApplicationTests
         CatalogueSource source = new(sourceId, "local-folder", sourceRoot, now);
         SqliteAssetCatalogueRepository assetRepository = new(database);
 
+        AssetId detectedAssetId = AssetId.New();
         CatalogueAssetRevision detectedRevision = await assetRepository.SaveRevisionAsync(
             source,
-            new CatalogueAsset(AssetId.New(), sourceId, "R001__group.jpg", now),
-            Revision(detectedPhotoBytes, AssetIdPlaceholder: null));
+            new CatalogueAsset(detectedAssetId, sourceId, "R001__group.jpg", now),
+            Revision(detectedAssetId, detectedPhotoBytes));
 
+        AssetId emptyAssetId = AssetId.New();
         CatalogueAssetRevision emptyRevision = await assetRepository.SaveRevisionAsync(
             source,
-            new CatalogueAsset(AssetId.New(), sourceId, "R002__empty.jpg", now),
-            Revision(emptyPhotoBytes, AssetIdPlaceholder: null));
+            new CatalogueAsset(emptyAssetId, sourceId, "R002__empty.jpg", now),
+            Revision(emptyAssetId, emptyPhotoBytes));
 
         ProcessingRunId runId = ProcessingRunId.New();
         FaceOccurrenceId faceId = FaceOccurrenceId.New();
@@ -172,9 +174,8 @@ public sealed class DetectorEvaluationApplicationTests
 
         return new SeededEvaluation(runId, sourceRoot, detectedPhotoBytes);
 
-        CatalogueAssetRevision Revision(byte[] bytes, AssetId? AssetIdPlaceholder)
+        CatalogueAssetRevision Revision(AssetId assetId, byte[] bytes)
         {
-            AssetId assetId = AssetIdPlaceholder ?? AssetId.New();
             string hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
             return new CatalogueAssetRevision(
                 AssetRevisionId.New(),
