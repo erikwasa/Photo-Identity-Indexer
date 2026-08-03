@@ -9,11 +9,14 @@ public partial class Program
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-        string defaultDatabasePath = Path.Combine(
+        string defaultApplicationRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "PhotoIdentity",
-            "catalogue.db");
+            "PhotoIdentity");
+        string defaultDatabasePath = Path.Combine(defaultApplicationRoot, "catalogue.db");
+        string defaultDetectorEvaluationRoot = Path.Combine(defaultApplicationRoot, "detector-evaluations");
         string databasePath = builder.Configuration["PhotoIdentity:DatabasePath"] ?? defaultDatabasePath;
+        string detectorEvaluationRoot =
+            builder.Configuration["PhotoIdentity:DetectorEvaluationRoot"] ?? defaultDetectorEvaluationRoot;
 
         builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
         builder.Services.AddSingleton<SqliteReviewRepository>();
@@ -31,6 +34,9 @@ public partial class Program
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
+            detectorEvaluationRoot,
+            serviceProvider.GetRequiredService<TimeProvider>()));
 
         WebApplication app = builder.Build();
         await app.Services.GetRequiredService<SqliteCatalogueDatabase>().InitializeAsync();
