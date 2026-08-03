@@ -36,7 +36,7 @@ public static class DetectorEvaluationManifestCsv
         }
 
         char delimiter = CountUnquoted(headerLine, ';') > CountUnquoted(headerLine, ',') ? ';' : ',';
-        IReadOnlyList<IReadOnlyList<string>> rows = ParseRows(string.Join('\n', lines), delimiter);
+        IReadOnlyList<IReadOnlyList<string>> rows = ParseRows(string.Join("\n", lines), delimiter);
         if (rows.Count < 2)
         {
             throw new FormatException("The CSV contains no manifest rows.");
