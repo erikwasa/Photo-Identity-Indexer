@@ -72,6 +72,14 @@
     align-items: start;
 }
 
+.detector-authoring-grid.focus-mode {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.detector-authoring-grid.focus-mode .detector-review-panel {
+    display: none;
+}
+
 .detector-image-panel,
 .detector-review-panel {
     overflow: hidden;
@@ -103,11 +111,97 @@
     background: #dff1e9;
 }
 
+.detector-image-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    padding: 0.65rem 0.8rem;
+    background: #f3f1e9;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+}
+
+.detector-zoom-controls,
+.detector-view-controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.detector-image-toolbar button,
+.detector-image-toolbar a {
+    min-height: 36px;
+}
+
+.zoom-button,
+.zoom-step {
+    padding: 0.4rem 0.62rem;
+    color: #35484b;
+    background: #fff;
+    border: 1px solid #cbc8be;
+    border-radius: 0.55rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 750;
+}
+
+.zoom-button.active {
+    color: #fff;
+    background: var(--ink);
+    border-color: var(--ink);
+}
+
+.zoom-step {
+    min-width: 2.2rem;
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.zoom-button:disabled,
+.zoom-step:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.detector-view-controls > span {
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.detector-view-controls a {
+    display: inline-flex;
+    align-items: center;
+    color: var(--accent-strong);
+    font-size: 0.85rem;
+    font-weight: 750;
+    text-decoration: none;
+}
+
+.detector-authoring-viewport {
+    position: relative;
+    width: 100%;
+    min-height: 18rem;
+    max-height: calc(100vh - 13rem);
+    overflow: auto;
+    background: #202829;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+}
+
+.focus-mode .detector-authoring-viewport {
+    max-height: calc(100vh - 10rem);
+}
+
 .detector-authoring-stage {
     position: relative;
     width: 100%;
-    min-height: 12rem;
-    overflow: hidden;
+    min-width: 1px;
+    min-height: 1px;
+    overflow: visible;
     background: #202829;
     user-select: none;
 }
@@ -411,6 +505,7 @@
         text-align: left;
     }
 
+    .detector-image-toolbar,
     .missed-face-toolbar,
     .detector-image-panel > header {
         align-items: flex-start;
@@ -421,5 +516,10 @@
     .detection-actions,
     .detector-save-actions {
         grid-template-columns: 1fr;
+    }
+
+    .detector-authoring-viewport,
+    .focus-mode .detector-authoring-viewport {
+        max-height: 65vh;
     }
 }
