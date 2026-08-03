@@ -75,7 +75,7 @@ else
             </button>
         </section>
 
-        <section class="detector-authoring-grid">
+        <section class="detector-authoring-grid @(FocusMode ? "focus-mode" : string.Empty)">
             <div class="detector-image-panel">
                 <header>
                     <div>
@@ -87,32 +87,90 @@ else
                     </span>
                 </header>
 
-                <div class="detector-authoring-stage @(MarkMissedMode ? "marking" : "")"
-                     @ref="StageElement"
-                     @onclick="HandleStageClickAsync">
-                    <img src="@photo.ContentUrl"
-                         alt="Source photo @photo.PhotoName with detector and missed-face boxes" />
+                <div class="detector-image-toolbar" aria-label="Image zoom controls">
+                    <div class="detector-zoom-controls" role="group" aria-label="Zoom level">
+                        <button type="button"
+                                class="@ZoomButtonClass(null)"
+                                disabled="@Saving"
+                                @onclick="() => SetZoomAsync(null)">
+                            Fit
+                        </button>
+                        <button type="button"
+                                class="@ZoomButtonClass(1)"
+                                disabled="@Saving"
+                                @onclick="() => SetZoomAsync(1)">
+                            100%
+                        </button>
+                        <button type="button"
+                                class="@ZoomButtonClass(2)"
+                                disabled="@Saving"
+                                @onclick="() => SetZoomAsync(2)">
+                            200%
+                        </button>
+                        <button type="button"
+                                class="@ZoomButtonClass(4)"
+                                disabled="@Saving"
+                                @onclick="() => SetZoomAsync(4)">
+                            400%
+                        </button>
+                        <button type="button"
+                                class="zoom-step"
+                                disabled="@(Saving || !CanZoomOut)"
+                                aria-label="Zoom out"
+                                @onclick="ZoomOutAsync">
+                            −
+                        </button>
+                        <button type="button"
+                                class="zoom-step"
+                                disabled="@(Saving || !CanZoomIn)"
+                                aria-label="Zoom in"
+                                @onclick="ZoomInAsync">
+                            +
+                        </button>
+                    </div>
+                    <div class="detector-view-controls">
+                        <span>@ZoomLabel</span>
+                        <button type="button"
+                                class="button secondary"
+                                disabled="@Saving"
+                                aria-pressed="@FocusMode"
+                                @onclick="ToggleFocusMode">
+                            @(FocusMode ? "Exit focus" : "Focus image")
+                        </button>
+                        <a href="@photo.ContentUrl" target="_blank" rel="noopener">Open original</a>
+                    </div>
+                </div>
 
-                    @foreach (DetectorEvaluationSessionDetectionResponse detection in photo.Detections)
-                    {
-                        <div class="detector-authoring-box @DispositionClass(JudgementFor(detection.Id))"
-                             style="@BoxStyle(detection.BoundingBox)">
-                            <span>@detection.FaceNumber · @ConfidenceLabel(detection.Confidence)</span>
-                        </div>
-                    }
+                <div class="detector-authoring-viewport" @ref="ViewportElement">
+                    <div class="detector-authoring-stage @(MarkMissedMode ? "marking" : "")"
+                         @ref="StageElement"
+                         @onclick="HandleStageClickAsync">
+                        <img src="@photo.ContentUrl"
+                             @ref="ImageElement"
+                             @onload="HandleImageLoadedAsync"
+                             alt="Source photo @photo.PhotoName with detector and missed-face boxes" />
 
-                    @foreach (DetectorEvaluationMissedFaceRequest missed in MissedFaces)
-                    {
-                        <div class="detector-authoring-box missed"
-                             style="@BoxStyle(missed.BoundingBox)">
-                            <span>Missed</span>
-                        </div>
-                    }
+                        @foreach (DetectorEvaluationSessionDetectionResponse detection in photo.Detections)
+                        {
+                            <div class="detector-authoring-box @DispositionClass(JudgementFor(detection.Id))"
+                                 style="@BoxStyle(detection.BoundingBox)">
+                                <span>@detection.FaceNumber · @ConfidenceLabel(detection.Confidence)</span>
+                            </div>
+                        }
 
-                    @if (MissStart is DetectorEvaluationPoint start)
-                    {
-                        <div class="miss-start" style="@PointStyle(start)" aria-hidden="true"></div>
-                    }
+                        @foreach (DetectorEvaluationMissedFaceRequest missed in MissedFaces)
+                        {
+                            <div class="detector-authoring-box missed"
+                                 style="@BoxStyle(missed.BoundingBox)">
+                                <span>Missed</span>
+                            </div>
+                        }
+
+                        @if (MissStart is DetectorEvaluationPoint start)
+                        {
+                            <div class="miss-start" style="@PointStyle(start)" aria-hidden="true"></div>
+                        }
+                    </div>
                 </div>
 
                 <div class="missed-face-toolbar">
@@ -247,15 +305,20 @@ else
     private DetectorEvaluationSessionResponse? Session { get; set; }
     private Dictionary<string, string?> Judgements { get; } = new(StringComparer.Ordinal);
     private List<DetectorEvaluationMissedFaceRequest> MissedFaces { get; } = [];
+    private ElementReference ViewportElement { get; set; }
     private ElementReference StageElement { get; set; }
+    private ElementReference ImageElement { get; set; }
     private DetectorEvaluationPoint? MissStart { get; set; }
     private string? MissReason { get; set; }
     private string? Notes { get; set; }
     private int CurrentIndex { get; set; }
+    private double? ZoomScale { get; set; }
     private bool Loading { get; set; }
     private bool Saving { get; set; }
     private bool Dirty { get; set; }
     private bool MarkMissedMode { get; set; }
+    private bool FocusMode { get; set; }
+    private bool ApplyZoomAfterRender { get; set; }
     private string? Error { get; set; }
     private string? Success { get; set; }
 
@@ -272,10 +335,24 @@ else
         CurrentPhoto.CountableFaces == ProjectedCorrect + MissedFaces.Count;
     private bool ProjectedComplete => CurrentPhoto is not null &&
         ClassifiedCount == CurrentPhoto.Detections.Count && ArithmeticMatches;
+    private bool CanZoomOut => ZoomScale is not null;
+    private bool CanZoomIn => ZoomScale is null || ZoomScale < 4;
+    private string ZoomLabel => ZoomScale is null
+        ? "Fit to panel"
+        : $"{ZoomScale.Value * 100:0}% of source pixels";
 
     protected override async Task OnParametersSetAsync()
     {
         await LoadSessionAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (ApplyZoomAfterRender)
+        {
+            ApplyZoomAfterRender = false;
+            await ApplyZoomAsync();
+        }
     }
 
     private async Task LoadSessionAsync()
@@ -393,6 +470,86 @@ else
         MarkDirty();
     }
 
+    private async Task SetZoomAsync(double? scale)
+    {
+        ZoomScale = scale;
+        await ApplyZoomAsync();
+    }
+
+    private async Task ZoomInAsync()
+    {
+        if (ZoomScale is null)
+        {
+            ZoomScale = 1;
+        }
+        else if (ZoomScale < 2)
+        {
+            ZoomScale = 2;
+        }
+        else
+        {
+            ZoomScale = 4;
+        }
+
+        await ApplyZoomAsync();
+    }
+
+    private async Task ZoomOutAsync()
+    {
+        if (ZoomScale is null)
+        {
+            return;
+        }
+
+        if (ZoomScale > 2)
+        {
+            ZoomScale = 2;
+        }
+        else if (ZoomScale > 1)
+        {
+            ZoomScale = 1;
+        }
+        else
+        {
+            ZoomScale = null;
+        }
+
+        await ApplyZoomAsync();
+    }
+
+    private void ToggleFocusMode()
+    {
+        FocusMode = !FocusMode;
+        ApplyZoomAfterRender = true;
+    }
+
+    private async Task HandleImageLoadedAsync()
+    {
+        await ApplyZoomAsync();
+    }
+
+    private async Task ApplyZoomAsync()
+    {
+        if (CurrentPhoto is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "detectorEvaluation.applyZoom",
+                ViewportElement,
+                StageElement,
+                ImageElement,
+                ZoomScale ?? 0);
+        }
+        catch (Exception exception)
+        {
+            Error = $"Image zoom could not be applied: {exception.Message}";
+        }
+    }
+
     private async Task NavigateAsync(int delta)
     {
         if (Dirty && !await SaveCurrentAsync(false))
@@ -473,6 +630,14 @@ else
     {
         Dirty = true;
         Success = null;
+    }
+
+    private string ZoomButtonClass(double? candidate)
+    {
+        bool active = candidate is null
+            ? ZoomScale is null
+            : ZoomScale == candidate;
+        return active ? "zoom-button active" : "zoom-button";
     }
 
     private static int FindFirstIncomplete(IReadOnlyList<DetectorEvaluationSessionPhotoResponse> photos)
