@@ -22,6 +22,7 @@
 
 .detector-evaluation-note,
 .detector-evaluation-controls,
+.detector-session-panel,
 .detector-photo-card {
     background: rgba(255, 253, 248, 0.94);
     border: 1px solid var(--line);
@@ -53,6 +54,86 @@
     justify-content: flex-end;
     gap: 0.8rem;
     color: var(--muted);
+}
+
+.detector-session-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(20rem, 0.75fr);
+    gap: 0;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.detector-session-list,
+.detector-session-creator {
+    padding: 1.15rem;
+}
+
+.detector-session-creator {
+    border-left: 1px solid var(--line);
+    background: rgba(245, 244, 237, 0.72);
+}
+
+.detector-session-list h2,
+.detector-session-creator h2 {
+    margin: 0.2rem 0 0.65rem;
+}
+
+.detector-session-creator > p:not(.eyebrow),
+.detector-session-empty,
+.manifest-summary {
+    color: var(--muted);
+    line-height: 1.55;
+}
+
+.detector-session-links {
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 0.85rem;
+}
+
+.detector-session-links article {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.8rem;
+    border: 1px solid #dfdcd3;
+    border-radius: 0.85rem;
+    background: #fff;
+}
+
+.detector-session-links strong,
+.detector-session-links span {
+    display: block;
+}
+
+.detector-session-links span {
+    margin-top: 0.2rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+.detector-session-creator input[type="file"] {
+    width: 100%;
+    padding: 0.7rem;
+    border: 1px dashed #b9b7ae;
+    border-radius: 0.72rem;
+    background: #fff;
+}
+
+.manifest-label {
+    margin-top: 0.9rem;
+}
+
+.manifest-summary {
+    margin: 0.75rem 0;
+    font-size: 0.88rem;
+}
+
+.detector-session-creator .button {
+    width: 100%;
+    margin-top: 0.9rem;
 }
 
 .detector-page-summary {
@@ -146,8 +227,14 @@
 
 @media (max-width: 850px) {
     .detector-evaluation-hero,
-    .detector-evaluation-controls {
+    .detector-evaluation-controls,
+    .detector-session-panel {
         grid-template-columns: 1fr;
+    }
+
+    .detector-session-creator {
+        border-top: 1px solid var(--line);
+        border-left: 0;
     }
 
     .detector-run-summary {
@@ -156,6 +243,7 @@
     }
 
     .detector-page-summary,
+    .detector-session-links article,
     .detector-photo-card > header,
     .detector-photo-card > footer {
         align-items: flex-start;
