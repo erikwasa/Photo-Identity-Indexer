@@ -1,7 +1,10 @@
 @page "/detector-evaluation"
 @using System.Globalization
 @using System.Net.Http.Json
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Forms
 @inject HttpClient Http
+@inject NavigationManager Navigation
 
 <PageTitle>Detector evaluation · Photo Identity</PageTitle>
 
@@ -10,16 +13,17 @@
         <p class="eyebrow">Photo-level detector review</p>
         <h1>Evaluate detections in context</h1>
         <p>
-            Browse complete source photos in stable filename order with every persisted detector box overlaid.
-            Photos with zero detections remain visible, so missed-face review does not disappear from the workflow.
+            Browse complete source photos in stable filename order, then create a private evaluation session from
+            the completed manifest. Sessions keep detector judgements and missed-face ground truth separate from
+            identity review.
         </p>
     </div>
 
     <aside class="detector-evaluation-note">
-        <strong>Read-only first slice</strong>
+        <strong>Private ground truth</strong>
         <p>
-            This page does not assign identities or change review state. Private sample categories and reusable
-            ground-truth annotations will be added separately.
+            Session files are stored outside the catalogue in the configured detector-evaluation root. The browser
+            receives photo names and boxes, but never source roots or session storage paths.
         </p>
     </aside>
 </section>
@@ -53,6 +57,84 @@
     <div class="notice error" role="alert">@Error</div>
 }
 
+@if (!string.IsNullOrWhiteSpace(Success))
+{
+    <div class="notice success" role="status">@Success</div>
+}
+
+@if (Runs.Count > 0)
+{
+    <section class="detector-session-panel" aria-label="Detector evaluation sessions">
+        <div class="detector-session-list">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Resume</p>
+                    <h2>Evaluation sessions</h2>
+                </div>
+                <span>@Sessions.Count session@(Sessions.Count == 1 ? "" : "s")</span>
+            </div>
+
+            @if (Sessions.Count == 0)
+            {
+                <p class="detector-session-empty">No private evaluation session exists for this run yet.</p>
+            }
+            else
+            {
+                <div class="detector-session-links">
+                    @foreach (DetectorEvaluationSessionSummaryResponse session in Sessions)
+                    {
+                        <article>
+                            <div>
+                                <strong>@session.Name</strong>
+                                <span>
+                                    @session.CompletedPhotoCount / @session.PhotoCount photos complete ·
+                                    updated @session.UpdatedAtUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
+                                </span>
+                            </div>
+                            <button class="button secondary" @onclick="() => OpenSession(session.Id)">Resume</button>
+                        </article>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="detector-session-creator">
+            <p class="eyebrow">Create</p>
+            <h2>Import the private manifest</h2>
+            <p>
+                Export the Photo Review sheet as CSV UTF-8. Required columns are Sample ID, Image Name,
+                Source Group, Primary Category and Countable Faces. The image names must exactly match this run.
+            </p>
+
+            <label class="field-label" for="session-name">Session name</label>
+            <input id="session-name"
+                   @bind="SessionName"
+                   placeholder="M16 confidence 0.9 baseline"
+                   disabled="@CreatingSession" />
+
+            <label class="field-label manifest-label" for="manifest-file">Manifest CSV</label>
+            <InputFile id="manifest-file"
+                       OnChange="ReadManifestAsync"
+                       accept=".csv,text/csv"
+                       disabled="@CreatingSession" />
+
+            @if (ManifestEntries.Count > 0)
+            {
+                <p class="manifest-summary">
+                    <strong>@ManifestFileName</strong><br />
+                    @ManifestEntries.Count manifest rows parsed.
+                </p>
+            }
+
+            <button class="button primary"
+                    disabled="@(CreatingSession || ManifestEntries.Count == 0 || string.IsNullOrWhiteSpace(SessionName))"
+                    @onclick="CreateSessionAsync">
+                @(CreatingSession ? "Creating…" : "Create evaluation session")
+            </button>
+        </div>
+    </section>
+}
+
 @if (Loading)
 {
     <section class="empty-state" aria-live="polite">
@@ -78,7 +160,7 @@ else
 {
     <div class="detector-page-summary" role="status">
         <span>@PageLabel</span>
-        <span>Boxes use normalized coordinates from the persisted detector observations.</span>
+        <span>Read-only preview of persisted detector observations.</span>
     </div>
 
     <section class="detector-photo-list" aria-label="Photos with detector overlays">
@@ -133,14 +215,21 @@ else
 
 @code {
     private const int PageSize = 8;
+    private const long MaximumManifestBytes = 5 * 1024 * 1024;
 
     private List<DetectorEvaluationRunResponse> Runs { get; } = [];
     private List<DetectorEvaluationPhotoResponse> Photos { get; } = [];
+    private List<DetectorEvaluationSessionSummaryResponse> Sessions { get; } = [];
+    private List<DetectorEvaluationManifestEntryRequest> ManifestEntries { get; } = [];
     private string SelectedRunId { get; set; } = string.Empty;
+    private string SessionName { get; set; } = string.Empty;
+    private string? ManifestFileName { get; set; }
     private int Offset { get; set; }
     private int Total { get; set; }
     private bool Loading { get; set; }
+    private bool CreatingSession { get; set; }
     private string? Error { get; set; }
+    private string? Success { get; set; }
 
     private DetectorEvaluationRunResponse? SelectedRun =>
         Runs.FirstOrDefault(run => string.Equals(run.Id, SelectedRunId, StringComparison.Ordinal));
@@ -176,6 +265,7 @@ else
             if (!string.IsNullOrWhiteSpace(SelectedRunId))
             {
                 await LoadPhotosCoreAsync();
+                await LoadSessionsCoreAsync();
             }
         }
         catch (Exception exception)
@@ -191,28 +281,35 @@ else
     private async Task ChangeRunAsync()
     {
         Offset = 0;
+        ManifestEntries.Clear();
+        ManifestFileName = null;
+        Success = null;
         await LoadPhotosAsync();
     }
 
     private async Task PreviousPageAsync()
     {
         Offset = Math.Max(0, Offset - PageSize);
-        await LoadPhotosAsync();
+        await LoadPhotosAsync(loadSessions: false);
     }
 
     private async Task NextPageAsync()
     {
         Offset += PageSize;
-        await LoadPhotosAsync();
+        await LoadPhotosAsync(loadSessions: false);
     }
 
-    private async Task LoadPhotosAsync()
+    private async Task LoadPhotosAsync(bool loadSessions = true)
     {
         Loading = true;
         Error = null;
         try
         {
             await LoadPhotosCoreAsync();
+            if (loadSessions)
+            {
+                await LoadSessionsCoreAsync();
+            }
         }
         catch (Exception exception)
         {
@@ -238,6 +335,103 @@ else
         {
             Total = 0;
         }
+    }
+
+    private async Task LoadSessionsCoreAsync()
+    {
+        DetectorEvaluationSessionSummaryResponse[]? sessions =
+            await Http.GetFromJsonAsync<DetectorEvaluationSessionSummaryResponse[]>(
+                $"/api/detector-evaluation/sessions?runId={Uri.EscapeDataString(SelectedRunId)}");
+        Sessions.Clear();
+        if (sessions is not null)
+        {
+            Sessions.AddRange(sessions);
+        }
+    }
+
+    private async Task ReadManifestAsync(InputFileChangeEventArgs args)
+    {
+        Error = null;
+        Success = null;
+        ManifestEntries.Clear();
+        ManifestFileName = args.File.Name;
+        try
+        {
+            await using Stream stream = args.File.OpenReadStream(MaximumManifestBytes);
+            using StreamReader reader = new(stream);
+            string csv = await reader.ReadToEndAsync();
+            ManifestEntries.AddRange(DetectorEvaluationManifestCsv.Parse(csv));
+            if (string.IsNullOrWhiteSpace(SessionName))
+            {
+                SessionName = Path.GetFileNameWithoutExtension(args.File.Name);
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+    }
+
+    private async Task CreateSessionAsync()
+    {
+        CreatingSession = true;
+        Error = null;
+        Success = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "/api/detector-evaluation/sessions",
+                new CreateDetectorEvaluationSessionRequest(
+                    SessionName,
+                    SelectedRunId,
+                    ManifestEntries.ToArray()));
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await ReadErrorAsync(response);
+                return;
+            }
+
+            DetectorEvaluationSessionSummaryResponse? created =
+                await response.Content.ReadFromJsonAsync<DetectorEvaluationSessionSummaryResponse>();
+            if (created is null)
+            {
+                Error = "The evaluation session was created but the response was empty.";
+                return;
+            }
+
+            Navigation.NavigateTo($"/detector-evaluation/sessions/{created.Id}");
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            CreatingSession = false;
+        }
+    }
+
+    private void OpenSession(string sessionId) =>
+        Navigation.NavigateTo($"/detector-evaluation/sessions/{sessionId}");
+
+    private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
+    {
+        string content = await response.Content.ReadAsStringAsync();
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(content);
+            if (document.RootElement.TryGetProperty("error", out JsonElement error))
+            {
+                return error.GetString() ?? response.ReasonPhrase ?? "The request failed.";
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return string.IsNullOrWhiteSpace(content)
+            ? response.ReasonPhrase ?? "The request failed."
+            : content;
     }
 
     private static string RunLabel(DetectorEvaluationRunResponse run) =>
