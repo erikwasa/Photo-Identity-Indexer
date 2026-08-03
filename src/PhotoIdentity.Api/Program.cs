@@ -25,6 +25,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();
         builder.Services.AddSingleton<SqliteBulkSuggestionReviewRepository>();
         builder.Services.AddSingleton<SqliteCollectionQueryRepository>();
+        builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();
@@ -39,7 +40,8 @@ public partial class Program
         app.Use(async (context, next) =>
         {
             if (context.Request.Path.StartsWithSegments("/api/review") ||
-                context.Request.Path.StartsWithSegments("/api/collections"))
+                context.Request.Path.StartsWithSegments("/api/collections") ||
+                context.Request.Path.StartsWithSegments("/api/detector-evaluation"))
             {
                 context.Response.OnStarting(() =>
                 {
@@ -66,6 +68,7 @@ public partial class Program
         app.MapBulkReviewEndpoints();
         app.MapBulkSuggestionReviewEndpoints();
         app.MapCollectionEndpoints();
+        app.MapDetectorEvaluationEndpoints();
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();
