@@ -2,11 +2,11 @@
 
 Status date: 2026-08-03
 
-Implementation branch: `agent/WI-0039-detector-evaluation-workspace`
+Current implementation branch: `agent/WI-0039-ground-truth-authoring`
 
 ## Why this work started
 
-The fixed 100-photo evaluation set is ready and the isolated YuNet confidence-0.9 batch has completed. The existing identity review queue is face-oriented: it shows aligned crops, omits complete photo context and cannot show photos with zero detections. That makes category-based detector recall review unnecessarily slow and incomplete across repeated threshold runs.
+The fixed 100-photo evaluation set is ready and the isolated YuNet confidence-0.9 batch has completed. The identity review queue is face-oriented: it shows aligned crops, omits complete photo context and cannot show photos with zero detections. That makes category-based detector recall review unnecessarily slow and incomplete across repeated threshold runs.
 
 ## Accepted direction
 
@@ -17,34 +17,47 @@ The durable target is:
 1. browse every photo for one processing run in stable order;
 2. show the original source photo with persisted normalized detector boxes and confidence labels;
 3. retain zero-detection photos;
-4. import private Sample ID, Source Group, Primary Category and countable-face ground truth outside Git;
+4. import private Sample ID, Sample Group, Source Group, Primary Category and countable-face ground truth outside Git;
 5. record reusable face-level ground-truth geometry;
 6. automatically match later detector runs to ground truth; and
 7. export privacy-safe aggregate and category comparisons.
 
 Detector evaluation decisions must not create identity assignments, identity rejections or synthetic people.
 
-## First implementation slice
+## Slice 1 merged
 
-In progress on the branch:
+Pull request [#70](https://github.com/erikwasa/Photo-Identity-Indexer/pull/70) delivered the read-only photo browser:
 
-- add read-only SQLite queries for processing runs and photo-level detections;
-- expose no-cache API endpoints without source roots or private storage paths;
-- reuse the existing path-safe resolver to stream the original photo;
-- add `/detector-evaluation` with processing-run selection, stable filename ordering, pagination and bounding-box overlays;
-- include successful photos with no detections; and
-- add integration coverage for privacy, zero-detection photos, bounding boxes and original-photo streaming.
+- photo-level run queries and no-cache API endpoints;
+- original-photo streaming without source paths;
+- `/detector-evaluation` processing-run selection and overlays;
+- stable ordering including zero-detection photos; and
+- synthetic integration coverage for privacy, geometry and streaming.
 
-## Deferred within the same direction
+## Slice 2 in progress
 
-The first slice intentionally does not yet persist evaluation decisions. Follow-up implementation should add:
+The current branch adds the private authoring loop:
 
-- private manifest import for Sample ID, Source Group, Primary Category and Countable Faces;
-- per-detection classifications: correct, background/unknown, false and duplicate;
-- direct marking of missed-face ground truth on the original image;
-- immutable private JSON export keyed by source hash and sample ID;
-- automatic intersection-over-union matching for later runs; and
-- category summaries and spreadsheet-compatible export.
+- parse Excel-exported comma or semicolon CSV after optional workbook preamble rows;
+- validate the manifest against every immutable photo in the selected run;
+- optionally verify full source SHA-256 values;
+- create resumable private JSON sessions outside the catalogue;
+- classify detections as correct, background/unknown, false or duplicate;
+- mark missed countable faces directly on the source image;
+- enforce per-photo arithmetic before marking a row complete;
+- resume after application restart; and
+- export spreadsheet-compatible CSV rows.
+
+The default private location is the application-local `detector-evaluations` directory. Operators can set `PhotoIdentity__DetectorEvaluationRoot` to keep the session files beside other private M16 evidence.
+
+## Still pending
+
+A final comparison slice must:
+
+- derive reusable countable-face ground truth from the authored session;
+- match later threshold or detector runs with deterministic intersection-over-union rules;
+- surface unmatched and ambiguous cases for human correction; and
+- calculate source-group, category and M16 decision-gate summaries.
 
 ## Privacy
 
