@@ -55,7 +55,7 @@ Exclude from the primary metric:
 
 Record excluded screen, poster or reflection faces separately when they occur. Do not change the counting rule partway through the sample.
 
-## Step 4: create the tally
+## Step 4: create the private manifest
 
 Use the private detector-recall spreadsheet with one row per photo and these fields:
 
@@ -63,6 +63,7 @@ Use the private detector-recall spreadsheet with one row per photo and these fie
 sample_id
 image_name
 sample_group
+source_group
 primary_category
 countable_faces
 correct_detections
@@ -75,29 +76,101 @@ notes
 row_check
 ```
 
-Use neutral sample IDs such as `R001` to `R050` and `D001` to `D050`. Enter the real image name in the private workbook, but do not commit the completed workbook.
+Use neutral sample IDs such as `R001` to `R050` and `D001` to `D050`. Enter the exact staged image name in the private workbook, but do not commit the completed workbook.
+
+Use stable `source_group` values such as:
+
+```text
+Pilot representative
+Pilot difficult
+External difficult
+```
 
 `likely_background_or_unknown_detections` is optional. It estimates how many correctly detected faces are likely to create review work without becoming named identities. It is not a person assignment and does not require deciding exactly who somebody is.
 
-## Step 5: review each photo
+Before detector review, complete at least these columns:
 
-For each of the 100 photos:
+```text
+Sample ID
+Image Name
+Sample Group
+Source Group
+Primary Category
+Countable Faces
+```
 
-1. Open the original photo or full preview at 100% zoom.
-2. Count every face that meets the fixed counting rule.
-3. Open the detector results for that same photo in the current review workflow.
-4. Match each detected crop or box to one countable face.
-5. Record one `correct_detection` for each countable face detected at least once.
-6. Record one `missed_face` for each countable face with no matching detection.
-7. Record a `false_detection` for a detector result that is not a countable human face.
-8. When the same face is detected more than once, count one correct detection and record every additional result as a duplicate.
-9. Optionally count correctly detected faces that appear to be background people or people the operator does not know. Do not name or assign them during this pass.
-10. Add a short neutral note for the reason a face appears missed, such as `small`, `profile`, `occluded`, `blur`, `low_light` or `scan`.
-11. Verify that `countable_faces = correct_detections + missed_faces` before moving to the next photo.
+Export the **Photo Review** sheet as CSV UTF-8. The workspace accepts comma or semicolon separators and finds the header after the spreadsheet preamble rows. An optional `Source SHA-256` column adds a full content-hash check; exact staged filenames and persisted revision hashes are retained in the private session even when this column is absent.
 
-Do not identify people during this pass. The task is only to determine whether a face was found and to estimate later background-face workload.
+## Step 5: start the private evaluation workspace
 
-## Step 6: calculate the results
+Publish and run the local application against the isolated detector database. In Windows PowerShell 5.1:
+
+```powershell
+$repo = "C:\Kod\codex\Photo Identity Indexer"
+$publish = "C:\PhotoIdentity\M16\review-app"
+$baselineDb = "C:\PhotoIdentity\M16\runs\confidence-090\catalogue.db"
+$evaluationRoot = "C:\PhotoIdentity\M16\private\evaluation-sessions"
+
+Set-Location -LiteralPath $repo
+
+Remove-Item `
+    -LiteralPath $publish `
+    -Recurse `
+    -Force `
+    -ErrorAction SilentlyContinue
+
+dotnet publish `
+    .\src\PhotoIdentity.Api\PhotoIdentity.Api.csproj `
+    --configuration Release `
+    --output $publish
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Publishing the review application failed."
+}
+
+$env:PhotoIdentity__DatabasePath = $baselineDb
+$env:PhotoIdentity__DetectorEvaluationRoot = $evaluationRoot
+
+Set-Location -LiteralPath $publish
+
+dotnet .\PhotoIdentity.Api.dll `
+    --urls "http://127.0.0.1:5080"
+```
+
+Leave that PowerShell window running. Open this address in a browser:
+
+```text
+http://localhost:5080/detector-evaluation
+```
+
+The detector-evaluation root contains private JSON session files. Keep it outside the repository and include it in the private M16 backup process.
+
+## Step 6: import and review the baseline
+
+1. Select the completed confidence-0.9 processing run.
+2. Enter a session name such as `M16 confidence 0.9 baseline`.
+3. Select the private Photo Review CSV.
+4. Create the evaluation session. Creation fails when an image is missing, extra, duplicated or attached to a different optional SHA-256.
+5. Review one complete source photo at a time.
+6. Classify every detector box as one of:
+   - `Correct` — one useful detection of a countable face;
+   - `Background / unknown` — a correctly detected countable face likely to remain unnamed;
+   - `False` — not a countable human face under the fixed rule; or
+   - `Duplicate` — an additional detection of a face already counted once.
+7. For every countable face with no matching detector box, choose **Mark missed face**, click two opposite corners around the face and retain one missed box per missed face.
+8. Add a neutral miss reason such as `small`, `profile`, `occluded`, `blur`, `low_light` or `scan` when useful.
+9. Save the photo. A row is complete only when every detector box is classified and:
+
+```text
+countable_faces = correct_or_background_detections + missed_face_boxes
+```
+
+10. Use **Save and next** to continue. The JSON session is updated atomically and can be resumed after restarting the application.
+11. Export CSV when review is complete. The export retains per-photo values compatible with the private spreadsheet and marks incomplete rows explicitly.
+
+Do not identify people during this pass. Detector-evaluation classifications do not write assignments, rejections or suggestions to the canonical identity review history.
+
+## Step 7: calculate the results
 
 Calculate:
 
@@ -116,7 +189,7 @@ Also calculate recall separately for:
 - profile, occluded, blurred or low-light faces; and
 - scanned, old or low-resolution photos.
 
-## Step 7: make the milestone decision
+## Step 8: make the milestone decision
 
 - When every decision target passes and no material failure category remains, complete WI-0034, cancel WI-0035 through WI-0038 as unnecessary, and complete M16.
 - When recall fails but most misses have low confidence, continue to WI-0035 for a threshold sweep.
