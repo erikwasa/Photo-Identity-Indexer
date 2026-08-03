@@ -1,0 +1,559 @@
+@page "/detector-evaluation/sessions/{SessionId}"
+@using System.Globalization
+@using System.Net.Http.Json
+@using System.Text.Json
+@using Microsoft.AspNetCore.Components.Web
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<PageTitle>Detector ground truth · Photo Identity</PageTitle>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+
+@if (!string.IsNullOrWhiteSpace(Success))
+{
+    <div class="notice success" role="status">@Success</div>
+}
+
+@if (Loading)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading detector evaluation session…</p>
+    </section>
+}
+else if (Session is null)
+{
+    <section class="empty-state">
+        <h1>Evaluation session unavailable</h1>
+        <p>The private session file could not be loaded.</p>
+        <a class="button secondary" href="/detector-evaluation">Back to detector evaluation</a>
+    </section>
+}
+else
+{
+    <section class="detector-authoring-header">
+        <div>
+            <a class="back-link" href="/detector-evaluation">← Detector evaluation</a>
+            <p class="eyebrow">Ground-truth authoring</p>
+            <h1>@Session.Name</h1>
+            <p>
+                Review complete photos without changing identity state. Correct and background/unknown detections
+                count toward recall; false and duplicate detections do not.
+            </p>
+        </div>
+        <aside>
+            <strong>@Session.CompletedPhotoCount / @Session.Photos.Count complete</strong>
+            <progress max="@Session.Photos.Count" value="@Session.CompletedPhotoCount"></progress>
+            <a class="button secondary"
+               href="@($"/api/detector-evaluation/sessions/{Session.Id}/export.csv")">
+                Export CSV
+            </a>
+        </aside>
+    </section>
+
+    @if (CurrentPhoto is DetectorEvaluationSessionPhotoResponse photo)
+    {
+        <section class="detector-photo-navigation" aria-label="Evaluation photo navigation">
+            <button class="button secondary"
+                    disabled="@(Saving || CurrentIndex == 0)"
+                    @onclick="() => NavigateAsync(-1)">
+                Previous
+            </button>
+            <div>
+                <strong>@photo.SampleId · @photo.PhotoName</strong>
+                <span>Photo @(CurrentIndex + 1) of @Session.Photos.Count</span>
+            </div>
+            <button class="button secondary"
+                    disabled="@(Saving || CurrentIndex + 1 >= Session.Photos.Count)"
+                    @onclick="() => NavigateAsync(1)">
+                Next
+            </button>
+        </section>
+
+        <section class="detector-authoring-grid">
+            <div class="detector-image-panel">
+                <header>
+                    <div>
+                        <h2>@photo.SampleId</h2>
+                        <p>@photo.SourceGroup · @photo.PrimaryCategory</p>
+                    </div>
+                    <span class="state-badge @(ProjectedComplete ? "complete" : "")">
+                        @(ProjectedComplete ? "Complete" : "Incomplete")
+                    </span>
+                </header>
+
+                <div class="detector-authoring-stage @(MarkMissedMode ? "marking" : "")"
+                     @ref="StageElement"
+                     @onclick="HandleStageClickAsync">
+                    <img src="@photo.ContentUrl"
+                         alt="Source photo @photo.PhotoName with detector and missed-face boxes" />
+
+                    @foreach (DetectorEvaluationSessionDetectionResponse detection in photo.Detections)
+                    {
+                        <div class="detector-authoring-box @DispositionClass(JudgementFor(detection.Id))"
+                             style="@BoxStyle(detection.BoundingBox)">
+                            <span>@detection.FaceNumber · @ConfidenceLabel(detection.Confidence)</span>
+                        </div>
+                    }
+
+                    @foreach (DetectorEvaluationMissedFaceRequest missed in MissedFaces)
+                    {
+                        <div class="detector-authoring-box missed"
+                             style="@BoxStyle(missed.BoundingBox)">
+                            <span>Missed</span>
+                        </div>
+                    }
+
+                    @if (MissStart is DetectorEvaluationPoint start)
+                    {
+                        <div class="miss-start" style="@PointStyle(start)" aria-hidden="true"></div>
+                    }
+                </div>
+
+                <div class="missed-face-toolbar">
+                    <button class="button @(MarkMissedMode ? "primary" : "secondary")"
+                            disabled="@Saving"
+                            @onclick="ToggleMissedMode">
+                        @(MarkMissedMode ? "Cancel marking" : "Mark missed face")
+                    </button>
+                    <span>
+                        @if (MarkMissedMode && MissStart is null)
+                        {
+                            <text>Click the first corner of a missed face.</text>
+                        }
+                        else if (MarkMissedMode)
+                        {
+                            <text>Click the opposite corner to save the missed-face box.</text>
+                        }
+                        else
+                        {
+                            <text>@MissedFaces.Count missed face@(MissedFaces.Count == 1 ? "" : "s") marked.</text>
+                        }
+                    </span>
+                </div>
+
+                @if (MissedFaces.Count > 0)
+                {
+                    <div class="missed-face-list">
+                        @for (int index = 0; index < MissedFaces.Count; index++)
+                        {
+                            DetectorEvaluationMissedFaceRequest missed = MissedFaces[index];
+                            <span>
+                                Missed @(index + 1)
+                                <button type="button"
+                                        aria-label="Remove missed face @(index + 1)"
+                                        @onclick="() => RemoveMissedFace(missed.Id)">×</button>
+                            </span>
+                        }
+                    </div>
+                }
+            </div>
+
+            <aside class="detector-review-panel">
+                <section class="detector-photo-metadata">
+                    <div><span>Countable faces</span><strong>@photo.CountableFaces</strong></div>
+                    <div><span>Correct</span><strong>@ProjectedCorrect</strong></div>
+                    <div><span>Missed</span><strong>@MissedFaces.Count</strong></div>
+                    <div><span>False</span><strong>@ProjectedFalse</strong></div>
+                    <div><span>Duplicates</span><strong>@ProjectedDuplicates</strong></div>
+                    <div><span>Background / unknown</span><strong>@ProjectedBackground</strong></div>
+                </section>
+
+                <div class="detector-arithmetic @(ArithmeticMatches ? "valid" : "invalid")">
+                    @photo.CountableFaces countable = @ProjectedCorrect correct + @MissedFaces.Count missed
+                </div>
+
+                <section class="detection-judgements" aria-label="Detection classifications">
+                    <div class="section-heading">
+                        <h2>Detections</h2>
+                        <span>@ClassifiedCount / @photo.Detections.Count classified</span>
+                    </div>
+
+                    @if (photo.Detections.Count == 0)
+                    {
+                        <p class="detector-no-detections">This photo has zero detector boxes.</p>
+                    }
+                    else
+                    {
+                        @foreach (DetectorEvaluationSessionDetectionResponse detection in photo.Detections)
+                        {
+                            string? disposition = JudgementFor(detection.Id);
+                            <article class="detection-judgement @DispositionClass(disposition)">
+                                <header>
+                                    <strong>Detection @detection.FaceNumber</strong>
+                                    <span>@ConfidenceLabel(detection.Confidence)</span>
+                                </header>
+                                <div class="detection-actions">
+                                    <button class="@ActiveClass(disposition, CorrectDisposition)"
+                                            @onclick="() => SetDisposition(detection.Id, CorrectDisposition)">Correct</button>
+                                    <button class="@ActiveClass(disposition, BackgroundDisposition)"
+                                            @onclick="() => SetDisposition(detection.Id, BackgroundDisposition)">Background / unknown</button>
+                                    <button class="@ActiveClass(disposition, FalseDisposition)"
+                                            @onclick="() => SetDisposition(detection.Id, FalseDisposition)">False</button>
+                                    <button class="@ActiveClass(disposition, DuplicateDisposition)"
+                                            @onclick="() => SetDisposition(detection.Id, DuplicateDisposition)">Duplicate</button>
+                                </div>
+                            </article>
+                        }
+                    }
+                </section>
+
+                <label class="field-label" for="miss-reason">Miss reason</label>
+                <input id="miss-reason"
+                       @bind="MissReason"
+                       @bind:event="oninput"
+                       @bind:after="MarkDirty"
+                       placeholder="Small/distant, profile, blur, low light…" />
+
+                <label class="field-label notes-label" for="evaluation-notes">Notes</label>
+                <textarea id="evaluation-notes"
+                          @bind="Notes"
+                          @bind:event="oninput"
+                          @bind:after="MarkDirty"
+                          rows="4"
+                          placeholder="Optional private review notes"></textarea>
+
+                <div class="detector-save-actions">
+                    <button class="button secondary"
+                            disabled="@Saving"
+                            @onclick="() => SaveCurrentAsync(false)">
+                        @(Saving ? "Saving…" : "Save")
+                    </button>
+                    <button class="button primary"
+                            disabled="@Saving"
+                            @onclick="() => SaveCurrentAsync(true)">
+                        Save and next
+                    </button>
+                </div>
+            </aside>
+        </section>
+    }
+}
+
+@code {
+    private const string CorrectDisposition = "correct";
+    private const string BackgroundDisposition = "background-unknown";
+    private const string FalseDisposition = "false";
+    private const string DuplicateDisposition = "duplicate";
+
+    [Parameter]
+    public string SessionId { get; set; } = string.Empty;
+
+    private DetectorEvaluationSessionResponse? Session { get; set; }
+    private Dictionary<string, string?> Judgements { get; } = new(StringComparer.Ordinal);
+    private List<DetectorEvaluationMissedFaceRequest> MissedFaces { get; } = [];
+    private ElementReference StageElement { get; set; }
+    private DetectorEvaluationPoint? MissStart { get; set; }
+    private string? MissReason { get; set; }
+    private string? Notes { get; set; }
+    private int CurrentIndex { get; set; }
+    private bool Loading { get; set; }
+    private bool Saving { get; set; }
+    private bool Dirty { get; set; }
+    private bool MarkMissedMode { get; set; }
+    private string? Error { get; set; }
+    private string? Success { get; set; }
+
+    private DetectorEvaluationSessionPhotoResponse? CurrentPhoto =>
+        Session is null || Session.Photos.Count == 0 ? null : Session.Photos[CurrentIndex];
+
+    private int ProjectedCorrect => Judgements.Values.Count(value =>
+        value is CorrectDisposition or BackgroundDisposition);
+    private int ProjectedBackground => Judgements.Values.Count(value => value == BackgroundDisposition);
+    private int ProjectedFalse => Judgements.Values.Count(value => value == FalseDisposition);
+    private int ProjectedDuplicates => Judgements.Values.Count(value => value == DuplicateDisposition);
+    private int ClassifiedCount => Judgements.Values.Count(value => !string.IsNullOrWhiteSpace(value));
+    private bool ArithmeticMatches => CurrentPhoto is not null &&
+        CurrentPhoto.CountableFaces == ProjectedCorrect + MissedFaces.Count;
+    private bool ProjectedComplete => CurrentPhoto is not null &&
+        ClassifiedCount == CurrentPhoto.Detections.Count && ArithmeticMatches;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadSessionAsync();
+    }
+
+    private async Task LoadSessionAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Session = await Http.GetFromJsonAsync<DetectorEvaluationSessionResponse>(
+                $"/api/detector-evaluation/sessions/{Uri.EscapeDataString(SessionId)}");
+            if (Session is not null && Session.Photos.Count > 0)
+            {
+                int firstIncomplete = FindFirstIncomplete(Session.Photos);
+                CurrentIndex = firstIncomplete >= 0 ? firstIncomplete : 0;
+                LoadEditorState();
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private void LoadEditorState()
+    {
+        Judgements.Clear();
+        MissedFaces.Clear();
+        DetectorEvaluationSessionPhotoResponse? photo = CurrentPhoto;
+        if (photo is not null)
+        {
+            foreach (DetectorEvaluationSessionDetectionResponse detection in photo.Detections)
+            {
+                Judgements[detection.Id] = detection.Disposition;
+            }
+
+            MissedFaces.AddRange(photo.MissedFaces.Select(missed => new DetectorEvaluationMissedFaceRequest(
+                missed.Id,
+                missed.BoundingBox)));
+            MissReason = photo.MissReason;
+            Notes = photo.Notes;
+        }
+
+        MissStart = null;
+        MarkMissedMode = false;
+        Dirty = false;
+        Success = null;
+    }
+
+    private void SetDisposition(string detectionId, string disposition)
+    {
+        Judgements[detectionId] = disposition;
+        MarkDirty();
+    }
+
+    private string? JudgementFor(string detectionId) =>
+        Judgements.TryGetValue(detectionId, out string? value) ? value : null;
+
+    private void ToggleMissedMode()
+    {
+        MarkMissedMode = !MarkMissedMode;
+        MissStart = null;
+    }
+
+    private async Task HandleStageClickAsync(MouseEventArgs args)
+    {
+        if (!MarkMissedMode || Saving)
+        {
+            return;
+        }
+
+        double[] point = await JS.InvokeAsync<double[]>(
+            "detectorEvaluation.getNormalizedPoint",
+            StageElement,
+            args.ClientX,
+            args.ClientY);
+        if (point.Length != 2)
+        {
+            Error = "The image coordinate helper returned an invalid point.";
+            return;
+        }
+
+        DetectorEvaluationPoint selected = new(point[0], point[1]);
+        if (MissStart is null)
+        {
+            MissStart = selected;
+            return;
+        }
+
+        DetectorEvaluationPoint start = MissStart.Value;
+        double x = Math.Min(start.X, selected.X);
+        double y = Math.Min(start.Y, selected.Y);
+        double width = Math.Abs(selected.X - start.X);
+        double height = Math.Abs(selected.Y - start.Y);
+        MissStart = null;
+        if (width < 0.002 || height < 0.002)
+        {
+            Error = "The missed-face box is too small. Select two distinct corners.";
+            return;
+        }
+
+        MissedFaces.Add(new DetectorEvaluationMissedFaceRequest(
+            Guid.NewGuid().ToString("D"),
+            new DetectorEvaluationBoundingBoxResponse(x, y, width, height)));
+        MarkMissedMode = false;
+        MarkDirty();
+    }
+
+    private void RemoveMissedFace(string id)
+    {
+        MissedFaces.RemoveAll(value => string.Equals(value.Id, id, StringComparison.Ordinal));
+        MarkDirty();
+    }
+
+    private async Task NavigateAsync(int delta)
+    {
+        if (Dirty && !await SaveCurrentAsync(false))
+        {
+            return;
+        }
+
+        if (Session is null)
+        {
+            return;
+        }
+
+        CurrentIndex = Math.Clamp(CurrentIndex + delta, 0, Session.Photos.Count - 1);
+        LoadEditorState();
+    }
+
+    private async Task<bool> SaveCurrentAsync(bool advance)
+    {
+        if (Session is null || CurrentPhoto is null)
+        {
+            return false;
+        }
+
+        Saving = true;
+        Error = null;
+        Success = null;
+        string currentRevisionId = CurrentPhoto.RevisionId;
+        try
+        {
+            SaveDetectorEvaluationPhotoReviewRequest request = new(
+                CurrentPhoto.Detections.Select(detection => new DetectorEvaluationDetectionJudgementRequest(
+                    detection.Id,
+                    JudgementFor(detection.Id))).ToArray(),
+                MissedFaces.ToArray(),
+                MissReason,
+                Notes);
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                $"/api/detector-evaluation/sessions/{Session.Id}/photos/{currentRevisionId}",
+                request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await ReadErrorAsync(response);
+                return false;
+            }
+
+            DetectorEvaluationSessionResponse? updated =
+                await response.Content.ReadFromJsonAsync<DetectorEvaluationSessionResponse>();
+            if (updated is null)
+            {
+                Error = "The photo review was saved but the response was empty.";
+                return false;
+            }
+
+            Session = updated;
+            int savedIndex = Session.Photos
+                .Select((photo, index) => new { photo.RevisionId, Index = index })
+                .First(value => string.Equals(value.RevisionId, currentRevisionId, StringComparison.Ordinal))
+                .Index;
+            CurrentIndex = advance ? FindNextIndex(Session.Photos, savedIndex) : savedIndex;
+            LoadEditorState();
+            Success = ProjectedComplete
+                ? "Photo saved and complete."
+                : "Photo saved. Complete the remaining classifications or arithmetic before final export.";
+            return true;
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+            return false;
+        }
+        finally
+        {
+            Saving = false;
+        }
+    }
+
+    private void MarkDirty()
+    {
+        Dirty = true;
+        Success = null;
+    }
+
+    private static int FindFirstIncomplete(IReadOnlyList<DetectorEvaluationSessionPhotoResponse> photos)
+    {
+        for (int index = 0; index < photos.Count; index++)
+        {
+            if (!photos[index].IsComplete)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    private static int FindNextIndex(
+        IReadOnlyList<DetectorEvaluationSessionPhotoResponse> photos,
+        int currentIndex)
+    {
+        for (int index = currentIndex + 1; index < photos.Count; index++)
+        {
+            if (!photos[index].IsComplete)
+            {
+                return index;
+            }
+        }
+
+        for (int index = 0; index < currentIndex; index++)
+        {
+            if (!photos[index].IsComplete)
+            {
+                return index;
+            }
+        }
+
+        return Math.Min(currentIndex + 1, photos.Count - 1);
+    }
+
+    private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
+    {
+        string content = await response.Content.ReadAsStringAsync();
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(content);
+            if (document.RootElement.TryGetProperty("error", out JsonElement error))
+            {
+                return error.GetString() ?? response.ReasonPhrase ?? "The request failed.";
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return string.IsNullOrWhiteSpace(content)
+            ? response.ReasonPhrase ?? "The request failed."
+            : content;
+    }
+
+    private static string ConfidenceLabel(double confidence) =>
+        confidence.ToString("P1", CultureInfo.InvariantCulture);
+
+    private static string BoxStyle(DetectorEvaluationBoundingBoxResponse box) =>
+        FormattableString.Invariant(
+            $"left:{box.X * 100:0.####}%;top:{box.Y * 100:0.####}%;width:{box.Width * 100:0.####}%;height:{box.Height * 100:0.####}%;");
+
+    private static string PointStyle(DetectorEvaluationPoint point) =>
+        FormattableString.Invariant($"left:{point.X * 100:0.####}%;top:{point.Y * 100:0.####}%;");
+
+    private static string DispositionClass(string? disposition) => disposition switch
+    {
+        CorrectDisposition => "correct",
+        BackgroundDisposition => "background",
+        FalseDisposition => "false",
+        DuplicateDisposition => "duplicate",
+        _ => "unclassified",
+    };
+
+    private static string ActiveClass(string? current, string candidate) =>
+        string.Equals(current, candidate, StringComparison.Ordinal)
+            ? "active"
+            : string.Empty;
+
+    private readonly record struct DetectorEvaluationPoint(double X, double Y);
+}
