@@ -6,6 +6,7 @@ using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Web;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -20,12 +21,13 @@ public sealed class DetectorEvaluationApplicationTests
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
+            string sessionRoot = Path.Combine(directory, "private-sessions");
             SqliteCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
             SeededEvaluation seeded = await SeedEvaluationAsync(database, directory);
 
-            await using DetectorEvaluationApiFactory factory = new(databasePath);
+            await using DetectorEvaluationApiFactory factory = new(databasePath, sessionRoot);
             using HttpClient client = factory.CreateClient();
 
             using HttpResponseMessage runsResponse = await client.GetAsync("/api/detector-evaluation/runs");
@@ -78,6 +80,141 @@ public sealed class DetectorEvaluationApplicationTests
         {
             DeleteTemporaryDirectory(directory);
         }
+    }
+
+    [Fact]
+    public async Task Detector_evaluation_sessions_persist_resume_and_export_private_ground_truth()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            string sessionRoot = Path.Combine(directory, "private-sessions");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            SeededEvaluation seeded = await SeedEvaluationAsync(database, directory);
+
+            DetectorEvaluationSessionSummaryResponse created;
+            await using (DetectorEvaluationApiFactory factory = new(databasePath, sessionRoot))
+            using (HttpClient client = factory.CreateClient())
+            {
+                CreateDetectorEvaluationSessionRequest createRequest = new(
+                    "M16 baseline",
+                    seeded.RunId.ToString(),
+                    [
+                        new DetectorEvaluationManifestEntryRequest(
+                            "R001",
+                            "R001__group.jpg",
+                            "Representative",
+                            "Pilot representative",
+                            "Group",
+                            1,
+                            null),
+                        new DetectorEvaluationManifestEntryRequest(
+                            "R002",
+                            "R002__empty.jpg",
+                            "Difficult",
+                            "External difficult",
+                            "Small / distant",
+                            1,
+                            null),
+                    ]);
+
+                using HttpResponseMessage createResponse = await client.PostAsJsonAsync(
+                    "/api/detector-evaluation/sessions",
+                    createRequest);
+                createResponse.EnsureSuccessStatusCode();
+                created = Assert.IsType<DetectorEvaluationSessionSummaryResponse>(
+                    await createResponse.Content.ReadFromJsonAsync<DetectorEvaluationSessionSummaryResponse>());
+                Assert.Equal(2, created.PhotoCount);
+                Assert.Equal(0, created.CompletedPhotoCount);
+
+                DetectorEvaluationSessionResponse session = Assert.IsType<DetectorEvaluationSessionResponse>(
+                    await client.GetFromJsonAsync<DetectorEvaluationSessionResponse>(
+                        $"/api/detector-evaluation/sessions/{created.Id}"));
+                Assert.Equal(2, session.Photos.Count);
+
+                DetectorEvaluationSessionPhotoResponse detectedPhoto = session.Photos[0];
+                DetectorEvaluationSessionDetectionResponse detection = Assert.Single(detectedPhoto.Detections);
+                SaveDetectorEvaluationPhotoReviewRequest detectedReview = new(
+                    [new DetectorEvaluationDetectionJudgementRequest(detection.Id, "correct")],
+                    [],
+                    null,
+                    "Confirmed on the full photo.");
+                using HttpResponseMessage detectedSave = await client.PutAsJsonAsync(
+                    $"/api/detector-evaluation/sessions/{created.Id}/photos/{detectedPhoto.RevisionId}",
+                    detectedReview);
+                detectedSave.EnsureSuccessStatusCode();
+
+                DetectorEvaluationSessionPhotoResponse emptyPhoto = session.Photos[1];
+                SaveDetectorEvaluationPhotoReviewRequest emptyReview = new(
+                    [],
+                    [
+                        new DetectorEvaluationMissedFaceRequest(
+                            Guid.NewGuid().ToString("D"),
+                            new DetectorEvaluationBoundingBoxResponse(0.15, 0.2, 0.1, 0.14)),
+                    ],
+                    "Small / distant",
+                    "Missed face marked directly on the photo.");
+                using HttpResponseMessage emptySave = await client.PutAsJsonAsync(
+                    $"/api/detector-evaluation/sessions/{created.Id}/photos/{emptyPhoto.RevisionId}",
+                    emptyReview);
+                emptySave.EnsureSuccessStatusCode();
+            }
+
+            Assert.Single(Directory.GetFiles(sessionRoot, "*.json", SearchOption.TopDirectoryOnly));
+
+            await using DetectorEvaluationApiFactory restartedFactory = new(databasePath, sessionRoot);
+            using HttpClient restartedClient = restartedFactory.CreateClient();
+            using HttpResponseMessage sessionResponse = await restartedClient.GetAsync(
+                $"/api/detector-evaluation/sessions/{created.Id}");
+            sessionResponse.EnsureSuccessStatusCode();
+            string sessionJson = await sessionResponse.Content.ReadAsStringAsync();
+            Assert.DoesNotContain(seeded.SourceRoot, sessionJson, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(sessionRoot, sessionJson, StringComparison.OrdinalIgnoreCase);
+
+            DetectorEvaluationSessionResponse resumed = Assert.IsType<DetectorEvaluationSessionResponse>(
+                await sessionResponse.Content.ReadFromJsonAsync<DetectorEvaluationSessionResponse>());
+            Assert.Equal(2, resumed.CompletedPhotoCount);
+            Assert.All(resumed.Photos, photo => Assert.True(photo.IsComplete));
+            Assert.Equal(1, resumed.Photos[0].CorrectDetections);
+            Assert.Single(resumed.Photos[1].MissedFaces);
+
+            using HttpResponseMessage exportResponse = await restartedClient.GetAsync(
+                $"/api/detector-evaluation/sessions/{created.Id}/export.csv");
+            exportResponse.EnsureSuccessStatusCode();
+            Assert.Equal("text/csv", exportResponse.Content.Headers.ContentType?.MediaType);
+            string csv = await exportResponse.Content.ReadAsStringAsync();
+            Assert.Contains("Sample ID,Image Name", csv, StringComparison.Ordinal);
+            Assert.Contains("R001,R001__group.jpg", csv, StringComparison.Ordinal);
+            Assert.Contains("R002,R002__empty.jpg", csv, StringComparison.Ordinal);
+            Assert.Contains("Small / distant", csv, StringComparison.Ordinal);
+            Assert.DoesNotContain(seeded.SourceRoot, csv, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public void Detector_evaluation_manifest_parser_finds_excel_sheet_headers_after_preamble()
+    {
+        const string csv = """
+            Detector Recall Pilot;;;;;;
+            Complete Countable Faces before review;;;;;;
+            Keep this file private;;;;;;
+            Sample ID;Image Name;Sample Group;Primary Category;Countable Faces;Source Group;Source SHA-256
+            R001;R001__group.jpg;Representative;Group;5;Pilot representative;
+            D001;D001__small.jpg;Difficult;Small / distant;2;External difficult;
+            """;
+
+        IReadOnlyList<DetectorEvaluationManifestEntryRequest> entries = DetectorEvaluationManifestCsv.Parse(csv);
+
+        Assert.Equal(2, entries.Count);
+        Assert.Equal("R001__group.jpg", entries[0].ImageName);
+        Assert.Equal(5, entries[0].CountableFaces);
+        Assert.Equal("External difficult", entries[1].SourceGroup);
     }
 
     private static async Task<SeededEvaluation> SeedEvaluationAsync(
@@ -216,15 +353,18 @@ public sealed class DetectorEvaluationApplicationTests
     private sealed class DetectorEvaluationApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
     {
         private readonly string _databasePath;
+        private readonly string _sessionRoot;
 
-        public DetectorEvaluationApiFactory(string databasePath)
+        public DetectorEvaluationApiFactory(string databasePath, string sessionRoot)
         {
             _databasePath = databasePath;
+            _sessionRoot = sessionRoot;
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting("PhotoIdentity:DetectorEvaluationRoot", _sessionRoot);
         }
     }
 }

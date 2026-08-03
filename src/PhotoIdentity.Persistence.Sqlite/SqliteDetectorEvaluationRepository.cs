@@ -70,9 +70,9 @@ public sealed class SqliteDetectorEvaluationRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
-        if (limit is < 1 or > 100)
+        if (limit is < 1 or > 1000)
         {
-            throw new ArgumentOutOfRangeException(nameof(limit), "Photo page size must be between 1 and 100.");
+            throw new ArgumentOutOfRangeException(nameof(limit), "Photo page size must be between 1 and 1000.");
         }
 
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
