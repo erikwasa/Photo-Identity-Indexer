@@ -83,6 +83,7 @@ milestones:
   document: ../milestones/M16-detector-recall.md
   work_items:
   - WI-0039
+  - WI-0040
   - WI-0034
   - WI-0035
   - WI-0036

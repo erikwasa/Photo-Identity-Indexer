@@ -30,4 +30,4 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Next ready work
 
-None.
+- [**WI-0040 — Build a viewport-fitted detector comparison review workspace**](../work-items/WI-0040-detector-comparison-review-workspace.md) — `ready`; owner: `ai-agent`

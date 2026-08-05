@@ -2,7 +2,7 @@
 
 Status date: 2026-08-05
 
-Status update branch: `agent/WI-0039-status-and-threshold-run-docs`
+Status update branch: `agent/WI-0040-comparison-review-workspace`
 
 ## Current outcome
 
@@ -10,7 +10,9 @@ The fixed private 100-photo set has been processed and fully reviewed with the p
 
 The completed confidence-0.9 baseline was evaluated against the predeclared M16 decision target on 2026-08-05 and **did not pass**. Detailed counts, filenames, paths, images and category values remain private. The immutable authored session is the reference ground truth for the threshold experiments.
 
-PR #74 merged the repeated-run comparison slice into `main` on 2026-08-05. WI-0039 is complete and WI-0035 is now active.
+PR #74 merged the repeated-run comparison slice into `main` on 2026-08-05. PR #76 then changed exception review to one photo at a time with plain-language decisions and clearer status treatment. PR #77 added compact `R`/`C` markers and automatically classified candidate-free reference faces as detector misses. WI-0039 remains complete and WI-0035 remains active.
+
+Operator use of the refined comparison page identified one remaining workflow problem: source images still determine page height. Portrait and unusually large photos can force repeated browser-page scrolling between box markers and decision fields. WI-0040 is now ready to build a viewport-fitted comparison review workspace without changing persisted corrections, matching or metrics.
 
 ## Delivered workspace
 
@@ -47,13 +49,38 @@ PR #74 merged the repeated-run comparison slice into `main` on 2026-08-05. WI-00
 - overall, five-plus-face, source-group, category and M16 gate summaries; and
 - spreadsheet-compatible summary export.
 
+### Comparison-review clarity — merged in PRs #76 and #77
+
+- one exception photo at a time with previous, next and save-and-next actions;
+- operator-facing candidate/reference terminology and decision-completion status;
+- distinct pass, fail, pending, resolved and needs-review treatment;
+- compact numbered `R` and `C` markers for clustered faces;
+- removal of internal component IDs from the operator workflow; and
+- automatic detector-miss classification when a photo has reference faces but no candidate review boxes.
+
 The implementation is covered by synthetic integration tests for frozen ground truth, isolated catalogue attachment, changed-source rejection, correction persistence, restart recovery, metrics and gate export.
+
+## Ready usability follow-up
+
+WI-0040 defines the next comparison-workspace refinement:
+
+- use a stable viewport-relative review area;
+- fit the complete image without cropping by default;
+- place the image and decision panel side by side on desktop;
+- scroll only the decision panel when decisions overflow;
+- keep navigation, completion status and save actions continuously reachable;
+- support explicit fit, zoom and pan controls;
+- reset zoom, pan and panel scroll on every photo change;
+- link `R`/`C` overlays to their decision controls; and
+- provide a bounded narrow-screen fallback.
+
+The work item explicitly preserves the existing comparison API, correction format, automatic-miss rules, matching and gate arithmetic.
 
 ## Active next work
 
-WI-0035 now executes the fixed confidence sweep against the unchanged 100-photo set.
+WI-0035 continues the fixed confidence sweep against the unchanged 100-photo set. WI-0040 is ready and should be completed before substantial remaining manual exception review when practical; it does not change the governed threshold order or candidate-run preparation.
 
-The immediate next steps are:
+The immediate experiment steps remain:
 
 1. start the application with the immutable confidence-0.9 catalogue and freeze its reusable ground truth;
 2. process the unchanged sample at confidence `0.8` into a new isolated catalogue and output directory;
@@ -66,4 +93,4 @@ The complete Windows commands and comparison workflow are documented in [`docs/o
 
 ## Privacy
 
-No private image names, source paths, face boxes, counts, ground-truth files, databases or detector outputs are committed. Repository evidence records only the fixed method, completed review, failed baseline gate, delivered comparison capability and next governed experiment.
+No private image names, source paths, face boxes, counts, ground-truth files, databases or detector outputs are committed. Repository evidence records only the fixed method, completed review, failed baseline gate, delivered comparison capability, privacy-safe usability findings and next governed work.
