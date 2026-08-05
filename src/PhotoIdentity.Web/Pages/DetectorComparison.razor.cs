@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using PhotoIdentity.Web.Contracts;
 using System.Net.Http.Json;
 using System.Text.Json;
