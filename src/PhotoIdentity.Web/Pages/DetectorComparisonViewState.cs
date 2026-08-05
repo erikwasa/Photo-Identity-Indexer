@@ -1,6 +1,6 @@
 namespace PhotoIdentity.Web.Pages;
 
-internal sealed class DetectorComparisonViewState
+public sealed class DetectorComparisonViewState
 {
     public double? ZoomScale { get; private set; }
     public string? ActiveReviewKey { get; private set; }
