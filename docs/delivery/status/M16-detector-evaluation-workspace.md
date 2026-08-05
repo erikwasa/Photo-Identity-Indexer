@@ -1,64 +1,57 @@
 # M16 detector evaluation workspace status
 
-Status date: 2026-08-03
+Status date: 2026-08-05
 
-Current implementation branch: `agent/WI-0039-ground-truth-authoring`
+Status update branch: `agent/M16-baseline-failed-status`
 
-## Why this work started
+## Current outcome
 
-The fixed 100-photo evaluation set is ready and the isolated YuNet confidence-0.9 batch has completed. The identity review queue is face-oriented: it shows aligned crops, omits complete photo context and cannot show photos with zero detections. That makes category-based detector recall review unnecessarily slow and incomplete across repeated threshold runs.
+The fixed private 100-photo set has been processed and fully reviewed with the pinned YuNet detector at confidence `0.9`. The detector-evaluation workspace retained the complete photo context, zero-detection photos, per-detection classifications, missed-face geometry, source groups and primary categories without changing canonical identity review state.
 
-## Accepted direction
+The completed confidence-0.9 baseline was evaluated against the predeclared M16 decision target on 2026-08-05 and **did not pass**. Detailed counts, filenames, paths, images and category values remain private. The immutable authored session is the reference ground truth for the next threshold experiments.
 
-Build a detector-specific, photo-level workspace that remains separate from canonical identity review.
+## Delivered workspace
 
-The durable target is:
+### Slice 1 — merged in PR #70
 
-1. browse every photo for one processing run in stable order;
-2. show the original source photo with persisted normalized detector boxes and confidence labels;
-3. retain zero-detection photos;
-4. import private Sample ID, Sample Group, Source Group, Primary Category and countable-face ground truth outside Git;
-5. record reusable face-level ground-truth geometry;
-6. automatically match later detector runs to ground truth; and
-7. export privacy-safe aggregate and category comparisons.
-
-Detector evaluation decisions must not create identity assignments, identity rejections or synthetic people.
-
-## Slice 1 merged
-
-Pull request [#70](https://github.com/erikwasa/Photo-Identity-Indexer/pull/70) delivered the read-only photo browser:
-
-- photo-level run queries and no-cache API endpoints;
+- photo-level processing-run queries and no-cache API endpoints;
 - original-photo streaming without source paths;
-- `/detector-evaluation` processing-run selection and overlays;
 - stable ordering including zero-detection photos; and
-- synthetic integration coverage for privacy, geometry and streaming.
+- detector overlays on the complete source photo.
 
-## Slice 2 in progress
+### Slice 2 — merged in PR #71
 
-The current branch adds the private authoring loop:
+- private spreadsheet CSV import and immutable-run validation;
+- resumable private JSON sessions outside the catalogue;
+- correct, background/unknown, false and duplicate classifications;
+- direct missed-face geometry authoring;
+- per-photo completion arithmetic; and
+- spreadsheet-compatible export.
 
-- parse Excel-exported comma or semicolon CSV after optional workbook preamble rows;
-- validate the manifest against every immutable photo in the selected run;
-- optionally verify full source SHA-256 values;
-- create resumable private JSON sessions outside the catalogue;
-- classify detections as correct, background/unknown, false or duplicate;
-- mark missed countable faces directly on the source image;
-- enforce per-photo arithmetic before marking a row complete;
-- resume after application restart; and
-- export spreadsheet-compatible CSV rows.
+### Large-image refinement — merged in PR #72
 
-The default private location is the application-local `detector-evaluations` directory. Operators can set `PhotoIdentity__DetectorEvaluationRoot` to keep the session files beside other private M16 evidence.
+- Fit, 100%, 200% and 400% source-pixel zoom;
+- scrollable panning and full-width focus mode; and
+- stable normalized detector and missed-face geometry at every zoom level.
 
-## Still pending
+These slices were verified locally against the private confidence-0.9 run on Windows PowerShell 5.1.
 
-A final comparison slice must:
+## Active next slice
 
-- derive reusable countable-face ground truth from the authored session;
-- match later threshold or detector runs with deterministic intersection-over-union rules;
-- surface unmatched and ambiguous cases for human correction; and
-- calculate source-group, category and M16 decision-gate summaries.
+The failed baseline activates the repeated-run comparison slice of WI-0039 before WI-0035 executes confidence `0.8`, `0.7`, `0.6` and `0.5`.
+
+The comparison slice must:
+
+- derive reusable countable-face ground truth from the authored baseline;
+- attach candidate runs to the same immutable photos and private manifest;
+- use deterministic intersection-over-union matching;
+- classify matches, misses, unmatched detections, duplicates and ambiguous overlaps;
+- present only exceptions for human correction;
+- persist resumable private comparison decisions; and
+- calculate overall, five-plus-face, source-group, category and M16 gate summaries.
+
+WI-0034 is complete. WI-0035 is the selected next detector experiment but remains blocked until the comparison slice is usable.
 
 ## Privacy
 
-No private image names, source paths, face boxes, counts, ground-truth files, databases or detector outputs are committed. Only implementation, automated synthetic tests and privacy-safe progress notes belong in Git.
+No private image names, source paths, face boxes, counts, ground-truth files, databases or detector outputs are committed. Repository evidence records only the fixed method, completed review, failed gate and implementation state.
