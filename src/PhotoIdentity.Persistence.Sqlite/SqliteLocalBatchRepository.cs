@@ -132,7 +132,7 @@ public sealed class SqliteLocalBatchRepository
 
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = AssetRevisionSelect + """
+        command.CommandText = AssetRevisionSelect + "\n" + """
             WHERE asset.source_key = $source_key
               AND revision.content_sha256 = $content_sha256
             ORDER BY revision.observed_at_utc DESC, revision.id DESC
