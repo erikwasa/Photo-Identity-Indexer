@@ -2,7 +2,7 @@
 
 Status date: 2026-08-05
 
-Status update branch: `agent/WI-0040-comparison-review-workspace`
+Status update branch: `agent/WI-0040-viewport-review-workspace`
 
 ## Current outcome
 
@@ -12,7 +12,7 @@ The completed confidence-0.9 baseline was evaluated against the predeclared M16 
 
 PR #74 merged the repeated-run comparison slice into `main` on 2026-08-05. PR #76 then changed exception review to one photo at a time with plain-language decisions and clearer status treatment. PR #77 added compact `R`/`C` markers and automatically classified candidate-free reference faces as detector misses. WI-0039 remains complete and WI-0035 remains active.
 
-Operator use of the refined comparison page identified one remaining workflow problem: source images still determine page height. Portrait and unusually large photos can force repeated browser-page scrolling between box markers and decision fields. WI-0040 is now ready to build a viewport-fitted comparison review workspace without changing persisted corrections, matching or metrics.
+Operator use of the refined comparison page identified one remaining workflow problem: source images still determine page height. Portrait and unusually large photos can force repeated browser-page scrolling between box markers and decision fields. WI-0040 implementation started on 2026-08-05 in branch `agent/WI-0040-viewport-review-workspace` and draft PR #79.
 
 ## Delivered workspace
 
@@ -58,27 +58,28 @@ Operator use of the refined comparison page identified one remaining workflow pr
 - removal of internal component IDs from the operator workflow; and
 - automatic detector-miss classification when a photo has reference faces but no candidate review boxes.
 
-The implementation is covered by synthetic integration tests for frozen ground truth, isolated catalogue attachment, changed-source rejection, correction persistence, restart recovery, metrics and gate export.
+The delivered comparison capability is covered by synthetic integration tests for frozen ground truth, isolated catalogue attachment, changed-source rejection, correction persistence, restart recovery, metrics and gate export.
 
-## Ready usability follow-up
+## Active viewport-workspace implementation
 
-WI-0040 defines the next comparison-workspace refinement:
+WI-0040 draft PR #79 currently implements:
 
-- use a stable viewport-relative review area;
-- fit the complete image without cropping by default;
-- place the image and decision panel side by side on desktop;
-- scroll only the decision panel when decisions overflow;
-- keep navigation, completion status and save actions continuously reachable;
-- support explicit fit, zoom and pan controls;
-- reset zoom, pan and panel scroll on every photo change;
-- link `R`/`C` overlays to their decision controls; and
-- provide a bounded narrow-screen fallback.
+- a stable viewport-relative review area;
+- complete-image fitting by both available width and height without cropping;
+- a desktop split layout with the image and decisions visible together;
+- independent decision-panel scrolling while the image remains visible;
+- continuously reachable previous, next, completion, save and save-and-next actions;
+- Fit, 100%, 200%, 400%, zoom-step and drag-to-pan controls;
+- reset of zoom, pan, decision-panel scroll and transient focus on every photo change;
+- pointer and keyboard linkage between `R`/`C` overlays and decision controls;
+- collapsed comparison metrics, summaries, instructions and qualitative-gate controls below the active workspace; and
+- a bounded narrow-screen layout with sticky save actions.
 
-The work item explicitly preserves the existing comparison API, correction format, automatic-miss rules, matching and gate arithmetic.
+The implementation preserves the existing comparison API, correction format, automatic-miss rules, matching, completion arithmetic, metrics and exports. Automated validation covers view-state reset, the published zoom/pan helper and responsive workspace styles. GitHub Actions and privacy-safe human review with representative portrait, landscape and multi-decision photos remain pending before completion.
 
 ## Active next work
 
-WI-0035 continues the fixed confidence sweep against the unchanged 100-photo set. WI-0040 is ready and should be completed before substantial remaining manual exception review when practical; it does not change the governed threshold order or candidate-run preparation.
+WI-0035 continues the fixed confidence sweep against the unchanged 100-photo set. WI-0040 is now in progress and should be completed before substantial remaining manual exception review when practical; it does not change the governed threshold order or candidate-run preparation.
 
 The immediate experiment steps remain:
 
@@ -93,4 +94,4 @@ The complete Windows commands and comparison workflow are documented in [`docs/o
 
 ## Privacy
 
-No private image names, source paths, face boxes, counts, ground-truth files, databases or detector outputs are committed. Repository evidence records only the fixed method, completed review, failed baseline gate, delivered comparison capability, privacy-safe usability findings and next governed work.
+No private image names, source paths, face boxes, counts, ground-truth files, databases or detector outputs are committed. Repository evidence records only the fixed method, completed review, failed baseline gate, delivered comparison capability, privacy-safe usability findings and active governed work.
