@@ -788,7 +788,7 @@ work_items:
   - id: WI-0035
     title: Tune YuNet confidence threshold
     milestone: M16
-    status: blocked
+    status: in_progress
     owner: human-maintainer
     document: ../work-items/WI-0035-yunet-threshold-sweep.md
     started_at: '2026-08-05'
@@ -797,7 +797,7 @@ work_items:
       - WI-0039
     evidence:
       - type: human_verification
-        value: The failed private confidence-0.9 baseline selected the fixed 0.8, 0.7, 0.6 and 0.5 YuNet threshold sweep; execution waits for reusable candidate-run matching in WI-0039.
+        value: PR #74 completed reusable candidate-run matching and activated the fixed 0.8, 0.7, 0.6 and 0.5 YuNet threshold sweep; confidence 0.8 is the first candidate.
   - id: WI-0036
     title: Add multi-scale YuNet detection
     milestone: M16
@@ -828,12 +828,15 @@ work_items:
   - id: WI-0039
     title: Build detector evaluation workspace
     milestone: M16
-    status: in_progress
+    status: completed
     owner: ai-agent
     document: ../work-items/WI-0039-detector-evaluation-workspace.md
     started_at: '2026-08-03'
+    completed_at: '2026-08-05'
+    verified_at: '2026-08-05'
+    verified_by: automated
     last_updated_at: '2026-08-05'
-    branch: agent/M16-baseline-failed-status
+    branch: agent/WI-0039-comparison-slice
     blockers:
       - WI-0029
     evidence:
@@ -853,3 +856,9 @@ work_items:
         value: 9831e62372cecaf0b417ee314108e61f3667e5dc
       - type: human_verification
         value: Private confidence-0.9 manifest import, resumable authoring, full 100-photo review, source-pixel zoom and CSV export were verified locally on Windows PowerShell 5.1 by 2026-08-05; detailed evidence remains outside Git.
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/74
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31013795777
+      - type: merge_commit
+        value: 23790991b0abf4e6dea32fd33f312df3e37d6e50
