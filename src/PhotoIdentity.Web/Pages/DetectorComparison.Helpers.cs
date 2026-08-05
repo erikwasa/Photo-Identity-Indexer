@@ -50,6 +50,17 @@ public partial class DetectorComparison
         photo.ExceptionComponents.SelectMany(component => component.CandidateDetections)
             .DistinctBy(candidate => candidate.Id, StringComparer.OrdinalIgnoreCase).OrderBy(candidate => candidate.FaceNumber).ThenBy(candidate => candidate.Id, StringComparer.Ordinal).ToArray();
 
+    private static IReadOnlyList<string> AutomaticMissedGroundTruthFaceIds(DetectorEvaluationComparisonPhotoResponse photo) =>
+        photo.ExceptionComponents
+            .Where(IsReferenceOnlyComponent)
+            .SelectMany(component => component.GroundTruthFaces)
+            .Select(face => face.Id)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static bool IsReferenceOnlyComponent(DetectorEvaluationComparisonExceptionComponentResponse component) =>
+        component.CandidateDetections.Count == 0 && component.GroundTruthFaces.Count > 0;
+
     private static string CandidateAction(PhotoCorrectionDraft draft, string candidateId) =>
         draft.CandidateActions.TryGetValue(candidateId, out string? action) ? action : string.Empty;
 
@@ -93,7 +104,8 @@ public partial class DetectorComparison
     private static string ComponentTitle(DetectorEvaluationComparisonExceptionComponentResponse component) => component.Kind switch
     {
         "unmatched" when component.CandidateDetections.Count > 0 && component.GroundTruthFaces.Count == 0 => "Extra candidate detection",
-        "unmatched" when component.CandidateDetections.Count == 0 && component.GroundTruthFaces.Count > 0 => "Reference face without an automatic match",
+        "unmatched" when IsReferenceOnlyComponent(component) && component.GroundTruthFaces.Count == 1 => "Detector missed one reference face",
+        "unmatched" when IsReferenceOnlyComponent(component) => $"Detector missed {component.GroundTruthFaces.Count} reference faces",
         "duplicate" => "Possible duplicate detection",
         "ambiguous" => "Possible match needs review",
         _ => "Review required",
@@ -103,8 +115,8 @@ public partial class DetectorComparison
     {
         "unmatched" when component.CandidateDetections.Count > 0 && component.GroundTruthFaces.Count == 0 =>
             "The evaluated detector found this box, but it did not automatically match a reference face. Choose whether it is a real face, a false detection or a duplicate.",
-        "unmatched" when component.CandidateDetections.Count == 0 && component.GroundTruthFaces.Count > 0 =>
-            "No candidate detection automatically matched this reference face. Check the box only when the evaluated detector truly missed it.",
+        "unmatched" when IsReferenceOnlyComponent(component) =>
+            "The baseline review confirms these are countable faces, and the evaluated detector produced no boxes to compare with them. They are counted as detector misses automatically; no checkbox is needed.",
         "duplicate" => "More than one candidate detection may refer to the same reference face. Match the correct detection and mark any additional detection as a duplicate.",
         "ambiguous" => "Several boxes overlap in a way that cannot be resolved automatically. Match each real candidate detection to the correct reference face.",
         _ => "Resolve every candidate detection and reference face shown below.",
