@@ -1,0 +1,12 @@
+body .comparison-review-workspace {
+    height: clamp(28rem, calc(100dvh - 14rem), 58rem);
+    min-height: 0;
+}
+
+@media (max-width: 900px) {
+    body .comparison-review-workspace {
+        height: auto;
+        min-height: 0;
+        max-height: none;
+    }
+}
