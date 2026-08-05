@@ -59,11 +59,12 @@ public static partial class DetectorEvaluationComparisonEndpoints
             CalculateGate(comparison),
             comparison.Photos
                 .Where(photo => photo.ExceptionComponents.Count > 0)
-                .Select(ToPhotoResponse)
+                .Select(photo => ToPhotoResponse(comparison.Id, photo))
                 .ToArray());
     }
 
     private static DetectorEvaluationComparisonPhotoResponse ToPhotoResponse(
+        Guid comparisonId,
         StoredDetectorEvaluationComparisonPhoto photo)
     {
         Dictionary<string, StoredDetectorGroundTruthFace> groundTruth = photo.GroundTruthFaces.ToDictionary(
@@ -77,7 +78,7 @@ public static partial class DetectorEvaluationComparisonEndpoints
             photo.CandidateRevisionId,
             photo.PhotoName,
             photo.RevisionSha256[..12],
-            $"/api/detector-evaluation/photos/{photo.CandidateRevisionId}/content",
+            $"/api/detector-evaluation/comparisons/{comparisonId:D}/photos/{photo.CandidateRevisionId}/content",
             photo.SampleId,
             photo.SampleGroup,
             photo.SourceGroup,
