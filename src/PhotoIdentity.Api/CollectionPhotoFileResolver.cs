@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
@@ -28,6 +29,23 @@ public sealed class CollectionPhotoFileResolver
         CatalogueProcessingAssetRevision? revision = await _repository.GetAssetRevisionAsync(
             revisionId,
             cancellationToken);
+        return Resolve(revision);
+    }
+
+    public async Task<CollectionPhotoFile?> ResolveAsync(
+        string sourceKey,
+        Sha256Digest contentHash,
+        CancellationToken cancellationToken = default)
+    {
+        CatalogueProcessingAssetRevision? revision = await _repository.FindAssetRevisionAsync(
+            sourceKey,
+            contentHash,
+            cancellationToken);
+        return Resolve(revision);
+    }
+
+    private static CollectionPhotoFile? Resolve(CatalogueProcessingAssetRevision? revision)
+    {
         if (revision is null ||
             !string.Equals(revision.SourceKind, LocalFolderSourceKind, StringComparison.Ordinal) ||
             string.IsNullOrWhiteSpace(revision.RootLocator) ||
