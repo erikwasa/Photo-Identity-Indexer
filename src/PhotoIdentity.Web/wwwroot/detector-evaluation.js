@@ -110,6 +110,27 @@ function configureDetectorComparisonPan(viewport) {
     viewport.addEventListener("pointercancel", endPan);
 }
 
+function configureDetectorComparisonResize(viewport, stage, image) {
+    viewport.__detectorComparisonStage = stage;
+    viewport.__detectorComparisonImage = image;
+    if (viewport.__detectorComparisonResizeObserver) {
+        return;
+    }
+
+    viewport.__detectorComparisonResizeObserver = new ResizeObserver(() => {
+        if (viewport.dataset.zoomScale !== "0") {
+            return;
+        }
+
+        window.detectorComparison.applyZoom(
+            viewport,
+            viewport.__detectorComparisonStage,
+            viewport.__detectorComparisonImage,
+            0);
+    });
+    viewport.__detectorComparisonResizeObserver.observe(viewport);
+}
+
 window.detectorComparison = {
     applyZoom(viewport, stage, image, zoomScale) {
         if (!viewport || !stage || !image) {
@@ -124,6 +145,7 @@ window.detectorComparison = {
         }
 
         configureDetectorComparisonPan(viewport);
+        configureDetectorComparisonResize(viewport, stage, image);
 
         const previousBounds = stage.getBoundingClientRect();
         const centerX = previousBounds.width > 0
@@ -142,6 +164,7 @@ window.detectorComparison = {
         const targetWidth = Math.max(1, Math.floor(naturalWidth * effectiveScale));
         const targetHeight = Math.max(1, Math.floor(naturalHeight * effectiveScale));
 
+        viewport.dataset.zoomScale = fitMode ? "0" : String(requestedScale);
         stage.style.width = `${targetWidth}px`;
         stage.style.height = `${targetHeight}px`;
         stage.style.maxWidth = "none";
@@ -184,7 +207,17 @@ window.detectorComparison = {
             throw new Error(`Detector comparison decision '${elementId}' was not found.`);
         }
 
-        decision.focus({ preventScroll: true });
-        decision.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });
+        const focusTarget = decision.matches(":disabled")
+            ? decision.closest(".comparison-resolution-row")
+            : decision;
+        if (!focusTarget) {
+            throw new Error(`Detector comparison decision '${elementId}' has no focusable review row.`);
+        }
+        if (!focusTarget.hasAttribute("tabindex") && focusTarget !== decision) {
+            focusTarget.setAttribute("tabindex", "-1");
+        }
+
+        focusTarget.focus({ preventScroll: true });
+        focusTarget.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "auto" });
     }
 };
