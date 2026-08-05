@@ -773,26 +773,31 @@ work_items:
   - id: WI-0034
     title: Measure baseline detector recall
     milestone: M16
-    status: blocked
+    status: completed
     owner: human-maintainer
     document: ../work-items/WI-0034-detector-recall-baseline.md
     started_at: '2026-08-03'
-    last_updated_at: '2026-08-03'
-    blockers:
-      - WI-0029
-      - WI-0039
+    completed_at: '2026-08-05'
+    verified_at: '2026-08-05'
+    verified_by: human
+    last_updated_at: '2026-08-05'
+    blockers: []
     evidence:
       - type: human_verification
-        value: The fixed private 100-photo set was staged and the isolated YuNet confidence-0.9 batch completed on Windows PowerShell 5.1 on 2026-08-03; filenames, paths and detailed counts remain outside Git.
+        value: The fixed private 100-photo YuNet confidence-0.9 baseline was fully reviewed and evaluated on Windows PowerShell 5.1 by 2026-08-05; it did not meet the predeclared M16 decision target, and detailed counts remain outside Git.
   - id: WI-0035
     title: Tune YuNet confidence threshold
     milestone: M16
-    status: proposed
-    owner: unassigned
+    status: blocked
+    owner: human-maintainer
     document: ../work-items/WI-0035-yunet-threshold-sweep.md
+    started_at: '2026-08-05'
+    last_updated_at: '2026-08-05'
     blockers:
-      - WI-0034
-    evidence: []
+      - WI-0039
+    evidence:
+      - type: human_verification
+        value: The failed private confidence-0.9 baseline selected the fixed 0.8, 0.7, 0.6 and 0.5 YuNet threshold sweep; execution waits for reusable candidate-run matching in WI-0039.
   - id: WI-0036
     title: Add multi-scale YuNet detection
     milestone: M16
@@ -827,10 +832,24 @@ work_items:
     owner: ai-agent
     document: ../work-items/WI-0039-detector-evaluation-workspace.md
     started_at: '2026-08-03'
-    last_updated_at: '2026-08-03'
-    branch: agent/WI-0039-detector-evaluation-workspace
+    last_updated_at: '2026-08-05'
+    branch: agent/M16-baseline-failed-status
     blockers:
       - WI-0029
     evidence:
       - type: pull_request
         value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/70
+      - type: merge_commit
+        value: 55b8fcbd2aeaf95c7f4a94885aba4077e2e86aba
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/71
+      - type: merge_commit
+        value: 1f9221be5999ac3a21041fd0bdfada309fe3f8da
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/72
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30802539255
+      - type: merge_commit
+        value: 9831e62372cecaf0b417ee314108e61f3667e5dc
+      - type: human_verification
+        value: Private confidence-0.9 manifest import, resumable authoring, full 100-photo review, source-pixel zoom and CSV export were verified locally on Windows PowerShell 5.1 by 2026-08-05; detailed evidence remains outside Git.

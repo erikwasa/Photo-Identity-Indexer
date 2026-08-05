@@ -30,22 +30,36 @@ Pull request [#70](https://github.com/erikwasa/Photo-Identity-Indexer/pull/70) a
 - `/detector-evaluation` with run selection, pagination and overlays; and
 - synthetic privacy, ordering, geometry and streaming coverage.
 
-### Slice 2: private manifest and ground-truth authoring — in progress
+### Slice 2: private manifest and ground-truth authoring — merged
 
-- Import Sample ID, Sample Group, Source Group, Primary Category and Countable Faces from a private CSV outside Git.
-- Match the manifest to one immutable processing run by exact staged filename and optional source SHA-256.
-- Persist resumable private JSON session files outside the canonical catalogue.
-- Classify every persisted detection as correct, background/unknown, false or duplicate.
-- Mark missed countable faces directly on the source photo.
-- Enforce `countable = correct/background + missed` before a photo is complete.
-- Export spreadsheet-compatible per-photo CSV rows.
+Pull request [#71](https://github.com/erikwasa/Photo-Identity-Indexer/pull/71) added:
 
-### Slice 3: repeated-run comparison — pending
+- private comma- or semicolon-separated manifest import after optional spreadsheet preamble rows;
+- exact matching to one immutable processing run by filename and optional SHA-256;
+- resumable private JSON sessions outside the canonical catalogue;
+- correct, background/unknown, false and duplicate classifications;
+- direct missed-face geometry authoring;
+- per-photo arithmetic validation;
+- restart/resume support; and
+- spreadsheet-compatible per-photo CSV export.
 
-- Derive reusable countable-face ground truth from correct/background detections and manually marked misses.
-- Match later detector runs automatically with deterministic intersection-over-union rules.
-- Require human review only for unmatched or ambiguous cases.
-- Export source-group, category and overall comparison summaries for the M16 decision gate.
+Pull request [#72](https://github.com/erikwasa/Photo-Identity-Indexer/pull/72) added source-pixel zoom, scrolling and focus mode so small faces in large source photos can be marked accurately without changing saved session data.
+
+The complete private confidence-0.9 baseline was reviewed through these merged slices and did not meet the M16 decision target on 2026-08-05.
+
+### Slice 3: repeated-run comparison — active
+
+The failed baseline makes the comparison slice required before WI-0035 runs the remaining confidence thresholds.
+
+This slice must:
+
+- derive reusable countable-face ground truth from correct/background detections and manually marked misses;
+- attach a later detector run to the same private manifest and immutable source revisions;
+- match later detections to ground-truth faces with deterministic intersection-over-union rules;
+- identify one-to-one matches, misses, unmatched detections, duplicates and ambiguous overlaps;
+- require human review only for unmatched or ambiguous cases;
+- preserve manual corrections in a private resumable comparison session; and
+- export source-group, category, overall and M16 decision-gate summaries.
 
 ## Acceptance criteria
 
@@ -53,12 +67,13 @@ Pull request [#70](https://github.com/erikwasa/Photo-Identity-Indexer/pull/70) a
 - [x] Original photos and detector boxes render together without exposing private source paths.
 - [x] The workspace does not write identity assignments, rejections or suggestions.
 - [x] Synthetic integration tests cover run scoping, stable ordering, bounding boxes, privacy and original-photo streaming.
-- [ ] Private sample metadata can be imported and validated without being committed.
-- [ ] Review progress, classifications and missed-face geometry survive an application restart.
-- [ ] Spreadsheet-compatible per-photo results can be exported.
+- [x] Private sample metadata can be imported and validated without being committed.
+- [x] Review progress, classifications and missed-face geometry survive an application restart.
+- [x] Spreadsheet-compatible per-photo results can be exported.
+- [x] Large source photos can be inspected and annotated at source-pixel zoom without changing normalized geometry.
 - [ ] Face-level ground truth can be reused across later threshold and detector runs.
 - [ ] Automatic matching is deterministic and surfaces ambiguous cases for human review.
-- [ ] Category and source-group summaries can be exported for the M16 decision gate.
+- [ ] Category, source-group and M16 gate summaries can be exported for a candidate run.
 
 ## Privacy
 
@@ -66,4 +81,4 @@ Photos, filenames, source paths, databases, detector outputs, ground-truth geome
 
 ## Completion boundary
 
-WI-0034 remains blocked until the operator can author and resume the complete baseline ground truth without reconstructing photo context from individual crops. WI-0035 must use the same private manifest and ground truth when the baseline gate fails.
+WI-0034 is complete and established that confidence `0.9` does not meet the M16 target. WI-0035 remains blocked until this work item can compare candidate runs against the immutable baseline ground truth without a complete manual recount.
