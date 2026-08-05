@@ -24,9 +24,9 @@ The project measures detector recall on a bounded 100-photo sample and improves 
 
 The maintainer retained the 50 mechanically selected representative pilot photos and supplemented the difficult half with archive-relevant external photos that cover conditions missing from the original pilot. The exact 100-photo set remains staged privately and immutable across detector runs.
 
-The reusable detector-evaluation workspace was delivered through pull requests #70, #71 and #72. It shows complete source photos including zero-detection cases, imports private source-group/category metadata, persists resumable ground-truth sessions, exports per-photo results and supports source-pixel zoom for small faces in large images.
+The reusable detector-evaluation workspace was delivered through pull requests #70, #71, #72 and #74. It shows complete source photos including zero-detection cases, imports private source-group/category metadata, persists resumable ground-truth sessions, supports source-pixel zoom, freezes reusable face-level ground truth, validates isolated candidate catalogues and exports comparison summaries and the M16 gate.
 
-The confidence-0.9 YuNet baseline was fully reviewed and evaluated on 2026-08-05. It did not meet the predeclared M16 decision target. WI-0034 is therefore complete, the threshold-tuning path in WI-0035 is selected, and the final WI-0039 comparison slice is required before lower thresholds run.
+The confidence-0.9 YuNet baseline was fully reviewed and evaluated on 2026-08-05. It did not meet the predeclared M16 decision target. WI-0034 and WI-0039 are complete, and WI-0035 is now the active next work item. The first candidate is confidence `0.8`, processed in an isolated catalogue against the unchanged 100-photo set and compared with the frozen baseline ground truth.
 
 This evaluation data is separate from canonical identity review. Detector judgements must not create person assignments, rejection actions or synthetic identities.
 
@@ -37,7 +37,8 @@ See [M16 detector evaluation workspace status](../status/M16-detector-evaluation
 This milestone is intentionally allowed to finish without completing every proposed work item.
 
 - WI-0034 established that confidence `0.9` does not meet the decision target.
-- WI-0039 must finish reusable candidate-run matching and summaries before WI-0035 executes `0.8` through `0.5`.
+- WI-0039 completed reusable candidate-run matching and summaries in PR #74.
+- WI-0035 now evaluates `0.8`, followed only when needed by `0.7`, `0.6` and `0.5`.
 - If WI-0035 meets the target, cancel WI-0036 and WI-0037, then complete WI-0038.
 - If WI-0036 meets the target, cancel WI-0037, then complete WI-0038.
 - WI-0037 is required only when the governed YuNet options remain below target.

@@ -1,8 +1,8 @@
 # Detector comparison runs
 
-Use this procedure only after the WI-0039 comparison slice has been merged and the completed confidence-0.9 baseline session is still available in the private detector-evaluation root.
+Use this procedure after the WI-0039 comparison slice has been merged and the completed confidence-0.9 baseline session is still available in the private detector-evaluation root.
 
-Do not process confidence `0.8`, `0.7`, `0.6` or `0.5` before the comparison slice is available. Each candidate must use an isolated catalogue and the unchanged 100-photo evaluation set.
+Each candidate must use an isolated catalogue and the unchanged 100-photo evaluation set.
 
 ## Invariants
 
@@ -12,8 +12,10 @@ Keep these inputs unchanged for every candidate:
 - the source bytes for every photo;
 - the private manifest metadata and countable-face rule;
 - the frozen confidence-0.9 face-level ground truth;
-- the IoU threshold, which defaults to `0.50`; and
-- the detector model and preprocessing configuration except for the confidence value being evaluated.
+- the IoU (intersection over union) threshold, which defaults to `0.50`;
+- the detector and embedder model revisions;
+- the padding ratio, which defaults to `0.25`; and
+- all other preprocessing configuration except for the confidence value being evaluated.
 
 The comparison API verifies the complete filename set and full SHA-256 revision hash for every source photo. A changed, missing, extra or duplicate source prevents comparison creation.
 
@@ -53,7 +55,7 @@ The frozen snapshot copies accepted baseline detection boxes and manually marked
 
 After this succeeds, stop the application. The candidate catalogue does not need the baseline processing run, but it must use the same detector-evaluation root so the frozen snapshot remains available.
 
-## Step 2: create one isolated catalogue per confidence
+## Step 2: process one confidence in an isolated catalogue
 
 Use separate paths, for example:
 
@@ -64,20 +66,82 @@ C:\PhotoIdentity\M16\runs\confidence-060\catalogue.db
 C:\PhotoIdentity\M16\runs\confidence-050\catalogue.db
 ```
 
-Never reuse or mutate the confidence-0.9 baseline catalogue. Stage the unchanged 100-photo set for each candidate and process exactly one confidence value into its catalogue.
+Never reuse or mutate the confidence-0.9 baseline catalogue. The source directory must contain the unchanged 100-photo set and nothing else.
+
+The following Windows PowerShell command processes the first candidate at confidence `0.8`. Change only `$confidence` and `$confidenceTag` for a later governed candidate.
+
+```powershell
+$repo = "C:\Kod\codex\Photo Identity Indexer"
+$sample = "C:\PhotoIdentity\M16\sample"
+$confidence = 0.8
+$confidenceTag = "080"
+$candidateRoot = "C:\PhotoIdentity\M16\runs\confidence-$confidenceTag"
+$candidateDb = Join-Path $candidateRoot "catalogue.db"
+$candidateOutput = Join-Path $candidateRoot "outputs"
+$candidateLog = Join-Path $candidateRoot "batch-start.log"
+
+New-Item -ItemType Directory -Force `
+    -Path $candidateRoot,$candidateOutput | Out-Null
+
+if (Test-Path -LiteralPath $candidateDb) {
+    throw "Candidate catalogue already exists: $candidateDb"
+}
+
+Set-Location -LiteralPath $repo
+
+& dotnet run `
+    --project .\src\PhotoIdentity.Cli `
+    -- `
+    batch start `
+    --database $candidateDb `
+    --source $sample `
+    --output $candidateOutput `
+    --detector-model yunet-2023mar-fp32 `
+    --embedder-model sface-2021dec-fp32 `
+    --confidence $confidence `
+    --padding 0.25 2>&1 | Tee-Object -FilePath $candidateLog
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Candidate processing failed for confidence $confidence."
+}
+```
+
+Record the run ID printed by `batch start`. Check its durable status before opening the comparison application:
+
+```powershell
+$runId = "REPLACE_WITH_PRINTED_RUN_ID"
+
+dotnet run `
+    --project .\src\PhotoIdentity.Cli `
+    -- `
+    batch status `
+    --database $candidateDb `
+    --run $runId
+```
+
+The status must show that all intended photos completed successfully. Resume the same run after an interruption; do not start a replacement catalogue for the same candidate:
+
+```powershell
+dotnet run `
+    --project .\src\PhotoIdentity.Cli `
+    -- `
+    batch resume `
+    --database $candidateDb `
+    --run $runId
+```
 
 Run candidates in this order:
 
-1. `0.8`
-2. `0.7`
-3. `0.6`
-4. `0.5`
+1. `0.8` with tag `080`
+2. `0.7` with tag `070`
+3. `0.6` with tag `060`
+4. `0.5` with tag `050`
 
 Do not run later candidates merely to collect extra data after an earlier candidate has met the governed M16 target unless the milestone decision explicitly requires it.
 
 ## Step 3: attach a candidate run
 
-Start the application against one candidate catalogue while retaining the same private detector-evaluation root.
+Start the application against one completed candidate catalogue while retaining the same private detector-evaluation root.
 
 ```powershell
 $candidateDb = "C:\PhotoIdentity\M16\runs\confidence-080\catalogue.db"

@@ -46,6 +46,10 @@ A human-confirmed face used as positive identity evidence for matching. Suggesti
 
 The stable catalogue identity of a face within one immutable asset revision. Detector observations, crops, embeddings, suggestions and human review actions attach to this identity.
 
+## Intersection over union (IoU)
+
+A measure of how much two bounding boxes overlap. It is calculated as the area shared by both boxes divided by the total area covered by either box: `intersection area / union area`. The result ranges from `0`, meaning no overlap, to `1`, meaning identical boxes. Detector comparison uses an IoU threshold to decide which candidate and ground-truth boxes may belong to the same face; the default threshold `0.50` requires their intersection to cover at least half of their combined union area.
+
 ## Manifest
 
 A structured document that declares content and provenance. Model manifests pin model files and preprocessing contracts; evaluation manifests pin datasets and splits; collection manifests describe path-free photo results; bundle manifests describe portable inputs or outputs.

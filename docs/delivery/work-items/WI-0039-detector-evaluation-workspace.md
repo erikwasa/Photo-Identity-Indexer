@@ -47,19 +47,19 @@ Pull request [#72](https://github.com/erikwasa/Photo-Identity-Indexer/pull/72) a
 
 The complete private confidence-0.9 baseline was reviewed through these merged slices and did not meet the M16 decision target on 2026-08-05.
 
-### Slice 3: repeated-run comparison — active
+### Slice 3: repeated-run comparison — merged
 
-The failed baseline makes the comparison slice required before WI-0035 runs the remaining confidence thresholds.
+Pull request [#74](https://github.com/erikwasa/Photo-Identity-Indexer/pull/74) completed the comparison workflow:
 
-This slice must:
+- freezes reusable countable-face ground truth from the completed baseline;
+- verifies candidate catalogues against the exact frozen filename and SHA-256 source set;
+- matches later detections with deterministic intersection-over-union connected components;
+- hides clean one-to-one matches and surfaces unmatched, duplicate and ambiguous components;
+- persists manual corrections and qualitative gate assessment outside the catalogue;
+- reports overall, five-plus-face, source-group, category and M16 gate summaries; and
+- exports spreadsheet-compatible summaries while retaining private detailed evidence.
 
-- derive reusable countable-face ground truth from correct/background detections and manually marked misses;
-- attach a later detector run to the same private manifest and immutable source revisions;
-- match later detections to ground-truth faces with deterministic intersection-over-union rules;
-- identify one-to-one matches, misses, unmatched detections, duplicates and ambiguous overlaps;
-- require human review only for unmatched or ambiguous cases;
-- preserve manual corrections in a private resumable comparison session; and
-- export source-group, category, overall and M16 decision-gate summaries.
+Synthetic integration coverage verifies ground-truth freezing, isolated candidate attachment, changed-source rejection, correction persistence, restart recovery, metrics and gate export.
 
 ## Acceptance criteria
 
@@ -71,9 +71,9 @@ This slice must:
 - [x] Review progress, classifications and missed-face geometry survive an application restart.
 - [x] Spreadsheet-compatible per-photo results can be exported.
 - [x] Large source photos can be inspected and annotated at source-pixel zoom without changing normalized geometry.
-- [ ] Face-level ground truth can be reused across later threshold and detector runs.
-- [ ] Automatic matching is deterministic and surfaces ambiguous cases for human review.
-- [ ] Category, source-group and M16 gate summaries can be exported for a candidate run.
+- [x] Face-level ground truth can be reused across later threshold and detector runs.
+- [x] Automatic matching is deterministic and surfaces ambiguous cases for human review.
+- [x] Category, source-group and M16 gate summaries can be exported for a candidate run.
 
 ## Privacy
 
@@ -81,4 +81,4 @@ Photos, filenames, source paths, databases, detector outputs, ground-truth geome
 
 ## Completion boundary
 
-WI-0034 is complete and established that confidence `0.9` does not meet the M16 target. WI-0035 remains blocked until this work item can compare candidate runs against the immutable baseline ground truth without a complete manual recount.
+WI-0039 is complete after PR #74 merged into `main` on 2026-08-05. WI-0035 is now the active next step: freeze the completed confidence-0.9 ground truth, process confidence `0.8` in an isolated catalogue and compare it before deciding whether to continue with `0.7`, `0.6` and `0.5`.
