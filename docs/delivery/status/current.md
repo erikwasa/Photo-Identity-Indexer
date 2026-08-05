@@ -21,6 +21,7 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 - [**WI-0032 — Validate documentation from a clean setup**](../work-items/WI-0032-documentation-validation.md) — `in_progress`; owner: `human-maintainer`
 - [**WI-0035 — Tune YuNet confidence threshold**](../work-items/WI-0035-yunet-threshold-sweep.md) — `in_progress`; owner: `human-maintainer`
+- [**WI-0040 — Build a viewport-fitted detector comparison review workspace**](../work-items/WI-0040-detector-comparison-review-workspace.md) — `in_progress`; owner: `ai-agent`
 
 ## Recently completed
 
@@ -30,4 +31,4 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Next ready work
 
-- [**WI-0040 — Build a viewport-fitted detector comparison review workspace**](../work-items/WI-0040-detector-comparison-review-workspace.md) — `ready`; owner: `ai-agent`
+None.
