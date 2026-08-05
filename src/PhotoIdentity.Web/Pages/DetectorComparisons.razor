@@ -1,0 +1,46 @@
+@page "/detector-comparisons"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Detector comparisons · Photo Identity</PageTitle>
+
+@if (!string.IsNullOrWhiteSpace(Error)) { <div class="notice error" role="alert">@Error</div> }
+@if (!string.IsNullOrWhiteSpace(Success)) { <div class="notice success" role="status">@Success</div> }
+@if (Loading)
+{
+    <section class="empty-state"><p>Loading detector comparison workspace…</p></section>
+}
+else
+{
+    <section class="detector-comparison-hero">
+        <div><p class="eyebrow">WI-0039 comparison slice</p><h1>Prepare isolated detector comparisons</h1><p>Freeze the completed baseline once, then attach a candidate catalogue with the exact same filenames and SHA-256 revisions.</p></div>
+        <aside class="detector-evaluation-note"><strong>No threshold run yet</strong><p>Run 0.8, 0.7, 0.6 and 0.5 only after this slice is merged.</p></aside>
+    </section>
+
+    <section class="comparison-setup-grid">
+        <article class="comparison-setup-card">
+            <p class="eyebrow">Step 1</p><h2>Freeze baseline ground truth</h2>
+            <label class="field-label" for="baseline-session">Completed baseline session</label>
+            <select id="baseline-session" @bind="SelectedBaselineSessionId"><option value="">Select session</option>@foreach (var session in Sessions) { <option value="@session.Id">@session.Name · @session.CompletedPhotoCount/@session.PhotoCount complete</option> }</select>
+            @if (SelectedBaselineSession is { } selected)
+            {
+                var frozen = GroundTruthFor(selected.Id);
+                <p class="comparison-status-line"><span class="state-badge">@(frozen is null ? "Not frozen" : "Frozen")</span><span>@(frozen is null ? "Open the baseline catalogue before freezing." : $"{frozen.FaceCount} faces / {frozen.PhotoCount} photos")</span></p>
+                <button class="button primary" disabled="@(Busy || frozen is not null || selected.CompletedPhotoCount != selected.PhotoCount)" @onclick="FreezeGroundTruthAsync">Freeze reusable ground truth</button>
+            }
+        </article>
+
+        <article class="comparison-setup-card">
+            <p class="eyebrow">Step 2</p><h2>Attach candidate run</h2>
+            <label class="field-label" for="candidate-run">Candidate processing run</label>
+            <select id="candidate-run" @bind="SelectedCandidateRunId"><option value="">Select run</option>@foreach (var run in Runs) { <option value="@run.Id">@RunLabel(run)</option> }</select>
+            <label class="field-label" for="comparison-name">Comparison name</label><input id="comparison-name" @bind="ComparisonName" placeholder="M16 confidence 0.8" />
+            <label class="field-label" for="iou-threshold">IoU threshold</label><input id="iou-threshold" type="number" min="0.01" max="1" step="0.01" @bind="IouThreshold" />
+            <button class="button primary" disabled="@(!CanCreateComparison || Busy)" @onclick="CreateComparisonAsync">Create deterministic comparison</button>
+        </article>
+    </section>
+
+    <section class="comparison-list-section"><div class="section-heading"><div><p class="eyebrow">Resume</p><h2>Comparisons</h2></div><span>@Comparisons.Count</span></div>
+        <div class="comparison-list">@foreach (var item in Comparisons) { <article><div><strong>@item.Name</strong><span>@item.ResolvedExceptionPhotoCount/@item.ExceptionPhotoCount exceptions resolved · gate @item.GateStatus</span></div><button class="button secondary" @onclick="() => OpenComparison(item.Id)">Review</button></article> }</div>
+    </section>
+}
