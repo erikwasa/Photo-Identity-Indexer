@@ -10,6 +10,11 @@ public partial class DetectorComparison
     [Parameter] public Guid ComparisonId { get; set; }
     private Dictionary<string, PhotoCorrectionDraft> Drafts { get; } = new(StringComparer.OrdinalIgnoreCase);
     private DetectorEvaluationComparisonResponse? Comparison { get; set; }
+    private int CurrentPhotoIndex { get; set; }
+    private DetectorEvaluationComparisonPhotoResponse? CurrentPhoto =>
+        Comparison is not null && CurrentPhotoIndex >= 0 && CurrentPhotoIndex < Comparison.ExceptionPhotos.Count
+            ? Comparison.ExceptionPhotos[CurrentPhotoIndex]
+            : null;
     private string MaterialCategoryValue { get; set; } = string.Empty;
     private string? GateNotes { get; set; }
     private bool Loading { get; set; }
@@ -26,7 +31,7 @@ public partial class DetectorComparison
         finally { Loading = false; }
     }
 
-    private async Task LoadComparisonAsync()
+    private async Task LoadComparisonAsync(string? preferredRevisionId = null, int? fallbackIndex = null)
     {
         Comparison = await Http.GetFromJsonAsync<DetectorEvaluationComparisonResponse>($"/api/detector-evaluation/comparisons/{ComparisonId:D}");
         Drafts.Clear();
@@ -42,10 +47,42 @@ public partial class DetectorComparison
             draft.MissedGroundTruthFaceIds.UnionWith(photo.Correction.MissedGroundTruthFaceIds);
             Drafts[photo.CandidateRevisionId] = draft;
         }
+
+        if (Comparison.ExceptionPhotos.Count == 0)
+        {
+            CurrentPhotoIndex = 0;
+            return;
+        }
+
+        int preferredIndex = preferredRevisionId is null
+            ? -1
+            : Comparison.ExceptionPhotos.FindIndex(photo => string.Equals(photo.CandidateRevisionId, preferredRevisionId, StringComparison.OrdinalIgnoreCase));
+        CurrentPhotoIndex = preferredIndex >= 0
+            ? preferredIndex
+            : Math.Clamp(fallbackIndex ?? CurrentPhotoIndex, 0, Comparison.ExceptionPhotos.Count - 1);
     }
 
-    private async Task SavePhotoAsync(DetectorEvaluationComparisonPhotoResponse photo, PhotoCorrectionDraft draft)
+    private void ShowPreviousPhoto()
     {
+        if (CurrentPhotoIndex > 0) CurrentPhotoIndex--;
+        Success = null;
+        Error = null;
+    }
+
+    private void ShowNextPhoto()
+    {
+        if (Comparison is not null && CurrentPhotoIndex < Comparison.ExceptionPhotos.Count - 1) CurrentPhotoIndex++;
+        Success = null;
+        Error = null;
+    }
+
+    private async Task SavePhotoAsync(DetectorEvaluationComparisonPhotoResponse photo, PhotoCorrectionDraft draft, bool moveNext)
+    {
+        int savedIndex = CurrentPhotoIndex;
+        string? nextRevisionId = moveNext && Comparison is not null && savedIndex + 1 < Comparison.ExceptionPhotos.Count
+            ? Comparison.ExceptionPhotos[savedIndex + 1].CandidateRevisionId
+            : photo.CandidateRevisionId;
+
         await RunBusyAsync(async () =>
         {
             List<DetectorEvaluationComparisonManualMatchRequest> matches = [];
@@ -60,8 +97,8 @@ public partial class DetectorComparison
             var request = new SaveDetectorEvaluationComparisonPhotoRequest(matches, falseDetections, duplicates, draft.MissedGroundTruthFaceIds.ToArray(), draft.Notes);
             using HttpResponseMessage response = await Http.PutAsJsonAsync($"/api/detector-evaluation/comparisons/{Comparison!.Id}/photos/{photo.CandidateRevisionId}", request);
             if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadErrorAsync(response));
-            Success = $"Corrections saved for {photo.PhotoName}.";
-            await LoadComparisonAsync();
+            Success = moveNext ? $"Saved {photo.PhotoName}." : $"Corrections saved for {photo.PhotoName}.";
+            await LoadComparisonAsync(nextRevisionId, savedIndex);
         });
     }
 
@@ -74,7 +111,7 @@ public partial class DetectorComparison
             using HttpResponseMessage response = await Http.PutAsJsonAsync($"/api/detector-evaluation/comparisons/{Comparison.Id}/m16-gate", new SaveDetectorEvaluationM16GateRequest(materialFailure, GateNotes));
             if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadErrorAsync(response));
             Success = "M16 gate assessment saved.";
-            await LoadComparisonAsync();
+            await LoadComparisonAsync(CurrentPhoto?.CandidateRevisionId, CurrentPhotoIndex);
         });
     }
 
@@ -98,5 +135,18 @@ public partial class DetectorComparison
         }
         catch (JsonException) { }
         return string.IsNullOrWhiteSpace(payload) ? response.ReasonPhrase ?? "Request failed." : payload;
+    }
+}
+
+internal static class DetectorComparisonPhotoListExtensions
+{
+    public static int FindIndex(this IReadOnlyList<DetectorEvaluationComparisonPhotoResponse> photos, Func<DetectorEvaluationComparisonPhotoResponse, bool> predicate)
+    {
+        for (int index = 0; index < photos.Count; index++)
+        {
+            if (predicate(photos[index])) return index;
+        }
+
+        return -1;
     }
 }
