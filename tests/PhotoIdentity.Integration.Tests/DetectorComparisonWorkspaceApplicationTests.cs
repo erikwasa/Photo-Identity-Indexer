@@ -17,16 +17,21 @@ public sealed class DetectorComparisonWorkspaceApplicationTests
                 Path.Combine(directory, "private-sessions"));
             using HttpClient client = factory.CreateClient();
 
+            string shell = await client.GetStringAsync("/");
             string styles = await client.GetStringAsync("/PhotoIdentity.Web.styles.css");
+            string viewportOverrides = await client.GetStringAsync("/css/detector-comparison-workspace.css?v=1");
 
+            Assert.Contains("css/detector-comparison-workspace.css?v=1", shell, StringComparison.Ordinal);
             Assert.Contains("comparison-review-workspace", styles, StringComparison.Ordinal);
             Assert.Contains("comparison-workspace-body", styles, StringComparison.Ordinal);
             Assert.Contains("comparison-photo-viewport", styles, StringComparison.Ordinal);
             Assert.Contains("comparison-decision-panel", styles, StringComparison.Ordinal);
-            Assert.Contains("100dvh", styles, StringComparison.Ordinal);
             Assert.Contains("42dvh", styles, StringComparison.Ordinal);
             Assert.Contains("position:sticky", styles.Replace(" ", string.Empty), StringComparison.Ordinal);
             Assert.Contains("overflow-y:auto", styles.Replace(" ", string.Empty), StringComparison.Ordinal);
+            Assert.Contains("calc(100dvh - 14rem)", viewportOverrides, StringComparison.Ordinal);
+            Assert.Contains("min-height: 0", viewportOverrides, StringComparison.Ordinal);
+            Assert.Contains("height: auto", viewportOverrides, StringComparison.Ordinal);
         }
         finally
         {
