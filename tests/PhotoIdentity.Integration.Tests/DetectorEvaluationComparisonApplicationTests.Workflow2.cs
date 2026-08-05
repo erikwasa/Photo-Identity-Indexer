@@ -43,8 +43,8 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
 
         var exceptionPhoto = Assert.Single(comparison.ExceptionPhotos);
         Assert.Equal(3, exceptionPhoto.AutomaticMatchCount);
-        var duplicate = Assert.Single(exceptionPhoto.ExceptionComponents.Where(component => component.Kind == "duplicate"));
-        var unmatched = Assert.Single(exceptionPhoto.ExceptionComponents.Where(component => component.Kind == "unmatched"));
+        var duplicate = Assert.Single(exceptionPhoto.ExceptionComponents, component => component.Kind == "duplicate");
+        var unmatched = Assert.Single(exceptionPhoto.ExceptionComponents, component => component.Kind == "unmatched");
         Assert.Equal(2, duplicate.CandidateDetections.Count);
         Assert.Empty(unmatched.CandidateDetections);
         var ordered = duplicate.CandidateDetections.OrderBy(detection => detection.FaceNumber).ToArray();

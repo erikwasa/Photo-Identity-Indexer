@@ -34,7 +34,7 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
         var summary = Assert.IsType<DetectorEvaluationSessionSummaryResponse>(await createResponse.Content.ReadFromJsonAsync<DetectorEvaluationSessionSummaryResponse>());
         var session = Assert.IsType<DetectorEvaluationSessionResponse>(await client.GetFromJsonAsync<DetectorEvaluationSessionResponse>($"/api/detector-evaluation/sessions/{summary.Id}"));
 
-        var groupPhoto = Assert.Single(session.Photos.Where(photo => photo.PhotoName == "R001__group.jpg"));
+        var groupPhoto = Assert.Single(session.Photos, photo => photo.PhotoName == "R001__group.jpg");
         using HttpResponseMessage groupSave = await client.PutAsJsonAsync(
             $"/api/detector-evaluation/sessions/{summary.Id}/photos/{groupPhoto.RevisionId}",
             new SaveDetectorEvaluationPhotoReviewRequest(
@@ -42,7 +42,7 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
                 [], null, "Five countable faces confirmed."));
         groupSave.EnsureSuccessStatusCode();
 
-        var smallPhoto = Assert.Single(session.Photos.Where(photo => photo.PhotoName == "R002__small.jpg"));
+        var smallPhoto = Assert.Single(session.Photos, photo => photo.PhotoName == "R002__small.jpg");
         using HttpResponseMessage smallSave = await client.PutAsJsonAsync(
             $"/api/detector-evaluation/sessions/{summary.Id}/photos/{smallPhoto.RevisionId}",
             new SaveDetectorEvaluationPhotoReviewRequest(

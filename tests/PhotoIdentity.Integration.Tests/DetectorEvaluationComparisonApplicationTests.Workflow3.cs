@@ -25,8 +25,8 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
         Assert.False(resumed.M16Gate.FivePlusRecallPass);
         Assert.True(resumed.M16Gate.FalseOrDuplicatePass);
         Assert.True(resumed.M16Gate.MaterialCategoryPass is true);
-        Assert.Equal(4d / 5d, Assert.Single(resumed.SourceGroups.Where(group => group.Group == "Pilot representative")).Metrics.Recall, 6);
-        Assert.Equal(1, Assert.Single(resumed.Categories.Where(group => group.Group == "Small / distant")).Metrics.MatchedFaces);
+        Assert.Equal(4d / 5d, Assert.Single(resumed.SourceGroups, group => group.Group == "Pilot representative").Metrics.Recall, 6);
+        Assert.Equal(1, Assert.Single(resumed.Categories, group => group.Group == "Small / distant").Metrics.MatchedFaces);
 
         using HttpResponseMessage exportResponse = await client.GetAsync($"/api/detector-evaluation/comparisons/{comparisonId}/export.csv");
         exportResponse.EnsureSuccessStatusCode();
