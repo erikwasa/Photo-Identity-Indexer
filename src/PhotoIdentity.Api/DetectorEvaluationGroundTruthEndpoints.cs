@@ -22,6 +22,7 @@ public static partial class DetectorEvaluationComparisonEndpoints
         group.MapGet("/comparisons", GetComparisonsAsync);
         group.MapPost("/comparisons", CreateComparisonAsync);
         group.MapGet("/comparisons/{comparisonId}", GetComparisonAsync);
+        group.MapGet("/comparisons/{comparisonId}/photos/{revisionId}/content", GetComparisonPhotoContentAsync);
         group.MapPut("/comparisons/{comparisonId}/photos/{revisionId}", SavePhotoCorrectionAsync);
         group.MapPut("/comparisons/{comparisonId}/m16-gate", SaveGateAssessmentAsync);
         group.MapGet("/comparisons/{comparisonId}/export.csv", ExportComparisonCsvAsync);
