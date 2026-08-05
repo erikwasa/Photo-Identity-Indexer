@@ -27,7 +27,7 @@ else
             <p><strong>Candidate detection</strong> is a face box produced by the detector run being evaluated. Candidate boxes are orange and dashed.</p>
             <p><strong>Reference face</strong> is a countable face retained from the reviewed baseline. Reference boxes are green.</p>
             <p><strong>Automatically matched</strong> means the candidate and reference boxes formed a clear one-to-one match and need no action.</p>
-            <p>Use <strong>Detector missed this reference face</strong> only when no candidate box represents that face. Otherwise match the candidate detection to the reference face.</p>
+            <p>When a review group contains reference faces but no candidate boxes, those faces are counted as detector misses automatically. Use the missed-face checkbox only when candidate boxes are present but none represents that reference face.</p>
         </div>
     </section>
     <section class="comparison-exceptions"><div class="section-heading"><div><p class="eyebrow">Manual review only</p><h2>Photos requiring a decision</h2></div><span>@Comparison.ExceptionPhotos.Count</span></div>
@@ -46,18 +46,42 @@ else
             </nav>
             <article class="comparison-photo-card"><header><div><h3>@photo.PhotoName</h3><p>@photo.AutomaticMatchCount automatically matched faces · @photo.CountableFaces reference faces · @photo.SourceGroup · @photo.PrimaryCategory</p></div><span class="state-badge @(IsDraftResolved(photo, draft) ? "resolved" : "needs-review")">@(IsDraftResolved(photo, draft) ? "Ready to save" : "Needs review")</span></header>
                 <p class="comparison-photo-explanation">The automatic count is already accepted. Review only the orange and green boxes shown below.</p>
-                <div class="comparison-photo-stage"><img src="@photo.ContentUrl" alt="@photo.PhotoName" />@foreach (var face in ExceptionGroundTruthFaces(photo)) { <div class="comparison-box ground-truth" style="@BoxStyle(face.BoundingBox)"><span>Reference @ReferenceFaceNumber(photo, face.Id)</span></div> }@foreach (var candidate in ExceptionCandidates(photo)) { <div class="comparison-box candidate" style="@BoxStyle(candidate.BoundingBox)"><span>Candidate @candidate.FaceNumber</span></div> }</div>
+                <div class="comparison-photo-stage">
+                    <img src="@photo.ContentUrl" alt="@photo.PhotoName" />
+                    @foreach (var face in ExceptionGroundTruthFaces(photo))
+                    {
+                        <div class="comparison-box ground-truth" style="@BoxStyle(face.BoundingBox)" title="@ReferenceFaceLabel(photo, face.Id)" aria-label="@ReferenceFaceLabel(photo, face.Id)"><span>R@(ReferenceFaceNumber(photo, face.Id))</span></div>
+                    }
+                    @foreach (var candidate in ExceptionCandidates(photo))
+                    {
+                        <div class="comparison-box candidate" style="@BoxStyle(candidate.BoundingBox)" title="Candidate detection @candidate.FaceNumber" aria-label="Candidate detection @candidate.FaceNumber"><span>C@(candidate.FaceNumber)</span></div>
+                    }
+                </div>
+                <div class="comparison-overlay-legend" aria-label="Overlay legend">
+                    <span><span class="comparison-legend-marker reference">R</span> Reference face</span>
+                    <span><span class="comparison-legend-marker candidate">C</span> Candidate detection</span>
+                </div>
                 <div class="comparison-component-list">
                     @foreach (var component in photo.ExceptionComponents)
                     {
                         <section class="comparison-component"><h4>@ComponentTitle(component)</h4><p class="comparison-component-help">@ComponentHelp(component)</p>
-                            @foreach (var candidate in component.CandidateDetections)
+                            @if (IsReferenceOnlyComponent(component))
                             {
-                                <label class="comparison-resolution-row"><span><strong>Candidate detection @candidate.FaceNumber</strong><small>Confidence @candidate.Confidence.ToString("0.000", CultureInfo.InvariantCulture)</small></span><select value="@CandidateAction(draft, candidate.Id)" @onchange="args => SetCandidateAction(draft, candidate.Id, args.Value?.ToString())"><option value="">Choose outcome…</option>@foreach (var face in ExceptionGroundTruthFaces(photo)) { <option value="@($"match:{face.Id}")">Match to @ReferenceFaceLabel(photo, face.Id)</option> }<option value="false">False detection — not a countable face</option><option value="duplicate">Duplicate — same face detected again</option></select></label>
+                                @foreach (var face in component.GroundTruthFaces)
+                                {
+                                    <div class="comparison-resolution-row automatic-miss-row"><span><strong>@ReferenceFaceLabel(photo, face.Id)</strong><small>@GroundTruthOriginLabel(face.Origin)</small></span><span class="automatic-miss-status"><span aria-hidden="true">✓</span> Counted as detector miss automatically</span></div>
+                                }
                             }
-                            @foreach (var face in component.GroundTruthFaces)
+                            else
                             {
-                                <label class="comparison-resolution-row checkbox-row"><span><strong>@ReferenceFaceLabel(photo, face.Id)</strong><small>@GroundTruthOriginLabel(face.Origin)</small></span><span><input type="checkbox" checked="@draft.MissedGroundTruthFaceIds.Contains(face.Id)" disabled="@IsGroundTruthMatched(draft, face.Id)" @onchange="args => SetMissed(draft, face.Id, args.Value is true)" /> Detector missed this reference face</span></label>
+                                @foreach (var candidate in component.CandidateDetections)
+                                {
+                                    <label class="comparison-resolution-row"><span><strong>Candidate detection @candidate.FaceNumber</strong><small>Confidence @candidate.Confidence.ToString("0.000", CultureInfo.InvariantCulture)</small></span><select value="@CandidateAction(draft, candidate.Id)" @onchange="args => SetCandidateAction(draft, candidate.Id, args.Value?.ToString())"><option value="">Choose outcome…</option>@foreach (var face in ExceptionGroundTruthFaces(photo)) { <option value="@($"match:{face.Id}")">Match to @ReferenceFaceLabel(photo, face.Id)</option> }<option value="false">False detection — not a countable face</option><option value="duplicate">Duplicate — same face detected again</option></select></label>
+                                }
+                                @foreach (var face in component.GroundTruthFaces)
+                                {
+                                    <label class="comparison-resolution-row checkbox-row"><span><strong>@ReferenceFaceLabel(photo, face.Id)</strong><small>@GroundTruthOriginLabel(face.Origin)</small></span><span><input type="checkbox" checked="@draft.MissedGroundTruthFaceIds.Contains(face.Id)" disabled="@IsGroundTruthMatched(draft, face.Id)" @onchange="args => SetMissed(draft, face.Id, args.Value is true)" /> Detector missed this reference face</span></label>
+                                }
                             }
                         </section>
                     }
