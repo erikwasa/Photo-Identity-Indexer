@@ -862,3 +862,15 @@ work_items:
         value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31013795777
       - type: merge_commit
         value: 23790991b0abf4e6dea32fd33f312df3e37d6e50
+  - id: WI-0040
+    title: Build a viewport-fitted detector comparison review workspace
+    milestone: M16
+    status: ready
+    owner: ai-agent
+    document: ../work-items/WI-0040-detector-comparison-review-workspace.md
+    last_updated_at: '2026-08-05'
+    blockers:
+      - WI-0039
+    evidence:
+      - type: human_verification
+        value: During active detector-comparison review on 2026-08-05, the maintainer observed repeated page-level scrolling between overlays and decision fields because source-image aspect ratios produce inconsistent page heights; the proposed viewport-fitted workspace is documented without private photo data.
