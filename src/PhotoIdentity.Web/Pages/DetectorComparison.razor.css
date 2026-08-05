@@ -28,7 +28,8 @@
 .comparison-list-section,
 .comparison-gate-card,
 .comparison-summary-tables > article,
-.comparison-photo-card {
+.comparison-photo-card,
+.comparison-review-guide {
     border: 1px solid var(--border-color, #d8d8d8);
     border-radius: 1rem;
     background: var(--surface-color, #fff);
@@ -44,7 +45,9 @@
 .comparison-help,
 .comparison-status-line,
 .comparison-photo-card header p,
-.comparison-detail-header p {
+.comparison-detail-header p,
+.comparison-component-help,
+.comparison-photo-explanation {
     color: var(--muted-color, #626262);
 }
 
@@ -58,7 +61,8 @@
 .comparison-list-section,
 .comparison-exceptions,
 .comparison-gate-card,
-.comparison-summary-tables {
+.comparison-summary-tables,
+.comparison-review-guide {
     margin-top: 1.5rem;
 }
 
@@ -104,6 +108,33 @@
     background: var(--surface-color, #fff);
 }
 
+.comparison-metric-grid article.status-success {
+    border-color: #79c98d;
+    background: #edf9f0;
+}
+
+.comparison-metric-grid article.status-success strong {
+    color: #176c32;
+}
+
+.comparison-metric-grid article.status-failure {
+    border-color: #df8a8a;
+    background: #fff1f1;
+}
+
+.comparison-metric-grid article.status-failure strong {
+    color: #9b2424;
+}
+
+.comparison-metric-grid article.status-pending {
+    border-color: #d8b45a;
+    background: #fff8e5;
+}
+
+.comparison-metric-grid article.status-pending strong {
+    color: #765300;
+}
+
 .comparison-metric-grid strong {
     font-size: 1.7rem;
 }
@@ -142,6 +173,28 @@
     white-space: nowrap;
 }
 
+.comparison-guide-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1.5rem;
+}
+
+.comparison-guide-grid p {
+    margin: 0;
+}
+
+.comparison-photo-navigation {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.comparison-photo-navigation strong {
+    text-align: center;
+}
+
 .comparison-photo-card {
     margin-top: 1rem;
 }
@@ -156,6 +209,22 @@
 
 .comparison-photo-card h3 {
     margin-bottom: 0.25rem;
+}
+
+.comparison-photo-explanation {
+    margin: 0.8rem 0 0;
+}
+
+.state-badge.resolved {
+    color: #176c32;
+    border-color: #79c98d;
+    background: #edf9f0;
+}
+
+.state-badge.needs-review {
+    color: #765300;
+    border-color: #d8b45a;
+    background: #fff8e5;
 }
 
 .comparison-photo-stage {
@@ -224,19 +293,29 @@
 }
 
 .comparison-component h4 {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.comparison-component-help {
+    margin: 0 0 0.75rem;
 }
 
 .comparison-resolution-row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(15rem, 0.55fr);
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.65fr);
     align-items: center;
     gap: 1rem;
-    padding: 0.55rem 0;
+    padding: 0.7rem 0;
     border-top: 1px solid var(--border-color, #eee);
+}
+
+.comparison-resolution-row > span:first-child {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.comparison-resolution-row small {
+    color: var(--muted-color, #626262);
 }
 
 .comparison-resolution-row:first-of-type {
@@ -258,9 +337,35 @@
     width: 100%;
 }
 
+.comparison-notes {
+    display: grid;
+    gap: 0.4rem;
+}
+
 .comparison-photo-card footer {
     margin-top: 0.8rem;
     color: var(--muted-color, #626262);
+}
+
+.comparison-resolution-status.complete {
+    color: #176c32;
+    font-weight: 700;
+}
+
+.comparison-resolution-status.incomplete {
+    color: #765300;
+    font-weight: 700;
+}
+
+.comparison-save-actions {
+    display: flex;
+    gap: 0.6rem;
+}
+
+.comparison-save-success {
+    border-color: #79c98d;
+    background: #edf9f0;
+    color: #176c32;
 }
 
 @media (max-width: 1000px) {
@@ -275,7 +380,8 @@
     .comparison-setup-grid,
     .comparison-summary-tables,
     .comparison-gate-card,
-    .comparison-resolution-row {
+    .comparison-resolution-row,
+    .comparison-guide-grid {
         grid-template-columns: 1fr;
     }
 
@@ -283,10 +389,23 @@
         grid-template-columns: 1fr;
     }
 
+    .comparison-photo-navigation {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .comparison-photo-navigation strong {
+        grid-column: 1 / -1;
+        grid-row: 1;
+    }
+
     .comparison-list article,
     .comparison-photo-card header,
     .comparison-photo-card footer {
         align-items: flex-start;
         flex-direction: column;
+    }
+
+    .comparison-save-actions {
+        width: 100%;
     }
 }
