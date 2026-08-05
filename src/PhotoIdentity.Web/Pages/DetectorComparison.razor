@@ -5,7 +5,7 @@
 <PageTitle>Detector comparison · Photo Identity</PageTitle>
 
 @if (!string.IsNullOrWhiteSpace(Error)) { <div class="notice error" role="alert">@Error</div> }
-@if (!string.IsNullOrWhiteSpace(Success)) { <div class="notice success" role="status">@Success</div> }
+@if (!string.IsNullOrWhiteSpace(Success)) { <div class="notice success comparison-save-success" role="status">@Success</div> }
 @if (Loading)
 {
     <section class="empty-state"><p>Loading detector comparison…</p></section>
@@ -17,24 +17,53 @@ else if (Comparison is null)
 else
 {
     <section class="comparison-detail-header"><div><a href="/detector-comparisons">← All comparisons</a><p class="eyebrow">Candidate comparison</p><h1>@Comparison.Name</h1><p>Baseline @Comparison.BaselineName · IoU @Comparison.IouThreshold.ToString("0.00", CultureInfo.InvariantCulture)</p></div><a class="button secondary" href="@($"/api/detector-evaluation/comparisons/{Comparison.Id}/export.csv")">Export summaries</a></section>
-    <section class="comparison-metric-grid">@MetricCard("Overall recall", Comparison.Overall.Recall, Comparison.Overall.MatchedFaces, Comparison.Overall.CountableFaces)@MetricCard("Five-plus recall", Comparison.FivePlusFaces.Recall, Comparison.FivePlusFaces.MatchedFaces, Comparison.FivePlusFaces.CountableFaces)<article><span>False + duplicate</span><strong>@(Comparison.Overall.FalseDetections + Comparison.Overall.DuplicateDetections)</strong><small>limit @Comparison.M16Gate.FalseOrDuplicateLimit</small></article><article><span>M16 gate</span><strong>@Comparison.M16Gate.Status.ToUpperInvariant()</strong><small>@GateDetail(Comparison.M16Gate)</small></article></section>
+    <section class="comparison-metric-grid">@MetricCard("Overall recall", Comparison.Overall.Recall, Comparison.Overall.MatchedFaces, Comparison.Overall.CountableFaces)@MetricCard("Five-plus recall", Comparison.FivePlusFaces.Recall, Comparison.FivePlusFaces.MatchedFaces, Comparison.FivePlusFaces.CountableFaces)<article><span>False + duplicate</span><strong>@(Comparison.Overall.FalseDetections + Comparison.Overall.DuplicateDetections)</strong><small>limit @Comparison.M16Gate.FalseOrDuplicateLimit</small></article><article class="@GateStatusClass(Comparison.M16Gate.Status)"><span>M16 gate</span><strong>@Comparison.M16Gate.Status.ToUpperInvariant()</strong><small>@GateDetail(Comparison.M16Gate)</small></article></section>
     <section class="comparison-gate-card"><div><p class="eyebrow">M16 qualitative gate</p><h2>Material failure category</h2></div><div class="comparison-gate-form"><select @bind="MaterialCategoryValue"><option value="">Pending</option><option value="false">No material failure</option><option value="true">Material failure exists</option></select><textarea @bind="GateNotes" rows="2" placeholder="Gate notes"></textarea><button class="button primary" disabled="@Busy" @onclick="SaveGateAsync">Save gate assessment</button></div></section>
     <section class="comparison-summary-tables">@SummaryTable("Source groups", Comparison.SourceGroups)@SummaryTable("Categories", Comparison.Categories)</section>
-    <section class="comparison-exceptions"><div class="section-heading"><div><p class="eyebrow">Manual review only</p><h2>Unmatched, duplicate or ambiguous photos</h2></div><span>@Comparison.ExceptionPhotos.Count</span></div>
-        @if (Comparison.ExceptionPhotos.Count == 0) { <div class="notice success">All candidate detections matched one-to-one. Record the qualitative gate.</div> }
-        @foreach (var photo in Comparison.ExceptionPhotos)
+    <section class="comparison-review-guide" aria-labelledby="comparison-review-guide-title">
+        <p class="eyebrow">How to review</p>
+        <h2 id="comparison-review-guide-title">Resolve only the boxes that could not be matched automatically</h2>
+        <div class="comparison-guide-grid">
+            <p><strong>Candidate detection</strong> is a face box produced by the detector run being evaluated. Candidate boxes are orange and dashed.</p>
+            <p><strong>Reference face</strong> is a countable face retained from the reviewed baseline. Reference boxes are green.</p>
+            <p><strong>Automatically matched</strong> means the candidate and reference boxes formed a clear one-to-one match and need no action.</p>
+            <p>Use <strong>Detector missed this reference face</strong> only when no candidate box represents that face. Otherwise match the candidate detection to the reference face.</p>
+        </div>
+    </section>
+    <section class="comparison-exceptions"><div class="section-heading"><div><p class="eyebrow">Manual review only</p><h2>Photos requiring a decision</h2></div><span>@Comparison.ExceptionPhotos.Count</span></div>
+        @if (Comparison.ExceptionPhotos.Count == 0)
         {
+            <div class="notice success">All candidate detections have been resolved. Record the qualitative gate assessment.</div>
+        }
+        else if (CurrentPhoto is not null)
+        {
+            var photo = CurrentPhoto;
             var draft = Drafts[photo.CandidateRevisionId];
-            <article class="comparison-photo-card"><header><div><h3>@photo.PhotoName</h3><p>@photo.AutomaticMatchCount automatic · @photo.CountableFaces countable · @photo.SourceGroup · @photo.PrimaryCategory</p></div><span class="state-badge">@(photo.IsResolved ? "Resolved" : "Needs review")</span></header>
-                <div class="comparison-photo-stage"><img src="@photo.ContentUrl" alt="@photo.PhotoName" loading="lazy" />@foreach (var face in ExceptionGroundTruthFaces(photo)) { <div class="comparison-box ground-truth" style="@BoxStyle(face.BoundingBox)"><span>GT @ShortId(face.Id)</span></div> }@foreach (var candidate in ExceptionCandidates(photo)) { <div class="comparison-box candidate" style="@BoxStyle(candidate.BoundingBox)"><span>C@candidate.FaceNumber</span></div> }</div>
-                @foreach (var component in photo.ExceptionComponents)
-                {
-                    <section class="comparison-component"><h4><span class="state-badge">@component.Kind</span> @component.Id</h4>
-                        @foreach (var candidate in component.CandidateDetections) { <label class="comparison-resolution-row"><span>Candidate @candidate.FaceNumber · @candidate.Confidence.ToString("0.000", CultureInfo.InvariantCulture)</span><select value="@CandidateAction(draft, candidate.Id)" @onchange="args => SetCandidateAction(draft, candidate.Id, args.Value?.ToString())"><option value="">Unresolved</option>@foreach (var face in ExceptionGroundTruthFaces(photo)) { <option value="@($"match:{face.Id}")">Match GT @ShortId(face.Id)</option> }<option value="false">False detection</option><option value="duplicate">Duplicate detection</option></select></label> }
-                        @foreach (var face in component.GroundTruthFaces) { <label class="comparison-resolution-row checkbox-row"><span>Ground truth @ShortId(face.Id) · @face.Origin</span><span><input type="checkbox" checked="@draft.MissedGroundTruthFaceIds.Contains(face.Id)" disabled="@IsGroundTruthMatched(draft, face.Id)" @onchange="args => SetMissed(draft, face.Id, args.Value is true)" /> Candidate missed this face</span></label> }
-                    </section>
-                }
-                <textarea @bind="draft.Notes" rows="2" placeholder="Correction notes"></textarea><footer><span>@ResolutionLabel(photo, draft)</span><button class="button primary" disabled="@Busy" @onclick="() => SavePhotoAsync(photo, draft)">Save corrections</button></footer>
+            <nav class="comparison-photo-navigation" aria-label="Comparison photo navigation">
+                <button class="button secondary" disabled="@(Busy || CurrentPhotoIndex == 0)" @onclick="ShowPreviousPhoto">← Previous</button>
+                <strong>Photo @(CurrentPhotoIndex + 1) of @Comparison.ExceptionPhotos.Count</strong>
+                <button class="button secondary" disabled="@(Busy || CurrentPhotoIndex >= Comparison.ExceptionPhotos.Count - 1)" @onclick="ShowNextPhoto">Next →</button>
+            </nav>
+            <article class="comparison-photo-card"><header><div><h3>@photo.PhotoName</h3><p>@photo.AutomaticMatchCount automatically matched faces · @photo.CountableFaces reference faces · @photo.SourceGroup · @photo.PrimaryCategory</p></div><span class="state-badge @(IsDraftResolved(photo, draft) ? "resolved" : "needs-review")">@(IsDraftResolved(photo, draft) ? "Ready to save" : "Needs review")</span></header>
+                <p class="comparison-photo-explanation">The automatic count is already accepted. Review only the orange and green boxes shown below.</p>
+                <div class="comparison-photo-stage"><img src="@photo.ContentUrl" alt="@photo.PhotoName" />@foreach (var face in ExceptionGroundTruthFaces(photo)) { <div class="comparison-box ground-truth" style="@BoxStyle(face.BoundingBox)"><span>Reference @ReferenceFaceNumber(photo, face.Id)</span></div> }@foreach (var candidate in ExceptionCandidates(photo)) { <div class="comparison-box candidate" style="@BoxStyle(candidate.BoundingBox)"><span>Candidate @candidate.FaceNumber</span></div> }</div>
+                <div class="comparison-component-list">
+                    @foreach (var component in photo.ExceptionComponents)
+                    {
+                        <section class="comparison-component"><h4>@ComponentTitle(component)</h4><p class="comparison-component-help">@ComponentHelp(component)</p>
+                            @foreach (var candidate in component.CandidateDetections)
+                            {
+                                <label class="comparison-resolution-row"><span><strong>Candidate detection @candidate.FaceNumber</strong><small>Confidence @candidate.Confidence.ToString("0.000", CultureInfo.InvariantCulture)</small></span><select value="@CandidateAction(draft, candidate.Id)" @onchange="args => SetCandidateAction(draft, candidate.Id, args.Value?.ToString())"><option value="">Choose outcome…</option>@foreach (var face in ExceptionGroundTruthFaces(photo)) { <option value="@($"match:{face.Id}")">Match to @ReferenceFaceLabel(photo, face.Id)</option> }<option value="false">False detection — not a countable face</option><option value="duplicate">Duplicate — same face detected again</option></select></label>
+                            }
+                            @foreach (var face in component.GroundTruthFaces)
+                            {
+                                <label class="comparison-resolution-row checkbox-row"><span><strong>@ReferenceFaceLabel(photo, face.Id)</strong><small>@GroundTruthOriginLabel(face.Origin)</small></span><span><input type="checkbox" checked="@draft.MissedGroundTruthFaceIds.Contains(face.Id)" disabled="@IsGroundTruthMatched(draft, face.Id)" @onchange="args => SetMissed(draft, face.Id, args.Value is true)" /> Detector missed this reference face</span></label>
+                            }
+                        </section>
+                    }
+                </div>
+                <label class="comparison-notes"><span>Optional correction notes</span><textarea @bind="draft.Notes" rows="2" placeholder="Add a neutral note only when it helps explain the decision"></textarea></label>
+                <footer><span class="comparison-resolution-status @(IsDraftResolved(photo, draft) ? "complete" : "incomplete")">@ResolutionLabel(photo, draft)</span><div class="comparison-save-actions"><button class="button secondary" disabled="@Busy" @onclick="() => SavePhotoAsync(photo, draft, false)">Save</button><button class="button primary" disabled="@(Busy || !IsDraftResolved(photo, draft))" @onclick="() => SavePhotoAsync(photo, draft, true)">Save and next</button></div></footer>
             </article>
         }
     </section>
