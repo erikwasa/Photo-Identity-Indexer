@@ -50,6 +50,19 @@ public partial class DetectorComparison
         photo.ExceptionComponents.SelectMany(component => component.CandidateDetections)
             .DistinctBy(candidate => candidate.Id, StringComparer.OrdinalIgnoreCase).OrderBy(candidate => candidate.FaceNumber).ThenBy(candidate => candidate.Id, StringComparer.Ordinal).ToArray();
 
+    private static IReadOnlyList<string> AutomaticMissedGroundTruthFaceIds(DetectorEvaluationComparisonPhotoResponse photo) =>
+        ExceptionCandidates(photo).Count == 0
+            ? ExceptionGroundTruthFaces(photo).Select(face => face.Id).ToArray()
+            : [];
+
+    private static bool IsReferenceOnlyComponent(DetectorEvaluationComparisonExceptionComponentResponse component) =>
+        component.CandidateDetections.Count == 0 && component.GroundTruthFaces.Count > 0;
+
+    private static bool IsAutomaticMissComponent(
+        DetectorEvaluationComparisonPhotoResponse photo,
+        DetectorEvaluationComparisonExceptionComponentResponse component) =>
+        ExceptionCandidates(photo).Count == 0 && IsReferenceOnlyComponent(component);
+
     private static string CandidateAction(PhotoCorrectionDraft draft, string candidateId) =>
         draft.CandidateActions.TryGetValue(candidateId, out string? action) ? action : string.Empty;
 
@@ -90,21 +103,29 @@ public partial class DetectorComparison
         _ => origin.Replace('-', ' '),
     };
 
-    private static string ComponentTitle(DetectorEvaluationComparisonExceptionComponentResponse component) => component.Kind switch
+    private static string ComponentTitle(
+        DetectorEvaluationComparisonPhotoResponse photo,
+        DetectorEvaluationComparisonExceptionComponentResponse component) => component.Kind switch
     {
         "unmatched" when component.CandidateDetections.Count > 0 && component.GroundTruthFaces.Count == 0 => "Extra candidate detection",
-        "unmatched" when component.CandidateDetections.Count == 0 && component.GroundTruthFaces.Count > 0 => "Reference face without an automatic match",
+        "unmatched" when IsAutomaticMissComponent(photo, component) && component.GroundTruthFaces.Count == 1 => "Detector missed one reference face",
+        "unmatched" when IsAutomaticMissComponent(photo, component) => $"Detector missed {component.GroundTruthFaces.Count} reference faces",
+        "unmatched" when IsReferenceOnlyComponent(component) => "Reference face without an automatic match",
         "duplicate" => "Possible duplicate detection",
         "ambiguous" => "Possible match needs review",
         _ => "Review required",
     };
 
-    private static string ComponentHelp(DetectorEvaluationComparisonExceptionComponentResponse component) => component.Kind switch
+    private static string ComponentHelp(
+        DetectorEvaluationComparisonPhotoResponse photo,
+        DetectorEvaluationComparisonExceptionComponentResponse component) => component.Kind switch
     {
         "unmatched" when component.CandidateDetections.Count > 0 && component.GroundTruthFaces.Count == 0 =>
             "The evaluated detector found this box, but it did not automatically match a reference face. Choose whether it is a real face, a false detection or a duplicate.",
-        "unmatched" when component.CandidateDetections.Count == 0 && component.GroundTruthFaces.Count > 0 =>
-            "No candidate detection automatically matched this reference face. Check the box only when the evaluated detector truly missed it.",
+        "unmatched" when IsAutomaticMissComponent(photo, component) =>
+            "The baseline review confirms these are countable faces, and this photo has no candidate boxes available for manual matching. They are counted as detector misses automatically; no checkbox is needed.",
+        "unmatched" when IsReferenceOnlyComponent(component) =>
+            "No candidate detection automatically matched this reference face. Candidate boxes elsewhere in the photo may still be matched to it, so confirm a miss only when none represents this face.",
         "duplicate" => "More than one candidate detection may refer to the same reference face. Match the correct detection and mark any additional detection as a duplicate.",
         "ambiguous" => "Several boxes overlap in a way that cannot be resolved automatically. Match each real candidate detection to the correct reference face.",
         _ => "Resolve every candidate detection and reference face shown below.",

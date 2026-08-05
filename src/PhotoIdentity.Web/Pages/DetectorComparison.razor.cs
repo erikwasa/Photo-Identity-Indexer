@@ -45,6 +45,7 @@ public partial class DetectorComparison
             foreach (string id in photo.Correction.FalseCandidateDetectionIds) draft.CandidateActions[id] = "false";
             foreach (string id in photo.Correction.DuplicateCandidateDetectionIds) draft.CandidateActions[id] = "duplicate";
             draft.MissedGroundTruthFaceIds.UnionWith(photo.Correction.MissedGroundTruthFaceIds);
+            draft.MissedGroundTruthFaceIds.UnionWith(AutomaticMissedGroundTruthFaceIds(photo));
             Drafts[photo.CandidateRevisionId] = draft;
         }
 
