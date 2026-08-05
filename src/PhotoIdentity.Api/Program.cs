@@ -37,6 +37,12 @@ public partial class Program
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
             detectorEvaluationRoot,
             serviceProvider.GetRequiredService<TimeProvider>()));
+        builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationGroundTruthStore(
+            Path.Combine(detectorEvaluationRoot, "ground-truth"),
+            serviceProvider.GetRequiredService<TimeProvider>()));
+        builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationComparisonStore(
+            Path.Combine(detectorEvaluationRoot, "comparisons"),
+            serviceProvider.GetRequiredService<TimeProvider>()));
 
         WebApplication app = builder.Build();
         await app.Services.GetRequiredService<SqliteCatalogueDatabase>().InitializeAsync();
@@ -75,6 +81,7 @@ public partial class Program
         app.MapBulkSuggestionReviewEndpoints();
         app.MapCollectionEndpoints();
         app.MapDetectorEvaluationEndpoints();
+        app.MapDetectorEvaluationComparisonEndpoints();
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();

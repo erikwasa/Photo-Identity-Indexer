@@ -116,3 +116,133 @@ public sealed record SaveDetectorEvaluationPhotoReviewRequest(
     IReadOnlyList<DetectorEvaluationMissedFaceRequest> MissedFaces,
     string? MissReason,
     string? Notes);
+
+public sealed record DetectorEvaluationGroundTruthSummaryResponse(
+    string BaselineSessionId,
+    string Name,
+    DateTimeOffset FrozenAtUtc,
+    int PhotoCount,
+    int FaceCount);
+
+public sealed record CreateDetectorEvaluationComparisonRequest(
+    string Name,
+    string BaselineSessionId,
+    string CandidateProcessingRunId,
+    double? IouThreshold);
+
+public sealed record DetectorEvaluationComparisonSummaryResponse(
+    string Id,
+    string Name,
+    string BaselineSessionId,
+    string BaselineName,
+    string CandidateProcessingRunId,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    int PhotoCount,
+    int ExceptionPhotoCount,
+    int ResolvedExceptionPhotoCount,
+    string GateStatus);
+
+public sealed record DetectorEvaluationComparisonGroundTruthFaceResponse(
+    string Id,
+    DetectorEvaluationBoundingBoxResponse BoundingBox,
+    bool IsBackgroundUnknown,
+    string Origin);
+
+public sealed record DetectorEvaluationComparisonCandidateDetectionResponse(
+    string Id,
+    int FaceNumber,
+    double Confidence,
+    DetectorEvaluationBoundingBoxResponse BoundingBox);
+
+public sealed record DetectorEvaluationComparisonExceptionComponentResponse(
+    string Id,
+    string Kind,
+    IReadOnlyList<DetectorEvaluationComparisonGroundTruthFaceResponse> GroundTruthFaces,
+    IReadOnlyList<DetectorEvaluationComparisonCandidateDetectionResponse> CandidateDetections);
+
+public sealed record DetectorEvaluationComparisonManualMatchResponse(
+    string GroundTruthFaceId,
+    string CandidateDetectionId);
+
+public sealed record DetectorEvaluationComparisonCorrectionResponse(
+    IReadOnlyList<DetectorEvaluationComparisonManualMatchResponse> Matches,
+    IReadOnlyList<string> FalseCandidateDetectionIds,
+    IReadOnlyList<string> DuplicateCandidateDetectionIds,
+    IReadOnlyList<string> MissedGroundTruthFaceIds,
+    string? Notes);
+
+public sealed record DetectorEvaluationComparisonPhotoResponse(
+    string CandidateRevisionId,
+    string PhotoName,
+    string RevisionHashPrefix,
+    string ContentUrl,
+    string SampleId,
+    string SampleGroup,
+    string SourceGroup,
+    string PrimaryCategory,
+    int CountableFaces,
+    int AutomaticMatchCount,
+    IReadOnlyList<DetectorEvaluationComparisonExceptionComponentResponse> ExceptionComponents,
+    DetectorEvaluationComparisonCorrectionResponse Correction,
+    bool IsResolved);
+
+public sealed record DetectorEvaluationComparisonMetricsResponse(
+    int PhotoCount,
+    int CountableFaces,
+    int MatchedFaces,
+    int MissedFaces,
+    int UnresolvedGroundTruthFaces,
+    double Recall,
+    int FalseDetections,
+    int DuplicateDetections,
+    int UnresolvedCandidateDetections);
+
+public sealed record DetectorEvaluationComparisonGroupSummaryResponse(
+    string Group,
+    DetectorEvaluationComparisonMetricsResponse Metrics);
+
+public sealed record DetectorEvaluationM16GateResponse(
+    string Status,
+    bool IsComparisonComplete,
+    bool? MaterialCategoryFailure,
+    string? Notes,
+    double OverallRecallTarget,
+    double FivePlusRecallTarget,
+    int FalseOrDuplicateLimit,
+    bool OverallRecallPass,
+    bool FivePlusRecallPass,
+    bool FalseOrDuplicatePass,
+    bool? MaterialCategoryPass);
+
+public sealed record DetectorEvaluationComparisonResponse(
+    string Id,
+    string Name,
+    string BaselineSessionId,
+    string BaselineName,
+    DateTimeOffset GroundTruthFrozenAtUtc,
+    string CandidateProcessingRunId,
+    double IouThreshold,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    DetectorEvaluationComparisonMetricsResponse Overall,
+    DetectorEvaluationComparisonMetricsResponse FivePlusFaces,
+    IReadOnlyList<DetectorEvaluationComparisonGroupSummaryResponse> SourceGroups,
+    IReadOnlyList<DetectorEvaluationComparisonGroupSummaryResponse> Categories,
+    DetectorEvaluationM16GateResponse M16Gate,
+    IReadOnlyList<DetectorEvaluationComparisonPhotoResponse> ExceptionPhotos);
+
+public sealed record DetectorEvaluationComparisonManualMatchRequest(
+    string GroundTruthFaceId,
+    string CandidateDetectionId);
+
+public sealed record SaveDetectorEvaluationComparisonPhotoRequest(
+    IReadOnlyList<DetectorEvaluationComparisonManualMatchRequest> Matches,
+    IReadOnlyList<string> FalseCandidateDetectionIds,
+    IReadOnlyList<string> DuplicateCandidateDetectionIds,
+    IReadOnlyList<string> MissedGroundTruthFaceIds,
+    string? Notes);
+
+public sealed record SaveDetectorEvaluationM16GateRequest(
+    bool? MaterialCategoryFailure,
+    string? Notes);
