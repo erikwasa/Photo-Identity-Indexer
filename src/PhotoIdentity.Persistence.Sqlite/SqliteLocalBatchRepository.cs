@@ -118,24 +118,51 @@ public sealed class SqliteLocalBatchRepository
     {
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT
-                revision.id,
-                revision.asset_id,
-                asset.source_id,
-                source.kind,
-                source.root_locator,
-                asset.source_key,
-                revision.content_sha256,
-                revision.size_bytes,
-                revision.media_type
-            FROM asset_revisions AS revision
-            INNER JOIN assets AS asset ON asset.id = revision.asset_id
-            INNER JOIN sources AS source ON source.id = asset.source_id
-            WHERE revision.id = $revision_id;
-            """;
+        command.CommandText = AssetRevisionSelect + " WHERE revision.id = $revision_id;";
         command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
+        return await ReadAssetRevisionAsync(command, cancellationToken);
+    }
 
+    public async Task<CatalogueProcessingAssetRevision?> FindAssetRevisionAsync(
+        string sourceKey,
+        Sha256Digest contentHash,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceKey);
+
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = AssetRevisionSelect + """
+            WHERE asset.source_key = $source_key
+              AND revision.content_sha256 = $content_sha256
+            ORDER BY revision.observed_at_utc DESC, revision.id DESC
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$source_key", sourceKey);
+        command.Parameters.AddWithValue("$content_sha256", contentHash.ToString());
+        return await ReadAssetRevisionAsync(command, cancellationToken);
+    }
+
+    private const string AssetRevisionSelect = """
+        SELECT
+            revision.id,
+            revision.asset_id,
+            asset.source_id,
+            source.kind,
+            source.root_locator,
+            asset.source_key,
+            revision.content_sha256,
+            revision.size_bytes,
+            revision.media_type
+        FROM asset_revisions AS revision
+        INNER JOIN assets AS asset ON asset.id = revision.asset_id
+        INNER JOIN sources AS source ON source.id = asset.source_id
+        """;
+
+    private static async Task<CatalogueProcessingAssetRevision?> ReadAssetRevisionAsync(
+        SqliteCommand command,
+        CancellationToken cancellationToken)
+    {
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
