@@ -229,7 +229,7 @@
 
 .comparison-photo-stage {
     position: relative;
-    margin: 1rem 0;
+    margin: 1rem 0 0;
     overflow: hidden;
     border-radius: 0.8rem;
     background: #111;
@@ -250,11 +250,17 @@
 
 .comparison-box span {
     position: absolute;
-    left: -2px;
-    top: -1.45rem;
-    padding: 0.14rem 0.3rem;
-    font-size: 0.72rem;
-    font-weight: 700;
+    display: grid;
+    place-items: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    padding: 0;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 55%);
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1;
     color: #fff;
     white-space: nowrap;
 }
@@ -264,6 +270,8 @@
 }
 
 .comparison-box.ground-truth span {
+    left: 0.15rem;
+    top: 0.15rem;
     background: #157a39;
 }
 
@@ -273,10 +281,42 @@
 }
 
 .comparison-box.candidate span {
-    right: -2px;
-    left: auto;
-    top: auto;
-    bottom: -1.45rem;
+    right: 0.15rem;
+    bottom: 0.15rem;
+    background: #8a5700;
+}
+
+.comparison-overlay-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem 1.25rem;
+    margin: 0.65rem 0 1rem;
+    color: var(--muted-color, #626262);
+    font-size: 0.9rem;
+}
+
+.comparison-overlay-legend > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.comparison-legend-marker {
+    display: inline-grid;
+    place-items: center;
+    width: 1.45rem;
+    height: 1.45rem;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+
+.comparison-legend-marker.reference {
+    background: #157a39;
+}
+
+.comparison-legend-marker.candidate {
     background: #8a5700;
 }
 
@@ -326,6 +366,28 @@
     display: flex;
     align-items: center;
     gap: 0.45rem;
+}
+
+.automatic-miss-row {
+    border-color: #cbe5d2;
+}
+
+.automatic-miss-status {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: #176c32;
+    font-weight: 700;
+}
+
+.automatic-miss-status > span {
+    display: inline-grid;
+    place-items: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 999px;
+    background: #edf9f0;
+    border: 1px solid #79c98d;
 }
 
 .comparison-photo-card textarea,
