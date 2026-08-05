@@ -20,14 +20,14 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 ## Active work
 
 - [**WI-0032 — Validate documentation from a clean setup**](../work-items/WI-0032-documentation-validation.md) — `in_progress`; owner: `human-maintainer`
-- [**WI-0034 — Measure baseline detector recall**](../work-items/WI-0034-detector-recall-baseline.md) — `blocked`; owner: `human-maintainer`
+- [**WI-0035 — Tune YuNet confidence threshold**](../work-items/WI-0035-yunet-threshold-sweep.md) — `blocked`; owner: `human-maintainer`
 - [**WI-0039 — Build detector evaluation workspace**](../work-items/WI-0039-detector-evaluation-workspace.md) — `in_progress`; owner: `ai-agent`
 
 ## Recently completed
 
+- [**WI-0034 — Measure baseline detector recall**](../work-items/WI-0034-detector-recall-baseline.md) — `completed`; owner: `human-maintainer`
 - [**WI-0031 — Rewrite operator and architecture documentation**](../work-items/WI-0031-documentation-rewrite.md) — `completed`; owner: `ai-agent`
 - [**WI-0025 — Add collection-ready queries**](../work-items/WI-0025-collection-api.md) — `completed`; owner: `ai-agent`
-- [**WI-0033 — Accelerate the human review workflow**](../work-items/WI-0033-review-throughput.md) — `completed`; owner: `ai-agent`
 
 ## Next ready work
 
