@@ -27,17 +27,17 @@ public sealed class DetectorComparisonViewStateTests
         DetectorComparisonViewState state = new();
 
         state.ZoomIn();
-        Assert.Equal(1, state.ZoomScale);
+        Assert.Equal(1d, state.ZoomScale);
         state.ZoomIn();
-        Assert.Equal(2, state.ZoomScale);
+        Assert.Equal(2d, state.ZoomScale);
         state.ZoomIn();
-        Assert.Equal(4, state.ZoomScale);
+        Assert.Equal(4d, state.ZoomScale);
         Assert.False(state.CanZoomIn);
 
         state.ZoomOut();
-        Assert.Equal(2, state.ZoomScale);
+        Assert.Equal(2d, state.ZoomScale);
         state.ZoomOut();
-        Assert.Equal(1, state.ZoomScale);
+        Assert.Equal(1d, state.ZoomScale);
         state.ZoomOut();
         Assert.Null(state.ZoomScale);
     }
