@@ -19,12 +19,20 @@ public sealed class DetectorEvaluationZoomApplicationTests
             using HttpClient client = factory.CreateClient();
 
             string shell = await client.GetStringAsync("/");
-            Assert.Contains("detector-evaluation.js?v=2", shell, StringComparison.Ordinal);
+            Assert.Contains("detector-evaluation.js?v=3", shell, StringComparison.Ordinal);
 
-            string script = await client.GetStringAsync("/detector-evaluation.js?v=2");
+            string script = await client.GetStringAsync("/detector-evaluation.js?v=3");
+            Assert.Contains("detectorEvaluation", script, StringComparison.Ordinal);
+            Assert.Contains("detectorComparison", script, StringComparison.Ordinal);
             Assert.Contains("applyZoom", script, StringComparison.Ordinal);
             Assert.Contains("naturalWidth", script, StringComparison.Ordinal);
+            Assert.Contains("naturalHeight", script, StringComparison.Ordinal);
+            Assert.Contains("Math.min", script, StringComparison.Ordinal);
+            Assert.Contains("resetWorkspace", script, StringComparison.Ordinal);
+            Assert.Contains("focusDecision", script, StringComparison.Ordinal);
+            Assert.Contains("setPointerCapture", script, StringComparison.Ordinal);
             Assert.Contains("scrollLeft", script, StringComparison.Ordinal);
+            Assert.Contains("scrollTop", script, StringComparison.Ordinal);
             Assert.Contains("getNormalizedPoint", script, StringComparison.Ordinal);
         }
         finally

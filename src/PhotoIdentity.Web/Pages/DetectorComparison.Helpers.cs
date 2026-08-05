@@ -165,6 +165,24 @@ public partial class DetectorComparison
         _ => "status-pending",
     };
 
+    private static string CandidateReviewKey(string candidateId) => $"candidate:{candidateId}";
+
+    private static string ReferenceReviewKey(string groundTruthId) => $"reference:{groundTruthId}";
+
+    private static string CandidateDecisionId(DetectorEvaluationComparisonCandidateDetectionResponse candidate) =>
+        $"comparison-candidate-{candidate.FaceNumber}";
+
+    private static string ReferenceDecisionId(DetectorEvaluationComparisonPhotoResponse photo, string groundTruthId) =>
+        $"comparison-reference-{ReferenceFaceNumber(photo, groundTruthId)}";
+
+    private string ZoomButtonClass(double? candidate)
+    {
+        bool active = candidate is null
+            ? ViewState.ZoomScale is null
+            : ViewState.ZoomScale == candidate;
+        return active ? "comparison-zoom-button active" : "comparison-zoom-button";
+    }
+
     private static string BoxStyle(DetectorEvaluationBoundingBoxResponse box) =>
         FormattableString.Invariant($"left:{box.X * 100:0.####}%;top:{box.Y * 100:0.####}%;width:{box.Width * 100:0.####}%;height:{box.Height * 100:0.####}%;");
 

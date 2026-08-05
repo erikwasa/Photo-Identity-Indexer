@@ -19,6 +19,24 @@ The comparison page now reviews one photo at a time and uses compact `R` and `C`
 
 The preferred design is a dedicated review workspace rather than another fixed image-height adjustment. On desktop, the image and decisions should remain visible side by side inside a viewport-bounded area. Overflow decisions may scroll independently without moving the image. Detail inspection remains available through explicit zoom and pan controls.
 
+## Implementation status
+
+Implementation started on 2026-08-05 in branch `agent/WI-0040-viewport-review-workspace` and draft PR #79.
+
+The first implementation slice includes:
+
+- a viewport-bounded split review workspace with continuously reachable navigation and save actions;
+- complete-image fitting by both available width and height;
+- Fit, 100%, 200%, 400%, zoom-step and drag-to-pan controls;
+- independent decision-panel scrolling;
+- per-photo reset of zoom, pan, decision-panel scroll and transient review focus;
+- pointer and keyboard linkage between `R`/`C` overlays and decision controls;
+- collapsed comparison-level metrics, summaries, instructions and gate assessment below the active workspace;
+- a bounded narrow-screen fallback with sticky save actions; and
+- automated view-state, published asset and responsive-style coverage.
+
+Build, test and review-application validation are pending in GitHub Actions. Privacy-safe human verification with representative portrait, landscape and multi-decision photos remains required before completion.
+
 ## Scope
 
 - Introduce a responsive review workspace for the current exception photo.
