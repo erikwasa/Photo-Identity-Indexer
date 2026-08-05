@@ -8,8 +8,15 @@ namespace PhotoIdentity.Web.Pages;
 public partial class DetectorComparison
 {
     [Parameter] public Guid ComparisonId { get; set; }
+
     private Dictionary<string, PhotoCorrectionDraft> Drafts { get; } = new(StringComparer.OrdinalIgnoreCase);
+    private DetectorComparisonViewState ViewState { get; } = new();
     private DetectorEvaluationComparisonResponse? Comparison { get; set; }
+    private ElementReference WorkspaceElement { get; set; }
+    private ElementReference ViewportElement { get; set; }
+    private ElementReference StageElement { get; set; }
+    private ElementReference ImageElement { get; set; }
+    private ElementReference DecisionPanelElement { get; set; }
     private int CurrentPhotoIndex { get; set; }
     private DetectorEvaluationComparisonPhotoResponse? CurrentPhoto =>
         Comparison is not null && CurrentPhotoIndex >= 0 && CurrentPhotoIndex < Comparison.ExceptionPhotos.Count
@@ -19,6 +26,7 @@ public partial class DetectorComparison
     private string? GateNotes { get; set; }
     private bool Loading { get; set; }
     private bool Busy { get; set; }
+    private bool ApplyViewAfterRender { get; set; }
     private string? Error { get; set; }
     private string? Success { get; set; }
 
@@ -29,6 +37,17 @@ public partial class DetectorComparison
         try { await LoadComparisonAsync(); }
         catch (Exception exception) { Error = exception.Message; }
         finally { Loading = false; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!ApplyViewAfterRender)
+        {
+            return;
+        }
+
+        ApplyViewAfterRender = false;
+        await ApplyViewAsync(resetWorkspace: true);
     }
 
     private async Task LoadComparisonAsync(string? preferredRevisionId = null, int? fallbackIndex = null)
@@ -52,6 +71,7 @@ public partial class DetectorComparison
         if (Comparison.ExceptionPhotos.Count == 0)
         {
             CurrentPhotoIndex = 0;
+            ResetViewState();
             return;
         }
 
@@ -61,20 +81,106 @@ public partial class DetectorComparison
         CurrentPhotoIndex = preferredIndex >= 0
             ? preferredIndex
             : Math.Clamp(fallbackIndex ?? CurrentPhotoIndex, 0, Comparison.ExceptionPhotos.Count - 1);
+        ResetViewState();
     }
 
     private void ShowPreviousPhoto()
     {
-        if (CurrentPhotoIndex > 0) CurrentPhotoIndex--;
+        if (CurrentPhotoIndex > 0)
+        {
+            CurrentPhotoIndex--;
+            ResetViewState();
+        }
+
         Success = null;
         Error = null;
     }
 
     private void ShowNextPhoto()
     {
-        if (Comparison is not null && CurrentPhotoIndex < Comparison.ExceptionPhotos.Count - 1) CurrentPhotoIndex++;
+        if (Comparison is not null && CurrentPhotoIndex < Comparison.ExceptionPhotos.Count - 1)
+        {
+            CurrentPhotoIndex++;
+            ResetViewState();
+        }
+
         Success = null;
         Error = null;
+    }
+
+    private async Task HandleImageLoadedAsync() => await ApplyViewAsync(resetWorkspace: false);
+
+    private async Task SetZoomAsync(double? scale)
+    {
+        ViewState.SetZoom(scale);
+        await ApplyViewAsync(resetWorkspace: false);
+    }
+
+    private async Task ZoomInAsync()
+    {
+        ViewState.ZoomIn();
+        await ApplyViewAsync(resetWorkspace: false);
+    }
+
+    private async Task ZoomOutAsync()
+    {
+        ViewState.ZoomOut();
+        await ApplyViewAsync(resetWorkspace: false);
+    }
+
+    private void SetActiveReviewKey(string reviewKey) => ViewState.Activate(reviewKey);
+
+    private void ClearActiveReviewKey(string reviewKey) => ViewState.Clear(reviewKey);
+
+    private string ReviewActiveClass(string reviewKey) => ViewState.IsActive(reviewKey) ? "active-review" : string.Empty;
+
+    private async Task FocusDecisionAsync(string reviewKey, string elementId)
+    {
+        ViewState.Activate(reviewKey);
+        try
+        {
+            await JS.InvokeVoidAsync("detectorComparison.focusDecision", elementId);
+        }
+        catch (Exception exception)
+        {
+            Error = $"The review decision could not be focused: {exception.Message}";
+        }
+    }
+
+    private void ResetViewState()
+    {
+        ViewState.Reset();
+        ApplyViewAfterRender = true;
+    }
+
+    private async Task ApplyViewAsync(bool resetWorkspace)
+    {
+        if (CurrentPhoto is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "detectorComparison.applyZoom",
+                ViewportElement,
+                StageElement,
+                ImageElement,
+                ViewState.ZoomScale ?? 0);
+            if (resetWorkspace)
+            {
+                await JS.InvokeVoidAsync(
+                    "detectorComparison.resetWorkspace",
+                    WorkspaceElement,
+                    ViewportElement,
+                    DecisionPanelElement);
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = $"The comparison image view could not be applied: {exception.Message}";
+        }
     }
 
     private async Task SavePhotoAsync(DetectorEvaluationComparisonPhotoResponse photo, PhotoCorrectionDraft draft, bool moveNext)
