@@ -6,6 +6,11 @@ on:
       - agent/WI-0037-centerface-qualification
     paths:
       - .github/workflows/wi-0037-status-and-qualification.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/wi-0037-status-and-qualification.yml
 
 permissions:
   contents: write
