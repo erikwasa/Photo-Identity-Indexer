@@ -87,7 +87,16 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         YuNetFaceDetector detector = new(
             detectorManifest,
             detectorPath,
-            new YuNetDetectorOptions { ConfidenceThreshold = configuration.ConfidenceThreshold });
+            new YuNetDetectorOptions
+            {
+                ConfidenceThreshold = configuration.ConfidenceThreshold,
+                PipelineMode = configuration.DetectorPipeline == LocalBatchConfiguration.MultiScaleDetectorPipeline
+                    ? YuNetDetectorPipelineMode.MultiScale
+                    : YuNetDetectorPipelineMode.SinglePass,
+                TileSize = configuration.TileSize,
+                TileOverlap = configuration.TileOverlap,
+                MergeNmsThreshold = configuration.MergeNmsThreshold,
+            });
         try
         {
             SFaceFaceEmbedder embedder = new(embedderManifest, embedderPath);

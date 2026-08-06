@@ -26,6 +26,10 @@ internal sealed record BatchCommandOptions(
     bool Recursive,
     double ConfidenceThreshold,
     double PaddingRatio,
+    string DetectorPipeline,
+    int TileSize,
+    double TileOverlap,
+    double MergeNmsThreshold,
     int MaxAttemptsPerInvocation)
 {
     public static BatchCommandOptions Parse(string[] args)
@@ -57,6 +61,10 @@ internal sealed record BatchCommandOptions(
         bool recursive = true;
         double confidence = 0.9;
         double padding = 0.25;
+        string detectorPipeline = LocalBatchConfiguration.SinglePassDetectorPipeline;
+        int tileSize = LocalBatchConfiguration.DefaultTileSize;
+        double tileOverlap = LocalBatchConfiguration.DefaultTileOverlap;
+        double mergeNmsThreshold = LocalBatchConfiguration.DefaultMergeNmsThreshold;
         int maxAttempts = int.MaxValue;
 
         for (int index = 1; index < args.Length; index++)
@@ -129,6 +137,18 @@ internal sealed record BatchCommandOptions(
                 case "--padding":
                     padding = NonNegative(value, option);
                     break;
+                case "--detector-pipeline":
+                    detectorPipeline = ParseDetectorPipeline(value, option);
+                    break;
+                case "--tile-size":
+                    tileSize = PositiveInteger(value, option);
+                    break;
+                case "--tile-overlap":
+                    tileOverlap = UnitIntervalExclusiveUpper(value, option);
+                    break;
+                case "--merge-nms":
+                    mergeNmsThreshold = UnitInterval(value, option);
+                    break;
                 case "--max-attempts":
                     maxAttempts = PositiveInteger(value, option);
                     break;
@@ -169,6 +189,10 @@ internal sealed record BatchCommandOptions(
             recursive,
             confidence,
             padding,
+            detectorPipeline,
+            tileSize,
+            tileOverlap,
+            mergeNmsThreshold,
             maxAttempts);
     }
 
@@ -192,12 +216,31 @@ internal sealed record BatchCommandOptions(
         return value.Trim();
     }
 
+    private static string ParseDetectorPipeline(string value, string option)
+    {
+        string parsed = Required(value, option).ToLowerInvariant();
+        return parsed is LocalBatchConfiguration.SinglePassDetectorPipeline or
+            LocalBatchConfiguration.MultiScaleDetectorPipeline
+            ? parsed
+            : throw new ArgumentException(
+                $"Option '{option}' must be '{LocalBatchConfiguration.SinglePassDetectorPipeline}' or " +
+                $"'{LocalBatchConfiguration.MultiScaleDetectorPipeline}'.");
+    }
+
     private static double UnitInterval(string value, string option)
     {
         double parsed = Number(value, option);
         return parsed is >= 0 and <= 1
             ? parsed
             : throw new ArgumentException($"Option '{option}' must be between zero and one.");
+    }
+
+    private static double UnitIntervalExclusiveUpper(string value, string option)
+    {
+        double parsed = Number(value, option);
+        return parsed is >= 0 and < 1
+            ? parsed
+            : throw new ArgumentException($"Option '{option}' must be at least zero and less than one.");
     }
 
     private static double NonNegative(string value, string option)
@@ -272,7 +315,11 @@ internal static class BatchCommandRunner
             options.ConfidenceThreshold,
             options.PaddingRatio,
             options.DetectorModelId,
-            options.EmbedderModelId);
+            options.EmbedderModelId,
+            options.DetectorPipeline,
+            options.TileSize,
+            options.TileOverlap,
+            options.MergeNmsThreshold);
         using LocalInspectionJobHandler handler = await LocalInspectionJobHandler.CreateAsync(
             database,
             configuration,
@@ -285,8 +332,7 @@ internal static class BatchCommandRunner
                 maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
             cancellationToken);
 
-        output.WriteLine($"detector-model: {configuration.DetectorModelId}");
-        output.WriteLine($"embedder-model: {configuration.EmbedderModelId}");
+        WriteConfiguration(configuration, output);
         output.WriteLine($"scan-supported: {result.ScanSummary.SupportedFileCount}");
         output.WriteLine($"scan-new-revisions: {result.ScanSummary.NewRevisionCount}");
         output.WriteLine($"scan-unchanged: {result.ScanSummary.UnchangedFileCount}");
@@ -316,10 +362,24 @@ internal static class BatchCommandRunner
             new ResumableBatchProcessorOptions(
                 maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
             cancellationToken);
-        output.WriteLine($"detector-model: {configuration.DetectorModelId}");
-        output.WriteLine($"embedder-model: {configuration.EmbedderModelId}");
+        WriteConfiguration(configuration, output);
         WriteSummary(result.Summary, output);
         return result.Summary.FailedJobs == 0 ? 0 : 1;
+    }
+
+    private static void WriteConfiguration(LocalBatchConfiguration configuration, TextWriter output)
+    {
+        output.WriteLine($"detector-model: {configuration.DetectorModelId}");
+        output.WriteLine($"embedder-model: {configuration.EmbedderModelId}");
+        output.WriteLine($"detector-pipeline: {configuration.DetectorPipeline}");
+        output.WriteLine($"confidence: {configuration.ConfidenceThreshold.ToString(CultureInfo.InvariantCulture)}");
+        output.WriteLine($"padding: {configuration.PaddingRatio.ToString(CultureInfo.InvariantCulture)}");
+        if (configuration.DetectorPipeline == LocalBatchConfiguration.MultiScaleDetectorPipeline)
+        {
+            output.WriteLine($"tile-size: {configuration.TileSize}");
+            output.WriteLine($"tile-overlap: {configuration.TileOverlap.ToString(CultureInfo.InvariantCulture)}");
+            output.WriteLine($"merge-nms: {configuration.MergeNmsThreshold.ToString(CultureInfo.InvariantCulture)}");
+        }
     }
 
     private static void WriteSummary(ProcessingRunSummary summary, TextWriter output)

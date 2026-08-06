@@ -11,6 +11,11 @@ public sealed record LocalBatchConfiguration
 {
     public const string DefaultDetectorModelId = "yunet-2023mar-fp32";
     public const string DefaultEmbedderModelId = "sface-2021dec-fp32";
+    public const string SinglePassDetectorPipeline = "single-pass";
+    public const string MultiScaleDetectorPipeline = "full-image-plus-tiles";
+    public const int DefaultTileSize = 1024;
+    public const double DefaultTileOverlap = 0.2;
+    public const double DefaultMergeNmsThreshold = 0.3;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -27,13 +32,18 @@ public sealed record LocalBatchConfiguration
         double confidenceThreshold = 0.9,
         double paddingRatio = 0.25,
         string detectorModelId = DefaultDetectorModelId,
-        string embedderModelId = DefaultEmbedderModelId)
+        string embedderModelId = DefaultEmbedderModelId,
+        string detectorPipeline = SinglePassDetectorPipeline,
+        int tileSize = DefaultTileSize,
+        double tileOverlap = DefaultTileOverlap,
+        double mergeNmsThreshold = DefaultMergeNmsThreshold)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(repositoryRoot);
         ArgumentException.ThrowIfNullOrWhiteSpace(detectorModelId);
         ArgumentException.ThrowIfNullOrWhiteSpace(embedderModelId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(detectorPipeline);
         if (!double.IsFinite(confidenceThreshold) || confidenceThreshold is < 0 or > 1)
         {
             throw new ArgumentOutOfRangeException(
@@ -44,6 +54,33 @@ public sealed record LocalBatchConfiguration
         if (!double.IsFinite(paddingRatio) || paddingRatio < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(paddingRatio), "The padding ratio must be non-negative.");
+        }
+
+        string canonicalPipeline = detectorPipeline.Trim().ToLowerInvariant();
+        if (canonicalPipeline is not (SinglePassDetectorPipeline or MultiScaleDetectorPipeline))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(detectorPipeline),
+                $"The detector pipeline must be '{SinglePassDetectorPipeline}' or '{MultiScaleDetectorPipeline}'.");
+        }
+
+        if (tileSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(tileSize), "The tile size must be positive.");
+        }
+
+        if (!double.IsFinite(tileOverlap) || tileOverlap < 0 || tileOverlap >= 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(tileOverlap),
+                "The tile overlap must be at least zero and less than one.");
+        }
+
+        if (!double.IsFinite(mergeNmsThreshold) || mergeNmsThreshold is < 0 or > 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(mergeNmsThreshold),
+                "The merge NMS threshold must be between zero and one.");
         }
 
         SourceRoot = Path.GetFullPath(sourceRoot);
@@ -58,6 +95,10 @@ public sealed record LocalBatchConfiguration
         PaddingRatio = paddingRatio;
         DetectorModelId = detectorModelId.Trim();
         EmbedderModelId = embedderModelId.Trim();
+        DetectorPipeline = canonicalPipeline;
+        TileSize = tileSize;
+        TileOverlap = tileOverlap;
+        MergeNmsThreshold = mergeNmsThreshold;
     }
 
     public string SourceRoot { get; }
@@ -69,6 +110,10 @@ public sealed record LocalBatchConfiguration
     public double PaddingRatio { get; }
     public string DetectorModelId { get; }
     public string EmbedderModelId { get; }
+    public string DetectorPipeline { get; }
+    public int TileSize { get; }
+    public double TileOverlap { get; }
+    public double MergeNmsThreshold { get; }
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
 
@@ -87,7 +132,11 @@ public sealed record LocalBatchConfiguration
                 data.ConfidenceThreshold,
                 data.PaddingRatio,
                 data.DetectorModelId ?? DefaultDetectorModelId,
-                data.EmbedderModelId ?? DefaultEmbedderModelId);
+                data.EmbedderModelId ?? DefaultEmbedderModelId,
+                data.DetectorPipeline ?? SinglePassDetectorPipeline,
+                data.TileSize ?? DefaultTileSize,
+                data.TileOverlap ?? DefaultTileOverlap,
+                data.MergeNmsThreshold ?? DefaultMergeNmsThreshold);
     }
 
     private static void EnsureOutsideSource(string sourceRoot, string outputRoot)
@@ -115,7 +164,11 @@ public sealed record LocalBatchConfiguration
         double ConfidenceThreshold,
         double PaddingRatio,
         string? DetectorModelId,
-        string? EmbedderModelId);
+        string? EmbedderModelId,
+        string? DetectorPipeline,
+        int? TileSize,
+        double? TileOverlap,
+        double? MergeNmsThreshold);
 }
 
 public sealed record LocalBatchStartResult(

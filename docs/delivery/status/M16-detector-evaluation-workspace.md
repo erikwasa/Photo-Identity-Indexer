@@ -1,20 +1,20 @@
 # M16 detector evaluation workspace status
 
-Status date: 2026-08-05
+Status date: 2026-08-06
 
-Status update branch: `agent/WI-0040-status-and-threshold-080`
+Active implementation branch: `agent/WI-0036-multiscale-yunet`
 
 ## Current outcome
 
-The fixed private 100-photo set has been processed and fully reviewed with the pinned YuNet detector at confidence `0.9`. The detector-evaluation workspace retained complete photo context, zero-detection photos, per-detection classifications, missed-face geometry, source groups and primary categories without changing canonical identity review state.
+The fixed private 100-photo set has been processed and fully reviewed with the pinned YuNet detector at confidence `0.9`. That immutable baseline failed the predeclared M16 decision target and remains the reusable face-level ground truth.
 
-The completed confidence-0.9 baseline was evaluated against the predeclared M16 decision target on 2026-08-05 and **did not pass**. The immutable authored session remains the reference ground truth for threshold experiments.
+The maintainer subsequently completed isolated candidate runs at confidence `0.8`, `0.7`, `0.6` and `0.5` against the unchanged ground truth. Every candidate was fully reviewed and every complete M16 gate failed. Detailed counts, filenames, paths, images and category values remain private.
 
-Confidence `0.8` was then processed in an isolated catalogue, compared with the frozen baseline and fully reviewed by the maintainer on 2026-08-05. It also **failed the complete M16 gate**. Detailed counts, filenames, paths, images and category values remain private. WI-0035 remains active, and confidence `0.7` is the next governed candidate.
+WI-0035 is complete. Threshold tuning alone is insufficient, and no confidence setting is approved for rollout.
 
-WI-0040 is complete. PR #79 delivered the viewport-fitted comparison workspace, and PR #80 fixed comparison-photo retrieval across isolated catalogues. The maintainer tested the merged workflow on 2026-08-05 and confirmed that it works as expected.
+WI-0036 is active. Its first implementation increment introduces an opt-in full-image plus tiled YuNet pipeline while retaining the existing single-pass path as the default for compatibility.
 
-## Delivered workspace
+## Delivered evaluation workspace
 
 ### Baseline authoring and export — PRs #70, #71 and #72
 
@@ -50,50 +50,46 @@ WI-0040 is complete. PR #79 delivered the viewport-fitted comparison workspace, 
 - removal of internal component IDs from the operator workflow; and
 - automatic detector-miss classification when a photo has reference faces but no candidate review boxes.
 
-### Viewport-fitted review workspace — PR #79
+### Viewport-fitted and cross-catalogue review — PRs #79 and #80
 
-- a stable viewport-relative review area;
 - complete-image fitting by both available width and height without cropping;
 - a desktop split layout with the image and decisions visible together;
 - independent decision-panel scrolling while the image remains visible;
-- continuously reachable previous, next, completion, save and save-and-next actions;
-- Fit, 100%, 200%, 400%, zoom-step and drag-to-pan controls;
-- reset of zoom, pan, decision-panel scroll and transient focus on every photo change;
-- pointer and keyboard linkage between `R`/`C` overlays and decision controls;
-- collapsed comparison metrics, summaries, instructions and qualitative-gate controls below the active workspace; and
-- a bounded narrow-screen layout with sticky save actions.
+- reachable navigation and save actions;
+- zoom, pan and marker-to-decision linkage;
+- reset of transient view state between photos;
+- bounded narrow-screen behavior; and
+- comparison-scoped image resolution across isolated catalogues using staged filename and full SHA-256 validation.
 
-### Cross-catalogue comparison-photo retrieval — PR #80
+## Active WI-0036 implementation
 
-- comparison-scoped image URLs rather than raw candidate-revision URLs;
-- direct candidate-revision lookup when the original revision exists in the active catalogue;
-- fallback lookup by staged filename and complete frozen SHA-256 when another isolated catalogue is active;
-- validation that the requested photo belongs to the saved comparison;
-- retention of path-containment, file-size, reparse-point and media-type checks; and
-- integration coverage for restarting a saved comparison against the baseline catalogue.
+The multi-scale implementation provides:
 
-GitHub Actions build #495 passed the release build, complete test suite, living-document validation, generated-document verification, review-application smoke verification and Windows PowerShell mixed-media verification. Human verification then confirmed the merged WI-0040 workflow behaves as expected.
+- one aspect-ratio-preserving full-image pass;
+- deterministic row-major overlapping source-pixel tiles;
+- letterboxing into the pinned YuNet input instead of stretching each pass;
+- mapping of boxes and all five landmarks into original-image normalised coordinates;
+- deterministic global non-maximum suppression across full-image and tile detections;
+- a compatibility-preserving `single-pass` default;
+- an explicit `full-image-plus-tiles` batch option; and
+- durable confidence, pipeline, tile-size, overlap and merge-threshold provenance.
+
+Automated tests cover tile coverage, aspect preservation, mapping, cross-pass duplicate suppression, deterministic ordering, CLI parsing and legacy run-configuration compatibility.
 
 ## Active next work
 
-WI-0035 continues the fixed confidence sweep against the unchanged 100-photo set.
+After implementation validation and merge:
 
-Completed governed candidates:
+1. process the unchanged private 100-photo set into a new isolated multi-scale catalogue;
+2. use confidence `0.9`, tile size `1024`, overlap `0.20` and global merge IoU `0.30` for the first governed candidate;
+3. attach the completed run to the frozen confidence-0.9 face-level ground truth;
+4. resolve only surfaced exception photos;
+5. retain runtime and review-effort evidence in addition to the existing gate metrics;
+6. record the material-category assessment and export the complete M16 gate; and
+7. continue to WI-0038 if the candidate passes, otherwise continue to WI-0037.
 
-1. confidence `0.9` baseline — failed;
-2. confidence `0.8` candidate — failed.
-
-Next governed steps:
-
-1. process the unchanged sample at confidence `0.7` into a new isolated catalogue and output directory;
-2. attach the completed `0.7` processing run to the frozen confidence-0.9 ground truth;
-3. resolve only surfaced exception photos in the viewport-fitted comparison workspace;
-4. record the material-category assessment;
-5. export and assess the complete M16 gate; and
-6. stop if the gate passes, otherwise continue in order with `0.6` and `0.5` only as required.
-
-The complete Windows commands and current comparison workflow are documented in [`docs/operations/detector-comparison-runs.md`](../../operations/detector-comparison-runs.md).
+The Windows procedure is documented in [`docs/operations/multiscale-detector-runs.md`](../../operations/multiscale-detector-runs.md).
 
 ## Privacy
 
-No private image names, source paths, face boxes, counts, ground-truth files, databases or detector outputs are committed. Repository evidence records only the fixed method, completed reviews, pass/fail decisions, delivered comparison capability and active governed work.
+No private image names, source paths, face boxes, counts, ground-truth files, databases or detector outputs are committed. Repository evidence records only the fixed method, completed reviews, aggregate pass/fail decisions, implementation capability and active governed work.

@@ -1,18 +1,37 @@
 # Build context
 
-## Current milestone
+## Current milestones
 
-**M15 — Operator documentation and system guide**
+Two independent milestones are active:
 
-Status: `in_progress`
+- **M15 — Operator documentation and system guide**: `in_progress`
+- **M16 — Face detection recall**: `in_progress`
 
 ## Current work
 
-**WI-0032 — Validate documentation from a clean setup** is active under the human maintainer. The current documentation correction is on `agent/WI-0032-powershell-optional`.
+**WI-0032 — Validate documentation from a clean setup** remains active under the human maintainer. Its clean-environment and trusted-network checklist remains authoritative for M15.
 
-WI-0031 completed on 2026-08-02 after PRs #64–#66 merged. PR #67 then closed the implementation item, started WI-0032 and added the clean-environment validation checklist.
+**WI-0036 — Add multi-scale YuNet detection** is active under the AI agent on `agent/WI-0036-multiscale-yunet`.
 
-## Validation progress
+The maintainer completed the governed M16 confidence sweep on 2026-08-06. The immutable confidence-0.9 baseline and isolated confidence `0.8`, `0.7`, `0.6` and `0.5` candidates all failed the complete M16 gate. Detailed metrics and category evidence remain private. WI-0035 is therefore complete, and threshold tuning is not approved for rollout.
+
+## M16 implementation direction
+
+The first WI-0036 increment adds an opt-in `full-image-plus-tiles` YuNet pipeline while preserving `single-pass` as the compatibility default.
+
+The implementation provides:
+
+- an aspect-ratio-preserving full-image pass;
+- deterministic overlapping source-pixel tiles;
+- letterboxed pass preprocessing;
+- mapping of boxes and five landmarks into original-image normalised coordinates;
+- deterministic global non-maximum suppression across all passes;
+- durable pipeline, tile, overlap and merge provenance in processing-run configuration; and
+- automated coverage for planning, mapping, suppression, ordering and configuration compatibility.
+
+The next M16 step after merge is to process the unchanged private 100-photo set at confidence `0.9` using the governed multi-scale defaults, attach that run to the frozen baseline ground truth, review only surfaced exceptions, record runtime and review effort, and assess the unchanged complete M16 gate.
+
+## M15 validation progress
 
 The maintainer ran the first automated validation phase on Windows:
 
@@ -21,33 +40,13 @@ The maintainer ran the first automated validation phase on Windows:
 - the comparison self-test passed under Windows PowerShell `5.1.26100.8875`; and
 - PowerShell 7 was not installed, so the literal `pwsh` command failed before the script could run.
 
-That result exposed a documentation inconsistency rather than a product failure. The checklist described PowerShell 7 or Windows PowerShell 5.1 as sufficient, but later invoked both executables unconditionally.
-
-The correction now states:
-
-- at least one supported PowerShell edition is required;
-- Windows PowerShell 5.1 is sufficient for local validation;
-- PowerShell 7 is optional locally;
-- every installed supported edition must pass; and
-- repository CI remains responsible for continuously testing both editions.
+That result exposed a documentation inconsistency rather than a product failure. The checklist now treats Windows PowerShell 5.1 as sufficient locally and PowerShell 7 as optional when it is not installed.
 
 The maintainer also reported executing the baseline build, test, model-installation and review-smoke commands. Their final pass/fail states must be included in the WI-0032 completion summary.
 
-## Remaining milestone gate
+## Remaining M15 gate
 
 Only independent clean-environment and trusted-network human verification remains. `docs/delivery/work-items/WI-0032-documentation-validation.md` is the authoritative checklist.
-
-The remaining work is to:
-
-1. merge the optional-PowerShell documentation correction;
-2. confirm pass/fail for the baseline build, tests, model installation and review smoke;
-3. process a representative 450–550-image private set, including interruption, status and resume;
-4. verify review, suggestion, evaluation, collection and neutral-manifest workflows on Windows;
-5. verify the browser workflow on Pixel over a trusted private network;
-6. validate deterministic export/evaluation, stopped-state backup/restore and documented recovery paths;
-7. inspect the multi-model procedure, using Windows PowerShell 5.1 and PowerShell 7 only when installed;
-8. perform the second reading pass and correct every confusing or hidden prerequisite; and
-9. return only the privacy-safe summary template from WI-0032.
 
 Any documentation defect found during validation must be corrected and merged before WI-0032 and M15 complete.
 
@@ -60,21 +59,15 @@ Any documentation defect found during validation must be corrected and merged be
 - The same-corpus comparison passed source, detector-count, deterministic-export and split-equality checks.
 - A private manual review of 20 representative faces found both revisions correct with no material practical difference; FP32 remains the local default.
 - Collection queries and the neutral manifest passed automated validation plus private Windows/Pixel verification.
-- The README and local operator guide provide one current PowerShell-first path.
-- The architecture and model documentation describe implemented behavior rather than roadmap-era plans.
-- All WI-0031 acceptance criteria and automated validation gates are complete.
-
-## Delivery objective
-
-1. maintain the accepted local processing, review, evaluation and collection workflows;
-2. independently validate the operator and architecture documentation from a clean setup; and
-3. resume Azure execution only after documentation validation and when access is available.
+- The confidence-0.9 YuNet baseline and all governed confidence candidates through `0.5` were reviewed against the same frozen 100-photo ground truth; threshold tuning was insufficient.
 
 ## Relevant planning files
 
 - `docs/delivery/milestones/M15-documentation.md`
-- `docs/delivery/work-items/WI-0031-documentation-rewrite.md`
 - `docs/delivery/work-items/WI-0032-documentation-validation.md`
+- `docs/delivery/milestones/M16-detector-recall.md`
+- `docs/delivery/work-items/WI-0036-multiscale-yunet.md`
+- `docs/operations/multiscale-detector-runs.md`
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/status/milestones.yaml`
 
