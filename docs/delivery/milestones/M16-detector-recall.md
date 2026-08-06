@@ -16,9 +16,9 @@ The project measures detector recall on a bounded 100-photo sample and improves 
 - [WI-0039](../work-items/WI-0039-detector-evaluation-workspace.md) — build reusable photo-level detector evaluation before repeated manual review
 - [WI-0040](../work-items/WI-0040-detector-comparison-review-workspace.md) — keep the complete comparison image and its decisions visible in a viewport-fitted review workspace
 - [WI-0034](../work-items/WI-0034-detector-recall-baseline.md) — measure the current detector on 100 photos
-- [WI-0035](../work-items/WI-0035-yunet-threshold-sweep.md) — tune confidence because the baseline gate failed
-- [WI-0036](../work-items/WI-0036-multiscale-yunet.md) — add multi-scale YuNet only when threshold tuning is insufficient
-- [WI-0037](../work-items/WI-0037-detector-candidate.md) — evaluate another detector only when YuNet remains insufficient
+- [WI-0035](../work-items/WI-0035-yunet-threshold-sweep.md) — determine whether confidence tuning is sufficient
+- [WI-0036](../work-items/WI-0036-multiscale-yunet.md) — evaluate full-image plus tiled YuNet because threshold tuning was insufficient
+- [WI-0037](../work-items/WI-0037-detector-candidate.md) — evaluate another detector only when multi-scale YuNet remains insufficient
 - [WI-0038](../work-items/WI-0038-detector-rollout.md) — safely roll out any changed detector pipeline
 
 ## Current implementation decision
@@ -29,11 +29,13 @@ The reusable detector-evaluation workspace was delivered through pull requests #
 
 Pull requests #76 and #77 refined comparison review to one photo at a time, replaced internal comparison terminology with operator-facing decisions, added clear status treatment, introduced compact numbered reference/candidate markers and automatically classified candidate-free reference faces as detector misses.
 
-WI-0040 was completed through PRs #79 and #80. The delivered workspace fits the complete image and decisions into a stable viewport-bounded review surface, keeps decision overflow independent from the image, provides zoom and pan inspection, resets transient view state between photos, links image markers with decision controls and keeps comparison images readable across isolated catalogue switches when staged filename and full SHA-256 match. The maintainer tested the merged workflow on 2026-08-05 and confirmed that it works as expected.
+WI-0040 was completed through PRs #79 and #80. The delivered workspace fits the complete image and decisions into a stable viewport-bounded review surface, keeps decision overflow independent from the image, provides zoom and pan inspection, resets transient view state between photos, links image markers with decision controls and keeps comparison images readable across isolated catalogue switches when staged filename and full SHA-256 match.
 
-The confidence-0.9 YuNet baseline was fully reviewed and failed the predeclared M16 decision target on 2026-08-05. Confidence `0.8` was then processed in an isolated catalogue, fully reviewed against the frozen baseline and also failed the complete M16 gate. WI-0034, WI-0039 and WI-0040 are complete. WI-0035 remains active, and confidence `0.7` is the next governed candidate.
+The confidence-0.9 YuNet baseline failed the predeclared M16 decision target on 2026-08-05. The maintainer then completed isolated confidence `0.8`, `0.7`, `0.6` and `0.5` comparisons against the same frozen face-level ground truth by 2026-08-06. Every governed threshold failed the complete M16 gate. Detailed counts and category evidence remain private.
 
-This evaluation data is separate from canonical identity review. Detector judgements must not create person assignments, rejection actions or synthetic identities.
+WI-0035 is complete and no threshold is approved for rollout. WI-0036 is active and adds an opt-in full-image plus deterministic overlapping-tile YuNet pipeline with aspect-preserving preprocessing, original-image coordinate mapping, global deterministic non-maximum suppression and durable pipeline provenance.
+
+This evaluation data remains separate from canonical identity review. Detector judgements must not create person assignments, rejection actions or synthetic identities.
 
 See [M16 detector evaluation workspace status](../status/M16-detector-evaluation-workspace.md).
 
@@ -44,10 +46,10 @@ This milestone is intentionally allowed to finish without completing every propo
 - WI-0034 established that confidence `0.9` does not meet the decision target.
 - WI-0039 completed reusable candidate-run matching and summaries in PR #74.
 - WI-0040 completed the viewport-fitted and cross-catalogue-safe comparison-review workflow in PRs #79 and #80.
-- WI-0035 established that confidence `0.8` also fails and now evaluates `0.7`, followed only when needed by `0.6` and `0.5`.
-- If WI-0035 meets the target, cancel WI-0036 and WI-0037, then complete WI-0038.
-- If WI-0036 meets the target, cancel WI-0037, then complete WI-0038.
-- WI-0037 is required only when the governed YuNet options remain below target.
+- WI-0035 established that every governed confidence from `0.9` through `0.5` fails the complete gate.
+- WI-0036 is now required and evaluates multi-scale YuNet against the same immutable sample and ground truth.
+- If WI-0036 meets the target, cancel WI-0037 and continue to WI-0038.
+- WI-0037 is required only when multi-scale YuNet remains below target.
 
 Cancelled work items mean the evidence showed that the work was unnecessary; they are not failures.
 
@@ -72,7 +74,7 @@ The pilot also records an optional count of correctly detected faces that appear
 - Reusable face-level ground truth prevents full manual recounting for every threshold or detector candidate.
 - Comparison exceptions can be reviewed in a stable viewport-fitted workspace without page-level back-and-forth scrolling during the normal photo-to-photo loop.
 - Saved comparison images remain resolvable across isolated catalogue switches when verified source bytes are available.
-- Privacy-safe aggregate recall, false-detection and likely-background evidence is retained.
+- Privacy-safe aggregate recall, false-detection, runtime, review-effort and likely-background evidence is retained.
 - The first pipeline meeting the decision target is selected without unnecessary later work.
 - Any changed detector pipeline has explicit provenance and a safe canonical-catalogue rollout plan.
 - A materially expanded face population triggers a fresh exact-model comparison before production model selection.
