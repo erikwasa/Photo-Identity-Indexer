@@ -1,0 +1,321 @@
+name: Complete WI-0036 and qualify CenterFace
+
+on:
+  push:
+    branches:
+      - agent/WI-0037-centerface-qualification
+    paths:
+      - .github/workflows/wi-0037-status-and-qualification.yml
+
+permissions:
+  contents: write
+
+jobs:
+  update-status-and-qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/WI-0037-centerface-qualification
+          fetch-depth: 0
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ONNX inspector
+        run: python -m pip install --disable-pip-version-check onnx==1.18.0
+
+      - name: Update canonical status and inspect CenterFace
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import urllib.request
+          import onnx
+
+          registry = Path('docs/delivery/status/work-items.yaml')
+          text = registry.read_text(encoding='utf-8')
+
+          old_36 = '''  - id: WI-0036
+              title: Add multi-scale YuNet detection
+              milestone: M16
+              status: in_progress
+              owner: ai-agent
+              document: ../work-items/WI-0036-multiscale-yunet.md
+              started_at: '2026-08-06'
+              last_updated_at: '2026-08-06'
+              branch: agent/WI-0036-multiscale-yunet
+              blockers:
+                - WI-0035
+              evidence:
+                - type: human_verification
+                  value: The completed confidence sweep established that threshold tuning alone is insufficient, activating governed multi-scale YuNet work on 2026-08-06.
+                - type: pull_request
+                  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/82
+          '''
+          new_36 = '''  - id: WI-0036
+              title: Add multi-scale YuNet detection
+              milestone: M16
+              status: completed
+              owner: ai-agent
+              document: ../work-items/WI-0036-multiscale-yunet.md
+              started_at: '2026-08-06'
+              completed_at: '2026-08-07'
+              verified_at: '2026-08-07'
+              verified_by: human
+              last_updated_at: '2026-08-07'
+              branch: agent/WI-0036-multiscale-yunet
+              blockers:
+                - WI-0035
+              evidence:
+                - type: human_verification
+                  value: The completed confidence sweep established that threshold tuning alone is insufficient, activating governed multi-scale YuNet work on 2026-08-06.
+                - type: pull_request
+                  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/82
+                - type: human_verification
+                  value: The maintainer completed the governed multi-scale confidence-0.9 comparison on 2026-08-07. It failed the complete M16 gate but performed better than the single-pass confidence-0.9 baseline and single-pass confidence 0.8; detailed recall and category evidence remain private.
+                - type: human_verification
+                  value: The explicitly approved multi-scale confidence-0.7 follow-up returned more than 100 false or duplicate detections, far above the maximum of 10. Confidence 0.6 was intentionally not run because lowering the threshold could not plausibly repair the disqualifying workload.
+          '''
+
+          old_37 = '''  - id: WI-0037
+              title: Evaluate another face detector
+              milestone: M16
+              status: proposed
+              owner: unassigned
+              document: ../work-items/WI-0037-detector-candidate.md
+              blockers:
+                - WI-0036
+              evidence: []
+          '''
+          new_37 = '''  - id: WI-0037
+              title: Evaluate another face detector
+              milestone: M16
+              status: in_progress
+              owner: ai-agent
+              document: ../work-items/WI-0037-detector-candidate.md
+              started_at: '2026-08-07'
+              last_updated_at: '2026-08-07'
+              branch: agent/WI-0037-centerface-qualification
+              blockers:
+                - WI-0036
+              evidence:
+                - type: human_verification
+                  value: Governed multi-scale YuNet candidates failed the complete M16 gate, activating alternative-detector evaluation on 2026-08-07.
+                - type: pull_request
+                  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/84
+                - type: human_verification
+                  value: CenterFace ONNX was selected as the first qualification target; exact artifact, licence, training-data, tensor and Windows runtime evidence must be pinned before the private sample is processed.
+          '''
+
+          old_38 = '''  - id: WI-0038
+              title: Roll out the selected detector pipeline
+              milestone: M16
+              status: proposed
+              owner: unassigned
+              document: ../work-items/WI-0038-detector-rollout.md
+              blockers:
+                - WI-0036
+              evidence: []
+          '''
+          new_38 = '''  - id: WI-0038
+              title: Roll out the selected detector pipeline
+              milestone: M16
+              status: proposed
+              owner: unassigned
+              document: ../work-items/WI-0038-detector-rollout.md
+              blockers:
+                - WI-0037
+              evidence: []
+          '''
+
+          for label, old, new in (
+              ('WI-0036', old_36, new_36),
+              ('WI-0037', old_37, new_37),
+              ('WI-0038', old_38, new_38),
+          ):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one canonical {label} block, found {count}')
+              text = text.replace(old, new)
+
+          registry.write_text(text, encoding='utf-8', newline='\n')
+
+          revision = 'b82ec0c4844e89fd5a0305986aed9bdf33c72585'
+          artifact_url = (
+              'https://raw.githubusercontent.com/Star-Clouds/CenterFace/'
+              f'{revision}/models/onnx/centerface.onnx'
+          )
+          artifact_path = Path('/tmp/centerface.onnx')
+          urllib.request.urlretrieve(artifact_url, artifact_path)
+
+          data = artifact_path.read_bytes()
+          size = len(data)
+          digest = hashlib.sha256(data).hexdigest()
+          if size != 7_532_772:
+              raise SystemExit(f'Unexpected CenterFace size: {size}')
+
+          model = onnx.load(str(artifact_path), load_external_data=False)
+          onnx.checker.check_model(model)
+
+          def tensor_shape(value):
+              tensor_type = value.type.tensor_type
+              dims = []
+              for dim in tensor_type.shape.dim:
+                  if dim.HasField('dim_value'):
+                      dims.append(dim.dim_value)
+                  elif dim.HasField('dim_param'):
+                      dims.append(dim.dim_param)
+                  else:
+                      dims.append('?')
+              return dims
+
+          def tensor_type(value):
+              return onnx.TensorProto.DataType.Name(value.type.tensor_type.elem_type)
+
+          inputs = [
+              {
+                  'name': value.name,
+                  'type': tensor_type(value),
+                  'shape': tensor_shape(value),
+              }
+              for value in model.graph.input
+          ]
+          outputs = [
+              {
+                  'name': value.name,
+                  'type': tensor_type(value),
+                  'shape': tensor_shape(value),
+              }
+              for value in model.graph.output
+          ]
+          output_names = [item['name'] for item in outputs]
+          if output_names != ['537', '538', '539', '540']:
+              raise SystemExit(f'Unexpected CenterFace outputs: {output_names}')
+
+          opsets = ', '.join(
+              f"{item.domain or 'ai.onnx'}:{item.version}"
+              for item in model.opset_import
+          )
+
+          input_rows = '\n'.join(
+              f"| `{item['name']}` | `{item['type']}` | `{json.dumps(item['shape'])}` |"
+              for item in inputs
+          )
+          output_rows = '\n'.join(
+              f"| `{item['name']}` | `{item['type']}` | `{json.dumps(item['shape'])}` |"
+              for item in outputs
+          )
+
+          qualification = f'''# CenterFace 2019 ONNX qualification
+
+Status date: 2026-08-07
+
+State: **qualified for adapter design; not yet authorised for the private M16 sample**
+
+This record is the first implementation increment for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). It pins the exact upstream bytes and graph metadata without committing the model binary.
+
+## Exact artifact
+
+| Property | Value |
+|---|---|
+| Proposed model ID | `centerface-2019-fp32` |
+| Role | Face detection with five landmarks |
+| Upstream repository | `Star-Clouds/CenterFace` |
+| Source revision | `{revision}` |
+| Upstream path | `models/onnx/centerface.onnx` |
+| Git blob SHA | `1487d5fe214feb569865b225216b24c8f4ef1050` |
+| Byte size | `{size}` |
+| SHA-256 | `{digest}` |
+| Format/runtime target | ONNX / ONNX Runtime |
+| ONNX IR version | `{model.ir_version}` |
+| Opsets | `{opsets}` |
+
+The artifact was downloaded from the immutable revision during repository automation, hashed locally and discarded after inspection. Model bytes are not committed.
+
+## Graph contract
+
+### Inputs
+
+| Name | Element type | Shape |
+|---|---|---|
+{input_rows}
+
+### Outputs
+
+| Name | Element type | Shape |
+|---|---|---|
+{output_rows}
+
+The pinned upstream Python implementation binds outputs `537`, `538`, `539` and `540` as heatmap, scale, offset and landmarks respectively. The exact graph passes the ONNX checker under `onnx==1.18.0`.
+
+## Pinned upstream preprocessing and decoder evidence
+
+The reference implementation at the same revision:
+
+- rounds source width and height up to multiples of 32;
+- uses `blobFromImage` with scale `1.0`, zero mean, `swapRB=true` and no crop, producing RGB float32 NCHW input;
+- decodes heatmap locations at stride four;
+- exponentiates the two scale channels and multiplies by four;
+- applies offset channels to recover box centres;
+- decodes five landmark pairs relative to the recovered box; and
+- applies NMS at IoU `0.30`.
+
+These are implementation evidence, not yet the final application contract. The adapter must verify tensor axes, landmark order, clipping, resizing behavior and deterministic NMS independently.
+
+## Licence and training-data boundary
+
+The pinned repository contains a root MIT licence covering the supplied "Software" and does not state a separate exception for the committed ONNX file. The project records that as provisional model-weight evidence, not as legal advice or an automatic production approval.
+
+The upstream project reports WIDER FACE evaluation and the associated paper describes WIDER FACE training. This project does not assert a WIDER FACE dataset licence or a right to train or redistribute derived weights.
+
+Before production promotion or redistribution, the maintainer must accept the model-weight interpretation and the remaining training-data limitation. Failure to resolve that boundary blocks promotion even if local evaluation succeeds.
+
+## Remaining blockers
+
+1. Decide and document the governed input-shape policy. The exact graph is dynamic while the current model-manifest schema records a fixed width and height.
+2. Verify the anatomical order of both eyes, nose and both mouth corners against `sface-five-point-v1`.
+3. Create the immutable detector manifest only after the input policy and landmark semantics are fixed.
+4. Implement unit tests for tensor interpretation, decoding, clipping, coordinate mapping and deterministic NMS.
+5. Add integration coverage for exact-model selection, missing or mismatched bytes and durable run provenance.
+6. Pass a bounded Windows CPU smoke test before authorising the unchanged 100-photo comparison.
+
+## Decision
+
+Proceed with CenterFace adapter design. Do not process the private M16 sample and do not treat `centerface-2019-fp32` as an installable governed model until the remaining blockers are closed.
+'''
+          Path('docs/models/centerface-2019-qualification.md').write_text(
+              qualification,
+              encoding='utf-8',
+              newline='\n')
+
+          Path('.github/workflows/wi-0037-status-and-qualification.yml').unlink()
+          PY
+
+      - name: Generate delivery status
+        run: dotnet run --project tools/PhotoIdentity.Docs -- generate
+
+      - name: Validate living documentation
+        run: dotnet run --project tools/PhotoIdentity.Docs -- validate
+
+      - name: Verify generated documentation
+        run: dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+
+      - name: Commit transition and qualification
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Complete WI-0036 and start WI-0037"
+          git push origin HEAD:agent/WI-0037-centerface-qualification
