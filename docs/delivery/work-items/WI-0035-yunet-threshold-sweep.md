@@ -15,31 +15,33 @@ Determine whether confidence tuning alone can meet the M16 recall target while p
 
 ## Activation
 
-The fully reviewed YuNet confidence-0.9 baseline from WI-0034 did not meet the predeclared M16 decision target on 2026-08-05. Threshold tuning is therefore the selected detector experiment.
+The fully reviewed YuNet confidence-0.9 baseline from WI-0034 did not meet the predeclared M16 decision target on 2026-08-05. Threshold tuning was therefore selected as the first detector experiment.
 
-The `0.9` run is complete and remains immutable. Do not repeat it. PR [#74](https://github.com/erikwasa/Photo-Identity-Indexer/pull/74) completed the reusable comparison workflow, and WI-0040 completed the viewport-fitted exception-review workspace. The remaining threshold sweep reuses the frozen baseline ground truth and surfaces only unmatched, duplicate or ambiguous cases for review.
+The `0.9` run remains immutable. PR [#74](https://github.com/erikwasa/Photo-Identity-Indexer/pull/74) completed the reusable comparison workflow, and WI-0040 completed the viewport-fitted exception-review workspace. Every threshold candidate reused the frozen baseline ground truth and surfaced only unmatched, duplicate or ambiguous cases for review.
 
-Follow the Windows procedure in [Detector comparison runs](../../operations/detector-comparison-runs.md).
+The Windows procedure remains documented in [Detector comparison runs](../../operations/detector-comparison-runs.md).
 
-## Current progress
+## Final outcome
 
-Confidence `0.8` was processed in an isolated catalogue, compared against the frozen confidence-0.9 ground truth and fully reviewed by the maintainer on 2026-08-05. The candidate **failed the complete M16 gate**. Detailed counts and category evidence remain private.
+The maintainer completed isolated comparison runs for confidence `0.8`, `0.7`, `0.6` and `0.5` against the unchanged confidence-0.9 ground truth by 2026-08-06. Every candidate was fully reviewed and every complete M16 gate failed.
 
-The governed next candidate is confidence `0.7`. Do not rerun `0.8`; preserve its catalogue, logs, private comparison and export as the durable failed-candidate record.
+The baseline and all governed threshold candidates are retained as durable private evidence. Detailed counts, filenames, paths, images and category values remain private.
+
+No confidence threshold is approved for rollout. Threshold tuning is insufficient, so WI-0036 multi-scale YuNet is activated.
 
 ## Scope
 
 - Reprocess the exact WI-0034 sample in isolated databases and output directories.
 - Evaluate the fixed threshold grid: `0.8`, `0.7`, `0.6` and `0.5`.
 - Keep model, source revisions, preprocessing, padding and counting rules fixed.
-- Reuse the immutable confidence-0.9 ground-truth session for automatic comparison.
+- Reuse the immutable confidence-0.9 face-level ground truth for automatic comparison.
 - Compare recall, false detections, duplicates, background/unknown workload and review effort.
 - Review only unmatched, duplicate or ambiguous geometry unless a comparison invariant fails.
 - Do not write threshold experiments into the canonical reviewed catalogue.
 
 ## Reproducibility
 
-Every threshold run must retain:
+Every threshold run retained:
 
 - the same source-manifest hash;
 - the same 100 staged photos;
@@ -55,12 +57,12 @@ Every threshold run must retain:
 - [x] The `0.8` run retained exact configuration and model provenance.
 - [x] Automatic matching preserved baseline face-level ground truth for `0.8`.
 - [x] The `0.8` unmatched and ambiguous cases were reviewed without recounting every photo.
-- [ ] Every remaining governed threshold uses the same 100 photos and face-counting ground truth.
-- [ ] Each remaining run records exact configuration and model provenance.
-- [ ] The selected threshold is based on the predeclared M16 decision target.
-- [x] Existing reviewed identities were not changed by the `0.8` experiment.
-- [ ] A privacy-safe final comparison summary identifies whether threshold tuning is sufficient.
+- [x] Every remaining governed threshold used the same 100 photos and face-counting ground truth.
+- [x] Each remaining run recorded exact configuration and model provenance.
+- [x] The threshold decision was based on the predeclared M16 decision target.
+- [x] Existing reviewed identities were not changed by threshold experiments.
+- [x] A privacy-safe final comparison summary identifies that threshold tuning is insufficient.
 
-## Gate
+## Gate result
 
-When a threshold-only candidate passes, cancel WI-0036 and WI-0037 and continue to WI-0038. Confidence `0.8` failed, so continue with `0.7`. If the remaining governed threshold candidates also fail, or recorded evidence shows that lower thresholds cannot resolve the material failure category acceptably, continue to WI-0036.
+Every governed confidence from `0.9` through `0.5` failed the complete M16 gate. Preserve all private evidence, close WI-0035 and continue to WI-0036.
