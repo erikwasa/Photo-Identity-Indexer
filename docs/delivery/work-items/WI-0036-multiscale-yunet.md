@@ -15,13 +15,13 @@ Improve recall for small and distant faces by evaluating a governed full-image p
 
 ## Activation
 
-WI-0035 completed on 2026-08-06 after the immutable confidence-0.9 baseline and every governed threshold candidate from `0.8` through `0.5` failed the complete M16 gate. Confidence tuning alone is therefore insufficient.
+WI-0035 completed on 2026-08-06 after the immutable confidence-0.9 baseline and every governed threshold candidate from `0.8` through `0.5` failed the complete M16 gate. Confidence tuning alone was therefore insufficient.
 
-WI-0036 is active on `agent/WI-0036-multiscale-yunet`.
+The multi-scale implementation was delivered through pull request [#82](https://github.com/erikwasa/Photo-Identity-Indexer/pull/82).
 
-## Current implementation
+## Delivered implementation
 
-The first implementation increment adds an opt-in `full-image-plus-tiles` detector pipeline while retaining `single-pass` as the default for existing runs.
+The implementation adds an opt-in `full-image-plus-tiles` detector pipeline while retaining `single-pass` as the default for existing runs.
 
 The multi-scale path:
 
@@ -32,7 +32,7 @@ The multi-scale path:
 - merges full-image and tile detections with deterministic global non-maximum suppression; and
 - stores pipeline name, confidence, tile size, overlap and merge threshold in the durable processing-run configuration.
 
-The initial implementation defaults are:
+The governed defaults were:
 
 - pipeline: `full-image-plus-tiles`;
 - tile size: `1024` source pixels;
@@ -40,7 +40,37 @@ The initial implementation defaults are:
 - global merge IoU threshold: `0.30`; and
 - per-pass YuNet NMS: unchanged at `0.30`.
 
-These are governed experiment inputs, not an approved rollout configuration. The exact private 100-photo sample must still be processed and reviewed before the work item gate can be decided.
+## Governed evaluation
+
+Both multi-scale candidates used new isolated catalogues and output directories. The source set, source hashes, YuNet model revision, embedder revision, padding, face-counting ground truth and comparison IoU remained unchanged.
+
+### Confidence 0.9
+
+The first candidate used confidence `0.9` to isolate the pipeline change from the earlier threshold sweep.
+
+The maintainer completed the private comparison review on 2026-08-07. Multi-scale confidence `0.9` failed the complete M16 gate, although it performed better than the single-pass confidence-0.9 baseline and the single-pass confidence-0.8 candidate. Detailed counts and category evidence remain private.
+
+This result established that deterministic tiling recovered useful faces but was not sufficient at the conservative threshold.
+
+### Confidence 0.7 follow-up
+
+A single combined threshold-plus-multi-scale follow-up at confidence `0.7` was explicitly selected before processing because single-pass confidence `0.7` and `0.6` had produced the strongest recall results in WI-0035.
+
+The multi-scale confidence-0.7 run returned more than 100 false or duplicate detections across the fixed sample. That exceeds the M16 maximum of 10 by an order of magnitude and makes the complete gate impossible regardless of any recall improvement.
+
+Confidence `0.6` was therefore not run. Lowering the threshold further would predictably increase rather than resolve the already disqualifying false/duplicate workload, and another run would not be a proportionate use of review effort.
+
+## Final outcome
+
+No governed YuNet multi-scale configuration meets the complete M16 target:
+
+- confidence `0.9` improved recall relative to relevant earlier YuNet runs but still failed the complete gate;
+- confidence `0.7` produced more than 100 false or duplicate detections; and
+- confidence `0.6` was intentionally skipped under the predeclared stop rationale.
+
+The implementation remains available as an opt-in, exactly provenance-recorded experimental pipeline. It is not approved for canonical rollout.
+
+WI-0036 is complete as an evaluation work item. Continue to [WI-0037](WI-0037-detector-candidate.md) to qualify and evaluate a different face-detector family.
 
 ## Scope
 
@@ -53,20 +83,14 @@ These are governed experiment inputs, not an approved rollout configuration. The
 
 ## Acceptance criteria
 
-- [ ] Small-face information is not lost through unconditional whole-image square resizing alone.
-- [ ] Cross-tile duplicates are merged deterministically.
-- [ ] Output geometry remains valid in original-image normalised coordinates.
-- [ ] Automated tests cover mapping, overlap, duplicate suppression and deterministic ordering.
-- [ ] The same 100-photo sample reports recall, false detections, runtime and review effort.
+- [x] Small-face information is not lost through unconditional whole-image square resizing alone.
+- [x] Cross-tile duplicates are merged deterministically.
+- [x] Output geometry remains valid in original-image normalised coordinates.
+- [x] Automated tests cover mapping, overlap, duplicate suppression and deterministic ordering.
+- [x] The same 100-photo sample reports recall, false detections, runtime and review effort.
 
-## Governed evaluation
+## Privacy
 
-Use a new isolated catalogue and output directory. Keep the source set, source hashes, YuNet model revision, embedder revision, padding, face-counting ground truth and comparison IoU unchanged.
+The repository records only privacy-safe workflow conclusions. Detailed counts other than the disqualifying aggregate `100+` false-or-duplicate result, filenames, paths, source images, face boxes, category values, databases and comparison files remain outside Git.
 
-The first multi-scale candidate should use confidence `0.9` so the pipeline change is isolated from the failed threshold sweep. Any later combined threshold-plus-multi-scale candidate requires a separately recorded decision before processing.
-
-Follow [Multi-scale detector runs](../../operations/multiscale-detector-runs.md).
-
-## Gate
-
-When multi-scale YuNet passes, cancel WI-0037 and continue to WI-0038. Otherwise continue to WI-0037.
+Follow [Multi-scale detector runs](../../operations/multiscale-detector-runs.md) for the retained procedure and final decision record.
