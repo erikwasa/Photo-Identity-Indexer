@@ -88,6 +88,8 @@ jobs:
               evidence:
                 - type: human_verification
                   value: The completed confidence sweep established that threshold tuning alone is insufficient, activating governed multi-scale YuNet work on 2026-08-06.
+                - type: pull_request
+                  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/82
           '''
 
           old_38 = '''  - id: WI-0038
