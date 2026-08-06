@@ -33,7 +33,7 @@ try {
 
     $sha256Algorithm = [System.Security.Cryptography.SHA256]::Create()
     try {
-        $sha256 = ConvertTo-HexString -Bytes $sha256Algorithm.ComputeHash($modelBytes)
+        $sha256 = ConvertTo-HexString -Bytes ($sha256Algorithm.ComputeHash($modelBytes))
     }
     finally {
         $sha256Algorithm.Dispose()
@@ -46,7 +46,7 @@ try {
 
     $sha1Algorithm = [System.Security.Cryptography.SHA1]::Create()
     try {
-        $gitBlobSha1 = ConvertTo-HexString -Bytes $sha1Algorithm.ComputeHash($gitObjectBytes)
+        $gitBlobSha1 = ConvertTo-HexString -Bytes ($sha1Algorithm.ComputeHash($gitObjectBytes))
     }
     finally {
         $sha1Algorithm.Dispose()
