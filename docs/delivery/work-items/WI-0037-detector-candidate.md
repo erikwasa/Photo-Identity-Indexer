@@ -13,6 +13,12 @@ affected_modules: [Models, PhotoIdentity.Recognition.Onnx, Evaluation]
 
 Evaluate a governed detector candidate only when the fixed and multi-scale YuNet options remain below the M16 target.
 
+## Pre-screened candidates
+
+The planning-only [face detector candidate registry](../../models/face-detector-candidate-registry.md) records the initial technical, licensing, provenance and alignment screen for SCRFD, CenterFace, YOLO5Face, RetinaFace and rejected alternatives.
+
+The registry does not activate this work item or approve any model. Re-check upstream licences, artifact availability and source revisions before selecting a candidate, then pin one exact binary and pipeline under the normal model-governance rules.
+
 ## Scope
 
 - Select a candidate with an acceptable licence, provenance and local runtime path.
