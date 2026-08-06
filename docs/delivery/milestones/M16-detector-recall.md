@@ -18,7 +18,7 @@ The project measures detector recall on a bounded 100-photo sample and improves 
 - [WI-0034](../work-items/WI-0034-detector-recall-baseline.md) — measure the current detector on 100 photos
 - [WI-0035](../work-items/WI-0035-yunet-threshold-sweep.md) — determine whether confidence tuning is sufficient
 - [WI-0036](../work-items/WI-0036-multiscale-yunet.md) — evaluate full-image plus tiled YuNet because threshold tuning was insufficient
-- [WI-0037](../work-items/WI-0037-detector-candidate.md) — evaluate another detector only when multi-scale YuNet remains insufficient
+- [WI-0037](../work-items/WI-0037-detector-candidate.md) — qualify and evaluate another detector after multi-scale YuNet remained insufficient
 - [WI-0038](../work-items/WI-0038-detector-rollout.md) — safely roll out any changed detector pipeline
 
 ## Current implementation decision
@@ -33,7 +33,14 @@ WI-0040 was completed through PRs #79 and #80. The delivered workspace fits the 
 
 The confidence-0.9 YuNet baseline failed the predeclared M16 decision target on 2026-08-05. The maintainer then completed isolated confidence `0.8`, `0.7`, `0.6` and `0.5` comparisons against the same frozen face-level ground truth by 2026-08-06. Every governed threshold failed the complete M16 gate. Detailed counts and category evidence remain private.
 
-WI-0035 is complete and no threshold is approved for rollout. WI-0036 is active and adds an opt-in full-image plus deterministic overlapping-tile YuNet pipeline with aspect-preserving preprocessing, original-image coordinate mapping, global deterministic non-maximum suppression and durable pipeline provenance.
+WI-0036 delivered an opt-in full-image plus deterministic overlapping-tile YuNet pipeline through PR #82. The maintainer completed the governed private comparisons on 2026-08-07:
+
+- multi-scale confidence `0.9` failed the complete gate, although it performed better than the single-pass confidence-0.9 baseline and single-pass confidence `0.8`; and
+- multi-scale confidence `0.7` returned more than 100 false or duplicate detections, far above the maximum of 10.
+
+Confidence `0.6` was intentionally not run because a lower threshold could not plausibly repair the already disqualifying false/duplicate workload. No YuNet threshold or multi-scale configuration is approved for rollout.
+
+WI-0036 is complete and WI-0037 is active. CenterFace ONNX is the first qualification target because it provides five landmarks and a direct compact ONNX artifact without the explicit non-commercial pretrained-weight restriction attached to the higher-ranked SCRFD option. Exact artifact provenance, model-weight interpretation, WIDER FACE limitations, tensor semantics and Windows runtime compatibility must be pinned before the private sample is processed.
 
 This evaluation data remains separate from canonical identity review. Detector judgements must not create person assignments, rejection actions or synthetic identities.
 
@@ -46,12 +53,12 @@ This milestone is intentionally allowed to finish without completing every propo
 - WI-0034 established that confidence `0.9` does not meet the decision target.
 - WI-0039 completed reusable candidate-run matching and summaries in PR #74.
 - WI-0040 completed the viewport-fitted and cross-catalogue-safe comparison-review workflow in PRs #79 and #80.
-- WI-0035 established that every governed confidence from `0.9` through `0.5` fails the complete gate.
-- WI-0036 is now required and evaluates multi-scale YuNet against the same immutable sample and ground truth.
-- If WI-0036 meets the target, cancel WI-0037 and continue to WI-0038.
-- WI-0037 is required only when multi-scale YuNet remains below target.
+- WI-0035 established that every governed single-pass confidence from `0.9` through `0.5` fails the complete gate.
+- WI-0036 established that multi-scale confidence `0.9` still fails and that lowering multi-scale confidence to `0.7` creates an unacceptable false/duplicate workload.
+- WI-0037 is now required and qualifies a different detector family against the same immutable sample and ground truth.
+- WI-0038 remains blocked until WI-0037 identifies an acceptable pipeline.
 
-Cancelled work items mean the evidence showed that the work was unnecessary; they are not failures.
+Cancelled or skipped candidates mean the evidence showed that further work was unnecessary; they are not failures of the evaluation process.
 
 ## Decision target
 
