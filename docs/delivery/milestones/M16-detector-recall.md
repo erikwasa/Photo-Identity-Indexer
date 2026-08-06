@@ -27,9 +27,11 @@ The maintainer retained the 50 mechanically selected representative pilot photos
 
 The reusable detector-evaluation workspace was delivered through pull requests #70, #71, #72 and #74. It shows complete source photos including zero-detection cases, imports private source-group/category metadata, persists resumable ground-truth sessions, supports source-pixel zoom, freezes reusable face-level ground truth, validates isolated candidate catalogues and exports comparison summaries and the M16 gate.
 
-Pull requests #76 and #77 refined comparison review to one photo at a time, replaced internal comparison terminology with operator-facing decisions, added clear status treatment, introduced compact numbered reference/candidate markers and automatically classified candidate-free reference faces as detector misses. The remaining review-usability gap is source-aspect-ratio-driven page height: portrait and large images can still force repeated scrolling between overlays and decision fields. WI-0040 is ready to replace that vertical flow with a viewport-fitted split review workspace while preserving comparison data and metric semantics.
+Pull requests #76 and #77 refined comparison review to one photo at a time, replaced internal comparison terminology with operator-facing decisions, added clear status treatment, introduced compact numbered reference/candidate markers and automatically classified candidate-free reference faces as detector misses.
 
-The confidence-0.9 YuNet baseline was fully reviewed and evaluated on 2026-08-05. It did not meet the predeclared M16 decision target. WI-0034 and WI-0039 are complete, WI-0035 is active and WI-0040 is ready. The first threshold candidate is confidence `0.8`, processed in an isolated catalogue against the unchanged 100-photo set and compared with the frozen baseline ground truth.
+WI-0040 was completed through PRs #79 and #80. The delivered workspace fits the complete image and decisions into a stable viewport-bounded review surface, keeps decision overflow independent from the image, provides zoom and pan inspection, resets transient view state between photos, links image markers with decision controls and keeps comparison images readable across isolated catalogue switches when staged filename and full SHA-256 match. The maintainer tested the merged workflow on 2026-08-05 and confirmed that it works as expected.
+
+The confidence-0.9 YuNet baseline was fully reviewed and failed the predeclared M16 decision target on 2026-08-05. Confidence `0.8` was then processed in an isolated catalogue, fully reviewed against the frozen baseline and also failed the complete M16 gate. WI-0034, WI-0039 and WI-0040 are complete. WI-0035 remains active, and confidence `0.7` is the next governed candidate.
 
 This evaluation data is separate from canonical identity review. Detector judgements must not create person assignments, rejection actions or synthetic identities.
 
@@ -41,8 +43,8 @@ This milestone is intentionally allowed to finish without completing every propo
 
 - WI-0034 established that confidence `0.9` does not meet the decision target.
 - WI-0039 completed reusable candidate-run matching and summaries in PR #74.
-- WI-0040 improves the comparison-review workspace without changing threshold order, matching rules or gate arithmetic; complete it before substantial remaining exception review when practical.
-- WI-0035 evaluates `0.8`, followed only when needed by `0.7`, `0.6` and `0.5`.
+- WI-0040 completed the viewport-fitted and cross-catalogue-safe comparison-review workflow in PRs #79 and #80.
+- WI-0035 established that confidence `0.8` also fails and now evaluates `0.7`, followed only when needed by `0.6` and `0.5`.
 - If WI-0035 meets the target, cancel WI-0036 and WI-0037, then complete WI-0038.
 - If WI-0036 meets the target, cancel WI-0037, then complete WI-0038.
 - WI-0037 is required only when the governed YuNet options remain below target.
@@ -69,6 +71,7 @@ The pilot also records an optional count of correctly detected faces that appear
 - Private source-group and category metadata can be applied consistently across repeated detector runs.
 - Reusable face-level ground truth prevents full manual recounting for every threshold or detector candidate.
 - Comparison exceptions can be reviewed in a stable viewport-fitted workspace without page-level back-and-forth scrolling during the normal photo-to-photo loop.
+- Saved comparison images remain resolvable across isolated catalogue switches when verified source bytes are available.
 - Privacy-safe aggregate recall, false-detection and likely-background evidence is retained.
 - The first pipeline meeting the decision target is selected without unnecessary later work.
 - Any changed detector pipeline has explicit provenance and a safe canonical-catalogue rollout plan.

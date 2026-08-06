@@ -797,7 +797,9 @@ work_items:
       - WI-0039
     evidence:
       - type: human_verification
-        value: PR #74 completed reusable candidate-run matching and activated the fixed 0.8, 0.7, 0.6 and 0.5 YuNet threshold sweep; confidence 0.8 is the first candidate.
+        value: PR #74 completed reusable candidate-run matching and activated the fixed 0.8, 0.7, 0.6 and 0.5 YuNet threshold sweep; confidence 0.8 was the first candidate.
+      - type: human_verification
+        value: The maintainer completed review of the isolated confidence-0.8 candidate on 2026-08-05. It failed the complete M16 gate; detailed metrics and category evidence remain private, and confidence 0.7 is the next governed candidate.
   - id: WI-0036
     title: Add multi-scale YuNet detection
     milestone: M16
@@ -865,16 +867,29 @@ work_items:
   - id: WI-0040
     title: Build a viewport-fitted detector comparison review workspace
     milestone: M16
-    status: in_progress
+    status: completed
     owner: ai-agent
     document: ../work-items/WI-0040-detector-comparison-review-workspace.md
     started_at: '2026-08-05'
+    completed_at: '2026-08-05'
+    verified_at: '2026-08-05'
+    verified_by: human
     last_updated_at: '2026-08-05'
     branch: agent/WI-0040-viewport-review-workspace
     blockers:
       - WI-0039
     evidence:
       - type: human_verification
-        value: During active detector-comparison review on 2026-08-05, the maintainer observed repeated page-level scrolling between overlays and decision fields because source-image aspect ratios produce inconsistent page heights; the proposed viewport-fitted workspace is documented without private photo data.
+        value: During active detector-comparison review on 2026-08-05, the maintainer observed repeated page-level scrolling between overlays and decision fields because source-image aspect ratios produced inconsistent page heights; the viewport-fitted workspace was specified without private photo data.
       - type: pull_request
         value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/79
+      - type: merge_commit
+        value: 6e1da45196ac6888d4bb464d4bfd3b780b768124
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/80
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31045597984
+      - type: merge_commit
+        value: 7a6ad053ef452413a41e2cd284094f26c5968ca4
+      - type: human_verification
+        value: The maintainer tested the merged WI-0040 viewport-fitted review workflow and cross-catalogue comparison-photo fix on 2026-08-05 and confirmed that it works as expected.

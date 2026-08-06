@@ -1,8 +1,18 @@
 # Detector comparison runs
 
-Use this procedure after the WI-0039 comparison slice has been merged and the completed confidence-0.9 baseline session is still available in the private detector-evaluation root.
+Use this procedure for the governed M16 confidence sweep after WI-0039 and WI-0040 have been merged. The completed confidence-0.9 baseline session and frozen face-level ground truth must remain available in the private detector-evaluation root.
 
-Each candidate must use an isolated catalogue and the unchanged 100-photo evaluation set.
+Each candidate uses an isolated catalogue and the unchanged 100-photo evaluation set.
+
+## Current governed status
+
+- Confidence `0.9`: immutable baseline; fully reviewed; failed the M16 gate.
+- Confidence `0.8`: isolated candidate; fully reviewed on 2026-08-05; failed the M16 gate.
+- Confidence `0.7`: next candidate.
+- Confidence `0.6`: run only if still required.
+- Confidence `0.5`: run only if still required.
+
+Do not rerun completed candidates. Preserve their databases, logs, outputs, private comparisons and exports as durable evidence.
 
 ## Invariants
 
@@ -17,11 +27,13 @@ Keep these inputs unchanged for every candidate:
 - the padding ratio, which defaults to `0.25`; and
 - all other preprocessing configuration except for the confidence value being evaluated.
 
-The comparison API verifies the complete filename set and full SHA-256 revision hash for every source photo. A changed, missing, extra or duplicate source prevents comparison creation.
+Comparison creation verifies the complete filename set and full SHA-256 revision hash for every source photo. A changed, missing, extra or duplicate source prevents comparison creation.
 
-## Step 1: freeze the baseline before switching catalogues
+## Step 1: confirm the frozen baseline
 
-Run the application against the completed confidence-0.9 baseline catalogue and the existing private detector-evaluation root.
+The baseline ground truth is frozen once. Do not create a new baseline snapshot for each candidate.
+
+Run the application against the completed confidence-0.9 baseline catalogue and the existing private detector-evaluation root only when the snapshot still needs to be created or verified:
 
 ```powershell
 $publish = "C:\PhotoIdentity\M16\review-app"
@@ -41,19 +53,19 @@ Open:
 http://localhost:5080/detector-comparisons
 ```
 
-Select `M16 confidence 0.9 baseline` and choose **Freeze reusable ground truth**. Freezing succeeds only when all 100 baseline photos are complete and their arithmetic still matches:
+Select `M16 confidence 0.9 baseline`. If no frozen snapshot exists, choose **Freeze reusable ground truth**. Freezing succeeds only when all 100 baseline photos are complete and their arithmetic still matches:
 
 ```text
 countable_faces = correct_or_background_detections + manually_marked_misses
 ```
 
-The frozen snapshot copies accepted baseline detection boxes and manually marked missed-face boxes into a private immutable ground-truth file under:
+The snapshot is stored privately under:
 
 ```text
 <DetectorEvaluationRoot>\ground-truth
 ```
 
-After this succeeds, stop the application. The candidate catalogue does not need the baseline processing run, but it must use the same detector-evaluation root so the frozen snapshot remains available.
+After the snapshot exists, stop the application before switching catalogues. Candidate catalogues do not need the baseline processing run, but every review session must use the same detector-evaluation root.
 
 ## Step 2: process one confidence in an isolated catalogue
 
@@ -66,15 +78,15 @@ C:\PhotoIdentity\M16\runs\confidence-060\catalogue.db
 C:\PhotoIdentity\M16\runs\confidence-050\catalogue.db
 ```
 
-Never reuse or mutate the confidence-0.9 baseline catalogue. The source directory must contain the unchanged 100-photo set and nothing else.
+Never reuse or mutate the confidence-0.9 baseline catalogue. Do not overwrite a completed candidate catalogue. The source directory must contain the unchanged 100-photo set and nothing else.
 
-The following Windows PowerShell command processes the first candidate at confidence `0.8`. Change only `$confidence` and `$confidenceTag` for a later governed candidate.
+The following Windows PowerShell command processes confidence `0.7`, which is the next governed candidate after the failed `0.8` review. Change only `$confidence` and `$confidenceTag` when advancing to a later governed candidate.
 
 ```powershell
 $repo = "C:\Kod\codex\Photo Identity Indexer"
 $sample = "C:\PhotoIdentity\M16\sample"
-$confidence = 0.8
-$confidenceTag = "080"
+$confidence = 0.7
+$confidenceTag = "070"
 $candidateRoot = "C:\PhotoIdentity\M16\runs\confidence-$confidenceTag"
 $candidateDb = Join-Path $candidateRoot "catalogue.db"
 $candidateOutput = Join-Path $candidateRoot "outputs"
@@ -119,7 +131,7 @@ dotnet run `
     --run $runId
 ```
 
-The status must show that all intended photos completed successfully. Resume the same run after an interruption; do not start a replacement catalogue for the same candidate:
+All intended photos must complete successfully. Resume the same run after an interruption:
 
 ```powershell
 dotnet run `
@@ -130,21 +142,21 @@ dotnet run `
     --run $runId
 ```
 
-Run candidates in this order:
+The governed order is:
 
-1. `0.8` with tag `080`
-2. `0.7` with tag `070`
-3. `0.6` with tag `060`
-4. `0.5` with tag `050`
+1. `0.8` with tag `080` — completed and failed
+2. `0.7` with tag `070` — next
+3. `0.6` with tag `060` — only if required
+4. `0.5` with tag `050` — only if required
 
-Do not run later candidates merely to collect extra data after an earlier candidate has met the governed M16 target unless the milestone decision explicitly requires it.
+Stop the sweep as soon as a candidate meets the complete M16 gate, unless the milestone decision explicitly requires another governed run.
 
-## Step 3: attach a candidate run
+## Step 3: attach the completed candidate run
 
-Start the application against one completed candidate catalogue while retaining the same private detector-evaluation root.
+Start the application against the completed candidate catalogue while retaining the same private detector-evaluation root:
 
 ```powershell
-$candidateDb = "C:\PhotoIdentity\M16\runs\confidence-080\catalogue.db"
+$candidateDb = "C:\PhotoIdentity\M16\runs\confidence-070\catalogue.db"
 $evaluationRoot = "C:\PhotoIdentity\M16\private\evaluation-sessions"
 
 $env:PhotoIdentity__DatabasePath = $candidateDb
@@ -154,7 +166,7 @@ Set-Location -LiteralPath "C:\PhotoIdentity\M16\review-app"
 dotnet .\PhotoIdentity.Api.dll --urls "http://127.0.0.1:5080"
 ```
 
-Open `http://localhost:5080/detector-comparisons`, select the frozen baseline, select the candidate processing run and create a comparison such as `M16 confidence 0.8`.
+Open `http://localhost:5080/detector-comparisons`, select the frozen baseline, select the completed candidate processing run and create a comparison such as `M16 confidence 0.7`.
 
 Comparison creation:
 
@@ -166,17 +178,40 @@ Comparison creation:
 
 Clean one-to-one matches are counted automatically and do not appear in the manual queue.
 
-## Step 4: resolve only surfaced exceptions
+Saved comparisons use comparison-scoped photo URLs. When the original candidate revision is not present in the currently opened catalogue, the application can resolve the same staged filename with the complete frozen SHA-256. This allows an existing comparison to remain readable after switching back to the baseline or another isolated catalogue, provided the verified source photo is locally available.
+
+## Step 4: review one surfaced exception photo at a time
+
+The comparison workspace keeps the complete image and decisions visible together on desktop. The decision panel scrolls independently, while the image stays in view. On narrow screens, the image is bounded and save actions remain reachable.
+
+Use the overlay legend:
+
+- `R1`, `R2`, and so on are reference faces from the frozen baseline.
+- `C1`, `C2`, and so on are detections from the candidate run.
 
 For each exception photo:
 
-- match a candidate detection to one ground-truth face;
-- classify an unmatched candidate as `False detection`;
-- classify an additional detection of an already counted face as `Duplicate detection`;
-- mark a ground-truth face as missed when no candidate should match it; and
+- match a candidate detection to one reference face when they represent the same face;
+- classify an unmatched candidate as **False detection**;
+- classify an additional detection of an already counted face as **Duplicate detection**;
+- mark a reference face as missed when no candidate represents it; and
 - add neutral notes only when they help explain the correction.
 
-Manual matches are one-to-one. Every surfaced candidate and ground-truth node must be resolved before the comparison is complete. Corrections are saved atomically under:
+When a photo contains reference faces but no candidate review boxes, those reference faces are necessarily detector misses. The workspace counts them automatically and shows an informational completed row instead of redundant missed-face checkboxes. Use the normal save action to persist them.
+
+Manual matches are one-to-one. Every surfaced candidate and reference decision must be resolved before **Save and next** becomes available.
+
+Review controls:
+
+- **Previous** and **Next** move between exception photos.
+- **Save** persists the current corrections without leaving the photo.
+- **Save and next** persists a complete photo and advances.
+- **Fit** shows the complete image and is the default for every photo.
+- 100%, 200%, 400%, zoom-step and drag-to-pan support detail inspection.
+- Moving to another photo resets zoom, pan, decision-panel scroll and transient marker focus.
+- Selecting or focusing a decision highlights the associated `R` or `C` marker, and selecting a marker reveals its decision.
+
+Corrections are saved atomically under:
 
 ```text
 <DetectorEvaluationRoot>\comparisons
@@ -186,9 +221,9 @@ The application can be restarted and the comparison resumed without repeating au
 
 ## Step 5: assess and export the M16 gate
 
-After exception review, record whether a material failure category remains incompatible with the intended archive workflow. The gate remains `pending` until both conditions are true:
+After all exception photos are resolved, record whether a material failure category remains incompatible with the intended archive workflow. The gate remains `pending` until:
 
-- every exception node is resolved; and
+- every exception decision is resolved; and
 - the material-category assessment is recorded.
 
 The comparison calculates:
@@ -207,10 +242,15 @@ The fixed M16 target is:
 - no more than `10` false or duplicate detections; and
 - no material failure category.
 
-Use **Export summaries** to create a spreadsheet-compatible CSV. Keep the detailed comparison files and export private. Commit only privacy-safe aggregate evidence.
+Use **Export summaries** to create a spreadsheet-compatible CSV. Keep detailed comparison files and exports private. Commit only privacy-safe aggregate evidence.
+
+Record the candidate as passed or failed only after the complete gate is no longer pending. Do not infer which sub-gate failed in public documentation unless a privacy-safe aggregate decision explicitly records it.
 
 ## Step 6: proceed or stop
 
-When a confidence candidate meets the complete M16 gate, stop the threshold sweep and continue with the governed rollout work. When all four threshold candidates fail, use the recorded category evidence to decide whether WI-0036 multi-scale YuNet is required.
+- If the candidate passes the complete M16 gate, stop the threshold sweep and continue to the governed rollout work.
+- If it fails, preserve the candidate record and continue to the next governed threshold.
+- Confidence `0.8` has failed, so the next candidate is `0.7`.
+- When all governed threshold candidates fail, use the recorded private category evidence to decide whether WI-0036 multi-scale YuNet is required.
 
 Do not copy candidate detections into the canonical reviewed catalogue during comparison. Any accepted detector change still requires WI-0038 rollout and provenance controls.

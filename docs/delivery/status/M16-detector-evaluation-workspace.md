@@ -2,46 +2,38 @@
 
 Status date: 2026-08-05
 
-Status update branch: `agent/WI-0040-viewport-review-workspace`
+Status update branch: `agent/WI-0040-status-and-threshold-080`
 
 ## Current outcome
 
-The fixed private 100-photo set has been processed and fully reviewed with the pinned YuNet detector at confidence `0.9`. The detector-evaluation workspace retained the complete photo context, zero-detection photos, per-detection classifications, missed-face geometry, source groups and primary categories without changing canonical identity review state.
+The fixed private 100-photo set has been processed and fully reviewed with the pinned YuNet detector at confidence `0.9`. The detector-evaluation workspace retained complete photo context, zero-detection photos, per-detection classifications, missed-face geometry, source groups and primary categories without changing canonical identity review state.
 
-The completed confidence-0.9 baseline was evaluated against the predeclared M16 decision target on 2026-08-05 and **did not pass**. Detailed counts, filenames, paths, images and category values remain private. The immutable authored session is the reference ground truth for the threshold experiments.
+The completed confidence-0.9 baseline was evaluated against the predeclared M16 decision target on 2026-08-05 and **did not pass**. The immutable authored session remains the reference ground truth for threshold experiments.
 
-PR #74 merged the repeated-run comparison slice into `main` on 2026-08-05. PR #76 then changed exception review to one photo at a time with plain-language decisions and clearer status treatment. PR #77 added compact `R`/`C` markers and automatically classified candidate-free reference faces as detector misses. WI-0039 remains complete and WI-0035 remains active.
+Confidence `0.8` was then processed in an isolated catalogue, compared with the frozen baseline and fully reviewed by the maintainer on 2026-08-05. It also **failed the complete M16 gate**. Detailed counts, filenames, paths, images and category values remain private. WI-0035 remains active, and confidence `0.7` is the next governed candidate.
 
-Operator use of the refined comparison page identified one remaining workflow problem: source images still determine page height. Portrait and unusually large photos can force repeated browser-page scrolling between box markers and decision fields. WI-0040 implementation started on 2026-08-05 in branch `agent/WI-0040-viewport-review-workspace` and draft PR #79.
+WI-0040 is complete. PR #79 delivered the viewport-fitted comparison workspace, and PR #80 fixed comparison-photo retrieval across isolated catalogues. The maintainer tested the merged workflow on 2026-08-05 and confirmed that it works as expected.
 
 ## Delivered workspace
 
-### Slice 1 — merged in PR #70
+### Baseline authoring and export — PRs #70, #71 and #72
 
 - photo-level processing-run queries and no-cache API endpoints;
 - original-photo streaming without source paths;
-- stable ordering including zero-detection photos; and
-- detector overlays on the complete source photo.
-
-### Slice 2 — merged in PR #71
-
+- stable ordering including zero-detection photos;
+- detector overlays on the complete source photo;
 - private spreadsheet CSV import and immutable-run validation;
 - resumable private JSON sessions outside the catalogue;
 - correct, background/unknown, false and duplicate classifications;
 - direct missed-face geometry authoring;
-- per-photo completion arithmetic; and
-- spreadsheet-compatible export.
+- per-photo completion arithmetic;
+- spreadsheet-compatible export; and
+- Fit, 100%, 200% and 400% source-pixel zoom with panning and stable normalized geometry.
 
-### Large-image refinement — merged in PR #72
-
-- Fit, 100%, 200% and 400% source-pixel zoom;
-- scrollable panning and full-width focus mode; and
-- stable normalized detector and missed-face geometry at every zoom level.
-
-### Repeated-run comparison — merged in PR #74
+### Repeated-run comparison — PR #74
 
 - reusable face-level ground truth frozen from the completed baseline;
-- exact candidate-source validation by filename and SHA-256;
+- exact candidate-source validation by filename and full SHA-256;
 - deterministic intersection-over-union connected-component matching;
 - automatic handling of clean one-to-one matches;
 - exception review for unmatched, duplicate and ambiguous components;
@@ -49,7 +41,7 @@ Operator use of the refined comparison page identified one remaining workflow pr
 - overall, five-plus-face, source-group, category and M16 gate summaries; and
 - spreadsheet-compatible summary export.
 
-### Comparison-review clarity — merged in PRs #76 and #77
+### Comparison-review clarity — PRs #76 and #77
 
 - one exception photo at a time with previous, next and save-and-next actions;
 - operator-facing candidate/reference terminology and decision-completion status;
@@ -58,11 +50,7 @@ Operator use of the refined comparison page identified one remaining workflow pr
 - removal of internal component IDs from the operator workflow; and
 - automatic detector-miss classification when a photo has reference faces but no candidate review boxes.
 
-The delivered comparison capability is covered by synthetic integration tests for frozen ground truth, isolated catalogue attachment, changed-source rejection, correction persistence, restart recovery, metrics and gate export.
-
-## Active viewport-workspace implementation
-
-WI-0040 draft PR #79 currently implements:
+### Viewport-fitted review workspace — PR #79
 
 - a stable viewport-relative review area;
 - complete-image fitting by both available width and height without cropping;
@@ -75,23 +63,37 @@ WI-0040 draft PR #79 currently implements:
 - collapsed comparison metrics, summaries, instructions and qualitative-gate controls below the active workspace; and
 - a bounded narrow-screen layout with sticky save actions.
 
-The implementation preserves the existing comparison API, correction format, automatic-miss rules, matching, completion arithmetic, metrics and exports. Automated validation covers view-state reset, the published zoom/pan helper and responsive workspace styles. GitHub Actions and privacy-safe human review with representative portrait, landscape and multi-decision photos remain pending before completion.
+### Cross-catalogue comparison-photo retrieval — PR #80
+
+- comparison-scoped image URLs rather than raw candidate-revision URLs;
+- direct candidate-revision lookup when the original revision exists in the active catalogue;
+- fallback lookup by staged filename and complete frozen SHA-256 when another isolated catalogue is active;
+- validation that the requested photo belongs to the saved comparison;
+- retention of path-containment, file-size, reparse-point and media-type checks; and
+- integration coverage for restarting a saved comparison against the baseline catalogue.
+
+GitHub Actions build #495 passed the release build, complete test suite, living-document validation, generated-document verification, review-application smoke verification and Windows PowerShell mixed-media verification. Human verification then confirmed the merged WI-0040 workflow behaves as expected.
 
 ## Active next work
 
-WI-0035 continues the fixed confidence sweep against the unchanged 100-photo set. WI-0040 is now in progress and should be completed before substantial remaining manual exception review when practical; it does not change the governed threshold order or candidate-run preparation.
+WI-0035 continues the fixed confidence sweep against the unchanged 100-photo set.
 
-The immediate experiment steps remain:
+Completed governed candidates:
 
-1. start the application with the immutable confidence-0.9 catalogue and freeze its reusable ground truth;
-2. process the unchanged sample at confidence `0.8` into a new isolated catalogue and output directory;
-3. attach the `0.8` processing run to the frozen ground truth;
-4. resolve only the surfaced exceptions and record the material-category assessment;
-5. export and assess the M16 gate; and
-6. stop when the complete gate passes, otherwise continue in order with `0.7`, `0.6` and `0.5` as governed by the recorded result.
+1. confidence `0.9` baseline — failed;
+2. confidence `0.8` candidate — failed.
 
-The complete Windows commands and comparison workflow are documented in [`docs/operations/detector-comparison-runs.md`](../../operations/detector-comparison-runs.md).
+Next governed steps:
+
+1. process the unchanged sample at confidence `0.7` into a new isolated catalogue and output directory;
+2. attach the completed `0.7` processing run to the frozen confidence-0.9 ground truth;
+3. resolve only surfaced exception photos in the viewport-fitted comparison workspace;
+4. record the material-category assessment;
+5. export and assess the complete M16 gate; and
+6. stop if the gate passes, otherwise continue in order with `0.6` and `0.5` only as required.
+
+The complete Windows commands and current comparison workflow are documented in [`docs/operations/detector-comparison-runs.md`](../../operations/detector-comparison-runs.md).
 
 ## Privacy
 
-No private image names, source paths, face boxes, counts, ground-truth files, databases or detector outputs are committed. Repository evidence records only the fixed method, completed review, failed baseline gate, delivered comparison capability, privacy-safe usability findings and active governed work.
+No private image names, source paths, face boxes, counts, ground-truth files, databases or detector outputs are committed. Repository evidence records only the fixed method, completed reviews, pass/fail decisions, delivered comparison capability and active governed work.

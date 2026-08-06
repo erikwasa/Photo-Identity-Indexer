@@ -21,13 +21,12 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 - [**WI-0032 — Validate documentation from a clean setup**](../work-items/WI-0032-documentation-validation.md) — `in_progress`; owner: `human-maintainer`
 - [**WI-0035 — Tune YuNet confidence threshold**](../work-items/WI-0035-yunet-threshold-sweep.md) — `in_progress`; owner: `human-maintainer`
-- [**WI-0040 — Build a viewport-fitted detector comparison review workspace**](../work-items/WI-0040-detector-comparison-review-workspace.md) — `in_progress`; owner: `ai-agent`
 
 ## Recently completed
 
+- [**WI-0040 — Build a viewport-fitted detector comparison review workspace**](../work-items/WI-0040-detector-comparison-review-workspace.md) — `completed`; owner: `ai-agent`
 - [**WI-0039 — Build detector evaluation workspace**](../work-items/WI-0039-detector-evaluation-workspace.md) — `completed`; owner: `ai-agent`
 - [**WI-0034 — Measure baseline detector recall**](../work-items/WI-0034-detector-recall-baseline.md) — `completed`; owner: `human-maintainer`
-- [**WI-0031 — Rewrite operator and architecture documentation**](../work-items/WI-0031-documentation-rewrite.md) — `completed`; owner: `ai-agent`
 
 ## Next ready work
 
