@@ -1,18 +1,27 @@
 # M16 detector evaluation workspace status
 
-Status date: 2026-08-06
+Status date: 2026-08-07
 
-Active implementation branch: `agent/WI-0036-multiscale-yunet`
+Active implementation branch: `agent/WI-0037-centerface-qualification`
 
 ## Current outcome
 
 The fixed private 100-photo set has been processed and fully reviewed with the pinned YuNet detector at confidence `0.9`. That immutable baseline failed the predeclared M16 decision target and remains the reusable face-level ground truth.
 
-The maintainer subsequently completed isolated candidate runs at confidence `0.8`, `0.7`, `0.6` and `0.5` against the unchanged ground truth. Every candidate was fully reviewed and every complete M16 gate failed. Detailed counts, filenames, paths, images and category values remain private.
+The maintainer subsequently completed isolated single-pass candidate runs at confidence `0.8`, `0.7`, `0.6` and `0.5` against the unchanged ground truth. Every candidate was fully reviewed and every complete M16 gate failed. Detailed counts, filenames, paths, images and category values remain private.
 
-WI-0035 is complete. Threshold tuning alone is insufficient, and no confidence setting is approved for rollout.
+WI-0035 is complete. Threshold tuning alone is insufficient, and no single-pass confidence setting is approved for rollout.
 
-WI-0036 is active. Its first implementation increment introduces an opt-in full-image plus tiled YuNet pipeline while retaining the existing single-pass path as the default for compatibility.
+WI-0036 delivered the opt-in full-image plus tiled YuNet pipeline through PR #82 and is now complete as an evaluation work item.
+
+The maintainer completed two governed multi-scale runs on 2026-08-07:
+
+- confidence `0.9` failed the complete gate but performed better than the single-pass confidence-0.9 baseline and single-pass confidence `0.8`; and
+- confidence `0.7` returned more than 100 false or duplicate detections, making the maximum of 10 impossible.
+
+A confidence-0.6 multi-scale run was intentionally skipped because lowering the threshold could not plausibly resolve the already disqualifying false/duplicate workload. No YuNet multi-scale configuration is approved for rollout.
+
+WI-0037 is active. CenterFace ONNX is the first exact-model qualification target.
 
 ## Delivered evaluation workspace
 
@@ -61,7 +70,7 @@ WI-0036 is active. Its first implementation increment introduces an opt-in full-
 - bounded narrow-screen behavior; and
 - comparison-scoped image resolution across isolated catalogues using staged filename and full SHA-256 validation.
 
-## Active WI-0036 implementation
+## Completed WI-0036 implementation
 
 The multi-scale implementation provides:
 
@@ -76,20 +85,25 @@ The multi-scale implementation provides:
 
 Automated tests cover tile coverage, aspect preservation, mapping, cross-pass duplicate suppression, deterministic ordering, CLI parsing and legacy run-configuration compatibility.
 
-## Active next work
+The implementation remains available for reproducibility, but the private evaluation did not identify a rollout configuration.
 
-After implementation validation and merge:
+## Active WI-0037 qualification
 
-1. process the unchanged private 100-photo set into a new isolated multi-scale catalogue;
-2. use confidence `0.9`, tile size `1024`, overlap `0.20` and global merge IoU `0.30` for the first governed candidate;
-3. attach the completed run to the frozen confidence-0.9 face-level ground truth;
-4. resolve only surfaced exception photos;
-5. retain runtime and review-effort evidence in addition to the existing gate metrics;
-6. record the material-category assessment and export the complete M16 gate; and
-7. continue to WI-0038 if the candidate passes, otherwise continue to WI-0037.
+The first target is the exact upstream `centerface.onnx` file committed at `Star-Clouds/CenterFace@b82ec0c4844e89fd5a0305986aed9bdf33c72585`.
 
-The Windows procedure is documented in [`docs/operations/multiscale-detector-runs.md`](../../operations/multiscale-detector-runs.md).
+Before a full private comparison, the active work must:
+
+1. pin byte size and SHA-256 in an immutable detector manifest;
+2. document the root MIT licence, exact model-artifact interpretation and WIDER FACE training-data limitation separately;
+3. verify graph input and output semantics under the project's ONNX Runtime version;
+4. freeze resize, colour, scale, heatmap, box, landmark and NMS behavior;
+5. implement unit and integration coverage without weakening `sface-five-point-v1`; and
+6. pass a bounded Windows CPU smoke test.
+
+SCRFD remains technically attractive but is not the first target because InsightFace states an explicit non-commercial restriction for its supplied pretrained models. CenterFace promotion or redistribution also remains blocked until its model-weight and training-data considerations are accepted under the project's governance rules.
+
+The candidate screen is retained in [`docs/models/face-detector-candidate-registry.md`](../../models/face-detector-candidate-registry.md).
 
 ## Privacy
 
-No private image names, source paths, face boxes, counts, ground-truth files, databases or detector outputs are committed. Repository evidence records only the fixed method, completed reviews, aggregate pass/fail decisions, implementation capability and active governed work.
+No private image names, source paths, face boxes, detailed counts, ground-truth files, databases or detector outputs are committed. Repository evidence records only the fixed method, completed reviews, the aggregate `100+` false-or-duplicate conclusion, implementation capability and active governed work.
