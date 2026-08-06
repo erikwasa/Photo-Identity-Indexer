@@ -4,7 +4,11 @@ Candidate models are installed and evaluated alongside the accepted baseline. Th
 
 ## Detector candidate planning
 
-The planning-only [face detector candidate registry](face-detector-candidate-registry.md) pre-screens alternatives for WI-0037 without activating, installing or approving a detector. It records technical fit, licence and provenance blockers, alignment compatibility, screened-out options and the recommended evaluation order if multi-scale YuNet remains below the M16 target.
+The [face detector candidate registry](face-detector-candidate-registry.md) pre-screens alternatives for WI-0037. It records technical fit, licence and provenance blockers, alignment compatibility, screened-out options and the recommended evaluation order.
+
+WI-0037 became active on 2026-08-07 after governed multi-scale YuNet candidates failed the complete M16 gate. CenterFace ONNX is the first qualification target. The active [CenterFace qualification record](centerface-2019-qualification.md) pins the screened source, exact artifact evidence, graph contract and unresolved governance conditions before an adapter or full private-sample run is authorised.
+
+This qualification does not install or approve CenterFace automatically. A normal detector manifest, adapter tests and Windows smoke verification remain required before the exact model may process the M16 sample.
 
 ## Current candidate: SFace INT8
 
