@@ -119,7 +119,7 @@ internal static class YuNetTilePlanner
     }
 }
 
-internal readonly record struct YuNetPreprocessingTransform(
+internal sealed record YuNetPreprocessingTransform(
     ImageSize SourceImageSize,
     YuNetSourceRegion SourceRegion,
     ImageSize CanvasSize,
