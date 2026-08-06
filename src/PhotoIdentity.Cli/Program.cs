@@ -99,7 +99,9 @@ public static class Program
               batch start --database PATH --source DIR [--output DIR]
                           [--root PATH] [--model-dir DIR] [--non-recursive]
                           [--confidence 0..1] [--padding RATIO]
-                          [--max-attempts COUNT]
+                          [--detector-pipeline single-pass|full-image-plus-tiles]
+                          [--tile-size PIXELS] [--tile-overlap 0..<1]
+                          [--merge-nms 0..1] [--max-attempts COUNT]
               batch resume --database PATH --run RUN_ID [--max-attempts COUNT]
               batch status --database PATH --run RUN_ID
               batch cancel --database PATH --run RUN_ID
@@ -140,6 +142,9 @@ public static class Program
 
             Batch start scans a local folder, creates durable jobs for each current
             immutable revision and runs the production inspection pipeline until idle.
+            The default detector pipeline is single-pass. The optional
+            full-image-plus-tiles pipeline preserves aspect ratio for each pass, maps
+            tile detections to original-image coordinates and globally merges duplicates.
             Batch resume reconstructs the saved configuration and continues due work.
             Batch status reports durable progress counts. Batch cancel atomically
             cancels queued and active work and invalidates active leases.
