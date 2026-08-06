@@ -2,6 +2,10 @@
 
 Candidate models are installed and evaluated alongside the accepted baseline. They do not replace canonical people, assignments, rejections or review history, and they are never promoted from score evidence alone.
 
+## Detector candidate planning
+
+The planning-only [face detector candidate registry](face-detector-candidate-registry.md) pre-screens alternatives for WI-0037 without activating, installing or approving a detector. It records technical fit, licence and provenance blockers, alignment compatibility, screened-out options and the recommended evaluation order if multi-scale YuNet remains below the M16 target.
+
 ## Current candidate: SFace INT8
 
 The first governed candidate is the upstream INT8-quantised revision of the December 2021 SFace embedder.
