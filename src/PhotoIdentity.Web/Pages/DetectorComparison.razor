@@ -170,6 +170,7 @@ else
                                                     {
                                                         <option value="@($"match:{face.Id}")">Match to @ReferenceFaceLabel(photo, face.Id)</option>
                                                     }
+                                                    <option value="neutral">Neutral — legitimate detection outside countable scope</option>
                                                     <option value="false">False detection — not a countable face</option>
                                                     <option value="duplicate">Duplicate — same face detected again</option>
                                                 </select>
@@ -223,7 +224,7 @@ else
             <section class="comparison-metric-grid">
                 @MetricCard("Overall recall", Comparison.Overall.Recall, Comparison.Overall.MatchedFaces, Comparison.Overall.CountableFaces)
                 @MetricCard("Five-plus recall", Comparison.FivePlusFaces.Recall, Comparison.FivePlusFaces.MatchedFaces, Comparison.FivePlusFaces.CountableFaces)
-                <article><span>False + duplicate</span><strong>@(Comparison.Overall.FalseDetections + Comparison.Overall.DuplicateDetections)</strong><small>limit @Comparison.M16Gate.FalseOrDuplicateLimit</small></article>
+                <article><span>False + duplicate</span><strong>@(Comparison.Overall.FalseDetections + Comparison.Overall.DuplicateDetections)</strong><small>limit @Comparison.M16Gate.FalseOrDuplicateLimit · @Comparison.Overall.NeutralDetections neutral excluded</small></article>
                 <article class="@GateStatusClass(Comparison.M16Gate.Status)"><span>M16 gate</span><strong>@Comparison.M16Gate.Status.ToUpperInvariant()</strong><small>@GateDetail(Comparison.M16Gate)</small></article>
             </section>
             <section class="comparison-gate-card">
@@ -242,6 +243,7 @@ else
                     <p><strong>Candidate detection</strong> is a face box produced by the detector run being evaluated. Candidate boxes are orange and dashed.</p>
                     <p><strong>Reference face</strong> is a countable face retained from the reviewed baseline. Reference boxes are green.</p>
                     <p><strong>Automatically matched</strong> means the candidate and reference boxes formed a clear one-to-one match and need no action.</p>
+                    <p><strong>Neutral</strong> means the candidate is a legitimate face detection that is outside the fixed countable-face scope. It resolves the candidate without increasing recall and without counting as false or duplicate.</p>
                     <p>When a photo has reference faces to review but no candidate review boxes, those faces are counted as detector misses automatically. Use the missed-face checkbox only when candidate boxes are present but none represents that reference face.</p>
                 </div>
             </section>
