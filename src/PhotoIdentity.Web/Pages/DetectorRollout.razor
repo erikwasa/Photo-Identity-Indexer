@@ -88,7 +88,7 @@ else
                 <article class="rollout-review-card">
                     <header>
                         <div>
-                            <p class="eyebrow">Revision @item.AssetRevisionId[..Math.Min(12, item.AssetRevisionId.Length)]</p>
+                            <p class="eyebrow">Revision @ShortRevision(item.AssetRevisionId)</p>
                             <h2>Candidate @(item.CandidateIndex + 1)</h2>
                         </div>
                         @if (item.LatestResolution is { } latest)
