@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -172,6 +173,11 @@ public static class DetectorRolloutEndpoints
             candidateIndex < 0)
         {
             return BadRequest("The rollout candidate key is invalid.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Action))
+        {
+            return BadRequest("A resolution action is required.");
         }
 
         if (string.IsNullOrWhiteSpace(request.Actor))
