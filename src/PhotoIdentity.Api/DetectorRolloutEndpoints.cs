@@ -36,6 +36,7 @@ public static class DetectorRolloutEndpoints
 
         try
         {
+            _ = await rolloutRepository.GetPipelineHashAsync(parsedRunId, cancellationToken);
             ProcessingRunSummary processing = await processingRepository.GetRunSummaryAsync(parsedRunId, cancellationToken);
             CatalogueDetectorRolloutSummary rollout = await rolloutRepository.GetSummaryAsync(parsedRunId, cancellationToken);
             bool complete = rollout.CandidateCount == rollout.AppliedCount &&
@@ -73,6 +74,15 @@ public static class DetectorRolloutEndpoints
         if (!TryRunId(runId, out ProcessingRunId parsedRunId))
         {
             return BadRequest("The rollout run identifier is invalid.");
+        }
+
+        try
+        {
+            _ = await rolloutRepository.GetPipelineHashAsync(parsedRunId, cancellationToken);
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
         }
 
         IReadOnlyList<CatalogueDetectorRolloutPendingReview> pending =
