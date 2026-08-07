@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" />
+    <PackageReference Include="OpenCvSharp4" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
