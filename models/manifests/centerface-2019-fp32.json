@@ -20,7 +20,8 @@
     },
     "shapePolicy": {
       "kind": "dynamic-multiple-of",
-      "multipleOf": 32
+      "multipleOf": 32,
+      "maximumLongEdge": 1600
     }
   },
   "output": {
@@ -28,7 +29,7 @@
     "dimensions": null,
     "normalisation": "none",
     "distanceMetric": null,
-    "semantics": "CenterFace heatmap, scale, offset and five-landmark tensors exposed as ONNX outputs 537, 538, 539 and 540. The adapter decodes stride-4 boxes and landmarks and applies deterministic NMS."
+    "semantics": "CenterFace heatmap, scale, offset and five-landmark tensors exposed as ONNX outputs 537, 538, 539 and 540. The adapter downsizes only when the source long edge exceeds 1600 pixels, rounds each tensor dimension up to a multiple of 32, decodes stride-4 boxes and landmarks, and applies deterministic NMS."
   },
   "alignmentProtocol": null,
   "licences": {
