@@ -1,0 +1,169 @@
+@page "/detector-rollout"
+@page "/detector-rollout/{RunId}"
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<PageTitle>Detector rollout · Photo Identity</PageTitle>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Success))
+{
+    <div class="notice success" role="status">@Success</div>
+}
+
+@if (string.IsNullOrWhiteSpace(RunId))
+{
+    <section class="rollout-landing">
+        <p class="eyebrow">WI-0038 local migration</p>
+        <h1>Detector rollout review</h1>
+        <p>Open a rollout run created by the dedicated <code>rollout start</code> command. Ordinary batch runs are intentionally not accepted here.</p>
+        <div class="rollout-run-picker">
+            <label for="rollout-run-id">Rollout run ID</label>
+            <input id="rollout-run-id" @bind="RunInput" placeholder="00000000-0000-0000-0000-000000000000" />
+            <button type="button" @onclick="OpenRun">Open run</button>
+        </div>
+    </section>
+}
+else if (Loading)
+{
+    <section class="empty-state"><p>Loading rollout reconciliation…</p></section>
+}
+else if (Summary is null)
+{
+    <section class="empty-state"><p>The rollout run could not be loaded.</p></section>
+}
+else
+{
+    <section class="rollout-hero">
+        <div>
+            <p class="eyebrow">WI-0038 · occurrence reconciliation</p>
+            <h1>CenterFace rollout review</h1>
+            <p class="rollout-run-id">Run <code>@Summary.ProcessingRunId</code></p>
+            <p>This workspace resolves which stable face occurrence a detector candidate represents. It never assigns or changes a person.</p>
+        </div>
+        <aside class="rollout-safety-note">
+            <strong>Review and apply are separate</strong>
+            <p>Save ambiguous decisions here. Then run <code>rollout apply --database … --run @Summary.ProcessingRunId</code> to persist reviewed mappings from the stored candidate payload.</p>
+        </aside>
+    </section>
+
+    <section class="rollout-summary-grid" aria-label="Rollout summary">
+        <article><span>Revisions</span><strong>@Summary.SucceededRevisionCount / @Summary.RevisionCount</strong><small>@Summary.ProcessingStatus</small></article>
+        <article><span>Candidates</span><strong>@Summary.AppliedCount / @Summary.CandidateCount</strong><small>applied</small></article>
+        <article><span>Awaiting review</span><strong>@Summary.AwaitingReviewCount</strong><small>no decision yet</small></article>
+        <article><span>Ready to apply</span><strong>@Summary.ReadyToApplyCount</strong><small>reviewed, not applied</small></article>
+        <article><span>Deferred</span><strong>@Summary.DeferredCount</strong><small>still unresolved</small></article>
+        <article><span>Old unmatched</span><strong>@Summary.UnmatchedExistingCount</strong><small>retained unchanged</small></article>
+    </section>
+
+    <section class="rollout-review-toolbar">
+        <label for="rollout-actor">Review actor</label>
+        <input id="rollout-actor" @bind="Actor" disabled="@Busy" />
+        <button type="button" @onclick="LoadAsync" disabled="@Busy">Refresh</button>
+    </section>
+
+    @if (Pending.Count == 0)
+    {
+        <section class="empty-state rollout-empty">
+            <h2>No ambiguous candidates are awaiting application</h2>
+            @if (Summary.RolloutComplete)
+            {
+                <p>All detector candidates in this scoped run are applied. Continue with the pilot verification and rollback checks before any canonical rollout.</p>
+            }
+            else
+            {
+                <p>The processing run may still be running, failed, or waiting for a separate <code>rollout apply</code> invocation. Refresh the status after the terminal step.</p>
+            }
+        </section>
+    }
+    else
+    {
+        <section class="rollout-review-list">
+            @foreach (DetectorRolloutPendingReviewResponse item in Pending)
+            {
+                ReviewDraft draft = DraftFor(item);
+                <article class="rollout-review-card">
+                    <header>
+                        <div>
+                            <p class="eyebrow">Revision @ShortRevision(item.AssetRevisionId)</p>
+                            <h2>Candidate @(item.CandidateIndex + 1)</h2>
+                        </div>
+                        @if (item.LatestResolution is { } latest)
+                        {
+                            <span class="rollout-resolution-pill">Latest: @latest.Kind</span>
+                        }
+                    </header>
+
+                    <div class="rollout-visual-grid">
+                        <div class="rollout-source-panel">
+                            <h3>Source geometry</h3>
+                            <div class="rollout-source-frame">
+                                <img src="@item.SourceImageUrl" alt="Source revision for reconciliation" />
+                                <span class="rollout-box candidate" style="@CandidateStyle(item.CandidateBoundingBox)">C</span>
+                                @for (int optionIndex = 0; optionIndex < item.Options.Count; optionIndex++)
+                                {
+                                    DetectorRolloutOptionResponse option = item.Options[optionIndex];
+                                    <span class="rollout-box option" style="@CandidateStyle(option.BoundingBox)">O@(optionIndex + 1)</span>
+                                }
+                            </div>
+                            <p class="rollout-legend"><span>C</span> CenterFace candidate · <span>O</span> eligible existing occurrence</p>
+                        </div>
+
+                        <div class="rollout-candidate-panel">
+                            <h3>Candidate crop</h3>
+                            <img class="rollout-face-crop" src="@item.CandidateImageUrl" alt="Aligned CenterFace candidate crop" />
+                        </div>
+                    </div>
+
+                    <div class="rollout-options">
+                        <h3>Eligible existing occurrences</h3>
+                        @foreach (DetectorRolloutOptionResponse option in item.Options)
+                        {
+                            <div class="rollout-option-row">
+                                <img src="@option.CropImageUrl" alt="Existing reviewed face crop" />
+                                <div>
+                                    <strong>@OptionLabel(option)</strong>
+                                    <small><code>@option.FaceOccurrenceId</code></small>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="rollout-decision-grid">
+                        <label>
+                            Reconciliation decision
+                            <select @bind="draft.Action" disabled="@Busy">
+                                <option value="">Choose…</option>
+                                @foreach (DetectorRolloutOptionResponse option in item.Options)
+                                {
+                                    <option value="existing:@option.FaceOccurrenceId">Use @OptionLabel(option)</option>
+                                }
+                                <option value="new">This is a genuinely new face occurrence</option>
+                                <option value="defer">Defer — leave unresolved</option>
+                            </select>
+                        </label>
+                        <label>
+                            Note
+                            <input @bind="draft.Note" disabled="@Busy" placeholder="Optional reconciliation note" />
+                        </label>
+                        <button type="button" @onclick="() => SaveAsync(item)" disabled="@Busy">Save decision</button>
+                    </div>
+
+                    @if (item.LatestResolution is { } resolution)
+                    {
+                        <footer>
+                            Last saved by <strong>@resolution.Actor</strong> at @resolution.CreatedAtUtc.ToLocalTime().ToString("g")
+                            @if (!string.IsNullOrWhiteSpace(resolution.Note))
+                            {
+                                <span> · @resolution.Note</span>
+                            }
+                        </footer>
+                    }
+                </article>
+            }
+        </section>
+    }
+}

@@ -65,7 +65,7 @@ PR #94 implements the dedicated SQLite persistence boundary for detector migrati
 - a genuinely new face receives a new stable occurrence ID and an ordinal above the existing range rather than inheriting candidate ordering;
 - old occurrences with no CenterFace candidate are retained and never deleted by reconciliation;
 - an ambiguous candidate throws before catalogue mutation and is left for Slice 3 human resolution; and
-- the legacy `SqliteFaceCatalogueRepository.SaveInspectionAsync` path remains unchanged and is not an allowed detector-migration boundary.
+- the legacy `SqliteFaceCatalogueRepository.SaveInspectionAsync` path remains unchanged and is not an allowed detector-migration entry point.
 
 The migration and repository behavior are covered by SQLite integration tests, including version-7-to-8 schema upgrade, explicit old-face reuse, non-ordinal new-face allocation and ambiguity refusal. The existing historical migration fixtures are also kept forward-compatible with schema version 8.
 
@@ -83,36 +83,42 @@ PR #95 establishes the persistence contract needed to review and resume ambiguou
 
 These human actions resolve **face-occurrence identity only**. They never create or change a person label, and no detector, embedding or geometry score is allowed to assign a person automatically.
 
-This sub-slice still does **not** expose a rollout command or authorize a pilot. Its purpose is to make the next orchestration/review layer resumable without keeping model outputs only in memory or requiring inference to be repeated after human review.
-
 ### Slice 3B — rollout orchestration and local reconciliation review
 
-Next, connect the selected CenterFace pipeline to the rollout planner and the durable review state. The operator workflow must be able to:
+PR #96 implements the operator-facing rollout path on top of the Slice 1–3A contracts:
 
-- plan an explicitly scoped set of immutable asset revisions before canonical mutation;
-- inspect the old and candidate geometry on the same source revision;
-- confirm a proposed old-to-new face mapping;
-- select the correct old occurrence when geometry is ambiguous;
-- mark the candidate as a genuinely new occurrence; or
-- leave the case deferred without changing existing assignments.
+- `rollout start` accepts only explicitly named immutable asset revision IDs, either repeated with `--revision` or supplied one per line with `--revision-file`; it does not scan a source folder;
+- the rollout worker fixes the governed detector choice to CenterFace confidence `0.5`, `single-pass`, with SFace alignment/embedding, so threshold/model drift cannot be introduced through command-line options;
+- one durable processing job is created for each explicitly scoped immutable revision and may be resumed through `rollout resume`;
+- a persisted plan is reused on retry instead of replanning against a catalogue that may already contain some safely applied candidates;
+- **every candidate's aligned crop and embedding payload is persisted before any unambiguous candidate is applied**;
+- unambiguous one-to-one and new-face decisions are applied automatically only through the rollout orchestration boundary;
+- ambiguous candidates remain unapplied and are shown at `/detector-rollout/{RUN_ID}` with candidate/source geometry and only the planner-persisted old-face options;
+- the operator can select one eligible old occurrence, mark the candidate as genuinely new, or defer; no arbitrary face or person can be selected;
+- review and catalogue mutation are separate operations: `rollout apply` consumes the latest saved human decision and the persisted candidate payload without re-running detector/alignment/embedding inference;
+- a reviewed new-face application allocates beyond the existing ordinal range and is replay-safe if execution stops after face persistence but before the candidate applied marker;
+- `rollout status` distinguishes awaiting-review, ready-to-apply and deferred candidates and does not consider a deferred case complete; and
+- rollout status/review rejects ordinary batch runs without registered rollout pipeline provenance, while resume rejects the legacy batch configuration shape.
 
-The orchestration path must register the exact pipeline hash, persist each reconciliation plan and candidate payload before applying candidate results, apply only unambiguous decisions automatically, and resume without creating duplicate new occurrences. Resolved ambiguous candidates must be applied from their persisted candidate payload rather than by re-running inference.
+The browser workflow resolves occurrence identity only. Person labels, rejections, assignments and append-only review history remain outside reconciliation and are not modified automatically.
 
-Until this slice is implemented and tested, **do not run a CenterFace migration against either the canonical catalogue or a pilot copy**. The existing `batch start` command still uses the legacy ordinal-based writer.
+PR #96 does **not** authorize full-archive rollout. Once merged, it authorizes only the disposable pilot in Slice 4, using the selected CenterFace pipeline and an explicitly scoped revision list.
 
 ### Slice 4 — pilot migration and rollback verification
 
 After Slice 3B is merged:
 
-1. back up the canonical catalogue and generated-output roots;
-2. run the selected pipeline on a disposable copy of the established pilot/catalogue scope;
-3. apply only unambiguous reconciliations and complete the surfaced manual reconciliation queue;
-4. verify that reviewed assignments/rejections and their append-only history still refer to the same physical faces;
-5. verify genuinely new faces receive new occurrence IDs and enter normal review;
-6. confirm the selected pipeline still behaves consistently with the accepted M16 decision; and
-7. exercise rollback by discarding/restoring the pilot copy rather than deleting or rewriting historical review data in place.
+1. stop writers and make a recoverable copy of the canonical catalogue before testing;
+2. run the selected pipeline on a disposable database copy and a deliberately limited set of current immutable revisions;
+3. inspect every surfaced ambiguous mapping in the local rollout workspace;
+4. run `rollout apply` only after those decisions are saved and leave any uncertain case deferred;
+5. verify reviewed assignments/rejections and append-only history still refer to the same physical faces;
+6. verify genuinely new faces receive new occurrence IDs and enter ordinary face review;
+7. repeat status/resume/apply as appropriate and confirm no duplicate new occurrences are introduced;
+8. confirm the selected detector still behaves consistently with the accepted M16 decision; and
+9. exercise rollback by discarding/restoring the pilot copy rather than deleting or rewriting historical review data in place.
 
-Only after that verification may the full-archive local rollout be authorised.
+Only after that human-verified pilot may the full-archive local rollout be authorised.
 
 ## Invariants
 
@@ -125,6 +131,8 @@ Only after that verification may the full-archive local rollout be authorised.
 - Human reconciliation history is append-only and does not assign a person.
 - Candidate detector/crop/embedding payload is persisted before canonical mutation so reviewed decisions are resumable.
 - Pipeline provenance distinguishes material detector/preprocessing/configuration changes even when the ONNX bytes are unchanged.
+- A deferred ambiguity remains incomplete.
+- Ordinary batch runs are not valid detector-rollout runs.
 - Detailed private face geometry, filenames and migration decisions stay outside Git.
 
 ## Acceptance criteria
@@ -132,14 +140,14 @@ Only after that verification may the full-archive local rollout be authorised.
 - [x] Detector-pipeline identity distinguishes materially different detection behaviour at the contract level.
 - [x] A dedicated persistence boundary records pipeline identity with rollout detector results and durable reconciliation evidence.
 - [x] Ambiguous candidates can retain exact candidate inspection payload and append-only human resolution evidence without mutating person labels.
-- [ ] All detector-migration execution is routed through reconciliation so existing reviewed faces cannot silently change person because detection ordering changed.
-- [ ] New faces are surfaced and reviewable without overwriting existing occurrences.
-- [ ] Ambiguous reconciliation is operable through the local application/workflow and can be resumed safely.
+- [x] The dedicated detector-migration execution path is routed through reconciliation so existing reviewed faces cannot silently change person because detection ordering changed.
+- [x] New faces are surfaced and reviewable without overwriting existing occurrences.
+- [x] Ambiguous reconciliation is operable through the local application/workflow and can be resumed safely.
 - [ ] Pilot reprocessing passes the accepted detector target and catalogue-history invariants.
 - [ ] Operator documentation and an exercised procedure explain migration, rollback and evidence retention.
 
 ## Completion boundary
 
-WI-0038 remains in progress until the selected CenterFace pipeline has been safely applied to a pilot copy of the canonical catalogue, all ambiguous cases are reviewable, identity history invariants have been verified, and rollback has been exercised.
+WI-0038 remains in progress until the selected CenterFace pipeline has been safely applied to a pilot copy of the canonical catalogue, all ambiguous cases are reviewed or explicitly deferred, identity-history invariants have been verified, and rollback has been exercised.
 
-Do **not** run a full-archive canonical migration merely because WI-0037 passed the detector gate. The selected detector is the engineering target for this local rollout work; the legacy ordinal-based processing path is not a safe detector-replacement mechanism.
+Do **not** run a full-archive canonical migration merely because WI-0037 passed the detector gate or Slice 3B exists. The selected detector is the engineering target for this local rollout work; the legacy ordinal-based processing path is not a safe detector-replacement mechanism.

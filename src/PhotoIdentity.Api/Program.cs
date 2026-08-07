@@ -30,7 +30,11 @@ public partial class Program
         builder.Services.AddSingleton<SqliteCollectionQueryRepository>();
         builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
+        builder.Services.AddSingleton<SqliteProcessingRepository>();
+        builder.Services.AddSingleton<SqliteDetectorRolloutReviewRepository>();
+        builder.Services.AddSingleton<SqliteDetectorRolloutApplicationRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
+        builder.Services.AddSingleton<DetectorRolloutCropFileResolver>();
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
@@ -53,7 +57,8 @@ public partial class Program
         {
             if (context.Request.Path.StartsWithSegments("/api/review") ||
                 context.Request.Path.StartsWithSegments("/api/collections") ||
-                context.Request.Path.StartsWithSegments("/api/detector-evaluation"))
+                context.Request.Path.StartsWithSegments("/api/detector-evaluation") ||
+                context.Request.Path.StartsWithSegments("/api/detector-rollout"))
             {
                 context.Response.OnStarting(() =>
                 {
@@ -82,6 +87,7 @@ public partial class Program
         app.MapCollectionEndpoints();
         app.MapDetectorEvaluationEndpoints();
         app.MapDetectorEvaluationComparisonEndpoints();
+        app.MapDetectorRolloutEndpoints();
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();

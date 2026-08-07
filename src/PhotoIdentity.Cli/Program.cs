@@ -73,6 +73,10 @@ public static class Program
                     MatchCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
                     cancellationToken),
+                "rollout" => await DetectorRolloutCommandRunner.RunAsync(
+                    DetectorRolloutCommandOptions.Parse(args.Skip(1).ToArray()),
+                    output,
+                    cancellationToken),
                 _ => UnknownCommand(args[0], error),
             };
         }
@@ -105,6 +109,13 @@ public static class Program
               batch resume --database PATH --run RUN_ID [--max-attempts COUNT]
               batch status --database PATH --run RUN_ID
               batch cancel --database PATH --run RUN_ID
+
+              rollout start --database PATH --output DIR
+                            (--revision REVISION_ID [...] | --revision-file PATH)
+                            [--root PATH] [--model-dir DIR] [--max-attempts COUNT]
+              rollout resume --database PATH --run RUN_ID [--max-attempts COUNT]
+              rollout status --database PATH --run RUN_ID
+              rollout apply --database PATH --run RUN_ID
 
               bundle export --database PATH --revision REVISION_ID --job PATH
                             [--profile full-image|reduced-image|face-crops]
@@ -148,6 +159,15 @@ public static class Program
             Batch resume reconstructs the saved configuration and continues due work.
             Batch status reports durable progress counts. Batch cancel atomically
             cancels queued and active work and invalidates active leases.
+
+            Rollout start is a separate detector-migration path. It never scans a source
+            folder and accepts only explicitly named immutable catalogue revisions. The
+            detector is fixed to the governed CenterFace 0.5 single-pass pipeline. Every
+            revision persists its reconciliation plan and all candidate payloads before
+            any unambiguous result is applied. Ambiguous candidates remain pending human
+            review at /detector-rollout/{RUN_ID}; rollout apply persists reviewed choices
+            from the saved payload without re-running detector inference. The ordinary
+            batch command is not a detector-migration mechanism.
 
             Bundle export verifies a canonical immutable revision and writes a portable
             full-image, reduced-image or aligned face-crop job. Face-crop exports require
