@@ -17,9 +17,10 @@ Adopt the first detector pipeline that meets the M16 target without attaching ne
 
 WI-0037 completed on 2026-08-07 after the maintainer:
 
-- explicitly accepted the documented CenterFace model-weight/training-data uncertainty for local evaluation and private local rollout work;
-- completed the unchanged 100-photo comparison against the frozen WI-0034 ground truth; and
-- reported that CenterFace confidence `0.5`, `single-pass` passed the complete M16 gate.
+- explicitly accepted the documented CenterFace model-weight/training-data uncertainty for local evaluation;
+- completed the unchanged 100-photo comparison against the frozen WI-0034 ground truth;
+- reported that CenterFace confidence `0.5`, `single-pass` passed the complete M16 gate; and
+- instructed the project to continue with WI-0038 rollout engineering.
 
 The selected local pipeline is therefore:
 
@@ -32,7 +33,7 @@ The selected local pipeline is therefore:
 - SFace `sface-2021dec-fp32` using `sface-five-point-v1`; and
 - padding `0.25` for the existing local inspection workflow.
 
-This work remains local/private. The provisional pretrained-weight and training-data boundary is recorded in the CenterFace qualification record and is not converted into a redistribution approval by this rollout.
+The licence/training-data acceptance is explicitly for local evaluation. Proceeding with WI-0038 is an engineering instruction for this private local project; it does not broaden the licence conclusion or establish redistribution rights.
 
 ## Why rollout needs reconciliation
 
@@ -115,4 +116,4 @@ Only after that verification may the full-archive local rollout be authorised.
 
 WI-0038 remains in progress until the selected CenterFace pipeline has been safely applied to a pilot copy of the canonical catalogue, all ambiguous cases are reviewable, identity history invariants have been verified, and rollback has been exercised.
 
-Do **not** run a full-archive canonical migration merely because WI-0037 passed the detector gate. The selected detector is approved for this local rollout work; the current ordinal-based persistence behaviour is not yet safe for detector replacement.
+Do **not** run a full-archive canonical migration merely because WI-0037 passed the detector gate. The selected detector is the engineering target for this local rollout work; the current ordinal-based persistence behaviour is not yet safe for detector replacement.
