@@ -1,10 +1,10 @@
 # CenterFace detector runs
 
-Use this procedure for the first governed WI-0037 CenterFace candidate. It separates functional/runtime smoke verification from the immutable 100-photo M16 comparison so the smoke set cannot become an informal threshold-tuning set.
+Use this procedure for the governed WI-0037 CenterFace candidate. Functional/runtime smoke verification remains separate from the immutable 100-photo M16 comparison so smoke observations cannot become informal threshold tuning.
 
 ## Fixed candidate identity
 
-The first candidate is:
+The first candidate remains:
 
 - detector model `centerface-2019-fp32`;
 - SHA-256 `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe`;
@@ -18,17 +18,19 @@ The first candidate is:
 - padding `0.25`; and
 - unchanged `sface-five-point-v1` alignment.
 
-Do not change the confidence, maximum input edge, resize rule, NMS or landmark mapping during the first candidate run. A changed value is a separately approved candidate, not a retry of the same run.
+Do not change confidence, maximum input edge, resize rule, NMS or landmark mapping during runtime debugging. A changed value is a separately approved candidate.
 
-## Runtime correction after the first smoke
+## Smoke history and current stop rule
 
-The first five-image smoke run used ONNX Runtime and run ID `fbe99826-96ce-44af-b64f-3e6a3b8d93b1`. All five jobs failed before detector output because the pinned upstream ONNX artifact declares stale static input metadata equivalent to `10 x 3 x 32 x 32`. ONNX Runtime rejected the governed photo-dependent tensors.
+Three disposable five-image smoke runs are retained as evidence:
 
-That run is retained as runtime-compatibility evidence. It is **not** detector-quality evidence and does not justify changing confidence or preprocessing.
+1. `fbe99826-96ce-44af-b64f-3e6a3b8d93b1` — ONNX Runtime rejected the model's stale static input metadata.
+2. `8a74c35e-e214-47e6-ad47-176bebc6d7e3` — OpenCV DNN executed the graph but the adapter failed while copying four-dimensional output tensors.
+3. `84f6f779-5a56-4e85-8d41-ee8569dce4d2` — all five jobs completed after N-D marshalling was fixed, but visual review failed badly: one eight-person photo yielded eight faces, while other reviewed images yielded `593`, `633`, or one unusable detection/crop.
 
-The pinned upstream CenterFace reference executes this same ONNX artifact through OpenCV DNN with dimensions rounded to multiples of `32`. The project therefore keeps the same ONNX bytes, preprocessing, decoder, confidence and smoke images while changing only the execution runtime to OpenCV DNN.
+The third run is not detector-quality evidence and does not authorise the private 100-photo sample.
 
-Do not reuse the failed ONNX Runtime database for the corrected smoke.
+An independent CenterFace adapter documents problematic results when one OpenCV model instance is reused across calls. The current project correction therefore creates and disposes a fresh OpenCV `Net` for each image inference while keeping all candidate parameters unchanged.
 
 ## 1. Validate the implementation on Windows
 
@@ -54,9 +56,9 @@ dotnet run --project .\tools\PhotoIdentity.Docs --configuration Release --no-bui
 if ($LASTEXITCODE -ne 0) { throw "Generated documentation is stale." }
 ```
 
-Do not continue if the model-manifest, decoder, preprocessing or existing YuNet tests fail.
+Do not continue if the model-manifest, preprocessing, decoder or existing YuNet tests fail.
 
-## 2. Install and re-verify the exact model
+## 2. Re-verify the exact model
 
 ```powershell
 Set-Location -LiteralPath $repo
@@ -69,17 +71,15 @@ The installed file must still report SHA-256:
 
 `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe`
 
-Do not manually rename or substitute another CenterFace ONNX graph.
+Do not substitute another CenterFace ONNX graph.
 
-## 3. Repeat the bounded functional smoke through OpenCV DNN
+## 3. Repeat the bounded smoke with per-image OpenCV network state
 
-Use the same small disposable folder of roughly three to five representative images that are **not** part of the fixed M16 100-photo sample. The smoke test answers only whether the graph loads, inference completes, geometry is plausible and aligned crops are usable. Do not use it to tune confidence.
-
-Use a **new** root so the failed ONNX Runtime evidence remains intact:
+Use the same five disposable images and a **new** root. Keep every earlier smoke root intact.
 
 ```powershell
 $smokeSource = "C:\PhotoIdentity\M16\centerface-smoke-source"
-$smokeRoot = "C:\PhotoIdentity\M16\runs\centerface-smoke-opencv-050"
+$smokeRoot = "C:\PhotoIdentity\M16\runs\centerface-smoke-opencv-freshnet-050"
 $smokeDb = Join-Path $smokeRoot "catalogue.db"
 $smokeOutput = Join-Path $smokeRoot "outputs"
 $smokeLog = Join-Path $smokeRoot "batch-start.log"
@@ -108,11 +108,11 @@ Set-Location -LiteralPath $repo
     --detector-pipeline single-pass 2>&1 | Tee-Object -FilePath $smokeLog
 
 if ($LASTEXITCODE -ne 0) {
-    throw "CenterFace OpenCV DNN smoke processing failed."
+    throw "CenterFace per-image-network smoke processing failed."
 }
 ```
 
-Record the printed run ID and verify status:
+Record the run ID and inspect the result:
 
 ```powershell
 $smokeRunId = "REPLACE_WITH_PRINTED_RUN_ID"
@@ -127,25 +127,26 @@ dotnet run `
     --run $smokeRunId
 ```
 
-The smoke passes only when:
+The repeat smoke passes only when:
 
-- all intended images finish without OpenCV DNN/model errors;
-- the printed detector model is `centerface-2019-fp32`;
-- the detector confidence is `0.5` and pipeline is `single-pass`;
-- detected boxes are visually plausible on the disposable images;
-- a few generated `aligned.png` crops show the eyes, nose and mouth in sensible SFace alignment rather than mirrored or grossly displaced; and
-- runtime and memory behavior are practical enough to attempt the bounded 100-photo evaluation.
+- all five images complete without runtime errors;
+- detection counts are plausible for every disposable image rather than exploding after the first call;
+- the known eight-person group remains approximately correct rather than merely being the only valid first image;
+- boxes visually cover faces rather than arbitrary background regions;
+- several `aligned.png` crops show sensible, non-corrupted eye/nose/mouth geometry; and
+- no systematic upside-down, mirrored or indecipherable crops remain.
 
-Generated aligned crops are under the smoke output's `runs/<run-id>/assets/.../faces/.../aligned.png` hierarchy. Smoke evidence remains local; commit only the privacy-safe pass/fail conclusion.
+Generated aligned crops are under `outputs/runs/<run-id>/assets/.../faces/.../aligned.png`.
 
-If landmark alignment looks mirrored or otherwise systematically wrong, stop. Correct and re-review the mapping before touching the private M16 sample. Do not compensate by changing the identity model or alignment template.
+Do not tune confidence from these images. If the repeated run still produces hundreds of detections or corrupted crops, stop and investigate preprocessing/output semantics.
 
-## 4. Authorise the first M16 candidate
+## 4. Authorise the first M16 candidate only after smoke passes
 
 Before the full run, record that:
 
-- the current Windows build/tests and corrected OpenCV DNN smoke passed;
-- the exact model hash remained unchanged;
+- the current Windows build/tests pass;
+- the per-image-network smoke passes both functional and visual checks;
+- the exact model hash remains unchanged;
 - the maintainer accepts the documented repository/model-weight interpretation and unresolved WIDER FACE training-data limitation for this local evaluation; and
 - no smoke observation caused a threshold or preprocessing change.
 
@@ -163,8 +164,7 @@ $candidateDb = Join-Path $candidateRoot "catalogue.db"
 $candidateOutput = Join-Path $candidateRoot "outputs"
 $candidateLog = Join-Path $candidateRoot "batch-start.log"
 
-New-Item -ItemType Directory -Force `
-    -Path $candidateRoot,$candidateOutput | Out-Null
+New-Item -ItemType Directory -Force -Path $candidateRoot,$candidateOutput | Out-Null
 
 if (Test-Path -LiteralPath $candidateDb) {
     throw "Candidate catalogue already exists: $candidateDb"
@@ -192,55 +192,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 ```
 
-Record the run ID and confirm every intended photo completed:
-
-```powershell
-$runId = "REPLACE_WITH_PRINTED_RUN_ID"
-
-dotnet run `
-    --project .\src\PhotoIdentity.Cli `
-    --configuration Release `
-    --no-build `
-    -- `
-    batch status `
-    --database $candidateDb `
-    --run $runId
-```
-
-Resume that exact run after interruption rather than creating another candidate:
-
-```powershell
-dotnet run `
-    --project .\src\PhotoIdentity.Cli `
-    --configuration Release `
-    --no-build `
-    -- `
-    batch resume `
-    --database $candidateDb `
-    --run $runId
-```
+Record the run ID and confirm every intended photo completed before comparison.
 
 ## 6. Compare against the frozen ground truth
 
-Use the same detector-comparison workspace and private evaluation root used for WI-0035 and WI-0036:
-
-```powershell
-$evaluationRoot = "C:\PhotoIdentity\M16\private\evaluation-sessions"
-
-$env:PhotoIdentity__DatabasePath = $candidateDb
-$env:PhotoIdentity__DetectorEvaluationRoot = $evaluationRoot
-
-Set-Location -LiteralPath "C:\PhotoIdentity\M16\review-app"
-dotnet .\PhotoIdentity.Api.dll --urls "http://127.0.0.1:5080"
-```
-
-Open `http://localhost:5080/detector-comparisons`, select the immutable `M16 confidence 0.9 baseline`, select the completed CenterFace run and create a comparison whose name records `centerface-2019-fp32`, `opencv-dnn` and confidence `0.5`.
-
-Comparison creation must verify the exact source filename set and every source SHA-256 before review begins.
-
-Resolve only surfaced unmatched, duplicate or ambiguous cases. Retain runtime and review-effort evidence with the gate summary.
-
-The unchanged M16 gate is:
+Use the same detector-comparison workspace and private evaluation root used for WI-0035 and WI-0036. The unchanged M16 gate is:
 
 - overall recall at least `90%`;
 - five-plus-face recall at least `85%`;
@@ -249,10 +205,4 @@ The unchanged M16 gate is:
 
 ## Stop rule
 
-Review the complete confidence-`0.5` result before changing any parameter.
-
-- If it passes the complete M16 gate, stop candidate search and continue to WI-0038.
-- If it fails because of a clearly bounded confidence trade-off, predeclare one follow-up configuration before processing it.
-- If it fails materially, is operationally impractical or exposes a governance blocker, record the gap and return to the WI-0037 candidate registry.
-
-Do not run an unplanned confidence sweep.
+Review the complete confidence-`0.5` result before changing any parameter. Do not run an unplanned confidence sweep.
