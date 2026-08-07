@@ -6,6 +6,7 @@ using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Recognition.Onnx.CenterFace;
 using PhotoIdentity.Recognition.Onnx.Models;
 using PhotoIdentity.Recognition.Onnx.SFace;
 using PhotoIdentity.Recognition.Onnx.YuNet;
@@ -84,19 +85,7 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         string detectorPath = RequireModelFile(configuration.ModelDirectory, detectorManifest);
         string embedderPath = RequireModelFile(configuration.ModelDirectory, embedderManifest);
 
-        YuNetFaceDetector detector = new(
-            detectorManifest,
-            detectorPath,
-            new YuNetDetectorOptions
-            {
-                ConfidenceThreshold = configuration.ConfidenceThreshold,
-                PipelineMode = configuration.DetectorPipeline == LocalBatchConfiguration.MultiScaleDetectorPipeline
-                    ? YuNetDetectorPipelineMode.MultiScale
-                    : YuNetDetectorPipelineMode.SinglePass,
-                TileSize = configuration.TileSize,
-                TileOverlap = configuration.TileOverlap,
-                MergeNmsThreshold = configuration.MergeNmsThreshold,
-            });
+        IFaceDetector detector = CreateDetector(detectorManifest, detectorPath, configuration);
         try
         {
             SFaceFaceEmbedder embedder = new(embedderManifest, embedderPath);
@@ -111,7 +100,11 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         }
         catch
         {
-            detector.Dispose();
+            if (detector is IDisposable disposableDetector)
+            {
+                disposableDetector.Dispose();
+            }
+
             throw;
         }
     }
@@ -401,6 +394,53 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
                 File.Delete(temporaryPath);
             }
         }
+    }
+
+    private static IFaceDetector CreateDetector(
+        ModelManifest manifest,
+        string modelPath,
+        LocalBatchConfiguration configuration)
+    {
+        return manifest.ModelId switch
+        {
+            LocalBatchConfiguration.DefaultDetectorModelId => new YuNetFaceDetector(
+                manifest,
+                modelPath,
+                new YuNetDetectorOptions
+                {
+                    ConfidenceThreshold = configuration.ConfidenceThreshold,
+                    PipelineMode = configuration.DetectorPipeline == LocalBatchConfiguration.MultiScaleDetectorPipeline
+                        ? YuNetDetectorPipelineMode.MultiScale
+                        : YuNetDetectorPipelineMode.SinglePass,
+                    TileSize = configuration.TileSize,
+                    TileOverlap = configuration.TileOverlap,
+                    MergeNmsThreshold = configuration.MergeNmsThreshold,
+                }),
+            "centerface-2019-fp32" => CreateCenterFaceDetector(manifest, modelPath, configuration),
+            _ => throw new ModelManifestException(
+                $"No local detector adapter is registered for model '{manifest.ModelId}'."),
+        };
+    }
+
+    private static IFaceDetector CreateCenterFaceDetector(
+        ModelManifest manifest,
+        string modelPath,
+        LocalBatchConfiguration configuration)
+    {
+        if (configuration.DetectorPipeline != LocalBatchConfiguration.SinglePassDetectorPipeline)
+        {
+            throw new ModelManifestException(
+                "CenterFace currently supports only the 'single-pass' detector pipeline. " +
+                "Its bounded dynamic input-shape policy is defined by the model manifest.");
+        }
+
+        return new CenterFaceFaceDetector(
+            manifest,
+            modelPath,
+            new CenterFaceDetectorOptions
+            {
+                ConfidenceThreshold = configuration.ConfidenceThreshold,
+            });
     }
 
     private static ModelManifest RequireManifest(
