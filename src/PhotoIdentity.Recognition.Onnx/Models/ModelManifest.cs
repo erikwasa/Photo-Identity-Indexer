@@ -349,17 +349,17 @@ public static class ModelManifestValidator
 
                 break;
             case "dynamic-multiple-of":
-                if (input.ShapePolicy.MultipleOf <= 0)
+                if (input.ShapePolicy.MultipleOf is null or <= 0)
                 {
                     errors.Add("dynamic-multiple-of input shapePolicy requires a positive multipleOf.");
                 }
 
-                if (input.ShapePolicy.MaximumLongEdge <= 0)
+                if (input.ShapePolicy.MaximumLongEdge is null or <= 0)
                 {
                     errors.Add("dynamic-multiple-of input shapePolicy requires a positive maximumLongEdge.");
                 }
 
-                if (input.ShapePolicy.MultipleOf > 0 &&
+                if (input.ShapePolicy.MultipleOf is > 0 &&
                     (input.Width % input.ShapePolicy.MultipleOf.Value != 0 ||
                      input.Height % input.ShapePolicy.MultipleOf.Value != 0))
                 {
