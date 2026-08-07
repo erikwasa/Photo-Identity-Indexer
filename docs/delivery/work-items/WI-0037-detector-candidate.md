@@ -92,7 +92,7 @@ The smoke set must not contain the fixed M16 sample photos and must not be used 
 ## Acceptance criteria
 
 - [x] Candidate licensing and training-data limitations are documented.
-- [x] Exact model and pipeline provenance is immutable for the first candidate.
+- [x] Exact model and first-candidate preprocessing provenance is pinned by model hash, checked-in manifest and implementation revision.
 - [ ] The comparison uses unchanged source photos and ground truth.
 - [x] No score automatically becomes a canonical person label.
 - [ ] A human-reviewed recommendation identifies the first acceptable pipeline.
@@ -107,7 +107,7 @@ Do not run CenterFace on the complete private sample until:
 4. human smoke review confirms plausible boxes and aligned five-point crops; and
 5. the maintainer accepts the documented licence/training-data uncertainty for local evaluation.
 
-When the candidate becomes runnable, use a new isolated candidate catalogue, output directory and log. The existing run configuration persists exact detector ID, hash, confidence and pipeline; the immutable detector manifest persists the input-shape and decoder policy.
+When the candidate becomes runnable, use a new isolated candidate catalogue, output directory and log. The durable run configuration records detector model ID, confidence and pipeline, while persisted detections/results carry the detector model hash. Record the exact repository commit with the private candidate log because the bounded input policy lives in the checked-in manifest and adapter implementation.
 
 ## Gate
 
