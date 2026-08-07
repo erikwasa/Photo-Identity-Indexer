@@ -2,7 +2,7 @@
 
 Status date: 2026-08-07
 
-State: **exact artifact verified; OpenCV DNN functional smoke completed successfully; human box/alignment review pending**
+State: **exact artifact verified; runtime executes; visual smoke failed; per-image OpenCV network isolation awaiting repeat smoke**
 
 This record is the active qualification evidence for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). Model bytes remain outside Git.
 
@@ -20,62 +20,80 @@ This record is the active qualification evidence for [WI-0037](../delivery/work-
 | SHA-256 | `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe` |
 | Format/runtime | ONNX / OpenCV DNN |
 
-The maintainer ran [`models/inspect-centerface-candidate.ps1`](../../models/inspect-centerface-candidate.ps1) on Windows on 2026-08-07. The immutable download matched the expected byte size and Git blob identity and produced the SHA-256 above. The checked-in [`centerface-2019-fp32` manifest](../../models/manifests/centerface-2019-fp32.json) pins those exact bytes.
+The maintainer verified the immutable download on Windows with `models/inspect-centerface-candidate.ps1`. The checked-in manifest pins these exact bytes.
 
-## Runtime compatibility findings
+## Governed candidate
 
-The first disposable five-image smoke run used ONNX Runtime at confidence `0.5`, `single-pass`, with the governed dynamic multiple-of-32 input policy. All five jobs failed before detector output was produced. The durable run ID was `fbe99826-96ce-44af-b64f-3e6a3b8d93b1`.
+The first candidate remains unchanged throughout the runtime/debugging work:
 
-The persisted errors showed that the pinned ONNX graph declares static input metadata equivalent to `10 x 3 x 32 x 32`. ONNX Runtime therefore rejected the intended project inputs such as `1 x 3 x 1216 x 1600`, `1 x 3 x 1280 x 1280` and other bounded photo-dependent shapes.
-
-This failure is a runtime-contract incompatibility, not detector-quality evidence. It does not justify changing confidence, preprocessing or the private evaluation sample.
-
-The pinned upstream CenterFace Python reference loads this same ONNX artifact through OpenCV DNN, rounds image dimensions up to multiples of `32`, builds an RGB float32 blob at the resulting dimensions and requests outputs `537`, `538`, `539` and `540`. The project therefore kept the exact model bytes and governed preprocessing/decoder semantics but switched the execution runtime from ONNX Runtime to OpenCV DNN.
-
-The second disposable five-image smoke run used OpenCV DNN with durable run ID `8a74c35e-e214-47e6-ad47-176bebc6d7e3`. OpenCV DNN accepted the governed photo-dependent inputs and reached real CenterFace output `537` on all five jobs. Every job then failed in the managed adapter with `CenterFace output '537' could not be read as float32 data.`
-
-That second failure exposed an output-marshalling bug rather than a graph or detector-quality failure. OpenCvSharp's `Mat.GetArray<T>` convenience path sizes its destination from the two-dimensional `Rows * Cols` view, while CenterFace DNN outputs are four-dimensional `[N,C,H,W]` tensors. PR #89 replaced that 2-D convenience path with explicit N-D shape validation and contiguous float-buffer copying. The exact model, runtime, preprocessing, decoder and confidence remained unchanged.
-
-The third disposable five-image smoke run used the N-D marshalling correction with durable run ID `84f6f779-5a56-4e85-8d41-ee8569dce4d2`. It completed successfully: all five intended images were processed, with `5` succeeded, `0` failed and no cancelled jobs at confidence `0.5`, `single-pass`, using `centerface-2019-fp32` with `sface-2021dec-fp32` and padding `0.25`.
-
-This third run clears the functional graph-execution, required-output-copy and batch-processing gates. It does not yet clear the human geometry gate: detected boxes and several generated `aligned.png` crops must still be visually checked for plausible face localisation and correct eye/nose/mouth alignment before the private 100-photo comparison is authorised.
-
-Both failed smoke catalogues and the successful third smoke catalogue remain retained as runtime/adapter evidence. The first two are not detector-quality results; the third is functional smoke evidence only and must not be used for confidence tuning.
-
-## Governed input policy
-
-CenterFace's upstream implementation accepts source-dependent input dimensions. Treating it as a fixed `640x640` model would incorrectly hide preprocessing changes under one model identity.
-
-The first governed project revision records:
-
-- `640x640` as a reference manifest size, not a forced runtime tensor size;
+- detector `centerface-2019-fp32`;
+- confidence `0.5`;
+- detector pipeline `single-pass`;
 - RGB float32 input, scale `1.0`, zero mean;
-- source long edge bounded to `1600` pixels before multiple rounding;
-- each bounded dimension rounded up to a multiple of `32`;
-- direct bilinear resize to that runtime tensor; and
-- the resulting input-shape policy in the checked-in model manifest.
+- source long edge bounded to `1600` before dimensions are rounded up to multiples of `32`;
+- deterministic CenterFace IoU `0.30` NMS;
+- embedder `sface-2021dec-fp32`;
+- padding `0.25`; and
+- `sface-five-point-v1` alignment.
 
-Rounding can make the final runtime tensor dimension slightly greater than `1600`; the `1600` limit applies before rounding to the required multiple of `32`.
+Do not change confidence, preprocessing, NMS or landmark mapping while diagnosing runtime correctness. A changed value is a separate governed candidate.
 
-Changing the maximum edge, resize rule or multiple later is a new governed pipeline revision and must not be presented as the same evaluation configuration.
+## Upstream contract
 
-## Decoder contract
+The pinned upstream Python implementation:
 
-The pinned upstream implementation:
-
+- rounds input height and width up to multiples of `32`;
+- uses `cv2.dnn.blobFromImage` with scale `1.0`, zero mean, `swapRB=True`, and no crop;
 - requests outputs `537`, `538`, `539` and `540` as heatmap, scale, offset and landmarks;
-- decodes heatmap positions at stride four;
-- exponentiates the two scale channels and multiplies by four;
-- treats scale channel zero as height and channel one as width;
-- treats offset channel zero as vertical and channel one as horizontal;
-- decodes five landmark pairs relative to each recovered box; and
-- applies non-maximum suppression at IoU `0.30`.
+- thresholds the heatmap with strict `score > threshold` semantics;
+- decodes at stride four;
+- uses scale channel zero as height and channel one as width;
+- uses offset channel zero as vertical and channel one as horizontal;
+- decodes five landmark pairs relative to the recovered box; and
+- applies NMS at IoU `0.30`.
 
-The project adapter freezes those semantics and adds deterministic candidate ordering and suppression. It fails closed when required outputs are missing, have unexpected shapes or cannot be read as float32.
+The project decoder freezes those semantics and adds deterministic ordering.
+
+## Runtime findings
+
+### Smoke 1 — ONNX Runtime static-input incompatibility
+
+Run `fbe99826-96ce-44af-b64f-3e6a3b8d93b1` used the governed five disposable images. All five jobs failed before detector output because the pinned ONNX graph exposes stale static input metadata equivalent to `10 x 3 x 32 x 32`. ONNX Runtime rejected the intended photo-dependent tensors.
+
+This was a runtime-contract incompatibility, not detector-quality evidence. The project therefore switched execution to OpenCV DNN, matching the pinned upstream reference while retaining the exact model bytes and candidate parameters.
+
+### Smoke 2 — N-D output marshalling bug
+
+Run `8a74c35e-e214-47e6-ad47-176bebc6d7e3` reached real CenterFace output `537` on all five jobs, then failed while copying the four-dimensional OpenCV tensors through a two-dimensional `Mat.GetArray<T>` convenience path.
+
+PR #89 replaced that path with explicit N-D shape validation and contiguous float-buffer copying. No candidate parameter changed.
+
+### Smoke 3 — processing completed, visual review failed
+
+Run `84f6f779-5a56-4e85-8d41-ee8569dce4d2` completed all five jobs at the unchanged candidate settings: `5` succeeded and `0` failed.
+
+That processing completion **does not qualify the detector**. Human review found severe cross-image instability:
+
+- one group photo with eight people produced eight detected faces;
+- one photo with two people produced `593` detections, with some generated crops upside down;
+- one photo with one person produced `633` detections; and
+- one photo with four people produced only one unusable/indecipherable face crop.
+
+This decisively fails the visual smoke gate. Do not process the fixed 100-photo M16 sample from this implementation and do not interpret the counts as a threshold trade-off.
+
+## OpenCV network-lifetime finding
+
+An independent CenterFace adapter in DeepFace documents that reusing its OpenCV DNN model across calls produces problematic results from the second call, and works around the problem by rebuilding the CenterFace model for each image.
+
+The project implementation had likewise retained one `OpenCvSharp.Dnn.Net` for the full detector lifetime, so a batch reused the same native network across images and changing source dimensions. The observed sequence — a plausible first image followed by hundreds of nonsensical detections — is consistent with that documented failure mode.
+
+The current correction stores only the model path and creates/disposes a fresh OpenCV `Net` inside each inference call. This isolates native graph state per image while keeping model bytes, preprocessing, confidence, decoder, NMS and landmarks unchanged.
+
+This is still a hypothesis until the same disposable five-image smoke is repeated successfully and visually reviewed.
 
 ## Alignment compatibility
 
-CenterFace emits five points. The project mapping is frozen as:
+CenterFace emits five landmarks. The project currently maps them as:
 
 1. anatomical right eye;
 2. anatomical left eye;
@@ -83,22 +101,11 @@ CenterFace emits five points. The project mapping is frozen as:
 4. anatomical right mouth corner; and
 5. anatomical left mouth corner.
 
-The project maps these native points into `NormalizedFaceLandmarks` and leaves `sface-five-point-v1` unchanged. Synthetic tests lock the mapping and box/landmark math. A Windows smoke run must still visually confirm plausible aligned crops before the private 100-photo comparison.
-
-## Detector selection and provenance
-
-The local batch worker chooses a detector adapter by exact detector model ID:
-
-- `yunet-2023mar-fp32` retains the existing single-pass and multi-scale behavior;
-- `centerface-2019-fp32` uses the CenterFace adapter through OpenCV DNN and only permits `single-pass`.
-
-The exact CenterFace ONNX SHA-256 is unchanged by the runtime and marshalling corrections. The manifest runtime field records `opencv-dnn`; a future change back to another execution runtime is a governed pipeline change and must not be silently compared as if identical.
-
-The durable batch configuration records detector model ID, confidence and pipeline, while persisted face observations and results record the detector model hash. Record the exact repository commit with each private candidate run because runtime/preprocessing semantics are defined by the checked-in manifest and adapter implementation.
+Synthetic tests cover the mapping and box/landmark math. Because smoke 3 produced corrupted detections after the first image, the upside-down crops are not sufficient evidence by themselves to change the landmark mapping. Re-evaluate alignment only after network-state isolation removes the cross-image corruption.
 
 ## Licence and training-data boundary
 
-The pinned repository contains a root MIT licence covering the supplied "Software" and does not state a separate exception for the committed ONNX file. The manifest deliberately records the weight licence as `LicenseRef-CenterFace-Repository-MIT-Provisional` rather than asserting a definitive standalone pretrained-weight licence.
+The pinned repository contains a root MIT licence covering the supplied software and does not state a separate exception for the committed ONNX file. The manifest deliberately records the weight licence as `LicenseRef-CenterFace-Repository-MIT-Provisional` rather than asserting a definitive standalone pretrained-weight licence.
 
 The upstream project reports WIDER FACE evaluation and the associated paper describes WIDER FACE training. This project does not assert a WIDER FACE dataset licence or a right to train or redistribute derived weights.
 
@@ -106,33 +113,23 @@ Local evaluation may proceed only under the maintainer's acceptance of this docu
 
 ## Qualification checklist
 
-- [x] The immutable download matches `7,532,772` bytes.
-- [x] The calculated Git blob SHA-1 matches `1487d5fe214feb569865b225216b24c8f4ef1050`.
-- [x] The SHA-256 `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe` is recorded in the manifest.
-- [x] A bounded dynamic input-shape policy is pinned rather than pretending the candidate is fixed `640x640`.
-- [x] Resize, colour order, scale and multiple-of-32 semantics are frozen.
-- [x] Heatmap, scale, offset, landmark decoding, thresholding and deterministic NMS have synthetic unit coverage.
-- [x] The proposed landmark mapping is explicit and covered by tests.
-- [x] The original implementation branch passed repository build/tests and documentation checks on Windows CI before the real-model smoke.
-- [x] The first real ONNX Runtime smoke reproduced a static-input incompatibility on all five disposable images and preserved the errors durably.
-- [x] The OpenCV DNN runtime correction passed Windows CI.
-- [x] OpenCV DNN loads the exact graph and reaches real output `537` at the governed photo-dependent input dimensions.
-- [x] The N-D output-marshalling correction passes Windows CI.
-- [x] All required outputs can be copied and the complete five-image real-model batch finishes successfully.
-- [ ] Human smoke review confirms plausible boxes and `sface-five-point-v1` aligned crops.
-- [ ] The maintainer accepts the documented licence and training-data boundary for local evaluation.
+- [x] Exact model byte size, Git blob SHA-1 and SHA-256 are pinned.
+- [x] A bounded dynamic multiple-of-32 input policy is recorded.
+- [x] Upstream preprocessing, output names, decoder math and NMS semantics are documented.
+- [x] Synthetic tests cover preprocessing, decoder geometry, threshold semantics and landmark mapping.
+- [x] ONNX Runtime static-input incompatibility was reproduced and retained as evidence.
+- [x] OpenCV DNN executes the exact graph at governed photo-dependent dimensions.
+- [x] N-D output marshalling is corrected and covered by regression testing.
+- [x] A complete five-image batch can execute without terminal processing errors.
+- [x] Human visual review of smoke 3 was performed.
+- [x] Smoke 3 failed the visual gate and blocks the 100-photo comparison.
+- [ ] Per-image OpenCV `Net` isolation passes Windows CI.
+- [ ] Repeat smoke produces plausible detection counts across all five disposable images.
+- [ ] Repeat smoke aligned crops show sensible, non-corrupted eye/nose/mouth geometry.
+- [ ] The maintainer accepts the documented licence/training-data boundary for local evaluation.
 
-## Remaining gate before the 100-photo comparison
+## Stop rule
 
-Visually review the successful smoke run `84f6f779-5a56-4e85-8d41-ee8569dce4d2`. Check the detected boxes and several generated `aligned.png` crops for plausible face localisation and sensible eye/nose/mouth alignment. If the crops are mirrored, grossly displaced or systematically misframed, stop and correct the mapping/decoder before touching the private sample.
+Do **not** run the fixed 100-photo M16 comparison yet. First repeat the same five disposable images on the per-image-network implementation, using a fresh database/output root and the unchanged confidence `0.5` candidate.
 
-If the human smoke review passes and the maintainer accepts the documented licence/training-data boundary for this local evaluation, the first governed private candidate remains:
-
-- detector `centerface-2019-fp32`;
-- confidence `0.5`;
-- detector pipeline `single-pass`;
-- manifest-bound maximum long edge `1600`, rounded to multiples of `32`;
-- SFace `sface-2021dec-fp32` and padding `0.25`; and
-- the unchanged WI-0034 100-photo set and frozen ground truth.
-
-Review that complete candidate before approving any threshold change.
+If the repeated smoke still produces hundreds of detections or corrupted crops, stop and investigate preprocessing/output semantics before any threshold experiment. If the repeated smoke is stable, visually validate boxes and aligned crops before authorising the private 100-photo sample.
