@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using OpenCvSharp;
 using OpenCvSharp.Dnn;
 
@@ -78,25 +79,8 @@ internal sealed class OpenCvDnnCenterFaceInferenceSession : ICenterFaceInference
             for (int index = 0; index < RequiredOutputNames.Length; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                Mat output = outputBlobs[index];
-                if (output.Empty())
-                {
-                    throw new CenterFaceOutputException(
-                        $"CenterFace output '{RequiredOutputNames[index]}' was empty.");
-                }
-
-                if (!output.GetArray(out float[] data))
-                {
-                    throw new CenterFaceOutputException(
-                        $"CenterFace output '{RequiredOutputNames[index]}' could not be read as float32 data.");
-                }
-
-                long[] outputShape = Enumerable.Range(0, output.Dims)
-                    .Select(dimension => (long)output.Size(dimension))
-                    .ToArray();
-                outputs.Add(
-                    RequiredOutputNames[index],
-                    new CenterFaceTensor(RequiredOutputNames[index], outputShape, data));
+                string outputName = RequiredOutputNames[index];
+                outputs.Add(outputName, ReadOutputTensor(outputName, outputBlobs[index]));
             }
 
             return outputs;
@@ -108,6 +92,65 @@ internal sealed class OpenCvDnnCenterFaceInferenceSession : ICenterFaceInference
                 output.Dispose();
             }
         }
+    }
+
+    internal static CenterFaceTensor ReadOutputTensor(string name, Mat output)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        ArgumentNullException.ThrowIfNull(output);
+
+        if (output.Empty())
+        {
+            throw new CenterFaceOutputException($"CenterFace output '{name}' was empty.");
+        }
+
+        if (output.Type() != MatType.CV_32FC1)
+        {
+            throw new CenterFaceOutputException(
+                $"CenterFace output '{name}' must contain float32 values, but OpenCV returned {output.Type()}.");
+        }
+
+        long[] outputShape = Enumerable.Range(0, output.Dims)
+            .Select(dimension => (long)output.Size(dimension))
+            .ToArray();
+
+        long elementCount = 1;
+        foreach (long dimension in outputShape)
+        {
+            if (dimension <= 0)
+            {
+                throw new CenterFaceOutputException(
+                    $"CenterFace output '{name}' has invalid shape [{string.Join(", ", outputShape)}].");
+            }
+
+            elementCount = checked(elementCount * dimension);
+        }
+
+        if (elementCount > int.MaxValue)
+        {
+            throw new CenterFaceOutputException(
+                $"CenterFace output '{name}' contains too many elements to copy safely: {elementCount}.");
+        }
+
+        float[] data = new float[(int)elementCount];
+        Mat source = output;
+        Mat? contiguousCopy = null;
+        try
+        {
+            if (!output.IsContinuous())
+            {
+                contiguousCopy = output.Clone();
+                source = contiguousCopy;
+            }
+
+            Marshal.Copy(source.Data, data, 0, data.Length);
+        }
+        finally
+        {
+            contiguousCopy?.Dispose();
+        }
+
+        return new CenterFaceTensor(name, outputShape, data);
     }
 
     public void Dispose() => _net.Dispose();
