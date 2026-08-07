@@ -11,6 +11,7 @@ $sourceRevision = 'b82ec0c4844e89fd5a0305986aed9bdf33c72585'
 $sourceUrl = "https://raw.githubusercontent.com/Star-Clouds/CenterFace/$sourceRevision/models/onnx/centerface.onnx"
 $expectedSize = 7532772L
 $expectedGitBlobSha1 = '1487d5fe214feb569865b225216b24c8f4ef1050'
+$expectedSha256 = '77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe'
 $tempPath = Join-Path ([System.IO.Path]::GetTempPath()) ("centerface-{0}.onnx" -f [guid]::NewGuid())
 
 function ConvertTo-HexString {
@@ -37,6 +38,10 @@ try {
     }
     finally {
         $sha256Algorithm.Dispose()
+    }
+
+    if (-not [string]::Equals($sha256, $expectedSha256, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "CenterFace SHA-256 mismatch. Expected $expectedSha256, got $sha256."
     }
 
     [byte[]] $gitHeader = [System.Text.Encoding]::UTF8.GetBytes("blob $($modelBytes.LongLength)`0")

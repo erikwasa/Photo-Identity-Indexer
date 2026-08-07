@@ -2,17 +2,19 @@
 
 Candidate models are installed and evaluated alongside the accepted baseline. They do not replace canonical people, assignments, rejections or review history, and they are never promoted from score evidence alone.
 
-## Detector candidate planning
+## Active detector candidate: CenterFace
 
-The [face detector candidate registry](face-detector-candidate-registry.md) pre-screens alternatives for WI-0037. It records technical fit, licence and provenance blockers, alignment compatibility, screened-out options and the recommended evaluation order.
+The [face detector candidate registry](face-detector-candidate-registry.md) pre-screened alternatives for WI-0037. It records technical fit, licence and provenance blockers, alignment compatibility, screened-out options and the recommended evaluation order.
 
-WI-0037 became active on 2026-08-07 after governed multi-scale YuNet candidates failed the complete M16 gate. CenterFace ONNX is the first qualification target. The active [CenterFace qualification record](centerface-2019-qualification.md) pins the screened source, exact artifact evidence, graph contract and unresolved governance conditions before an adapter or full private-sample run is authorised.
+WI-0037 became active on 2026-08-07 after governed multi-scale YuNet candidates failed the complete M16 gate. CenterFace ONNX is the first runnable detector candidate. The [CenterFace qualification record](centerface-2019-qualification.md) pins the exact upstream artifact, SHA-256, bounded dynamic input policy, decoder contract, landmark mapping and unresolved governance conditions.
 
-This qualification does not install or approve CenterFace automatically. A normal detector manifest, adapter tests and Windows smoke verification remain required before the exact model may process the M16 sample.
+The candidate implementation adds a dedicated ONNX Runtime adapter and local-batch detector selection. It is **not yet authorised for the fixed 100-photo comparison** until the Windows build/tests, exact model installation and disposable smoke procedure in the [CenterFace detector runbook](../operations/centerface-detector-runs.md) pass.
 
-## Current candidate: SFace INT8
+The first full candidate is predeclared as `centerface-2019-fp32`, confidence `0.5`, `single-pass`, maximum source long edge `1600` before multiple-of-32 rounding, SFace FP32 and padding `0.25`. Do not use smoke images to tune that configuration.
 
-The first governed candidate is the upstream INT8-quantised revision of the December 2021 SFace embedder.
+## Current embedder candidate: SFace INT8
+
+The first governed embedder candidate is the upstream INT8-quantised revision of the December 2021 SFace embedder.
 
 It deliberately keeps the following fixed relative to the FP32 baseline:
 

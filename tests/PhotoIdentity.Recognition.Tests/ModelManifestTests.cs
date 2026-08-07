@@ -16,8 +16,9 @@ public sealed class ModelManifestTests
         IReadOnlyList<ModelManifest> manifests = await loader.LoadDirectoryAsync(
             Path.Combine(root, "models", "manifests"));
 
-        Assert.Equal(3, manifests.Count);
+        Assert.Equal(4, manifests.Count);
         Assert.Contains(manifests, value => value.ModelId == "yunet-2023mar-fp32");
+        Assert.Contains(manifests, value => value.ModelId == "centerface-2019-fp32");
         Assert.Contains(manifests, value => value.ModelId == "sface-2021dec-fp32");
         Assert.Contains(manifests, value => value.ModelId == "sface-2021dec-int8");
 
@@ -27,6 +28,20 @@ public sealed class ModelManifestTests
 
         Assert.Equal(ModelRole.FaceDetection, yunet.Role);
         Assert.Equal(new ImageSize(640, 640), yunet.InputSize);
+        Assert.Equal(ModelInputShapeKind.Fixed, yunet.InputShapePolicy.Kind);
+
+        ModelManifest centerFaceManifest = manifests
+            .Single(value => value.ModelId == "centerface-2019-fp32");
+        ModelDescriptor centerFace = centerFaceManifest.ToDescriptor();
+        Assert.Equal(ModelRole.FaceDetection, centerFace.Role);
+        Assert.Equal(new ImageSize(640, 640), centerFace.InputSize);
+        Assert.Equal(ModelInputShapeKind.DynamicMultipleOf, centerFace.InputShapePolicy.Kind);
+        Assert.Equal(32, centerFace.InputShapePolicy.MultipleOf);
+        Assert.Equal(1600, centerFace.InputShapePolicy.MaximumLongEdge);
+        Assert.Equal(7_532_772, centerFaceManifest.SizeBytes);
+        Assert.Equal(
+            "77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe",
+            centerFace.ModelHash.Value);
 
         ModelManifest baselineManifest = manifests
             .Single(value => value.ModelId == "sface-2021dec-fp32");
@@ -83,10 +98,32 @@ public sealed class ModelManifestTests
             () => ModelManifestValidator.Validate(manifest));
     }
 
+    [Fact]
+    public void Dynamic_input_shape_requires_multiple_and_bound()
+    {
+        ModelManifest manifest = ValidEmbeddingManifest() with
+        {
+            Input = ValidEmbeddingManifest().Input with
+            {
+                ShapePolicy = new ModelInputShapeManifest
+                {
+                    Kind = "dynamic-multiple-of",
+                    MultipleOf = 32,
+                    MaximumLongEdge = null,
+                },
+            },
+        };
+
+        ModelManifestException exception = Assert.Throws<ModelManifestException>(
+            () => ModelManifestValidator.Validate(manifest));
+        Assert.Contains("maximumLongEdge", exception.Message, StringComparison.Ordinal);
+    }
+
     private static void AssertSFaceDescriptor(ModelDescriptor descriptor)
     {
         Assert.Equal(ModelRole.FaceEmbedding, descriptor.Role);
         Assert.Equal(new ImageSize(112, 112), descriptor.InputSize);
+        Assert.Equal(ModelInputShapeKind.Fixed, descriptor.InputShapePolicy.Kind);
         Assert.Equal(128, descriptor.OutputDimensions);
         Assert.Equal(DistanceMetric.Cosine, descriptor.DistanceMetric);
         Assert.Equal("sface-five-point-v1", descriptor.AlignmentProtocol?.ToString());
