@@ -39,47 +39,55 @@ The licence/training-data acceptance is explicitly for local evaluation. Proceed
 
 The canonical SQLite schema gives a face occurrence a stable identity and currently enforces a unique `(asset_revision_id, ordinal)` pair. Person labels and append-only review actions refer to that stable `face_occurrence_id`.
 
-The local inspection worker, however, deterministically sorts the current detector result and writes each item using the resulting zero-based ordinal. When a different detector changes confidence ordering, misses an old face or finds an additional face, the same ordinal can refer to a different physical person. The current persistence path resolves an ordinal collision to the already-persisted occurrence.
+The local inspection worker, however, deterministically sorts the current detector result and writes each item using the resulting zero-based ordinal. When a different detector changes confidence ordering, misses an old face or finds an additional face, the same ordinal can refer to a different physical person. The legacy persistence path resolves an ordinal collision to the already-persisted occurrence.
 
-Therefore **ordinal equality is not evidence of face identity during detector migration**. WI-0038 must reconcile geometry and five-point landmarks before any new detector result is allowed to reuse a reviewed occurrence.
+Therefore **ordinal equality is not evidence of face identity during detector migration**. WI-0038 uses a separate rollout persistence boundary that requires explicit reconciliation before a new detector result may reuse a reviewed occurrence. The ordinary batch writer remains unchanged for its existing deterministic resume semantics and must not be used for detector migration.
 
 ## Delivery slices
 
 ### Slice 1 — rollout identity and conservative reconciliation foundation
 
-The active branch introduces two reusable contracts before canonical persistence is changed:
+PR #93 established two reusable contracts before canonical persistence was changed:
 
 1. `DetectorPipelineDefinition` produces a versioned SHA-256 identity over detector behaviour that can change the face population or geometry. The canonical representation includes implementation ID, exact detector model ID/hash, runtime, confidence, pipeline mode, resize policy, input dimensions/shape policy, colour order, data type, normalisation, detector NMS/top-K, tile/overlap/merge settings where applicable, and rotation policy.
 2. `FaceDetectionReconciliationPlanner` compares old and new detections by normalized bounding-box IoU and all five landmarks. A persisted occurrence may be proposed for reuse only when the eligibility graph is one-to-one. A candidate with no eligible old occurrence is a new occurrence. Any many-to-one or one-to-many relation is `Ambiguous` and may not be auto-applied.
 
-The worker-side pipeline identity factory freezes the currently implemented YuNet and CenterFace behaviour into that generic identity contract. This makes a future persistence migration auditable without making model SHA-256 stand in for preprocessing or threshold semantics.
+The worker-side pipeline identity factory freezes the currently implemented YuNet and CenterFace behaviour into that generic identity contract. This makes the persistence migration auditable without making model SHA-256 stand in for preprocessing or threshold semantics.
 
 ### Slice 2 — persist rollout provenance and reconciliation state
 
-Next, wire the versioned pipeline identity into durable run/face provenance and add persistence for reconciliation plans. The persistence boundary must:
+PR #94 implements the dedicated SQLite persistence boundary for detector migration:
 
-- never remap an existing reviewed occurrence merely because its ordinal collides with the new result;
-- preserve existing `people`, `person_labels`, `review_actions` and suggestion history;
-- add a new occurrence for a genuinely new candidate;
-- retain old occurrences that the selected detector no longer returns rather than deleting their history; and
-- persist ambiguous cases without mutating identity state.
+- schema version `8` records exact detector-pipeline definitions and binds one pipeline hash to a processing run;
+- reconciliation plans persist candidate geometry and landmarks, `ExistingOccurrence` / `NewOccurrence` / `Ambiguous` disposition, possible old occurrence IDs, and old occurrences with no candidate;
+- rollout-written detector observations retain the detector-pipeline hash in addition to the exact detector model identity;
+- an existing occurrence is reused only when the persisted reconciliation plan explicitly names that occurrence;
+- a genuinely new face receives a new stable occurrence ID and an ordinal above the existing range rather than inheriting candidate ordering;
+- old occurrences with no CenterFace candidate are retained and never deleted by reconciliation;
+- an ambiguous candidate throws before catalogue mutation and is left for Slice 3 human resolution; and
+- the legacy `SqliteFaceCatalogueRepository.SaveInspectionAsync` path remains unchanged and is not an allowed detector-migration boundary.
 
-Schema changes must be forward-migrated and covered by SQLite integration tests.
+The migration and repository behavior are covered by SQLite integration tests, including version-7-to-8 schema upgrade, explicit old-face reuse, non-ordinal new-face allocation and ambiguity refusal. The existing historical migration fixtures are also kept forward-compatible with schema version 8.
 
-### Slice 3 — explicit ambiguity/new-face review
+This slice deliberately does **not** yet provide an operator command that runs CenterFace against a copied catalogue. A safe pilot requires orchestration that produces a reconciliation plan first and routes every candidate through this rollout boundary.
 
-Expose pending reconciliation cases to the local review workflow. The operator must be able to:
+### Slice 3 — explicit ambiguity/new-face review and rollout orchestration
 
+Next, connect the selected CenterFace pipeline to the rollout planner and expose pending reconciliation cases to the local review workflow. The operator must be able to:
+
+- inspect the old and candidate geometry on the same source revision;
 - confirm a proposed old-to-new face mapping;
 - select the correct old occurrence when geometry is ambiguous;
 - mark the candidate as a genuinely new occurrence; or
 - leave the case deferred without changing existing assignments.
 
-No detector score, embedding score or geometry score may assign a person automatically.
+The orchestration path must register the exact pipeline hash, persist the plan before applying candidate results, apply only unambiguous decisions automatically, and resume without creating duplicate new occurrences. No detector score, embedding score or geometry score may assign a person automatically.
+
+Until this slice is implemented and tested, **do not run a CenterFace migration against either the canonical catalogue or a pilot copy**. The existing `batch start` command still uses the legacy ordinal-based writer.
 
 ### Slice 4 — pilot migration and rollback verification
 
-Before processing the full archive:
+After Slice 3 is merged:
 
 1. back up the canonical catalogue and generated-output roots;
 2. run the selected pipeline on a disposable copy of the established pilot/catalogue scope;
@@ -105,9 +113,9 @@ Only after that verification may the full-archive local rollout be authorised.
 ## Acceptance criteria
 
 - [x] Detector-pipeline identity distinguishes materially different detection behaviour at the contract level.
-- [ ] Pipeline identity is persisted with production/local-catalogue detector results and reconciliation evidence.
-- [ ] Existing reviewed faces cannot silently change person because detection ordering changed.
-- [ ] New faces are added without overwriting existing occurrences.
+- [x] A dedicated persistence boundary records pipeline identity with rollout detector results and durable reconciliation evidence.
+- [ ] All detector-migration execution is routed through reconciliation so existing reviewed faces cannot silently change person because detection ordering changed.
+- [ ] New faces are surfaced and reviewable without overwriting existing occurrences.
 - [ ] Ambiguous reconciliation requires human review in the local application/workflow.
 - [ ] Pilot reprocessing passes the accepted detector target and catalogue-history invariants.
 - [ ] Operator documentation and an exercised procedure explain migration, rollback and evidence retention.
@@ -116,4 +124,4 @@ Only after that verification may the full-archive local rollout be authorised.
 
 WI-0038 remains in progress until the selected CenterFace pipeline has been safely applied to a pilot copy of the canonical catalogue, all ambiguous cases are reviewable, identity history invariants have been verified, and rollback has been exercised.
 
-Do **not** run a full-archive canonical migration merely because WI-0037 passed the detector gate. The selected detector is the engineering target for this local rollout work; the current ordinal-based persistence behaviour is not yet safe for detector replacement.
+Do **not** run a full-archive canonical migration merely because WI-0037 passed the detector gate. The selected detector is the engineering target for this local rollout work; the legacy ordinal-based processing path is not a safe detector-replacement mechanism.

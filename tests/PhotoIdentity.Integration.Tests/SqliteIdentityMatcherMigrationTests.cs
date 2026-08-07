@@ -42,6 +42,15 @@ public sealed class SqliteIdentityMatcherMigrationTests
                         merged_into_person_id TEXT NULL);
                     CREATE TABLE face_occurrences (
                         id TEXT NOT NULL PRIMARY KEY);
+                    CREATE TABLE face_observations (
+                        face_occurrence_id TEXT NOT NULL,
+                        detector_model_id TEXT NOT NULL,
+                        detector_model_hash TEXT NOT NULL,
+                        confidence REAL NOT NULL,
+                        bounding_box_json TEXT NOT NULL,
+                        landmarks_json TEXT NOT NULL,
+                        observed_at_utc TEXT NOT NULL,
+                        PRIMARY KEY (face_occurrence_id, detector_model_id, detector_model_hash));
                     CREATE TABLE identity_suggestions (
                         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
                         face_occurrence_id TEXT NOT NULL,
@@ -86,8 +95,8 @@ public sealed class SqliteIdentityMatcherMigrationTests
             await database.InitializeAsync();
 
             await using SqliteConnection upgraded = await database.OpenConnectionAsync();
-            Assert.Equal(7, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
-            Assert.Equal(7, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM schema_migrations;"));
+            Assert.Equal(SqliteCatalogueDatabase.CurrentSchemaVersion, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
+            Assert.Equal(SqliteCatalogueDatabase.CurrentSchemaVersion, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM schema_migrations;"));
             Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM identity_suggestions;"));
             Assert.Equal(
                 1,

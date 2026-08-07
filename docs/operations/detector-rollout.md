@@ -1,6 +1,6 @@
 # Detector pipeline rollout
 
-Use this runbook for WI-0038 after a detector candidate has passed the complete M16 evaluation gate. The current selected local candidate is CenterFace confidence `0.5`, `single-pass`.
+Use this runbook for WI-0038 after a detector candidate has passed the complete M16 evaluation gate. The selected local candidate is CenterFace confidence `0.5`, `single-pass`.
 
 This procedure is intentionally more conservative than starting another batch run. Detector replacement can change face count and detection ordering, while canonical person assignments and review actions are attached to stable face occurrence IDs.
 
@@ -24,11 +24,27 @@ Changing any material detector/preprocessing parameter creates a different pipel
 
 The maintainer accepted the documented CenterFace model-weight/training-data uncertainty for local evaluation on 2026-08-07 and separately instructed WI-0038 rollout engineering to proceed. Redistribution remains outside that acceptance.
 
+## Current implementation boundary
+
+PR #93 added the versioned pipeline identity and conservative geometry/landmark reconciliation planner.
+
+PR #94 adds the SQLite rollout-persistence boundary:
+
+- detector pipeline definitions and hashes can be bound to a processing run;
+- reconciliation plans retain candidate geometry, dispositions, old-face options and unmatched old occurrences;
+- unambiguous existing-face mappings can reuse only the occurrence explicitly named by the persisted plan;
+- new candidates receive new occurrence IDs and ordinals above the existing range rather than candidate ordinals; and
+- ambiguous candidates are persisted but cannot be applied before human resolution.
+
+The ordinary `batch start` processing path still writes through the legacy ordinal-based inspection repository. **Do not use `batch start` as a detector-migration command.** The rollout planner/repository are not yet wired into an operator-facing migration command or ambiguity-review UI.
+
+Therefore there is currently **no local pilot command to run**. Pilot execution becomes available only after the WI-0038 orchestration/review slice is implemented and merged.
+
 ## Why an ordinary rerun is unsafe
 
-Existing face occurrences are unique by asset revision and ordinal. The inspection worker sorts each current detector result and uses that sort position as the ordinal. A new detector can therefore cause ordinal `0` to refer to a different physical face than ordinal `0` from an earlier detector run.
+Existing face occurrences are unique by asset revision and ordinal. The legacy inspection worker sorts each current detector result and uses that sort position as the ordinal. A new detector can therefore cause ordinal `0` to refer to a different physical face than ordinal `0` from an earlier detector run.
 
-Do not point the selected detector at the canonical reviewed database until WI-0038 persistence has been changed to reconcile detections explicitly. A successful detector-quality comparison does not make ordinal identity safe.
+A successful detector-quality comparison does not make ordinal identity safe. Detector migration must use the dedicated reconciliation boundary rather than the ordinary inspection writer.
 
 ## Reconciliation rule
 
@@ -62,7 +78,7 @@ A migration implementation and pilot must demonstrate all of the following:
 
 ## Pilot preparation
 
-Do not use the only copy of the canonical catalogue for the first migration attempt.
+The following steps are **future operator steps**, after the orchestration/review slice is merged. Do not perform them yet.
 
 1. Stop the review application and any worker writing to the catalogue.
 2. Back up the canonical SQLite database and generated-output root together.
@@ -74,7 +90,7 @@ Private filenames, geometry and reconciliation details stay outside Git.
 
 ## Pilot execution
 
-Once the persistence/review slices of WI-0038 are implemented:
+Once the orchestration and reconciliation-review slices of WI-0038 are implemented:
 
 1. Run reconciliation planning against the pilot copy before applying mutations.
 2. Confirm there are no ordinal-only remaps in the plan.
@@ -105,7 +121,7 @@ Do not attempt rollback by deleting selected `face_occurrences`, relabelling peo
 Full-archive canonical rollout remains blocked until:
 
 - pipeline identity is persisted with results;
-- reconciliation is applied without ordinal-only identity reuse;
+- all detector-migration execution is routed through reconciliation without ordinal-only identity reuse;
 - ambiguous cases have a human review path;
 - a pilot migration preserves assignment/rejection/history invariants;
 - genuinely new faces enter normal review without overwriting old occurrences; and

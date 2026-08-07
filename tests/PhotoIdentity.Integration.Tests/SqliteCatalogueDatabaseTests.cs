@@ -20,9 +20,9 @@ public sealed class SqliteCatalogueDatabaseTests
 
             Assert.True(File.Exists(databasePath));
             await using SqliteConnection connection = await database.OpenConnectionAsync();
-            Assert.Equal(7, await ReadInt64Async(connection, "PRAGMA user_version;"));
+            Assert.Equal(SqliteCatalogueDatabase.CurrentSchemaVersion, await ReadInt64Async(connection, "PRAGMA user_version;"));
             Assert.Equal(1, await ReadInt64Async(connection, "PRAGMA foreign_keys;"));
-            Assert.Equal(7, await ReadInt64Async(connection, "SELECT COUNT(*) FROM schema_migrations;"));
+            Assert.Equal(SqliteCatalogueDatabase.CurrentSchemaVersion, await ReadInt64Async(connection, "SELECT COUNT(*) FROM schema_migrations;"));
             Assert.Equal(
                 1,
                 await ReadInt64Async(
@@ -73,6 +73,16 @@ public sealed class SqliteCatalogueDatabaseTests
                 await ReadInt64Async(
                     connection,
                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'ix_person_maintenance_history';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    connection,
+                    "SELECT COUNT(*) FROM pragma_table_info('face_observations') WHERE name = 'detector_pipeline_hash';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    connection,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'detector_reconciliation_plans';"));
         }
         finally
         {
@@ -131,6 +141,15 @@ public sealed class SqliteCatalogueDatabaseTests
                         height INTEGER NULL,
                         FOREIGN KEY (asset_id) REFERENCES assets (id) ON DELETE CASCADE,
                         UNIQUE (asset_id, content_sha256));
+                    CREATE TABLE face_observations (
+                        face_occurrence_id TEXT NOT NULL,
+                        detector_model_id TEXT NOT NULL,
+                        detector_model_hash TEXT NOT NULL,
+                        confidence REAL NOT NULL,
+                        bounding_box_json TEXT NOT NULL,
+                        landmarks_json TEXT NOT NULL,
+                        observed_at_utc TEXT NOT NULL,
+                        PRIMARY KEY (face_occurrence_id, detector_model_id, detector_model_hash));
                     CREATE TABLE processing_runs (
                         id TEXT NOT NULL PRIMARY KEY,
                         status TEXT NOT NULL,
@@ -181,7 +200,7 @@ public sealed class SqliteCatalogueDatabaseTests
             await database.InitializeAsync();
 
             await using SqliteConnection upgraded = await database.OpenConnectionAsync();
-            Assert.Equal(7, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
+            Assert.Equal(SqliteCatalogueDatabase.CurrentSchemaVersion, await ReadInt64Async(upgraded, "PRAGMA user_version;"));
             Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM assets;"));
             Assert.Equal(1, await ReadInt64Async(upgraded, "SELECT COUNT(*) FROM processing_jobs;"));
             Assert.Equal(
@@ -199,6 +218,11 @@ public sealed class SqliteCatalogueDatabaseTests
                 await ReadInt64Async(
                     upgraded,
                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'person_maintenance_actions';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    upgraded,
+                    "SELECT COUNT(*) FROM pragma_table_info('face_observations') WHERE name = 'detector_pipeline_hash';"));
             using SqliteCommand read = upgraded.CreateCommand();
             read.CommandText = """
                 SELECT asset.last_seen_at_utc, asset.deleted_at_utc, job.idempotency_key,
