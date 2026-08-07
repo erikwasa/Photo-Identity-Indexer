@@ -28,7 +28,7 @@ The maintainer accepted the documented CenterFace model-weight/training-data unc
 
 PR #93 added the versioned pipeline identity and conservative geometry/landmark reconciliation planner.
 
-PR #94 adds the SQLite rollout-persistence boundary:
+PR #94 added the SQLite rollout-persistence boundary:
 
 - detector pipeline definitions and hashes can be bound to a processing run;
 - reconciliation plans retain candidate geometry, dispositions, old-face options and unmatched old occurrences;
@@ -36,9 +36,17 @@ PR #94 adds the SQLite rollout-persistence boundary:
 - new candidates receive new occurrence IDs and ordinals above the existing range rather than candidate ordinals; and
 - ambiguous candidates are persisted but cannot be applied before human resolution.
 
-The ordinary `batch start` processing path still writes through the legacy ordinal-based inspection repository. **Do not use `batch start` as a detector-migration command.** The rollout planner/repository are not yet wired into an operator-facing migration command or ambiguity-review UI.
+PR #95 adds the durable review state required before orchestration can be made resumable:
 
-Therefore there is currently **no local pilot command to run**. Pilot execution becomes available only after the WI-0038 orchestration/review slice is implemented and merged.
+- the exact candidate detector identity/confidence, aligned-crop provenance, SFace model identity and embedding vector are persisted before canonical face mutation;
+- candidate payload geometry must exactly match the already-persisted reconciliation plan;
+- ambiguous human decisions are append-only actions to select one eligible existing occurrence, mark the candidate as new, or defer;
+- an existing-face selection is valid only when the planner recorded that occurrence as an ambiguity option on the same asset revision; and
+- these actions resolve face-occurrence identity only and never assign or change a person label.
+
+The ordinary `batch start` processing path still writes through the legacy ordinal-based inspection repository. **Do not use `batch start` as a detector-migration command.** The rollout planner/repositories are not yet wired into the operator-facing planning/apply command and ambiguity-review UI.
+
+Therefore there is currently **no local pilot command to run**. Pilot execution becomes available only after WI-0038 Slice 3B orchestration/review is implemented and merged.
 
 ## Why an ordinary rerun is unsafe
 
@@ -63,6 +71,20 @@ Eligibility currently requires both:
 
 These are conservative migration defaults, not detector-quality thresholds. They must be validated on the pilot before full rollout. Changing them is a reconciliation-policy change and should be retained with migration evidence.
 
+## Durable planning and review rule
+
+The future rollout command must make planning durable before it changes canonical face occurrences:
+
+1. register the exact detector-pipeline hash for the rollout processing run;
+2. run CenterFace only against explicitly scoped immutable revision IDs;
+3. persist the geometry/landmark reconciliation plan;
+4. persist the exact candidate aligned crop and embedding payload;
+5. auto-apply only unambiguous existing/new decisions through the rollout repository;
+6. leave ambiguous candidates unapplied until a human records an existing/new decision; and
+7. apply a reviewed ambiguous candidate from its persisted payload, not by re-running inference.
+
+A `defer` resolution records that the operator deliberately left a candidate unresolved. It does not permit the rollout to treat that candidate as complete.
+
 ## Required invariants
 
 A migration implementation and pilot must demonstrate all of the following:
@@ -72,13 +94,15 @@ A migration implementation and pilot must demonstrate all of the following:
 3. Existing rejection/assignment/undo history remains append-only and points to the same occurrence.
 4. Genuinely new CenterFace detections receive new occurrence IDs.
 5. Existing occurrences that CenterFace does not return are retained rather than deleted.
-6. Ambiguous mappings are persisted as pending review and do not mutate identity state.
+6. Ambiguous mappings are persisted as pending review and do not mutate identity state until explicitly resolved.
 7. Detector pipeline provenance contains the versioned pipeline hash as well as the exact model hash.
-8. Rollout does not write automatic person labels from detector or embedding scores.
+8. Candidate detector/crop/embedding payload is durable before canonical mutation so review can be resumed without inference replay.
+9. Human reconciliation history is append-only.
+10. Rollout does not write automatic person labels from detector, embedding or geometry scores.
 
 ## Pilot preparation
 
-The following steps are **future operator steps**, after the orchestration/review slice is merged. Do not perform them yet.
+The following steps are **future operator steps**, after Slice 3B is merged. Do not perform them yet.
 
 1. Stop the review application and any worker writing to the catalogue.
 2. Back up the canonical SQLite database and generated-output root together.
@@ -90,17 +114,18 @@ Private filenames, geometry and reconciliation details stay outside Git.
 
 ## Pilot execution
 
-Once the orchestration and reconciliation-review slices of WI-0038 are implemented:
+Once Slice 3B orchestration and reconciliation review are implemented:
 
-1. Run reconciliation planning against the pilot copy before applying mutations.
-2. Confirm there are no ordinal-only remaps in the plan.
-3. Apply only one-to-one proposed mappings automatically.
-4. Create new occurrences only for candidates classified as new.
-5. Review every ambiguous case before considering the pilot complete.
-6. Run ordinary face review for newly added faces where needed.
-7. Verify person counts, active person labels and review-action history before and after migration.
-8. Spot-check source photos where face count changed, especially group/small/profile/occluded cases.
-9. Confirm the selected detector still shows behavior consistent with the accepted M16 result; the rollout pilot is not a new threshold-tuning exercise.
+1. run reconciliation planning against the pilot copy before applying mutations;
+2. confirm there are no ordinal-only remaps in the plan;
+3. apply only one-to-one proposed mappings automatically;
+4. create new occurrences only for candidates classified or explicitly resolved as new;
+5. review every ambiguous case before considering the pilot complete;
+6. resume the same rollout run and verify reviewed candidates apply from durable payload without duplicate new occurrences;
+7. run ordinary face review for newly added faces where needed;
+8. verify person counts, active person labels and review-action history before and after migration;
+9. spot-check source photos where face count changed, especially group/small/profile/occluded cases; and
+10. confirm the selected detector still shows behavior consistent with the accepted M16 result; the rollout pilot is not a new threshold-tuning exercise.
 
 ## Rollback
 
@@ -122,7 +147,8 @@ Full-archive canonical rollout remains blocked until:
 
 - pipeline identity is persisted with results;
 - all detector-migration execution is routed through reconciliation without ordinal-only identity reuse;
-- ambiguous cases have a human review path;
+- candidate payloads and human reconciliation decisions are durable;
+- ambiguous cases have an operable human review path;
 - a pilot migration preserves assignment/rejection/history invariants;
 - genuinely new faces enter normal review without overwriting old occurrences; and
 - backup and restore have been exercised successfully.
