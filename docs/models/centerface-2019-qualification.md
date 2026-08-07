@@ -20,7 +20,7 @@ This record is the active qualification evidence for [WI-0037](../delivery/work-
 | SHA-256 | `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe` |
 | Format/runtime | ONNX / ONNX Runtime |
 
-The maintainer ran [`models/inspect-centerface-candidate.ps1`](../../models/inspect-centerface-candidate.ps1) on Windows on 2026-08-07. The immutable download matched the expected byte size and Git blob identity and produced the SHA-256 above. The checked-in [`centerface-2019-fp32` manifest](../../models/manifests/centerface-2019-fp32.json) now pins those exact bytes.
+The maintainer ran [`models/inspect-centerface-candidate.ps1`](../../models/inspect-centerface-candidate.ps1) on Windows on 2026-08-07. The immutable download matched the expected byte size and Git blob identity and produced the SHA-256 above. The checked-in [`centerface-2019-fp32` manifest](../../models/manifests/centerface-2019-fp32.json) now pins those exact bytes, and the inspector itself now rejects any later SHA-256 mismatch.
 
 ## Governed input policy
 
@@ -33,7 +33,7 @@ The first governed project revision therefore records:
 - source long edge bounded to `1600` pixels before multiple rounding;
 - each bounded dimension rounded up to a multiple of `32`;
 - direct bilinear resize to that runtime tensor, matching the upstream `blobFromImage(..., crop=false)` resize behavior; and
-- the resulting input-shape policy as immutable model/pipeline provenance.
+- the resulting input-shape policy in the checked-in model manifest.
 
 Rounding can make the final runtime tensor dimension slightly greater than `1600`; the `1600` limit applies before rounding to the required multiple of `32`.
 
@@ -74,11 +74,13 @@ The local batch worker now chooses a detector adapter by exact detector model ID
 - `yunet-2023mar-fp32` retains the existing single-pass and multi-scale behavior;
 - `centerface-2019-fp32` uses the CenterFace adapter and only permits `single-pass`.
 
-The existing run configuration already persists detector model ID, exact hash, confidence, pipeline and embedding revision. CenterFace's maximum-long-edge and multiple-of-32 policy are pinned in its immutable model manifest, so a resumed run cannot silently adopt another preprocessing policy.
+The durable batch configuration records detector model ID, confidence and pipeline, while persisted face observations and results record the detector model hash. The CenterFace input policy is defined by the checked-in manifest and adapter implementation rather than duplicated into the older batch configuration schema.
+
+For this governed evaluation, the operator runbook therefore records the exact repository commit and re-verifies the installed model immediately before processing. Keep that commit and manifest unchanged when resuming the candidate. A future preprocessing-policy change requires a new governed candidate and must not reuse this result as if it were identical.
 
 ## Licence and training-data boundary
 
-The pinned repository contains a root MIT licence covering the supplied "Software" and does not state a separate exception for the committed ONNX file. The project records that as provisional model-weight evidence, not as legal advice or automatic production approval.
+The pinned repository contains a root MIT licence covering the supplied "Software" and does not state a separate exception for the committed ONNX file. The manifest deliberately records the weight licence as `LicenseRef-CenterFace-Repository-MIT-Provisional` rather than asserting a definitive standalone pretrained-weight licence.
 
 The upstream project reports WIDER FACE evaluation and the associated paper describes WIDER FACE training. This project does not assert a WIDER FACE dataset licence or a right to train or redistribute derived weights.
 
