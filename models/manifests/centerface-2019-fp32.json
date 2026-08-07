@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "modelId": "centerface-2019-fp32",
+  "role": "faceDetection",
+  "format": "onnx",
+  "fileName": "centerface.onnx",
+  "downloadUri": "https://raw.githubusercontent.com/Star-Clouds/CenterFace/b82ec0c4844e89fd5a0305986aed9bdf33c72585/models/onnx/centerface.onnx",
+  "sha256": "77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe",
+  "sizeBytes": 7532772,
+  "runtime": "onnxruntime",
+  "sourceVersion": "Star-Clouds/CenterFace@b82ec0c4844e89fd5a0305986aed9bdf33c72585",
+  "input": {
+    "width": 640,
+    "height": 640,
+    "colourOrder": "RGB",
+    "dataType": "float32",
+    "normalisation": {
+      "scale": 1.0,
+      "mean": [0.0, 0.0, 0.0]
+    },
+    "shapePolicy": {
+      "kind": "dynamic-multiple-of",
+      "multipleOf": 32
+    }
+  },
+  "output": {
+    "kind": "detections",
+    "dimensions": null,
+    "normalisation": "none",
+    "distanceMetric": null,
+    "semantics": "CenterFace heatmap, scale, offset and five-landmark tensors exposed as ONNX outputs 537, 538, 539 and 540. The adapter decodes stride-4 boxes and landmarks and applies deterministic NMS."
+  },
+  "alignmentProtocol": null,
+  "licences": {
+    "code": {
+      "spdx": "MIT",
+      "source": "https://github.com/Star-Clouds/CenterFace/blob/b82ec0c4844e89fd5a0305986aed9bdf33c72585/LICENSE"
+    },
+    "weights": {
+      "spdx": "MIT",
+      "source": "https://github.com/Star-Clouds/CenterFace/blob/b82ec0c4844e89fd5a0305986aed9bdf33c72585/LICENSE"
+    },
+    "trainingData": {
+      "name": "WIDER FACE",
+      "licence": "not asserted by this project",
+      "notes": "The CenterFace paper and repository report WIDER FACE training/evaluation. The project records the upstream repository licence as provisional weight evidence but does not assert separate training-data rights or permission to train or redistribute derived weights."
+    }
+  }
+}
