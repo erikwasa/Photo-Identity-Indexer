@@ -168,20 +168,61 @@ public sealed class SqliteDetectorRolloutApplicationRepository
             reader.GetInt32(7));
     }
 
+    public async Task<IReadOnlyList<CatalogueDetectorRolloutPendingReview>> GetPendingReviewsAsync(
+        ProcessingRunId processingRunId,
+        CancellationToken cancellationToken = default)
+    {
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        List<(AssetRevisionId RevisionId, int CandidateIndex)> keys = [];
+        using (SqliteCommand command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                SELECT asset_revision_id, candidate_index
+                FROM detector_reconciliation_candidates
+                WHERE processing_run_id = $run_id
+                  AND disposition = 'ambiguous'
+                  AND applied_face_occurrence_id IS NULL
+                ORDER BY asset_revision_id, candidate_index;
+                """;
+            command.Parameters.AddWithValue("$run_id", processingRunId.ToString());
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                keys.Add((AssetRevisionId.From(Guid.Parse(reader.GetString(0))), reader.GetInt32(1)));
+            }
+        }
+
+        List<CatalogueDetectorRolloutPendingReview> values = new(keys.Count);
+        foreach ((AssetRevisionId revisionId, int candidateIndex) in keys)
+        {
+            CatalogueDetectorReconciliationReview? review = await _reviewRepository.GetReviewAsync(
+                processingRunId,
+                revisionId,
+                candidateIndex,
+                cancellationToken);
+            if (review is not null)
+            {
+                values.Add(new CatalogueDetectorRolloutPendingReview(processingRunId, revisionId, review));
+            }
+        }
+
+        return values;
+    }
+
     public async Task<CatalogueDetectorRolloutApplyResult> ApplyResolvedAsync(
         ProcessingRunId processingRunId,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<CatalogueDetectorReconciliationReview> pending =
-            await _reviewRepository.GetPendingAmbiguousAsync(processingRunId, cancellationToken);
+        IReadOnlyList<CatalogueDetectorRolloutPendingReview> pending =
+            await GetPendingReviewsAsync(processingRunId, cancellationToken);
         int applied = 0;
         int deferred = 0;
         int awaiting = 0;
 
-        foreach (CatalogueDetectorReconciliationReview value in pending)
+        foreach (CatalogueDetectorRolloutPendingReview value in pending)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            CatalogueDetectorReconciliationResolution? resolution = value.LatestResolution;
+            CatalogueDetectorReconciliationResolution? resolution = value.Review.LatestResolution;
             if (resolution is null)
             {
                 awaiting++;
@@ -196,8 +237,8 @@ public sealed class SqliteDetectorRolloutApplicationRepository
 
             _ = await ApplyReviewedCandidateAsync(
                 processingRunId,
-                value.Candidate.AssetRevisionId,
-                value.Candidate.CandidateIndex,
+                value.AssetRevisionId,
+                value.Review.Candidate.CandidateIndex,
                 cancellationToken);
             applied++;
         }
@@ -258,7 +299,6 @@ public sealed class SqliteDetectorRolloutApplicationRepository
         }
 
         CatalogueFaceOccurrence occurrence;
-        bool mustMatchExactOccurrence = false;
         if (resolution.Kind == DetectorReconciliationResolutionKind.ExistingOccurrence)
         {
             FaceOccurrenceId target = resolution.FaceOccurrenceId
@@ -274,8 +314,6 @@ public sealed class SqliteDetectorRolloutApplicationRepository
             {
                 throw new InvalidOperationException("The resolved existing face belongs to a different asset revision.");
             }
-
-            mustMatchExactOccurrence = true;
         }
         else if (resolution.Kind == DetectorReconciliationResolutionKind.NewOccurrence)
         {
@@ -289,7 +327,6 @@ public sealed class SqliteDetectorRolloutApplicationRepository
                     assetRevisionId,
                     inspection.ObservedAtUtc,
                     cancellationToken);
-            mustMatchExactOccurrence = true;
         }
         else
         {
@@ -330,7 +367,7 @@ public sealed class SqliteDetectorRolloutApplicationRepository
                 inspection.ObservedAtUtc),
             cancellationToken);
 
-        if (mustMatchExactOccurrence && persisted.Occurrence.Id != occurrence.Id)
+        if (persisted.Occurrence.Id != occurrence.Id)
         {
             throw new InvalidOperationException(
                 "The reviewed rollout application resolved to a different occurrence than the explicit human decision.");
