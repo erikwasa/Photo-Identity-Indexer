@@ -54,7 +54,12 @@ internal sealed class OpenCvDnnCenterFaceInferenceSession : ICenterFaceInference
         int[] matShape = shape
             .Select(dimension => checked((int)dimension))
             .ToArray();
-        long expectedElements = shape.Aggregate(1L, checked((product, dimension) => product * dimension));
+        long expectedElements = 1;
+        foreach (long dimension in shape)
+        {
+            expectedElements = checked(expectedElements * dimension);
+        }
+
         if (expectedElements != input.LongLength)
         {
             throw new CenterFaceOutputException(
