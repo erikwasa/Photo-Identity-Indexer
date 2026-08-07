@@ -2,7 +2,7 @@
 
 Status date: 2026-08-07
 
-Active implementation branch: `agent/WI-0037-centerface-qualification`
+Active implementation branch: `agent/WI-0037-centerface-adapter`
 
 ## Current outcome
 
@@ -21,7 +21,7 @@ The maintainer completed two governed multi-scale runs on 2026-08-07:
 
 A confidence-0.6 multi-scale run was intentionally skipped because lowering the threshold could not plausibly resolve the already disqualifying false/duplicate workload. No YuNet multi-scale configuration is approved for rollout.
 
-WI-0037 is active. CenterFace ONNX is the first exact-model qualification target.
+WI-0037 is active. CenterFace ONNX is the first alternative detector. The exact artifact is now verified and pinned, and the dedicated adapter is implemented on the active branch. Full private-sample processing remains blocked on Windows build/runtime and human smoke verification.
 
 ## Delivered evaluation workspace
 
@@ -87,20 +87,47 @@ Automated tests cover tile coverage, aspect preservation, mapping, cross-pass du
 
 The implementation remains available for reproducibility, but the private evaluation did not identify a rollout configuration.
 
-## Active WI-0037 qualification
+## Active WI-0037 CenterFace implementation
 
 The first target is the exact upstream `centerface.onnx` file committed at `Star-Clouds/CenterFace@b82ec0c4844e89fd5a0305986aed9bdf33c72585`.
 
-Before a full private comparison, the active work must:
+The maintainer verified the artifact locally on Windows on 2026-08-07:
 
-1. pin byte size and SHA-256 in an immutable detector manifest;
-2. document the root MIT licence, exact model-artifact interpretation and WIDER FACE training-data limitation separately;
-3. verify graph input and output semantics under the project's ONNX Runtime version;
-4. freeze resize, colour, scale, heatmap, box, landmark and NMS behavior;
-5. implement unit and integration coverage without weakening `sface-five-point-v1`; and
-6. pass a bounded Windows CPU smoke test.
+- byte size `7,532,772`;
+- Git blob SHA-1 `1487d5fe214feb569865b225216b24c8f4ef1050`; and
+- SHA-256 `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe`.
 
-SCRFD remains technically attractive but is not the first target because InsightFace states an explicit non-commercial restriction for its supplied pretrained models. CenterFace promotion or redistribution also remains blocked until its model-weight and training-data considerations are accepted under the project's governance rules.
+The active branch now provides:
+
+- immutable `centerface-2019-fp32` model identity and local installation path;
+- an explicit bounded dynamic input-shape contract rather than falsely treating the graph as fixed `640x640`;
+- pre-round source long edge `1600`, dimensions rounded up to multiples of `32`;
+- RGB float32, scale `1.0`, zero-mean direct resize preprocessing;
+- a dedicated ONNX Runtime session requiring outputs `537`, `538`, `539` and `540`;
+- deterministic stride-four heatmap, scale, offset and five-landmark decoding;
+- deterministic IoU `0.30` NMS;
+- explicit right-eye, left-eye, nose, right-mouth and left-mouth mapping into the unchanged SFace alignment contract;
+- local-batch detector selection by exact model ID with CenterFace restricted to `single-pass`; and
+- synthetic tests for provenance, preprocessing, decoder geometry, thresholding, NMS, landmark mapping and malformed tensor shapes.
+
+The repository root MIT licence is recorded separately from the provisional model-weight interpretation. WIDER FACE training-data rights remain not asserted by this project.
+
+## Active next work
+
+Before the full private comparison:
+
+1. run the repository restore/build/test and living-document checks on Windows;
+2. install `centerface-2019-fp32` through the normal exact-size/hash verifier;
+3. process only a disposable smoke set that excludes the fixed M16 sample;
+4. confirm real ONNX Runtime dynamic-shape inference and expected float32 output shapes;
+5. visually confirm plausible detector boxes and non-mirrored SFace aligned crops; and
+6. record acceptance of the documented licence/training-data uncertainty for local evaluation.
+
+The smoke procedure is documented in [`docs/operations/centerface-detector-runs.md`](../../operations/centerface-detector-runs.md).
+
+If the smoke gate passes, the first full private candidate is predeclared as confidence `0.5`, `single-pass`, maximum source long edge `1600` before multiple-of-32 rounding, SFace FP32 and padding `0.25`. Review the complete result before changing any parameter.
+
+SCRFD remains technically attractive but is not the first target because InsightFace states an explicit non-commercial restriction for its supplied pretrained models. CenterFace production promotion or redistribution also remains blocked until its model-weight and training-data considerations are acceptable under the project's governance rules.
 
 The candidate screen is retained in [`docs/models/face-detector-candidate-registry.md`](../../models/face-detector-candidate-registry.md).
 
