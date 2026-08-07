@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 7;
+    public const int CurrentSchemaVersion = 8;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -313,6 +313,96 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 7;
         """;
 
+    private const string VersionEightMigration = """
+        ALTER TABLE face_observations ADD COLUMN detector_pipeline_hash TEXT NULL;
+
+        CREATE TABLE detector_pipelines (
+            pipeline_hash TEXT NOT NULL PRIMARY KEY,
+            detector_model_id TEXT NOT NULL,
+            detector_model_hash TEXT NOT NULL,
+            canonical_definition TEXT NOT NULL,
+            recorded_at_utc TEXT NOT NULL
+        );
+
+        CREATE TABLE processing_run_detector_pipelines (
+            processing_run_id TEXT NOT NULL PRIMARY KEY,
+            pipeline_hash TEXT NOT NULL,
+            recorded_at_utc TEXT NOT NULL,
+            FOREIGN KEY (processing_run_id) REFERENCES processing_runs (id) ON DELETE CASCADE,
+            FOREIGN KEY (pipeline_hash) REFERENCES detector_pipelines (pipeline_hash) ON DELETE RESTRICT
+        );
+
+        CREATE TABLE detector_reconciliation_plans (
+            processing_run_id TEXT NOT NULL,
+            asset_revision_id TEXT NOT NULL,
+            pipeline_hash TEXT NOT NULL,
+            planned_at_utc TEXT NOT NULL,
+            PRIMARY KEY (processing_run_id, asset_revision_id),
+            FOREIGN KEY (processing_run_id) REFERENCES processing_runs (id) ON DELETE CASCADE,
+            FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+            FOREIGN KEY (pipeline_hash) REFERENCES detector_pipelines (pipeline_hash) ON DELETE RESTRICT
+        );
+
+        CREATE TABLE detector_reconciliation_candidates (
+            processing_run_id TEXT NOT NULL,
+            asset_revision_id TEXT NOT NULL,
+            candidate_index INTEGER NOT NULL CHECK (candidate_index >= 0),
+            disposition TEXT NOT NULL CHECK (disposition IN ('existing', 'new', 'ambiguous')),
+            proposed_face_occurrence_id TEXT NULL,
+            bounding_box_json TEXT NOT NULL,
+            landmarks_json TEXT NOT NULL,
+            applied_face_occurrence_id TEXT NULL,
+            applied_at_utc TEXT NULL,
+            PRIMARY KEY (processing_run_id, asset_revision_id, candidate_index),
+            FOREIGN KEY (processing_run_id, asset_revision_id)
+                REFERENCES detector_reconciliation_plans (processing_run_id, asset_revision_id) ON DELETE CASCADE,
+            FOREIGN KEY (proposed_face_occurrence_id) REFERENCES face_occurrences (id) ON DELETE RESTRICT,
+            FOREIGN KEY (applied_face_occurrence_id) REFERENCES face_occurrences (id) ON DELETE RESTRICT,
+            CHECK (
+                (disposition = 'existing' AND proposed_face_occurrence_id IS NOT NULL)
+                OR (disposition IN ('new', 'ambiguous') AND proposed_face_occurrence_id IS NULL)
+            ),
+            CHECK (
+                (applied_face_occurrence_id IS NULL AND applied_at_utc IS NULL)
+                OR (applied_face_occurrence_id IS NOT NULL AND applied_at_utc IS NOT NULL)
+            )
+        );
+
+        CREATE TABLE detector_reconciliation_candidate_options (
+            processing_run_id TEXT NOT NULL,
+            asset_revision_id TEXT NOT NULL,
+            candidate_index INTEGER NOT NULL,
+            face_occurrence_id TEXT NOT NULL,
+            PRIMARY KEY (processing_run_id, asset_revision_id, candidate_index, face_occurrence_id),
+            FOREIGN KEY (processing_run_id, asset_revision_id, candidate_index)
+                REFERENCES detector_reconciliation_candidates (
+                    processing_run_id, asset_revision_id, candidate_index) ON DELETE CASCADE,
+            FOREIGN KEY (face_occurrence_id) REFERENCES face_occurrences (id) ON DELETE RESTRICT
+        );
+
+        CREATE TABLE detector_reconciliation_unmatched_existing (
+            processing_run_id TEXT NOT NULL,
+            asset_revision_id TEXT NOT NULL,
+            face_occurrence_id TEXT NOT NULL,
+            PRIMARY KEY (processing_run_id, asset_revision_id, face_occurrence_id),
+            FOREIGN KEY (processing_run_id, asset_revision_id)
+                REFERENCES detector_reconciliation_plans (processing_run_id, asset_revision_id) ON DELETE CASCADE,
+            FOREIGN KEY (face_occurrence_id) REFERENCES face_occurrences (id) ON DELETE RESTRICT
+        );
+
+        CREATE UNIQUE INDEX ux_face_observations_pipeline
+            ON face_observations (face_occurrence_id, detector_pipeline_hash)
+            WHERE detector_pipeline_hash IS NOT NULL;
+        CREATE INDEX ix_detector_reconciliation_pending
+            ON detector_reconciliation_candidates (disposition, applied_face_occurrence_id);
+        CREATE INDEX ix_detector_reconciliation_revision
+            ON detector_reconciliation_plans (asset_revision_id, pipeline_hash);
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (8, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 8;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -388,6 +478,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 7)
         {
             await ApplyMigrationAsync(connection, VersionSevenMigration, cancellationToken);
+            version = 7;
+        }
+
+        if (version < 8)
+        {
+            await ApplyMigrationAsync(connection, VersionEightMigration, cancellationToken);
         }
     }
 
