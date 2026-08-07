@@ -56,7 +56,8 @@ public sealed record ModelManifest
             null or "fixed" => ModelInputShapePolicy.Fixed,
             "dynamic-multiple-of" => new ModelInputShapePolicy(
                 ModelInputShapeKind.DynamicMultipleOf,
-                Input.ShapePolicy.MultipleOf),
+                Input.ShapePolicy.MultipleOf,
+                Input.ShapePolicy.MaximumLongEdge),
             _ => throw new ModelManifestException(
                 $"Unsupported input shape policy '{Input.ShapePolicy.Kind}'."),
         };
@@ -91,6 +92,7 @@ public sealed record ModelInputShapeManifest
 {
     public required string Kind { get; init; }
     public int? MultipleOf { get; init; }
+    public int? MaximumLongEdge { get; init; }
 }
 
 public sealed record ModelNormalisationManifest
@@ -339,9 +341,10 @@ public static class ModelManifestValidator
         switch (input.ShapePolicy.Kind)
         {
             case "fixed":
-                if (input.ShapePolicy.MultipleOf is not null)
+                if (input.ShapePolicy.MultipleOf is not null ||
+                    input.ShapePolicy.MaximumLongEdge is not null)
                 {
-                    errors.Add("fixed input shapePolicy cannot declare multipleOf.");
+                    errors.Add("fixed input shapePolicy cannot declare dynamic shape parameters.");
                 }
 
                 break;
@@ -350,8 +353,15 @@ public static class ModelManifestValidator
                 {
                     errors.Add("dynamic-multiple-of input shapePolicy requires a positive multipleOf.");
                 }
-                else if (input.Width % input.ShapePolicy.MultipleOf.Value != 0 ||
-                         input.Height % input.ShapePolicy.MultipleOf.Value != 0)
+
+                if (input.ShapePolicy.MaximumLongEdge <= 0)
+                {
+                    errors.Add("dynamic-multiple-of input shapePolicy requires a positive maximumLongEdge.");
+                }
+
+                if (input.ShapePolicy.MultipleOf > 0 &&
+                    (input.Width % input.ShapePolicy.MultipleOf.Value != 0 ||
+                     input.Height % input.ShapePolicy.MultipleOf.Value != 0))
                 {
                     errors.Add("dynamic reference input width and height must be divisible by shapePolicy.multipleOf.");
                 }
