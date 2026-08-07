@@ -2,48 +2,79 @@
 
 Status date: 2026-08-07
 
-State: **selected for exact-artifact qualification; not authorised for the private M16 sample**
+State: **exact artifact verified and adapter implemented; Windows runtime smoke required before the private M16 sample**
 
-This record starts the first implementation increment for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). It pins the upstream source and expected Git object while keeping the model binary outside Git.
+This record is the active qualification evidence for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). Model bytes remain outside Git.
 
-## Selected upstream artifact
+## Exact artifact
 
 | Property | Value |
 |---|---|
-| Proposed model ID | `centerface-2019-fp32` |
+| Model ID | `centerface-2019-fp32` |
 | Role | Face detection with five landmarks |
 | Upstream repository | `Star-Clouds/CenterFace` |
 | Source revision | `b82ec0c4844e89fd5a0305986aed9bdf33c72585` |
 | Upstream path | `models/onnx/centerface.onnx` |
 | Upstream Git blob SHA-1 | `1487d5fe214feb569865b225216b24c8f4ef1050` |
-| Expected byte size | `7,532,772` bytes |
-| Format/runtime target | ONNX / ONNX Runtime |
-| Exact SHA-256 | Pending local byte verification |
+| Byte size | `7,532,772` bytes |
+| SHA-256 | `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe` |
+| Format/runtime | ONNX / ONNX Runtime |
 
-The repository automation available while preparing this record could read Git metadata and source text but could not download arbitrary binary bytes. It therefore does not claim an SHA-256 or graph inspection that it did not perform.
+The maintainer ran [`models/inspect-centerface-candidate.ps1`](../../models/inspect-centerface-candidate.ps1) on Windows on 2026-08-07. The immutable download matched the expected byte size and Git blob identity and produced the SHA-256 above. The checked-in [`centerface-2019-fp32` manifest](../../models/manifests/centerface-2019-fp32.json) now pins those exact bytes.
 
-Run [`models/inspect-centerface-candidate.ps1`](../../models/inspect-centerface-candidate.ps1) on Windows to download the immutable artifact, verify its byte size and Git blob identity, and print the locally calculated SHA-256. Record that value in the eventual detector manifest only after the command succeeds.
+## Governed input policy
 
-## Pinned preprocessing and decoder evidence
+CenterFace's upstream implementation accepts source-dependent input dimensions. Treating it as a fixed `640x640` model would incorrectly hide preprocessing changes under one model identity.
 
-The upstream Python implementation at the same revision:
+The first governed project revision therefore records:
 
-- rounds source width and height up to multiples of 32;
-- creates an input with OpenCV `blobFromImage` using scale `1.0`, zero mean, `swapRB=true` and no crop;
+- `640x640` as a reference manifest size, not a forced runtime tensor size;
+- RGB float32 input, scale `1.0`, zero mean;
+- source long edge bounded to `1600` pixels before multiple rounding;
+- each bounded dimension rounded up to a multiple of `32`;
+- direct bilinear resize to that runtime tensor, matching the upstream `blobFromImage(..., crop=false)` resize behavior; and
+- the resulting input-shape policy as immutable model/pipeline provenance.
+
+Rounding can make the final runtime tensor dimension slightly greater than `1600`; the `1600` limit applies before rounding to the required multiple of `32`.
+
+Changing the maximum edge, resize rule or multiple later is a new governed pipeline revision and must not be presented as the same evaluation configuration.
+
+## Decoder contract
+
+The pinned upstream Python implementation:
+
 - requests outputs `537`, `538`, `539` and `540` as heatmap, scale, offset and landmarks;
 - decodes heatmap positions at stride four;
 - exponentiates the two scale channels and multiplies by four;
-- applies the offset channels to recover box centres;
+- treats scale channel zero as height and channel one as width;
+- treats offset channel zero as vertical and channel one as horizontal;
 - decodes five landmark pairs relative to each recovered box; and
 - applies non-maximum suppression at IoU `0.30`.
 
-These statements are source-code evidence, not yet a frozen application contract. The exact ONNX graph and produced tensors must independently confirm them before implementation is accepted.
+The project adapter freezes those semantics and adds deterministic candidate ordering and suppression. It fails closed when required outputs are missing, have unexpected shapes or are not float32.
 
 ## Alignment compatibility
 
-CenterFace predicts five landmark pairs, which is structurally compatible with `sface-five-point-v1`. Structural compatibility is not enough: the adapter must verify the anatomical ordering of right eye, left eye, nose, right mouth corner and left mouth corner before any embeddings are generated.
+CenterFace emits five points. The project mapping is frozen as:
 
-Do not silently reorder landmarks based only on visual plausibility. Freeze the verified mapping in tests and model provenance.
+1. anatomical right eye;
+2. anatomical left eye;
+3. nose;
+4. anatomical right mouth corner; and
+5. anatomical left mouth corner.
+
+The upstream decoder establishes the five-point tensor layout but does not label the anatomy in code. The anatomical interpretation is independently corroborated by the DeepFace CenterFace adapter, which explicitly names the same point order. The project maps these native points into `NormalizedFaceLandmarks` and leaves `sface-five-point-v1` unchanged.
+
+Synthetic tests lock that mapping and its box/landmark math. A Windows smoke run must still visually confirm plausible aligned crops before the private 100-photo comparison; this protects against a formally consistent but semantically wrong landmark interpretation.
+
+## Detector selection and provenance
+
+The local batch worker now chooses a detector adapter by exact detector model ID:
+
+- `yunet-2023mar-fp32` retains the existing single-pass and multi-scale behavior;
+- `centerface-2019-fp32` uses the CenterFace adapter and only permits `single-pass`.
+
+The existing run configuration already persists detector model ID, exact hash, confidence, pipeline and embedding revision. CenterFace's maximum-long-edge and multiple-of-32 policy are pinned in its immutable model manifest, so a resumed run cannot silently adopt another preprocessing policy.
 
 ## Licence and training-data boundary
 
@@ -51,29 +82,34 @@ The pinned repository contains a root MIT licence covering the supplied "Softwar
 
 The upstream project reports WIDER FACE evaluation and the associated paper describes WIDER FACE training. This project does not assert a WIDER FACE dataset licence or a right to train or redistribute derived weights.
 
-Before production promotion or redistribution, the maintainer must accept the model-weight interpretation and the remaining training-data limitation. An unresolved boundary blocks promotion even when local evaluation succeeds.
+Local evaluation may proceed only under the maintainer's acceptance of this documented uncertainty. Production promotion or redistribution remains blocked if the weight or training-data boundary cannot be defended for the intended use.
 
 ## Qualification checklist
 
-- [ ] The immutable download matches `7,532,772` bytes.
-- [ ] The calculated Git blob SHA-1 matches `1487d5fe214feb569865b225216b24c8f4ef1050`.
-- [ ] The locally calculated SHA-256 is recorded.
-- [ ] ONNX Runtime loads the exact graph on the supported Windows runtime.
-- [ ] Input and output names, shapes and numeric types are recorded from the graph.
-- [ ] Resize, colour order, scale and padding semantics are frozen.
-- [ ] Heatmap, scale, offset and landmark decoding are covered by deterministic tests.
-- [ ] Landmark anatomical order is verified against `sface-five-point-v1`.
-- [ ] Licence and training-data limitations are accepted for the intended use.
-- [ ] A bounded Windows CPU smoke test passes before the 100-photo run.
+- [x] The immutable download matches `7,532,772` bytes.
+- [x] The calculated Git blob SHA-1 matches `1487d5fe214feb569865b225216b24c8f4ef1050`.
+- [x] The SHA-256 `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe` is recorded in the manifest.
+- [x] A bounded dynamic input-shape policy is pinned rather than pretending the graph is fixed `640x640`.
+- [x] Resize, colour order, scale and multiple-of-32 semantics are frozen.
+- [x] Heatmap, scale, offset, landmark decoding, thresholding and deterministic NMS have synthetic unit coverage.
+- [x] The proposed landmark mapping is explicit and covered by tests.
+- [ ] Repository build and tests pass on the supported Windows toolchain.
+- [ ] ONNX Runtime loads the exact graph and accepts a bounded dynamic input on Windows.
+- [ ] The required outputs are observed with the expected float32 shapes during real inference.
+- [ ] Human smoke review confirms plausible boxes and `sface-five-point-v1` aligned crops.
+- [ ] The maintainer accepts the documented licence and training-data boundary for local evaluation.
 
-## Current blockers
+## Remaining gate before the 100-photo comparison
 
-1. The current model-manifest schema records fixed positive input width and height, while the upstream implementation uses dimensions derived from each source image. The governed input-shape policy must be selected before creating the manifest.
-2. Exact graph metadata and SHA-256 still require local binary inspection.
-3. Landmark order requires explicit verification.
-4. The adapter, unit coverage and durable detector-selection provenance do not yet exist.
-5. The Windows CPU smoke test has not run.
+Run the bounded smoke procedure in [`docs/operations/centerface-detector-runs.md`](../operations/centerface-detector-runs.md). Do not tune the confidence threshold using the smoke images; it is a functional/runtime check only.
 
-## Decision
+If the smoke succeeds, the first governed private candidate is:
 
-Proceed with exact-artifact verification and adapter design. Do not process the private M16 sample and do not treat `centerface-2019-fp32` as an installable governed model until every blocker above is closed.
+- detector `centerface-2019-fp32`;
+- confidence `0.5`;
+- detector pipeline `single-pass`;
+- manifest-bound maximum long edge `1600`, rounded to multiples of `32`;
+- SFace `sface-2021dec-fp32` and padding `0.25`; and
+- the unchanged WI-0034 100-photo set and frozen ground truth.
+
+Review that complete candidate before approving any threshold change.
