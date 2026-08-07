@@ -11,7 +11,6 @@ public sealed record CenterFaceDetectorOptions
     public double ConfidenceThreshold { get; init; } = 0.5;
     public double NmsThreshold { get; init; } = 0.3;
     public int TopK { get; init; } = 5000;
-    public int MaxLongEdge { get; init; } = 1600;
 
     internal void Validate()
     {
@@ -32,11 +31,6 @@ public sealed record CenterFaceDetectorOptions
         if (TopK <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(TopK), "TopK must be positive.");
-        }
-
-        if (MaxLongEdge <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(MaxLongEdge), "Maximum long edge must be positive.");
         }
     }
 }
@@ -59,6 +53,7 @@ public sealed class CenterFaceFaceDetector : IFaceDetector, IDisposable
     private readonly ICenterFaceInferenceSession _session;
     private readonly CenterFaceDetectorOptions _options;
     private readonly int _inputMultiple;
+    private readonly int _maximumLongEdge;
     private bool _disposed;
 
     public CenterFaceFaceDetector(
@@ -92,10 +87,11 @@ public sealed class CenterFaceFaceDetector : IFaceDetector, IDisposable
 
         Descriptor = manifest.ToDescriptor();
         if (Descriptor.InputShapePolicy.Kind != ModelInputShapeKind.DynamicMultipleOf ||
-            Descriptor.InputShapePolicy.MultipleOf is null)
+            Descriptor.InputShapePolicy.MultipleOf is null ||
+            Descriptor.InputShapePolicy.MaximumLongEdge is null)
         {
             throw new ModelManifestException(
-                $"Model '{manifest.ModelId}' must declare a dynamic-multiple-of input shape policy.");
+                $"Model '{manifest.ModelId}' must declare a bounded dynamic-multiple-of input shape policy.");
         }
 
         _options = options ?? new CenterFaceDetectorOptions();
@@ -103,6 +99,7 @@ public sealed class CenterFaceFaceDetector : IFaceDetector, IDisposable
         _manifest = manifest;
         _session = session;
         _inputMultiple = Descriptor.InputShapePolicy.MultipleOf.Value;
+        _maximumLongEdge = Descriptor.InputShapePolicy.MaximumLongEdge.Value;
     }
 
     public ModelDescriptor Descriptor { get; }
@@ -144,7 +141,7 @@ public sealed class CenterFaceFaceDetector : IFaceDetector, IDisposable
             image,
             _manifest,
             _inputMultiple,
-            _options.MaxLongEdge,
+            _maximumLongEdge,
             cancellationToken);
         TimeSpan preprocessingDuration = Stopwatch.GetElapsedTime(preprocessingStarted);
 
