@@ -14,7 +14,12 @@ public sealed class SqliteDetectorRolloutRepositoryTests
         string databasePath = TemporaryDatabasePath();
         try
         {
-            await using (SqliteConnection connection = new($"Data Source={databasePath}"))
+            string seedConnectionString = new SqliteConnectionStringBuilder
+            {
+                DataSource = databasePath,
+                Pooling = false,
+            }.ToString();
+            await using (SqliteConnection connection = new(seedConnectionString))
             {
                 await connection.OpenAsync();
                 using SqliteCommand command = connection.CreateCommand();
@@ -54,29 +59,31 @@ public sealed class SqliteDetectorRolloutRepositoryTests
             SqliteCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
 
-            await using SqliteConnection upgraded = await database.OpenConnectionAsync();
-            using SqliteCommand version = upgraded.CreateCommand();
-            version.CommandText = "PRAGMA user_version;";
-            Assert.Equal(8L, Convert.ToInt64(await version.ExecuteScalarAsync()));
+            await using (SqliteConnection upgraded = await database.OpenConnectionAsync())
+            {
+                using SqliteCommand version = upgraded.CreateCommand();
+                version.CommandText = "PRAGMA user_version;";
+                Assert.Equal(8L, Convert.ToInt64(await version.ExecuteScalarAsync()));
 
-            using SqliteCommand tables = upgraded.CreateCommand();
-            tables.CommandText = """
-                SELECT COUNT(*)
-                FROM sqlite_master
-                WHERE type = 'table'
-                  AND name IN (
-                      'detector_pipelines',
-                      'processing_run_detector_pipelines',
-                      'detector_reconciliation_plans',
-                      'detector_reconciliation_candidates',
-                      'detector_reconciliation_candidate_options',
-                      'detector_reconciliation_unmatched_existing');
-                """;
-            Assert.Equal(6L, Convert.ToInt64(await tables.ExecuteScalarAsync()));
+                using SqliteCommand tables = upgraded.CreateCommand();
+                tables.CommandText = """
+                    SELECT COUNT(*)
+                    FROM sqlite_master
+                    WHERE type = 'table'
+                      AND name IN (
+                          'detector_pipelines',
+                          'processing_run_detector_pipelines',
+                          'detector_reconciliation_plans',
+                          'detector_reconciliation_candidates',
+                          'detector_reconciliation_candidate_options',
+                          'detector_reconciliation_unmatched_existing');
+                    """;
+                Assert.Equal(6L, Convert.ToInt64(await tables.ExecuteScalarAsync()));
 
-            using SqliteCommand column = upgraded.CreateCommand();
-            column.CommandText = "SELECT COUNT(*) FROM pragma_table_info('face_observations') WHERE name = 'detector_pipeline_hash';";
-            Assert.Equal(1L, Convert.ToInt64(await column.ExecuteScalarAsync()));
+                using SqliteCommand column = upgraded.CreateCommand();
+                column.CommandText = "SELECT COUNT(*) FROM pragma_table_info('face_observations') WHERE name = 'detector_pipeline_hash';";
+                Assert.Equal(1L, Convert.ToInt64(await column.ExecuteScalarAsync()));
+            }
         }
         finally
         {
@@ -364,6 +371,7 @@ public sealed class SqliteDetectorRolloutRepositoryTests
 
     private static void DeleteDatabase(string path)
     {
+        SqliteConnection.ClearAllPools();
         foreach (string candidate in new[] { path, path + "-wal", path + "-shm" })
         {
             if (File.Exists(candidate))
