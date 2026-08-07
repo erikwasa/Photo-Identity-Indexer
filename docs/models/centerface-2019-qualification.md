@@ -24,33 +24,13 @@ The maintainer verified the immutable download on Windows with `models/inspect-c
 
 ## Governed candidate
 
-The first candidate remains unchanged throughout the runtime/debugging work:
-
-- detector `centerface-2019-fp32`;
-- confidence `0.5`;
-- detector pipeline `single-pass`;
-- RGB float32 input, scale `1.0`, zero mean;
-- source long edge bounded to `1600` before dimensions are rounded up to multiples of `32`;
-- deterministic CenterFace IoU `0.30` NMS;
-- embedder `sface-2021dec-fp32`;
-- padding `0.25`; and
-- `sface-five-point-v1` alignment.
+The first candidate remains unchanged throughout runtime debugging: detector `centerface-2019-fp32`, confidence `0.5`, `single-pass`, RGB float32 scale `1.0` zero mean, source long edge bounded to `1600` before multiple-of-32 rounding, IoU `0.30` NMS, SFace `sface-2021dec-fp32`, padding `0.25`, and `sface-five-point-v1` alignment.
 
 Do not change confidence, preprocessing, NMS or landmark mapping while diagnosing runtime correctness. A changed value is a separate governed candidate.
 
 ## Upstream contract
 
-The pinned upstream Python implementation:
-
-- rounds input height and width up to multiples of `32`;
-- uses `cv2.dnn.blobFromImage` with scale `1.0`, zero mean, `swapRB=True`, and no crop;
-- requests outputs `537`, `538`, `539` and `540` as heatmap, scale, offset and landmarks;
-- thresholds the heatmap with strict `score > threshold` semantics;
-- decodes at stride four;
-- uses scale channel zero as height and channel one as width;
-- uses offset channel zero as vertical and channel one as horizontal;
-- decodes five landmark pairs relative to the recovered box; and
-- applies NMS at IoU `0.30`.
+The pinned upstream Python implementation rounds input dimensions up to multiples of `32`, uses `cv2.dnn.blobFromImage` with scale `1.0`, zero mean, `swapRB=True` and no crop, requests outputs `537`, `538`, `539`, `540`, thresholds with strict `score > threshold`, decodes at stride four, and applies NMS at IoU `0.30`.
 
 The project decoder freezes those semantics and adds deterministic ordering.
 
@@ -58,21 +38,21 @@ The project decoder freezes those semantics and adds deterministic ordering.
 
 ### Smoke 1 — ONNX Runtime static-input incompatibility
 
-Run `fbe99826-96ce-44af-b64f-3e6a3b8d93b1` used the governed five disposable images. All five jobs failed before detector output because the pinned ONNX graph exposes stale static input metadata equivalent to `10 x 3 x 32 x 32`. ONNX Runtime rejected the intended photo-dependent tensors.
+Run `fbe99826-96ce-44af-b64f-3e6a3b8d93b1` failed all five disposable images before detector output because the pinned ONNX graph exposes stale static input metadata equivalent to `10 x 3 x 32 x 32`. ONNX Runtime rejected the intended photo-dependent tensors.
 
-This was a runtime-contract incompatibility, not detector-quality evidence. The project therefore switched execution to OpenCV DNN, matching the pinned upstream reference while retaining the exact model bytes and candidate parameters.
+This was a runtime-contract incompatibility, not detector-quality evidence. Execution moved to OpenCV DNN, matching the pinned upstream reference while retaining exact model bytes and candidate parameters.
 
 ### Smoke 2 — N-D output marshalling bug
 
-Run `8a74c35e-e214-47e6-ad47-176bebc6d7e3` reached real CenterFace output `537` on all five jobs, then failed while copying the four-dimensional OpenCV tensors through a two-dimensional `Mat.GetArray<T>` convenience path.
+Run `8a74c35e-e214-47e6-ad47-176bebc6d7e3` reached real CenterFace output `537` on all five jobs, then failed while copying four-dimensional OpenCV tensors through a two-dimensional `Mat.GetArray<T>` path.
 
 PR #89 replaced that path with explicit N-D shape validation and contiguous float-buffer copying. No candidate parameter changed.
 
 ### Smoke 3 — processing completed, visual review failed
 
-Run `84f6f779-5a56-4e85-8d41-ee8569dce4d2` completed all five jobs at the unchanged candidate settings: `5` succeeded and `0` failed.
+Run `84f6f779-5a56-4e85-8d41-ee8569dce4d2` completed all five jobs at the unchanged settings: `5` succeeded and `0` failed.
 
-That processing completion **does not qualify the detector**. Human review found severe cross-image instability:
+Human review nevertheless found severe cross-image instability:
 
 - one group photo with eight people produced eight detected faces;
 - one photo with two people produced `593` detections, with some generated crops upside down;
@@ -83,29 +63,21 @@ This decisively fails the visual smoke gate. Do not process the fixed 100-photo 
 
 ## OpenCV network-lifetime finding
 
-An independent CenterFace adapter in DeepFace documents that reusing its OpenCV DNN model across calls produces problematic results from the second call, and works around the problem by rebuilding the CenterFace model for each image.
+An independent CenterFace adapter in DeepFace explicitly notes that the model produces problematic results from the second call if the model is not flushed, and therefore rebuilds the CenterFace model for each image. The project implementation had likewise retained one `OpenCvSharp.Dnn.Net` for the full detector lifetime, so a batch reused the same native network across changing source images and dimensions.
 
-The project implementation had likewise retained one `OpenCvSharp.Dnn.Net` for the full detector lifetime, so a batch reused the same native network across images and changing source dimensions. The observed sequence — a plausible first image followed by hundreds of nonsensical detections — is consistent with that documented failure mode.
+The observed sequence — a plausible image followed by hundreds of nonsensical detections — is consistent with that documented failure mode. The current correction stores only the model path and creates/disposes a fresh OpenCV `Net` inside each inference call. Model bytes, preprocessing, confidence, decoder, NMS and landmark mapping remain unchanged.
 
-The current correction stores only the model path and creates/disposes a fresh OpenCV `Net` inside each inference call. This isolates native graph state per image while keeping model bytes, preprocessing, confidence, decoder, NMS and landmarks unchanged.
-
-This is still a hypothesis until the same disposable five-image smoke is repeated successfully and visually reviewed.
+This is still a hypothesis until the same five-image smoke is repeated successfully and visually reviewed.
 
 ## Alignment compatibility
 
-CenterFace emits five landmarks. The project currently maps them as:
+CenterFace emits five landmarks. The project currently maps them as anatomical right eye, anatomical left eye, nose, anatomical right mouth corner and anatomical left mouth corner. Synthetic tests cover the mapping and box/landmark math.
 
-1. anatomical right eye;
-2. anatomical left eye;
-3. nose;
-4. anatomical right mouth corner; and
-5. anatomical left mouth corner.
-
-Synthetic tests cover the mapping and box/landmark math. Because smoke 3 produced corrupted detections after the first image, the upside-down crops are not sufficient evidence by themselves to change the landmark mapping. Re-evaluate alignment only after network-state isolation removes the cross-image corruption.
+Because smoke 3 produced corrupted detections after an initially plausible result, the upside-down crops are not sufficient evidence by themselves to change landmark mapping. Re-evaluate alignment only after network-state isolation removes cross-image corruption.
 
 ## Licence and training-data boundary
 
-The pinned repository contains a root MIT licence covering the supplied software and does not state a separate exception for the committed ONNX file. The manifest deliberately records the weight licence as `LicenseRef-CenterFace-Repository-MIT-Provisional` rather than asserting a definitive standalone pretrained-weight licence.
+The pinned repository contains a root MIT licence covering supplied software and does not state a separate exception for the committed ONNX file. The manifest records the weight licence as `LicenseRef-CenterFace-Repository-MIT-Provisional` rather than asserting a definitive standalone pretrained-weight licence.
 
 The upstream project reports WIDER FACE evaluation and the associated paper describes WIDER FACE training. This project does not assert a WIDER FACE dataset licence or a right to train or redistribute derived weights.
 
@@ -121,8 +93,8 @@ Local evaluation may proceed only under the maintainer's acceptance of this docu
 - [x] OpenCV DNN executes the exact graph at governed photo-dependent dimensions.
 - [x] N-D output marshalling is corrected and covered by regression testing.
 - [x] A complete five-image batch can execute without terminal processing errors.
-- [x] Human visual review of smoke 3 was performed.
-- [x] Smoke 3 failed the visual gate and blocks the 100-photo comparison.
+- [x] Human visual review of smoke 3 was performed and failed.
+- [x] Smoke 3 blocks the 100-photo comparison.
 - [ ] Per-image OpenCV `Net` isolation passes Windows CI.
 - [ ] Repeat smoke produces plausible detection counts across all five disposable images.
 - [ ] Repeat smoke aligned crops show sensible, non-corrupted eye/nose/mouth geometry.
@@ -130,6 +102,6 @@ Local evaluation may proceed only under the maintainer's acceptance of this docu
 
 ## Stop rule
 
-Do **not** run the fixed 100-photo M16 comparison yet. First repeat the same five disposable images on the per-image-network implementation, using a fresh database/output root and the unchanged confidence `0.5` candidate.
+Do **not** run the fixed 100-photo M16 comparison yet. First repeat the same five disposable images on the per-image-network implementation, using a fresh database/output root and unchanged confidence `0.5`.
 
-If the repeated smoke still produces hundreds of detections or corrupted crops, stop and investigate preprocessing/output semantics before any threshold experiment. If the repeated smoke is stable, visually validate boxes and aligned crops before authorising the private 100-photo sample.
+If the repeated smoke still produces hundreds of detections or corrupted crops, stop and investigate preprocessing/output semantics before any threshold experiment. If it is stable, visually validate boxes and aligned crops before authorising the private 100-photo sample.
