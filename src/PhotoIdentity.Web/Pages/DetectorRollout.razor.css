@@ -1,0 +1,239 @@
+.rollout-landing,
+.rollout-hero,
+.rollout-review-card,
+.rollout-summary-grid article,
+.rollout-review-toolbar,
+.rollout-empty {
+    border: 1px solid var(--border-color, #d8dde6);
+    border-radius: 14px;
+    background: var(--surface, #fff);
+}
+
+.rollout-landing,
+.rollout-hero,
+.rollout-review-card,
+.rollout-empty {
+    padding: 1.25rem;
+}
+
+.rollout-landing h1,
+.rollout-hero h1 {
+    margin: .15rem 0 .5rem;
+}
+
+.rollout-run-picker {
+    display: grid;
+    grid-template-columns: minmax(12rem, 1fr) auto;
+    gap: .65rem;
+    align-items: end;
+    margin-top: 1rem;
+}
+
+.rollout-run-picker label {
+    grid-column: 1 / -1;
+}
+
+.rollout-run-picker input,
+.rollout-review-toolbar input,
+.rollout-decision-grid input,
+.rollout-decision-grid select {
+    width: 100%;
+    padding: .55rem .65rem;
+    border: 1px solid var(--border-color, #cbd2dc);
+    border-radius: 8px;
+    background: var(--surface, #fff);
+}
+
+.rollout-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(16rem, .7fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.rollout-run-id {
+    overflow-wrap: anywhere;
+}
+
+.rollout-safety-note {
+    padding: 1rem;
+    border-radius: 10px;
+    background: var(--surface-muted, #f5f7fa);
+}
+
+.rollout-safety-note p {
+    margin-bottom: 0;
+}
+
+.rollout-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: .75rem;
+    margin: 1rem 0;
+}
+
+.rollout-summary-grid article {
+    padding: .85rem;
+    display: grid;
+    gap: .15rem;
+}
+
+.rollout-summary-grid span,
+.rollout-summary-grid small {
+    color: var(--muted-text, #626b78);
+}
+
+.rollout-summary-grid strong {
+    font-size: 1.35rem;
+}
+
+.rollout-review-toolbar {
+    display: grid;
+    grid-template-columns: auto minmax(12rem, 20rem) auto;
+    gap: .65rem;
+    align-items: center;
+    padding: .8rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.rollout-review-list {
+    display: grid;
+    gap: 1rem;
+}
+
+.rollout-review-card > header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: start;
+    margin-bottom: 1rem;
+}
+
+.rollout-review-card h2,
+.rollout-review-card h3 {
+    margin: .15rem 0 .6rem;
+}
+
+.rollout-resolution-pill {
+    padding: .35rem .65rem;
+    border-radius: 999px;
+    background: var(--surface-muted, #eef1f5);
+    white-space: nowrap;
+}
+
+.rollout-visual-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(10rem, 15rem);
+    gap: 1rem;
+    align-items: start;
+}
+
+.rollout-source-frame {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 10px;
+    background: #111;
+}
+
+.rollout-source-frame > img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.rollout-box {
+    position: absolute;
+    box-sizing: border-box;
+    border: 2px solid currentColor;
+    font-size: .7rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: .15rem;
+    pointer-events: none;
+}
+
+.rollout-box.candidate {
+    color: #ffdf5d;
+}
+
+.rollout-box.option {
+    color: #70d7ff;
+    border-style: dashed;
+}
+
+.rollout-legend {
+    color: var(--muted-text, #626b78);
+    font-size: .85rem;
+    margin: .5rem 0 0;
+}
+
+.rollout-face-crop,
+.rollout-option-row img {
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border-color, #d8dde6);
+}
+
+.rollout-face-crop {
+    width: min(100%, 12rem);
+    aspect-ratio: 1;
+}
+
+.rollout-options {
+    margin-top: 1rem;
+}
+
+.rollout-option-row {
+    display: grid;
+    grid-template-columns: 4rem minmax(0, 1fr);
+    gap: .65rem;
+    align-items: center;
+    padding: .45rem 0;
+}
+
+.rollout-option-row img {
+    width: 4rem;
+    height: 4rem;
+}
+
+.rollout-option-row small {
+    display: block;
+    overflow-wrap: anywhere;
+    margin-top: .2rem;
+}
+
+.rollout-decision-grid {
+    display: grid;
+    grid-template-columns: minmax(14rem, 1.2fr) minmax(12rem, 1fr) auto;
+    gap: .75rem;
+    align-items: end;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color, #d8dde6);
+}
+
+.rollout-decision-grid label {
+    display: grid;
+    gap: .3rem;
+}
+
+.rollout-review-card footer {
+    margin-top: .8rem;
+    color: var(--muted-text, #626b78);
+    font-size: .85rem;
+}
+
+@media (max-width: 800px) {
+    .rollout-hero,
+    .rollout-visual-grid,
+    .rollout-decision-grid,
+    .rollout-review-toolbar,
+    .rollout-run-picker {
+        grid-template-columns: 1fr;
+    }
+
+    .rollout-review-card > header {
+        display: grid;
+    }
+}
