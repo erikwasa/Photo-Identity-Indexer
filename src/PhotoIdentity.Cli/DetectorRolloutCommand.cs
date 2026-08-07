@@ -1,3 +1,4 @@
+using System.Text.Json;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Sqlite;
@@ -178,8 +179,9 @@ internal static class DetectorRolloutCommandRunner
                 await WriteStatusAsync(database, options.RunId!.Value, output, cancellationToken);
                 return 0;
             case DetectorRolloutCommandAction.Apply:
+                await RequireRegisteredPipelineAsync(database, options.RunId!.Value, cancellationToken);
                 CatalogueDetectorRolloutApplyResult apply = await new SqliteDetectorRolloutApplicationRepository(database)
-                    .ApplyResolvedAsync(options.RunId!.Value, cancellationToken);
+                    .ApplyResolvedAsync(options.RunId.Value, cancellationToken);
                 output.WriteLine($"reviewed-considered: {apply.ConsideredCount}");
                 output.WriteLine($"reviewed-applied: {apply.AppliedCount}");
                 output.WriteLine($"reviewed-deferred: {apply.DeferredCount}");
@@ -226,8 +228,9 @@ internal static class DetectorRolloutCommandRunner
         TextWriter output,
         CancellationToken cancellationToken)
     {
+        await RequireRolloutConfigurationAsync(database, options.RunId!.Value, cancellationToken);
         DetectorRolloutResumeResult result = await new DetectorRolloutCoordinator(database).ResumeAsync(
-            options.RunId!.Value,
+            options.RunId.Value,
             new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
             cancellationToken);
         WriteSelectedPipeline(output);
@@ -243,6 +246,7 @@ internal static class DetectorRolloutCommandRunner
         TextWriter output,
         CancellationToken cancellationToken)
     {
+        await RequireRegisteredPipelineAsync(database, runId, cancellationToken);
         ProcessingRunSummary processing = await new SqliteProcessingRepository(database)
             .GetRunSummaryAsync(runId, cancellationToken);
         CatalogueDetectorRolloutSummary rollout = await new SqliteDetectorRolloutApplicationRepository(database)
@@ -250,6 +254,55 @@ internal static class DetectorRolloutCommandRunner
         WriteProcessingSummary(processing, output);
         WriteRolloutSummary(rollout, output);
         output.WriteLine($"review-path: /detector-rollout/{runId}");
+    }
+
+    private static async Task RequireRolloutConfigurationAsync(
+        SqliteCatalogueDatabase database,
+        ProcessingRunId runId,
+        CancellationToken cancellationToken)
+    {
+        CatalogueProcessingRun run = await new SqliteProcessingRepository(database)
+            .GetRunAsync(runId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Processing run {runId} was not found.");
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(run.ConfigurationJson);
+            JsonElement root = document.RootElement;
+            bool hasOutput = root.TryGetProperty("outputRoot", out JsonElement outputRoot) &&
+                             outputRoot.ValueKind == JsonValueKind.String;
+            bool hasRepository = root.TryGetProperty("repositoryRoot", out JsonElement repositoryRoot) &&
+                                 repositoryRoot.ValueKind == JsonValueKind.String;
+            bool isLegacyBatch = root.TryGetProperty("sourceRoot", out _);
+            if (!hasOutput || !hasRepository || isLegacyBatch)
+            {
+                throw new InvalidOperationException(
+                    $"Processing run {runId} is not a detector-rollout run and cannot be resumed by the rollout command.");
+            }
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException(
+                $"Processing run {runId} does not contain a valid detector-rollout configuration.",
+                exception);
+        }
+    }
+
+    private static async Task RequireRegisteredPipelineAsync(
+        SqliteCatalogueDatabase database,
+        ProcessingRunId runId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            _ = await new SqliteDetectorRolloutApplicationRepository(database)
+                .GetPipelineHashAsync(runId, cancellationToken);
+        }
+        catch (KeyNotFoundException exception)
+        {
+            throw new InvalidOperationException(
+                $"Processing run {runId} is not a registered detector-rollout run.",
+                exception);
+        }
     }
 
     private static async Task<IReadOnlyList<AssetRevisionId>> ReadRevisionFileAsync(
