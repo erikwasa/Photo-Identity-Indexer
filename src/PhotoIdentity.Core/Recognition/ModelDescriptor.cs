@@ -30,26 +30,42 @@ public enum ModelInputShapeKind
 
 public sealed record ModelInputShapePolicy
 {
-    public ModelInputShapePolicy(ModelInputShapeKind kind, int? multipleOf = null)
+    public ModelInputShapePolicy(
+        ModelInputShapeKind kind,
+        int? multipleOf = null,
+        int? maximumLongEdge = null)
     {
-        if (kind == ModelInputShapeKind.Fixed && multipleOf is not null)
+        if (kind == ModelInputShapeKind.Fixed &&
+            (multipleOf is not null || maximumLongEdge is not null))
         {
-            throw new ArgumentException("Fixed input shapes cannot declare a dynamic multiple.", nameof(multipleOf));
+            throw new ArgumentException("Fixed input shapes cannot declare dynamic shape parameters.");
         }
 
-        if (kind == ModelInputShapeKind.DynamicMultipleOf && multipleOf <= 0)
+        if (kind == ModelInputShapeKind.DynamicMultipleOf)
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(multipleOf),
-                "Dynamic-multiple input shapes require a positive multiple.");
+            if (multipleOf <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(multipleOf),
+                    "Dynamic-multiple input shapes require a positive multiple.");
+            }
+
+            if (maximumLongEdge <= 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(maximumLongEdge),
+                    "Dynamic-multiple input shapes require a positive maximum long edge.");
+            }
         }
 
         Kind = kind;
         MultipleOf = multipleOf;
+        MaximumLongEdge = maximumLongEdge;
     }
 
     public ModelInputShapeKind Kind { get; }
     public int? MultipleOf { get; }
+    public int? MaximumLongEdge { get; }
 
     public static ModelInputShapePolicy Fixed { get; } = new(ModelInputShapeKind.Fixed);
 }
