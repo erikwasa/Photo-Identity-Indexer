@@ -2,7 +2,7 @@
 
 Status date: 2026-08-07
 
-State: **exact artifact verified; ONNX Runtime incompatibility reproduced; upstream-compatible OpenCV DNN runtime awaiting repeat smoke**
+State: **exact artifact verified; ONNX Runtime incompatibility reproduced; OpenCV DNN inference reached real outputs; N-D output marshalling correction awaiting repeat smoke**
 
 This record is the active qualification evidence for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). Model bytes remain outside Git.
 
@@ -22,7 +22,7 @@ This record is the active qualification evidence for [WI-0037](../delivery/work-
 
 The maintainer ran [`models/inspect-centerface-candidate.ps1`](../../models/inspect-centerface-candidate.ps1) on Windows on 2026-08-07. The immutable download matched the expected byte size and Git blob identity and produced the SHA-256 above. The checked-in [`centerface-2019-fp32` manifest](../../models/manifests/centerface-2019-fp32.json) pins those exact bytes.
 
-## Runtime compatibility finding
+## Runtime compatibility findings
 
 The first disposable five-image smoke run used ONNX Runtime at confidence `0.5`, `single-pass`, with the governed dynamic multiple-of-32 input policy. All five jobs failed before detector output was produced. The durable run ID was `fbe99826-96ce-44af-b64f-3e6a3b8d93b1`.
 
@@ -30,9 +30,13 @@ The persisted errors showed that the pinned ONNX graph declares static input met
 
 This failure is a runtime-contract incompatibility, not detector-quality evidence. It does not justify changing confidence, preprocessing or the private evaluation sample.
 
-The pinned upstream CenterFace Python reference loads this same ONNX artifact through OpenCV DNN, rounds image dimensions up to multiples of `32`, builds an RGB float32 blob at the resulting dimensions and requests outputs `537`, `538`, `539` and `540`. The project therefore keeps the exact model bytes and governed preprocessing/decoder semantics but switches the execution runtime from ONNX Runtime to OpenCV DNN.
+The pinned upstream CenterFace Python reference loads this same ONNX artifact through OpenCV DNN, rounds image dimensions up to multiples of `32`, builds an RGB float32 blob at the resulting dimensions and requests outputs `537`, `538`, `539` and `540`. The project therefore kept the exact model bytes and governed preprocessing/decoder semantics but switched the execution runtime from ONNX Runtime to OpenCV DNN.
 
-The failed ONNX Runtime smoke remains retained as evidence. Do not rewrite it as a successful or partially successful detector run.
+The second disposable five-image smoke run used OpenCV DNN with durable run ID `8a74c35e-e214-47e6-ad47-176bebc6d7e3`. OpenCV DNN accepted the governed photo-dependent inputs and reached real CenterFace output `537` on all five jobs. Every job then failed in the managed adapter with `CenterFace output '537' could not be read as float32 data.`
+
+That second failure exposed an output-marshalling bug rather than a graph or detector-quality failure. OpenCvSharp's `Mat.GetArray<T>` convenience path sizes its destination from the two-dimensional `Rows * Cols` view, while CenterFace DNN outputs are four-dimensional `[N,C,H,W]` tensors. PR #89 replaces that 2-D convenience path with explicit N-D shape validation and contiguous float-buffer copying. The exact model, runtime, preprocessing, decoder and confidence remain unchanged.
+
+Both failed smoke catalogues remain retained as runtime/adapter evidence. Do not rewrite either as a successful or partially successful detector-quality run.
 
 ## Governed input policy
 
@@ -84,7 +88,7 @@ The local batch worker chooses a detector adapter by exact detector model ID:
 - `yunet-2023mar-fp32` retains the existing single-pass and multi-scale behavior;
 - `centerface-2019-fp32` uses the CenterFace adapter through OpenCV DNN and only permits `single-pass`.
 
-The exact CenterFace ONNX SHA-256 is unchanged by the runtime correction. The manifest runtime field now records `opencv-dnn`; a future change back to another execution runtime is a governed pipeline change and must not be silently compared as if identical.
+The exact CenterFace ONNX SHA-256 is unchanged by the runtime and marshalling corrections. The manifest runtime field records `opencv-dnn`; a future change back to another execution runtime is a governed pipeline change and must not be silently compared as if identical.
 
 The durable batch configuration records detector model ID, confidence and pipeline, while persisted face observations and results record the detector model hash. Record the exact repository commit with each private candidate run because runtime/preprocessing semantics are defined by the checked-in manifest and adapter implementation.
 
@@ -107,17 +111,18 @@ Local evaluation may proceed only under the maintainer's acceptance of this docu
 - [x] The proposed landmark mapping is explicit and covered by tests.
 - [x] The original implementation branch passed repository build/tests and documentation checks on Windows CI before the real-model smoke.
 - [x] The first real ONNX Runtime smoke reproduced a static-input incompatibility on all five disposable images and preserved the errors durably.
-- [ ] The OpenCV DNN runtime-correction branch passes Windows CI.
-- [ ] OpenCV DNN loads the exact graph and completes inference at the governed photo-dependent input dimensions.
-- [ ] The required outputs are observed with the expected float32 shapes during real inference.
+- [x] The OpenCV DNN runtime correction passed Windows CI.
+- [x] OpenCV DNN loads the exact graph and reaches real output `537` at the governed photo-dependent input dimensions.
+- [ ] The N-D output-marshalling correction passes Windows CI.
+- [ ] All required outputs are copied with the expected float32 `[N,C,H,W]` shapes during real inference.
 - [ ] Human smoke review confirms plausible boxes and `sface-five-point-v1` aligned crops.
 - [ ] The maintainer accepts the documented licence and training-data boundary for local evaluation.
 
 ## Remaining gate before the 100-photo comparison
 
-Repeat the bounded smoke procedure in [`docs/operations/centerface-detector-runs.md`](../operations/centerface-detector-runs.md) using a **fresh** smoke database/output root while keeping the same disposable smoke images and confidence `0.5`. Do not reuse the failed ONNX Runtime catalogue and do not tune the confidence threshold from the smoke images.
+Repeat the bounded smoke procedure in [`docs/operations/centerface-detector-runs.md`](../operations/centerface-detector-runs.md) using a **fresh** smoke database/output root while keeping the same disposable smoke images and confidence `0.5`. Do not reuse either failed smoke catalogue and do not tune the confidence threshold from the smoke images.
 
-If the OpenCV DNN smoke succeeds, the first governed private candidate remains:
+If the corrected OpenCV DNN smoke succeeds, the first governed private candidate remains:
 
 - detector `centerface-2019-fp32`;
 - confidence `0.5`;
