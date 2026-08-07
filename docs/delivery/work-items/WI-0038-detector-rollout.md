@@ -69,25 +69,40 @@ PR #94 implements the dedicated SQLite persistence boundary for detector migrati
 
 The migration and repository behavior are covered by SQLite integration tests, including version-7-to-8 schema upgrade, explicit old-face reuse, non-ordinal new-face allocation and ambiguity refusal. The existing historical migration fixtures are also kept forward-compatible with schema version 8.
 
-This slice deliberately does **not** yet provide an operator command that runs CenterFace against a copied catalogue. A safe pilot requires orchestration that produces a reconciliation plan first and routes every candidate through this rollout boundary.
+### Slice 3A — durable candidate payload and human resolution state
 
-### Slice 3 — explicit ambiguity/new-face review and rollout orchestration
+PR #95 establishes the persistence contract needed to review and resume ambiguous candidates without re-running detector/alignment/embedding inference:
 
-Next, connect the selected CenterFace pipeline to the rollout planner and expose pending reconciliation cases to the local review workflow. The operator must be able to:
+- schema version `9` stores the exact candidate detector identity, confidence, aligned-crop provenance, SFace model identity and embedding vector before any canonical face occurrence is mutated;
+- a persisted candidate payload must exactly match the geometry and five landmarks already recorded in the reconciliation plan;
+- the candidate detector model/hash must match the processing run's registered detector-pipeline provenance;
+- ambiguous decisions are append-only human actions with one of three meanings: select an eligible existing occurrence, mark the candidate as genuinely new, or defer the decision;
+- selecting an existing occurrence is accepted only when it is one of the planner-persisted ambiguity options and belongs to the same immutable asset revision;
+- human resolution is rejected for already-unambiguous candidates and for candidates that have already been applied; and
+- repeated identical resolution requests are idempotent, while a later changed decision is preserved as another history row rather than rewriting earlier evidence.
 
+These human actions resolve **face-occurrence identity only**. They never create or change a person label, and no detector, embedding or geometry score is allowed to assign a person automatically.
+
+This sub-slice still does **not** expose a rollout command or authorize a pilot. Its purpose is to make the next orchestration/review layer resumable without keeping model outputs only in memory or requiring inference to be repeated after human review.
+
+### Slice 3B — rollout orchestration and local reconciliation review
+
+Next, connect the selected CenterFace pipeline to the rollout planner and the durable review state. The operator workflow must be able to:
+
+- plan an explicitly scoped set of immutable asset revisions before canonical mutation;
 - inspect the old and candidate geometry on the same source revision;
 - confirm a proposed old-to-new face mapping;
 - select the correct old occurrence when geometry is ambiguous;
 - mark the candidate as a genuinely new occurrence; or
 - leave the case deferred without changing existing assignments.
 
-The orchestration path must register the exact pipeline hash, persist the plan before applying candidate results, apply only unambiguous decisions automatically, and resume without creating duplicate new occurrences. No detector score, embedding score or geometry score may assign a person automatically.
+The orchestration path must register the exact pipeline hash, persist each reconciliation plan and candidate payload before applying candidate results, apply only unambiguous decisions automatically, and resume without creating duplicate new occurrences. Resolved ambiguous candidates must be applied from their persisted candidate payload rather than by re-running inference.
 
 Until this slice is implemented and tested, **do not run a CenterFace migration against either the canonical catalogue or a pilot copy**. The existing `batch start` command still uses the legacy ordinal-based writer.
 
 ### Slice 4 — pilot migration and rollback verification
 
-After Slice 3 is merged:
+After Slice 3B is merged:
 
 1. back up the canonical catalogue and generated-output roots;
 2. run the selected pipeline on a disposable copy of the established pilot/catalogue scope;
@@ -107,6 +122,8 @@ Only after that verification may the full-archive local rollout be authorised.
 - Newly detected faces receive new stable occurrence IDs.
 - An old occurrence that is not returned by CenterFace is retained; rollout does not erase historical evidence.
 - Ambiguity blocks automatic application for that candidate.
+- Human reconciliation history is append-only and does not assign a person.
+- Candidate detector/crop/embedding payload is persisted before canonical mutation so reviewed decisions are resumable.
 - Pipeline provenance distinguishes material detector/preprocessing/configuration changes even when the ONNX bytes are unchanged.
 - Detailed private face geometry, filenames and migration decisions stay outside Git.
 
@@ -114,9 +131,10 @@ Only after that verification may the full-archive local rollout be authorised.
 
 - [x] Detector-pipeline identity distinguishes materially different detection behaviour at the contract level.
 - [x] A dedicated persistence boundary records pipeline identity with rollout detector results and durable reconciliation evidence.
+- [x] Ambiguous candidates can retain exact candidate inspection payload and append-only human resolution evidence without mutating person labels.
 - [ ] All detector-migration execution is routed through reconciliation so existing reviewed faces cannot silently change person because detection ordering changed.
 - [ ] New faces are surfaced and reviewable without overwriting existing occurrences.
-- [ ] Ambiguous reconciliation requires human review in the local application/workflow.
+- [ ] Ambiguous reconciliation is operable through the local application/workflow and can be resumed safely.
 - [ ] Pilot reprocessing passes the accepted detector target and catalogue-history invariants.
 - [ ] Operator documentation and an exercised procedure explain migration, rollback and evidence retention.
 
