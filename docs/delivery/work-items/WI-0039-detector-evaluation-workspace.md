@@ -61,6 +61,20 @@ Pull request [#74](https://github.com/erikwasa/Photo-Identity-Indexer/pull/74) c
 
 Synthetic integration coverage verifies ground-truth freezing, isolated candidate attachment, changed-source rejection, correction persistence, restart recovery, metrics and gate export.
 
+### Follow-up: neutral candidate detections
+
+Later detector review showed that a stronger detector can legitimately find faces that were intentionally outside the fixed countable-face ground truth. Treating every such unmatched candidate as a false detection can penalize a detector for useful extra detections rather than actual false positives.
+
+The comparison workflow therefore supports a `Neutral` candidate outcome with deliberately narrow semantics:
+
+- the candidate detection must be a legitimate face detection that is outside the fixed countable-face scope;
+- neutral resolves the candidate review item but is not a match and therefore cannot increase recall;
+- neutral is excluded from the false-plus-duplicate M16 penalty;
+- a countable reference face that remains unmatched must still be resolved as a detector miss; and
+- neutral totals are retained in comparison summaries and CSV exports so historical corrections remain auditable.
+
+Existing private comparison JSON remains compatible because the new neutral collection defaults to empty when absent. Previous comparisons can therefore be reopened and corrected without regenerating detector runs or frozen ground truth.
+
 ## Acceptance criteria
 
 - [x] A selected run lists all of its photos, including zero-detection photos.
@@ -74,6 +88,7 @@ Synthetic integration coverage verifies ground-truth freezing, isolated candidat
 - [x] Face-level ground truth can be reused across later threshold and detector runs.
 - [x] Automatic matching is deterministic and surfaces ambiguous cases for human review.
 - [x] Category, source-group and M16 gate summaries can be exported for a candidate run.
+- [x] Legitimate out-of-scope candidate faces can be marked neutral without changing recall or false/duplicate gate arithmetic.
 
 ## Privacy
 
@@ -81,4 +96,4 @@ Photos, filenames, source paths, databases, detector outputs, ground-truth geome
 
 ## Completion boundary
 
-WI-0039 is complete after PR #74 merged into `main` on 2026-08-05. WI-0035 is now the active next step: freeze the completed confidence-0.9 ground truth, process confidence `0.8` in an isolated catalogue and compare it before deciding whether to continue with `0.7`, `0.6` and `0.5`.
+WI-0039 is complete after PR #74 merged into `main` on 2026-08-05. Later evaluation-workspace corrections, including neutral candidate disposition support, preserve that completed scope while improving the reusable M16 review tooling. WI-0035 through WI-0037 consume this workspace for governed detector comparisons.
