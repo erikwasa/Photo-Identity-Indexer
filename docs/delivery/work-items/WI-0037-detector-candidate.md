@@ -20,19 +20,19 @@ WI-0036 completed on 2026-08-07 without an acceptable YuNet configuration:
 - multi-scale confidence `0.9` improved on relevant earlier YuNet runs but failed the complete gate; and
 - multi-scale confidence `0.7` returned more than 100 false or duplicate detections, so confidence `0.6` was intentionally not run.
 
-WI-0037 was activated through PR #85. PR #86 added the first runnable CenterFace adapter, PR #87 surfaced durable batch failure reasons, PR #88 moved the pinned graph to the upstream-compatible OpenCV DNN runtime, PR #89 corrected N-D tensor marshalling, and PR #90 isolated OpenCV network state per image after human smoke review exposed cross-image corruption.
+WI-0037 was activated through PR #85. PR #86 added the first runnable CenterFace adapter, PR #87 surfaced durable batch failure reasons, PR #88 moved the pinned graph to the upstream-compatible OpenCV DNN runtime, PR #89 corrected N-D tensor marshalling, and PR #90 isolated OpenCV network state per image after human smoke review exposed cross-image corruption. PR #91 recorded the corrected repeat-smoke pass.
 
-## First candidate decision
+## Candidate decision
 
-The first qualification target is the upstream **CenterFace ONNX** model committed as `models/onnx/centerface.onnx` at `Star-Clouds/CenterFace@b82ec0c4844e89fd5a0305986aed9bdf33c72585`.
+The selected qualification target is the upstream **CenterFace ONNX** model committed as `models/onnx/centerface.onnx` at `Star-Clouds/CenterFace@b82ec0c4844e89fd5a0305986aed9bdf33c72585`.
 
-CenterFace is selected ahead of SCRFD for this first implementation increment because:
+CenterFace was selected ahead of SCRFD for this evaluation because:
 
 - it provides five facial landmarks and a compact local ONNX artifact;
 - its repository carries an MIT licence without the explicit non-commercial pretrained-model restriction stated by InsightFace for SCRFD weights; and
-- it offers a bounded CPU-oriented candidate before considering heavier or more encumbered alternatives.
+- it offered a bounded CPU-oriented candidate before considering heavier or more encumbered alternatives.
 
-This selection does **not** approve the model for production or redistribution. The project records the repository MIT licence as provisional weight evidence and separately records that WIDER FACE training-data rights are not asserted. Production promotion remains blocked if those boundaries cannot be defended for the intended use.
+The project records the repository MIT licence as provisional weight evidence and separately records that WIDER FACE training-data rights are not asserted. On 2026-08-07 the maintainer explicitly accepted that documented uncertainty for **local evaluation and private local rollout work**. That acceptance does not establish a right to redistribute the pretrained weights and does not remove the recorded production/redistribution caveat.
 
 See the [face detector candidate registry](../../models/face-detector-candidate-registry.md) for the screened alternatives and trade-offs.
 
@@ -58,11 +58,11 @@ PR #90 changed CenterFace to create and dispose a fresh OpenCV `Net` for every i
 
 Windows CI for the corrected PR head passed. The maintainer then repeated the same five disposable images and reported that face outputs matched the source images consistently on every image. The repeat run ID was not supplied to the repository evidence and is therefore not invented.
 
-The runtime-stability smoke gate is now cleared. The smoke evidence is not a detector-quality comparison and does not justify threshold tuning.
+The runtime-stability smoke gate was cleared without using the disposable smoke set for threshold selection.
 
 ## Runnable implementation
 
-The current implementation includes:
+The selected implementation includes:
 
 - an explicit fixed-versus-dynamic input-shape contract without changing existing fixed YuNet or SFace manifests;
 - a CenterFace model manifest with a `dynamic-multiple-of` policy, multiple `32` and pre-round maximum long edge `1600`;
@@ -80,9 +80,9 @@ Synthetic tests cover manifest provenance, dynamic-size preprocessing, BGR-to-RG
 
 See [CenterFace qualification](../../models/centerface-2019-qualification.md) and the [CenterFace detector runbook](../../operations/centerface-detector-runs.md).
 
-## First governed candidate
+## Governed M16 candidate
 
-The first complete M16 candidate remains predeclared as:
+The complete M16 comparison used the predeclared candidate without parameter changes:
 
 - detector `centerface-2019-fp32`;
 - runtime `opencv-dnn` with per-image network isolation;
@@ -94,33 +94,41 @@ The first complete M16 candidate remains predeclared as:
 - padding `0.25`; and
 - the unchanged WI-0034 source photos, hashes, frozen ground truth, countable-face rule, comparison IoU and category metadata.
 
-Review the complete confidence-`0.5` M16 result before approving any follow-up configuration.
+PR #92 added a narrow `Neutral` comparison outcome for legitimate face detections that were intentionally outside the frozen countable-face scope. Neutral resolves review workload but does not add a matched face and therefore cannot improve recall; it is also excluded from the false-plus-duplicate penalty. This preserves the fixed counting rule while avoiding an artificial penalty for useful out-of-scope face detections.
+
+## Final evaluation decision
+
+On 2026-08-07 the maintainer completed the governed private 100-photo CenterFace comparison and reported that it **passed the complete M16 gate**. Detailed private recall, category and review data remain outside Git.
+
+The privacy-safe conclusion is:
+
+- overall recall met or exceeded `90%`;
+- recall on photos with at least five countable faces met or exceeded `85%`;
+- false plus duplicate detections remained at or below `10` after human review under the fixed counting rule; and
+- no material archive-workflow failure category remained.
+
+CenterFace confidence `0.5` single-pass is therefore the first accepted detector pipeline from M16 and advances to [WI-0038](WI-0038-detector-rollout.md) for safe local-catalogue rollout.
+
+This selection does not permit ordinal-based replacement of existing reviewed face occurrences. WI-0038 must preserve people, assignments, rejections and append-only review history while reconciling the changed face population by geometry and landmarks.
 
 ## Scope
 
-- Select a candidate with an acceptable licence, provenance and local runtime path.
+- Select a candidate with an acceptable documented local-use boundary, provenance and runtime path.
 - Pin exact model identity, hash, preprocessing and output semantics.
 - Adapt landmarks or alignment inputs without weakening the SFace contract.
 - Compare the candidate on the exact WI-0034 sample.
-- Include recall by category, false detections, runtime and review effort.
+- Include recall by category, false detections, runtime and review effort in the private evidence.
 
 ## Acceptance criteria
 
 - [x] Candidate licensing and training-data limitations are documented.
 - [x] Exact model and first-candidate preprocessing provenance is pinned by model hash, checked-in manifest and implementation revision.
-- [ ] The comparison uses unchanged source photos and ground truth.
+- [x] The comparison uses unchanged source photos and ground truth.
 - [x] No score automatically becomes a canonical person label.
-- [ ] A human-reviewed recommendation identifies the first acceptable pipeline.
+- [x] A human-reviewed recommendation identifies the first acceptable pipeline.
 
-## Evaluation boundary
+## Completion boundary
 
-The runtime smoke blocker is cleared. Before processing the complete private sample:
+WI-0037 is complete. Preserve the private comparison, candidate catalogue, exported summaries and run log as M16 evidence.
 
-1. spot-check several aligned crops if the successful repeat review covered only counts/boxes rather than aligned outputs; and
-2. the maintainer must explicitly accept the documented CenterFace weight/training-data uncertainty for this local evaluation.
-
-Once those governance checks are satisfied, use a new isolated candidate catalogue, output directory and log and process the unchanged 100-photo sample exactly once at confidence `0.5`. The durable run configuration records detector model ID, confidence and pipeline, while persisted detections/results carry the detector model hash. Record the exact repository commit with the private candidate log because runtime and bounded input semantics live in the checked-in manifest and adapter implementation.
-
-## Gate
-
-The first candidate meeting the complete M16 target continues to WI-0038. If CenterFace fails after a valid full comparison or cannot clear governance, record the remaining gap and select the next governed candidate or one explicitly justified CenterFace follow-up configuration only after the full result is reviewed.
+Any broader redistribution or deployment decision remains subject to the recorded pretrained-weight/training-data uncertainty. The next engineering boundary is WI-0038: create a versioned detector-pipeline identity, reconcile detections without ordinal-only remapping, route ambiguity/new faces through review, reprocess the pilot safely and retain a rollback path.
