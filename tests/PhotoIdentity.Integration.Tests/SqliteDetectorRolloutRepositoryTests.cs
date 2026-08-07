@@ -63,7 +63,7 @@ public sealed class SqliteDetectorRolloutRepositoryTests
             {
                 using SqliteCommand version = upgraded.CreateCommand();
                 version.CommandText = "PRAGMA user_version;";
-                Assert.Equal(8L, Convert.ToInt64(await version.ExecuteScalarAsync()));
+                Assert.Equal(SqliteCatalogueDatabase.CurrentSchemaVersion, Convert.ToInt64(await version.ExecuteScalarAsync()));
 
                 using SqliteCommand tables = upgraded.CreateCommand();
                 tables.CommandText = """
