@@ -8,6 +8,7 @@ The first candidate is:
 
 - detector model `centerface-2019-fp32`;
 - SHA-256 `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe`;
+- execution runtime `opencv-dnn`;
 - detector confidence `0.5`;
 - detector pipeline `single-pass`;
 - RGB float32 input with scale `1.0` and zero mean;
@@ -18,6 +19,16 @@ The first candidate is:
 - unchanged `sface-five-point-v1` alignment.
 
 Do not change the confidence, maximum input edge, resize rule, NMS or landmark mapping during the first candidate run. A changed value is a separately approved candidate, not a retry of the same run.
+
+## Runtime correction after the first smoke
+
+The first five-image smoke run used ONNX Runtime and run ID `fbe99826-96ce-44af-b64f-3e6a3b8d93b1`. All five jobs failed before detector output because the pinned upstream ONNX artifact declares stale static input metadata equivalent to `10 x 3 x 32 x 32`. ONNX Runtime rejected the governed photo-dependent tensors.
+
+That run is retained as runtime-compatibility evidence. It is **not** detector-quality evidence and does not justify changing confidence or preprocessing.
+
+The pinned upstream CenterFace reference executes this same ONNX artifact through OpenCV DNN with dimensions rounded to multiples of `32`. The project therefore keeps the same ONNX bytes, preprocessing, decoder, confidence and smoke images while changing only the execution runtime to OpenCV DNN.
+
+Do not reuse the failed ONNX Runtime database for the corrected smoke.
 
 ## 1. Validate the implementation on Windows
 
@@ -43,27 +54,32 @@ dotnet run --project .\tools\PhotoIdentity.Docs --configuration Release --no-bui
 if ($LASTEXITCODE -ne 0) { throw "Generated documentation is stale." }
 ```
 
-The CenterFace unit coverage must run as part of the normal solution test suite. Do not continue if the model-manifest, decoder, preprocessing or existing YuNet tests fail.
+Do not continue if the model-manifest, decoder, preprocessing or existing YuNet tests fail.
 
-## 2. Install the exact model
+## 2. Install and re-verify the exact model
 
 ```powershell
 Set-Location -LiteralPath $repo
 
 .\models\install-models.ps1 -Id centerface-2019-fp32
+.\models\inspect-centerface-candidate.ps1 -OutputPath .\models\installed\centerface-2019-fp32\centerface.onnx
 ```
 
-The installer must accept only the exact manifest byte size and SHA-256. Do not manually rename or substitute another CenterFace ONNX graph.
+The installed file must still report SHA-256:
 
-## 3. Run a bounded functional smoke test
+`77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe`
 
-Use a small disposable folder of roughly three to five representative images that are **not** part of the fixed M16 100-photo sample. The smoke test answers only whether the graph loads, inference completes, geometry is plausible and aligned crops are usable. Do not use it to tune confidence.
+Do not manually rename or substitute another CenterFace ONNX graph.
 
-Example:
+## 3. Repeat the bounded functional smoke through OpenCV DNN
+
+Use the same small disposable folder of roughly three to five representative images that are **not** part of the fixed M16 100-photo sample. The smoke test answers only whether the graph loads, inference completes, geometry is plausible and aligned crops are usable. Do not use it to tune confidence.
+
+Use a **new** root so the failed ONNX Runtime evidence remains intact:
 
 ```powershell
 $smokeSource = "C:\PhotoIdentity\M16\centerface-smoke-source"
-$smokeRoot = "C:\PhotoIdentity\M16\runs\centerface-smoke-050"
+$smokeRoot = "C:\PhotoIdentity\M16\runs\centerface-smoke-opencv-050"
 $smokeDb = Join-Path $smokeRoot "catalogue.db"
 $smokeOutput = Join-Path $smokeRoot "outputs"
 $smokeLog = Join-Path $smokeRoot "batch-start.log"
@@ -92,7 +108,7 @@ Set-Location -LiteralPath $repo
     --detector-pipeline single-pass 2>&1 | Tee-Object -FilePath $smokeLog
 
 if ($LASTEXITCODE -ne 0) {
-    throw "CenterFace smoke processing failed."
+    throw "CenterFace OpenCV DNN smoke processing failed."
 }
 ```
 
@@ -113,7 +129,7 @@ dotnet run `
 
 The smoke passes only when:
 
-- all intended images finish without model or ONNX Runtime errors;
+- all intended images finish without OpenCV DNN/model errors;
 - the printed detector model is `centerface-2019-fp32`;
 - the detector confidence is `0.5` and pipeline is `single-pass`;
 - detected boxes are visually plausible on the disposable images;
@@ -128,8 +144,9 @@ If landmark alignment looks mirrored or otherwise systematically wrong, stop. Co
 
 Before the full run, record that:
 
-- the Windows build/tests and runtime smoke passed;
-- the maintainer accepts the documented repository/model-weight interpretation and the unresolved WIDER FACE training-data limitation for this local evaluation; and
+- the current Windows build/tests and corrected OpenCV DNN smoke passed;
+- the exact model hash remained unchanged;
+- the maintainer accepts the documented repository/model-weight interpretation and unresolved WIDER FACE training-data limitation for this local evaluation; and
 - no smoke observation caused a threshold or preprocessing change.
 
 Only then process the fixed M16 sample.
@@ -140,7 +157,7 @@ Use a new isolated database, output directory and log. Keep the private source s
 
 ```powershell
 $sample = "C:\PhotoIdentity\M16\sample"
-$candidateName = "centerface-050"
+$candidateName = "centerface-opencv-050"
 $candidateRoot = "C:\PhotoIdentity\M16\runs\$candidateName"
 $candidateDb = Join-Path $candidateRoot "catalogue.db"
 $candidateOutput = Join-Path $candidateRoot "outputs"
@@ -217,7 +234,7 @@ Set-Location -LiteralPath "C:\PhotoIdentity\M16\review-app"
 dotnet .\PhotoIdentity.Api.dll --urls "http://127.0.0.1:5080"
 ```
 
-Open `http://localhost:5080/detector-comparisons`, select the immutable `M16 confidence 0.9 baseline`, select the completed CenterFace run and create a comparison whose name records `centerface-2019-fp32` and confidence `0.5`.
+Open `http://localhost:5080/detector-comparisons`, select the immutable `M16 confidence 0.9 baseline`, select the completed CenterFace run and create a comparison whose name records `centerface-2019-fp32`, `opencv-dnn` and confidence `0.5`.
 
 Comparison creation must verify the exact source filename set and every source SHA-256 before review begins.
 

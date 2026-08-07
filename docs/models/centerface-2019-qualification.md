@@ -2,7 +2,7 @@
 
 Status date: 2026-08-07
 
-State: **exact artifact verified and adapter implemented; Windows runtime smoke required before the private M16 sample**
+State: **exact artifact verified; ONNX Runtime incompatibility reproduced; upstream-compatible OpenCV DNN runtime awaiting repeat smoke**
 
 This record is the active qualification evidence for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). Model bytes remain outside Git.
 
@@ -18,21 +18,33 @@ This record is the active qualification evidence for [WI-0037](../delivery/work-
 | Upstream Git blob SHA-1 | `1487d5fe214feb569865b225216b24c8f4ef1050` |
 | Byte size | `7,532,772` bytes |
 | SHA-256 | `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe` |
-| Format/runtime | ONNX / ONNX Runtime |
+| Format/runtime | ONNX / OpenCV DNN |
 
-The maintainer ran [`models/inspect-centerface-candidate.ps1`](../../models/inspect-centerface-candidate.ps1) on Windows on 2026-08-07. The immutable download matched the expected byte size and Git blob identity and produced the SHA-256 above. The checked-in [`centerface-2019-fp32` manifest](../../models/manifests/centerface-2019-fp32.json) now pins those exact bytes, and the inspector itself now rejects any later SHA-256 mismatch.
+The maintainer ran [`models/inspect-centerface-candidate.ps1`](../../models/inspect-centerface-candidate.ps1) on Windows on 2026-08-07. The immutable download matched the expected byte size and Git blob identity and produced the SHA-256 above. The checked-in [`centerface-2019-fp32` manifest](../../models/manifests/centerface-2019-fp32.json) pins those exact bytes.
+
+## Runtime compatibility finding
+
+The first disposable five-image smoke run used ONNX Runtime at confidence `0.5`, `single-pass`, with the governed dynamic multiple-of-32 input policy. All five jobs failed before detector output was produced. The durable run ID was `fbe99826-96ce-44af-b64f-3e6a3b8d93b1`.
+
+The persisted errors showed that the pinned ONNX graph declares static input metadata equivalent to `10 x 3 x 32 x 32`. ONNX Runtime therefore rejected the intended project inputs such as `1 x 3 x 1216 x 1600`, `1 x 3 x 1280 x 1280` and other bounded photo-dependent shapes.
+
+This failure is a runtime-contract incompatibility, not detector-quality evidence. It does not justify changing confidence, preprocessing or the private evaluation sample.
+
+The pinned upstream CenterFace Python reference loads this same ONNX artifact through OpenCV DNN, rounds image dimensions up to multiples of `32`, builds an RGB float32 blob at the resulting dimensions and requests outputs `537`, `538`, `539` and `540`. The project therefore keeps the exact model bytes and governed preprocessing/decoder semantics but switches the execution runtime from ONNX Runtime to OpenCV DNN.
+
+The failed ONNX Runtime smoke remains retained as evidence. Do not rewrite it as a successful or partially successful detector run.
 
 ## Governed input policy
 
 CenterFace's upstream implementation accepts source-dependent input dimensions. Treating it as a fixed `640x640` model would incorrectly hide preprocessing changes under one model identity.
 
-The first governed project revision therefore records:
+The first governed project revision records:
 
 - `640x640` as a reference manifest size, not a forced runtime tensor size;
 - RGB float32 input, scale `1.0`, zero mean;
 - source long edge bounded to `1600` pixels before multiple rounding;
 - each bounded dimension rounded up to a multiple of `32`;
-- direct bilinear resize to that runtime tensor, matching the upstream `blobFromImage(..., crop=false)` resize behavior; and
+- direct bilinear resize to that runtime tensor; and
 - the resulting input-shape policy in the checked-in model manifest.
 
 Rounding can make the final runtime tensor dimension slightly greater than `1600`; the `1600` limit applies before rounding to the required multiple of `32`.
@@ -41,7 +53,7 @@ Changing the maximum edge, resize rule or multiple later is a new governed pipel
 
 ## Decoder contract
 
-The pinned upstream Python implementation:
+The pinned upstream implementation:
 
 - requests outputs `537`, `538`, `539` and `540` as heatmap, scale, offset and landmarks;
 - decodes heatmap positions at stride four;
@@ -51,7 +63,7 @@ The pinned upstream Python implementation:
 - decodes five landmark pairs relative to each recovered box; and
 - applies non-maximum suppression at IoU `0.30`.
 
-The project adapter freezes those semantics and adds deterministic candidate ordering and suppression. It fails closed when required outputs are missing, have unexpected shapes or are not float32.
+The project adapter freezes those semantics and adds deterministic candidate ordering and suppression. It fails closed when required outputs are missing, have unexpected shapes or cannot be read as float32.
 
 ## Alignment compatibility
 
@@ -63,20 +75,18 @@ CenterFace emits five points. The project mapping is frozen as:
 4. anatomical right mouth corner; and
 5. anatomical left mouth corner.
 
-The upstream decoder establishes the five-point tensor layout but does not label the anatomy in code. The anatomical interpretation is independently corroborated by the DeepFace CenterFace adapter, which explicitly names the same point order. The project maps these native points into `NormalizedFaceLandmarks` and leaves `sface-five-point-v1` unchanged.
-
-Synthetic tests lock that mapping and its box/landmark math. A Windows smoke run must still visually confirm plausible aligned crops before the private 100-photo comparison; this protects against a formally consistent but semantically wrong landmark interpretation.
+The project maps these native points into `NormalizedFaceLandmarks` and leaves `sface-five-point-v1` unchanged. Synthetic tests lock the mapping and box/landmark math. A Windows smoke run must still visually confirm plausible aligned crops before the private 100-photo comparison.
 
 ## Detector selection and provenance
 
-The local batch worker now chooses a detector adapter by exact detector model ID:
+The local batch worker chooses a detector adapter by exact detector model ID:
 
 - `yunet-2023mar-fp32` retains the existing single-pass and multi-scale behavior;
-- `centerface-2019-fp32` uses the CenterFace adapter and only permits `single-pass`.
+- `centerface-2019-fp32` uses the CenterFace adapter through OpenCV DNN and only permits `single-pass`.
 
-The durable batch configuration records detector model ID, confidence and pipeline, while persisted face observations and results record the detector model hash. The CenterFace input policy is defined by the checked-in manifest and adapter implementation rather than duplicated into the older batch configuration schema.
+The exact CenterFace ONNX SHA-256 is unchanged by the runtime correction. The manifest runtime field now records `opencv-dnn`; a future change back to another execution runtime is a governed pipeline change and must not be silently compared as if identical.
 
-For this governed evaluation, the operator runbook therefore records the exact repository commit and re-verifies the installed model immediately before processing. Keep that commit and manifest unchanged when resuming the candidate. A future preprocessing-policy change requires a new governed candidate and must not reuse this result as if it were identical.
+The durable batch configuration records detector model ID, confidence and pipeline, while persisted face observations and results record the detector model hash. Record the exact repository commit with each private candidate run because runtime/preprocessing semantics are defined by the checked-in manifest and adapter implementation.
 
 ## Licence and training-data boundary
 
@@ -91,21 +101,23 @@ Local evaluation may proceed only under the maintainer's acceptance of this docu
 - [x] The immutable download matches `7,532,772` bytes.
 - [x] The calculated Git blob SHA-1 matches `1487d5fe214feb569865b225216b24c8f4ef1050`.
 - [x] The SHA-256 `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe` is recorded in the manifest.
-- [x] A bounded dynamic input-shape policy is pinned rather than pretending the graph is fixed `640x640`.
+- [x] A bounded dynamic input-shape policy is pinned rather than pretending the candidate is fixed `640x640`.
 - [x] Resize, colour order, scale and multiple-of-32 semantics are frozen.
 - [x] Heatmap, scale, offset, landmark decoding, thresholding and deterministic NMS have synthetic unit coverage.
 - [x] The proposed landmark mapping is explicit and covered by tests.
-- [ ] Repository build and tests pass on the supported Windows toolchain.
-- [ ] ONNX Runtime loads the exact graph and accepts a bounded dynamic input on Windows.
+- [x] The original implementation branch passed repository build/tests and documentation checks on Windows CI before the real-model smoke.
+- [x] The first real ONNX Runtime smoke reproduced a static-input incompatibility on all five disposable images and preserved the errors durably.
+- [ ] The OpenCV DNN runtime-correction branch passes Windows CI.
+- [ ] OpenCV DNN loads the exact graph and completes inference at the governed photo-dependent input dimensions.
 - [ ] The required outputs are observed with the expected float32 shapes during real inference.
 - [ ] Human smoke review confirms plausible boxes and `sface-five-point-v1` aligned crops.
 - [ ] The maintainer accepts the documented licence and training-data boundary for local evaluation.
 
 ## Remaining gate before the 100-photo comparison
 
-Run the bounded smoke procedure in [`docs/operations/centerface-detector-runs.md`](../operations/centerface-detector-runs.md). Do not tune the confidence threshold using the smoke images; it is a functional/runtime check only.
+Repeat the bounded smoke procedure in [`docs/operations/centerface-detector-runs.md`](../operations/centerface-detector-runs.md) using a **fresh** smoke database/output root while keeping the same disposable smoke images and confidence `0.5`. Do not reuse the failed ONNX Runtime catalogue and do not tune the confidence threshold from the smoke images.
 
-If the smoke succeeds, the first governed private candidate is:
+If the OpenCV DNN smoke succeeds, the first governed private candidate remains:
 
 - detector `centerface-2019-fp32`;
 - confidence `0.5`;

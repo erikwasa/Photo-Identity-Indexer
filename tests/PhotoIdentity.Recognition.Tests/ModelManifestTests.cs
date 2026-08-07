@@ -38,6 +38,7 @@ public sealed class ModelManifestTests
         Assert.Equal(ModelInputShapeKind.DynamicMultipleOf, centerFace.InputShapePolicy.Kind);
         Assert.Equal(32, centerFace.InputShapePolicy.MultipleOf);
         Assert.Equal(1600, centerFace.InputShapePolicy.MaximumLongEdge);
+        Assert.Equal("opencv-dnn", centerFace.Runtime);
         Assert.Equal(7_532_772, centerFaceManifest.SizeBytes);
         Assert.Equal(
             "77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe",
