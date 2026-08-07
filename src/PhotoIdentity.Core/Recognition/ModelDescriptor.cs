@@ -43,14 +43,14 @@ public sealed record ModelInputShapePolicy
 
         if (kind == ModelInputShapeKind.DynamicMultipleOf)
         {
-            if (multipleOf <= 0)
+            if (multipleOf is null or <= 0)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(multipleOf),
                     "Dynamic-multiple input shapes require a positive multiple.");
             }
 
-            if (maximumLongEdge <= 0)
+            if (maximumLongEdge is null or <= 0)
             {
                 throw new ArgumentOutOfRangeException(
                     nameof(maximumLongEdge),
