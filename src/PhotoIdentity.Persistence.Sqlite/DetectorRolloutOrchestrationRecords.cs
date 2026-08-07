@@ -9,6 +9,11 @@ public sealed record CatalogueDetectorRolloutOccurrenceAnchor(
     NormalizedBoundingBox BoundingBox,
     NormalizedFaceLandmarks Landmarks);
 
+public sealed record CatalogueDetectorRolloutPendingReview(
+    ProcessingRunId ProcessingRunId,
+    AssetRevisionId AssetRevisionId,
+    CatalogueDetectorReconciliationReview Review);
+
 public sealed record CatalogueDetectorRolloutSummary(
     ProcessingRunId ProcessingRunId,
     int RevisionCount,
