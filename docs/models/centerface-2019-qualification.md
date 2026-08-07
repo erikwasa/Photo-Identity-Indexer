@@ -2,7 +2,7 @@
 
 Status date: 2026-08-07
 
-State: **exact artifact verified; ONNX Runtime incompatibility reproduced; OpenCV DNN inference reached real outputs; N-D output marshalling correction awaiting repeat smoke**
+State: **exact artifact verified; OpenCV DNN functional smoke completed successfully; human box/alignment review pending**
 
 This record is the active qualification evidence for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). Model bytes remain outside Git.
 
@@ -34,9 +34,13 @@ The pinned upstream CenterFace Python reference loads this same ONNX artifact th
 
 The second disposable five-image smoke run used OpenCV DNN with durable run ID `8a74c35e-e214-47e6-ad47-176bebc6d7e3`. OpenCV DNN accepted the governed photo-dependent inputs and reached real CenterFace output `537` on all five jobs. Every job then failed in the managed adapter with `CenterFace output '537' could not be read as float32 data.`
 
-That second failure exposed an output-marshalling bug rather than a graph or detector-quality failure. OpenCvSharp's `Mat.GetArray<T>` convenience path sizes its destination from the two-dimensional `Rows * Cols` view, while CenterFace DNN outputs are four-dimensional `[N,C,H,W]` tensors. PR #89 replaces that 2-D convenience path with explicit N-D shape validation and contiguous float-buffer copying. The exact model, runtime, preprocessing, decoder and confidence remain unchanged.
+That second failure exposed an output-marshalling bug rather than a graph or detector-quality failure. OpenCvSharp's `Mat.GetArray<T>` convenience path sizes its destination from the two-dimensional `Rows * Cols` view, while CenterFace DNN outputs are four-dimensional `[N,C,H,W]` tensors. PR #89 replaced that 2-D convenience path with explicit N-D shape validation and contiguous float-buffer copying. The exact model, runtime, preprocessing, decoder and confidence remained unchanged.
 
-Both failed smoke catalogues remain retained as runtime/adapter evidence. Do not rewrite either as a successful or partially successful detector-quality run.
+The third disposable five-image smoke run used the N-D marshalling correction with durable run ID `84f6f779-5a56-4e85-8d41-ee8569dce4d2`. It completed successfully: all five intended images were processed, with `5` succeeded, `0` failed and no cancelled jobs at confidence `0.5`, `single-pass`, using `centerface-2019-fp32` with `sface-2021dec-fp32` and padding `0.25`.
+
+This third run clears the functional graph-execution, required-output-copy and batch-processing gates. It does not yet clear the human geometry gate: detected boxes and several generated `aligned.png` crops must still be visually checked for plausible face localisation and correct eye/nose/mouth alignment before the private 100-photo comparison is authorised.
+
+Both failed smoke catalogues and the successful third smoke catalogue remain retained as runtime/adapter evidence. The first two are not detector-quality results; the third is functional smoke evidence only and must not be used for confidence tuning.
 
 ## Governed input policy
 
@@ -113,16 +117,16 @@ Local evaluation may proceed only under the maintainer's acceptance of this docu
 - [x] The first real ONNX Runtime smoke reproduced a static-input incompatibility on all five disposable images and preserved the errors durably.
 - [x] The OpenCV DNN runtime correction passed Windows CI.
 - [x] OpenCV DNN loads the exact graph and reaches real output `537` at the governed photo-dependent input dimensions.
-- [ ] The N-D output-marshalling correction passes Windows CI.
-- [ ] All required outputs are copied with the expected float32 `[N,C,H,W]` shapes during real inference.
+- [x] The N-D output-marshalling correction passes Windows CI.
+- [x] All required outputs can be copied and the complete five-image real-model batch finishes successfully.
 - [ ] Human smoke review confirms plausible boxes and `sface-five-point-v1` aligned crops.
 - [ ] The maintainer accepts the documented licence and training-data boundary for local evaluation.
 
 ## Remaining gate before the 100-photo comparison
 
-Repeat the bounded smoke procedure in [`docs/operations/centerface-detector-runs.md`](../operations/centerface-detector-runs.md) using a **fresh** smoke database/output root while keeping the same disposable smoke images and confidence `0.5`. Do not reuse either failed smoke catalogue and do not tune the confidence threshold from the smoke images.
+Visually review the successful smoke run `84f6f779-5a56-4e85-8d41-ee8569dce4d2`. Check the detected boxes and several generated `aligned.png` crops for plausible face localisation and sensible eye/nose/mouth alignment. If the crops are mirrored, grossly displaced or systematically misframed, stop and correct the mapping/decoder before touching the private sample.
 
-If the corrected OpenCV DNN smoke succeeds, the first governed private candidate remains:
+If the human smoke review passes and the maintainer accepts the documented licence/training-data boundary for this local evaluation, the first governed private candidate remains:
 
 - detector `centerface-2019-fp32`;
 - confidence `0.5`;
