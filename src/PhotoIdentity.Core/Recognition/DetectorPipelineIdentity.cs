@@ -134,8 +134,8 @@ public sealed record DetectorPipelineDefinition
     public string ToCanonicalText()
     {
         string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
-        string Optional(double? value) => value.HasValue ? Number(value.Value) : "-";
-        string Optional(int? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "-";
+        string OptionalDouble(double? value) => value.HasValue ? Number(value.Value) : "-";
+        string OptionalInt(int? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "-";
 
         return string.Join('\n',
         [
@@ -149,17 +149,17 @@ public sealed record DetectorPipelineDefinition
             $"resize={ResizePolicy}",
             $"input-size={InputWidth.ToString(CultureInfo.InvariantCulture)}x{InputHeight.ToString(CultureInfo.InvariantCulture)}",
             $"input-shape-policy={InputShapePolicy}",
-            $"input-multiple={Optional(InputMultipleOf)}",
-            $"maximum-long-edge={Optional(MaximumLongEdge)}",
+            $"input-multiple={OptionalInt(InputMultipleOf)}",
+            $"maximum-long-edge={OptionalInt(MaximumLongEdge)}",
             $"colour-order={ColourOrder}",
             $"data-type={DataType}",
             $"input-scale={Number(InputScale)}",
-            $"input-mean={string.Join(',', InputMean.Select(Number))}",
+            $"input-mean={string.Join(",", InputMean.Select(Number))}",
             $"detector-nms={Number(DetectorNmsThreshold)}",
             $"detector-top-k={DetectorTopK.ToString(CultureInfo.InvariantCulture)}",
-            $"tile-size={Optional(TileSize)}",
-            $"tile-overlap={Optional(TileOverlap)}",
-            $"merge-nms={Optional(MergeNmsThreshold)}",
+            $"tile-size={OptionalInt(TileSize)}",
+            $"tile-overlap={OptionalDouble(TileOverlap)}",
+            $"merge-nms={OptionalDouble(MergeNmsThreshold)}",
             $"rotation={RotationPolicy}",
         ]);
     }
