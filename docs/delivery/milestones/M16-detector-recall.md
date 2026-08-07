@@ -42,7 +42,7 @@ Confidence `0.6` was intentionally not run because a lower threshold could not p
 
 WI-0037 then qualified CenterFace using the exact pinned ONNX artifact and unchanged first-candidate configuration. Runtime qualification moved the graph to OpenCV DNN, corrected N-D output marshalling and isolated native network state per image without tuning the detector from the disposable smoke set.
 
-On 2026-08-07 the maintainer explicitly accepted the documented CenterFace pretrained-weight/training-data uncertainty for local evaluation and private local rollout work. The maintainer then completed the governed CenterFace confidence `0.5`, `single-pass` comparison against the unchanged 100-photo sample and frozen ground truth and reported that it **passed the complete M16 gate**. Detailed metrics remain private.
+On 2026-08-07 the maintainer explicitly accepted the documented CenterFace pretrained-weight/training-data uncertainty for local evaluation. The maintainer then completed the governed CenterFace confidence `0.5`, `single-pass` comparison against the unchanged 100-photo sample and frozen ground truth, reported that it **passed the complete M16 gate**, and instructed WI-0038 rollout engineering to continue. Detailed metrics remain private.
 
 PR #92 added a narrow `Neutral` review outcome for legitimate face detections outside the frozen countable-face scope. Neutral does not increase recall and is excluded from the false-plus-duplicate penalty, so useful out-of-scope face detections no longer create an artificial false-positive penalty while the original counting rule remains fixed.
 
@@ -61,7 +61,7 @@ The selected local pipeline is:
 
 The remaining M16 work is safe catalogue rollout, not detector selection. Existing face occurrences are stable identity anchors, and current local persistence historically resolves `(asset revision, ordinal)` collisions to the existing occurrence. Because CenterFace changes face count and ordering, WI-0038 must add versioned full-pipeline provenance and reconcile new detections by geometry and five-point landmarks before any canonical reprocessing can reuse an existing reviewed occurrence.
 
-This evaluation and rollout planning remain separate from automatic identity decisions. Detector judgements and reconciliation scores must not create person assignments, rejection actions or synthetic identities.
+The local-evaluation licence acceptance does not establish redistribution rights. This evaluation and rollout planning remain separate from automatic identity decisions. Detector judgements and reconciliation scores must not create person assignments, rejection actions or synthetic identities.
 
 See [M16 detector evaluation workspace status](../status/M16-detector-evaluation-workspace.md) and the [detector rollout runbook](../../operations/detector-rollout.md).
 
