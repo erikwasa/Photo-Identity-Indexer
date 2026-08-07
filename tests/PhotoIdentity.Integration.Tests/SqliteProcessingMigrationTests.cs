@@ -49,6 +49,15 @@ public sealed class SqliteProcessingMigrationTests
                         completed_at_utc TEXT NULL,
                         error TEXT NULL,
                         UNIQUE (processing_run_id, asset_revision_id));
+                    CREATE TABLE face_observations (
+                        face_occurrence_id TEXT NOT NULL,
+                        detector_model_id TEXT NOT NULL,
+                        detector_model_hash TEXT NOT NULL,
+                        confidence REAL NOT NULL,
+                        bounding_box_json TEXT NOT NULL,
+                        landmarks_json TEXT NOT NULL,
+                        observed_at_utc TEXT NOT NULL,
+                        PRIMARY KEY (face_occurrence_id, detector_model_id, detector_model_hash));
                     INSERT INTO schema_migrations (version, applied_at_utc) VALUES (1, $now);
                     INSERT INTO schema_migrations (version, applied_at_utc) VALUES (2, $now);
                     INSERT INTO processing_runs (
