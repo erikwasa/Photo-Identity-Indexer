@@ -1,5 +1,6 @@
 using System.Globalization;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
 
@@ -296,6 +297,7 @@ internal static class BatchCommandRunner
             options.RunId!.Value,
             cancellationToken);
         WriteSummary(summary, output);
+        await WriteFailureSummaryAsync(repository, summary, output, cancellationToken);
         return summary.FailedJobs == 0 ? 0 : 1;
     }
 
@@ -339,6 +341,11 @@ internal static class BatchCommandRunner
         output.WriteLine($"scan-deleted: {result.ScanSummary.MarkedDeletedCount}");
         output.WriteLine($"scan-unsupported: {result.UnsupportedFileCount}");
         WriteSummary(result.ProcessingSummary, output);
+        await WriteFailureSummaryAsync(
+            new SqliteProcessingRepository(database),
+            result.ProcessingSummary,
+            output,
+            cancellationToken);
         return result.ProcessingSummary.FailedJobs == 0 ? 0 : 1;
     }
 
@@ -364,7 +371,45 @@ internal static class BatchCommandRunner
             cancellationToken);
         WriteConfiguration(configuration, output);
         WriteSummary(result.Summary, output);
+        await WriteFailureSummaryAsync(
+            new SqliteProcessingRepository(database),
+            result.Summary,
+            output,
+            cancellationToken);
         return result.Summary.FailedJobs == 0 ? 0 : 1;
+    }
+
+    private static async Task WriteFailureSummaryAsync(
+        SqliteProcessingRepository repository,
+        ProcessingRunSummary summary,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
+        if (summary.FailedJobs == 0)
+        {
+            return;
+        }
+
+        IReadOnlyList<CatalogueProcessingJob> jobs = await repository.GetJobsAsync(
+            summary.RunId,
+            cancellationToken);
+        IGrouping<string, CatalogueProcessingJob>[] failures = jobs
+            .Where(job => job.Status == ProcessingJobStatus.Failed && !string.IsNullOrWhiteSpace(job.Error))
+            .GroupBy(job => job.Error!.Trim(), StringComparer.Ordinal)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key, StringComparer.Ordinal)
+            .ToArray();
+
+        foreach (IGrouping<string, CatalogueProcessingJob> failure in failures)
+        {
+            output.WriteLine($"failure[{failure.Count()}]: {failure.Key}");
+        }
+
+        int withoutMessage = summary.FailedJobs - failures.Sum(group => group.Count());
+        if (withoutMessage > 0)
+        {
+            output.WriteLine($"failure[{withoutMessage}]: <no error recorded>");
+        }
     }
 
     private static void WriteConfiguration(LocalBatchConfiguration configuration, TextWriter output)
