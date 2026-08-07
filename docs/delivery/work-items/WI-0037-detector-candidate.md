@@ -20,7 +20,7 @@ WI-0036 completed on 2026-08-07 without an acceptable YuNet configuration:
 - multi-scale confidence `0.9` improved on relevant earlier YuNet runs but failed the complete gate; and
 - multi-scale confidence `0.7` returned more than 100 false or duplicate detections, so confidence `0.6` was intentionally not run.
 
-WI-0037 was activated through PR #85. PR #86 added the first runnable CenterFace adapter and passed Windows CI. PR #87 made durable batch failure reasons visible after the first real-model smoke exposed a runtime incompatibility.
+WI-0037 was activated through PR #85. PR #86 added the first runnable CenterFace adapter, PR #87 surfaced durable batch failure reasons, PR #88 moved the pinned graph to the upstream-compatible OpenCV DNN runtime, PR #89 corrected N-D tensor marshalling, and PR #90 isolated OpenCV network state per image after human smoke review exposed cross-image corruption.
 
 ## First candidate decision
 
@@ -46,17 +46,21 @@ The maintainer ran `models/inspect-centerface-candidate.ps1` on Windows on 2026-
 
 Those bytes remain pinned by the immutable `centerface-2019-fp32` manifest.
 
-## Runtime smoke finding
+## Runtime qualification
 
-The first five-image disposable smoke run used ONNX Runtime with the predeclared confidence `0.5`, `single-pass` pipeline and bounded multiple-of-32 input policy. Durable run `fbe99826-96ce-44af-b64f-3e6a3b8d93b1` failed all five jobs before detector output.
+The disposable five-image smoke exposed three implementation/runtime issues without changing the candidate configuration:
 
-The stored errors showed that the pinned ONNX artifact declares static input metadata equivalent to `10 x 3 x 32 x 32`, so ONNX Runtime rejected the intended project inputs such as `1 x 3 x 1216 x 1600` and `1 x 3 x 1280 x 1280`.
+1. ONNX Runtime rejected the graph's stale static input metadata.
+2. OpenCV DNN executed the graph but the first adapter could not marshal four-dimensional outputs correctly.
+3. After marshalling was corrected, reuse of one OpenCV `Net` across images caused severe cross-image corruption: a plausible first result was followed by hundreds of nonsensical detections on later images.
 
-This is a runtime-contract failure, not evidence about CenterFace recall or confidence. Do not count it as a failed M16 detector candidate and do not change confidence because of it.
+PR #90 changed CenterFace to create and dispose a fresh OpenCV `Net` for every image. The exact model bytes, confidence `0.5`, preprocessing, decoder, NMS, landmark mapping, SFace and padding remained unchanged.
 
-The pinned upstream CenterFace Python reference executes the same ONNX graph through OpenCV DNN with source-dependent dimensions rounded to multiples of `32`. The project therefore keeps the exact model bytes, preprocessing, outputs, decoder, NMS, landmark mapping and confidence while changing only the execution runtime from ONNX Runtime to `opencv-dnn`.
+Windows CI for the corrected PR head passed. The maintainer then repeated the same five disposable images and reported that face outputs matched the source images consistently on every image. The repeat run ID was not supplied to the repository evidence and is therefore not invented.
 
-## Runnable implementation increment
+The runtime-stability smoke gate is now cleared. The smoke evidence is not a detector-quality comparison and does not justify threshold tuning.
+
+## Runnable implementation
 
 The current implementation includes:
 
@@ -64,6 +68,7 @@ The current implementation includes:
 - a CenterFace model manifest with a `dynamic-multiple-of` policy, multiple `32` and pre-round maximum long edge `1600`;
 - RGB float32 preprocessing with scale `1.0`, zero mean and bounded source-dependent tensor dimensions;
 - OpenCV DNN execution of the pinned ONNX graph, matching the upstream reference runtime for variable image sizes;
+- fresh OpenCV network state for each image inference;
 - required outputs `537`, `538`, `539` and `540`;
 - deterministic heatmap, scale, offset and five-landmark decoding at stride four;
 - deterministic IoU `0.30` NMS;
@@ -77,10 +82,10 @@ See [CenterFace qualification](../../models/centerface-2019-qualification.md) an
 
 ## First governed candidate
 
-After the corrected Windows smoke gate passes, the first complete M16 candidate remains predeclared as:
+The first complete M16 candidate remains predeclared as:
 
 - detector `centerface-2019-fp32`;
-- runtime `opencv-dnn`;
+- runtime `opencv-dnn` with per-image network isolation;
 - confidence `0.5`;
 - pipeline `single-pass`;
 - manifest-bound source long edge `1600` before multiple-of-32 rounding;
@@ -89,7 +94,7 @@ After the corrected Windows smoke gate passes, the first complete M16 candidate 
 - padding `0.25`; and
 - the unchanged WI-0034 source photos, hashes, frozen ground truth, countable-face rule, comparison IoU and category metadata.
 
-The corrected smoke must use a fresh catalogue/output root but may use the same disposable five-image smoke set because no detector parameter is being selected from those images. Review the complete confidence-`0.5` M16 result before approving any follow-up configuration.
+Review the complete confidence-`0.5` M16 result before approving any follow-up configuration.
 
 ## Scope
 
@@ -109,16 +114,13 @@ The corrected smoke must use a fresh catalogue/output root but may use the same 
 
 ## Evaluation boundary
 
-Do not run CenterFace on the complete private sample until:
+The runtime smoke blocker is cleared. Before processing the complete private sample:
 
-1. the current OpenCV DNN correction branch builds and tests successfully on the supported Windows toolchain;
-2. the exact model installs and re-verifies through the manifest verifier;
-3. OpenCV DNN completes bounded source-dependent inference on the disposable smoke images;
-4. human smoke review confirms plausible boxes and aligned five-point crops; and
-5. the maintainer accepts the documented licence/training-data uncertainty for local evaluation.
+1. spot-check several aligned crops if the successful repeat review covered only counts/boxes rather than aligned outputs; and
+2. the maintainer must explicitly accept the documented CenterFace weight/training-data uncertainty for this local evaluation.
 
-When the candidate becomes runnable, use a new isolated candidate catalogue, output directory and log. The durable run configuration records detector model ID, confidence and pipeline, while persisted detections/results carry the detector model hash. Record the exact repository commit with the private candidate log because runtime and bounded input semantics live in the checked-in manifest and adapter implementation.
+Once those governance checks are satisfied, use a new isolated candidate catalogue, output directory and log and process the unchanged 100-photo sample exactly once at confidence `0.5`. The durable run configuration records detector model ID, confidence and pipeline, while persisted detections/results carry the detector model hash. Record the exact repository commit with the private candidate log because runtime and bounded input semantics live in the checked-in manifest and adapter implementation.
 
 ## Gate
 
-The first candidate meeting the complete M16 target continues to WI-0038. If CenterFace fails after a valid full comparison or cannot clear governance, record the remaining gap and select the next candidate from the registry before expanding the search.
+The first candidate meeting the complete M16 target continues to WI-0038. If CenterFace fails after a valid full comparison or cannot clear governance, record the remaining gap and select the next governed candidate or one explicitly justified CenterFace follow-up configuration only after the full result is reviewed.
