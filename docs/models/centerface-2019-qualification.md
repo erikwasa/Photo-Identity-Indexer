@@ -2,7 +2,7 @@
 
 Status date: 2026-08-07
 
-State: **exact artifact verified; corrected OpenCV runtime validated; local governance boundary accepted; governed 100-photo candidate passed M16 and is selected for WI-0038 rollout**
+State: **exact artifact verified; corrected OpenCV runtime validated; local-evaluation governance boundary accepted; governed 100-photo candidate passed M16 and WI-0038 rollout engineering is active**
 
 This record is the completed qualification evidence for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). Model bytes remain outside Git.
 
@@ -83,7 +83,7 @@ The pinned repository contains a root MIT licence covering supplied software and
 
 The upstream project reports WIDER FACE evaluation and the associated paper describes WIDER FACE training. This project does not assert a WIDER FACE dataset licence or a right to train or redistribute derived weights.
 
-On 2026-08-07 the maintainer explicitly accepted this documented uncertainty for **local evaluation and the private local rollout work that follows it**. This is a governance decision for the local project, not a claim that the pretrained-weight or training-data rights have been independently resolved. Redistribution remains blocked unless that boundary can be defended for the intended use.
+On 2026-08-07 the maintainer explicitly accepted this documented uncertainty for **local evaluation** and separately instructed WI-0038 local rollout engineering to proceed. This is a governance decision for the local project, not a claim that the pretrained-weight or training-data rights have been independently resolved. Redistribution remains blocked unless that boundary can be defended for the intended use.
 
 ## Governed 100-photo result
 
@@ -113,11 +113,11 @@ PR #92 introduced a narrow neutral candidate outcome for legitimate faces that w
 - [x] Human visual review of smoke 3 was performed and failed.
 - [x] Per-image OpenCV `Net` isolation passed Windows CI.
 - [x] Repeat smoke produced stable face outputs across all five disposable images.
-- [x] The maintainer explicitly accepted the documented licence/training-data boundary for local evaluation and private local rollout work.
+- [x] The maintainer explicitly accepted the documented licence/training-data boundary for local evaluation.
 - [x] The unchanged governed 100-photo candidate passed the complete M16 detector gate.
 
 ## Rollout boundary
 
-CenterFace confidence `0.5` single-pass is selected for [WI-0038](../delivery/work-items/WI-0038-detector-rollout.md).
+CenterFace confidence `0.5` single-pass is selected for [WI-0038](../delivery/work-items/WI-0038-detector-rollout.md) engineering after the maintainer instructed that work to continue.
 
 Selection is not permission to replace existing face occurrences by ordinal. The canonical catalogue currently preserves identity assignments and review history by `face_occurrence_id`, so WI-0038 must reconcile old and new detections using geometry and landmarks, create new occurrences for genuinely new faces, route ambiguous mappings through review and retain a rollback path before full-archive processing.
