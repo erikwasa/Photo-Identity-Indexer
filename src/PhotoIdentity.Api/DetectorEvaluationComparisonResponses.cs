@@ -74,6 +74,18 @@ public static partial class DetectorEvaluationComparisonEndpoints
             detection => detection.Id,
             StringComparer.OrdinalIgnoreCase);
 
+        DetectorEvaluationComparisonCorrectionResponse correction = new(
+            photo.Correction.Matches.Select(match => new DetectorEvaluationComparisonManualMatchResponse(
+                match.GroundTruthFaceId,
+                match.CandidateDetectionId)).ToArray(),
+            photo.Correction.FalseCandidateDetectionIds,
+            photo.Correction.DuplicateCandidateDetectionIds,
+            photo.Correction.MissedGroundTruthFaceIds,
+            photo.Correction.Notes)
+        {
+            NeutralCandidateDetectionIds = photo.Correction.NeutralCandidateDetectionIds,
+        };
+
         return new DetectorEvaluationComparisonPhotoResponse(
             photo.CandidateRevisionId,
             photo.PhotoName,
@@ -90,14 +102,7 @@ public static partial class DetectorEvaluationComparisonEndpoints
                 component.Kind,
                 component.GroundTruthFaceIds.Select(id => ToGroundTruthFaceResponse(groundTruth[id])).ToArray(),
                 component.CandidateDetectionIds.Select(id => ToCandidateResponse(candidates[id])).ToArray())).ToArray(),
-            new DetectorEvaluationComparisonCorrectionResponse(
-                photo.Correction.Matches.Select(match => new DetectorEvaluationComparisonManualMatchResponse(
-                    match.GroundTruthFaceId,
-                    match.CandidateDetectionId)).ToArray(),
-                photo.Correction.FalseCandidateDetectionIds,
-                photo.Correction.DuplicateCandidateDetectionIds,
-                photo.Correction.MissedGroundTruthFaceIds,
-                photo.Correction.Notes),
+            correction,
             IsResolved(photo));
     }
 
@@ -146,7 +151,8 @@ public static partial class DetectorEvaluationComparisonEndpoints
             int exceptionCount = photo.ExceptionComponents.Sum(component => component.CandidateDetectionIds.Count);
             int resolved = photo.Correction.Matches.Count +
                            photo.Correction.FalseCandidateDetectionIds.Count +
-                           photo.Correction.DuplicateCandidateDetectionIds.Count;
+                           photo.Correction.DuplicateCandidateDetectionIds.Count +
+                           photo.Correction.NeutralCandidateDetectionIds.Count;
             return Math.Max(0, exceptionCount - resolved);
         });
         return new DetectorEvaluationComparisonMetricsResponse(
@@ -158,7 +164,10 @@ public static partial class DetectorEvaluationComparisonEndpoints
             countableFaces == 0 ? 1 : (double)matched / countableFaces,
             values.Sum(photo => photo.Correction.FalseCandidateDetectionIds.Count),
             values.Sum(photo => photo.Correction.DuplicateCandidateDetectionIds.Count),
-            unresolvedCandidates);
+            unresolvedCandidates)
+        {
+            NeutralDetections = values.Sum(photo => photo.Correction.NeutralCandidateDetectionIds.Count),
+        };
     }
 
 }

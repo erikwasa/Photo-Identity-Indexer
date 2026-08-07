@@ -72,6 +72,7 @@ internal sealed class StoredDetectorEvaluationManualCorrection
     public List<StoredDetectorEvaluationManualMatch> Matches { get; init; } = [];
     public List<string> FalseCandidateDetectionIds { get; init; } = [];
     public List<string> DuplicateCandidateDetectionIds { get; init; } = [];
+    public List<string> NeutralCandidateDetectionIds { get; init; } = [];
     public List<string> MissedGroundTruthFaceIds { get; init; } = [];
     public string? Notes { get; init; }
 }
@@ -96,5 +97,7 @@ internal sealed record DetectorEvaluationComparisonCorrectionUpdate(
     IReadOnlyList<string> FalseCandidateDetectionIds,
     IReadOnlyList<string> DuplicateCandidateDetectionIds,
     IReadOnlyList<string> MissedGroundTruthFaceIds,
-    string? Notes);
-
+    string? Notes)
+{
+    public IReadOnlyList<string> NeutralCandidateDetectionIds { get; init; } = [];
+}

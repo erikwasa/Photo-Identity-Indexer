@@ -23,7 +23,7 @@ public partial class DetectorComparison
         builder.OpenElement(sequence++, "div"); builder.AddAttribute(sequence++, "class", "comparison-table-wrap");
         builder.OpenElement(sequence++, "table");
         builder.OpenElement(sequence++, "thead");
-        builder.AddMarkupContent(sequence++, "<tr><th>Group</th><th>Recall</th><th>Matched</th><th>Missed</th><th>False</th><th>Duplicate</th><th>Pending</th></tr>");
+        builder.AddMarkupContent(sequence++, "<tr><th>Group</th><th>Recall</th><th>Matched</th><th>Missed</th><th>False</th><th>Duplicate</th><th>Neutral</th><th>Pending</th></tr>");
         builder.CloseElement();
         builder.OpenElement(sequence++, "tbody");
         foreach (var group in groups)
@@ -35,6 +35,7 @@ public partial class DetectorComparison
             Cell(group.Metrics.MissedFaces.ToString(CultureInfo.CurrentCulture));
             Cell(group.Metrics.FalseDetections.ToString(CultureInfo.CurrentCulture));
             Cell(group.Metrics.DuplicateDetections.ToString(CultureInfo.CurrentCulture));
+            Cell(group.Metrics.NeutralDetections.ToString(CultureInfo.CurrentCulture));
             Cell((group.Metrics.UnresolvedGroundTruthFaces + group.Metrics.UnresolvedCandidateDetections).ToString(CultureInfo.CurrentCulture));
             builder.CloseElement();
         }
@@ -121,13 +122,13 @@ public partial class DetectorComparison
         DetectorEvaluationComparisonExceptionComponentResponse component) => component.Kind switch
     {
         "unmatched" when component.CandidateDetections.Count > 0 && component.GroundTruthFaces.Count == 0 =>
-            "The evaluated detector found this box, but it did not automatically match a reference face. Choose whether it is a real face, a false detection or a duplicate.",
+            "The evaluated detector found this box, but it did not automatically match a reference face. Mark it neutral when it is a legitimate face outside the fixed countable-face scope; otherwise classify it as false or duplicate.",
         "unmatched" when IsAutomaticMissComponent(photo, component) =>
             "The baseline review confirms these are countable faces, and this photo has no candidate boxes available for manual matching. They are counted as detector misses automatically; no checkbox is needed.",
         "unmatched" when IsReferenceOnlyComponent(component) =>
             "No candidate detection automatically matched this reference face. Candidate boxes elsewhere in the photo may still be matched to it, so confirm a miss only when none represents this face.",
-        "duplicate" => "More than one candidate detection may refer to the same reference face. Match the correct detection and mark any additional detection as a duplicate.",
-        "ambiguous" => "Several boxes overlap in a way that cannot be resolved automatically. Match each real candidate detection to the correct reference face.",
+        "duplicate" => "More than one candidate detection may refer to the same reference face. Match the correct detection and mark any additional detection as a duplicate. Use neutral only for a legitimate face outside the fixed reference scope.",
+        "ambiguous" => "Several boxes overlap in a way that cannot be resolved automatically. Match each countable candidate detection to the correct reference face; a legitimate out-of-scope face may be neutral.",
         _ => "Resolve every candidate detection and reference face shown below.",
     };
 

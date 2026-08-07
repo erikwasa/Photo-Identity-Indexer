@@ -41,7 +41,8 @@ public static partial class DetectorEvaluationComparisonEndpoints
         }
 
         if (request.Matches is null || request.FalseCandidateDetectionIds is null ||
-            request.DuplicateCandidateDetectionIds is null || request.MissedGroundTruthFaceIds is null)
+            request.DuplicateCandidateDetectionIds is null || request.NeutralCandidateDetectionIds is null ||
+            request.MissedGroundTruthFaceIds is null)
         {
             return Results.BadRequest(new { error = "Every correction collection is required." });
         }
@@ -57,7 +58,10 @@ public static partial class DetectorEvaluationComparisonEndpoints
                 request.FalseCandidateDetectionIds,
                 request.DuplicateCandidateDetectionIds,
                 request.MissedGroundTruthFaceIds,
-                request.Notes);
+                request.Notes)
+            {
+                NeutralCandidateDetectionIds = request.NeutralCandidateDetectionIds,
+            };
             StoredDetectorEvaluationComparison? comparison = await store.SavePhotoCorrectionAsync(
                 parsedComparisonId,
                 parsedRevisionId.ToString("D"),
@@ -112,7 +116,7 @@ public static partial class DetectorEvaluationComparisonEndpoints
 
         DetectorEvaluationComparisonResponse response = ToResponse(comparison);
         StringBuilder csv = new();
-        csv.AppendLine("Scope,Group,Photos,Countable Faces,Matched Faces,Missed Faces,Unresolved Ground Truth,Recall,False Detections,Duplicate Detections,Unresolved Candidate Detections");
+        csv.AppendLine("Scope,Group,Photos,Countable Faces,Matched Faces,Missed Faces,Unresolved Ground Truth,Recall,False Detections,Duplicate Detections,Neutral Detections,Unresolved Candidate Detections");
         AppendMetrics(csv, "Overall", "All photos", response.Overall);
         AppendMetrics(csv, "Five-plus-face", "Photos with at least five countable faces", response.FivePlusFaces);
         foreach (DetectorEvaluationComparisonGroupSummaryResponse group in response.SourceGroups)

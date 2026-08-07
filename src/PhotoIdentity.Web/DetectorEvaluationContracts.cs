@@ -170,7 +170,10 @@ public sealed record DetectorEvaluationComparisonCorrectionResponse(
     IReadOnlyList<string> FalseCandidateDetectionIds,
     IReadOnlyList<string> DuplicateCandidateDetectionIds,
     IReadOnlyList<string> MissedGroundTruthFaceIds,
-    string? Notes);
+    string? Notes)
+{
+    public IReadOnlyList<string> NeutralCandidateDetectionIds { get; init; } = [];
+}
 
 public sealed record DetectorEvaluationComparisonPhotoResponse(
     string CandidateRevisionId,
@@ -196,7 +199,10 @@ public sealed record DetectorEvaluationComparisonMetricsResponse(
     double Recall,
     int FalseDetections,
     int DuplicateDetections,
-    int UnresolvedCandidateDetections);
+    int UnresolvedCandidateDetections)
+{
+    public int NeutralDetections { get; init; }
+}
 
 public sealed record DetectorEvaluationComparisonGroupSummaryResponse(
     string Group,
@@ -241,7 +247,10 @@ public sealed record SaveDetectorEvaluationComparisonPhotoRequest(
     IReadOnlyList<string> FalseCandidateDetectionIds,
     IReadOnlyList<string> DuplicateCandidateDetectionIds,
     IReadOnlyList<string> MissedGroundTruthFaceIds,
-    string? Notes);
+    string? Notes)
+{
+    public IReadOnlyList<string> NeutralCandidateDetectionIds { get; init; } = [];
+}
 
 public sealed record SaveDetectorEvaluationM16GateRequest(
     bool? MaterialCategoryFailure,

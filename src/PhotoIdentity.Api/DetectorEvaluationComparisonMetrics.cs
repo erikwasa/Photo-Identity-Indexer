@@ -49,7 +49,8 @@ public static partial class DetectorEvaluationComparisonEndpoints
         int resolvedGroundTruth = photo.Correction.Matches.Count + photo.Correction.MissedGroundTruthFaceIds.Count;
         int resolvedCandidates = photo.Correction.Matches.Count +
                                  photo.Correction.FalseCandidateDetectionIds.Count +
-                                 photo.Correction.DuplicateCandidateDetectionIds.Count;
+                                 photo.Correction.DuplicateCandidateDetectionIds.Count +
+                                 photo.Correction.NeutralCandidateDetectionIds.Count;
         return exceptionGroundTruthCount == resolvedGroundTruth &&
                exceptionCandidateCount == resolvedCandidates;
     }
@@ -101,6 +102,7 @@ public static partial class DetectorEvaluationComparisonEndpoints
             metrics.Recall.ToString("P2", CultureInfo.InvariantCulture),
             metrics.FalseDetections.ToString(CultureInfo.InvariantCulture),
             metrics.DuplicateDetections.ToString(CultureInfo.InvariantCulture),
+            metrics.NeutralDetections.ToString(CultureInfo.InvariantCulture),
             metrics.UnresolvedCandidateDetections.ToString(CultureInfo.InvariantCulture),
         ];
         csv.AppendLine(string.Join(',', values.Select(EscapeCsv)));

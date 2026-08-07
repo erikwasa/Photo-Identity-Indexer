@@ -145,6 +145,7 @@ internal sealed class DetectorEvaluationComparisonStore
                 }).ToList(),
                 FalseCandidateDetectionIds = update.FalseCandidateDetectionIds.ToList(),
                 DuplicateCandidateDetectionIds = update.DuplicateCandidateDetectionIds.ToList(),
+                NeutralCandidateDetectionIds = update.NeutralCandidateDetectionIds.ToList(),
                 MissedGroundTruthFaceIds = update.MissedGroundTruthFaceIds.ToList(),
                 Notes = NormalizeOptional(update.Notes),
             };
@@ -218,6 +219,7 @@ internal sealed class DetectorEvaluationComparisonStore
 
         AddUnique(update.FalseCandidateDetectionIds, exceptionCandidateIds, usedCandidateIds, "false candidate detection", update);
         AddUnique(update.DuplicateCandidateDetectionIds, exceptionCandidateIds, usedCandidateIds, "duplicate candidate detection", update);
+        AddUnique(update.NeutralCandidateDetectionIds, exceptionCandidateIds, usedCandidateIds, "neutral candidate detection", update);
         AddUnique(update.MissedGroundTruthFaceIds, exceptionGroundTruthIds, usedGroundTruthIds, "missed ground-truth face", update);
     }
 
