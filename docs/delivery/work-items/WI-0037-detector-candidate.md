@@ -32,7 +32,7 @@ CenterFace was selected ahead of SCRFD for this evaluation because:
 - its repository carries an MIT licence without the explicit non-commercial pretrained-model restriction stated by InsightFace for SCRFD weights; and
 - it offered a bounded CPU-oriented candidate before considering heavier or more encumbered alternatives.
 
-The project records the repository MIT licence as provisional weight evidence and separately records that WIDER FACE training-data rights are not asserted. On 2026-08-07 the maintainer explicitly accepted that documented uncertainty for **local evaluation and private local rollout work**. That acceptance does not establish a right to redistribute the pretrained weights and does not remove the recorded production/redistribution caveat.
+The project records the repository MIT licence as provisional weight evidence and separately records that WIDER FACE training-data rights are not asserted. On 2026-08-07 the maintainer explicitly accepted that documented uncertainty for **local evaluation** and separately instructed WI-0038 local rollout engineering to proceed. That instruction does not establish a right to redistribute the pretrained weights and does not remove the recorded production/redistribution caveat.
 
 See the [face detector candidate registry](../../models/face-detector-candidate-registry.md) for the screened alternatives and trade-offs.
 
@@ -107,13 +107,13 @@ The privacy-safe conclusion is:
 - false plus duplicate detections remained at or below `10` after human review under the fixed counting rule; and
 - no material archive-workflow failure category remained.
 
-CenterFace confidence `0.5` single-pass is therefore the first accepted detector pipeline from M16 and advances to [WI-0038](WI-0038-detector-rollout.md) for safe local-catalogue rollout.
+CenterFace confidence `0.5` single-pass is therefore the first accepted detector pipeline from M16 and advances to [WI-0038](WI-0038-detector-rollout.md) for safe local-catalogue rollout engineering.
 
 This selection does not permit ordinal-based replacement of existing reviewed face occurrences. WI-0038 must preserve people, assignments, rejections and append-only review history while reconciling the changed face population by geometry and landmarks.
 
 ## Scope
 
-- Select a candidate with an acceptable documented local-use boundary, provenance and runtime path.
+- Select a candidate with an acceptable documented local-evaluation boundary, provenance and runtime path.
 - Pin exact model identity, hash, preprocessing and output semantics.
 - Adapt landmarks or alignment inputs without weakening the SFace contract.
 - Compare the candidate on the exact WI-0034 sample.
