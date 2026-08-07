@@ -60,7 +60,7 @@ public sealed class CenterFaceFaceDetector : IFaceDetector, IDisposable
         ModelManifest manifest,
         string modelPath,
         CenterFaceDetectorOptions? options = null)
-        : this(manifest, new OnnxCenterFaceInferenceSession(modelPath), options)
+        : this(manifest, new OpenCvDnnCenterFaceInferenceSession(modelPath), options)
     {
     }
 
