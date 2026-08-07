@@ -1,5 +1,5 @@
-using Microsoft.ML.OnnxRuntime;
-using Microsoft.ML.OnnxRuntime.Tensors;
+using OpenCvSharp;
+using OpenCvSharp.Dnn;
 
 namespace PhotoIdentity.Recognition.Onnx.CenterFace;
 
@@ -11,36 +11,29 @@ internal interface ICenterFaceInferenceSession : IDisposable
         CancellationToken cancellationToken);
 }
 
-internal sealed class OnnxCenterFaceInferenceSession : ICenterFaceInferenceSession
+/// <summary>
+/// Executes the pinned CenterFace ONNX graph through OpenCV DNN.
+/// The upstream CenterFace reference implementation uses OpenCV DNN because the
+/// committed ONNX graph carries stale static input metadata even though the
+/// network is fully convolutional and is evaluated at source-dependent dimensions.
+/// </summary>
+internal sealed class OpenCvDnnCenterFaceInferenceSession : ICenterFaceInferenceSession
 {
     private static readonly string[] RequiredOutputNames = ["537", "538", "539", "540"];
 
-    private readonly InferenceSession _session;
-    private readonly string _inputName;
+    private readonly Net _net;
 
-    public OnnxCenterFaceInferenceSession(string modelPath)
+    public OpenCvDnnCenterFaceInferenceSession(string modelPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelPath);
 
-        _session = new InferenceSession(modelPath);
-        if (_session.InputNames.Count != 1)
+        _net = Net.ReadNetFromONNX(modelPath)
+            ?? throw new CenterFaceOutputException("OpenCV DNN could not load the CenterFace ONNX graph.");
+        if (_net.Empty())
         {
-            _session.Dispose();
-            throw new CenterFaceOutputException(
-                $"CenterFace must expose exactly one input, but the model exposes {_session.InputNames.Count}.");
+            _net.Dispose();
+            throw new CenterFaceOutputException("OpenCV DNN loaded an empty CenterFace network.");
         }
-
-        string[] missingOutputs = RequiredOutputNames
-            .Where(name => !_session.OutputNames.Contains(name, StringComparer.Ordinal))
-            .ToArray();
-        if (missingOutputs.Length > 0)
-        {
-            _session.Dispose();
-            throw new CenterFaceOutputException(
-                $"CenterFace is missing required ONNX outputs: {string.Join(", ", missingOutputs)}.");
-        }
-
-        _inputName = _session.InputNames.Single();
     }
 
     public IReadOnlyDictionary<string, CenterFaceTensor> Run(
@@ -52,40 +45,65 @@ internal sealed class OnnxCenterFaceInferenceSession : ICenterFaceInferenceSessi
         ArgumentNullException.ThrowIfNull(shape);
         cancellationToken.ThrowIfCancellationRequested();
 
-        using OrtValue inputValue = OrtValue.CreateTensorValueFromMemory(input, shape);
-        using RunOptions runOptions = new();
-        string[] inputNames = [_inputName];
-        OrtValue[] inputValues = [inputValue];
-
-        using IDisposableReadOnlyCollection<OrtValue> outputValues = _session.Run(
-            runOptions,
-            inputNames,
-            inputValues,
-            RequiredOutputNames);
-
-        Dictionary<string, CenterFaceTensor> outputs = new(StringComparer.Ordinal);
-        for (int index = 0; index < RequiredOutputNames.Length; index++)
+        if (shape.Length != 4 || shape[0] != 1 || shape[1] != 3)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            OrtValue outputValue = outputValues[index];
-            OrtTensorTypeAndShapeInfo typeAndShape = outputValue.GetTensorTypeAndShape();
-            if (typeAndShape.ElementDataType != TensorElementType.Float)
-            {
-                throw new CenterFaceOutputException(
-                    $"CenterFace output '{RequiredOutputNames[index]}' must contain float32 values, " +
-                    $"but the model returned {typeAndShape.ElementDataType}.");
-            }
-
-            outputs.Add(
-                RequiredOutputNames[index],
-                new CenterFaceTensor(
-                    RequiredOutputNames[index],
-                    typeAndShape.Shape,
-                    outputValue.GetTensorDataAsSpan<float>()));
+            throw new CenterFaceOutputException(
+                $"CenterFace input must be NCHW [1, 3, H, W], but received [{string.Join(", ", shape)}].");
         }
 
-        return outputs;
+        int[] matShape = shape
+            .Select(dimension => checked((int)dimension))
+            .ToArray();
+        long expectedElements = shape.Aggregate(1L, checked((product, dimension) => product * dimension));
+        if (expectedElements != input.LongLength)
+        {
+            throw new CenterFaceOutputException(
+                $"CenterFace input shape declares {expectedElements} values but received {input.LongLength}.");
+        }
+
+        using Mat inputBlob = Mat.FromPixelData(matShape, MatType.CV_32FC1, input);
+        _net.SetInput(inputBlob);
+
+        Mat[] outputBlobs = RequiredOutputNames.Select(_ => new Mat()).ToArray();
+        try
+        {
+            _net.Forward(outputBlobs, RequiredOutputNames);
+
+            Dictionary<string, CenterFaceTensor> outputs = new(StringComparer.Ordinal);
+            for (int index = 0; index < RequiredOutputNames.Length; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Mat output = outputBlobs[index];
+                if (output.Empty())
+                {
+                    throw new CenterFaceOutputException(
+                        $"CenterFace output '{RequiredOutputNames[index]}' was empty.");
+                }
+
+                if (!output.GetArray(out float[] data))
+                {
+                    throw new CenterFaceOutputException(
+                        $"CenterFace output '{RequiredOutputNames[index]}' could not be read as float32 data.");
+                }
+
+                long[] outputShape = Enumerable.Range(0, output.Dims)
+                    .Select(dimension => (long)output.Size(dimension))
+                    .ToArray();
+                outputs.Add(
+                    RequiredOutputNames[index],
+                    new CenterFaceTensor(RequiredOutputNames[index], outputShape, data));
+            }
+
+            return outputs;
+        }
+        finally
+        {
+            foreach (Mat output in outputBlobs)
+            {
+                output.Dispose();
+            }
+        }
     }
 
-    public void Dispose() => _session.Dispose();
+    public void Dispose() => _net.Dispose();
 }
