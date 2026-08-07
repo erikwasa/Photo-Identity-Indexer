@@ -3,7 +3,7 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using Xunit;
 
-namespace PhotoIdentity_Core_Tests;
+namespace PhotoIdentity.Core.Tests;
 
 public sealed class DetectorRolloutTests
 {
