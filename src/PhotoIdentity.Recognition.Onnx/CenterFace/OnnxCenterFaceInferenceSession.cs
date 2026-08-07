@@ -22,19 +22,12 @@ internal sealed class OpenCvDnnCenterFaceInferenceSession : ICenterFaceInference
 {
     private static readonly string[] RequiredOutputNames = ["537", "538", "539", "540"];
 
-    private readonly Net _net;
+    private readonly string _modelPath;
 
     public OpenCvDnnCenterFaceInferenceSession(string modelPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(modelPath);
-
-        _net = Net.ReadNetFromONNX(modelPath)
-            ?? throw new CenterFaceOutputException("OpenCV DNN could not load the CenterFace ONNX graph.");
-        if (_net.Empty())
-        {
-            _net.Dispose();
-            throw new CenterFaceOutputException("OpenCV DNN loaded an empty CenterFace network.");
-        }
+        _modelPath = modelPath;
     }
 
     public IReadOnlyDictionary<string, CenterFaceTensor> Run(
@@ -68,12 +61,21 @@ internal sealed class OpenCvDnnCenterFaceInferenceSession : ICenterFaceInference
         }
 
         using Mat inputBlob = Mat.FromPixelData(matShape, MatType.CV_32FC1, input);
-        _net.SetInput(inputBlob);
+
+        // Do not reuse a CenterFace OpenCV Net across source images. Real smoke
+        // evidence showed that the first inference could be correct while later
+        // calls on the same Net produced hundreds of nonsensical detections.
+        // An independent CenterFace adapter documents the same native-runtime
+        // behaviour and rebuilds the graph for each call. Isolating Net lifetime
+        // here keeps every image inference independent without changing model bytes,
+        // preprocessing, confidence, decoder or NMS semantics.
+        using Net net = LoadNetwork();
+        net.SetInput(inputBlob);
 
         Mat[] outputBlobs = RequiredOutputNames.Select(_ => new Mat()).ToArray();
         try
         {
-            _net.Forward(outputBlobs, RequiredOutputNames);
+            net.Forward(outputBlobs, RequiredOutputNames);
 
             Dictionary<string, CenterFaceTensor> outputs = new(StringComparer.Ordinal);
             for (int index = 0; index < RequiredOutputNames.Length; index++)
@@ -92,6 +94,19 @@ internal sealed class OpenCvDnnCenterFaceInferenceSession : ICenterFaceInference
                 output.Dispose();
             }
         }
+    }
+
+    private Net LoadNetwork()
+    {
+        Net net = Net.ReadNetFromONNX(_modelPath)
+            ?? throw new CenterFaceOutputException("OpenCV DNN could not load the CenterFace ONNX graph.");
+        if (net.Empty())
+        {
+            net.Dispose();
+            throw new CenterFaceOutputException("OpenCV DNN loaded an empty CenterFace network.");
+        }
+
+        return net;
     }
 
     internal static CenterFaceTensor ReadOutputTensor(string name, Mat output)
@@ -153,5 +168,8 @@ internal sealed class OpenCvDnnCenterFaceInferenceSession : ICenterFaceInference
         return new CenterFaceTensor(name, outputShape, data);
     }
 
-    public void Dispose() => _net.Dispose();
+    public void Dispose()
+    {
+        // Networks are intentionally created and disposed per Run call.
+    }
 }
