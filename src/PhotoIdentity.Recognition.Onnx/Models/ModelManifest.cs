@@ -51,6 +51,16 @@ public sealed record ModelManifest
             ? null
             : new AlignmentProtocolId(AlignmentProtocol);
 
+        ModelInputShapePolicy inputShapePolicy = Input.ShapePolicy?.Kind switch
+        {
+            null or "fixed" => ModelInputShapePolicy.Fixed,
+            "dynamic-multiple-of" => new ModelInputShapePolicy(
+                ModelInputShapeKind.DynamicMultipleOf,
+                Input.ShapePolicy.MultipleOf),
+            _ => throw new ModelManifestException(
+                $"Unsupported input shape policy '{Input.ShapePolicy.Kind}'."),
+        };
+
         return new ModelDescriptor(
             new ModelId(ModelId),
             role,
@@ -62,7 +72,8 @@ public sealed record ModelManifest
             SourceVersion,
             Output.Dimensions,
             distanceMetric,
-            alignmentProtocol);
+            alignmentProtocol,
+            inputShapePolicy);
     }
 }
 
@@ -73,6 +84,13 @@ public sealed record ModelInputManifest
     public required string ColourOrder { get; init; }
     public required string DataType { get; init; }
     public required ModelNormalisationManifest Normalisation { get; init; }
+    public ModelInputShapeManifest? ShapePolicy { get; init; }
+}
+
+public sealed record ModelInputShapeManifest
+{
+    public required string Kind { get; init; }
+    public int? MultipleOf { get; init; }
 }
 
 public sealed record ModelNormalisationManifest
@@ -200,6 +218,8 @@ public static class ModelManifestValidator
                 errors.Add("input width and height must be positive.");
             }
 
+            ValidateInputShapePolicy(manifest.Input, errors);
+
             if (!SupportedColourOrders.Contains(manifest.Input.ColourOrder))
             {
                 errors.Add("input colourOrder must be 'BGR' or 'RGB'.");
@@ -274,7 +294,7 @@ public static class ModelManifestValidator
 
                 if (manifest.Output.DistanceMetric is not ("cosine" or "euclidean"))
                 {
-                    errors.Add("face-embedding distanceMetric must be 'cosine' or 'euclidean'.");
+                    errors.Add("face-embedding output distanceMetric must be 'cosine' or 'euclidean'.");
                 }
 
                 if (string.IsNullOrWhiteSpace(manifest.AlignmentProtocol))
@@ -303,6 +323,43 @@ public static class ModelManifestValidator
             throw new ModelManifestException(
                 $"Model manifest '{manifest.ModelId}' is invalid:{Environment.NewLine}- " +
                 string.Join($"{Environment.NewLine}- ", errors));
+        }
+    }
+
+    private static void ValidateInputShapePolicy(
+        ModelInputManifest input,
+        ICollection<string> errors)
+    {
+        if (input.ShapePolicy is null)
+        {
+            return;
+        }
+
+        Required(input.ShapePolicy.Kind, "input.shapePolicy.kind", errors);
+        switch (input.ShapePolicy.Kind)
+        {
+            case "fixed":
+                if (input.ShapePolicy.MultipleOf is not null)
+                {
+                    errors.Add("fixed input shapePolicy cannot declare multipleOf.");
+                }
+
+                break;
+            case "dynamic-multiple-of":
+                if (input.ShapePolicy.MultipleOf <= 0)
+                {
+                    errors.Add("dynamic-multiple-of input shapePolicy requires a positive multipleOf.");
+                }
+                else if (input.Width % input.ShapePolicy.MultipleOf.Value != 0 ||
+                         input.Height % input.ShapePolicy.MultipleOf.Value != 0)
+                {
+                    errors.Add("dynamic reference input width and height must be divisible by shapePolicy.multipleOf.");
+                }
+
+                break;
+            default:
+                errors.Add("input shapePolicy kind must be 'fixed' or 'dynamic-multiple-of'.");
+                break;
         }
     }
 
