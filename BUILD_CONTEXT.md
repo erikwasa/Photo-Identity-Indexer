@@ -11,27 +11,40 @@ Two independent milestones are active:
 
 **WI-0032 — Validate documentation from a clean setup** remains active under the human maintainer. Its clean-environment and trusted-network checklist remains authoritative for M15.
 
-**WI-0037 — Evaluate another face detector** is active under the AI agent on `agent/WI-0037-centerface-qualification`.
+**WI-0037 — Evaluate another face detector** is active under the AI agent. PR #85 completed the WI-0036 transition and initial CenterFace qualification; runnable CenterFace work continues on `agent/WI-0037-centerface-adapter`.
 
 WI-0036 completed on 2026-08-07. The multi-scale confidence-0.9 YuNet candidate failed the complete M16 gate despite improving on the single-pass confidence-0.9 baseline and single-pass confidence `0.8`. The explicit confidence-0.7 multi-scale follow-up returned more than 100 false or duplicate detections, so confidence `0.6` was intentionally not run. No YuNet threshold or multi-scale configuration is approved for rollout.
 
 Detailed recall, category and review evidence remains private. The repository records only privacy-safe workflow conclusions and the disqualifying aggregate false/duplicate result.
 
-## M16 implementation direction
+## M16 CenterFace implementation direction
 
-CenterFace ONNX is the first WI-0037 qualification target.
+The maintainer locally verified the pinned CenterFace artifact on 2026-08-07:
 
-The selected upstream artifact is `models/onnx/centerface.onnx` from `Star-Clouds/CenterFace@b82ec0c4844e89fd5a0305986aed9bdf33c72585`.
+- source revision `Star-Clouds/CenterFace@b82ec0c4844e89fd5a0305986aed9bdf33c72585`;
+- byte size `7,532,772`;
+- Git blob SHA-1 `1487d5fe214feb569865b225216b24c8f4ef1050`; and
+- SHA-256 `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe`.
 
-It is being qualified before SCRFD because:
+The active branch adds the immutable `centerface-2019-fp32` manifest and a dedicated ONNX Runtime adapter. It does not force the dynamic model into a false fixed-`640x640` contract. Instead the manifest freezes a bounded dynamic policy: source long edge at most `1600` before rounding each dimension up to a multiple of `32`, RGB float32, scale `1.0`, zero mean and direct bilinear resize.
 
-- it provides five landmarks compatible with the current SFace alignment contract;
-- the upstream repository includes a compact ONNX graph and an MIT root licence; and
-- InsightFace attaches an explicit non-commercial restriction to its supplied SCRFD pretrained models.
+The adapter requires outputs `537`, `538`, `539` and `540`, decodes heatmap/scale/offset/five-landmark tensors at stride four, uses deterministic IoU `0.30` NMS and explicitly maps native right-eye, left-eye, nose, right-mouth and left-mouth points into the unchanged `sface-five-point-v1` contract.
 
-CenterFace is not yet approved for the private 100-photo evaluation. The active increment must pin exact bytes and SHA-256, record model-weight and WIDER FACE limitations separately, verify graph and decoder semantics under the project's ONNX Runtime version, implement the adapter and pass a bounded Windows CPU smoke test.
+Local batch processing now selects the detector adapter by exact model ID. Existing YuNet behavior is unchanged; CenterFace supports only the `single-pass` batch pipeline. Synthetic tests cover manifest provenance, dynamic preprocessing, RGB channel order, decoder geometry, confidence semantics, NMS, landmark mapping and malformed tensor shapes.
 
-The upstream reference behavior rounds input dimensions up to multiples of 32, creates an RGB float32 tensor with scale `1.0` and zero mean, and decodes heatmap, scale, offset and five-landmark outputs at stride four before NMS. The exact graph must independently confirm these assumptions.
+The agent environment cannot execute a clean .NET checkout because outbound Git/DNS access is unavailable. Do not treat the branch as runtime-verified until the Windows procedure in `docs/operations/centerface-detector-runs.md` passes.
+
+The first governed full candidate is predeclared as CenterFace confidence `0.5`, single-pass, manifest-bound maximum long edge `1600`, SFace FP32 and padding `0.25`. Do not tune confidence during the disposable smoke test or before reviewing the complete first M16 comparison.
+
+## Remaining WI-0037 gate before private evaluation
+
+1. Windows restore/build/test and living-document checks pass.
+2. `centerface-2019-fp32` installs through the normal model verifier.
+3. A separate disposable smoke set confirms real ONNX Runtime dynamic-shape inference.
+4. Human inspection confirms plausible detector boxes and non-mirrored SFace aligned crops.
+5. The maintainer accepts the documented MIT/model-weight interpretation and unresolved WIDER FACE training-data limitation for local evaluation.
+
+Only then process the unchanged fixed 100-photo M16 sample.
 
 ## M15 validation progress
 
@@ -69,10 +82,10 @@ Any documentation defect found during validation must be corrected and merged be
 - `docs/delivery/milestones/M15-documentation.md`
 - `docs/delivery/work-items/WI-0032-documentation-validation.md`
 - `docs/delivery/milestones/M16-detector-recall.md`
-- `docs/delivery/work-items/WI-0036-multiscale-yunet.md`
 - `docs/delivery/work-items/WI-0037-detector-candidate.md`
+- `docs/models/centerface-2019-qualification.md`
 - `docs/models/face-detector-candidate-registry.md`
-- `docs/operations/multiscale-detector-runs.md`
+- `docs/operations/centerface-detector-runs.md`
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/status/milestones.yaml`
 
