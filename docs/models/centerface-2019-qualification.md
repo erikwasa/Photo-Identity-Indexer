@@ -2,9 +2,9 @@
 
 Status date: 2026-08-07
 
-State: **exact artifact verified; per-image OpenCV runtime correction validated; repeat smoke passed; local 100-photo evaluation awaits explicit governance acceptance**
+State: **exact artifact verified; corrected OpenCV runtime validated; local-evaluation governance boundary accepted; governed 100-photo candidate passed M16 and WI-0038 rollout engineering is active**
 
-This record is the active qualification evidence for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). Model bytes remain outside Git.
+This record is the completed qualification evidence for [WI-0037](../delivery/work-items/WI-0037-detector-candidate.md). Model bytes remain outside Git.
 
 ## Exact artifact
 
@@ -24,9 +24,9 @@ The maintainer verified the immutable download on Windows with `models/inspect-c
 
 ## Governed candidate
 
-The first candidate remains unchanged throughout runtime debugging: detector `centerface-2019-fp32`, confidence `0.5`, `single-pass`, RGB float32 scale `1.0` zero mean, source long edge bounded to `1600` before multiple-of-32 rounding, IoU `0.30` NMS, SFace `sface-2021dec-fp32`, padding `0.25`, and `sface-five-point-v1` alignment.
+The candidate remained unchanged throughout runtime qualification and the complete M16 comparison: detector `centerface-2019-fp32`, confidence `0.5`, `single-pass`, RGB float32 scale `1.0` zero mean, source long edge bounded to `1600` before multiple-of-32 rounding, IoU `0.30` NMS, SFace `sface-2021dec-fp32`, padding `0.25`, and `sface-five-point-v1` alignment.
 
-Do not change confidence, preprocessing, NMS or landmark mapping before the complete M16 comparison. A changed value is a separate governed candidate.
+Any changed confidence, preprocessing, NMS, resize rule or landmark mapping is a different governed candidate.
 
 ## Upstream contract
 
@@ -59,7 +59,7 @@ Human review nevertheless found severe cross-image instability:
 - one photo with one person produced `633` detections; and
 - one photo with four people produced only one unusable/indecipherable face crop.
 
-This failed the visual smoke gate and blocked the fixed 100-photo M16 sample.
+This failed the visual smoke gate and blocked the fixed 100-photo M16 sample until the runtime defect was corrected.
 
 ## OpenCV network-lifetime finding and correction
 
@@ -67,15 +67,15 @@ An independent CenterFace adapter in DeepFace explicitly notes that the model pr
 
 The observed smoke-3 sequence — a plausible image followed by hundreds of nonsensical detections — was consistent with that documented failure mode. PR #90 changed the project adapter to store only the model path and create/dispose a fresh OpenCV `Net` inside each inference call. Model bytes, preprocessing, confidence, decoder, NMS and landmark mapping remained unchanged.
 
-Windows CI for the corrected PR head passed. The maintainer then repeated the same five-image disposable smoke at the unchanged governed settings and reported that the face outputs now matched the source images consistently on every image. The repeat run ID was not supplied to the repository record, so no identifier is invented here.
+Windows CI for the corrected PR head passed. The maintainer then repeated the same five-image disposable smoke at the unchanged governed settings and reported that the face outputs matched the source images consistently on every image. The repeat run ID was not supplied to the repository record, so no identifier is invented here.
 
-This repeat clears the cross-image runtime-stability smoke gate. It is functional and visual qualification evidence only; it is not a detector-quality result and must not be used to tune confidence.
+This repeat cleared the cross-image runtime-stability smoke gate. It was functional and visual qualification evidence only; it was not used to tune confidence.
 
 ## Alignment compatibility
 
-CenterFace emits five landmarks. The project maps them as anatomical right eye, anatomical left eye, nose, anatomical right mouth corner and anatomical left mouth corner. Synthetic tests cover the mapping and box/landmark math.
+CenterFace emits five landmarks. The project maps them into the unchanged five-point SFace contract, and synthetic tests cover the mapping and box/landmark math.
 
-The corrected repeat smoke no longer shows the gross cross-image corruption seen when one OpenCV network instance was reused. If only detection counts were inspected during the repeat, spot-check several `aligned.png` outputs before beginning the private comparison; if the maintainer's repeat review included the aligned outputs, this check is already satisfied operationally.
+The corrected repeat smoke no longer showed the gross cross-image corruption seen when one OpenCV network instance was reused. The complete 100-photo candidate subsequently passed the detector gate. WI-0038 still treats geometry/landmark reconciliation as a rollout invariant because detector replacement can change occurrence order and face population even when detector quality is acceptable.
 
 ## Licence and training-data boundary
 
@@ -83,7 +83,22 @@ The pinned repository contains a root MIT licence covering supplied software and
 
 The upstream project reports WIDER FACE evaluation and the associated paper describes WIDER FACE training. This project does not assert a WIDER FACE dataset licence or a right to train or redistribute derived weights.
 
-Local evaluation may proceed only under the maintainer's explicit acceptance of this documented uncertainty. Production promotion or redistribution remains blocked if the weight or training-data boundary cannot be defended for the intended use.
+On 2026-08-07 the maintainer explicitly accepted this documented uncertainty for **local evaluation** and separately instructed WI-0038 local rollout engineering to proceed. This is a governance decision for the local project, not a claim that the pretrained-weight or training-data rights have been independently resolved. Redistribution remains blocked unless that boundary can be defended for the intended use.
+
+## Governed 100-photo result
+
+After the runtime smoke and local governance checks, the maintainer completed the unchanged WI-0034 100-photo comparison at the predeclared CenterFace settings and reported that the candidate **passed the complete M16 gate**.
+
+Only the privacy-safe decision is retained here:
+
+- overall recall met the `90%` target;
+- five-plus-face recall met the `85%` target;
+- false plus duplicate detections remained within the limit of `10`; and
+- no material archive-workflow failure category remained.
+
+Detailed counts, filenames, source paths, geometry and manual review decisions remain private.
+
+PR #92 introduced a narrow neutral candidate outcome for legitimate faces that were intentionally outside the frozen countable-face scope. Neutral cannot increase recall and is not a false or duplicate, so this correction does not weaken the recall gate or retroactively expand the fixed ground truth.
 
 ## Qualification checklist
 
@@ -98,16 +113,11 @@ Local evaluation may proceed only under the maintainer's explicit acceptance of 
 - [x] Human visual review of smoke 3 was performed and failed.
 - [x] Per-image OpenCV `Net` isolation passed Windows CI.
 - [x] Repeat smoke produced stable face outputs across all five disposable images.
-- [ ] Spot-check aligned crops if they were not included in the maintainer's repeat visual review.
-- [ ] The maintainer explicitly accepts the documented licence/training-data boundary for local evaluation.
+- [x] The maintainer explicitly accepted the documented licence/training-data boundary for local evaluation.
+- [x] The unchanged governed 100-photo candidate passed the complete M16 detector gate.
 
-## Gate before the 100-photo comparison
+## Rollout boundary
 
-The runtime smoke blocker is cleared. Do **not** change the candidate configuration.
+CenterFace confidence `0.5` single-pass is selected for [WI-0038](../delivery/work-items/WI-0038-detector-rollout.md) engineering after the maintainer instructed that work to continue.
 
-Before processing the fixed private 100-photo M16 sample:
-
-1. complete the aligned-crop spot-check if it was not already part of the successful repeat review; and
-2. record explicit maintainer acceptance of the documented licence/training-data uncertainty for this local evaluation.
-
-After those governance checks, process the unchanged WI-0034 100-photo sample once at the predeclared candidate settings, review the complete comparison against the frozen ground truth, and only then decide whether any follow-up candidate is justified.
+Selection is not permission to replace existing face occurrences by ordinal. The canonical catalogue currently preserves identity assignments and review history by `face_occurrence_id`, so WI-0038 must reconcile old and new detections using geometry and landmarks, create new occurrences for genuinely new faces, route ambiguous mappings through review and retain a rollback path before full-archive processing.
