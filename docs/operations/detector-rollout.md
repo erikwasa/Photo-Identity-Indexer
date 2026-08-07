@@ -22,7 +22,7 @@ The selected M16 pipeline is fixed as:
 
 Changing any material detector/preprocessing parameter creates a different pipeline identity and requires a new governed decision.
 
-The maintainer accepted the documented CenterFace model-weight/training-data uncertainty for local evaluation and private local rollout work on 2026-08-07. Redistribution remains outside that acceptance.
+The maintainer accepted the documented CenterFace model-weight/training-data uncertainty for local evaluation on 2026-08-07 and separately instructed WI-0038 rollout engineering to proceed. Redistribution remains outside that acceptance.
 
 ## Why an ordinary rerun is unsafe
 
