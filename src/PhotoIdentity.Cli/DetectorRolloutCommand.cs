@@ -217,7 +217,7 @@ internal static class DetectorRolloutCommandRunner
             cancellationToken);
         WriteSelectedPipeline(output);
         WriteProcessingSummary(result.ProcessingSummary, output);
-        WriteRolloutSummary(result.RolloutSummary, output);
+        WriteRolloutSummary(result.RolloutSummary, result.ProcessingSummary, output);
         output.WriteLine($"review-path: /detector-rollout/{result.RunId}");
         return result.ProcessingSummary.FailedJobs == 0 ? 0 : 1;
     }
@@ -235,7 +235,7 @@ internal static class DetectorRolloutCommandRunner
             cancellationToken);
         WriteSelectedPipeline(output);
         WriteProcessingSummary(result.ProcessingSummary, output);
-        WriteRolloutSummary(result.RolloutSummary, output);
+        WriteRolloutSummary(result.RolloutSummary, result.ProcessingSummary, output);
         output.WriteLine($"review-path: /detector-rollout/{options.RunId.Value}");
         return result.ProcessingSummary.FailedJobs == 0 ? 0 : 1;
     }
@@ -252,7 +252,7 @@ internal static class DetectorRolloutCommandRunner
         CatalogueDetectorRolloutSummary rollout = await new SqliteDetectorRolloutApplicationRepository(database)
             .GetSummaryAsync(runId, cancellationToken);
         WriteProcessingSummary(processing, output);
-        WriteRolloutSummary(rollout, output);
+        WriteRolloutSummary(rollout, processing, output);
         output.WriteLine($"review-path: /detector-rollout/{runId}");
     }
 
@@ -354,7 +354,10 @@ internal static class DetectorRolloutCommandRunner
         output.WriteLine($"revisions-failed: {summary.FailedJobs}");
     }
 
-    private static void WriteRolloutSummary(CatalogueDetectorRolloutSummary summary, TextWriter output)
+    private static void WriteRolloutSummary(
+        CatalogueDetectorRolloutSummary summary,
+        ProcessingRunSummary processing,
+        TextWriter output)
     {
         output.WriteLine($"plans: {summary.RevisionCount}");
         output.WriteLine($"candidates: {summary.CandidateCount}");
@@ -364,7 +367,9 @@ internal static class DetectorRolloutCommandRunner
         output.WriteLine($"ready-to-apply: {summary.ReadyToApplyCount}");
         output.WriteLine($"deferred: {summary.DeferredCount}");
         output.WriteLine($"unmatched-existing: {summary.UnmatchedExistingCount}");
-        bool complete = summary.CandidateCount == summary.AppliedCount &&
+        bool complete = processing.Status == ProcessingRunStatus.Completed &&
+                        processing.FailedJobs == 0 &&
+                        summary.CandidateCount == summary.AppliedCount &&
                         summary.AwaitingReviewCount == 0 &&
                         summary.ReadyToApplyCount == 0 &&
                         summary.DeferredCount == 0;
