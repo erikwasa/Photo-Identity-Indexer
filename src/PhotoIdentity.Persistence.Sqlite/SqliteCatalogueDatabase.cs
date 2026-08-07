@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 8;
+    public const int CurrentSchemaVersion = 9;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -403,6 +403,65 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 8;
         """;
 
+    private const string VersionNineMigration = """
+        CREATE TABLE detector_reconciliation_candidate_inspections (
+            processing_run_id TEXT NOT NULL,
+            asset_revision_id TEXT NOT NULL,
+            candidate_index INTEGER NOT NULL CHECK (candidate_index >= 0),
+            detector_model_id TEXT NOT NULL,
+            detector_model_hash TEXT NOT NULL,
+            confidence REAL NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+            crop_id TEXT NOT NULL,
+            crop_protocol TEXT NOT NULL,
+            crop_content_sha256 TEXT NOT NULL,
+            crop_storage_path TEXT NOT NULL,
+            crop_width INTEGER NOT NULL CHECK (crop_width > 0),
+            crop_height INTEGER NOT NULL CHECK (crop_height > 0),
+            embedder_model_id TEXT NOT NULL,
+            embedder_model_hash TEXT NOT NULL,
+            embedding_dimensions INTEGER NOT NULL CHECK (embedding_dimensions > 0),
+            embedding_l2_norm REAL NOT NULL CHECK (embedding_l2_norm > 0),
+            embedding_vector_blob BLOB NOT NULL,
+            observed_at_utc TEXT NOT NULL,
+            PRIMARY KEY (processing_run_id, asset_revision_id, candidate_index),
+            UNIQUE (crop_id),
+            FOREIGN KEY (processing_run_id, asset_revision_id, candidate_index)
+                REFERENCES detector_reconciliation_candidates (
+                    processing_run_id, asset_revision_id, candidate_index) ON DELETE CASCADE
+        );
+
+        CREATE TABLE detector_reconciliation_resolution_actions (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            processing_run_id TEXT NOT NULL,
+            asset_revision_id TEXT NOT NULL,
+            candidate_index INTEGER NOT NULL CHECK (candidate_index >= 0),
+            action_kind TEXT NOT NULL CHECK (action_kind IN ('existing', 'new', 'defer')),
+            face_occurrence_id TEXT NULL,
+            actor TEXT NOT NULL,
+            note TEXT NULL,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (processing_run_id, asset_revision_id, candidate_index)
+                REFERENCES detector_reconciliation_candidates (
+                    processing_run_id, asset_revision_id, candidate_index) ON DELETE CASCADE,
+            FOREIGN KEY (face_occurrence_id) REFERENCES face_occurrences (id) ON DELETE RESTRICT,
+            CHECK (
+                (action_kind = 'existing' AND face_occurrence_id IS NOT NULL)
+                OR (action_kind IN ('new', 'defer') AND face_occurrence_id IS NULL)
+            )
+        );
+
+        CREATE INDEX ix_detector_reconciliation_resolution_history
+            ON detector_reconciliation_resolution_actions (
+                processing_run_id, asset_revision_id, candidate_index, id DESC);
+        CREATE INDEX ix_detector_reconciliation_inspection_model
+            ON detector_reconciliation_candidate_inspections (
+                detector_model_id, detector_model_hash, embedder_model_id, embedder_model_hash);
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (9, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 9;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -484,6 +543,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 8)
         {
             await ApplyMigrationAsync(connection, VersionEightMigration, cancellationToken);
+            version = 8;
+        }
+
+        if (version < 9)
+        {
+            await ApplyMigrationAsync(connection, VersionNineMigration, cancellationToken);
         }
     }
 
