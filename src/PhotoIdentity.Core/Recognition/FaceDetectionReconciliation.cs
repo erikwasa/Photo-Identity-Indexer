@@ -34,18 +34,7 @@ public sealed record ExistingFaceDetectionAnchor(
 public sealed record CandidateFaceDetectionAnchor(
     int CandidateIndex,
     NormalizedBoundingBox BoundingBox,
-    NormalizedFaceLandmarks Landmarks)
-{
-    public CandidateFaceDetectionAnchor(
-        int candidateIndex,
-        DetectedFaceCandidate candidate)
-        : this(
-            candidateIndex,
-            candidate?.BoundingBox ?? throw new ArgumentNullException(nameof(candidate)),
-            candidate.Landmarks)
-    {
-    }
-}
+    NormalizedFaceLandmarks Landmarks);
 
 public enum FaceDetectionReconciliationDisposition
 {
