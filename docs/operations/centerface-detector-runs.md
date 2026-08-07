@@ -112,7 +112,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 ```
 
-Record the run ID and inspect the result:
+Record the run ID and inspect status:
 
 ```powershell
 $smokeRunId = "REPLACE_WITH_PRINTED_RUN_ID"
@@ -127,14 +127,7 @@ dotnet run `
     --run $smokeRunId
 ```
 
-The repeat smoke passes only when:
-
-- all five images complete without runtime errors;
-- detection counts are plausible for every disposable image rather than exploding after the first call;
-- the known eight-person group remains approximately correct rather than merely being the only valid first image;
-- boxes visually cover faces rather than arbitrary background regions;
-- several `aligned.png` crops show sensible, non-corrupted eye/nose/mouth geometry; and
-- no systematic upside-down, mirrored or indecipherable crops remain.
+The repeat smoke passes only when all five images complete, detection counts are plausible for every image rather than exploding after the first call, boxes cover faces rather than arbitrary background, several aligned crops have sensible eye/nose/mouth geometry, and no systematic upside-down/mirrored/indecipherable crops remain.
 
 Generated aligned crops are under `outputs/runs/<run-id>/assets/.../faces/.../aligned.png`.
 
@@ -142,13 +135,7 @@ Do not tune confidence from these images. If the repeated run still produces hun
 
 ## 4. Authorise the first M16 candidate only after smoke passes
 
-Before the full run, record that:
-
-- the current Windows build/tests pass;
-- the per-image-network smoke passes both functional and visual checks;
-- the exact model hash remains unchanged;
-- the maintainer accepts the documented repository/model-weight interpretation and unresolved WIDER FACE training-data limitation for this local evaluation; and
-- no smoke observation caused a threshold or preprocessing change.
+Before the full run, record that Windows build/tests pass, the per-image-network smoke passes functional and visual checks, the exact model hash remains unchanged, the maintainer accepts the documented model-weight/training-data boundary for local evaluation, and no smoke observation caused a threshold or preprocessing change.
 
 Only then process the fixed M16 sample.
 
@@ -192,16 +179,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 ```
 
-Record the run ID and confirm every intended photo completed before comparison.
-
 ## 6. Compare against the frozen ground truth
 
-Use the same detector-comparison workspace and private evaluation root used for WI-0035 and WI-0036. The unchanged M16 gate is:
-
-- overall recall at least `90%`;
-- five-plus-face recall at least `85%`;
-- no more than `10` false or duplicate detections; and
-- no material failure category incompatible with the archive workflow.
+Use the same detector-comparison workspace and private evaluation root used for WI-0035 and WI-0036. The unchanged M16 gate is overall recall at least `90%`, five-plus-face recall at least `85%`, no more than `10` false or duplicate detections, and no material failure category incompatible with the archive workflow.
 
 ## Stop rule
 
