@@ -77,7 +77,7 @@ work_items:
     verified_at: '2026-07-25'
     verified_by: human
     last_updated_at: '2026-07-25'
-    branch: agent/WI-0004-docs-tooling
+    branch: agent/living-documentation
     blockers: []
     evidence:
       - type: pull_request
@@ -829,12 +829,15 @@ work_items:
   - id: WI-0037
     title: Evaluate another face detector
     milestone: M16
-    status: in_progress
+    status: completed
     owner: ai-agent
     document: ../work-items/WI-0037-detector-candidate.md
     started_at: '2026-08-07'
+    completed_at: '2026-08-07'
+    verified_at: '2026-08-07'
+    verified_by: human
     last_updated_at: '2026-08-07'
-    branch: agent/WI-0037-centerface-qualification
+    branch: agent/WI-0037-centerface-smoke-pass
     blockers:
       - WI-0036
     evidence:
@@ -842,17 +845,36 @@ work_items:
         value: Governed multi-scale YuNet candidates failed the complete M16 gate, activating alternative-detector evaluation on 2026-08-07.
       - type: pull_request
         value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/84
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/86
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/88
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/89
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/90
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/91
       - type: human_verification
-        value: CenterFace ONNX was selected as the first qualification target; exact artifact, licence, training-data, tensor and Windows runtime evidence must be pinned before the private sample is processed.
+        value: The maintainer explicitly accepted the documented CenterFace pretrained-weight and training-data uncertainty for local evaluation and private local rollout work on 2026-08-07; redistribution remains outside that acceptance.
+      - type: human_verification
+        value: The maintainer completed the unchanged governed CenterFace confidence-0.5 single-pass comparison against the fixed private 100-photo M16 sample and frozen ground truth on 2026-08-07 and reported that it passed the complete M16 gate; detailed metrics remain outside Git.
   - id: WI-0038
     title: Roll out the selected detector pipeline
     milestone: M16
-    status: proposed
-    owner: unassigned
+    status: in_progress
+    owner: ai-agent
     document: ../work-items/WI-0038-detector-rollout.md
+    started_at: '2026-08-07'
+    last_updated_at: '2026-08-07'
+    branch: agent/WI-0038-detector-rollout
     blockers:
       - WI-0037
-    evidence: []
+    evidence:
+      - type: human_verification
+        value: CenterFace confidence 0.5 single-pass passed the complete M16 detector gate after the maintainer accepted the documented local-use governance boundary, activating safe canonical-catalogue rollout work on 2026-08-07.
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/93
   - id: WI-0039
     title: Build detector evaluation workspace
     milestone: M16
