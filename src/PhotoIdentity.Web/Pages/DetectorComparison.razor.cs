@@ -64,6 +64,7 @@ public partial class DetectorComparison
             foreach (var match in photo.Correction.Matches) draft.CandidateActions[match.CandidateDetectionId] = $"match:{match.GroundTruthFaceId}";
             foreach (string id in photo.Correction.FalseCandidateDetectionIds) draft.CandidateActions[id] = "false";
             foreach (string id in photo.Correction.DuplicateCandidateDetectionIds) draft.CandidateActions[id] = "duplicate";
+            foreach (string id in photo.Correction.NeutralCandidateDetectionIds) draft.CandidateActions[id] = "neutral";
             draft.MissedGroundTruthFaceIds.UnionWith(photo.Correction.MissedGroundTruthFaceIds);
             draft.MissedGroundTruthFaceIds.UnionWith(AutomaticMissedGroundTruthFaceIds(photo));
             Drafts[photo.CandidateRevisionId] = draft;
@@ -196,13 +197,18 @@ public partial class DetectorComparison
             List<DetectorEvaluationComparisonManualMatchRequest> matches = [];
             List<string> falseDetections = [];
             List<string> duplicates = [];
+            List<string> neutralDetections = [];
             foreach ((string candidateId, string action) in draft.CandidateActions)
             {
                 if (action.StartsWith("match:", StringComparison.Ordinal)) matches.Add(new(action[6..], candidateId));
                 else if (action == "false") falseDetections.Add(candidateId);
                 else if (action == "duplicate") duplicates.Add(candidateId);
+                else if (action == "neutral") neutralDetections.Add(candidateId);
             }
-            var request = new SaveDetectorEvaluationComparisonPhotoRequest(matches, falseDetections, duplicates, draft.MissedGroundTruthFaceIds.ToArray(), draft.Notes);
+            var request = new SaveDetectorEvaluationComparisonPhotoRequest(matches, falseDetections, duplicates, draft.MissedGroundTruthFaceIds.ToArray(), draft.Notes)
+            {
+                NeutralCandidateDetectionIds = neutralDetections,
+            };
             using HttpResponseMessage response = await Http.PutAsJsonAsync($"/api/detector-evaluation/comparisons/{Comparison!.Id}/photos/{photo.CandidateRevisionId}", request);
             if (!response.IsSuccessStatusCode) throw new InvalidOperationException(await ReadErrorAsync(response));
             Success = moveNext ? $"Saved {photo.PhotoName}." : $"Corrections saved for {photo.PhotoName}.";
