@@ -36,6 +36,27 @@ public sealed class CenterFaceDetectorTests
     }
 
     [Fact]
+    public async Task Detector_invokes_inference_session_once_per_image()
+    {
+        ModelManifest manifest = CreateManifest(maximumLongEdge: 64);
+        CountingSession session = new(CreateOutputs(new ImageSize(32, 32)));
+        using CenterFaceFaceDetector detector = new(
+            manifest,
+            session,
+            new CenterFaceDetectorOptions { ConfidenceThreshold = 0.5 });
+        ImageFrame image = new(
+            new ImageSize(1, 1),
+            PixelFormat.Bgr24,
+            stride: 3,
+            [10, 20, 30]);
+
+        await detector.DetectAsync(image, CancellationToken.None);
+        await detector.DetectAsync(image, CancellationToken.None);
+
+        Assert.Equal(2, session.RunCount);
+    }
+
+    [Fact]
     public void Preprocessor_bounds_long_edge_before_rounding_to_multiple_of_32()
     {
         ModelManifest manifest = CreateManifest(maximumLongEdge: 64);
@@ -144,6 +165,25 @@ public sealed class CenterFaceDetectorTests
 
         Assert.Contains("537", exception.Message, StringComparison.Ordinal);
         Assert.Contains("expected [1, 1, 8, 8]", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OpenCv_output_reader_preserves_four_dimensional_shape_and_values()
+    {
+        int[] shape = [1, 2, 2, 3];
+        float[] values = Enumerable.Range(0, 12)
+            .Select(value => value + 0.25f)
+            .ToArray();
+
+        using OpenCvSharp.Mat tensor = OpenCvSharp.Mat.FromPixelData(
+            shape,
+            OpenCvSharp.MatType.CV_32FC1,
+            values);
+
+        CenterFaceTensor result = OpenCvDnnCenterFaceInferenceSession.ReadOutputTensor("test", tensor);
+
+        Assert.Equal([1L, 2L, 2L, 3L], result.Shape);
+        Assert.Equal(values, result.Data.ToArray());
     }
 
     private static IReadOnlyDictionary<string, CenterFaceTensor> CreateOutputs(
@@ -258,7 +298,7 @@ public sealed class CenterFaceDetectorTests
         DownloadUri = new Uri("https://example.test/centerface-test.onnx"),
         Sha256 = new string('a', 64),
         SizeBytes = 1,
-        Runtime = "onnxruntime",
+        Runtime = "opencv-dnn",
         SourceVersion = "test@1",
         Input = new ModelInputManifest
         {
@@ -322,6 +362,26 @@ public sealed class CenterFaceDetectorTests
             cancellationToken.ThrowIfCancellationRequested();
             InputData = (float[])input.Clone();
             InputShape = (long[])shape.Clone();
+            return outputs;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class CountingSession(IReadOnlyDictionary<string, CenterFaceTensor> outputs)
+        : ICenterFaceInferenceSession
+    {
+        public int RunCount { get; private set; }
+
+        public IReadOnlyDictionary<string, CenterFaceTensor> Run(
+            float[] input,
+            long[] shape,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RunCount++;
             return outputs;
         }
 
