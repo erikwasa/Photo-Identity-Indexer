@@ -38,13 +38,13 @@
       "source": "https://github.com/Star-Clouds/CenterFace/blob/b82ec0c4844e89fd5a0305986aed9bdf33c72585/LICENSE"
     },
     "weights": {
-      "spdx": "MIT",
+      "spdx": "LicenseRef-CenterFace-Repository-MIT-Provisional",
       "source": "https://github.com/Star-Clouds/CenterFace/blob/b82ec0c4844e89fd5a0305986aed9bdf33c72585/LICENSE"
     },
     "trainingData": {
       "name": "WIDER FACE",
       "licence": "not asserted by this project",
-      "notes": "The CenterFace paper and repository report WIDER FACE training/evaluation. The project records the upstream repository licence as provisional weight evidence but does not assert separate training-data rights or permission to train or redistribute derived weights."
+      "notes": "The CenterFace paper and repository report WIDER FACE training/evaluation. The project records the root repository MIT licence as provisional evidence for the committed ONNX weight artifact, but does not assert that it independently settles model-weight or training-data-derived rights. Permission to train or redistribute derived weights is not asserted."
     }
   }
 }
