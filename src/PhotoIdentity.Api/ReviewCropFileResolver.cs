@@ -39,7 +39,7 @@ public sealed class ReviewCropFileResolver
                 ['/', '\\'],
                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             if (segments.Length < 3 ||
-                !string.Equals(segments[0], "runs", StringComparison.OrdinalIgnoreCase) ||
+                !IsSupportedRunDirectory(segments[0]) ||
                 !Guid.TryParse(segments[1], out Guid runId) ||
                 runId == Guid.Empty)
             {
@@ -70,6 +70,10 @@ public sealed class ReviewCropFileResolver
             return null;
         }
     }
+
+    private static bool IsSupportedRunDirectory(string value) =>
+        string.Equals(value, "runs", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(value, "rollouts", StringComparison.OrdinalIgnoreCase);
 
     private async Task<string?> GetOutputRootAsync(
         Guid runId,
