@@ -19,7 +19,7 @@ No YuNet configuration is approved for rollout.
 
 WI-0037 qualified the exact pinned CenterFace ONNX artifact, corrected its local runtime path without changing the governed candidate settings and completed the first alternative-detector comparison.
 
-On 2026-08-07 the maintainer explicitly accepted the documented CenterFace pretrained-weight/training-data uncertainty for local evaluation and private local rollout work. The maintainer then completed the unchanged CenterFace confidence `0.5`, `single-pass` comparison and reported that it **passed the complete M16 gate**. Detailed counts and category evidence remain private.
+On 2026-08-07 the maintainer explicitly accepted the documented CenterFace pretrained-weight/training-data uncertainty for local evaluation. The maintainer then completed the unchanged CenterFace confidence `0.5`, `single-pass` comparison, reported that it **passed the complete M16 gate**, and instructed WI-0038 rollout engineering to continue. Detailed counts and category evidence remain private.
 
 PR #92 added a `Neutral` comparison outcome for legitimate face detections that were intentionally outside the frozen countable-face scope. Neutral resolves review workload but does not increase recall and is not included in the false-plus-duplicate penalty.
 
@@ -41,7 +41,7 @@ The selected local pipeline is:
 - `sface-five-point-v1` alignment; and
 - padding `0.25` in the local inspection workflow.
 
-The local-use governance acceptance does not establish redistribution rights for the pretrained model. The provisional weight/training-data boundary remains recorded in the CenterFace qualification document.
+The local-evaluation governance acceptance does not establish redistribution rights for the pretrained model. The provisional weight/training-data boundary remains recorded in the CenterFace qualification document.
 
 ## Delivered evaluation workspace
 
