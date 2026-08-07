@@ -62,13 +62,11 @@ internal sealed class OpenCvDnnCenterFaceInferenceSession : ICenterFaceInference
 
         using Mat inputBlob = Mat.FromPixelData(matShape, MatType.CV_32FC1, input);
 
-        // Do not reuse a CenterFace OpenCV Net across source images. Real smoke
-        // evidence showed that the first inference could be correct while later
-        // calls on the same Net produced hundreds of nonsensical detections.
-        // An independent CenterFace adapter documents the same native-runtime
-        // behaviour and rebuilds the graph for each call. Isolating Net lifetime
-        // here keeps every image inference independent without changing model bytes,
-        // preprocessing, confidence, decoder or NMS semantics.
+        // CenterFace/OpenCV smoke evidence showed a valid first inference followed by
+        // corrupted later calls when one native Net was reused across source images.
+        // An independent CenterFace adapter documents the same second-call failure
+        // mode. Keep each image inference isolated by loading and disposing a fresh
+        // network while preserving all model/preprocessing/decoder parameters.
         using Net net = LoadNetwork();
         net.SetInput(inputBlob);
 
