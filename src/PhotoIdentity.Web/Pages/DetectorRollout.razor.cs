@@ -153,6 +153,9 @@ public partial class DetectorRollout
     private static string Key(DetectorRolloutPendingReviewResponse item) =>
         $"{item.AssetRevisionId}:{item.CandidateIndex}";
 
+    private static string ShortRevision(string value) =>
+        value[..Math.Min(12, value.Length)];
+
     private static string Percent(double value) =>
         (value * 100).ToString("0.###", CultureInfo.InvariantCulture) + "%";
 
