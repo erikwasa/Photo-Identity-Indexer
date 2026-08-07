@@ -22,6 +22,38 @@ public enum DistanceMetric
     Euclidean,
 }
 
+public enum ModelInputShapeKind
+{
+    Fixed,
+    DynamicMultipleOf,
+}
+
+public sealed record ModelInputShapePolicy
+{
+    public ModelInputShapePolicy(ModelInputShapeKind kind, int? multipleOf = null)
+    {
+        if (kind == ModelInputShapeKind.Fixed && multipleOf is not null)
+        {
+            throw new ArgumentException("Fixed input shapes cannot declare a dynamic multiple.", nameof(multipleOf));
+        }
+
+        if (kind == ModelInputShapeKind.DynamicMultipleOf && multipleOf <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(multipleOf),
+                "Dynamic-multiple input shapes require a positive multiple.");
+        }
+
+        Kind = kind;
+        MultipleOf = multipleOf;
+    }
+
+    public ModelInputShapeKind Kind { get; }
+    public int? MultipleOf { get; }
+
+    public static ModelInputShapePolicy Fixed { get; } = new(ModelInputShapeKind.Fixed);
+}
+
 public readonly record struct Sha256Digest
 {
     public Sha256Digest(string value)
@@ -53,7 +85,8 @@ public sealed record ModelDescriptor
         string sourceVersion,
         int? outputDimensions = null,
         DistanceMetric? distanceMetric = null,
-        AlignmentProtocolId? alignmentProtocol = null)
+        AlignmentProtocolId? alignmentProtocol = null,
+        ModelInputShapePolicy? inputShapePolicy = null)
     {
         if (outputDimensions <= 0)
         {
@@ -76,6 +109,7 @@ public sealed record ModelDescriptor
         OutputDimensions = outputDimensions;
         DistanceMetric = distanceMetric;
         AlignmentProtocol = alignmentProtocol;
+        InputShapePolicy = inputShapePolicy ?? ModelInputShapePolicy.Fixed;
     }
 
     public ModelId Id { get; }
@@ -83,6 +117,7 @@ public sealed record ModelDescriptor
     public ModelFormat Format { get; }
     public Sha256Digest ModelHash { get; }
     public ImageSize InputSize { get; }
+    public ModelInputShapePolicy InputShapePolicy { get; }
     public string Runtime { get; }
     public string Licence { get; }
     public string SourceVersion { get; }
