@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Web;
@@ -208,7 +209,6 @@ public static class ArchiveEndpoints
             SqliteArchiveStatusRepository statusRepository = new(database);
             CatalogueArchiveRunStatus? latest = await statusRepository.GetLatestRunAsync(profileHash, cancellationToken);
             ArchiveAnalysisCoordinator coordinator = new(database);
-            bool startedNewRun = false;
 
             if (latest is not null)
             {
@@ -230,9 +230,8 @@ public static class ArchiveEndpoints
                 analysisConfiguration,
                 new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: 1),
                 cancellationToken);
-            startedNewRun = started.ProcessingSummary is not null;
             return Results.Ok(new ArchiveAnalysisStepResponse(
-                startedNewRun,
+                started.ProcessingSummary is not null,
                 await BuildStatusAsync(database, operatorConfiguration, cancellationToken)));
         }
         catch (Exception exception)
