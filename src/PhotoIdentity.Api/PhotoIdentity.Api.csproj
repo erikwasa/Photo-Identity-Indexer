@@ -8,6 +8,7 @@
     <ProjectReference Include="../PhotoIdentity.Imaging.OpenCv/PhotoIdentity.Imaging.OpenCv.csproj" />
     <ProjectReference Include="../PhotoIdentity.Persistence.Sqlite/PhotoIdentity.Persistence.Sqlite.csproj" />
     <ProjectReference Include="../PhotoIdentity.Source.Local/PhotoIdentity.Source.Local.csproj" />
+    <ProjectReference Include="../PhotoIdentity.Source.OneDriveSync/PhotoIdentity.Source.OneDriveSync.csproj" />
     <ProjectReference Include="../PhotoIdentity.Web/PhotoIdentity.Web.csproj" />
     <ProjectReference Include="../PhotoIdentity.Worker/PhotoIdentity.Worker.csproj" />
   </ItemGroup>
