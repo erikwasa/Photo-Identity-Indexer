@@ -40,6 +40,11 @@ public static class Program
         {
             return args[0] switch
             {
+                "archive" when args.Length > 1 && args[1] == "proxy" =>
+                    await ArchiveProxyMeasureCommandRunner.RunAsync(
+                        ArchiveProxyMeasureCommandOptions.Parse(args.Skip(2).ToArray()),
+                        output,
+                        cancellationToken),
                 "archive" => await ArchiveCommandRunner.RunAsync(
                     ArchiveCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
@@ -112,6 +117,10 @@ public static class Program
                               [--max-attempts COUNT]
               archive resume --database PATH --run RUN_ID [--max-attempts COUNT]
               archive status --database PATH --run RUN_ID
+              archive proxy measure --source DIR --output DIR
+                                    --profile ID:MAX_LONG_EDGE:JPEG_QUALITY
+                                    --profile ID:MAX_LONG_EDGE:JPEG_QUALITY [...]
+                                    [--non-recursive]
 
               batch start --database PATH --source DIR [--output DIR]
                           [--root PATH] [--model-dir DIR] [--non-recursive]
@@ -178,6 +187,14 @@ public static class Program
             Archive resume continues the same durable run and validates the saved exact
             profile before processing. Archive status reports the registered profile and
             durable job progress.
+
+            Archive proxy measure is a pre-default tuning path. It renders every supported
+            JPEG/PNG source image with at least two exact candidate profiles, writes those
+            derivatives outside the source root, and reports only aggregate logical source
+            bytes plus total/mean/median/p95 proxy bytes and source-to-proxy compression.
+            Candidate syntax is ID:MAX_LONG_EDGE:JPEG_QUALITY. The command does not choose
+            or register a permanent catalogue default; the measurement gate remains a
+            maintainer decision after visual inspection of the generated candidates.
 
             Batch start scans a local folder, creates durable jobs for each current
             immutable revision and runs the production inspection pipeline until idle.
