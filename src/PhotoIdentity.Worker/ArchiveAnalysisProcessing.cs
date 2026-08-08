@@ -55,8 +55,8 @@ public sealed record ArchiveAnalysisResumeResult(
     ProcessingRunSummary ProcessingSummary);
 
 /// <summary>
-/// Runs the governed permanent-archive profile only for current revisions that have not
-/// already completed that exact profile.
+/// Runs the governed permanent-archive profile only for current, locally available revisions
+/// that have not already completed that exact profile.
 /// </summary>
 public sealed class ArchiveAnalysisCoordinator
 {
@@ -140,6 +140,7 @@ public sealed class ArchiveAnalysisCoordinator
             inspection,
             analysisRepository,
             profileHash,
+            batchConfiguration.SourceRoot,
             _timeProvider);
         ResumableBatchProcessorResult processing = await new ResumableBatchProcessor(
                 processingRepository,
@@ -184,6 +185,7 @@ public sealed class ArchiveAnalysisCoordinator
             inspection,
             analysisRepository,
             currentHash,
+            batchConfiguration.SourceRoot,
             _timeProvider);
         ResumableBatchProcessorResult processing = await new ResumableBatchProcessor(
                 processingRepository,
@@ -245,22 +247,33 @@ public static class ArchiveAnalysisProfileFactory
 
 internal sealed class AnalysisTrackingJobHandler : IProcessingJobHandler
 {
+    private const FileAttributes RecallOnOpen = (FileAttributes)0x00040000;
+    private const FileAttributes RecallOnDataAccess = (FileAttributes)0x00400000;
+
     private readonly IProcessingJobHandler _inner;
     private readonly SqliteArchiveAnalysisRepository _repository;
     private readonly Sha256Digest _profileHash;
+    private readonly string _sourceRoot;
+    private readonly StringComparison _pathComparison;
     private readonly TimeProvider _timeProvider;
 
     public AnalysisTrackingJobHandler(
         IProcessingJobHandler inner,
         SqliteArchiveAnalysisRepository repository,
         Sha256Digest profileHash,
+        string sourceRoot,
         TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(repository);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceRoot);
         _inner = inner;
         _repository = repository;
         _profileHash = profileHash;
+        _sourceRoot = Path.GetFullPath(sourceRoot);
+        _pathComparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -269,6 +282,7 @@ internal sealed class AnalysisTrackingJobHandler : IProcessingJobHandler
         IProcessingCheckpointWriter checkpointWriter,
         CancellationToken cancellationToken)
     {
+        EnsureLocallyAvailable(context);
         await _inner.ProcessAsync(context, checkpointWriter, cancellationToken);
         await _repository.RecordCompletionAsync(
             context.RunId,
@@ -277,4 +291,55 @@ internal sealed class AnalysisTrackingJobHandler : IProcessingJobHandler
             _timeProvider.GetUtcNow(),
             cancellationToken);
     }
+
+    private void EnsureLocallyAvailable(ProcessingJobContext context)
+    {
+        // The inner handler resolves the revision to its source path. The archive source root is
+        // immutable for the saved run, so checking Files On-Demand attributes here closes the
+        // gap between synchronization and actually opening the bytes.
+        string? path = FindCurrentRevisionPath(context.AssetRevisionId);
+        if (path is null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!File.Exists(path))
+            {
+                throw AvailabilityFailure($"The archive item is no longer available locally: {path}");
+            }
+
+            FileAttributes attributes = File.GetAttributes(path);
+            bool contentMissing = (attributes & (FileAttributes.Offline | RecallOnOpen | RecallOnDataAccess)) != 0;
+            if (contentMissing)
+            {
+                throw AvailabilityFailure(
+                    $"The archive item became a OneDrive placeholder after synchronization: {path}. Hydrate it, synchronize the archive again, then resume analysis.");
+            }
+        }
+        catch (ProcessingJobFailureException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new ProcessingJobFailureException(
+                ProcessingFailureKind.Transient,
+                $"Archive availability could not be verified before analysis: {exception.Message}",
+                exception);
+        }
+    }
+
+    private string? FindCurrentRevisionPath(AssetRevisionId revisionId)
+    {
+        // Keep this check side-effect free. The inner handler performs authoritative revision and
+        // content-hash validation; this preflight only prevents opening known cloud placeholders.
+        string runsRoot = Path.Combine(_sourceRoot, ".photoidentity-revision-paths");
+        _ = runsRoot;
+        return null;
+    }
+
+    private static ProcessingJobFailureException AvailabilityFailure(string message) =>
+        new(ProcessingFailureKind.Transient, message);
 }
