@@ -108,9 +108,16 @@ public sealed class SqliteArchiveAnalysisRepository
             : throw new KeyNotFoundException($"Processing run {runId} is not a registered archive-analysis run.");
     }
 
+    public Task<IReadOnlyList<AssetRevisionId>> GetPendingCurrentRevisionIdsAsync(
+        SourceId sourceId,
+        Sha256Digest profileHash,
+        CancellationToken cancellationToken = default) =>
+        GetPendingCurrentRevisionIdsAsync(sourceId, profileHash, includeHydratable: false, cancellationToken);
+
     public async Task<IReadOnlyList<AssetRevisionId>> GetPendingCurrentRevisionIdsAsync(
         SourceId sourceId,
         Sha256Digest profileHash,
+        bool includeHydratable,
         CancellationToken cancellationToken = default)
     {
         await EnsureSchemaAsync(cancellationToken);
@@ -133,12 +140,16 @@ public sealed class SqliteArchiveAnalysisRepository
                AND analysis.profile_hash = $profile_hash
             WHERE asset.source_id = $source_id
               AND asset.deleted_at_utc IS NULL
-              AND COALESCE(availability.availability, 'local') = 'local'
+              AND (
+                    COALESCE(availability.availability, 'local') = 'local'
+                    OR ($include_hydratable = 1 AND availability.availability IN ('online-only', 'downloading'))
+                  )
               AND analysis.asset_revision_id IS NULL
             ORDER BY asset.source_key;
             """;
         command.Parameters.AddWithValue("$source_id", sourceId.ToString());
         command.Parameters.AddWithValue("$profile_hash", profileHash.ToString());
+        command.Parameters.AddWithValue("$include_hydratable", includeHydratable ? 1 : 0);
 
         List<AssetRevisionId> revisions = [];
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -148,6 +159,25 @@ public sealed class SqliteArchiveAnalysisRepository
         }
 
         return revisions;
+    }
+
+    public async Task<bool> IsCompletedAsync(
+        AssetRevisionId revisionId,
+        Sha256Digest profileHash,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSchemaAsync(cancellationToken);
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT COUNT(*)
+            FROM asset_revision_analysis
+            WHERE asset_revision_id = $asset_revision_id
+              AND profile_hash = $profile_hash;
+            """;
+        command.Parameters.AddWithValue("$asset_revision_id", revisionId.ToString());
+        command.Parameters.AddWithValue("$profile_hash", profileHash.ToString());
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) > 0;
     }
 
     public async Task<int> CountCompletedCurrentRevisionsAsync(
