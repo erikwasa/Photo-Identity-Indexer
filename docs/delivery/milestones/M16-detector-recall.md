@@ -21,7 +21,7 @@ The project measures detector recall on a bounded 100-photo sample and improves 
 - [WI-0037](../work-items/WI-0037-detector-candidate.md) — qualify and evaluate another detector after multi-scale YuNet remained insufficient
 - [WI-0038](../work-items/WI-0038-detector-rollout.md) — safely roll out the selected detector pipeline
 
-## Current implementation decision
+## Completed implementation decision
 
 The maintainer retained the 50 mechanically selected representative pilot photos and supplemented the difficult half with archive-relevant external photos that cover conditions missing from the original pilot. The exact 100-photo set remains staged privately and immutable across detector runs.
 
@@ -42,13 +42,11 @@ Confidence `0.6` was intentionally not run because a lower threshold could not p
 
 WI-0037 then qualified CenterFace using the exact pinned ONNX artifact and unchanged first-candidate configuration. Runtime qualification moved the graph to OpenCV DNN, corrected N-D output marshalling and isolated native network state per image without tuning the detector from the disposable smoke set.
 
-On 2026-08-07 the maintainer explicitly accepted the documented CenterFace pretrained-weight/training-data uncertainty for local evaluation. The maintainer then completed the governed CenterFace confidence `0.5`, `single-pass` comparison against the unchanged 100-photo sample and frozen ground truth, reported that it **passed the complete M16 gate**, and instructed WI-0038 rollout engineering to continue. Detailed metrics remain private.
+On 2026-08-07 the maintainer explicitly accepted the documented CenterFace pretrained-weight/training-data uncertainty for local evaluation. The maintainer then completed the governed CenterFace confidence `0.5`, `single-pass` comparison against the unchanged 100-photo sample and frozen ground truth, reported that it **passed the complete M16 gate**, and separately instructed WI-0038 rollout engineering to continue. Detailed metrics remain private. The local-evaluation licence acceptance does not establish redistribution rights.
 
 PR #92 added a narrow `Neutral` review outcome for legitimate face detections outside the frozen countable-face scope. Neutral does not increase recall and is excluded from the false-plus-duplicate penalty, so useful out-of-scope face detections no longer create an artificial false-positive penalty while the original counting rule remains fixed.
 
-CenterFace confidence `0.5`, single-pass is therefore the selected M16 detector pipeline. WI-0037 is complete and WI-0038 is active.
-
-The selected local pipeline is:
+CenterFace confidence `0.5`, single-pass is therefore the selected M16 detector pipeline:
 
 - `centerface-2019-fp32` at SHA-256 `77e394b51108381b4c4f7b4baf1c64ca9f4aba73e5e803b2636419578913b5fe`;
 - OpenCV DNN with fresh native network state per image;
@@ -59,15 +57,17 @@ The selected local pipeline is:
 - SFace `sface-2021dec-fp32`; and
 - padding `0.25` in the local inspection workflow.
 
-The remaining M16 work is safe catalogue rollout, not detector selection. Existing face occurrences are stable identity anchors, and current local persistence historically resolves `(asset revision, ordinal)` collisions to the existing occurrence. Because CenterFace changes face count and ordering, WI-0038 must add versioned full-pipeline provenance and reconcile new detections by geometry and five-point landmarks before any canonical reprocessing can reuse an existing reviewed occurrence.
+WI-0038 implemented versioned full-pipeline provenance and conservative geometry/five-landmark reconciliation through PRs #93–#96. PR #97 fixed pilot-discovered review-crop resolution and rollout-completion reporting issues.
 
-The local-evaluation licence acceptance does not establish redistribution rights. This evaluation and rollout planning remain separate from automatic identity decisions. Detector judgements and reconciliation scores must not create person assignments, rejection actions or synthetic identities.
+On 2026-08-08 the maintainer completed the disposable migration pilot against a recoverable copy of the reviewed 560-image catalogue. Rollout run `5794d5c5-26fe-45f4-8a70-3132aae45891` completed 20/20 selected revisions and applied 77 candidates: 43 existing-occurrence mappings, 34 new occurrences, 0 ambiguous candidates and 1 retained unmatched existing occurrence. All 43 reviewed existing mappings were inspected and confirmed correct with 0 incorrect mappings. The 34 new occurrences had 0 person labels and 0 review actions. Source and migrated pilot counts remained 69 people, 454 person labels, 467 review actions and 10 ranked-suggestion rows. Replay/resume/apply kept face occurrences stable at 492 before and after, and restore-based rollback succeeded.
+
+Detailed filenames, face geometry and individual identity decisions remain private. The pilot satisfies the WI-0038 migration-safety gate, so M16 is complete. A full rollout of the **current 560-image local catalogue** may proceed through the dedicated `rollout` path using a fresh recoverable database copy. This does not start M12 full-archive processing, authorize automatic identity decisions, or broaden the CenterFace licence/training-data conclusion.
 
 See [M16 detector evaluation workspace status](../status/M16-detector-evaluation-workspace.md) and the [detector rollout runbook](../../operations/detector-rollout.md).
 
 ## Conditional execution
 
-This milestone is intentionally allowed to finish without completing every rejected detector candidate.
+This milestone was intentionally allowed to finish without completing every rejected detector candidate.
 
 - WI-0034 established that confidence `0.9` does not meet the decision target.
 - WI-0039 completed reusable candidate-run matching and summaries in PR #74; PR #92 later added neutral out-of-scope candidate review without changing recall.
@@ -75,7 +75,7 @@ This milestone is intentionally allowed to finish without completing every rejec
 - WI-0035 established that every governed single-pass YuNet confidence from `0.9` through `0.5` fails the complete gate.
 - WI-0036 established that multi-scale confidence `0.9` still fails and that lowering multi-scale confidence to `0.7` creates an unacceptable false/duplicate workload.
 - WI-0037 established that governed CenterFace confidence `0.5`, single-pass meets the complete M16 detector target and is the selected pipeline.
-- WI-0038 is now required and active because the selected detector changes the face population and cannot safely reuse canonical face occurrences by ordinal alone.
+- WI-0038 established that the selected detector can be reconciled into reviewed catalogue state without changing reviewed physical-face identity, losing history, duplicating new occurrences on replay, or preventing restore-based rollback.
 
 Skipped candidates mean the evidence showed that further detector search was unnecessary; they are not failures of the evaluation process.
 
@@ -105,5 +105,5 @@ The pilot also records an optional count of correctly detected faces that appear
 - Privacy-safe aggregate recall, false-detection, runtime, review-effort and likely-background evidence is retained.
 - The first pipeline meeting the decision target is selected without unnecessary later detector search.
 - The changed detector pipeline has explicit behavioral provenance and a safe canonical-catalogue reconciliation plan.
-- A pilot migration preserves people, assignments, rejections and append-only review history, exposes ambiguity for human review and exercises rollback before full-archive processing.
+- A pilot migration preserves people, assignments, rejections and append-only review history, exposes ambiguity for human review and exercises rollback before current-catalogue rollout.
 - A materially expanded face population triggers a fresh exact-model comparison before production model selection.
