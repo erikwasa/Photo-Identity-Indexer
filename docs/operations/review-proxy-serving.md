@@ -1,8 +1,8 @@
 # Review-proxy serving and explicit originals
 
-This document describes the WI-0042 Slice 2 boundary: ordinary browsing stays proxy-backed, while an authoritative original is an explicit, revision-verified operation.
+This document describes the WI-0042 collection-serving and bounded-original boundary: ordinary browsing stays proxy-backed, while an authoritative original is an explicit, revision-verified and storage-governed operation.
 
-## Configuration
+## Review-proxy configuration
 
 Proxy-backed collection browsing is enabled only when both settings are supplied to the API host:
 
@@ -14,6 +14,48 @@ PhotoIdentity:ReviewProxyProfileId
 `ReviewProxyRoot` is the local derivative root that contains the durable `review-proxies/...` paths recorded in the catalogue. It must be outside the authoritative OneDrive source root. `ReviewProxyProfileId` selects one exact registered review-proxy profile; the API does not infer a profile from dimensions or quality settings.
 
 The implementation does not hard-code `jpeg-1600-q78` as a global default. The profile remains selected explicitly by configuration until the visual tuning decision is retained as human evidence.
+
+## Bounded hydration policy
+
+New Photo-Identity-managed original hydration is disabled until all three limits are explicitly configured:
+
+```text
+PhotoIdentity:ArchiveHydration:MinimumFreeSpaceReserveBytes
+PhotoIdentity:ArchiveHydration:MaximumManagedHydrationBytes
+PhotoIdentity:ArchiveHydration:MaximumConcurrentOperations
+```
+
+No production values are guessed in code. `MinimumFreeSpaceReserveBytes` may be zero but must not be negative. `MaximumManagedHydrationBytes` and `MaximumConcurrentOperations` must be positive. Invalid numeric configuration stops application startup; missing values leave managed hydration disabled with an actionable storage-status message.
+
+Before an online-only original is pinned, Photo Identity reserves its complete catalogued logical byte length and checks both constraints:
+
+1. after reserving the requested original, current volume free space must remain at or above `MinimumFreeSpaceReserveBytes`; and
+2. the sum of Photo-Identity-managed local/downloading originals plus the requested original must remain at or below `MaximumManagedHydrationBytes`.
+
+Admission decisions are serialized inside the API process so simultaneous requests cannot both observe the same spare budget and overcommit it. Managed originals currently downloading also count against `MaximumConcurrentOperations`. The same configured operation limit bounds concurrent revision-verification reads for managed originals.
+
+If capacity is insufficient, Photo Identity may request release of already-local managed originals, oldest `last needed` first. A view or renewed managed hydration updates that durable last-needed timestamp. Pre-existing local or user-pinned files have no managed lease and are never eviction candidates.
+
+OneDrive release is asynchronous. A release-requested original continues to count against managed reserved bytes and free-space assumptions until OneDrive is actually observed online-only. The hydration request that triggered eviction therefore remains blocked and should be retried after storage status shows that release has completed.
+
+## Storage telemetry
+
+Privacy-safe aggregate storage state is available at:
+
+```text
+GET /api/archive/storage
+```
+
+The response separates:
+
+- current logical source bytes in the configured archive;
+- currently available free bytes on the archive volume;
+- Photo-Identity-managed local, downloading, releasing and total reserved original bytes;
+- active managed-original and in-progress hydration counts;
+- configured minimum reserve, managed-byte budget and operation limit; and
+- durable review-proxy bytes for the explicitly configured proxy profile.
+
+Source paths and filenames are not returned by this endpoint. A release request remains visible in the releasing/reserved totals until online-only state is observed.
 
 ## Collection resources
 
@@ -40,12 +82,13 @@ POST /api/collections/photos/{revisionId}/original/release
 
 Typical states are `online-only`, `downloading`, `ready`, `releasing`, `hash-mismatch`, `unavailable` and `error`. The status response also reports whether Photo Identity owns the hydration and whether hydrate, view or release is currently permitted.
 
-Example operator flow from PowerShell after the local API is running:
+Example operator flow from PowerShell after the local API is running and the bounded hydration policy is configured:
 
 ```powershell
 $Api = "http://localhost:5080"
 $Revision = "<asset-revision-id>"
 
+Invoke-RestMethod "$Api/api/archive/storage"
 Invoke-RestMethod "$Api/api/collections/photos/$Revision/original/status"
 Invoke-RestMethod -Method Post "$Api/api/collections/photos/$Revision/original/hydrate"
 
@@ -80,13 +123,15 @@ The verified file handle is rewound and served from that same handle, preventing
 
 ## Privacy boundary
 
-Source roots and filenames remain server-side. Files On-Demand command failures are surfaced with path-free messages because Windows diagnostics may contain private source locations. Generated proxies, original pixels, filenames and identity data remain outside Git.
+Source roots and filenames remain server-side. Files On-Demand command failures are surfaced with path-free messages because Windows diagnostics may contain private source locations. Storage telemetry contains aggregate byte counts and state counts only. Generated proxies, original pixels, filenames and identity data remain outside Git.
 
 ## Remaining WI-0042 work
 
-Slice 2 now has the core proxy-backed browsing and explicit-original lifecycle. A later UI increment may expose these controls directly on collection cards without changing the API safety contract.
+Slice 2 has the core proxy-backed browsing and explicit-original lifecycle. Its real Windows/OneDrive acceptance remains pending until the maintainer can perform it; do not treat that gate as passed merely because Slice 3 automated work is merged.
 
-Slice 3 still adds configurable free-space reserve, managed-hydration byte budget, bounded concurrency, storage telemetry and policy-driven release/eviction. Slice 4 adds online-only source re-verification and end-to-end local acceptance before WI-0041 resumes real-archive verification.
+Slice 3 adds the bounded admission, managed-byte accounting, concurrency limit, LRU managed release and aggregate storage telemetry described above. The remaining end-to-end bounded-processing integration and real-machine policy tuning can be completed alongside Slice 4 acceptance.
+
+Slice 4 adds online-only source re-verification and end-to-end local acceptance before WI-0041 resumes real-archive verification.
 
 ## Measurement evidence
 
