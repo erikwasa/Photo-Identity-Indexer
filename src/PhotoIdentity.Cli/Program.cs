@@ -40,6 +40,10 @@ public static class Program
         {
             return args[0] switch
             {
+                "archive" => await ArchiveCommandRunner.RunAsync(
+                    ArchiveCommandOptions.Parse(args.Skip(1).ToArray()),
+                    output,
+                    cancellationToken),
                 "batch" => await BatchCommandRunner.RunAsync(
                     BatchCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
@@ -100,6 +104,10 @@ public static class Program
         output.WriteLine("""
             Photo Identity Indexer CLI
 
+              archive include --database PATH --root DIR --folder RELATIVE_DIR
+              archive list --database PATH
+              archive sync --database PATH
+
               batch start --database PATH --source DIR [--output DIR]
                           [--root PATH] [--model-dir DIR] [--non-recursive]
                           [--confidence 0..1] [--padding RATIO]
@@ -150,6 +158,13 @@ public static class Program
 
               match regenerate --database PATH --embedder-id ID
                                --embedder-hash SHA256
+
+            Archive include configures one permanent local archive root and stores a
+            recursively included folder relative to that root. Adding a parent folder
+            subsumes redundant child inclusions without changing source identity. Archive
+            list reports the configured root and normalized coverage. Archive sync scans
+            every included folder and discovers new, changed and missing files without
+            tombstoning catalogue assets outside the selected coverage.
 
             Batch start scans a local folder, creates durable jobs for each current
             immutable revision and runs the production inspection pipeline until idle.
