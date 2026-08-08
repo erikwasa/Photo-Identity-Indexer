@@ -23,7 +23,7 @@ Collection manifest version 2 distinguishes three resources:
 - `preview` — the normal whole-photo browsing resource. If a durable proxy exists, the proxy bytes are served directly. Otherwise an already-local authoritative original may be used as a compatibility fallback.
 - `original` — the explicitly named authoritative-original resource. It never falls back to a proxy. The legacy `content` route remains an alias for compatibility and has the same original-only semantics.
 
-A normal collection page uses the preview resource, so an online-only authoritative original with a valid permanent proxy can remain unhydrated during ordinary browsing.
+The pre-v2 page-response `ContentUrl` compatibility property remains mapped to the thumbnail so existing consumers keep their established behavior. New clients can use `PreviewUrl` for the full review proxy without touching the original. Moving the Blazor collection card/link from the compatibility alias to `PreviewUrl` is a separate UI change and is not required to prove the server-side proxy boundary in this increment.
 
 ## Safety boundary
 
