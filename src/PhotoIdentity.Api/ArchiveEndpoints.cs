@@ -73,6 +73,7 @@ public static class ArchiveEndpoints
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/archive");
         group.MapGet("/status", GetStatusAsync);
+        group.MapGet("/items", GetItemsAsync);
         group.MapPost("/include", IncludeAsync);
         group.MapPost("/sync", SyncAsync);
         group.MapPost("/analysis/step", AnalysisStepAsync);
@@ -87,6 +88,50 @@ public static class ArchiveEndpoints
         try
         {
             return Results.Ok(await BuildStatusAsync(database, operatorConfiguration, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            return BadRequest(exception);
+        }
+    }
+
+    private static async Task<IResult> GetItemsAsync(
+        string? folder,
+        string? state,
+        int? offset,
+        int? limit,
+        SqliteCatalogueDatabase database,
+        ArchiveOperatorConfiguration operatorConfiguration,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            ArchiveCoverageConfiguration configured = await new SqliteArchiveCoverageRepository(database)
+                .GetAsync(cancellationToken)
+                ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
+            Sha256Digest? profileHash = await ResolveProfileHashAsync(
+                configured,
+                operatorConfiguration,
+                cancellationToken);
+            CatalogueArchiveItemPage page = await new SqliteArchiveStatusRepository(database).GetItemsAsync(
+                configured.Source.Id,
+                folder ?? string.Empty,
+                profileHash,
+                state ?? "all",
+                offset ?? 0,
+                limit ?? 50,
+                cancellationToken);
+            return Results.Ok(new ArchiveItemPageResponse(
+                page.Offset,
+                page.Limit,
+                page.Total,
+                page.Items
+                    .Select(item => new ArchiveItemStatusResponse(
+                        item.RelativePath,
+                        item.Availability,
+                        item.AnalysisState,
+                        item.LastError))
+                    .ToArray()));
         }
         catch (Exception exception)
         {
@@ -171,6 +216,11 @@ public static class ArchiveEndpoints
             ArchiveStatusResponse status = await BuildStatusAsync(database, operatorConfiguration, cancellationToken);
             return Results.Ok(new ArchiveSyncResponse(
                 summary.SupportedFileCount,
+                summary.LocalFileCount,
+                summary.OnlineOnlyFileCount,
+                summary.DownloadingFileCount,
+                summary.UnavailableFileCount,
+                summary.AvailabilityErrorCount,
                 summary.NewRevisionCount,
                 summary.UnchangedFileCount,
                 summary.MarkedDeletedCount,
@@ -247,7 +297,7 @@ public static class ArchiveEndpoints
     {
         ArchiveCoverageConfiguration? configured = await new SqliteArchiveCoverageRepository(database)
             .GetAsync(cancellationToken);
-        ArchiveFolderStatusResponse empty = new("", 0, 0, 0, 0, 0);
+        ArchiveFolderStatusResponse empty = new("", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         if (configured is null)
         {
             return new ArchiveStatusResponse(
@@ -331,9 +381,33 @@ public static class ArchiveEndpoints
             latestRun);
     }
 
+    private static async Task<Sha256Digest?> ResolveProfileHashAsync(
+        ArchiveCoverageConfiguration configured,
+        ArchiveOperatorConfiguration operatorConfiguration,
+        CancellationToken cancellationToken)
+    {
+        if (!operatorConfiguration.TryResolveAnalysisConfiguration(
+                out ArchiveAnalysisConfiguration? analysisConfiguration,
+                out _) ||
+            analysisConfiguration is null)
+        {
+            return null;
+        }
+
+        AnalysisProfileDefinition profile = await ArchiveAnalysisProfileFactory.CreateAsync(
+            analysisConfiguration.ToBatchConfiguration(configured.Source.RootLocator),
+            cancellationToken);
+        return profile.ComputeHash();
+    }
+
     private static ArchiveFolderStatusResponse ToResponse(CatalogueArchiveFolderStatus status) => new(
         status.RelativeFolder,
         status.CurrentImages,
+        status.LocalImages,
+        status.OnlineOnlyImages,
+        status.DownloadingImages,
+        status.UnavailableImages,
+        status.AvailabilityErrorImages,
         status.AnalysedImages,
         status.PendingImages,
         status.FailedImages,
