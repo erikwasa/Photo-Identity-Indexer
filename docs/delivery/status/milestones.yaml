@@ -109,9 +109,10 @@ milestones:
   - WI-0022
 - id: M12
   title: Full archive processing
-  status: proposed
+  status: in_progress
   document: ../milestones/M12-full-archive.md
   work_items:
+  - WI-0041
   - WI-0023
 - id: M13
   title: Ongoing local synchronisation
