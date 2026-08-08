@@ -101,14 +101,15 @@ public sealed class WindowsOneDriveFilesOnDemandPlatform : IOneDriveFilesOnDeman
 
         using Process process = Process.Start(startInfo)
             ?? throw new IOException("Windows could not start the Files On-Demand attribute command.");
+        Task<string> outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         Task<string> errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
         await process.WaitForExitAsync(cancellationToken);
-        string error = await errorTask;
+        _ = await outputTask;
+        _ = await errorTask;
         if (process.ExitCode != 0)
         {
-            throw new IOException(string.IsNullOrWhiteSpace(error)
-                ? "Windows rejected the Files On-Demand state change."
-                : $"Windows rejected the Files On-Demand state change: {error.Trim()}");
+            // Do not surface attrib output because Windows may include a private source path.
+            throw new IOException("Windows rejected the Files On-Demand state change.");
         }
     }
 }
