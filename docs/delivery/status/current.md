@@ -15,11 +15,13 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M08 — Multi-model local evaluation**: `completed`
 - **M15 — Operator documentation and system guide**: `in_progress`
 - **M16 — Face detection recall**: `completed`
+- **M12 — Full archive processing**: `in_progress`
 - **M14 — Collection-ready API**: `completed`
 
 ## Active work
 
 - [**WI-0032 — Validate documentation from a clean setup**](../work-items/WI-0032-documentation-validation.md) — `in_progress`; owner: `human-maintainer`
+- [**WI-0041 — Add incremental permanent archive ingestion**](../work-items/WI-0041-incremental-archive-ingestion.md) — `in_progress`; owner: `ai-agent`
 
 ## Recently completed
 
