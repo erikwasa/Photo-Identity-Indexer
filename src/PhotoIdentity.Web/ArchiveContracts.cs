@@ -48,3 +48,5 @@ public sealed record ArchiveSyncResponse(
 public sealed record ArchiveAnalysisStepResponse(
     bool StartedNewRun,
     ArchiveStatusResponse Status);
+
+public sealed record ArchiveErrorResponse(string Error);
