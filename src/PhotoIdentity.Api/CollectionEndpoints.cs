@@ -9,7 +9,7 @@ namespace PhotoIdentity.Api;
 public static class CollectionEndpoints
 {
     private const string ManifestFormat = "photoidentity.collection-manifest";
-    private const int ManifestVersion = 1;
+    private const int ManifestVersion = 2;
     private const int ManifestPageSize = 200;
     private const string ManifestMediaType = "application/vnd.photoidentity.collection-manifest+json";
 
@@ -18,6 +18,8 @@ public static class CollectionEndpoints
         endpoints.MapGet("/api/collections/photos", GetPhotosAsync);
         endpoints.MapGet("/api/collections/manifest", GetManifestAsync);
         endpoints.MapGet("/api/collections/photos/{revisionId}/thumbnail", GetPhotoThumbnailAsync);
+        endpoints.MapGet("/api/collections/photos/{revisionId}/preview", GetPhotoPreviewAsync);
+        endpoints.MapGet("/api/collections/photos/{revisionId}/original", GetPhotoContentAsync);
         endpoints.MapGet("/api/collections/photos/{revisionId}/content", GetPhotoContentAsync);
         return endpoints;
     }
@@ -166,7 +168,8 @@ public static class CollectionEndpoints
 
     private static async Task<IResult> GetPhotoThumbnailAsync(
         string revisionId,
-        CollectionPhotoFileResolver resolver,
+        CollectionReviewProxyFileResolver proxyResolver,
+        CollectionPhotoFileResolver originalResolver,
         OpenCvThumbnailRenderer renderer,
         CancellationToken cancellationToken)
     {
@@ -175,7 +178,8 @@ public static class CollectionEndpoints
             return Results.BadRequest(new { error = "The asset revision identifier is invalid." });
         }
 
-        CollectionPhotoFile? file = await resolver.ResolveAsync(parsedRevisionId, cancellationToken);
+        CollectionPhotoFile? file = await proxyResolver.ResolveAsync(parsedRevisionId, cancellationToken)
+            ?? await originalResolver.ResolveAsync(parsedRevisionId, cancellationToken);
         if (file is null)
         {
             return Results.NotFound();
@@ -185,6 +189,24 @@ public static class CollectionEndpoints
         return thumbnail is null
             ? Results.NotFound()
             : Results.File(thumbnail.Content, thumbnail.ContentType);
+    }
+
+    private static async Task<IResult> GetPhotoPreviewAsync(
+        string revisionId,
+        CollectionReviewProxyFileResolver proxyResolver,
+        CollectionPhotoFileResolver originalResolver,
+        CancellationToken cancellationToken)
+    {
+        if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
+        {
+            return Results.BadRequest(new { error = "The asset revision identifier is invalid." });
+        }
+
+        CollectionPhotoFile? file = await proxyResolver.ResolveAsync(parsedRevisionId, cancellationToken)
+            ?? await originalResolver.ResolveAsync(parsedRevisionId, cancellationToken);
+        return file is null
+            ? Results.NotFound()
+            : Results.File(file.Path, file.ContentType, enableRangeProcessing: true);
     }
 
     private static async Task<IResult> GetPhotoContentAsync(
@@ -207,6 +229,8 @@ public static class CollectionEndpoints
         photo.RevisionId.ToString(),
         photo.AssetId.ToString(),
         $"/api/collections/photos/{photo.RevisionId}/thumbnail",
+        $"/api/collections/photos/{photo.RevisionId}/preview",
+        $"/api/collections/photos/{photo.RevisionId}/original",
         photo.ObservedAtUtc,
         photo.MediaType,
         photo.Width,
@@ -219,7 +243,8 @@ public static class CollectionEndpoints
         photo.RevisionId.ToString(),
         photo.AssetId.ToString(),
         BuildPhotoUrl(request, photo.RevisionId, "thumbnail"),
-        BuildPhotoUrl(request, photo.RevisionId, "content"),
+        BuildPhotoUrl(request, photo.RevisionId, "preview"),
+        BuildPhotoUrl(request, photo.RevisionId, "original"),
         photo.MediaType,
         photo.Width,
         photo.Height,

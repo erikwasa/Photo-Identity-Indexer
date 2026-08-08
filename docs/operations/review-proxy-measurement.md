@@ -45,3 +45,23 @@ dotnet run --project src/PhotoIdentity.Cli -- archive proxy measure `
 ```
 
 Retain only the privacy-safe aggregate report in repository evidence. WI-0042 should freeze the permanent proxy default only after the 100-image visual/storage choice and the 560-image scale estimate are complete.
+
+## Recorded scale-validation result
+
+The maintainer reported the following privacy-safe aggregate result on 2026-08-09 for the private pilot corpus:
+
+- source images: `556`;
+- logical source bytes: `1,783,639,108`;
+- profile: `jpeg-1600-q78`;
+- protocol: `review-proxy-v1`;
+- encoder/format: `opencv-jpeg` / `jpeg`;
+- JPEG quality: `78`;
+- maximum long edge: `1600`;
+- resize policy: `fit-long-edge-no-upscale-area-v1`;
+- total proxy bytes: `112,900,614`;
+- mean proxy bytes: `203,058.7`;
+- median proxy bytes: `181,032.0`;
+- p95 proxy bytes: `400,427`; and
+- source-to-proxy compression ratio: `15.798x`.
+
+This satisfies the scale-measurement evidence for that exact candidate. It does not by itself record the earlier multi-candidate tuning comparison or the representative visual-usability decision, so `jpeg-1600-q78` remains configuration-driven rather than a hard-coded permanent default until that human selection evidence is explicitly retained.

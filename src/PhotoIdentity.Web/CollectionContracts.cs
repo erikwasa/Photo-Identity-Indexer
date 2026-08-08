@@ -10,12 +10,18 @@ public sealed record CollectionPersonMatchResponse(
 public sealed record CollectionPhotoResponse(
     string RevisionId,
     string AssetId,
-    string ContentUrl,
+    string ThumbnailUrl,
+    string PreviewUrl,
+    string OriginalUrl,
     DateTimeOffset ObservedAtUtc,
     string? MediaType,
     int? Width,
     int? Height,
-    IReadOnlyList<CollectionPersonMatchResponse> People);
+    IReadOnlyList<CollectionPersonMatchResponse> People)
+{
+    // Compatibility alias for the pre-v2 collection page contract.
+    public string ContentUrl => ThumbnailUrl;
+}
 
 public sealed record CollectionSuggestionPolicyResponse(
     string ModelId,
@@ -43,11 +49,16 @@ public sealed record CollectionManifestPhotoResponse(
     string RevisionId,
     string AssetId,
     string ThumbnailUrl,
-    string ContentUrl,
+    string PreviewUrl,
+    string OriginalUrl,
     string? MediaType,
     int? Width,
     int? Height,
-    IReadOnlyList<CollectionPersonMatchResponse> People);
+    IReadOnlyList<CollectionPersonMatchResponse> People)
+{
+    // Manifest v1 named the authoritative original URL "contentUrl".
+    public string ContentUrl => OriginalUrl;
+}
 
 public sealed record CollectionManifestResponse(
     string Format,

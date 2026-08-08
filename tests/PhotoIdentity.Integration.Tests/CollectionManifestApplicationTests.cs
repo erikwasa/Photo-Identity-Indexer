@@ -165,7 +165,7 @@ public sealed class CollectionManifestApplicationTests
                 await response.Content.ReadFromJsonAsync<CollectionManifestResponse>()
                 ?? throw new InvalidOperationException("The collection manifest response was empty.");
             Assert.Equal("photoidentity.collection-manifest", manifest.Format);
-            Assert.Equal(1, manifest.Version);
+            Assert.Equal(2, manifest.Version);
             Assert.Equal(PhotoCount, manifest.Total);
             Assert.Equal(PhotoCount, manifest.Photos.Count);
             Assert.Equal("all", manifest.Query.MatchMode);
@@ -185,9 +185,15 @@ public sealed class CollectionManifestApplicationTests
                 Assert.EndsWith("/thumbnail", photo.ThumbnailUrl, StringComparison.Ordinal);
                 Assert.StartsWith(
                     "http://localhost/api/collections/photos/",
-                    photo.ContentUrl,
+                    photo.PreviewUrl,
                     StringComparison.Ordinal);
-                Assert.EndsWith("/content", photo.ContentUrl, StringComparison.Ordinal);
+                Assert.EndsWith("/preview", photo.PreviewUrl, StringComparison.Ordinal);
+                Assert.StartsWith(
+                    "http://localhost/api/collections/photos/",
+                    photo.OriginalUrl,
+                    StringComparison.Ordinal);
+                Assert.EndsWith("/original", photo.OriginalUrl, StringComparison.Ordinal);
+                Assert.Equal(photo.OriginalUrl, photo.ContentUrl);
                 Assert.Equal("image/jpeg", photo.MediaType);
                 Assert.Equal(1600, photo.Width);
                 Assert.Equal(1200, photo.Height);

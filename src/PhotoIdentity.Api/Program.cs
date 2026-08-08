@@ -26,6 +26,9 @@ public partial class Program
             archiveAnalysisRoot,
             builder.Configuration["PhotoIdentity:RepositoryRoot"],
             builder.Configuration["PhotoIdentity:ModelDirectory"]));
+        builder.Services.AddSingleton(new ReviewProxyServingConfiguration(
+            builder.Configuration["PhotoIdentity:ReviewProxyRoot"],
+            builder.Configuration["PhotoIdentity:ReviewProxyProfileId"]));
         builder.Services.AddSingleton<SqliteReviewRepository>();
         builder.Services.AddSingleton<SqliteReviewFilterRepository>();
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
@@ -40,9 +43,11 @@ public partial class Program
         builder.Services.AddSingleton<SqliteProcessingRepository>();
         builder.Services.AddSingleton<SqliteDetectorRolloutReviewRepository>();
         builder.Services.AddSingleton<SqliteDetectorRolloutApplicationRepository>();
+        builder.Services.AddSingleton<SqliteArchiveReviewProxyRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton<DetectorRolloutCropFileResolver>();
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();
+        builder.Services.AddSingleton<CollectionReviewProxyFileResolver>();
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
