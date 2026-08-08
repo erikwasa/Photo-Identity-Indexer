@@ -13,9 +13,9 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M06 | Local evaluation and acceptance | completed |
 | M07 | Portable job bundles | completed |
 | M08 | Multi-model local evaluation | completed |
-| M15 | Operator documentation and system guide | in_progress |
+| M15 | Operator documentation and system guide | completed |
 | M16 | Face detection recall | completed |
-| M09 | Azure VM pilot without identities | proposed |
+| M09 | Azure VM pilot without identities | ready |
 | M10 | Azure checkpointing | proposed |
 | M11 | Production model selection | proposed |
 | M12 | Full archive processing | blocked |
