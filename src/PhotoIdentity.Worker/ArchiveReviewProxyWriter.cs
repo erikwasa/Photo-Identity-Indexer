@@ -51,6 +51,7 @@ public sealed class ArchiveReviewProxyWriter
         EnsurePathInsideRoot(normalizedSourcePath, normalizedSourceRoot, nameof(sourcePath));
         EnsureRootsAreSeparate(normalizedSourceRoot, normalizedDerivativeRoot);
 
+        await _repository.RegisterProfileAsync(profile, generatedAtUtc, cancellationToken);
         ArchiveReviewProxyRecord? existing = await _repository.GetAsync(
             revisionId,
             profile.Id,
@@ -61,7 +62,6 @@ public sealed class ArchiveReviewProxyWriter
             return existing;
         }
 
-        await _repository.RegisterProfileAsync(profile, generatedAtUtc, cancellationToken);
         EncodedReviewProxy encoded = await _renderer.RenderAsync(
             normalizedSourcePath,
             profile,
