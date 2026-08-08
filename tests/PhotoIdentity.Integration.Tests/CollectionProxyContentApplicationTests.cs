@@ -84,8 +84,12 @@ public sealed class CollectionProxyContentApplicationTests
             Assert.NotEmpty(await thumbnail.Content.ReadAsByteArrayAsync());
 
             using HttpResponseMessage original = await client.GetAsync(
-                $"/api/collections/photos/{persistedRevision.Id}/content");
+                $"/api/collections/photos/{persistedRevision.Id}/original");
             Assert.Equal(HttpStatusCode.NotFound, original.StatusCode);
+
+            using HttpResponseMessage legacyContent = await client.GetAsync(
+                $"/api/collections/photos/{persistedRevision.Id}/content");
+            Assert.Equal(HttpStatusCode.NotFound, legacyContent.StatusCode);
         }
         finally
         {
