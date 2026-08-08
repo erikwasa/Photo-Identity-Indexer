@@ -18,7 +18,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M09 | Azure VM pilot without identities | proposed |
 | M10 | Azure checkpointing | proposed |
 | M11 | Production model selection | proposed |
-| M12 | Full archive processing | proposed |
+| M12 | Full archive processing | in_progress |
 | M13 | Ongoing local synchronisation | proposed |
 | M14 | Collection-ready API | completed |
 
