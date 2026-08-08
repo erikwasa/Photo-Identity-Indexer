@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -44,6 +45,7 @@ public sealed class SqliteArchiveStatusRepository
         Sha256Digest? profileHash,
         CancellationToken cancellationToken = default)
     {
+        await EnsureAnalysisSchemaAsync(cancellationToken);
         string folder = ArchiveCoverage.NormalizeRelativeFolder(relativeFolder);
         string prefix = folder.Length == 0 ? string.Empty : folder + "/";
 
@@ -129,6 +131,7 @@ public sealed class SqliteArchiveStatusRepository
         Sha256Digest profileHash,
         CancellationToken cancellationToken = default)
     {
+        await EnsureAnalysisSchemaAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -171,6 +174,48 @@ public sealed class SqliteArchiveStatusRepository
             ReadCount(reader, 7),
             ReadCount(reader, 8),
             ReadCount(reader, 9));
+    }
+
+    private async Task EnsureAnalysisSchemaAsync(CancellationToken cancellationToken)
+    {
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE TABLE IF NOT EXISTS archive_analysis_profiles (
+                profile_hash TEXT NOT NULL PRIMARY KEY,
+                detector_pipeline_hash TEXT NOT NULL,
+                detector_model_id TEXT NOT NULL,
+                detector_model_hash TEXT NOT NULL,
+                embedder_model_id TEXT NOT NULL,
+                embedder_model_hash TEXT NOT NULL,
+                alignment_protocol TEXT NOT NULL,
+                canonical_definition TEXT NOT NULL,
+                recorded_at_utc TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS archive_analysis_runs (
+                processing_run_id TEXT NOT NULL PRIMARY KEY,
+                profile_hash TEXT NOT NULL,
+                registered_at_utc TEXT NOT NULL,
+                FOREIGN KEY (processing_run_id) REFERENCES processing_runs (id) ON DELETE CASCADE,
+                FOREIGN KEY (profile_hash) REFERENCES archive_analysis_profiles (profile_hash) ON DELETE RESTRICT
+            );
+
+            CREATE TABLE IF NOT EXISTS asset_revision_analysis (
+                asset_revision_id TEXT NOT NULL,
+                profile_hash TEXT NOT NULL,
+                processing_run_id TEXT NOT NULL,
+                completed_at_utc TEXT NOT NULL,
+                PRIMARY KEY (asset_revision_id, profile_hash),
+                FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                FOREIGN KEY (profile_hash) REFERENCES archive_analysis_profiles (profile_hash) ON DELETE RESTRICT,
+                FOREIGN KEY (processing_run_id) REFERENCES processing_runs (id) ON DELETE RESTRICT
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_asset_revision_analysis_profile
+                ON asset_revision_analysis (profile_hash, asset_revision_id);
+            """;
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static int ReadCount(SqliteDataReader reader, int ordinal) =>
