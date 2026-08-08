@@ -856,25 +856,58 @@ work_items:
       - type: pull_request
         value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/91
       - type: human_verification
-        value: The maintainer explicitly accepted the documented CenterFace pretrained-weight and training-data uncertainty for local evaluation and private local rollout work on 2026-08-07; redistribution remains outside that acceptance.
+        value: The maintainer explicitly accepted the documented CenterFace pretrained-weight and training-data uncertainty for local evaluation on 2026-08-07; rollout engineering was separately instructed, and redistribution remains outside that acceptance.
       - type: human_verification
         value: The maintainer completed the unchanged governed CenterFace confidence-0.5 single-pass comparison against the fixed private 100-photo M16 sample and frozen ground truth on 2026-08-07 and reported that it passed the complete M16 gate; detailed metrics remain outside Git.
   - id: WI-0038
     title: Roll out the selected detector pipeline
     milestone: M16
-    status: in_progress
+    status: completed
     owner: ai-agent
     document: ../work-items/WI-0038-detector-rollout.md
     started_at: '2026-08-07'
-    last_updated_at: '2026-08-07'
-    branch: agent/WI-0038-detector-rollout
+    completed_at: '2026-08-08'
+    verified_at: '2026-08-08'
+    verified_by: human
+    last_updated_at: '2026-08-08'
+    branch: agent/WI-0038-status-completion
     blockers:
       - WI-0037
     evidence:
       - type: human_verification
-        value: CenterFace confidence 0.5 single-pass passed the complete M16 detector gate after the maintainer accepted the documented local-use governance boundary, activating safe canonical-catalogue rollout work on 2026-08-07.
+        value: CenterFace confidence 0.5 single-pass passed the complete M16 detector gate after the maintainer accepted the documented local-evaluation governance boundary; rollout engineering was separately instructed on 2026-08-07.
       - type: pull_request
         value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/93
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/94
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31209699338
+      - type: merge_commit
+        value: 5fcaee5967b8bbe612ee6b73843fb26f5c9a3cd7
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/95
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31212074961
+      - type: merge_commit
+        value: f2ac13371e7c606a15153b6204ec967df8b70e38
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/96
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31216730491
+      - type: merge_commit
+        value: d709601783f4853589a92d1f75ecab08440ef516
+      - type: pull_request
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/97
+      - type: workflow
+        value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31224682650
+      - type: merge_commit
+        value: aad11770559d7a27dc328b4923f98abead3b274d
+      - type: human_verification
+        value: Disposable rollout run 5794d5c5-26fe-45f4-8a70-3132aae45891 completed 20 of 20 selected revisions with 77 applied candidates: 43 existing-occurrence mappings, 34 new occurrences, 0 ambiguous candidates and 1 retained unmatched existing occurrence.
+      - type: human_verification
+        value: The maintainer inspected all 43 reviewed existing mappings and confirmed 43 correct physical-face mappings with 0 incorrect mappings. The 34 new occurrences had 0 person labels and 0 review actions; source and migrated pilot counts remained 69 people, 454 person labels, 467 review actions and 10 ranked-suggestion rows.
+      - type: human_verification
+        value: Replay/resume/apply verification kept face occurrences stable at 492 before and after with no reviewed decisions left to apply, the unmatched existing occurrence was retained, and restore-based rollback successfully recovered the original reviewed state on 2026-08-08.
   - id: WI-0039
     title: Build detector evaluation workspace
     milestone: M16
