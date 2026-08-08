@@ -14,11 +14,18 @@ public partial class Program
             "PhotoIdentity");
         string defaultDatabasePath = Path.Combine(defaultApplicationRoot, "catalogue.db");
         string defaultDetectorEvaluationRoot = Path.Combine(defaultApplicationRoot, "detector-evaluations");
+        string defaultArchiveAnalysisRoot = Path.Combine(defaultApplicationRoot, "archive-analysis");
         string databasePath = builder.Configuration["PhotoIdentity:DatabasePath"] ?? defaultDatabasePath;
         string detectorEvaluationRoot =
             builder.Configuration["PhotoIdentity:DetectorEvaluationRoot"] ?? defaultDetectorEvaluationRoot;
+        string archiveAnalysisRoot =
+            builder.Configuration["PhotoIdentity:ArchiveAnalysisOutputRoot"] ?? defaultArchiveAnalysisRoot;
 
         builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
+        builder.Services.AddSingleton(new ArchiveOperatorConfiguration(
+            archiveAnalysisRoot,
+            builder.Configuration["PhotoIdentity:RepositoryRoot"],
+            builder.Configuration["PhotoIdentity:ModelDirectory"]));
         builder.Services.AddSingleton<SqliteReviewRepository>();
         builder.Services.AddSingleton<SqliteReviewFilterRepository>();
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
@@ -58,7 +65,8 @@ public partial class Program
             if (context.Request.Path.StartsWithSegments("/api/review") ||
                 context.Request.Path.StartsWithSegments("/api/collections") ||
                 context.Request.Path.StartsWithSegments("/api/detector-evaluation") ||
-                context.Request.Path.StartsWithSegments("/api/detector-rollout"))
+                context.Request.Path.StartsWithSegments("/api/detector-rollout") ||
+                context.Request.Path.StartsWithSegments("/api/archive"))
             {
                 context.Response.OnStarting(() =>
                 {
@@ -88,6 +96,7 @@ public partial class Program
         app.MapDetectorEvaluationEndpoints();
         app.MapDetectorEvaluationComparisonEndpoints();
         app.MapDetectorRolloutEndpoints();
+        app.MapArchiveEndpoints();
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();
