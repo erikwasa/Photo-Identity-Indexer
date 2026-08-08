@@ -82,6 +82,7 @@ public sealed class SqliteSourceCatalogueScanner
 
         int deleted = await MarkMissingAssetsAsync(
             catalogueSource.Id,
+            options.RelativeRoot,
             scannedAt,
             cancellationToken);
         return new SourceCatalogueScanSummary(
@@ -255,22 +256,38 @@ public sealed class SqliteSourceCatalogueScanner
 
     private async Task<int> MarkMissingAssetsAsync(
         SourceId sourceId,
+        string? relativeRoot,
         DateTimeOffset scannedAtUtc,
         CancellationToken cancellationToken)
     {
+        string scope = ArchiveCoverage.NormalizeRelativeFolder(relativeRoot ?? string.Empty);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
         using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = """
-            UPDATE assets
-            SET deleted_at_utc = COALESCE(deleted_at_utc, $scanned_at_utc)
-            WHERE source_id = $source_id
-              AND (last_seen_at_utc IS NULL OR last_seen_at_utc <> $scanned_at_utc)
-              AND deleted_at_utc IS NULL;
-            """;
+        command.CommandText = scope.Length == 0
+            ? """
+              UPDATE assets
+              SET deleted_at_utc = COALESCE(deleted_at_utc, $scanned_at_utc)
+              WHERE source_id = $source_id
+                AND (last_seen_at_utc IS NULL OR last_seen_at_utc <> $scanned_at_utc)
+                AND deleted_at_utc IS NULL;
+              """
+            : """
+              UPDATE assets
+              SET deleted_at_utc = COALESCE(deleted_at_utc, $scanned_at_utc)
+              WHERE source_id = $source_id
+                AND substr(source_key, 1, length($scope_prefix)) = $scope_prefix
+                AND (last_seen_at_utc IS NULL OR last_seen_at_utc <> $scanned_at_utc)
+                AND deleted_at_utc IS NULL;
+              """;
         command.Parameters.AddWithValue("$source_id", sourceId.ToString());
         command.Parameters.AddWithValue("$scanned_at_utc", Format(scannedAtUtc));
+        if (scope.Length > 0)
+        {
+            command.Parameters.AddWithValue("$scope_prefix", scope + "/");
+        }
+
         int updated = await command.ExecuteNonQueryAsync(cancellationToken);
         transaction.Commit();
         return updated;
