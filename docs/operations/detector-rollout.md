@@ -1,8 +1,8 @@
 # Detector pipeline rollout
 
-Use this runbook for WI-0038 after a detector candidate has passed the complete M16 evaluation gate. The selected local candidate is CenterFace confidence `0.5`, `single-pass`.
+Use this runbook for detector migration after a candidate has passed the complete M16 evaluation gate. The selected local pipeline is CenterFace confidence `0.5`, `single-pass`.
 
-This procedure is intentionally more conservative than starting another batch run. Detector replacement can change face count and detection ordering, while canonical person assignments and review actions are attached to stable face occurrence IDs.
+Detector replacement can change face count and detection ordering while person assignments and review actions remain attached to stable face-occurrence IDs. The ordinary batch path therefore remains unsafe for detector migration.
 
 ## Selected local pipeline
 
@@ -22,56 +22,38 @@ The selected M16 pipeline is fixed as:
 
 Changing any material detector/preprocessing parameter creates a different pipeline identity and requires a new governed decision.
 
-The maintainer accepted the documented CenterFace model-weight/training-data uncertainty for local evaluation on 2026-08-07 and separately instructed WI-0038 rollout engineering to proceed. Redistribution remains outside that acceptance.
+The maintainer accepted the documented CenterFace model-weight/training-data uncertainty for **local evaluation** on 2026-08-07 and separately instructed WI-0038 rollout engineering to proceed. Redistribution remains outside that acceptance.
 
 ## Implementation boundary
 
-PR #93 added the versioned pipeline identity and conservative geometry/landmark reconciliation planner.
+PR #93 added versioned pipeline identity and conservative geometry/landmark reconciliation.
 
-PR #94 added the SQLite rollout-persistence boundary:
+PR #94 added the SQLite rollout-persistence boundary so an existing occurrence can be reused only when the persisted plan explicitly identifies it; new candidates receive new occurrence IDs; unmatched old occurrences are retained; and ambiguous candidates cannot be applied before human resolution.
 
-- detector pipeline definitions and hashes can be bound to a processing run;
-- reconciliation plans retain candidate geometry, dispositions, old-face options and unmatched old occurrences;
-- unambiguous existing-face mappings can reuse only the occurrence explicitly named by the persisted plan;
-- new candidates receive new occurrence IDs and ordinals above the existing range rather than candidate ordinals; and
-- ambiguous candidates are persisted but cannot be applied before human resolution.
+PR #95 added durable candidate crop/embedding payload plus append-only human ambiguity decisions. Those decisions resolve face-occurrence identity only and never assign or change a person.
 
-PR #95 added durable candidate payload and append-only human resolution state:
+PR #96 added the operator-facing `rollout start`, `rollout resume`, `rollout status` and `rollout apply` workflow plus `/detector-rollout/{RUN_ID}` human reconciliation UI.
 
-- the exact candidate detector identity/confidence, aligned-crop provenance, SFace model identity and embedding vector are persisted before canonical face mutation;
-- candidate payload geometry must exactly match the already-persisted reconciliation plan;
-- ambiguous human decisions select one eligible existing occurrence, mark the candidate as new, or defer;
-- an existing-face selection is valid only when the planner recorded that occurrence as an ambiguity option on the same asset revision; and
-- these actions resolve face-occurrence identity only and never assign or change a person label.
+PR #97 fixed two issues found during the first disposable pilot:
 
-PR #96 adds the operator-facing Slice 3B workflow:
+- ordinary face review now resolves rollout crops stored under `rollouts/<run-id>/...`; and
+- CLI `rollout-complete` requires successful revision processing rather than candidate counts alone.
 
-- `rollout start` processes only explicitly supplied immutable asset revision IDs and never scans a source root;
-- CenterFace confidence `0.5`, `single-pass` is fixed by the rollout worker and cannot be replaced by command-line detector/threshold options;
-- each revision uses the durable job engine and can be resumed;
-- a reconciliation plan is persisted before mutation and reused on retry;
-- every candidate aligned crop and embedding payload is durable before any unambiguous candidate is applied;
-- the local `/detector-rollout/{RUN_ID}` workspace exposes only planner-produced old-face choices plus `new` and `defer`;
-- review decisions do not mutate the catalogue until the separate `rollout apply` command is run; and
-- reviewed ambiguous candidates are applied from the durable payload without inference replay, with replay-safe new-occurrence recovery.
+The ordinary `batch start` path still has its historical deterministic ordinal semantics. **Never use `batch start` as a detector-migration command.**
 
-The ordinary `batch start` processing path still has its historical deterministic ordinal semantics. **Do not use `batch start` as a detector-migration command.**
+## Why ordinal migration is unsafe
 
-PR #96 enables only the disposable pilot described below after it is merged. It does not authorize a canonical full-archive migration.
+Existing face occurrences are unique by asset revision and ordinal. The legacy inspection worker sorts the current detector result and uses that sort position as the ordinal. A different detector can therefore cause ordinal `0` to refer to a different physical face.
 
-## Why an ordinary rerun is unsafe
-
-Existing face occurrences are unique by asset revision and ordinal. The legacy inspection worker sorts each current detector result and uses that sort position as the ordinal. A new detector can therefore cause ordinal `0` to refer to a different physical face than ordinal `0` from an earlier detector run.
-
-A successful detector-quality comparison does not make ordinal identity safe. Detector migration must use the dedicated reconciliation boundary rather than the ordinary inspection entry point.
+A successful detector-quality comparison does not make ordinal identity safe. Detector migration must use the dedicated reconciliation boundary.
 
 ## Reconciliation rule
 
-For a fixed immutable source revision, compare the selected detector's candidates to the existing persisted detections using normalized geometry and all five landmarks.
+For one immutable source revision, compare CenterFace candidates to persisted old detections using normalized geometry and all five landmarks.
 
-The rollout planner applies these rules:
+The rollout planner uses these dispositions:
 
-- one candidate eligible for exactly one old occurrence, and that old occurrence eligible for exactly that one candidate: **proposed existing occurrence**;
+- one candidate eligible for exactly one old occurrence, and that old occurrence eligible for exactly that one candidate: **existing occurrence**;
 - candidate with no eligible old occurrence: **new occurrence**;
 - candidate or old occurrence participating in a many-to-one or one-to-many eligible relation: **ambiguous**.
 
@@ -80,91 +62,140 @@ Eligibility currently requires both:
 - bounding-box IoU of at least `0.30`; and
 - mean five-landmark distance no greater than `0.20` of the average old/new box diagonal.
 
-These are conservative migration defaults, not detector-quality thresholds. They must be validated on the pilot before full rollout. Changing them is a reconciliation-policy change and should be retained with migration evidence.
-
-## Durable planning and review rule
-
-The rollout workflow makes planning durable before it changes canonical face occurrences:
-
-1. create a processing run for an explicit set of immutable revision IDs;
-2. register the exact detector-pipeline hash;
-3. run the fixed CenterFace pipeline for a revision;
-4. persist the geometry/landmark reconciliation plan;
-5. persist every candidate aligned crop and embedding payload;
-6. auto-apply only unambiguous existing/new decisions through the rollout path;
-7. leave ambiguous candidates unapplied until a human records an existing/new decision; and
-8. apply a reviewed ambiguous candidate from its persisted payload, not by re-running inference.
-
-A `defer` resolution records that the operator deliberately left a candidate unresolved. It does not permit the rollout to treat that candidate as complete.
+These are migration-policy defaults, not detector-quality thresholds.
 
 ## Required invariants
 
-A pilot must demonstrate all of the following:
+A rollout must preserve all of the following:
 
-1. No existing reviewed occurrence is reused solely because the new detection has the same ordinal.
-2. Existing people and `person_labels` remain attached to the same physical face.
-3. Existing rejection/assignment/undo history remains append-only and points to the same occurrence.
+1. Ordinal equality is never treated as physical-face identity evidence.
+2. Existing people and `person_labels` stay attached to the same physical face.
+3. Existing rejection/assignment/undo history remains append-only and points to the same stable occurrence.
 4. Genuinely new CenterFace detections receive new occurrence IDs.
-5. Existing occurrences that CenterFace does not return are retained rather than deleted.
-6. Ambiguous mappings do not mutate identity state until explicitly resolved and applied.
-7. Detector pipeline provenance contains the versioned pipeline hash as well as the exact model hash.
-8. Candidate detector/crop/embedding payload is durable before canonical mutation so review can be resumed without inference replay.
+5. Existing occurrences that CenterFace does not return are retained.
+6. Ambiguous mappings do not mutate catalogue identity state until explicitly resolved and applied.
+7. Detector pipeline provenance contains the versioned pipeline hash and exact model hash.
+8. Candidate detector/crop/embedding payload is durable before canonical mutation.
 9. Human reconciliation history is append-only.
-10. Rollout does not write automatic person labels from detector, embedding or geometry scores.
-11. Re-running status/resume/apply does not create duplicate new occurrences.
+10. Rollout never writes automatic person labels from detector, embedding or geometry scores.
+11. Repeated status/resume/apply does not create duplicate new occurrences.
 
-## Disposable pilot preparation
+## Completed disposable pilot
 
-Do this only after PR #96 is merged and local `main` contains it.
+The WI-0038 migration-safety pilot passed on 2026-08-08 using rollout run `5794d5c5-26fe-45f4-8a70-3132aae45891` against a recoverable copy of the reviewed 560-image catalogue.
 
-Use a deliberately limited pilot scope, not the whole archive. Prefer roughly 10–30 current revisions that exercise already-reviewed assignments, group photos, face-count changes and at least a few difficult small/profile/occluded cases. Detailed filenames and selected revision IDs stay private.
+Privacy-safe aggregate evidence:
 
-Stop the review application and all catalogue writers before copying the database. Then prepare a disposable working area. Replace the two canonical paths with the paths used on the local machine:
+- 20/20 selected revisions succeeded;
+- 77 candidates were applied: 43 existing-occurrence mappings and 34 new occurrences;
+- 0 ambiguous candidates and 1 unmatched existing occurrence;
+- all 43 reviewed existing mappings were inspected and confirmed correct, with 0 incorrect mappings;
+- the 34 new occurrences had 0 person labels and 0 review actions;
+- source and migrated pilot state remained 69 people, 454 person labels, 467 review actions and 10 ranked-suggestion rows;
+- the unmatched old occurrence was inspected and retained;
+- replay/resume/apply kept face occurrences stable at 492 before and after; and
+- restore-based rollback succeeded.
+
+Detailed filenames, geometry and identity decisions remain private.
+
+This passed pilot authorizes a full rollout of the **current 560-image local catalogue** through the dedicated rollout path. It does **not** start M12 full-archive processing and does not broaden model licence or redistribution conclusions.
+
+## Full current-catalogue rollout
+
+Use a fresh recoverable database copy. Do not mutate the untouched reviewed source database in place.
+
+### 1. Update the repository and stop writers
+
+After the WI-0038 completion/status PR is merged:
 
 ```powershell
 Set-Location "C:\Kod\codex\Photo Identity Indexer"
-
 git switch main
 git pull --ff-only
+```
 
-$canonicalDb = "C:\PhotoIdentity\catalogue.db"       # replace if different
-$pilotRoot = "C:\PhotoIdentity\WI-0038-pilot"
-$pilotDb = Join-Path $pilotRoot "catalogue-pilot.db"
-$rolloutOutput = Join-Path $pilotRoot "rollout-output"
-$revisionFile = Join-Path $pilotRoot "pilot-revisions.txt"
-$reviewApp = Join-Path $pilotRoot "review-app"
+Stop the review application and every process that can write to the catalogue before making the copy.
 
-New-Item -ItemType Directory -Force -Path $pilotRoot,$rolloutOutput | Out-Null
-Copy-Item -LiteralPath $canonicalDb -Destination $pilotDb -Force
+### 2. Choose permanent rollout paths
+
+Set the source database to the untouched reviewed 560-image catalogue. Use a **permanent** output root for the full rollout because each processing run records its `outputRoot`, and ordinary face review resolves rollout crops through that recorded root. Do not move or rename that output directory after adopting the migrated database.
+
+```powershell
+$sourceDb = "C:\REPLACE\WITH\YOUR\560-IMAGE\catalogue.db"
+$fullRoot = "C:\PhotoIdentity\CenterFace-current-catalogue"
+$fullDb = Join-Path $fullRoot "catalogue-centerface.db"
+$rolloutOutput = Join-Path $fullRoot "rollout-output"
+$revisionCsv = Join-Path $fullRoot "current-revisions.csv"
+$revisionFile = Join-Path $fullRoot "current-revisions.txt"
+$reviewApp = Join-Path $fullRoot "review-app"
+
+New-Item -ItemType Directory -Force -Path $fullRoot,$rolloutOutput | Out-Null
+```
+
+### 3. Copy the reviewed source database
+
+With all source-database writers stopped:
+
+```powershell
+Copy-Item -LiteralPath $sourceDb -Destination $fullDb -Force
+
 foreach ($suffix in @("-wal", "-shm")) {
-    $sourceSidecar = "$canonicalDb$suffix"
-    if (Test-Path -LiteralPath $sourceSidecar) {
-        Copy-Item -LiteralPath $sourceSidecar -Destination "$pilotDb$suffix" -Force
+    $sidecar = "$sourceDb$suffix"
+    if (Test-Path -LiteralPath $sidecar) {
+        Copy-Item -LiteralPath $sidecar -Destination "$fullDb$suffix" -Force
     }
 }
 ```
 
-The copied catalogue retains the original local-folder source roots and historical crop-output roots. During the pilot those are read-only inputs. New CenterFace rollout crops are written only under `$rolloutOutput`.
+Keep `$sourceDb` untouched as the restore point.
 
-### Prepare the explicit revision list
+### 4. Build the explicit current-revision list
 
-Create `$revisionFile` with one current `AssetRevisionId` GUID per line. Blank lines and lines beginning with `#` are ignored. The list is deliberately explicit so the rollout command cannot silently expand to a source folder or the whole archive.
+`rollout start` deliberately cannot scan a source directory. It requires explicit immutable `AssetRevisionId` values.
 
-Revision IDs are available from the local catalogue/collection API (`RevisionId` in collection responses/manifests) or other local catalogue inspection tooling. A practical pilot is a small set of photos you already know contain reviewed people and challenging face layouts. Do not commit this file.
+In DB Browser for SQLite, run this against the **source** catalogue:
 
-Example file shape:
-
-```text
-# WI-0038 private pilot revisions
-00000000-0000-0000-0000-000000000001
-00000000-0000-0000-0000-000000000002
+```sql
+WITH ranked AS (
+    SELECT
+        ar.id AS revision_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY ar.asset_id
+            ORDER BY ar.observed_at_utc DESC, ar.id DESC
+        ) AS row_number
+    FROM asset_revisions AS ar
+    INNER JOIN assets AS a
+        ON a.id = ar.asset_id
+    WHERE a.deleted_at_utc IS NULL
+)
+SELECT revision_id
+FROM ranked
+WHERE row_number = 1
+ORDER BY revision_id;
 ```
 
-Replace those example values with real current revision IDs before running anything.
+Export the result with the header `revision_id` to `$revisionCsv`, then convert it to the one-GUID-per-line rollout file:
 
-## Run the pilot planning/application pass
+```powershell
+Import-Csv -LiteralPath $revisionCsv |
+    Select-Object -ExpandProperty revision_id |
+    Set-Content -LiteralPath $revisionFile -Encoding ascii
 
-Start the rollout against the **pilot database only**:
+$revisionCount = @(
+    Get-Content -LiteralPath $revisionFile |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+).Count
+
+$revisionCount
+```
+
+For the currently reviewed catalogue, the expected scope is **560 current revisions**. If the count is not the number of active photos you intend to migrate, stop and inspect the query/database before starting rollout.
+
+Do not commit the revision list.
+
+### 5. Start the full current-catalogue rollout
+
+Run only against `$fullDb`:
 
 ```powershell
 Set-Location "C:\Kod\codex\Photo Identity Indexer"
@@ -174,30 +205,22 @@ dotnet run `
     --configuration Release `
     -- `
     rollout start `
-    --database $pilotDb `
+    --database $fullDb `
     --output $rolloutOutput `
     --revision-file $revisionFile
 ```
 
-The command prints a rollout `run:` GUID and counts including `ambiguous`, `awaiting-review`, `ready-to-apply`, `deferred`, and `unmatched-existing`. Keep that GUID:
+Save the printed run GUID:
 
 ```powershell
 $runId = "REPLACE_WITH_PRINTED_RUN_ID"
 ```
 
-If processing was interrupted or deliberately limited, resume the **same** run rather than starting another one:
+Do not start another run merely because processing is interrupted.
 
-```powershell
-dotnet run `
-    --project .\src\PhotoIdentity.Cli `
-    --configuration Release `
-    -- `
-    rollout resume `
-    --database $pilotDb `
-    --run $runId
-```
+### 6. Resume or inspect failures on the same run
 
-Check status at any point:
+Check status:
 
 ```powershell
 dotnet run `
@@ -205,22 +228,41 @@ dotnet run `
     --configuration Release `
     -- `
     rollout status `
-    --database $pilotDb `
+    --database $fullDb `
     --run $runId
 ```
 
-## Review ambiguous occurrence mappings
+If processing was interrupted, resume the same run:
 
-Publish and run the current local review application against the pilot database:
+```powershell
+dotnet run `
+    --project .\src\PhotoIdentity.Cli `
+    --configuration Release `
+    -- `
+    rollout resume `
+    --database $fullDb `
+    --run $runId
+```
+
+Do not proceed to adoption while `revisions-failed` is non-zero.
+
+### 7. Review every ambiguity
+
+If `awaiting-review` is greater than zero, publish the review application against `$fullDb`:
 
 ```powershell
 Set-Location "C:\Kod\codex\Photo Identity Indexer"
 
 Remove-Item -LiteralPath $reviewApp -Recurse -Force -ErrorAction SilentlyContinue
-dotnet publish .\src\PhotoIdentity.Api --configuration Release --output $reviewApp
 
-$env:PhotoIdentity__DatabasePath = $pilotDb
+dotnet publish `
+    .\src\PhotoIdentity.Api `
+    --configuration Release `
+    --output $reviewApp
+
+$env:PhotoIdentity__DatabasePath = $fullDb
 Set-Location -LiteralPath $reviewApp
+
 dotnet .\PhotoIdentity.Api.dll --urls "http://127.0.0.1:5080"
 ```
 
@@ -230,19 +272,17 @@ Open:
 http://127.0.0.1:5080/detector-rollout/REPLACE_WITH_RUN_ID
 ```
 
-For every ambiguous candidate, inspect the source overlay and candidate/old crops. Choose exactly one of:
+For each ambiguity choose only:
 
-- an eligible old occurrence shown by the page, when it is the same physical face;
-- **new face occurrence**, when CenterFace found a legitimate face that has no old occurrence; or
-- **defer**, when the mapping is not safe to decide yet.
+- the displayed eligible old occurrence when it is the same physical face;
+- **new face occurrence** when the candidate is a real new detection; or
+- **defer** when uncertain.
 
-A deferred candidate intentionally keeps the rollout incomplete. The page never assigns a person.
+A deferred candidate keeps the rollout incomplete. The reconciliation UI never assigns a person.
 
-Stop the review app before the terminal apply step.
+Stop the review app before applying saved decisions.
 
-## Apply saved human decisions
-
-Apply the latest non-deferred decisions from their already-persisted candidate payloads:
+### 8. Apply saved human decisions
 
 ```powershell
 Set-Location "C:\Kod\codex\Photo Identity Indexer"
@@ -252,53 +292,100 @@ dotnet run `
     --configuration Release `
     -- `
     rollout apply `
-    --database $pilotDb `
+    --database $fullDb `
     --run $runId
 ```
 
-Run `rollout status` again. A pilot is not complete while `awaiting-review`, `ready-to-apply`, or `deferred` is non-zero, or while revision processing has failures.
+Repeat status/review/apply until all of the following are true:
 
-It is safe and expected to repeat `rollout status`, `rollout resume`, and `rollout apply` for the same run. The pilot must verify that doing so does not duplicate newly created face occurrences.
+```text
+revisions-failed: 0
+awaiting-review: 0
+ready-to-apply: 0
+deferred: 0
+rollout-complete: true
+```
 
-## Human pilot verification
+`unmatched-existing` may be greater than zero. Those old occurrences must be retained; their presence is not by itself a rollout failure.
 
-Before accepting the pilot, verify privately:
+### 9. Verify catalogue-history invariants before adoption
 
-1. Spot-check every ambiguous mapping you resolved.
-2. Spot-check photos where the CenterFace face count differs from the old detector.
-3. Confirm existing assigned/rejected faces still refer to the same physical person/face.
-4. Confirm existing review-action history remains intact and append-only.
-5. Confirm unmatched old occurrences remain present.
-6. Confirm genuinely new CenterFace faces have new occurrence IDs and appear in ordinary face review as unreviewed unless a separate human review action assigns/rejects them.
-7. Confirm the rollout UI did not create person labels.
-8. Repeat `rollout apply` and confirm counts/occurrence IDs remain stable.
-9. Record privacy-safe aggregate results and any ambiguous/deferred counts for WI-0038; keep filenames, face geometry and individual decisions private.
+Compare `$sourceDb` and `$fullDb`:
 
-The rollout pilot is a migration-safety exercise, not a new detector-threshold experiment. Do not change the selected CenterFace settings to make the pilot look better.
+```sql
+SELECT COUNT(*) AS people FROM people;
+SELECT COUNT(*) AS person_labels FROM person_labels;
+SELECT COUNT(*) AS review_actions FROM review_actions;
+SELECT COUNT(*) AS ranked_suggestions FROM identity_suggestion_rankings;
+SELECT COUNT(*) AS face_occurrences FROM face_occurrences;
+```
 
-## Rollback exercise
+Expected behavior:
 
-Rollback is restore-based, not destructive history rewriting.
+- people, person labels and review actions remain unchanged by rollout;
+- existing ranking rows are not deleted by rollout;
+- `face_occurrences` may increase because CenterFace adds genuinely new detections.
 
-For the required pilot rollback exercise:
+For new rollout candidates, verify they have no automatic person labels or review actions. Inspect reviewed existing mappings and every ambiguous human decision closely enough to confirm they still refer to the intended physical face. Inspect unmatched existing occurrences as well.
 
-1. stop the review application and all pilot writers;
-2. retain the completed/failed pilot database and rollout output privately if they are useful evidence;
-3. delete or move the disposable pilot copy;
-4. recreate `$pilotDb` from the same pre-rollout canonical backup/copy; and
-5. confirm the restored copy opens and contains the original reviewed state without relying on deletion of selected `face_occurrences` or edits to historical review actions.
+Do **not** run matcher regeneration until these migration checks are complete, because suggestion-table changes would make before/after rollout comparison noisier.
 
-If the pilot exposed an implementation/policy problem, fix it and rerun from a fresh database copy. Never repair a bad migration by bulk relabelling people or rewriting old review history in place.
+### 10. Verify replay safety
 
-## Full-archive authorization
+Record the migrated occurrence count:
 
-Full-archive canonical rollout remains blocked until the maintainer reports that the disposable pilot:
+```sql
+SELECT COUNT(*) AS face_occurrences FROM face_occurrences;
+```
 
-- preserved assignment/rejection/history invariants;
-- made every ambiguity reviewable and safely resumable;
-- added genuinely new faces without overwriting old occurrences;
-- remained replay-safe under repeated resume/apply;
-- produced acceptable private operator workload; and
-- passed the restore-based rollback exercise.
+Then run `rollout resume` and `rollout apply` again for the same `$runId`, followed by status. The face-occurrence count and applied occurrence IDs must remain stable. No duplicate new occurrences may appear.
 
-After those gates pass, record privacy-safe aggregate migration evidence in WI-0038 and only then prepare a separate full-archive authorization step. Detailed reconciliation evidence stays private.
+### 11. Adopt the migrated catalogue
+
+Only after the full current-catalogue run and replay checks pass:
+
+1. stop all catalogue writers;
+2. keep `$sourceDb` unchanged as the rollback database;
+3. keep `$rolloutOutput` at its permanent recorded path;
+4. point the local application at `$fullDb`, or copy the migrated database to the intended active database location while leaving `$rolloutOutput` unchanged; and
+5. reopen ordinary face review and spot-check existing reviewed people plus new unreviewed faces.
+
+Do not delete or rewrite old occurrences to make the migrated catalogue look cleaner.
+
+### 12. Regenerate identity suggestions only after adoption verification
+
+New CenterFace occurrences intentionally have no ranked identity suggestions until matcher regeneration is run. After migration/adoption checks are complete, regenerate suggestions for the exact SFace FP32 model if desired:
+
+```powershell
+Set-Location "C:\Kod\codex\Photo Identity Indexer"
+
+dotnet run `
+    --project .\src\PhotoIdentity.Cli `
+    --configuration Release `
+    -- `
+    match regenerate `
+    --database $fullDb `
+    --embedder-id sface-2021dec-fp32 `
+    --embedder-hash 0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79
+```
+
+Matcher suggestions remain suggestions only. They do not create person assignments automatically.
+
+## Rollback
+
+Rollback is restore-based, never historical-data rewriting.
+
+If the full current-catalogue migration reveals a problem:
+
+1. stop the review application and all writers;
+2. preserve the failed migrated database/output privately if useful for diagnosis;
+3. point the application back to the untouched `$sourceDb` or restore it to the active catalogue location; and
+4. verify the original reviewed state opens intact.
+
+Never repair a detector migration by bulk relabelling people, deleting unmatched old occurrences, or rewriting historical review actions in place.
+
+## Scope boundary
+
+The successful WI-0038 pilot and this procedure authorize migration of the **current reviewed 560-image local catalogue** to the selected CenterFace detector pipeline.
+
+They do not authorize M12 full-archive processing, cloud/archive expansion, model redistribution, or automatic identity assignment. Those remain separate governed decisions.
