@@ -119,7 +119,7 @@ public static class Program
               archive status --database PATH --run RUN_ID
               archive proxy measure --source DIR --output DIR
                                     --profile ID:MAX_LONG_EDGE:JPEG_QUALITY
-                                    --profile ID:MAX_LONG_EDGE:JPEG_QUALITY [...]
+                                    [--profile ID:MAX_LONG_EDGE:JPEG_QUALITY ...]
                                     [--non-recursive]
 
               batch start --database PATH --source DIR [--output DIR]
@@ -188,13 +188,14 @@ public static class Program
             profile before processing. Archive status reports the registered profile and
             durable job progress.
 
-            Archive proxy measure is a pre-default tuning path. It renders every supported
-            JPEG/PNG source image with at least two exact candidate profiles, writes those
+            Archive proxy measure is a pre-default measurement path. It renders every
+            supported JPEG/PNG source image with one or more exact profiles, writes those
             derivatives outside the source root, and reports only aggregate logical source
             bytes plus total/mean/median/p95 proxy bytes and source-to-proxy compression.
-            Candidate syntax is ID:MAX_LONG_EDGE:JPEG_QUALITY. The command does not choose
-            or register a permanent catalogue default; the measurement gate remains a
-            maintainer decision after visual inspection of the generated candidates.
+            Candidate syntax is ID:MAX_LONG_EDGE:JPEG_QUALITY. Use at least two profiles for
+            the 100-image tuning comparison and the one selected profile for the later
+            560-image scale validation. The command never chooses or registers a permanent
+            catalogue default; that remains a maintainer decision after visual inspection.
 
             Batch start scans a local folder, creates durable jobs for each current
             immutable revision and runs the production inspection pipeline until idle.
