@@ -19,6 +19,9 @@ public static class CollectionEndpoints
         endpoints.MapGet("/api/collections/manifest", GetManifestAsync);
         endpoints.MapGet("/api/collections/photos/{revisionId}/thumbnail", GetPhotoThumbnailAsync);
         endpoints.MapGet("/api/collections/photos/{revisionId}/preview", GetPhotoPreviewAsync);
+        endpoints.MapGet("/api/collections/photos/{revisionId}/original/status", GetOriginalStatusAsync);
+        endpoints.MapPost("/api/collections/photos/{revisionId}/original/hydrate", HydrateOriginalAsync);
+        endpoints.MapPost("/api/collections/photos/{revisionId}/original/release", ReleaseOriginalAsync);
         endpoints.MapGet("/api/collections/photos/{revisionId}/original", GetPhotoContentAsync);
         endpoints.MapGet("/api/collections/photos/{revisionId}/content", GetPhotoContentAsync);
         return endpoints;
@@ -175,7 +178,7 @@ public static class CollectionEndpoints
     {
         if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
         {
-            return Results.BadRequest(new { error = "The asset revision identifier is invalid." });
+            return InvalidRevision();
         }
 
         CollectionPhotoFile? file = await proxyResolver.ResolveAsync(parsedRevisionId, cancellationToken)
@@ -199,7 +202,7 @@ public static class CollectionEndpoints
     {
         if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
         {
-            return Results.BadRequest(new { error = "The asset revision identifier is invalid." });
+            return InvalidRevision();
         }
 
         CollectionPhotoFile? file = await proxyResolver.ResolveAsync(parsedRevisionId, cancellationToken)
@@ -209,20 +212,92 @@ public static class CollectionEndpoints
             : Results.File(file.Path, file.ContentType, enableRangeProcessing: true);
     }
 
-    private static async Task<IResult> GetPhotoContentAsync(
+    private static async Task<IResult> GetOriginalStatusAsync(
         string revisionId,
-        CollectionPhotoFileResolver resolver,
+        CollectionOriginalAccessService service,
         CancellationToken cancellationToken)
     {
         if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
         {
-            return Results.BadRequest(new { error = "The asset revision identifier is invalid." });
+            return InvalidRevision();
         }
 
-        CollectionPhotoFile? file = await resolver.ResolveAsync(parsedRevisionId, cancellationToken);
+        CollectionOriginalAccessSnapshot? snapshot = await service.GetStatusAsync(
+            parsedRevisionId,
+            cancellationToken);
+        return snapshot is null ? Results.NotFound() : Results.Ok(ToResponse(snapshot));
+    }
+
+    private static async Task<IResult> HydrateOriginalAsync(
+        string revisionId,
+        CollectionOriginalAccessService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
+        {
+            return InvalidRevision();
+        }
+
+        try
+        {
+            CollectionOriginalAccessSnapshot? snapshot = await service.RequestHydrationAsync(
+                parsedRevisionId,
+                cancellationToken);
+            return snapshot is null ? Results.NotFound() : Results.Ok(ToResponse(snapshot));
+        }
+        catch (FileNotFoundException exception)
+        {
+            return Results.NotFound(new { error = exception.Message });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or PlatformNotSupportedException)
+        {
+            return Results.Conflict(new { error = exception.Message });
+        }
+    }
+
+    private static async Task<IResult> ReleaseOriginalAsync(
+        string revisionId,
+        CollectionOriginalAccessService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
+        {
+            return InvalidRevision();
+        }
+
+        try
+        {
+            CollectionOriginalAccessSnapshot? snapshot = await service.RequestReleaseAsync(
+                parsedRevisionId,
+                cancellationToken);
+            return snapshot is null ? Results.NotFound() : Results.Ok(ToResponse(snapshot));
+        }
+        catch (FileNotFoundException exception)
+        {
+            return Results.NotFound(new { error = exception.Message });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or PlatformNotSupportedException)
+        {
+            return Results.Conflict(new { error = exception.Message });
+        }
+    }
+
+    private static async Task<IResult> GetPhotoContentAsync(
+        string revisionId,
+        CollectionOriginalAccessService service,
+        CancellationToken cancellationToken)
+    {
+        if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
+        {
+            return InvalidRevision();
+        }
+
+        VerifiedCollectionOriginal? file = await service.OpenVerifiedAsync(
+            parsedRevisionId,
+            cancellationToken);
         return file is null
             ? Results.NotFound()
-            : Results.File(file.Path, file.ContentType, enableRangeProcessing: true);
+            : Results.File(file.Stream, file.ContentType, enableRangeProcessing: true);
     }
 
     private static CollectionPhotoResponse ToResponse(CatalogueCollectionPhoto photo) => new(
@@ -236,6 +311,16 @@ public static class CollectionEndpoints
         photo.Width,
         photo.Height,
         ToPeopleResponse(photo));
+
+    private static CollectionOriginalAccessResponse ToResponse(CollectionOriginalAccessSnapshot snapshot) => new(
+        snapshot.RevisionId.ToString(),
+        snapshot.State,
+        snapshot.ManagedHydration,
+        snapshot.IsPinned,
+        snapshot.CanRequestHydration,
+        snapshot.CanView,
+        snapshot.CanRelease,
+        snapshot.Message);
 
     private static CollectionManifestPhotoResponse ToManifestResponse(
         HttpRequest request,
@@ -287,6 +372,11 @@ public static class CollectionEndpoints
     private static IResult MissingPeople() => Results.BadRequest(new
     {
         error = "Supply one or more comma-separated, non-empty person identifiers in the 'people' query parameter.",
+    });
+
+    private static IResult InvalidRevision() => Results.BadRequest(new
+    {
+        error = "The asset revision identifier is invalid.",
     });
 
     private static bool TryRevisionId(string value, out AssetRevisionId revisionId)

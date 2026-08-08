@@ -16,12 +16,13 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M15 — Operator documentation and system guide**: `completed`
 - **M16 — Face detection recall**: `completed`
 - **M09 — Azure VM pilot without identities**: `ready`
-- **M12 — Full archive processing**: `blocked`
+- **M12 — Full archive processing**: `in_progress`
 - **M14 — Collection-ready API**: `completed`
 
 ## Active work
 
 - [**WI-0041 — Add incremental permanent archive ingestion**](../work-items/WI-0041-incremental-archive-ingestion.md) — `blocked`; owner: `ai-agent`
+- [**WI-0042 — Add bounded archive hydration and review proxies**](../work-items/WI-0042-bounded-archive-storage.md) — `in_progress`; owner: `ai-agent`
 
 ## Recently completed
 
@@ -32,4 +33,3 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 ## Next ready work
 
 - [**WI-0020 — Run Azure VM pilot**](../work-items/WI-0020-azure-pilot.md) — `proposed`; owner: `unassigned`
-- [**WI-0042 — Add bounded archive hydration and review proxies**](../work-items/WI-0042-bounded-archive-storage.md) — `ready`; owner: `ai-agent`

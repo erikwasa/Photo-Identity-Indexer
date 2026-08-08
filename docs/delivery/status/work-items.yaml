@@ -1041,10 +1041,12 @@ work_items:
 - id: WI-0042
   title: Add bounded archive hydration and review proxies
   milestone: M12
-  status: ready
+  status: in_progress
   owner: ai-agent
   document: ../work-items/WI-0042-bounded-archive-storage.md
+  started_at: 2026-08-08
   last_updated_at: 2026-08-08
+  branch: agent/WI-0042-explicit-original-hydration
   blockers:
   - WI-0014
   - WI-0025

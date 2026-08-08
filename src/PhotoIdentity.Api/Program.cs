@@ -1,5 +1,6 @@
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Source.OneDriveSync;
 
 namespace PhotoIdentity.Api;
 
@@ -44,10 +45,13 @@ public partial class Program
         builder.Services.AddSingleton<SqliteDetectorRolloutReviewRepository>();
         builder.Services.AddSingleton<SqliteDetectorRolloutApplicationRepository>();
         builder.Services.AddSingleton<SqliteArchiveReviewProxyRepository>();
+        builder.Services.AddSingleton<SqliteArchiveHydrationRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton<DetectorRolloutCropFileResolver>();
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();
         builder.Services.AddSingleton<CollectionReviewProxyFileResolver>();
+        builder.Services.AddSingleton<CollectionOriginalAccessService>();
+        builder.Services.AddSingleton<IOneDriveFilesOnDemandPlatform, WindowsOneDriveFilesOnDemandPlatform>();
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
