@@ -39,7 +39,7 @@ public sealed record ArchiveReviewProxyRecord
         }
 
         string normalizedPath = NormalizeRelativePath(relativePath);
-        if (Path.IsPathRooted(relativePath) ||
+        if (Path.IsPathRooted(normalizedPath) ||
             normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries).Any(segment => segment == ".."))
         {
             throw new ArgumentException(
