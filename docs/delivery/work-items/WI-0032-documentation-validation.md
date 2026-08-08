@@ -15,13 +15,13 @@ Prove that the rewritten documentation is complete and comprehensible by followi
 
 ## Acceptance criteria
 
-- [ ] A clean checkout can install models, build, test and run synthetic verification using only the documented steps.
-- [ ] The documented local catalogue and review flow works on Windows and Pixel over a trusted network.
-- [ ] The 500-image pilot and multi-model comparison procedures identify every required input and expected output.
-- [ ] Every command is executed or covered by an automated documentation test where practical.
-- [ ] Broken links, stale generated status, unexplained terms and hidden prerequisites are rejected by validation.
-- [ ] A second reading pass records confusing sections and resolves them before completion.
-- [ ] Azure instructions remain clearly optional and deferred until access is available.
+- [x] A clean checkout can install models, build, test and run synthetic verification using only the documented steps.
+- [x] The documented local catalogue and review flow works on Windows and Pixel over a trusted network.
+- [x] The 500-image pilot and multi-model comparison procedures identify every required input and expected output.
+- [x] Every command is executed or covered by an automated documentation test where practical.
+- [x] Broken links, stale generated status, unexplained terms and hidden prerequisites are rejected by validation.
+- [x] A second reading pass records confusing sections and resolves them before completion.
+- [x] Azure instructions remain clearly optional and deferred until access is available.
 
 ## Validation boundary
 
