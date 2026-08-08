@@ -17,7 +17,11 @@ public sealed record CollectionPhotoResponse(
     string? MediaType,
     int? Width,
     int? Height,
-    IReadOnlyList<CollectionPersonMatchResponse> People);
+    IReadOnlyList<CollectionPersonMatchResponse> People)
+{
+    // Compatibility alias for the pre-v2 collection UI. Normal browsing now resolves to preview content.
+    public string ContentUrl => PreviewUrl;
+}
 
 public sealed record CollectionSuggestionPolicyResponse(
     string ModelId,
@@ -50,7 +54,11 @@ public sealed record CollectionManifestPhotoResponse(
     string? MediaType,
     int? Width,
     int? Height,
-    IReadOnlyList<CollectionPersonMatchResponse> People);
+    IReadOnlyList<CollectionPersonMatchResponse> People)
+{
+    // Manifest v1 named the authoritative original URL "contentUrl".
+    public string ContentUrl => OriginalUrl;
+}
 
 public sealed record CollectionManifestResponse(
     string Format,
