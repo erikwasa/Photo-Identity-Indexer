@@ -1,0 +1,62 @@
+name: WI-0032 completion
+
+on:
+  push:
+    branches:
+      - agent/WI-0032-completion
+
+permissions:
+  contents: write
+
+jobs:
+  complete-status:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/WI-0032-completion
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Complete WI-0032 through documentation tooling
+        shell: pwsh
+        run: |
+          dotnet run --project tools/PhotoIdentity.Docs -- complete WI-0032 `
+            --evidence-type human_verification `
+            --evidence-value "The maintainer confirmed on 2026-08-09 that WI-0032 clean-setup documentation validation and all remaining acceptance criteria are complete; detailed local validation notes remain outside Git." `
+            --verified-by human
+
+          $milestones = Get-Content docs/delivery/status/milestones.yaml -Raw
+          $before = @"
+          - id: M15
+            title: Operator documentation and system guide
+            status: in_progress
+          "@
+          $after = @"
+          - id: M15
+            title: Operator documentation and system guide
+            status: completed
+          "@
+          if (-not $milestones.Contains($before)) {
+            throw 'Expected M15 in_progress block was not found.'
+          }
+          Set-Content docs/delivery/status/milestones.yaml ($milestones.Replace($before, $after)) -NoNewline
+
+          $workItemPath = 'docs/delivery/work-items/WI-0032-documentation-validation.md'
+          $workItem = Get-Content $workItemPath -Raw
+          Set-Content $workItemPath ($workItem.Replace('- [ ] ', '- [x] ')) -NoNewline
+
+          dotnet run --project tools/PhotoIdentity.Docs -- generate
+          dotnet run --project tools/PhotoIdentity.Docs -- validate
+          dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+      - name: Commit generated completion state
+        shell: pwsh
+        run: |
+          git rm .github/workflows/wi0032-complete.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/delivery/status/work-items.yaml docs/delivery/status/milestones.yaml docs/delivery/status/current.md docs/delivery/work-items/WI-0032-documentation-validation.md
+          git commit -m "Complete WI-0032 documentation validation"
+          git push origin HEAD:agent/WI-0032-completion
