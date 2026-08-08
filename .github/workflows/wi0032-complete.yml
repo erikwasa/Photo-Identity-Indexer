@@ -43,7 +43,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          git rm .github/workflows/wi0032-complete.yml
+          git rm .github/workflows/wi0032-complete.yml .wi0032-completion-trigger
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add docs/delivery/status/work-items.yaml docs/delivery/status/milestones.yaml docs/delivery/status/current.md docs/delivery/roadmap.md docs/delivery/work-items/WI-0032-documentation-validation.md
