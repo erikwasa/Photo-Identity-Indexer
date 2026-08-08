@@ -119,6 +119,63 @@ public sealed class LocalFolderCatalogueScannerTests
         }
     }
 
+    [Fact]
+    public async Task Relative_root_scan_marks_missing_assets_only_inside_that_scope()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string sourceDirectory = Path.Combine(directory, "source");
+            string january = Path.Combine(sourceDirectory, "1970", "01");
+            string february = Path.Combine(sourceDirectory, "1970", "02");
+            Directory.CreateDirectory(january);
+            Directory.CreateDirectory(february);
+            string januaryPhoto = Path.Combine(january, "january.jpg");
+            string februaryPhoto = Path.Combine(february, "february.jpg");
+            await File.WriteAllBytesAsync(januaryPhoto, [1]);
+            await File.WriteAllBytesAsync(februaryPhoto, [2]);
+
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            SourceId sourceId = SourceId.New();
+            LocalFolderAssetSource source = new(sourceId, sourceDirectory);
+            CatalogueSource catalogueSource = new(
+                sourceId,
+                "local-folder",
+                sourceDirectory,
+                Utc(10));
+            SqliteSourceCatalogueScanner scanner = new(database);
+            await scanner.ScanAsync(source, catalogueSource, new SourceScanOptions(), Utc(10));
+
+            File.Delete(januaryPhoto);
+            SourceCatalogueScanSummary februaryScan = await scanner.ScanAsync(
+                source,
+                catalogueSource,
+                new SourceScanOptions("1970/02", Recursive: true),
+                Utc(11));
+
+            Assert.Equal(0, februaryScan.MarkedDeletedCount);
+            CatalogueAsset januaryAsset = (await scanner.GetAssetsAsync(sourceId))
+                .Single(asset => asset.SourceKey == "1970/01/january.jpg");
+            Assert.False(januaryAsset.IsDeleted);
+
+            SourceCatalogueScanSummary januaryScan = await scanner.ScanAsync(
+                source,
+                catalogueSource,
+                new SourceScanOptions("1970/01", Recursive: true),
+                Utc(12));
+
+            Assert.Equal(1, januaryScan.MarkedDeletedCount);
+            januaryAsset = (await scanner.GetAssetsAsync(sourceId))
+                .Single(asset => asset.SourceKey == "1970/01/january.jpg");
+            Assert.True(januaryAsset.IsDeleted);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
     private static async Task SeedHumanLabelAsync(
         SqliteCatalogueDatabase database,
         AssetRevisionId revisionId)

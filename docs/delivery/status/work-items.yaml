@@ -500,6 +500,7 @@ work_items:
     document: ../work-items/WI-0023-full-archive.md
     blockers:
       - WI-0022
+      - WI-0041
     evidence: []
   - id: WI-0024
     title: Add ongoing local synchronisation
@@ -974,3 +975,18 @@ work_items:
         value: 7a6ad053ef452413a41e2cd284094f26c5968ca4
       - type: human_verification
         value: The maintainer tested the merged WI-0040 viewport-fitted review workflow and cross-catalogue comparison-photo fix on 2026-08-05 and confirmed that it works as expected.
+  - id: WI-0041
+    title: Add incremental permanent archive ingestion
+    milestone: M12
+    status: in_progress
+    owner: ai-agent
+    document: ../work-items/WI-0041-incremental-archive-ingestion.md
+    started_at: '2026-08-08'
+    last_updated_at: '2026-08-08'
+    branch: agent/WI-0041-incremental-archive-ingestion
+    blockers:
+      - WI-0013
+      - WI-0014
+      - WI-0030
+      - WI-0037
+    evidence: []

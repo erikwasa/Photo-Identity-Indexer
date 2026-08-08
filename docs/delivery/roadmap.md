@@ -18,7 +18,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M09 | Azure VM pilot without identities | proposed |
 | M10 | Azure checkpointing | proposed |
 | M11 | Production model selection | proposed |
-| M12 | Full archive processing | proposed |
+| M12 | Full archive processing | in_progress |
 | M13 | Ongoing local synchronisation | proposed |
 | M14 | Collection-ready API | completed |
 
@@ -27,9 +27,9 @@ Expected evolution:
 ```text
 0.1 local inference and review
 0.2 OneDrive hydration and staging
-0.3 multi-model evaluation
-0.4 portable Azure execution without identities
-0.5 budget-controlled archive processing
-0.6 ongoing synchronisation
+0.3 multi-model and detector evaluation
+0.4 incremental permanent local archive ingestion
+0.5 production-model and optional Azure validation
+0.6 full-archive completion and ongoing synchronisation
 1.0 stable people index and collection API
 ```
