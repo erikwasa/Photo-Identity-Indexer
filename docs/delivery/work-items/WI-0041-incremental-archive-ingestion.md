@@ -89,7 +89,7 @@ The fourth merged slice added the local archive operator workspace:
 - analysis advances through bounded one-image HTTP steps backed by the durable processing run, resuming an existing non-terminal run before creating another run; and
 - the review application resolves the governed profile from `PhotoIdentity__RepositoryRoot` or a nearby checkout and keeps analysis disabled with an actionable message when that configuration cannot be resolved.
 
-The current fifth slice closes the pre-production availability and diagnosis boundary:
+The fifth merged slice closed the pre-production availability and diagnosis boundary:
 
 - archive synchronization uses the existing OneDrive Files On-Demand classifier even though the permanent source identity remains the same `local-folder` root;
 - local, online-only, downloading, unavailable and availability-error states are persisted independently of immutable revisions, so placeholders are catalogued without opening or hashing them;
@@ -98,7 +98,11 @@ The current fifth slice closes the pre-production availability and diagnosis bou
 - `/api/archive/items` and the Archive image drill-down expose only root-relative paths with availability, analysis state and latest processing error; and
 - regression coverage verifies `local -> online-only -> local` without opening the placeholder, without creating a duplicate revision and with analysis eligibility restored after hydration.
 
-After this slice merges, the remaining WI-0041 acceptance work is the human Windows verification against the real archive, including the `1970/01` -> `1970/02` -> `1970` progression and real OneDrive Files On-Demand states.
+## Pre-verification storage boundary
+
+Before starting the human Windows verification against the real archive, the maintainer identified a production constraint that changes the required steady-state workflow: the target computer has roughly 150 GB free while the logical archive is roughly 330 GB. Full or long-lived hydration of the complete archive is therefore not a valid prerequisite.
+
+WI-0041 is blocked on [WI-0042](WI-0042-bounded-archive-storage.md), which adds bounded original hydration, permanent review proxies, explicit full-resolution retrieval and local-capacity controls. The already-merged WI-0041 ingestion, availability and exact-profile semantics remain valid; final real-archive verification resumes after WI-0042 is implemented and locally verified.
 
 ## Scope boundary
 
