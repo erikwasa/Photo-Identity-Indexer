@@ -115,6 +115,7 @@ public partial class Program
         app.MapDetectorEvaluationComparisonEndpoints();
         app.MapDetectorRolloutEndpoints();
         app.MapArchiveEndpoints();
+        app.MapArchiveStorageEndpoints();
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();
