@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 9;
+    public const int CurrentSchemaVersion = 10;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -462,6 +462,30 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 9;
         """;
 
+    private const string VersionTenMigration = """
+        CREATE TABLE archive_configuration (
+            id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+            source_id TEXT NOT NULL UNIQUE,
+            configured_at_utc TEXT NOT NULL,
+            FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE RESTRICT
+        );
+
+        CREATE TABLE archive_included_folders (
+            source_id TEXT NOT NULL,
+            relative_path TEXT NOT NULL,
+            included_at_utc TEXT NOT NULL,
+            PRIMARY KEY (source_id, relative_path),
+            FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX ix_archive_included_folders_path
+            ON archive_included_folders (source_id, relative_path);
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (10, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 10;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -549,6 +573,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 9)
         {
             await ApplyMigrationAsync(connection, VersionNineMigration, cancellationToken);
+            version = 9;
+        }
+
+        if (version < 10)
+        {
+            await ApplyMigrationAsync(connection, VersionTenMigration, cancellationToken);
         }
     }
 
