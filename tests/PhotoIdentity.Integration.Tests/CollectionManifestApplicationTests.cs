@@ -192,7 +192,7 @@ public sealed class CollectionManifestApplicationTests
                     "http://localhost/api/collections/photos/",
                     photo.OriginalUrl,
                     StringComparison.Ordinal);
-                Assert.EndsWith("/content", photo.OriginalUrl, StringComparison.Ordinal);
+                Assert.EndsWith("/original", photo.OriginalUrl, StringComparison.Ordinal);
                 Assert.Equal(photo.OriginalUrl, photo.ContentUrl);
                 Assert.Equal("image/jpeg", photo.MediaType);
                 Assert.Equal(1600, photo.Width);
