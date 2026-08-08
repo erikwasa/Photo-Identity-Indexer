@@ -23,6 +23,16 @@ public sealed record CollectionPhotoResponse(
     public string ContentUrl => ThumbnailUrl;
 }
 
+public sealed record CollectionOriginalAccessResponse(
+    string RevisionId,
+    string State,
+    bool ManagedHydration,
+    bool IsPinned,
+    bool CanRequestHydration,
+    bool CanView,
+    bool CanRelease,
+    string? Message);
+
 public sealed record CollectionSuggestionPolicyResponse(
     string ModelId,
     string ModelHash,
