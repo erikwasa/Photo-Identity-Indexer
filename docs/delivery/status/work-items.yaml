@@ -462,7 +462,7 @@ work_items:
       - type: merge_commit
         value: a22cce996cd629d778421b6328bedbd891b0e515
       - type: human_verification
-        value: Pinned SFace INT8 installation, same-revision processing, exact-model coexistence, resume selection, baseline readability and unchanged human review data verified locally on Windows on 2026-08-01. Twenty representative faces were correct under both exact revisions with no material practical difference; retain the FP32 baseline. The detailed record remains private.
+        value: Pinned SFace INT8 installation, same-revision processing, exact-model coexistence, resume selection, baseline readability and unchanged human review data verified locally on Windows on 2026-08-01.
   - id: WI-0020
     title: Run Azure VM pilot
     milestone: M09
