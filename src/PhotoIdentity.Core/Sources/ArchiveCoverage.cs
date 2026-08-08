@@ -44,7 +44,7 @@ public static class ArchiveCoverage
             return string.Empty;
         }
 
-        if (Path.IsPathRooted(value) || value.Contains(':', StringComparison.Ordinal))
+        if (Path.IsPathRooted(value) || value.Contains(':'))
         {
             throw new ArgumentException("Archive folders must be relative to the configured source root.", nameof(relativeFolder));
         }
