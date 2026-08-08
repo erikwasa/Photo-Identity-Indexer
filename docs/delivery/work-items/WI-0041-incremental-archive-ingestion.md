@@ -4,7 +4,7 @@ title: Add incremental permanent archive ingestion
 milestone: M12
 status_source: ../status/work-items.yaml
 depends_on: [WI-0013, WI-0014, WI-0030, WI-0037]
-affected_modules: [PhotoIdentity.Core, PhotoIdentity.Source.Local, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Worker, PhotoIdentity.Cli, PhotoIdentity.Api, PhotoIdentity.Web]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Source.Local, PhotoIdentity.Source.OneDriveSync, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Worker, PhotoIdentity.Cli, PhotoIdentity.Api, PhotoIdentity.Web]
 ---
 
 # WI-0041: Add incremental permanent archive ingestion
@@ -19,10 +19,11 @@ The permanent local source root is conceptually stable. Selected recursive folde
 
 1. Create a fresh permanent catalogue whose local source root is the archive root.
 2. Include one or more relative folders beneath that root.
-3. Synchronise all included coverage to discover new, changed and missing files.
-4. Analyse only current revisions that have not already completed the selected detector/embedder processing profile.
-5. Review faces, maintain identities and regenerate suggestions as normal.
-6. Repeat synchronization whenever archive folders gain new photos or new folders are brought into coverage.
+3. Synchronise all included coverage to discover new, changed and missing files plus current OneDrive local/cloud availability.
+4. Hydrate any required OneDrive placeholders through the sync client and synchronize again; Photo Identity does not intentionally hydrate placeholders itself.
+5. Analyse only locally available current revisions that have not already completed the selected detector/embedder processing profile.
+6. Review faces, maintain identities and regenerate suggestions as normal.
+7. Repeat synchronization whenever archive folders gain new photos or new folders are brought into coverage.
 
 The initial target workflow must support this progression:
 
@@ -48,9 +49,9 @@ The final `1970` sync must reuse the already catalogued `1970/01` and `1970/02` 
 - [x] Expanding from child folders to their parent reuses the same catalogue assets and revisions for unchanged files.
 - [x] Unchanged current revisions that already completed the selected processing profile are not run through detector/embedding inference again.
 - [x] Zero-face results count as successful analysis so they are not repeatedly reprocessed.
-- [ ] The operator can see included folders plus discovered, analysed, pending, failed, unavailable and missing counts, with drill-down to individual images where useful.
+- [x] The operator can see included folders plus discovered, analysed, pending, failed, unavailable and missing counts, with drill-down to individual images where useful.
 - [x] The operator can add an archive folder and trigger synchronization without changing the permanent source root.
-- [ ] OneDrive-local availability is surfaced distinctly from processing failure.
+- [x] OneDrive-local availability is surfaced distinctly from processing failure.
 - [x] The permanent catalogue defaults to the selected local CenterFace confidence `0.5` single-pass detector and SFace FP32 embedder unless an explicit governed model change is made.
 - [ ] The `1970/01` -> `1970/02` -> `1970` progression is covered by automated integration tests and Windows operator verification.
 
@@ -80,7 +81,7 @@ The third merged slice added exact-profile incremental analysis:
 - `archive status` reports the registered analysis-profile hash and durable processing progress; and
 - a changed image revision becomes pending again while an unchanged completed revision remains skipped.
 
-The current fourth slice adds the local archive operator workspace:
+The fourth merged slice added the local archive operator workspace:
 
 - `/archive` shows the normalized included-folder set and current, analysed, pending, failed and missing counts for the whole archive and each included coverage root;
 - the page configures the initial permanent root without returning that full source path to browser status responses, then adds later folders as root-relative coverage;
@@ -88,7 +89,16 @@ The current fourth slice adds the local archive operator workspace:
 - analysis advances through bounded one-image HTTP steps backed by the durable processing run, resuming an existing non-terminal run before creating another run; and
 - the review application resolves the governed profile from `PhotoIdentity__RepositoryRoot` or a nearby checkout and keeps analysis disabled with an actionable message when that configuration cannot be resolved.
 
-The remaining slices are distinct OneDrive-local availability reporting, image-level coverage drill-down where useful, and Windows operator verification of the full incremental workflow.
+The current fifth slice closes the pre-production availability and diagnosis boundary:
+
+- archive synchronization uses the existing OneDrive Files On-Demand classifier even though the permanent source identity remains the same `local-folder` root;
+- local, online-only, downloading, unavailable and availability-error states are persisted independently of immutable revisions, so placeholders are catalogued without opening or hashing them;
+- only assets currently marked local are eligible for archive-analysis scheduling, while a queued job rechecks Windows cloud-file attributes immediately before opening bytes to close the sync-to-analysis race;
+- `/archive` shows local/cloud availability separately from detector/embedder failures and warns that hydration remains a user-managed OneDrive action;
+- `/api/archive/items` and the Archive image drill-down expose only root-relative paths with availability, analysis state and latest processing error; and
+- regression coverage verifies `local -> online-only -> local` without opening the placeholder, without creating a duplicate revision and with analysis eligibility restored after hydration.
+
+After this slice merges, the remaining WI-0041 acceptance work is the human Windows verification against the real archive, including the `1970/01` -> `1970/02` -> `1970` progression and real OneDrive Files On-Demand states.
 
 ## Scope boundary
 

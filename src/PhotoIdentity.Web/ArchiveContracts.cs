@@ -3,10 +3,27 @@ namespace PhotoIdentity.Web;
 public sealed record ArchiveFolderStatusResponse(
     string RelativeFolder,
     int CurrentImages,
+    int LocalImages,
+    int OnlineOnlyImages,
+    int DownloadingImages,
+    int UnavailableImages,
+    int AvailabilityErrorImages,
     int AnalysedImages,
     int PendingImages,
     int FailedImages,
     int MissingImages);
+
+public sealed record ArchiveItemStatusResponse(
+    string RelativePath,
+    string Availability,
+    string AnalysisState,
+    string? LastError);
+
+public sealed record ArchiveItemPageResponse(
+    int Offset,
+    int Limit,
+    int Total,
+    IReadOnlyList<ArchiveItemStatusResponse> Items);
 
 public sealed record ArchiveRunStatusResponse(
     string RunId,
@@ -40,6 +57,11 @@ public sealed record ArchiveIncludeRequest(
 
 public sealed record ArchiveSyncResponse(
     int SupportedFiles,
+    int LocalFiles,
+    int OnlineOnlyFiles,
+    int DownloadingFiles,
+    int UnavailableFiles,
+    int AvailabilityErrors,
     int NewRevisions,
     int UnchangedFiles,
     int MarkedMissing,

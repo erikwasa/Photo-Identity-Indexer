@@ -55,13 +55,29 @@ public sealed class ArchiveApplicationTests
                 await (await client.PostAsync("/api/archive/sync", null))
                     .Content.ReadFromJsonAsync<ArchiveSyncResponse>());
             Assert.Equal(2, firstSync.NewRevisions);
+            Assert.Equal(2, firstSync.LocalFiles);
+            Assert.Equal(0, firstSync.OnlineOnlyFiles);
             Assert.Equal(2, firstSync.Status.Totals.CurrentImages);
+            Assert.Equal(2, firstSync.Status.Totals.LocalImages);
+            Assert.Equal(0, firstSync.Status.Totals.OnlineOnlyImages);
             Assert.Equal(0, firstSync.Status.Totals.AnalysedImages);
             Assert.Equal(2, firstSync.Status.Totals.PendingImages);
             Assert.True(firstSync.Status.AnalysisReady);
             Assert.NotNull(firstSync.Status.ProfileHash);
             Assert.Single(firstSync.Status.Folders);
             Assert.Equal("1970", firstSync.Status.Folders[0].RelativeFolder);
+
+            using HttpResponseMessage itemResponse = await client.GetAsync(
+                "/api/archive/items?folder=1970&state=pending&offset=0&limit=50");
+            itemResponse.EnsureSuccessStatusCode();
+            Assert.Contains("no-store", itemResponse.Headers.CacheControl?.ToString() ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+            string itemJson = await itemResponse.Content.ReadAsStringAsync();
+            Assert.DoesNotContain(archiveRoot, itemJson, StringComparison.OrdinalIgnoreCase);
+            ArchiveItemPageResponse itemPage = Assert.IsType<ArchiveItemPageResponse>(
+                await itemResponse.Content.ReadFromJsonAsync<ArchiveItemPageResponse>());
+            Assert.Equal(2, itemPage.Total);
+            Assert.All(itemPage.Items, item => Assert.Equal("local", item.Availability));
+            Assert.All(itemPage.Items, item => Assert.Equal("pending", item.AnalysisState));
 
             File.Delete(Path.Combine(january, "one.jpg"));
             ArchiveSyncResponse secondSync = Assert.IsType<ArchiveSyncResponse>(
@@ -70,6 +86,13 @@ public sealed class ArchiveApplicationTests
             Assert.Equal(1, secondSync.MarkedMissing);
             Assert.Equal(1, secondSync.Status.Totals.CurrentImages);
             Assert.Equal(1, secondSync.Status.Totals.MissingImages);
+
+            ArchiveItemPageResponse missing = Assert.IsType<ArchiveItemPageResponse>(
+                await client.GetFromJsonAsync<ArchiveItemPageResponse>(
+                    "/api/archive/items?folder=1970&state=missing&offset=0&limit=50"));
+            ArchiveItemStatusResponse missingItem = Assert.Single(missing.Items);
+            Assert.Equal("1970/01/one.jpg", missingItem.RelativePath);
+            Assert.Equal("missing", missingItem.AnalysisState);
         }
         finally
         {

@@ -55,8 +55,8 @@ public sealed record ArchiveAnalysisResumeResult(
     ProcessingRunSummary ProcessingSummary);
 
 /// <summary>
-/// Runs the governed permanent-archive profile only for current revisions that have not
-/// already completed that exact profile.
+/// Runs the governed permanent-archive profile only for current, locally available revisions
+/// that have not already completed that exact profile.
 /// </summary>
 public sealed class ArchiveAnalysisCoordinator
 {
@@ -137,6 +137,7 @@ public sealed class ArchiveAnalysisCoordinator
             batchConfiguration,
             cancellationToken);
         AnalysisTrackingJobHandler handler = new(
+            _database,
             inspection,
             analysisRepository,
             profileHash,
@@ -181,6 +182,7 @@ public sealed class ArchiveAnalysisCoordinator
             batchConfiguration,
             cancellationToken);
         AnalysisTrackingJobHandler handler = new(
+            _database,
             inspection,
             analysisRepository,
             currentHash,
@@ -245,20 +247,27 @@ public static class ArchiveAnalysisProfileFactory
 
 internal sealed class AnalysisTrackingJobHandler : IProcessingJobHandler
 {
+    private const FileAttributes RecallOnOpen = (FileAttributes)0x00040000;
+    private const FileAttributes RecallOnDataAccess = (FileAttributes)0x00400000;
+
     private readonly IProcessingJobHandler _inner;
+    private readonly SqliteLocalBatchRepository _assetRepository;
     private readonly SqliteArchiveAnalysisRepository _repository;
     private readonly Sha256Digest _profileHash;
     private readonly TimeProvider _timeProvider;
 
     public AnalysisTrackingJobHandler(
+        SqliteCatalogueDatabase database,
         IProcessingJobHandler inner,
         SqliteArchiveAnalysisRepository repository,
         Sha256Digest profileHash,
         TimeProvider? timeProvider = null)
     {
+        ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(repository);
         _inner = inner;
+        _assetRepository = new SqliteLocalBatchRepository(database);
         _repository = repository;
         _profileHash = profileHash;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -269,6 +278,7 @@ internal sealed class AnalysisTrackingJobHandler : IProcessingJobHandler
         IProcessingCheckpointWriter checkpointWriter,
         CancellationToken cancellationToken)
     {
+        await EnsureLocallyAvailableAsync(context.AssetRevisionId, cancellationToken);
         await _inner.ProcessAsync(context, checkpointWriter, cancellationToken);
         await _repository.RecordCompletionAsync(
             context.RunId,
@@ -277,4 +287,75 @@ internal sealed class AnalysisTrackingJobHandler : IProcessingJobHandler
             _timeProvider.GetUtcNow(),
             cancellationToken);
     }
+
+    private async Task EnsureLocallyAvailableAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken)
+    {
+        CatalogueProcessingAssetRevision asset = await _assetRepository.GetAssetRevisionAsync(
+            revisionId,
+            cancellationToken)
+            ?? throw new ProcessingJobFailureException(
+                ProcessingFailureKind.Permanent,
+                $"Asset revision {revisionId} was not found before archive analysis.");
+        if (!string.Equals(asset.SourceKind, "local-folder", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        string path = ResolveSourcePath(asset.RootLocator, asset.SourceKey);
+        try
+        {
+            if (!File.Exists(path))
+            {
+                throw AvailabilityFailure(
+                    $"The archive item is no longer available locally: {asset.SourceKey}. Synchronize the archive before retrying.");
+            }
+
+            FileAttributes attributes = File.GetAttributes(path);
+            bool contentMissing = (attributes & (FileAttributes.Offline | RecallOnOpen | RecallOnDataAccess)) != 0;
+            if (contentMissing)
+            {
+                throw AvailabilityFailure(
+                    $"The archive item '{asset.SourceKey}' became a OneDrive placeholder after synchronization. Hydrate it with the OneDrive sync client, synchronize the archive again, then resume analysis.");
+            }
+        }
+        catch (ProcessingJobFailureException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new ProcessingJobFailureException(
+                ProcessingFailureKind.Transient,
+                $"Archive availability could not be verified for '{asset.SourceKey}' before analysis: {exception.Message}",
+                exception);
+        }
+    }
+
+    private static string ResolveSourcePath(string rootLocator, string sourceKey)
+    {
+        string root = Path.GetFullPath(rootLocator);
+        string platformPath = sourceKey
+            .Replace('/', Path.DirectorySeparatorChar)
+            .Replace('\\', Path.DirectorySeparatorChar);
+        string resolved = Path.GetFullPath(Path.Combine(root, platformPath));
+        string rootPrefix = root.EndsWith(Path.DirectorySeparatorChar)
+            ? root
+            : root + Path.DirectorySeparatorChar;
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (!resolved.Equals(root, comparison) && !resolved.StartsWith(rootPrefix, comparison))
+        {
+            throw new ProcessingJobFailureException(
+                ProcessingFailureKind.Permanent,
+                $"Archive source key '{sourceKey}' escapes the configured source root.");
+        }
+
+        return resolved;
+    }
+
+    private static ProcessingJobFailureException AvailabilityFailure(string message) =>
+        new(ProcessingFailureKind.Transient, message);
 }
