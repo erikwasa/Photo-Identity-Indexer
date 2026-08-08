@@ -1,3 +1,5 @@
+using System.Globalization;
+using Microsoft.Extensions.Configuration;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
@@ -30,6 +32,10 @@ public partial class Program
         builder.Services.AddSingleton(new ReviewProxyServingConfiguration(
             builder.Configuration["PhotoIdentity:ReviewProxyRoot"],
             builder.Configuration["PhotoIdentity:ReviewProxyProfileId"]));
+        builder.Services.AddSingleton(new ArchiveHydrationPolicyConfiguration(
+            ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MinimumFreeSpaceReserveBytes"),
+            ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MaximumManagedHydrationBytes"),
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:ArchiveHydration:MaximumConcurrentOperations")));
         builder.Services.AddSingleton<SqliteReviewRepository>();
         builder.Services.AddSingleton<SqliteReviewFilterRepository>();
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
@@ -46,12 +52,15 @@ public partial class Program
         builder.Services.AddSingleton<SqliteDetectorRolloutApplicationRepository>();
         builder.Services.AddSingleton<SqliteArchiveReviewProxyRepository>();
         builder.Services.AddSingleton<SqliteArchiveHydrationRepository>();
+        builder.Services.AddSingleton<SqliteArchiveStorageRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton<DetectorRolloutCropFileResolver>();
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();
         builder.Services.AddSingleton<CollectionReviewProxyFileResolver>();
         builder.Services.AddSingleton<CollectionOriginalAccessService>();
+        builder.Services.AddSingleton<ArchiveHydrationCapacityService>();
         builder.Services.AddSingleton<IOneDriveFilesOnDemandPlatform, WindowsOneDriveFilesOnDemandPlatform>();
+        builder.Services.AddSingleton<IArchiveStorageProbe, DriveArchiveStorageProbe>();
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
@@ -109,5 +118,37 @@ public partial class Program
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();
+    }
+
+    private static long? ParseOptionalLong(IConfiguration configuration, string key)
+    {
+        string? value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsed))
+        {
+            return parsed;
+        }
+
+        throw new InvalidOperationException($"Configuration '{key}' must be an integer byte count.");
+    }
+
+    private static int? ParseOptionalInt(IConfiguration configuration, string key)
+    {
+        string? value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed))
+        {
+            return parsed;
+        }
+
+        throw new InvalidOperationException($"Configuration '{key}' must be an integer.");
     }
 }
