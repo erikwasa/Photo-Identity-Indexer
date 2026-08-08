@@ -54,16 +54,24 @@ The final `1970` sync must reuse the already catalogued `1970/01` and `1970/02` 
 - [ ] The permanent catalogue defaults to the selected local CenterFace confidence `0.5` single-pass detector and SFace FP32 embedder unless an explicit governed model change is made.
 - [ ] The `1970/01` -> `1970/02` -> `1970` progression is covered by automated integration tests and Windows operator verification.
 
-## Current implementation slice
+## Implementation slices
 
-The first implementation slice establishes the safety-critical source semantics before adding persistence and UI:
+The first merged slice established the safety-critical source semantics:
 
 - root-relative archive coverage normalization collapses redundant child selections when a parent is added;
 - partial source scans scope missing-file marking to the scanned relative root rather than the entire source;
 - a local archive sync coordinator normalizes multiple included folders and synchronizes each recursive scope under one source identity; and
 - integration coverage exercises expansion from `1970/01` and `1970/02` to `1970` without duplicating unchanged assets.
 
-Next slices will persist the included-folder registry, expose archive include/list/sync operations, schedule only pending analysis profiles, and add archive coverage/status controls to the review application.
+The current second slice adds the persistent operator boundary:
+
+- catalogue schema version 10 stores exactly one permanent archive source plus normalized included folders;
+- `archive include` configures the root and adds recursive relative coverage while refusing a later root replacement;
+- `archive list` reports the stored root and normalized coverage;
+- `archive sync` synchronizes all stored coverage and reports supported, new, unchanged and missing counts; and
+- integration coverage exercises child-to-parent collapse, persisted configuration and discovery of a new image added to a previously covered child.
+
+The next slice will schedule only current revisions that have not completed the selected CenterFace/SFace processing profile, including durable successful zero-face results. Coverage/status UI and OneDrive availability reporting follow after that processing boundary is stable.
 
 ## Scope boundary
 
