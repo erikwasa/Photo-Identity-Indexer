@@ -903,7 +903,7 @@ work_items:
       - type: merge_commit
         value: aad11770559d7a27dc328b4923f98abead3b274d
       - type: human_verification
-        value: Disposable rollout run 5794d5c5-26fe-45f4-8a70-3132aae45891 completed 20 of 20 selected revisions with 77 applied candidates: 43 existing-occurrence mappings, 34 new occurrences, 0 ambiguous candidates and 1 retained unmatched existing occurrence.
+        value: "Disposable rollout run 5794d5c5-26fe-45f4-8a70-3132aae45891 completed 20 of 20 selected revisions with 77 applied candidates: 43 existing-occurrence mappings, 34 new occurrences, 0 ambiguous candidates and 1 retained unmatched existing occurrence."
       - type: human_verification
         value: The maintainer inspected all 43 reviewed existing mappings and confirmed 43 correct physical-face mappings with 0 incorrect mappings. The 34 new occurrences had 0 person labels and 0 review actions; source and migrated pilot counts remained 69 people, 454 person labels, 467 review actions and 10 ranked-suggestion rows.
       - type: human_verification
