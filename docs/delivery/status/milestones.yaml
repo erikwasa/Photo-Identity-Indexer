@@ -72,7 +72,7 @@ milestones:
   - WI-0030
 - id: M15
   title: Operator documentation and system guide
-  status: in_progress
+  status: completed
   document: ../milestones/M15-documentation.md
   work_items:
   - WI-0031
@@ -91,7 +91,7 @@ milestones:
   - WI-0038
 - id: M09
   title: Azure VM pilot without identities
-  status: proposed
+  status: ready
   document: ../milestones/M09-azure-pilot.md
   work_items:
   - WI-0020
