@@ -140,10 +140,10 @@ public sealed class StatusGenerator
         builder.AppendLine("```text");
         builder.AppendLine("0.1 local inference and review");
         builder.AppendLine("0.2 OneDrive hydration and staging");
-        builder.AppendLine("0.3 multi-model evaluation");
-        builder.AppendLine("0.4 portable Azure execution without identities");
-        builder.AppendLine("0.5 budget-controlled archive processing");
-        builder.AppendLine("0.6 ongoing synchronisation");
+        builder.AppendLine("0.3 multi-model and detector evaluation");
+        builder.AppendLine("0.4 incremental permanent local archive ingestion");
+        builder.AppendLine("0.5 production-model and optional Azure validation");
+        builder.AppendLine("0.6 full-archive completion and ongoing synchronisation");
         builder.AppendLine("1.0 stable people index and collection API");
         builder.AppendLine("```");
 
