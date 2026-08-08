@@ -1,0 +1,347 @@
+@page "/archive"
+@inject HttpClient Http
+
+<PageTitle>Archive · Photo Identity</PageTitle>
+
+<section class="hero archive-hero">
+    <div>
+        <p class="eyebrow">Permanent archive</p>
+        <h1>Archive coverage</h1>
+        <p>Add recursive folders under one stable source root, synchronize changed files, and analyze only revisions that still need the governed CenterFace/SFace profile.</p>
+    </div>
+    <button class="button secondary" disabled="@Busy" @onclick="LoadAsync">Refresh</button>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="notice" role="status">@Message</div>
+}
+
+@if (Loading || Status is null)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading archive status…</p>
+    </section>
+}
+else
+{
+    <section class="archive-configuration" aria-labelledby="archive-configuration-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Coverage</p>
+                <h2 id="archive-configuration-heading">@(Status.Configured ? Status.RootName ?? "Configured archive" : "Configure archive")</h2>
+            </div>
+            @if (Status.Configured)
+            {
+                <button class="button secondary" disabled="@Busy" @onclick="SyncAsync">Sync included folders</button>
+            }
+        </div>
+
+        <div class="archive-form-grid">
+            @if (!Status.Configured)
+            {
+                <div>
+                    <label class="field-label" for="archive-root">Permanent archive root</label>
+                    <input id="archive-root" @bind="RootPath" disabled="@Busy" placeholder="C:\…\Kamerabilder" />
+                    <p class="field-help">This root becomes the permanent source identity for this catalogue.</p>
+                </div>
+            }
+            <div>
+                <label class="field-label" for="archive-folder">Folder to include</label>
+                <input id="archive-folder" @bind="RelativeFolder" disabled="@Busy" placeholder="1970/01" />
+                <p class="field-help">Use a root-relative folder. A parent such as <code>1970</code> automatically subsumes included month folders.</p>
+            </div>
+            <div class="archive-form-action">
+                <button class="button primary" disabled="@(Busy || string.IsNullOrWhiteSpace(RelativeFolder) || (!Status.Configured && string.IsNullOrWhiteSpace(RootPath)))" @onclick="IncludeAsync">
+                    Add folder
+                </button>
+            </div>
+        </div>
+
+        @if (Status.IncludedFolders.Count > 0)
+        {
+            <div class="coverage-chips" aria-label="Included archive folders">
+                @foreach (string folder in Status.IncludedFolders)
+                {
+                    <span class="coverage-chip">@(string.IsNullOrEmpty(folder) ? "." : folder)</span>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="archive-summary" aria-label="Archive analysis summary">
+        <article>
+            <span>Current images</span>
+            <strong>@Status.Totals.CurrentImages</strong>
+        </article>
+        <article>
+            <span>Analyzed</span>
+            <strong>@AnalysisCount(Status.Totals.AnalysedImages)</strong>
+        </article>
+        <article>
+            <span>Pending</span>
+            <strong>@AnalysisCount(Status.Totals.PendingImages)</strong>
+        </article>
+        <article class="@(Status.Totals.FailedImages > 0 ? "attention" : null)">
+            <span>Failed</span>
+            <strong>@AnalysisCount(Status.Totals.FailedImages)</strong>
+        </article>
+        <article>
+            <span>Missing</span>
+            <strong>@Status.Totals.MissingImages</strong>
+        </article>
+    </section>
+
+    <section class="archive-analysis" aria-labelledby="archive-analysis-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Governed profile</p>
+                <h2 id="archive-analysis-heading">Archive analysis</h2>
+            </div>
+            <button class="button primary" disabled="@(Busy || !Status.Configured || !Status.AnalysisReady || Status.Totals.PendingImages == 0)" @onclick="AnalyzePendingAsync">
+                @(Analyzing ? "Analyzing…" : Status.LatestRun is { QueuedJobs: > 0 } ? "Continue analysis" : "Analyze pending")
+            </button>
+        </div>
+
+        <dl class="profile-details">
+            <div><dt>Detector</dt><dd>@Status.DetectorModelId · confidence @Status.DetectorConfidence</dd></div>
+            <div><dt>Embedder</dt><dd>@Status.EmbedderModelId</dd></div>
+            <div><dt>Profile</dt><dd><code>@(Status.ProfileHash is null ? "unavailable" : HashPrefix(Status.ProfileHash))</code></dd></div>
+        </dl>
+
+        @if (!Status.AnalysisReady)
+        {
+            <div class="notice warning">@Status.AnalysisMessage</div>
+        }
+
+        @if (Status.LatestRun is ArchiveRunStatusResponse run)
+        {
+            <div class="run-progress">
+                <div>
+                    <span>Latest run</span>
+                    <code>@run.RunId</code>
+                </div>
+                <div>
+                    <span>Status</span>
+                    <strong>@run.Status</strong>
+                </div>
+                <div>
+                    <span>Progress</span>
+                    <strong>@(run.SucceededJobs + run.FailedJobs + run.CancelledJobs) / @run.TotalJobs</strong>
+                </div>
+                <div>
+                    <span>Queued</span>
+                    <strong>@run.QueuedJobs</strong>
+                </div>
+            </div>
+        }
+    </section>
+
+    <section class="archive-folders" aria-labelledby="archive-folders-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Included coverage</p>
+                <h2 id="archive-folders-heading">Folder status</h2>
+            </div>
+        </div>
+
+        @if (Status.Folders.Count == 0)
+        {
+            <div class="empty-state compact">
+                <p>No archive folders are included yet.</p>
+            </div>
+        }
+        else
+        {
+            <div class="archive-table-wrap">
+                <table class="archive-table">
+                    <thead>
+                        <tr>
+                            <th>Folder</th>
+                            <th>Current</th>
+                            <th>Analyzed</th>
+                            <th>Pending</th>
+                            <th>Failed</th>
+                            <th>Missing</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (ArchiveFolderStatusResponse folder in Status.Folders)
+                        {
+                            <tr>
+                                <td><code>@(string.IsNullOrEmpty(folder.RelativeFolder) ? "." : folder.RelativeFolder)</code></td>
+                                <td>@folder.CurrentImages</td>
+                                <td>@AnalysisCount(folder.AnalysedImages)</td>
+                                <td>@AnalysisCount(folder.PendingImages)</td>
+                                <td class="@(folder.FailedImages > 0 ? "failure-count" : null)">@AnalysisCount(folder.FailedImages)</td>
+                                <td>@folder.MissingImages</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+}
+
+@code {
+    private ArchiveStatusResponse? Status { get; set; }
+    private string RootPath { get; set; } = string.Empty;
+    private string RelativeFolder { get; set; } = string.Empty;
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+    private bool Loading { get; set; } = true;
+    private bool Busy { get; set; }
+    private bool Analyzing { get; set; }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Status = await Http.GetFromJsonAsync<ArchiveStatusResponse>("api/archive/status");
+        }
+        catch (Exception exception)
+        {
+            Error = $"Archive status could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task IncludeAsync()
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/archive/include",
+                new ArchiveIncludeRequest(Status?.Configured == true ? null : RootPath, RelativeFolder));
+            Status = await ReadResponseAsync<ArchiveStatusResponse>(response);
+            Message = $"Included '{RelativeFolder}'.";
+            RelativeFolder = string.Empty;
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task SyncAsync()
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsync("api/archive/sync", content: null);
+            ArchiveSyncResponse result = await ReadResponseAsync<ArchiveSyncResponse>(response);
+            Status = result.Status;
+            Message = $"Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged, {result.MarkedMissing} marked missing.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task AnalyzePendingAsync()
+    {
+        Busy = true;
+        Analyzing = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            int previousFinished = Status?.LatestRun is ArchiveRunStatusResponse existing
+                ? existing.SucceededJobs + existing.FailedJobs + existing.CancelledJobs
+                : -1;
+            int steps = 0;
+            while (steps < 10000)
+            {
+                using HttpResponseMessage response = await Http.PostAsync("api/archive/analysis/step", content: null);
+                ArchiveAnalysisStepResponse result = await ReadResponseAsync<ArchiveAnalysisStepResponse>(response);
+                Status = result.Status;
+                steps++;
+
+                ArchiveRunStatusResponse? run = Status.LatestRun;
+                if (run is null || run.QueuedJobs == 0 && run.RunningJobs == 0)
+                {
+                    break;
+                }
+
+                int finished = run.SucceededJobs + run.FailedJobs + run.CancelledJobs;
+                if (finished <= previousFinished)
+                {
+                    Message = "Analysis is durable but no additional image was due in this step. Use Continue analysis later to resume queued work.";
+                    break;
+                }
+
+                previousFinished = finished;
+                await Task.Delay(75);
+            }
+
+            if (string.IsNullOrWhiteSpace(Message))
+            {
+                Message = Status?.Totals.PendingImages == 0
+                    ? "Archive analysis is up to date for the current profile."
+                    : "Archive analysis stopped with pending work remaining. Review failures or continue the run.";
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Analyzing = false;
+            Busy = false;
+        }
+    }
+
+    private async Task<T> ReadResponseAsync<T>(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<T>()
+                ?? throw new InvalidOperationException("The archive API returned an empty response.");
+        }
+
+        ArchiveErrorResponse? error = null;
+        try
+        {
+            error = await response.Content.ReadFromJsonAsync<ArchiveErrorResponse>();
+        }
+        catch
+        {
+            // Fall through to the HTTP status when the server response is not JSON.
+        }
+
+        throw new InvalidOperationException(error?.Error ?? $"Archive operation failed with HTTP {(int)response.StatusCode}.");
+    }
+
+    private string AnalysisCount(int value) => Status?.AnalysisReady == true ? value.ToString() : "—";
+
+    private static string HashPrefix(string hash) =>
+        hash[..Math.Min(12, hash.Length)];
+}

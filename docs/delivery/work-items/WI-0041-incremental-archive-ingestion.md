@@ -4,7 +4,7 @@ title: Add incremental permanent archive ingestion
 milestone: M12
 status_source: ../status/work-items.yaml
 depends_on: [WI-0013, WI-0014, WI-0030, WI-0037]
-affected_modules: [PhotoIdentity.Core, PhotoIdentity.Source.Local, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Worker, PhotoIdentity.Cli, PhotoIdentity.Api]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Source.Local, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Worker, PhotoIdentity.Cli, PhotoIdentity.Api, PhotoIdentity.Web]
 ---
 
 # WI-0041: Add incremental permanent archive ingestion
@@ -71,7 +71,7 @@ The second merged slice added the persistent operator boundary:
 - `archive sync` synchronizes all stored coverage and reports supported, new, unchanged and missing counts; and
 - integration coverage exercises child-to-parent collapse, persisted configuration and discovery of a new image added to a previously covered child.
 
-The current third slice adds exact-profile incremental analysis:
+The third merged slice added exact-profile incremental analysis:
 
 - a canonical analysis-profile identity combines the exact detector-pipeline hash with detector and embedder model hashes plus the alignment protocol;
 - successful immutable-revision completion is recorded independently of face count, so zero-face images are durable successes;
@@ -80,7 +80,15 @@ The current third slice adds exact-profile incremental analysis:
 - `archive status` reports the registered analysis-profile hash and durable processing progress; and
 - a changed image revision becomes pending again while an unchanged completed revision remains skipped.
 
-The remaining slices are the archive coverage/status UI, distinct OneDrive-local availability reporting, and Windows operator verification of the full incremental workflow.
+The current fourth slice adds the local archive operator workspace:
+
+- `/archive` shows the normalized included-folder set and current, analysed, pending, failed and missing counts for the whole archive and each included coverage root;
+- the page configures the initial permanent root without returning that full source path to browser status responses, then adds later folders as root-relative coverage;
+- operators can synchronize included folders directly from the review application;
+- analysis advances through bounded one-image HTTP steps backed by the durable processing run, resuming an existing non-terminal run before creating another run; and
+- the review application resolves the governed profile from `PhotoIdentity__RepositoryRoot` or a nearby checkout and keeps analysis disabled with an actionable message when that configuration cannot be resolved.
+
+The remaining slices are distinct OneDrive-local availability reporting, image-level coverage drill-down where useful, and Windows operator verification of the full incremental workflow.
 
 ## Scope boundary
 
