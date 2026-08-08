@@ -34,6 +34,7 @@ public sealed class CollectionOriginalAccessService
     private readonly SqliteLocalBatchRepository _catalogue;
     private readonly SqliteArchiveHydrationRepository _hydrations;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
+    private readonly ArchiveHydrationCapacityService _capacity;
     private readonly TimeProvider _timeProvider;
     private readonly StringComparison _pathComparison;
 
@@ -41,15 +42,18 @@ public sealed class CollectionOriginalAccessService
         SqliteLocalBatchRepository catalogue,
         SqliteArchiveHydrationRepository hydrations,
         IOneDriveFilesOnDemandPlatform platform,
+        ArchiveHydrationCapacityService capacity,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(catalogue);
         ArgumentNullException.ThrowIfNull(hydrations);
         ArgumentNullException.ThrowIfNull(platform);
+        ArgumentNullException.ThrowIfNull(capacity);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _catalogue = catalogue;
         _hydrations = hydrations;
         _platform = platform;
+        _capacity = capacity;
         _timeProvider = timeProvider;
         _pathComparison = OperatingSystem.IsWindows()
             ? StringComparison.OrdinalIgnoreCase
@@ -93,7 +97,7 @@ public sealed class CollectionOriginalAccessService
                 revisionId, OnlineOnlyState, managed, platformState.IsPinned,
                 canHydrate: true, canView: false, canRelease: false,
                 managed
-                    ? "The managed original is online-only. Hydration can be requested again."
+                    ? "The managed original is online-only. Hydration can be requested again subject to the storage policy."
                     : "The original is online-only. Normal browsing can continue from its review proxy."),
             AssetAvailability.Downloading when releasing => Snapshot(
                 revisionId, ReleasingState, managed, platformState.IsPinned,
@@ -140,15 +144,30 @@ public sealed class CollectionOriginalAccessService
         OneDriveFilesOnDemandState state = _platform.GetState(resolved.Path);
         if (state.Availability == AssetAvailability.OnlineOnly)
         {
-            // Claim ownership only after Windows accepts our explicit pin request. A crash between
-            // these operations leaks local storage rather than risking release of user-owned data.
-            await _platform.RequestHydrationAsync(resolved.Path, cancellationToken);
-            if (ownership is not { IsActive: true })
+            ArchiveHydrationAdmission admission = await _capacity.ExecuteHydrationAdmissionAsync(
+                resolved.Revision,
+                async () =>
+                {
+                    // Claim ownership only after Windows accepts our explicit pin request. A crash
+                    // between these operations leaks local storage rather than risking release of
+                    // content Photo Identity did not hydrate.
+                    await _platform.RequestHydrationAsync(resolved.Path, cancellationToken);
+                    if (ownership is not { IsActive: true })
+                    {
+                        await _hydrations.ClaimAsync(
+                            revisionId,
+                            _timeProvider.GetUtcNow(),
+                            cancellationToken);
+                    }
+                    else
+                    {
+                        await _capacity.TouchAsync(revisionId, cancellationToken);
+                    }
+                },
+                cancellationToken);
+            if (!admission.Allowed)
             {
-                await _hydrations.ClaimAsync(
-                    revisionId,
-                    _timeProvider.GetUtcNow(),
-                    cancellationToken);
+                throw new InvalidOperationException(admission.Message ?? "Managed hydration is blocked by the configured storage policy.");
             }
         }
         else if (state.Availability == AssetAvailability.Unavailable)
@@ -236,6 +255,23 @@ public sealed class CollectionOriginalAccessService
             return null;
         }
 
+        bool managed = ownership is { IsActive: true };
+        VerifiedCollectionOriginal? verified = await _capacity.RunLargeReadAsync(
+            managed,
+            () => OpenVerifiedCoreAsync(resolved, cancellationToken),
+            cancellationToken);
+        if (verified is not null && managed)
+        {
+            await _capacity.TouchAsync(revisionId, cancellationToken);
+        }
+
+        return verified;
+    }
+
+    private static async Task<VerifiedCollectionOriginal?> OpenVerifiedCoreAsync(
+        ResolvedOriginal resolved,
+        CancellationToken cancellationToken)
+    {
         FileStream stream = new(
             resolved.Path,
             FileMode.Open,
@@ -277,7 +313,10 @@ public sealed class CollectionOriginalAccessService
         bool isPinned,
         CancellationToken cancellationToken)
     {
-        bool matches = await VerifyContentAsync(resolved, cancellationToken);
+        bool matches = await _capacity.RunLargeReadAsync(
+            managed,
+            () => VerifyContentAsync(resolved, cancellationToken),
+            cancellationToken);
         return matches
             ? Snapshot(
                 resolved.Revision.RevisionId,
