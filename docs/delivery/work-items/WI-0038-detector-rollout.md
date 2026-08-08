@@ -102,7 +102,9 @@ PR #96 implements the operator-facing rollout path on top of the Slice 1–3A co
 
 The browser workflow resolves occurrence identity only. Person labels, rejections, assignments and append-only review history remain outside reconciliation and are not modified automatically.
 
-PR #96 does **not** authorize full-archive rollout. Once merged, it authorizes only the disposable pilot in Slice 4, using the selected CenterFace pipeline and an explicitly scoped revision list.
+PR #96 does **not** authorize full-catalogue rollout by itself. Once merged, it authorized only the disposable pilot in Slice 4, using the selected CenterFace pipeline and an explicitly scoped revision list.
+
+PR #97 fixes two issues found during the pilot: ordinary face review can resolve rollout crop paths written under `rollouts/<run-id>/...`, and CLI `rollout-complete` now also requires successful revision processing rather than candidate counts alone.
 
 ### Slice 4 — pilot migration and rollback verification
 
@@ -118,7 +120,23 @@ After Slice 3B is merged:
 8. confirm the selected detector still behaves consistently with the accepted M16 decision; and
 9. exercise rollback by discarding/restoring the pilot copy rather than deleting or rewriting historical review data in place.
 
-Only after that human-verified pilot may the full-archive local rollout be authorised.
+### Pilot outcome — 2026-08-08
+
+The maintainer completed the disposable pilot against a recoverable copy of the reviewed 560-image catalogue. Privacy-safe aggregate evidence for rollout run `5794d5c5-26fe-45f4-8a70-3132aae45891` is:
+
+- 20/20 selected revisions completed successfully;
+- 77 CenterFace candidates were applied: 43 explicit existing-occurrence mappings and 34 genuinely new occurrences;
+- 0 ambiguous candidates and 1 unmatched existing occurrence;
+- all 43 reviewed existing mappings were inspected and confirmed to remain attached to the correct physical face, with 0 incorrect mappings;
+- the 34 new occurrences had 0 person labels and 0 review actions;
+- catalogue review-state counts were unchanged across the source and migrated pilot: 69 people, 454 person labels, 467 review actions and 10 ranked-suggestion rows;
+- the unmatched existing occurrence was inspected and retained;
+- replay/resume/apply safety passed with 492 face occurrences before and after the repeat operation, and no reviewed decisions remained to apply; and
+- restore-based rollback successfully recovered the original reviewed state.
+
+Detailed filenames, face geometry and identity decisions remain private.
+
+This pilot satisfies the WI-0038 migration-safety gate. A full rollout of the **current 560-image local catalogue** may now proceed using the same dedicated `rollout` path and a fresh recoverable database copy. This authorization does not start or complete M12 full-archive processing and does not broaden the CenterFace licence/training-data conclusion or establish redistribution rights.
 
 ## Invariants
 
@@ -143,11 +161,11 @@ Only after that human-verified pilot may the full-archive local rollout be autho
 - [x] The dedicated detector-migration execution path is routed through reconciliation so existing reviewed faces cannot silently change person because detection ordering changed.
 - [x] New faces are surfaced and reviewable without overwriting existing occurrences.
 - [x] Ambiguous reconciliation is operable through the local application/workflow and can be resumed safely.
-- [ ] Pilot reprocessing passes the accepted detector target and catalogue-history invariants.
-- [ ] Operator documentation and an exercised procedure explain migration, rollback and evidence retention.
+- [x] Pilot reprocessing passes the accepted detector target and catalogue-history invariants.
+- [x] Operator documentation and an exercised procedure explain migration, rollback and evidence retention.
 
 ## Completion boundary
 
-WI-0038 remains in progress until the selected CenterFace pipeline has been safely applied to a pilot copy of the canonical catalogue, all ambiguous cases are reviewed or explicitly deferred, identity-history invariants have been verified, and rollback has been exercised.
+WI-0038 completed on 2026-08-08 after the selected CenterFace pipeline passed the disposable migration pilot, reviewed occurrence identity and history were verified, new occurrences remained unreviewed, replay safety was demonstrated, and restore-based rollback was exercised.
 
-Do **not** run a full-archive canonical migration merely because WI-0037 passed the detector gate or Slice 3B exists. The selected detector is the engineering target for this local rollout work; the legacy ordinal-based processing path is not a safe detector-replacement mechanism.
+Future detector migration must continue to use the dedicated reconciliation path. The legacy ordinal-based processing path is not a safe detector-replacement mechanism.
