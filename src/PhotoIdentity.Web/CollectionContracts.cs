@@ -19,8 +19,8 @@ public sealed record CollectionPhotoResponse(
     int? Height,
     IReadOnlyList<CollectionPersonMatchResponse> People)
 {
-    // Compatibility alias for the pre-v2 collection UI. Normal browsing now resolves to preview content.
-    public string ContentUrl => PreviewUrl;
+    // Compatibility alias for the pre-v2 collection page contract.
+    public string ContentUrl => ThumbnailUrl;
 }
 
 public sealed record CollectionSuggestionPolicyResponse(
