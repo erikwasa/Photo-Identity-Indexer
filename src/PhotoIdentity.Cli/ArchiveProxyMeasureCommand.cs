@@ -67,10 +67,10 @@ internal sealed record ArchiveProxyMeasureCommandOptions(
             throw new ArgumentException("Option '--output' is required for archive proxy measure.");
         }
 
-        if (profiles.Count < 2)
+        if (profiles.Count == 0)
         {
             throw new ArgumentException(
-                "Archive proxy measure requires at least two '--profile ID:MAX_LONG_EDGE:JPEG_QUALITY' candidates.");
+                "Archive proxy measure requires at least one '--profile ID:MAX_LONG_EDGE:JPEG_QUALITY'.");
         }
 
         string[] duplicateIds = profiles
