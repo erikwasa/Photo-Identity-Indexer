@@ -77,6 +77,15 @@ public sealed class ArchiveReviewProxyWriterTests
                 await new SqliteArchiveReviewProxyRepository(database).GetAsync(
                     persistedRevision.Id,
                     profile.Id));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                writer.GenerateAsync(
+                    persistedRevision.Id,
+                    sourcePath,
+                    sourceRoot,
+                    derivativeRoot,
+                    new ReviewProxyProfile(profile.Id, 1600, 75),
+                    now.AddMinutes(6)));
         }
         finally
         {
