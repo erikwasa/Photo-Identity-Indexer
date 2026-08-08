@@ -501,6 +501,7 @@ work_items:
     blockers:
       - WI-0022
       - WI-0041
+      - WI-0042
     evidence: []
   - id: WI-0024
     title: Add ongoing local synchronisation
@@ -978,7 +979,7 @@ work_items:
   - id: WI-0041
     title: Add incremental permanent archive ingestion
     milestone: M12
-    status: in_progress
+    status: blocked
     owner: ai-agent
     document: ../work-items/WI-0041-incremental-archive-ingestion.md
     started_at: '2026-08-08'
@@ -989,4 +990,16 @@ work_items:
       - WI-0014
       - WI-0030
       - WI-0037
+      - WI-0042
+    evidence: []
+  - id: WI-0042
+    title: Add bounded archive hydration and review proxies
+    milestone: M12
+    status: ready
+    owner: ai-agent
+    document: ../work-items/WI-0042-bounded-archive-storage.md
+    last_updated_at: '2026-08-08'
+    blockers:
+      - WI-0014
+      - WI-0025
     evidence: []
