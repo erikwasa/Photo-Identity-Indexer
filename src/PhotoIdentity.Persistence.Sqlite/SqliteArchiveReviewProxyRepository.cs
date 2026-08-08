@@ -25,6 +25,7 @@ public sealed class SqliteArchiveReviewProxyRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(profile);
+        await EnsureSchemaAsync(cancellationToken);
 
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
@@ -91,6 +92,7 @@ public sealed class SqliteArchiveReviewProxyRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
+        await EnsureSchemaAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -127,6 +129,7 @@ public sealed class SqliteArchiveReviewProxyRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(proxy);
+        await EnsureSchemaAsync(cancellationToken);
 
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
@@ -189,6 +192,7 @@ public sealed class SqliteArchiveReviewProxyRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
+        await EnsureSchemaAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         return await ReadAsync(connection, null, revisionId, profileId.Trim(), cancellationToken);
     }
@@ -199,6 +203,7 @@ public sealed class SqliteArchiveReviewProxyRepository
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
+        await EnsureSchemaAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -230,6 +235,45 @@ public sealed class SqliteArchiveReviewProxyRepository
         }
 
         return revisions;
+    }
+
+    private async Task EnsureSchemaAsync(CancellationToken cancellationToken)
+    {
+        await _database.InitializeAsync(cancellationToken);
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE TABLE IF NOT EXISTS archive_review_proxy_profiles (
+                profile_id TEXT NOT NULL PRIMARY KEY,
+                protocol_version TEXT NOT NULL,
+                encoder TEXT NOT NULL,
+                format TEXT NOT NULL,
+                jpeg_quality INTEGER NOT NULL CHECK (jpeg_quality BETWEEN 1 AND 100),
+                maximum_long_edge INTEGER NOT NULL CHECK (maximum_long_edge > 0),
+                resize_policy TEXT NOT NULL,
+                canonical_definition TEXT NOT NULL,
+                recorded_at_utc TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS asset_revision_review_proxies (
+                asset_revision_id TEXT NOT NULL,
+                profile_id TEXT NOT NULL,
+                encoded_byte_length INTEGER NOT NULL CHECK (encoded_byte_length > 0),
+                content_sha256 TEXT NOT NULL,
+                width INTEGER NOT NULL CHECK (width > 0),
+                height INTEGER NOT NULL CHECK (height > 0),
+                generated_at_utc TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                PRIMARY KEY (asset_revision_id, profile_id),
+                UNIQUE (relative_path),
+                FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                FOREIGN KEY (profile_id) REFERENCES archive_review_proxy_profiles (profile_id) ON DELETE RESTRICT
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_asset_revision_review_proxies_profile
+                ON asset_revision_review_proxies (profile_id, asset_revision_id);
+            """;
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<ArchiveReviewProxyRecord?> ReadAsync(
