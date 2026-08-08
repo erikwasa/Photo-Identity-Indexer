@@ -1,3 +1,5 @@
+using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
@@ -10,19 +12,28 @@ internal enum ArchiveCommandAction
     Include,
     List,
     Sync,
+    Analyze,
+    Resume,
+    Status,
 }
 
 internal sealed record ArchiveCommandOptions(
     ArchiveCommandAction Action,
     string DatabasePath,
     string? RootPath,
-    string? RelativeFolder)
+    string? RelativeFolder,
+    string? OutputRoot,
+    string? RepositoryRoot,
+    string? ModelDirectory,
+    ProcessingRunId? RunId,
+    int MaxAttemptsPerInvocation)
 {
     public static ArchiveCommandOptions Parse(string[] args)
     {
         if (args.Length == 0)
         {
-            throw new ArgumentException("The archive command requires 'include', 'list' or 'sync'.");
+            throw new ArgumentException(
+                "The archive command requires 'include', 'list', 'sync', 'analyze', 'resume' or 'status'.");
         }
 
         ArchiveCommandAction action = args[0] switch
@@ -30,12 +41,20 @@ internal sealed record ArchiveCommandOptions(
             "include" => ArchiveCommandAction.Include,
             "list" => ArchiveCommandAction.List,
             "sync" => ArchiveCommandAction.Sync,
+            "analyze" => ArchiveCommandAction.Analyze,
+            "resume" => ArchiveCommandAction.Resume,
+            "status" => ArchiveCommandAction.Status,
             _ => throw new ArgumentException($"Unknown archive action '{args[0]}'."),
         };
 
         string? databasePath = null;
         string? rootPath = null;
         string? relativeFolder = null;
+        string? outputRoot = null;
+        string? repositoryRoot = null;
+        string? modelDirectory = null;
+        ProcessingRunId? runId = null;
+        int maxAttempts = int.MaxValue;
 
         for (int index = 1; index < args.Length; index++)
         {
@@ -55,6 +74,36 @@ internal sealed record ArchiveCommandOptions(
                 case "--folder":
                     relativeFolder = Single(relativeFolder, value, option, allowDot: true);
                     break;
+                case "--output":
+                case "--output-root":
+                    outputRoot = Single(outputRoot, value, option);
+                    break;
+                case "--repository-root":
+                    repositoryRoot = Single(repositoryRoot, value, option);
+                    break;
+                case "--model-dir":
+                    modelDirectory = Single(modelDirectory, value, option);
+                    break;
+                case "--run":
+                case "--run-id":
+                    if (runId is not null)
+                    {
+                        throw new ArgumentException($"Option '{option}' may be supplied only once.");
+                    }
+
+                    if (!Guid.TryParse(value, out Guid parsedRunId) || parsedRunId == Guid.Empty)
+                    {
+                        throw new ArgumentException($"Option '{option}' requires a non-empty GUID.");
+                    }
+
+                    runId = ProcessingRunId.From(parsedRunId);
+                    break;
+                case "--max-attempts":
+                    if (!int.TryParse(value, out maxAttempts) || maxAttempts <= 0)
+                    {
+                        throw new ArgumentException($"Option '{option}' requires a positive integer.");
+                    }
+                    break;
                 default:
                     throw new ArgumentException($"Unknown option '{option}'.");
             }
@@ -65,24 +114,94 @@ internal sealed record ArchiveCommandOptions(
             throw new ArgumentException("Option '--database' is required.");
         }
 
-        if (action == ArchiveCommandAction.Include)
+        switch (action)
         {
-            if (rootPath is null)
-            {
-                throw new ArgumentException("Option '--root' is required for archive include.");
-            }
+            case ArchiveCommandAction.Include:
+                if (rootPath is null)
+                {
+                    throw new ArgumentException("Option '--root' is required for archive include.");
+                }
 
-            if (relativeFolder is null)
-            {
-                throw new ArgumentException("Option '--folder' is required for archive include.");
-            }
+                if (relativeFolder is null)
+                {
+                    throw new ArgumentException("Option '--folder' is required for archive include.");
+                }
+                RejectAnalysisOptions(outputRoot, repositoryRoot, modelDirectory, runId, maxAttempts);
+                break;
+            case ArchiveCommandAction.List:
+            case ArchiveCommandAction.Sync:
+                if (rootPath is not null || relativeFolder is not null || outputRoot is not null ||
+                    repositoryRoot is not null || modelDirectory is not null || runId is not null ||
+                    maxAttempts != int.MaxValue)
+                {
+                    throw new ArgumentException(
+                        $"Archive {args[0]} accepts only '--database'.");
+                }
+                break;
+            case ArchiveCommandAction.Analyze:
+                if (outputRoot is null)
+                {
+                    throw new ArgumentException("Option '--output' is required for archive analyze.");
+                }
+                if (rootPath is not null || relativeFolder is not null || runId is not null)
+                {
+                    throw new ArgumentException(
+                        "Options '--root', '--folder' and '--run' are not valid for archive analyze.");
+                }
+                break;
+            case ArchiveCommandAction.Resume:
+                if (runId is null)
+                {
+                    throw new ArgumentException("Option '--run' is required for archive resume.");
+                }
+                if (rootPath is not null || relativeFolder is not null || outputRoot is not null ||
+                    repositoryRoot is not null || modelDirectory is not null)
+                {
+                    throw new ArgumentException(
+                        "Archive resume reconstructs its saved configuration; only '--database', '--run' and '--max-attempts' are valid.");
+                }
+                break;
+            case ArchiveCommandAction.Status:
+                if (runId is null)
+                {
+                    throw new ArgumentException("Option '--run' is required for archive status.");
+                }
+                if (rootPath is not null || relativeFolder is not null || outputRoot is not null ||
+                    repositoryRoot is not null || modelDirectory is not null || maxAttempts != int.MaxValue)
+                {
+                    throw new ArgumentException(
+                        "Archive status accepts only '--database' and '--run'.");
+                }
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(action));
         }
-        else if (rootPath is not null || relativeFolder is not null)
+
+        return new ArchiveCommandOptions(
+            action,
+            databasePath,
+            rootPath,
+            relativeFolder,
+            outputRoot,
+            repositoryRoot,
+            modelDirectory,
+            runId,
+            maxAttempts);
+    }
+
+    private static void RejectAnalysisOptions(
+        string? outputRoot,
+        string? repositoryRoot,
+        string? modelDirectory,
+        ProcessingRunId? runId,
+        int maxAttempts)
+    {
+        if (outputRoot is not null || repositoryRoot is not null || modelDirectory is not null ||
+            runId is not null || maxAttempts != int.MaxValue)
         {
-            throw new ArgumentException("Options '--root' and '--folder' are valid only for archive include.");
+            throw new ArgumentException(
+                "Archive include accepts only '--database', '--root' and '--folder'.");
         }
-
-        return new ArchiveCommandOptions(action, databasePath, rootPath, relativeFolder);
     }
 
     private static string Single(
@@ -122,6 +241,9 @@ internal static class ArchiveCommandRunner
             ArchiveCommandAction.Include => await IncludeAsync(options, database, coverage, output, cancellationToken),
             ArchiveCommandAction.List => await ListAsync(coverage, output, cancellationToken),
             ArchiveCommandAction.Sync => await SyncAsync(database, coverage, output, cancellationToken),
+            ArchiveCommandAction.Analyze => await AnalyzeAsync(options, database, output, cancellationToken),
+            ArchiveCommandAction.Resume => await ResumeAsync(options, database, output, cancellationToken),
+            ArchiveCommandAction.Status => await StatusAsync(options, database, output, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(options)),
         };
     }
@@ -208,6 +330,91 @@ internal static class ArchiveCommandRunner
         output.WriteLine($"scan-unchanged: {summary.UnchangedFileCount}");
         output.WriteLine($"scan-deleted: {summary.MarkedDeletedCount}");
         return 0;
+    }
+
+    private static async Task<int> AnalyzeAsync(
+        ArchiveCommandOptions options,
+        SqliteCatalogueDatabase database,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
+        ArchiveAnalysisConfiguration configuration = new(
+            options.OutputRoot!,
+            RepositoryRootLocator.Resolve(options.RepositoryRoot),
+            options.ModelDirectory);
+        ArchiveAnalysisStartResult result = await new ArchiveAnalysisCoordinator(database).StartAsync(
+            configuration,
+            new ResumableBatchProcessorOptions(
+                maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
+            cancellationToken);
+
+        WriteProfile(result.Profile, output);
+        output.WriteLine($"current-revisions: {result.CurrentRevisionCount}");
+        output.WriteLine($"already-analyzed: {result.PreviouslyCompletedCount}");
+        output.WriteLine($"scheduled: {result.ProcessingSummary?.TotalJobs ?? 0}");
+        if (result.ProcessingSummary is null)
+        {
+            output.WriteLine("status: up-to-date");
+            return 0;
+        }
+
+        WriteProcessingSummary(result.ProcessingSummary, output);
+        return result.ProcessingSummary.FailedJobs == 0 ? 0 : 1;
+    }
+
+    private static async Task<int> ResumeAsync(
+        ArchiveCommandOptions options,
+        SqliteCatalogueDatabase database,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
+        ArchiveAnalysisResumeResult result = await new ArchiveAnalysisCoordinator(database).ResumeAsync(
+            options.RunId!.Value,
+            new ResumableBatchProcessorOptions(
+                maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
+            cancellationToken);
+        WriteProfile(result.Profile, output);
+        WriteProcessingSummary(result.ProcessingSummary, output);
+        return result.ProcessingSummary.FailedJobs == 0 ? 0 : 1;
+    }
+
+    private static async Task<int> StatusAsync(
+        ArchiveCommandOptions options,
+        SqliteCatalogueDatabase database,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
+        Sha256Digest profileHash = await new SqliteArchiveAnalysisRepository(database)
+            .GetRunProfileHashAsync(options.RunId!.Value, cancellationToken);
+        ProcessingRunSummary summary = await new SqliteProcessingRepository(database)
+            .GetRunSummaryAsync(options.RunId.Value, cancellationToken);
+        output.WriteLine($"analysis-profile: {profileHash}");
+        WriteProcessingSummary(summary, output);
+        return summary.FailedJobs == 0 ? 0 : 1;
+    }
+
+    private static void WriteProfile(AnalysisProfileDefinition profile, TextWriter output)
+    {
+        output.WriteLine($"analysis-profile: {profile.ComputeHash()}");
+        output.WriteLine($"detector-pipeline: {profile.DetectorPipelineHash}");
+        output.WriteLine($"detector-model: {profile.DetectorModelId}");
+        output.WriteLine($"detector-model-hash: {profile.DetectorModelHash}");
+        output.WriteLine($"embedder-model: {profile.EmbedderModelId}");
+        output.WriteLine($"embedder-model-hash: {profile.EmbedderModelHash}");
+        output.WriteLine($"alignment-protocol: {profile.AlignmentProtocol}");
+    }
+
+    private static void WriteProcessingSummary(ProcessingRunSummary summary, TextWriter output)
+    {
+        output.WriteLine($"run: {summary.RunId}");
+        output.WriteLine($"status: {summary.Status.ToString().ToLowerInvariant()}");
+        output.WriteLine($"total: {summary.TotalJobs}");
+        output.WriteLine($"queued: {summary.QueuedJobs}");
+        output.WriteLine($"running: {summary.RunningJobs}");
+        output.WriteLine($"succeeded: {summary.SucceededJobs}");
+        output.WriteLine($"failed: {summary.FailedJobs}");
+        output.WriteLine($"cancelled: {summary.CancelledJobs}");
+        output.WriteLine($"attempts: {summary.AttemptCount}");
     }
 
     private static void WriteConfiguration(ArchiveCoverageConfiguration configured, TextWriter output)
