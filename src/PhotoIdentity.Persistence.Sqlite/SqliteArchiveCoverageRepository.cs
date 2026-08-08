@@ -26,7 +26,6 @@ public sealed class SqliteArchiveCoverageRepository
     public async Task<ArchiveCoverageConfiguration?> GetAsync(
         CancellationToken cancellationToken = default)
     {
-        await EnsureSchemaAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         CatalogueSource? source = await ReadConfiguredSourceAsync(connection, transaction: null, cancellationToken);
         if (source is null)
@@ -49,7 +48,6 @@ public sealed class SqliteArchiveCoverageRepository
         string normalizedFolder = ArchiveCoverage.NormalizeRelativeFolder(relativeFolder);
         DateTimeOffset configuredAt = configuredAtUtc.ToUniversalTime();
 
-        await EnsureSchemaAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
 
@@ -106,32 +104,6 @@ public sealed class SqliteArchiveCoverageRepository
 
         transaction.Commit();
         return new ArchiveCoverageConfiguration(configured, normalized);
-    }
-
-    private async Task EnsureSchemaAsync(CancellationToken cancellationToken)
-    {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            CREATE TABLE IF NOT EXISTS archive_configuration (
-                id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
-                source_id TEXT NOT NULL UNIQUE,
-                configured_at_utc TEXT NOT NULL,
-                FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE RESTRICT
-            );
-
-            CREATE TABLE IF NOT EXISTS archive_included_folders (
-                source_id TEXT NOT NULL,
-                relative_path TEXT NOT NULL,
-                included_at_utc TEXT NOT NULL,
-                PRIMARY KEY (source_id, relative_path),
-                FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE
-            );
-
-            CREATE INDEX IF NOT EXISTS ix_archive_included_folders_path
-                ON archive_included_folders (source_id, relative_path);
-            """;
-        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<CatalogueSource?> ReadConfiguredSourceAsync(
