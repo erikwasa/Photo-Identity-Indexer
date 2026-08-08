@@ -8,6 +8,7 @@
     <ProjectReference Include="../PhotoIdentity.Persistence.Sqlite/PhotoIdentity.Persistence.Sqlite.csproj" />
     <ProjectReference Include="../PhotoIdentity.Recognition.Onnx/PhotoIdentity.Recognition.Onnx.csproj" />
     <ProjectReference Include="../PhotoIdentity.Source.Local/PhotoIdentity.Source.Local.csproj" />
+    <ProjectReference Include="../PhotoIdentity.Source.OneDriveSync/PhotoIdentity.Source.OneDriveSync.csproj" />
     <ProjectReference Include="../PhotoIdentity.Transfer.Bundles/PhotoIdentity.Transfer.Bundles.csproj" />
   </ItemGroup>
 </Project>

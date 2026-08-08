@@ -9,10 +9,27 @@ namespace PhotoIdentity.Persistence.Sqlite;
 public sealed record CatalogueArchiveFolderStatus(
     string RelativeFolder,
     int CurrentImages,
+    int LocalImages,
+    int OnlineOnlyImages,
+    int DownloadingImages,
+    int UnavailableImages,
+    int AvailabilityErrorImages,
     int AnalysedImages,
     int PendingImages,
     int FailedImages,
     int MissingImages);
+
+public sealed record CatalogueArchiveItemStatus(
+    string RelativePath,
+    string Availability,
+    string AnalysisState,
+    string? LastError);
+
+public sealed record CatalogueArchiveItemPage(
+    int Offset,
+    int Limit,
+    int Total,
+    IReadOnlyList<CatalogueArchiveItemStatus> Items);
 
 public sealed record CatalogueArchiveRunStatus(
     ProcessingRunId RunId,
@@ -27,7 +44,8 @@ public sealed record CatalogueArchiveRunStatus(
     int CancelledJobs);
 
 /// <summary>
-/// Reads permanent-archive coverage and exact-profile analysis state without exposing source files.
+/// Reads permanent-archive coverage, OneDrive availability and exact-profile analysis state
+/// without exposing the configured source root.
 /// </summary>
 public sealed class SqliteArchiveStatusRepository
 {
@@ -45,7 +63,7 @@ public sealed class SqliteArchiveStatusRepository
         Sha256Digest? profileHash,
         CancellationToken cancellationToken = default)
     {
-        await EnsureAnalysisSchemaAsync(cancellationToken);
+        await EnsureSchemasAsync(cancellationToken);
         string folder = ArchiveCoverage.NormalizeRelativeFolder(relativeFolder);
         string prefix = folder.Length == 0 ? string.Empty : folder + "/";
 
@@ -57,8 +75,11 @@ public sealed class SqliteArchiveStatusRepository
                     asset.id AS asset_id,
                     asset.source_key,
                     asset.deleted_at_utc,
+                    COALESCE(availability.availability, 'local') AS availability,
                     revision.id AS revision_id
                 FROM assets AS asset
+                LEFT JOIN archive_asset_availability AS availability
+                    ON availability.asset_id = asset.id
                 LEFT JOIN asset_revisions AS revision
                     ON revision.id = (
                         SELECT candidate.id
@@ -91,14 +112,21 @@ public sealed class SqliteArchiveStatusRepository
                 WHERE row_number = 1
             )
             SELECT
-                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.revision_id IS NOT NULL THEN 1 ELSE 0 END) AS current_images,
+                SUM(CASE WHEN current.deleted_at_utc IS NULL THEN 1 ELSE 0 END) AS current_images,
+                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'local' THEN 1 ELSE 0 END) AS local_images,
+                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'online-only' THEN 1 ELSE 0 END) AS online_only_images,
+                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'downloading' THEN 1 ELSE 0 END) AS downloading_images,
+                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'unavailable' THEN 1 ELSE 0 END) AS unavailable_images,
+                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'error' THEN 1 ELSE 0 END) AS availability_error_images,
                 SUM(CASE WHEN current.deleted_at_utc IS NULL AND analysis.asset_revision_id IS NOT NULL THEN 1 ELSE 0 END) AS analysed_images,
                 SUM(CASE WHEN current.deleted_at_utc IS NULL
+                              AND current.availability = 'local'
                               AND current.revision_id IS NOT NULL
                               AND analysis.asset_revision_id IS NULL
                               AND COALESCE(latest_job.status, '') <> 'failed'
                          THEN 1 ELSE 0 END) AS pending_images,
                 SUM(CASE WHEN current.deleted_at_utc IS NULL
+                              AND current.availability = 'local'
                               AND current.revision_id IS NOT NULL
                               AND analysis.asset_revision_id IS NULL
                               AND latest_job.status = 'failed'
@@ -114,7 +142,7 @@ public sealed class SqliteArchiveStatusRepository
         command.Parameters.AddWithValue("$source_id", sourceId.ToString());
         command.Parameters.AddWithValue("$folder", folder);
         command.Parameters.AddWithValue("$prefix", prefix);
-        command.Parameters.AddWithValue("$profile_hash", profileHash?.ToString() ?? "");
+        command.Parameters.AddWithValue("$profile_hash", profileHash?.ToString() ?? string.Empty);
 
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         _ = await reader.ReadAsync(cancellationToken);
@@ -124,14 +152,140 @@ public sealed class SqliteArchiveStatusRepository
             ReadCount(reader, 1),
             ReadCount(reader, 2),
             ReadCount(reader, 3),
-            ReadCount(reader, 4));
+            ReadCount(reader, 4),
+            ReadCount(reader, 5),
+            ReadCount(reader, 6),
+            ReadCount(reader, 7),
+            ReadCount(reader, 8),
+            ReadCount(reader, 9));
+    }
+
+    public async Task<CatalogueArchiveItemPage> GetItemsAsync(
+        SourceId sourceId,
+        string relativeFolder,
+        Sha256Digest? profileHash,
+        string state,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSchemasAsync(cancellationToken);
+        string folder = ArchiveCoverage.NormalizeRelativeFolder(relativeFolder);
+        string prefix = folder.Length == 0 ? string.Empty : folder + "/";
+        string normalizedState = NormalizeState(state);
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(limit, 200);
+
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            WITH asset_state AS (
+                SELECT
+                    asset.source_key,
+                    asset.deleted_at_utc,
+                    COALESCE(availability.availability, 'local') AS availability,
+                    revision.id AS revision_id,
+                    analysis.asset_revision_id AS analysed_revision_id,
+                    latest_job.status AS latest_job_status,
+                    latest_job.error AS latest_job_error
+                FROM assets AS asset
+                LEFT JOIN archive_asset_availability AS availability
+                    ON availability.asset_id = asset.id
+                LEFT JOIN asset_revisions AS revision
+                    ON revision.id = (
+                        SELECT candidate.id
+                        FROM asset_revisions AS candidate
+                        WHERE candidate.asset_id = asset.id
+                        ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
+                        LIMIT 1)
+                LEFT JOIN asset_revision_analysis AS analysis
+                    ON analysis.asset_revision_id = revision.id
+                   AND analysis.profile_hash = $profile_hash
+                LEFT JOIN (
+                    SELECT asset_revision_id, status, error
+                    FROM (
+                        SELECT
+                            job.asset_revision_id,
+                            job.status,
+                            job.error,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY job.asset_revision_id
+                                ORDER BY run.started_at_utc DESC, job.id DESC) AS row_number
+                        FROM processing_jobs AS job
+                        INNER JOIN processing_runs AS run
+                            ON run.id = job.processing_run_id
+                        INNER JOIN archive_analysis_runs AS archive_run
+                            ON archive_run.processing_run_id = run.id
+                        WHERE archive_run.profile_hash = $profile_hash
+                    ) AS ranked
+                    WHERE row_number = 1
+                ) AS latest_job
+                    ON latest_job.asset_revision_id = revision.id
+                WHERE asset.source_id = $source_id
+                  AND (
+                      $folder = '' OR
+                      asset.source_key = $folder OR
+                      substr(asset.source_key, 1, length($prefix)) = $prefix)
+            ),
+            classified AS (
+                SELECT
+                    source_key,
+                    availability,
+                    CASE
+                        WHEN deleted_at_utc IS NOT NULL THEN 'missing'
+                        WHEN availability <> 'local' THEN 'unavailable'
+                        WHEN analysed_revision_id IS NOT NULL THEN 'analysed'
+                        WHEN latest_job_status = 'failed' THEN 'failed'
+                        ELSE 'pending'
+                    END AS analysis_state,
+                    latest_job_error
+                FROM asset_state
+            )
+            SELECT
+                source_key,
+                availability,
+                analysis_state,
+                latest_job_error,
+                COUNT(*) OVER() AS total_count
+            FROM classified
+            WHERE $state = 'all' OR analysis_state = $state
+            ORDER BY source_key
+            LIMIT $limit OFFSET $offset;
+            """;
+        command.Parameters.AddWithValue("$source_id", sourceId.ToString());
+        command.Parameters.AddWithValue("$folder", folder);
+        command.Parameters.AddWithValue("$prefix", prefix);
+        command.Parameters.AddWithValue("$profile_hash", profileHash?.ToString() ?? string.Empty);
+        command.Parameters.AddWithValue("$state", normalizedState);
+        command.Parameters.AddWithValue("$offset", offset);
+        command.Parameters.AddWithValue("$limit", limit);
+
+        List<CatalogueArchiveItemStatus> items = [];
+        int total = 0;
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (items.Count == 0)
+            {
+                total = reader.GetInt32(4);
+            }
+
+            items.Add(new CatalogueArchiveItemStatus(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3)));
+        }
+
+        return new CatalogueArchiveItemPage(offset, limit, total, items);
     }
 
     public async Task<CatalogueArchiveRunStatus?> GetLatestRunAsync(
         Sha256Digest profileHash,
         CancellationToken cancellationToken = default)
     {
-        await EnsureAnalysisSchemaAsync(cancellationToken);
+        await EnsureSchemasAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -176,8 +330,9 @@ public sealed class SqliteArchiveStatusRepository
             ReadCount(reader, 9));
     }
 
-    private async Task EnsureAnalysisSchemaAsync(CancellationToken cancellationToken)
+    private async Task EnsureSchemasAsync(CancellationToken cancellationToken)
     {
+        await new SqliteArchiveAvailabilityRepository(_database).EnsureSchemaAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -217,6 +372,17 @@ public sealed class SqliteArchiveStatusRepository
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    private static string NormalizeState(string state) => state.Trim().ToLowerInvariant() switch
+    {
+        "all" => "all",
+        "analysed" or "analyzed" => "analysed",
+        "pending" => "pending",
+        "failed" => "failed",
+        "unavailable" => "unavailable",
+        "missing" => "missing",
+        _ => throw new ArgumentException($"Unknown archive item state '{state}'.", nameof(state)),
+    };
 
     private static int ReadCount(SqliteDataReader reader, int ordinal) =>
         reader.IsDBNull(ordinal)
