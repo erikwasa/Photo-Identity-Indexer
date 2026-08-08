@@ -11,6 +11,10 @@ Two independent milestones are active:
 
 **WI-0032 — Validate documentation from a clean setup** remains active under the human maintainer. Its clean-environment and trusted-network checklist remains authoritative for M15.
 
+**WI-0042 — Add bounded archive hydration and review proxies** is implementing Slice 1 on `agent/WI-0042-proxy-measurement` in PR #105. The slice adds an exact versioned review-proxy profile contract, deterministic OpenCV JPEG rendering, durable proxy profile/completion metadata separate from detector/embedder analysis completion, and the `archive proxy measure` operator path. The measurement command accepts explicit candidate settings, stores generated derivatives outside the supplied source root and reports privacy-safe aggregate storage statistics without selecting a permanent proxy default.
+
+The next concrete WI-0042 step after Slice 1 is merged and runnable locally is the fixed private 100-image tuning measurement described in `docs/operations/review-proxy-measurement.md`: compare at least two exact proxy candidates, inspect a representative subset for browsing/review usability, retain only aggregate results, then run the selected exact profile against the unchanged 560-image pilot corpus for scale validation. WI-0041 remains blocked until the broader bounded-storage workflow is implemented and locally verified.
+
 **WI-0037 — Evaluate another face detector** is active under the AI agent. PR #85 completed the WI-0036 transition and initial CenterFace qualification; runnable CenterFace work continues on `agent/WI-0037-centerface-adapter`.
 
 WI-0036 completed on 2026-08-07. The multi-scale confidence-0.9 YuNet candidate failed the complete M16 gate despite improving on the single-pass confidence-0.9 baseline and single-pass confidence `0.8`. The explicit confidence-0.7 multi-scale follow-up returned more than 100 false or duplicate detections, so confidence `0.6` was intentionally not run. No YuNet threshold or multi-scale configuration is approved for rollout.
@@ -83,6 +87,8 @@ Any documentation defect found during validation must be corrected and merged be
 - `docs/delivery/work-items/WI-0032-documentation-validation.md`
 - `docs/delivery/milestones/M16-detector-recall.md`
 - `docs/delivery/work-items/WI-0037-detector-candidate.md`
+- `docs/delivery/work-items/WI-0042-bounded-archive-storage.md`
+- `docs/operations/review-proxy-measurement.md`
 - `docs/models/centerface-2019-qualification.md`
 - `docs/models/face-detector-candidate-registry.md`
 - `docs/operations/centerface-detector-runs.md`

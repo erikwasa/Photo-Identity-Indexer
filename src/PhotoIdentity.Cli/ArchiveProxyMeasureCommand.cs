@@ -180,7 +180,7 @@ internal static class ArchiveProxyMeasureCommandRunner
                     sourcePath,
                     profile,
                     cancellationToken);
-                string relativeOutputPath = Path.ChangeExtension(relativeSourcePath, ".jpg");
+                string relativeOutputPath = relativeSourcePath + ".proxy.jpg";
                 string destination = Path.Combine(outputRoot, profile.Id, relativeOutputPath);
                 await WriteAtomicallyAsync(destination, encoded.Content, cancellationToken);
                 encodedSizes[profile.Id].Add(encoded.Content.LongLength);
