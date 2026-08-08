@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
@@ -240,8 +241,20 @@ public sealed class CollectionOriginalAccessApplicationTests
             {
                 services.RemoveAll<IOneDriveFilesOnDemandPlatform>();
                 services.AddSingleton<IOneDriveFilesOnDemandPlatform>(_platform);
+                services.RemoveAll<ArchiveHydrationPolicyConfiguration>();
+                services.AddSingleton(new ArchiveHydrationPolicyConfiguration(
+                    MinimumFreeSpaceReserveBytes: 0,
+                    MaximumManagedHydrationBytes: 1024L * 1024L * 1024L,
+                    MaximumConcurrentOperations: 2));
+                services.RemoveAll<IArchiveStorageProbe>();
+                services.AddSingleton<IArchiveStorageProbe>(new FixedStorageProbe(10L * 1024L * 1024L * 1024L));
             });
         }
+    }
+
+    private sealed class FixedStorageProbe(long availableBytes) : IArchiveStorageProbe
+    {
+        public long GetAvailableFreeSpaceBytes(string path) => availableBytes;
     }
 
     private sealed class FakeFilesOnDemandPlatform : IOneDriveFilesOnDemandPlatform
