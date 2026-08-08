@@ -41,17 +41,17 @@ The final `1970` sync must reuse the already catalogued `1970/01` and `1970/02` 
 
 ## Acceptance criteria
 
-- [ ] One permanent local source root remains stable while included folder coverage expands.
-- [ ] Included folders are stored as normalized root-relative paths; a parent inclusion subsumes redundant child inclusions.
-- [ ] Synchronization scans every included folder recursively and discovers new or changed immutable revisions.
-- [ ] Missing-file marking is scoped to the synchronized coverage and never tombstones catalogue assets outside included folders.
-- [ ] Expanding from child folders to their parent reuses the same catalogue assets and revisions for unchanged files.
-- [ ] Unchanged current revisions that already completed the selected processing profile are not run through detector/embedding inference again.
-- [ ] Zero-face results count as successful analysis so they are not repeatedly reprocessed.
+- [x] One permanent local source root remains stable while included folder coverage expands.
+- [x] Included folders are stored as normalized root-relative paths; a parent inclusion subsumes redundant child inclusions.
+- [x] Synchronization scans every included folder recursively and discovers new or changed immutable revisions.
+- [x] Missing-file marking is scoped to the synchronized coverage and never tombstones catalogue assets outside included folders.
+- [x] Expanding from child folders to their parent reuses the same catalogue assets and revisions for unchanged files.
+- [x] Unchanged current revisions that already completed the selected processing profile are not run through detector/embedding inference again.
+- [x] Zero-face results count as successful analysis so they are not repeatedly reprocessed.
 - [ ] The operator can see included folders plus discovered, analysed, pending, failed, unavailable and missing counts, with drill-down to individual images where useful.
-- [ ] The operator can add an archive folder and trigger synchronization without changing the permanent source root.
+- [x] The operator can add an archive folder and trigger synchronization without changing the permanent source root.
 - [ ] OneDrive-local availability is surfaced distinctly from processing failure.
-- [ ] The permanent catalogue defaults to the selected local CenterFace confidence `0.5` single-pass detector and SFace FP32 embedder unless an explicit governed model change is made.
+- [x] The permanent catalogue defaults to the selected local CenterFace confidence `0.5` single-pass detector and SFace FP32 embedder unless an explicit governed model change is made.
 - [ ] The `1970/01` -> `1970/02` -> `1970` progression is covered by automated integration tests and Windows operator verification.
 
 ## Implementation slices
@@ -63,7 +63,7 @@ The first merged slice established the safety-critical source semantics:
 - a local archive sync coordinator normalizes multiple included folders and synchronizes each recursive scope under one source identity; and
 - integration coverage exercises expansion from `1970/01` and `1970/02` to `1970` without duplicating unchanged assets.
 
-The current second slice adds the persistent operator boundary:
+The second merged slice added the persistent operator boundary:
 
 - catalogue schema version 10 stores exactly one permanent archive source plus normalized included folders;
 - `archive include` configures the root and adds recursive relative coverage while refusing a later root replacement;
@@ -71,7 +71,16 @@ The current second slice adds the persistent operator boundary:
 - `archive sync` synchronizes all stored coverage and reports supported, new, unchanged and missing counts; and
 - integration coverage exercises child-to-parent collapse, persisted configuration and discovery of a new image added to a previously covered child.
 
-The next slice will schedule only current revisions that have not completed the selected CenterFace/SFace processing profile, including durable successful zero-face results. Coverage/status UI and OneDrive availability reporting follow after that processing boundary is stable.
+The current third slice adds exact-profile incremental analysis:
+
+- a canonical analysis-profile identity combines the exact detector-pipeline hash with detector and embedder model hashes plus the alignment protocol;
+- successful immutable-revision completion is recorded independently of face count, so zero-face images are durable successes;
+- `archive analyze` uses the governed CenterFace confidence `0.5` single-pass detector plus SFace FP32 and schedules only current revisions missing that exact profile;
+- `archive resume` reconstructs an interrupted run and rejects a profile mismatch before inference resumes;
+- `archive status` reports the registered analysis-profile hash and durable processing progress; and
+- a changed image revision becomes pending again while an unchanged completed revision remains skipped.
+
+The remaining slices are the archive coverage/status UI, distinct OneDrive-local availability reporting, and Windows operator verification of the full incremental workflow.
 
 ## Scope boundary
 
