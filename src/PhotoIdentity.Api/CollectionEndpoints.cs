@@ -19,6 +19,7 @@ public static class CollectionEndpoints
         endpoints.MapGet("/api/collections/manifest", GetManifestAsync);
         endpoints.MapGet("/api/collections/photos/{revisionId}/thumbnail", GetPhotoThumbnailAsync);
         endpoints.MapGet("/api/collections/photos/{revisionId}/preview", GetPhotoPreviewAsync);
+        endpoints.MapGet("/api/collections/photos/{revisionId}/original", GetPhotoContentAsync);
         endpoints.MapGet("/api/collections/photos/{revisionId}/content", GetPhotoContentAsync);
         return endpoints;
     }
@@ -229,7 +230,7 @@ public static class CollectionEndpoints
         photo.AssetId.ToString(),
         $"/api/collections/photos/{photo.RevisionId}/thumbnail",
         $"/api/collections/photos/{photo.RevisionId}/preview",
-        $"/api/collections/photos/{photo.RevisionId}/content",
+        $"/api/collections/photos/{photo.RevisionId}/original",
         photo.ObservedAtUtc,
         photo.MediaType,
         photo.Width,
@@ -243,7 +244,7 @@ public static class CollectionEndpoints
         photo.AssetId.ToString(),
         BuildPhotoUrl(request, photo.RevisionId, "thumbnail"),
         BuildPhotoUrl(request, photo.RevisionId, "preview"),
-        BuildPhotoUrl(request, photo.RevisionId, "content"),
+        BuildPhotoUrl(request, photo.RevisionId, "original"),
         photo.MediaType,
         photo.Width,
         photo.Height,
