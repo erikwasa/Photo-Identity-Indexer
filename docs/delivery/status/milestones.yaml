@@ -79,7 +79,7 @@ milestones:
   - WI-0032
 - id: M16
   title: Face detection recall
-  status: in_progress
+  status: completed
   document: ../milestones/M16-detector-recall.md
   work_items:
   - WI-0039
