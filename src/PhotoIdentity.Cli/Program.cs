@@ -107,6 +107,11 @@ public static class Program
               archive include --database PATH --root DIR --folder RELATIVE_DIR
               archive list --database PATH
               archive sync --database PATH
+              archive analyze --database PATH --output DIR
+                              [--repository-root PATH] [--model-dir DIR]
+                              [--max-attempts COUNT]
+              archive resume --database PATH --run RUN_ID [--max-attempts COUNT]
+              archive status --database PATH --run RUN_ID
 
               batch start --database PATH --source DIR [--output DIR]
                           [--root PATH] [--model-dir DIR] [--non-recursive]
@@ -165,6 +170,14 @@ public static class Program
             list reports the configured root and normalized coverage. Archive sync scans
             every included folder and discovers new, changed and missing files without
             tombstoning catalogue assets outside the selected coverage.
+
+            Archive analyze runs the governed CenterFace confidence-0.5 single-pass and
+            SFace FP32 profile only for current immutable revisions that have not already
+            completed that exact profile. The completion marker is independent of detected
+            face count, so a successful zero-face image is not repeatedly reprocessed.
+            Archive resume continues the same durable run and validates the saved exact
+            profile before processing. Archive status reports the registered profile and
+            durable job progress.
 
             Batch start scans a local folder, creates durable jobs for each current
             immutable revision and runs the production inspection pipeline until idle.
