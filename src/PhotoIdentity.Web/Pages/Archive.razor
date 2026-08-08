@@ -7,9 +7,9 @@
     <div>
         <p class="eyebrow">Permanent archive</p>
         <h1>Archive coverage</h1>
-        <p>Add recursive folders under one stable source root, synchronize changed files, and analyze only revisions that still need the governed CenterFace/SFace profile.</p>
+        <p>Add recursive folders under one stable source root, synchronize changed files and OneDrive availability, and analyze only locally available revisions that still need the governed CenterFace/SFace profile.</p>
     </div>
-    <button class="button secondary" disabled="@Busy" @onclick="LoadAsync">Refresh</button>
+    <button class="button secondary" disabled="@Busy" @onclick="RefreshAsync">Refresh</button>
 </section>
 
 @if (!string.IsNullOrWhiteSpace(Error))
@@ -74,10 +74,26 @@ else
         }
     </section>
 
-    <section class="archive-summary" aria-label="Archive analysis summary">
+    <section class="archive-summary" aria-label="Archive availability summary">
         <article>
             <span>Current images</span>
             <strong>@Status.Totals.CurrentImages</strong>
+        </article>
+        <article>
+            <span>Local</span>
+            <strong>@Status.Totals.LocalImages</strong>
+        </article>
+        <article class="@(Status.Totals.OnlineOnlyImages > 0 ? "attention" : null)">
+            <span>Online-only</span>
+            <strong>@Status.Totals.OnlineOnlyImages</strong>
+        </article>
+        <article class="@(Status.Totals.DownloadingImages > 0 ? "attention" : null)">
+            <span>Downloading</span>
+            <strong>@Status.Totals.DownloadingImages</strong>
+        </article>
+        <article class="@(Status.Totals.AvailabilityErrorImages + Status.Totals.UnavailableImages > 0 ? "attention" : null)">
+            <span>Availability issues</span>
+            <strong>@(Status.Totals.AvailabilityErrorImages + Status.Totals.UnavailableImages)</strong>
         </article>
         <article>
             <span>Analyzed</span>
@@ -96,6 +112,13 @@ else
             <strong>@Status.Totals.MissingImages</strong>
         </article>
     </section>
+
+    @if (Status.Totals.OnlineOnlyImages + Status.Totals.DownloadingImages > 0)
+    {
+        <div class="notice warning">
+            OneDrive placeholders are catalogued but not opened. Hydrate them with the OneDrive sync client, then sync again before analysis.
+        </div>
+    }
 
     <section class="archive-analysis" aria-labelledby="archive-analysis-heading">
         <div class="section-heading">
@@ -164,6 +187,9 @@ else
                         <tr>
                             <th>Folder</th>
                             <th>Current</th>
+                            <th>Local</th>
+                            <th>Online-only</th>
+                            <th>Downloading</th>
                             <th>Analyzed</th>
                             <th>Pending</th>
                             <th>Failed</th>
@@ -176,6 +202,9 @@ else
                             <tr>
                                 <td><code>@(string.IsNullOrEmpty(folder.RelativeFolder) ? "." : folder.RelativeFolder)</code></td>
                                 <td>@folder.CurrentImages</td>
+                                <td>@folder.LocalImages</td>
+                                <td class="@(folder.OnlineOnlyImages > 0 ? "failure-count" : null)">@folder.OnlineOnlyImages</td>
+                                <td>@folder.DownloadingImages</td>
                                 <td>@AnalysisCount(folder.AnalysedImages)</td>
                                 <td>@AnalysisCount(folder.PendingImages)</td>
                                 <td class="@(folder.FailedImages > 0 ? "failure-count" : null)">@AnalysisCount(folder.FailedImages)</td>
@@ -187,19 +216,109 @@ else
             </div>
         }
     </section>
+
+    <section class="archive-items" aria-labelledby="archive-items-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Image drill-down</p>
+                <h2 id="archive-items-heading">Archive items</h2>
+            </div>
+            <span>@(ItemPage?.Total ?? 0) matching image@((ItemPage?.Total ?? 0) == 1 ? "" : "s")</span>
+        </div>
+
+        <div class="archive-item-filters">
+            <div>
+                <label class="field-label" for="archive-item-folder">Folder</label>
+                <select id="archive-item-folder" @bind="ItemFolder" @bind:after="ApplyItemFiltersAsync" disabled="@(Busy || ItemLoading)">
+                    <option value="">All included coverage</option>
+                    @foreach (string folder in Status.IncludedFolders)
+                    {
+                        <option value="@folder">@(string.IsNullOrEmpty(folder) ? "." : folder)</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label class="field-label" for="archive-item-state">State</label>
+                <select id="archive-item-state" @bind="ItemState" @bind:after="ApplyItemFiltersAsync" disabled="@(Busy || ItemLoading)">
+                    <option value="all">All states</option>
+                    <option value="pending">Pending analysis</option>
+                    <option value="failed">Processing failed</option>
+                    <option value="unavailable">Not local</option>
+                    <option value="missing">Missing</option>
+                    <option value="analysed">Analyzed</option>
+                </select>
+            </div>
+        </div>
+
+        @if (ItemLoading)
+        {
+            <div class="empty-state compact"><p>Loading archive items…</p></div>
+        }
+        else if (ItemPage is null || ItemPage.Items.Count == 0)
+        {
+            <div class="empty-state compact"><p>No images match this archive scope.</p></div>
+        }
+        else
+        {
+            <div class="archive-table-wrap">
+                <table class="archive-table archive-item-table">
+                    <thead>
+                        <tr>
+                            <th>Relative path</th>
+                            <th>Availability</th>
+                            <th>Analysis</th>
+                            <th>Latest error</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (ArchiveItemStatusResponse item in ItemPage.Items)
+                        {
+                            <tr>
+                                <td><code>@item.RelativePath</code></td>
+                                <td><span class="archive-state state-@CssToken(item.Availability)">@AvailabilityLabel(item.Availability)</span></td>
+                                <td><span class="archive-state state-@CssToken(item.AnalysisState)">@AnalysisStateLabel(item.AnalysisState)</span></td>
+                                <td class="archive-item-error">@(string.IsNullOrWhiteSpace(item.LastError) ? "—" : item.LastError)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination">
+                <button class="button secondary" disabled="@(ItemPage.Offset == 0 || ItemLoading)" @onclick="PreviousItemsAsync">Previous</button>
+                <span>Showing @(ItemPage.Offset + 1)–@Math.Min(ItemPage.Offset + ItemPage.Items.Count, ItemPage.Total)</span>
+                <button class="button secondary" disabled="@(ItemPage.Offset + ItemPage.Limit >= ItemPage.Total || ItemLoading)" @onclick="NextItemsAsync">Next</button>
+            </div>
+        }
+    </section>
 }
 
 @code {
+    private const int ItemPageSize = 50;
+
     private ArchiveStatusResponse? Status { get; set; }
+    private ArchiveItemPageResponse? ItemPage { get; set; }
     private string RootPath { get; set; } = string.Empty;
     private string RelativeFolder { get; set; } = string.Empty;
+    private string ItemFolder { get; set; } = string.Empty;
+    private string ItemState { get; set; } = "all";
+    private int ItemOffset { get; set; }
     private string? Error { get; set; }
     private string? Message { get; set; }
     private bool Loading { get; set; } = true;
+    private bool ItemLoading { get; set; }
     private bool Busy { get; set; }
     private bool Analyzing { get; set; }
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        await LoadAsync();
+        if (Status?.Configured == true)
+        {
+            await LoadItemsAsync();
+        }
+    }
 
     private async Task LoadAsync()
     {
@@ -219,6 +338,30 @@ else
         }
     }
 
+    private async Task LoadItemsAsync()
+    {
+        if (Status?.Configured != true)
+        {
+            ItemPage = null;
+            return;
+        }
+
+        ItemLoading = true;
+        try
+        {
+            string query = $"state={Uri.EscapeDataString(ItemState)}&folder={Uri.EscapeDataString(ItemFolder)}&offset={ItemOffset}&limit={ItemPageSize}";
+            ItemPage = await Http.GetFromJsonAsync<ArchiveItemPageResponse>($"api/archive/items?{query}");
+        }
+        catch (Exception exception)
+        {
+            Error = $"Archive items could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            ItemLoading = false;
+        }
+    }
+
     private async Task IncludeAsync()
     {
         Busy = true;
@@ -232,6 +375,8 @@ else
             Status = await ReadResponseAsync<ArchiveStatusResponse>(response);
             Message = $"Included '{RelativeFolder}'.";
             RelativeFolder = string.Empty;
+            ItemOffset = 0;
+            await LoadItemsAsync();
         }
         catch (Exception exception)
         {
@@ -253,7 +398,9 @@ else
             using HttpResponseMessage response = await Http.PostAsync("api/archive/sync", content: null);
             ArchiveSyncResponse result = await ReadResponseAsync<ArchiveSyncResponse>(response);
             Status = result.Status;
-            Message = $"Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged, {result.MarkedMissing} marked missing.";
+            Message = $"Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged local, {result.OnlineOnlyFiles} online-only, {result.DownloadingFiles} downloading, {result.AvailabilityErrors + result.UnavailableFiles} availability issue(s), {result.MarkedMissing} marked missing.";
+            ItemOffset = 0;
+            await LoadItemsAsync();
         }
         catch (Exception exception)
         {
@@ -304,9 +451,11 @@ else
             if (string.IsNullOrWhiteSpace(Message))
             {
                 Message = Status?.Totals.PendingImages == 0
-                    ? "Archive analysis is up to date for the current profile."
+                    ? "Archive analysis is up to date for locally available images in the current profile."
                     : "Archive analysis stopped with pending work remaining. Review failures or continue the run.";
             }
+
+            await LoadItemsAsync();
         }
         catch (Exception exception)
         {
@@ -317,6 +466,24 @@ else
             Analyzing = false;
             Busy = false;
         }
+    }
+
+    private async Task ApplyItemFiltersAsync()
+    {
+        ItemOffset = 0;
+        await LoadItemsAsync();
+    }
+
+    private async Task PreviousItemsAsync()
+    {
+        ItemOffset = Math.Max(0, ItemOffset - ItemPageSize);
+        await LoadItemsAsync();
+    }
+
+    private async Task NextItemsAsync()
+    {
+        ItemOffset += ItemPageSize;
+        await LoadItemsAsync();
     }
 
     private async Task<T> ReadResponseAsync<T>(HttpResponseMessage response)
@@ -341,6 +508,28 @@ else
     }
 
     private string AnalysisCount(int value) => Status?.AnalysisReady == true ? value.ToString() : "—";
+
+    private static string AvailabilityLabel(string availability) => availability switch
+    {
+        "local" => "Local",
+        "online-only" => "Online-only",
+        "downloading" => "Downloading",
+        "unavailable" => "Unavailable",
+        "error" => "Availability error",
+        _ => availability,
+    };
+
+    private static string AnalysisStateLabel(string state) => state switch
+    {
+        "analysed" => "Analyzed",
+        "pending" => "Pending",
+        "failed" => "Failed",
+        "unavailable" => "Not local",
+        "missing" => "Missing",
+        _ => state,
+    };
+
+    private static string CssToken(string value) => value.Replace("-", string.Empty, StringComparison.Ordinal);
 
     private static string HashPrefix(string hash) =>
         hash[..Math.Min(12, hash.Length)];
