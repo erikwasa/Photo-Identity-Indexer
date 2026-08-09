@@ -138,13 +138,11 @@ public sealed class StatusGenerator
         builder.AppendLine("Expected evolution:");
         builder.AppendLine();
         builder.AppendLine("```text");
-        builder.AppendLine("0.1 local inference and review");
-        builder.AppendLine("0.2 OneDrive hydration and staging");
-        builder.AppendLine("0.3 multi-model and detector evaluation");
-        builder.AppendLine("0.4 incremental permanent local archive ingestion");
-        builder.AppendLine("0.5 production-model and optional Azure validation");
-        builder.AppendLine("0.6 full-archive completion and ongoing synchronisation");
-        builder.AppendLine("1.0 stable people index and collection API");
+        builder.AppendLine("0.x local inference, review, model evaluation and archive-readiness foundations");
+        builder.AppendLine("1.0 permanent catalogue ready to begin processing the real full archive");
+        builder.AppendLine("post-1.0 complete archive coverage and ongoing synchronisation");
+        builder.AppendLine("post-1.0 improve identity automation and operator experience");
+        builder.AppendLine("later add capture metadata, location and semantic library intelligence");
         builder.AppendLine("```");
 
         return builder.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
