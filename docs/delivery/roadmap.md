@@ -28,11 +28,9 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 Expected evolution:
 
 ```text
-0.1 local inference and review
-0.2 OneDrive hydration and staging
-0.3 multi-model and detector evaluation
-0.4 incremental permanent local archive ingestion
-0.5 production-model and optional Azure validation
-0.6 full-archive completion and ongoing synchronisation
-1.0 stable people index and collection API
+0.x local inference, review, model evaluation and archive-readiness foundations
+1.0 permanent catalogue ready to begin processing the real full archive
+post-1.0 complete archive coverage and ongoing synchronisation
+post-1.0 improve identity automation and operator experience
+later add capture metadata, location and semantic library intelligence
 ```
