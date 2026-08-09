@@ -18,6 +18,18 @@ Make permanent archive ingestion recognize and process HEIC/HEIF plus every came
 
 The permanent catalogue must represent the real archive rather than only the JPEG/PNG subset. HEIC and camera RAW files are expected in source folders, and treating them as invisible would make completeness reporting misleading before version 1 begins.
 
+## Current archive evidence and implementation sequence
+
+As of 2026-08-09, the maintainer reports that the current full archive contains only a few HEIC images and no known RAW images. Future iPhone backups are expected to add more HEIC images and may introduce RAW media.
+
+Implementation is therefore intentionally staged:
+
+1. make HEIC/HEIF a supported permanent-archive input now and verify it against representative private archive files;
+2. keep unverified RAW extensions visible as unsupported media rather than silently accepting or dropping them; and
+3. when a real RAW variant appears, inventory that exact format, add a representative private sample and extend the isolated decoder path with a deliberate rendering policy for that format.
+
+This is not a reduction in the WI-0053 completeness requirement. It avoids implementing camera-specific RAW behavior without any real archive input against which orientation, rendering, runtime and memory can be verified.
+
 ## In scope
 
 - Inventory the real archive by extension/media signature using privacy-safe aggregate counts only.
@@ -55,6 +67,8 @@ The permanent catalogue must represent the real archive rather than only the JPE
 ## Verification requirements
 
 Automated tests must cover media recognition, decoder success/failure contracts, orientation, idempotent archive integration and representative downstream processing with distributable fixtures. Human verification must use private real HEIC and RAW files from the archive and retain only privacy-safe aggregate results in Git.
+
+RAW human verification is conditional on RAW media actually being present. Until then, the acceptance evidence must explicitly record that the archive inventory found no RAW variants; a future newly observed RAW variant reopens that format-specific verification requirement rather than being silently skipped.
 
 ## Completion notes
 
