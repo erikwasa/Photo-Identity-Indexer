@@ -99,7 +99,10 @@ public sealed class OpenCvImageDecoder : IImageDecoder
         cancellationToken.ThrowIfCancellationRequested();
         image.Strip();
         using var pixels = image.GetPixels();
-        byte[] data = pixels.ToByteArray(PixelMapping.BGR);
+        byte[] data = pixels.ToByteArray(PixelMapping.BGR)
+            ?? throw new ImageDecodingException(
+                ImageDecodingFailure.CorruptMedia,
+                "The HEIC/HEIF image did not expose decoded BGR pixels.");
         int width = checked((int)image.Width);
         int height = checked((int)image.Height);
         ImageSize size = new(width, height);
