@@ -1,6 +1,6 @@
 # Canonical data model
 
-The SQLite catalogue is sensitive application data and the canonical local record of source identity, immutable photo revisions, people, human review history and resumable processing state. Model-produced results are retained under exact provenance but remain derived and replaceable.
+The SQLite catalogue is sensitive application data and the canonical local record of source identity, immutable photo revisions, people, assignment/review history and resumable processing state. Model-produced results are retained under exact provenance but remain derived and replaceable unless an explicit governed policy promotes a decision into canonical history.
 
 This document describes logical ownership and invariants. Physical tables and migrations remain implementation details of `PhotoIdentity.Persistence.Sqlite`.
 
@@ -8,15 +8,17 @@ This document describes logical ownership and invariants. Physical tables and mi
 
 A **source** defines a trusted local filesystem boundary. Personal OneDrive is represented by a locally synchronised folder; the catalogue stores no Microsoft Graph credentials.
 
+The permanent archive uses one stable source root plus normalized relative included folders. Expanding coverage does not create a second archive source identity.
+
 An **asset** is the stable catalogue identity of one source media item. Its current source key or path can change while the internal asset ID remains stable after reconciliation.
 
-An **asset revision** is an immutable observed content version of an asset. It records provenance such as observation time, media type, dimensions, size and content fingerprint when available.
+An **asset revision** is an immutable observed content version of an asset. It records provenance such as observation time, media type, dimensions, size and content fingerprint when available. Lightweight metadata may indicate that re-verification is required, but immutable revision identity is established from authoritative bytes rather than metadata alone.
 
 Processing attaches to revisions so changed content cannot silently reuse older detections, crops or embeddings.
 
 ## Face occurrences and detector observations
 
-A **face occurrence** is the stable identity of one face within an immutable asset revision. It is the object that receives crops, embeddings, suggestions and human review actions.
+A **face occurrence** is the stable identity of one face within an immutable asset revision. It is the object that receives crops, embeddings, suggestions and canonical review/assignment actions.
 
 Detector output is stored as model-versioned **observations** containing the exact detector revision, confidence, bounding box, landmarks and observation time. A later detector can add another observation without replacing the face occurrence or its canonical review state.
 
@@ -32,33 +34,45 @@ A **face embedding** belongs to:
 
 Baseline and candidate embeddings coexist. Embeddings from different revisions must not be compared using an assumed shared score scale.
 
-## People and review history
+## People and assignment history
 
 A **person** has a stable internal ID and human-maintained display name. People are shared across all model revisions.
 
-Human decisions are append-only review actions. They include assignment, rejection, undo and person-maintenance operations such as rename or merge. Current state is derived from active history; audit records are not replaced by model output.
+Canonical identity decisions are append-only actions. The current runtime records human assignment, rejection, undo and person-maintenance operations such as rename or merge. ADR-0006 adds an accepted future action source: WI-0043 may create an automatic canonical assignment when an explicitly enabled exact-model High-confidence policy qualifies.
 
-An active assignment is canonical identity data. A rejection preserves negative evidence. Merged people resolve to a surviving canonical person without rewriting model provenance.
+Automatic assignments must record the actor/source plus exact model, score and policy evidence. A later manual reassignment supersedes the earlier active assignment through history rather than erasing it.
+
+Current state is derived from active history. An active assignment is canonical identity data regardless of whether its allowed actor was human or an enabled governed automatic policy. A rejection preserves negative evidence. Merged people resolve to a surviving canonical person without rewriting model provenance or historical assignment evidence.
 
 ## Exemplars and suggestions
 
-An **exemplar** is a human-confirmed face used as positive identity evidence for matching.
+An **exemplar** is an actively assigned face eligible to provide positive identity evidence for one exact embedding revision.
 
-An **identity suggestion** is advisory derived data. It identifies:
+Until WI-0043 is implemented, exemplars come from human assignments only. After WI-0043, qualifying active automatic assignments may also become exemplars in later regeneration runs. A regeneration uses a fixed exemplar snapshot so assignments created during that run do not feed back into its own scoring.
+
+An **identity suggestion** is derived model-scoped evidence. It identifies:
 
 - the target face occurrence;
 - the suggested person;
 - the exact embedding model ID and hash;
-- score and ranking evidence; and
+- score, margin and ranking evidence; and
 - lifecycle state such as pending or superseded by later regeneration/review.
 
-Only human-confirmed assignments become exemplars. Suggestions never train later suggestions automatically. Rejected face-person pairs remain excluded under the governed matching rules.
+A suggestion is not canonical merely because it exists. Only an explicit human action or the implemented/enabled automatic-assignment policy may create canonical assignment history. Rejected face-person pairs remain excluded under the governed matching rules.
+
+The planned Unknown review state represents a real but currently unidentified person without creating a synthetic Person row. Unknown faces are not exemplars or person-collection evidence until later assigned.
 
 ## Processing runs and jobs
 
 A **processing run** persists source scope, output location, selected model IDs and operational policy. Its jobs and attempts record pending, running, completed and failed work so an interrupted run can resume without changing models or duplicating canonical revision identity.
 
 Run state is canonical operational data. Individual model outputs remain derived.
+
+## Review proxies and authoritative originals
+
+A **review proxy** is a versioned derived image used for normal local browsing and review context. It is tied to an immutable source revision and explicit proxy-generation profile.
+
+The authoritative original remains the source photo. A proxy does not replace the source revision and must never be used to establish source content identity. Full-resolution originals may be hydrated temporarily under the bounded archive-storage policy for verification, analysis or explicit viewing.
 
 ## Evaluation data
 
@@ -74,24 +88,26 @@ Evaluation reports are derived and reproducible. Validation may select threshold
 
 ## Collection data
 
-Collection queries read canonical people/review state plus optional exact-model suggestion evidence. They return opaque asset/revision identifiers, media metadata and matched-person evidence.
+Collection queries read canonical people/assignment state plus optional exact-model suggestion evidence. They return opaque asset/revision identifiers, media metadata and matched-person evidence.
 
-The collection browser uses non-persisted bounded thumbnails. The versioned neutral manifest contains HTTP resource URLs rather than local source roots, source keys, filenames or crop paths.
+The collection browser uses versioned review proxies where configured. Neutral manifests expose opaque HTTP resource URLs rather than local source roots, source keys, filenames or crop paths.
+
+Future EXIF/location and visible-content tagging data extend asset/revision metadata without changing identity ownership. Model-generated tags remain derived with provenance; manually curated tags may be canonical user data when that capability is introduced.
 
 ## Portable bundles and imports
 
 Job bundles contain explicitly selected immutable revision inputs, neutral names, exact model manifests and checksums. Result bundles contain detector/embedding outputs, errors, timings and checkpoints.
 
-Validated import matches known revision IDs, verifies checksums and provenance, and changes only permitted derived state. Bundles never contain people, assignments, rejections or append-only review history.
+Validated import matches known revision IDs, verifies checksums and provenance, and changes only permitted derived state. Bundles never contain people, canonical assignments/rejections or append-only review history.
 
 ## Canonical versus regenerable
 
 | Canonical or governed | Derived and regenerable |
 |---|---|
 | Source, asset and revision identity | Detector observations |
-| People | Crops and thumbnails |
+| People | Crops, thumbnails and review proxies |
 | Assignments and rejections | Embeddings |
-| Append-only review history | Suggestions and rankings |
+| Append-only assignment/review history | Suggestions and rankings |
 | Processing-run/job state | Evaluation manifests and reports |
 | Bundle import/provenance records | Portable processing outputs |
 
@@ -101,4 +117,6 @@ Derived data is still biometric or private and must be protected accordingly.
 
 Every derived result must be traceable to the immutable source revision, exact model ID and hash, material preprocessing/alignment contract and processing run or import that produced it.
 
-See the [Glossary](../glossary.md), [Recognition and identity matching](identity-matching.md) and [SQLite persistence operations](../operations/sqlite-persistence.md).
+Every automatic canonical assignment, once WI-0043 is implemented, must additionally retain the exact matching policy and evidence that promoted it from derived suggestion evidence into canonical history.
+
+See the [Glossary](../glossary.md), [Recognition and identity matching](identity-matching.md), [ADR-0006](../decisions/ADR-0006-canonical-auto-assignment.md), [ADR-0007](../decisions/ADR-0007-permanent-archive-bounded-storage.md) and [SQLite persistence operations](../operations/sqlite-persistence.md).
