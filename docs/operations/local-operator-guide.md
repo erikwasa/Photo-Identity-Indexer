@@ -138,9 +138,25 @@ The CLI `archive analyze` command exists for the archive analysis coordinator, b
 
 ## 7. Media-format completeness
 
-JPEG/PNG support already exists. WI-0053 adds HEIC/HEIF and the RAW variants found in the real archive before version 1 is considered archive-ready.
+HEIC/HEIF is being added under WI-0053; RAW support is activated only for formats actually found in the real archive. Use the aggregate inventory before treating a coverage area as format-complete:
 
-Until that work is complete, unsupported media must remain visible as explicit unsupported state. Do not treat a scan with silently omitted HEIC/RAW files as full archive coverage.
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -- `
+  archive inventory --database $db
+```
+
+The inventory walks only configured archive coverage, does not open image content, and prints extension counts plus media family/current support state. It does not print source paths or filenames. Because it only enumerates directory entries, it can reveal online-only HEIC or future RAW extensions without requesting OneDrive hydration.
+
+Expected examples include:
+
+```text
+extension: .heic count=<n> family=heif supported=true
+extension: .dng count=<n> family=raw supported=false
+```
+
+A RAW line with `supported=false` is a deliberate trigger for format-specific WI-0053 work, not permission to omit the file. When the current archive reports no RAW family, retain that aggregate result and defer RAW decoding until a real variant appears.
+
+Do not treat a scan with silently omitted media as full archive coverage.
 
 ## 8. Review faces and maintain people
 
