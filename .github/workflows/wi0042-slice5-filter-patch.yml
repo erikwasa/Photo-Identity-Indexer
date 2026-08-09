@@ -1,0 +1,60 @@
+name: WI-0042 Slice 5 filter patch
+
+on:
+  push:
+    branches:
+      - agent/WI-0042-slice5-unattended-archive
+    paths:
+      - .github/workflows/wi0042-slice5-filter-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/WI-0042-slice5-unattended-archive
+      - name: Patch Archive filters
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("src/PhotoIdentity.Web/Pages/Archive.razor")
+          text = path.read_text(encoding="utf-8")
+
+          old = '''            <div>\n                <label class="field-label" for="archive-item-state">State</label>\n                <select id="archive-item-state" @bind="ItemState" @bind:after="ApplyItemFiltersAsync" disabled="@(Busy || ItemLoading)">\n                    <option value="all">All states</option>\n                    <option value="pending">Pending analysis</option>\n                    <option value="failed">Processing failed</option>\n                    <option value="needs-source-verification">Needs source verification</option>\n                    <option value="unverified">First source verification</option>\n                    <option value="unavailable">Not local</option>\n                    <option value="missing">Missing</option>\n                    <option value="analysed">Analyzed</option>\n                </select>\n            </div>'''
+          new = '''            <div>\n                <label class="field-label" for="archive-item-availability">Availability</label>\n                <select id="archive-item-availability" @bind="ItemAvailability" @bind:after="ApplyItemFiltersAsync" disabled="@(Busy || ItemLoading)">\n                    <option value="all">All availability</option>\n                    <option value="local">Local</option>\n                    <option value="online-only">Online-only</option>\n                    <option value="downloading">Downloading</option>\n                    <option value="unavailable">Unavailable</option>\n                    <option value="error">Availability error</option>\n                </select>\n            </div>\n            <div>\n                <label class="field-label" for="archive-item-verification">Source verification</label>\n                <select id="archive-item-verification" @bind="ItemVerification" @bind:after="ApplyItemFiltersAsync" disabled="@(Busy || ItemLoading)">\n                    <option value="all">All verification</option>\n                    <option value="verified">Verified</option>\n                    <option value="needs-source-verification">Needs verification</option>\n                    <option value="unverified">First verification</option>\n                </select>\n            </div>\n            <div>\n                <label class="field-label" for="archive-item-analysis">Analysis</label>\n                <select id="archive-item-analysis" @bind="ItemAnalysis" @bind:after="ApplyItemFiltersAsync" disabled="@(Busy || ItemLoading)">\n                    <option value="all">All analysis</option>\n                    <option value="analysed">Analyzed</option>\n                    <option value="pending">Pending</option>\n                    <option value="failed">Failed</option>\n                    <option value="not-ready">Not ready for analysis</option>\n                    <option value="missing">Missing</option>\n                </select>\n            </div>'''
+          if old not in text:
+              raise SystemExit("Archive state filter marker not found")
+          text = text.replace(old, new, 1)
+
+          old = '''    private string ItemFolder { get; set; } = string.Empty;\n    private string ItemState { get; set; } = "all";'''
+          new = '''    private string ItemFolder { get; set; } = string.Empty;\n    private string ItemAvailability { get; set; } = "all";\n    private string ItemVerification { get; set; } = "all";\n    private string ItemAnalysis { get; set; } = "all";'''
+          if old not in text:
+              raise SystemExit("Archive filter field marker not found")
+          text = text.replace(old, new, 1)
+
+          old = '''            string query = $"state={Uri.EscapeDataString(ItemState)}&folder={Uri.EscapeDataString(ItemFolder)}&offset={ItemOffset}&limit={ItemPageSize}";\n            ItemPage = await Http.GetFromJsonAsync<ArchiveItemPageResponse>($"api/archive/items?{query}");'''
+          new = '''            string query = $"availability={Uri.EscapeDataString(ItemAvailability)}&verification={Uri.EscapeDataString(ItemVerification)}&analysis={Uri.EscapeDataString(ItemAnalysis)}&folder={Uri.EscapeDataString(ItemFolder)}&offset={ItemOffset}&limit={ItemPageSize}";\n            ItemPage = await Http.GetFromJsonAsync<ArchiveItemPageResponse>($"api/archive/items/filter?{query}");'''
+          if old not in text:
+              raise SystemExit("Archive item query marker not found")
+          text = text.replace(old, new, 1)
+
+          old = '''        "failed" => "Failed",\n        "unavailable" => "Not local",'''
+          new = '''        "failed" => "Failed",\n        "not-ready" => "Not ready",\n        "unavailable" => "Not local",'''
+          if old not in text:
+              raise SystemExit("Archive analysis label marker not found")
+          text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding="utf-8")
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "Erik Wahlström"
+          git config user.email "54457926+erikwasa@users.noreply.github.com"
+          git add src/PhotoIdentity.Web/Pages/Archive.razor
+          git commit -m "Separate Archive availability verification and analysis filters"
+          git push origin HEAD:agent/WI-0042-slice5-unattended-archive
