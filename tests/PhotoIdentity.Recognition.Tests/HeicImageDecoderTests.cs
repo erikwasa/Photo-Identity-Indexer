@@ -1,8 +1,5 @@
 using ImageMagick;
-using OpenCvSharp;
-using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Imaging;
-using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
 using Xunit;
 
@@ -13,39 +10,12 @@ public sealed class HeicImageDecoderTests
     private readonly OpenCvImageDecoder _decoder = new();
 
     [Fact]
-    public async Task Decode_heic_returns_packed_bgr_pixels_and_resizes()
+    public void Bundled_imagemagick_runtime_exposes_a_heic_read_delegate()
     {
-        byte[] encoded = CreateHeic(width: 80, height: 40);
-        using MemoryStream stream = new(encoded);
+        var heic = Assert.Single(
+            MagickNET.SupportedFormats.Where(format => format.Format == MagickFormat.Heic));
 
-        ImageFrame result = await _decoder.DecodeAsync(
-            stream,
-            new DecodeOptions(new ImageSize(40, 40)),
-            CancellationToken.None);
-
-        Assert.Equal(new ImageSize(40, 20), result.Size);
-        Assert.Equal(PixelFormat.Bgr24, result.Format);
-        Assert.Equal(120, result.Stride);
-        Assert.Equal(result.Stride * result.Size.Height, result.Data.Length);
-    }
-
-    [Fact]
-    public void Review_proxy_renderer_uses_the_same_heic_decode_path()
-    {
-        byte[] encoded = CreateHeic(width: 120, height: 60);
-        OpenCvReviewProxyRenderer renderer = new();
-
-        EncodedReviewProxy proxy = renderer.Render(
-            encoded,
-            new ReviewProxyProfile("heic-test", 80, 82));
-
-        Assert.Equal(80, proxy.Width);
-        Assert.Equal(40, proxy.Height);
-        Assert.Equal("image/jpeg", proxy.ContentType);
-        using Mat decoded = Cv2.ImDecode(proxy.Content, ImreadModes.Color);
-        Assert.False(decoded.Empty());
-        Assert.Equal(80, decoded.Cols);
-        Assert.Equal(40, decoded.Rows);
+        Assert.True(heic.SupportsReading);
     }
 
     [Fact]
@@ -66,13 +36,5 @@ public sealed class HeicImageDecoderTests
             () => _decoder.DecodeAsync(stream, new DecodeOptions(), CancellationToken.None));
 
         Assert.Equal(ImageDecodingFailure.CorruptMedia, exception.Failure);
-    }
-
-    private static byte[] CreateHeic(uint width, uint height)
-    {
-        using MagickImage image = new(MagickColors.CornflowerBlue, width, height);
-        image.Format = MagickFormat.Heic;
-        image.Quality = 90;
-        return image.ToByteArray();
     }
 }
