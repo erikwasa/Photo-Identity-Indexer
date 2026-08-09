@@ -34,6 +34,7 @@ public sealed class BoundedHydrationWorkingSetTests
             ArchiveHydrationCapacityService capacity = new(
                 database,
                 hydrations,
+                new SqliteArchiveSourceHydrationRepository(database),
                 new SqliteArchiveStorageRepository(database),
                 platform,
                 new FixedStorageProbe(100_000),

@@ -21,12 +21,15 @@ public sealed class SqliteArchiveStorageRepository
         SourceId sourceId,
         CancellationToken cancellationToken = default)
     {
+        await new SqliteArchiveSourceObservationRepository(_database).EnsureSchemaAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
-            SELECT COALESCE(SUM(revision.size_bytes), 0)
+            SELECT COALESCE(SUM(COALESCE(observation.observed_size_bytes, revision.size_bytes, 0)), 0)
             FROM assets AS asset
-            INNER JOIN asset_revisions AS revision
+            LEFT JOIN archive_source_observations AS observation
+                ON observation.asset_id = asset.id
+            LEFT JOIN asset_revisions AS revision
                 ON revision.id = (
                     SELECT candidate.id
                     FROM asset_revisions AS candidate

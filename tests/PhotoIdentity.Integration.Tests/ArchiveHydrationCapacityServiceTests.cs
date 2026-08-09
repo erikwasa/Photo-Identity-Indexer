@@ -171,6 +171,7 @@ public sealed class ArchiveHydrationCapacityServiceTests
         new(
             database,
             new SqliteArchiveHydrationRepository(database),
+            new SqliteArchiveSourceHydrationRepository(database),
             new SqliteArchiveStorageRepository(database),
             platform,
             probe,
@@ -274,8 +275,6 @@ public sealed class ArchiveHydrationCapacityServiceTests
             cancellationToken.ThrowIfCancellationRequested();
             string fullPath = Path.GetFullPath(path);
             ReleaseRequests.Add(fullPath);
-            // Keep the file local here: release is asynchronous, and capacity must continue to
-            // count it until a later observation reports online-only.
             _states[fullPath] = new OneDriveFilesOnDemandState(AssetAvailability.Local, false, true);
             return Task.CompletedTask;
         }

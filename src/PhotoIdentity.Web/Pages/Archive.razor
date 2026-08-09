@@ -7,7 +7,7 @@
     <div>
         <p class="eyebrow">Permanent archive</p>
         <h1>Archive coverage</h1>
-        <p>Add recursive folders under one stable source root, synchronize changed files and OneDrive availability, and analyze only locally available revisions that still need the governed CenterFace/SFace profile.</p>
+        <p>Add recursive folders under one stable source root, synchronize lightweight OneDrive observations, verify changed or first-time online-only sources under the bounded storage policy, and analyze exact immutable revisions with the governed CenterFace/SFace profile.</p>
     </div>
     <button class="button secondary" disabled="@Busy" @onclick="RefreshAsync">Refresh</button>
 </section>
@@ -103,7 +103,14 @@ else
             <span>Pending</span>
             <strong>@AnalysisCount(Status.Totals.PendingImages)</strong>
         </article>
-        <article class="@(Status.Totals.FailedImages > 0 ? "attention" : null)">
+        <article class="@(Status.Totals.NeedsSourceVerificationImages > 0 ? "attention" : null)">
+<span>Needs verification</span>
+<strong>@Status.Totals.NeedsSourceVerificationImages</strong>
+        </article>
+        <article class="@(Status.Totals.UnverifiedSourceImages > 0 ? "attention" : null)">
+<span>First verification</span>
+<strong>@Status.Totals.UnverifiedSourceImages</strong>
+        </article>        <article class="@(Status.Totals.FailedImages > 0 ? "attention" : null)">
             <span>Failed</span>
             <strong>@AnalysisCount(Status.Totals.FailedImages)</strong>
         </article>
@@ -116,7 +123,7 @@ else
     @if (Status.Totals.OnlineOnlyImages + Status.Totals.DownloadingImages > 0)
     {
         <div class="notice warning">
-            OneDrive placeholders are catalogued but not opened. Hydrate them with the OneDrive sync client, then sync again before analysis.
+            OneDrive placeholders are catalogued without opening their content. Use Advance archive to request only the verification or analysis hydration that is needed; Photo Identity applies the configured storage budget and releases only content it hydrated.
         </div>
     }
 
@@ -126,8 +133,8 @@ else
                 <p class="eyebrow">Governed profile</p>
                 <h2 id="archive-analysis-heading">Archive analysis</h2>
             </div>
-            <button class="button primary" disabled="@(Busy || !Status.Configured || !Status.AnalysisReady || Status.Totals.PendingImages == 0)" @onclick="AnalyzePendingAsync">
-                @(Analyzing ? "Analyzing…" : Status.LatestRun is { QueuedJobs: > 0 } ? "Continue analysis" : "Analyze pending")
+            <button class="button primary" disabled="@(Busy || !Status.Configured || !Status.AnalysisReady)" @onclick="AnalyzePendingAsync">
+                @(Analyzing ? "Advancing…" : "Advance archive")
             </button>
         </div>
 
@@ -193,6 +200,7 @@ else
                             <th>Analyzed</th>
                             <th>Pending</th>
                             <th>Failed</th>
+                            <th>Verify</th>
                             <th>Missing</th>
                         </tr>
                     </thead>
@@ -208,6 +216,7 @@ else
                                 <td>@AnalysisCount(folder.AnalysedImages)</td>
                                 <td>@AnalysisCount(folder.PendingImages)</td>
                                 <td class="@(folder.FailedImages > 0 ? "failure-count" : null)">@AnalysisCount(folder.FailedImages)</td>
+                                <td class="@(folder.NeedsSourceVerificationImages + folder.UnverifiedSourceImages > 0 ? "failure-count" : null)">@(folder.NeedsSourceVerificationImages + folder.UnverifiedSourceImages)</td>
                                 <td>@folder.MissingImages</td>
                             </tr>
                         }
@@ -243,6 +252,8 @@ else
                     <option value="all">All states</option>
                     <option value="pending">Pending analysis</option>
                     <option value="failed">Processing failed</option>
+                    <option value="needs-source-verification">Needs source verification</option>
+                    <option value="unverified">First source verification</option>
                     <option value="unavailable">Not local</option>
                     <option value="missing">Missing</option>
                     <option value="analysed">Analyzed</option>
@@ -266,6 +277,7 @@ else
                         <tr>
                             <th>Relative path</th>
                             <th>Availability</th>
+                            <th>Source verification</th>
                             <th>Analysis</th>
                             <th>Latest error</th>
                         </tr>
@@ -276,6 +288,7 @@ else
                             <tr>
                                 <td><code>@item.RelativePath</code></td>
                                 <td><span class="archive-state state-@CssToken(item.Availability)">@AvailabilityLabel(item.Availability)</span></td>
+                                <td><span class="archive-state state-@CssToken(item.SourceVerificationState)">@SourceVerificationLabel(item.SourceVerificationState)</span></td>
                                 <td><span class="archive-state state-@CssToken(item.AnalysisState)">@AnalysisStateLabel(item.AnalysisState)</span></td>
                                 <td class="archive-item-error">@(string.IsNullOrWhiteSpace(item.LastError) ? "—" : item.LastError)</td>
                             </tr>
@@ -398,7 +411,7 @@ else
             using HttpResponseMessage response = await Http.PostAsync("api/archive/sync", content: null);
             ArchiveSyncResponse result = await ReadResponseAsync<ArchiveSyncResponse>(response);
             Status = result.Status;
-            Message = $"Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged local, {result.OnlineOnlyFiles} online-only, {result.DownloadingFiles} downloading, {result.AvailabilityErrors + result.UnavailableFiles} availability issue(s), {result.MarkedMissing} marked missing.";
+            Message = $"Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged local, {result.NeedsSourceVerification} needing re-verification, {result.UnverifiedSources} awaiting first verification, {result.OnlineOnlyFiles} online-only, {result.DownloadingFiles} downloading, {result.AvailabilityErrors + result.UnavailableFiles} availability issue(s), {result.MarkedMissing} marked missing.";
             ItemOffset = 0;
             await LoadItemsAsync();
         }
@@ -451,8 +464,8 @@ else
             if (string.IsNullOrWhiteSpace(Message))
             {
                 Message = Status?.Totals.PendingImages == 0
-                    ? "Archive analysis is up to date for locally available images in the current profile."
-                    : "Archive analysis stopped with pending work remaining. Review failures or continue the run.";
+                    ? "This archive step completed. If source verification or OneDrive downloading is still shown, use Advance archive again after content becomes local; the same action also retries durable proxy work."
+                    : "Archive advancement stopped with pending work remaining. Review failures or use Advance archive again.";
             }
 
             await LoadItemsAsync();
@@ -519,12 +532,21 @@ else
         _ => availability,
     };
 
+    private static string SourceVerificationLabel(string state) => state switch
+    {
+        "verified" => "Verified",
+        "needs-source-verification" => "Needs verification",
+        "unverified" => "First verification",
+        _ => state,
+    };
     private static string AnalysisStateLabel(string state) => state switch
     {
         "analysed" => "Analyzed",
         "pending" => "Pending",
         "failed" => "Failed",
         "unavailable" => "Not local",
+        "needs-source-verification" => "Needs source verification",
+        "unverified" => "First source verification",
         "missing" => "Missing",
         _ => state,
     };

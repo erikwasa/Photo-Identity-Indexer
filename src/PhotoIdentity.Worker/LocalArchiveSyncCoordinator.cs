@@ -18,6 +18,9 @@ public sealed record LocalArchiveSyncSummary(
     int AvailabilityErrorCount,
     int NewRevisionCount,
     int UnchangedFileCount,
+    int VerifiedSourceCount,
+    int NeedsSourceVerificationCount,
+    int UnverifiedSourceCount,
     int MarkedDeletedCount);
 
 /// <summary>
@@ -63,6 +66,9 @@ public sealed class LocalArchiveSyncCoordinator
         int availabilityErrors = 0;
         int newRevisions = 0;
         int unchanged = 0;
+        int verified = 0;
+        int needsVerification = 0;
+        int unverified = 0;
         int deleted = 0;
 
         foreach (string folder in normalized)
@@ -83,6 +89,9 @@ public sealed class LocalArchiveSyncCoordinator
             availabilityErrors += summary.AvailabilityErrorCount;
             newRevisions += summary.NewRevisionCount;
             unchanged += summary.UnchangedFileCount;
+            verified += summary.VerifiedSourceCount;
+            needsVerification += summary.NeedsSourceVerificationCount;
+            unverified += summary.UnverifiedSourceCount;
             deleted += summary.MarkedDeletedCount;
         }
 
@@ -98,6 +107,9 @@ public sealed class LocalArchiveSyncCoordinator
             availabilityErrors,
             newRevisions,
             unchanged,
+            verified,
+            needsVerification,
+            unverified,
             deleted);
     }
 }
