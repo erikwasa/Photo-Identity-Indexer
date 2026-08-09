@@ -266,11 +266,8 @@ internal sealed record DecodeCommandOptions(
             throw new ArgumentException($"Option '{option}' may be supplied only once.");
         }
 
-        if (!int.TryParse(value, out int result) || result <= 0)
-        {
-            throw new ArgumentException($"Option '{option}' requires a positive integer.");
-        }
-
-        return result;
+        return int.TryParse(value, out int parsed) && parsed > 0
+            ? parsed
+            : throw new ArgumentException($"Option '{option}' requires a positive integer.");
     }
 }
