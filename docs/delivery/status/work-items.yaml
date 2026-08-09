@@ -524,6 +524,7 @@ work_items:
   - WI-0022
   - WI-0041
   - WI-0042
+  - WI-0053
   blocker_notes: []
   evidence: []
 - id: WI-0024
@@ -721,7 +722,7 @@ work_items:
   blocker_notes: []
   evidence:
   - type: human_verification
-    value: Private same-corpus FP32-versus-INT8 comparison and manual suggestion review completed locally on 2026-08-01. Twenty representative faces were correct under both exact revisions with no material practical difference; retain the FP32 baseline. The detailed record remains private.
+    value: Private same-corpus FP32-versus-INT8 comparison and manual suggestion review completed locally on Windows on 2026-08-01. Twenty representative faces were correct under both revisions with no material practical difference; retain the FP32 baseline. The detailed record remains private.
 - id: WI-0031
   title: Rewrite operator and architecture documentation
   milestone: M15
@@ -902,7 +903,7 @@ work_items:
   - type: human_verification
     value: The maintainer explicitly accepted the documented CenterFace pretrained-weight and training-data uncertainty for local evaluation on 2026-08-07; rollout engineering was separately instructed, and redistribution remains outside that acceptance.
   - type: human_verification
-    value: The maintainer completed the unchanged governed CenterFace confidence-0.5 single-pass comparison against the fixed private 100-photo M16 sample and frozen ground truth on 2026-08-07 and reported that it passed the complete M16 gate; detailed metrics remain outside Git.
+    value: The maintainer completed the unchanged governed CenterFace confidence-0.5 single-pass comparison against the fixed private 100-photo M16 sample and frozen ground truth on 2026-08-07 and reported that it passed the complete M16 gate; detailed metrics remain private.
 - id: WI-0038
   title: Roll out the selected detector pipeline
   milestone: M16
@@ -1159,5 +1160,16 @@ work_items:
   blockers:
   - WI-0048
   - WI-0051
+  blocker_notes: []
+  evidence: []
+- id: WI-0053
+  title: Add HEIC and archive RAW image support
+  milestone: M12
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0053-heic-raw-support.md
+  blockers:
+  - WI-0006
+  - WI-0012
   blocker_notes: []
   evidence: []
