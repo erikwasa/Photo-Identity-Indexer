@@ -61,6 +61,10 @@ public partial class Program
         builder.Services.AddSingleton<SqliteArchiveReviewProxyRepository>();
         builder.Services.AddSingleton<SqliteArchivePostAnalysisRepository>();
         builder.Services.AddSingleton<SqliteArchiveHydrationRepository>();
+        builder.Services.AddSingleton<SqliteArchiveSourceHydrationRepository>();
+        builder.Services.AddSingleton<SqliteArchiveSourceObservationRepository>();
+        builder.Services.AddSingleton<SqliteArchiveSourceVerificationStateRepository>();
+        builder.Services.AddSingleton<SqliteArchiveAvailabilityRepository>();
         builder.Services.AddSingleton<SqliteArchiveStorageRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton<DetectorRolloutCropFileResolver>();
@@ -68,6 +72,7 @@ public partial class Program
         builder.Services.AddSingleton<CollectionReviewProxyFileResolver>();
         builder.Services.AddSingleton<CollectionOriginalAccessService>();
         builder.Services.AddSingleton<ArchiveHydrationCapacityService>();
+        builder.Services.AddSingleton<ArchiveSourceVerificationService>();
         builder.Services.AddSingleton<ArchiveBoundedAnalysisService>();
         builder.Services.AddSingleton<IOneDriveFilesOnDemandPlatform, WindowsOneDriveFilesOnDemandPlatform>();
         builder.Services.AddSingleton<IArchiveStorageProbe, DriveArchiveStorageProbe>();
