@@ -4,7 +4,7 @@ This glossary defines terms used across Photo Identity Indexer documentation, co
 
 ## Assignment
 
-A human review action that identifies one face occurrence as a person. An active assignment is canonical identity data. Later undo or correction is recorded through review history rather than by treating a model suggestion as authoritative.
+A canonical action that identifies one face occurrence as a person. The current runtime creates assignments through human review; ADR-0006 permits an explicitly enabled High-confidence automatic policy to create assignments once WI-0043 is implemented. Active assignments are canonical identity data. Later undo or correction is recorded through append-only history.
 
 ## Asset
 
@@ -12,7 +12,7 @@ The catalogue identity of one source photo or supported media item. An asset can
 
 ## Asset revision
 
-An immutable observed content version of an asset. Processing, face occurrences and collection results refer to a revision so changed file content cannot silently reuse older derived results.
+An immutable observed content version of an asset. Processing, face occurrences and collection results refer to a revision so changed file content cannot silently reuse older derived results. Authoritative bytes, not lightweight file metadata alone, establish immutable revision identity.
 
 ## Bundle
 
@@ -20,11 +20,11 @@ A portable, checksummed package used to move explicitly selected processing inpu
 
 ## Canonical data
 
-Data whose loss cannot be repaired safely by rerunning a model. In this system it includes people, active human assignments and rejections, append-only review history, source/revision identity and governed processing records.
+Data whose loss cannot be repaired safely by rerunning a model. In this system it includes people, active assignments and rejections, append-only assignment/review history, source/revision identity and governed processing records. A future governed automatic assignment is canonical because an explicit policy promotes the decision into history; its underlying suggestion and embedding remain derived.
 
 ## Catalogue
 
-The local SQLite database plus the referenced governed artefact state used by Photo Identity Indexer. It records sources, assets, immutable revisions, faces, people, review history, exact-model derived data and processing state. It is sensitive application data, not a disposable cache.
+The local SQLite database plus the referenced governed artefact state used by Photo Identity Indexer. It records sources, assets, immutable revisions, faces, people, assignment/review history, exact-model derived data and processing state. It is sensitive application data, not a disposable cache.
 
 ## Collection
 
@@ -32,7 +32,7 @@ A query result containing photos that match one or more selected people under ex
 
 ## Derived artefact
 
-A result that can be regenerated from canonical inputs and exact provenance, such as an aligned crop, embedding, suggestion, thumbnail, export or evaluation report. Derived does not mean public or non-sensitive.
+A result that can be regenerated from canonical inputs and exact provenance, such as an aligned crop, embedding, suggestion, review proxy, export or evaluation report. Derived does not mean public or non-sensitive.
 
 ## Embedding
 
@@ -40,11 +40,11 @@ A model-produced numeric vector representing one aligned face crop. Embeddings a
 
 ## Exemplar
 
-A human-confirmed face used as positive identity evidence for matching. Suggestions never become exemplars automatically.
+An actively assigned face used as positive identity evidence for matching under one exact embedding revision. The current implementation uses human-assigned exemplars. After WI-0043, eligible automatic assignments may become exemplars in later regeneration runs; a newly automatic assignment never feeds back into the same regeneration run that created it.
 
 ## Face occurrence
 
-The stable catalogue identity of a face within one immutable asset revision. Detector observations, crops, embeddings, suggestions and human review actions attach to this identity.
+The stable catalogue identity of a face within one immutable asset revision. Detector observations, crops, embeddings, suggestions and assignment/review actions attach to this identity.
 
 ## Intersection over union (IoU)
 
@@ -64,7 +64,7 @@ The exact model identity used to produce derived results: model ID, SHA-256 hash
 
 ## Observation
 
-A model-versioned measurement attached to a stable catalogue object. A detector observation can contain confidence, bounding box and landmarks without replacing the face occurrence or its human review state.
+A model-versioned measurement attached to a stable catalogue object. A detector observation can contain confidence, bounding box and landmarks without replacing the face occurrence or its canonical assignment/review state.
 
 ## Person
 
@@ -80,20 +80,28 @@ A human review action stating that a face is not the selected person, or that a 
 
 ## Review action
 
-An append-only human decision such as assignment, rejection, undo, rename or merge. Current state is derived from active history; the audit trail is not replaced by model output.
+An append-only canonical decision such as assignment, rejection, undo, rename or merge. Most current review actions are human. Future automatic assignment is recorded as an explicitly attributed canonical action rather than hidden model state. Current state is derived from active history.
+
+## Review proxy
+
+A versioned derived image retained locally for normal browsing and review context while the authoritative original can remain online-only in OneDrive. A review proxy never replaces source identity or the immutable original revision.
 
 ## Source
 
-A configured local filesystem boundary containing photos. Personal OneDrive is represented through the Windows synchronisation client as a local source; the application does not use Microsoft Graph credentials.
+A configured local filesystem boundary containing photos. Personal OneDrive is represented through the Windows synchronisation client as a local source; the application does not use Microsoft Graph credentials. The permanent archive is represented by one stable root plus normalized relative included folders.
 
 ## Suggestion
 
-Advisory identity evidence generated from one exact embedding-model revision. Suggestions carry scores, rankings and provenance, remain separate from canonical assignments and require human review.
+Derived identity evidence generated from one exact embedding-model revision. Suggestions carry scores, ranking/margin evidence and provenance. A suggestion is not itself canonical. The current runtime requires human review to create assignments; WI-0043 will allow a qualifying High suggestion to create a separate canonical automatic assignment when the explicit policy is enabled.
+
+## Unknown
+
+A planned face-review state for a real person whose identity is not currently known. Unknown is not a synthetic Person identity, is not positive exemplar evidence and does not satisfy a person-based collection until the face is later assigned. This state is planned under WI-0047.
 
 ## Thumbnail
 
-A bounded server-generated preview used by the local collection browser. Thumbnails avoid transferring original image dimensions while retaining opaque revision-based URLs and a no-store cache policy.
+A bounded server-generated preview used by the local collection browser. For permanent archive operation, durable versioned review proxies are preferred for normal browsing so original source files need not be hydrated.
 
 ## Trusted control plane
 
-The Windows computer that owns the canonical catalogue, people, review history, local artefacts, model installation, API and browser host. Optional remote compute receives explicit portable bundles only and never becomes the canonical owner.
+The Windows computer that owns the canonical catalogue, people, assignment/review history, local artefacts, model installation, API and browser host. Optional remote compute receives explicit portable bundles only and never becomes the canonical owner.
