@@ -39,6 +39,7 @@ public sealed class DecodeCommandTests
             Assert.Empty(error.ToString());
             Assert.True(File.Exists(outputPath));
             Assert.Equal(original, await File.ReadAllBytesAsync(inputPath));
+            Assert.Contains("peak-working-set-bytes:", output.ToString(), StringComparison.Ordinal);
 
             byte[] encoded = await File.ReadAllBytesAsync(outputPath);
             Assert.True(encoded.AsSpan().StartsWith(PngSignature));
@@ -51,6 +52,7 @@ public sealed class DecodeCommandTests
             Assert.Equal("passed", root.GetProperty("result").GetString());
             Assert.True(root.GetProperty("inputUnchanged").GetBoolean());
             Assert.Equal("Bgr24", root.GetProperty("pixelFormat").GetString());
+            Assert.True(root.GetProperty("peakWorkingSetBytes").GetInt64() > 0);
             Assert.Equal("normalised.png", root.GetProperty("outputFileName").GetString());
         }
         finally
