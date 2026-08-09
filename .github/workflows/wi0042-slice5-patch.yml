@@ -1,0 +1,127 @@
+name: WI-0042 Slice 5 patch
+
+on:
+  push:
+    branches:
+      - agent/WI-0042-slice5-unattended-archive
+    paths:
+      - .github/workflows/wi0042-slice5-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/WI-0042-slice5-unattended-archive
+
+      - name: Apply targeted patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding="utf-8")
+              if old not in text:
+                  raise SystemExit(f"marker not found in {path}: {old[:80]!r}")
+              p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # Collections: keep thumbnail for the grid, but open the proxy-first viewer.
+          replace_once(
+              "src/PhotoIdentity.Web/Pages/Collections.razor",
+              '''                            <a class="collection-photo-link"\n                               href="@photo.ContentUrl"\n                               target="_blank"\n                               rel="noopener noreferrer"\n                               aria-label="@OpenPhotoLabel(photo)">\n                                <img class="collection-photo"\n                                     src="@photo.ContentUrl"''',
+              '''                            <a class="collection-photo-link"\n                               href="@($"/photo/{photo.RevisionId}")"\n                               aria-label="@OpenPhotoLabel(photo)">\n                                <img class="collection-photo"\n                                     src="@photo.ThumbnailUrl"''')
+
+          archive = "src/PhotoIdentity.Web/Pages/Archive.razor"
+          replace_once(archive, '@page "/archive"\n@inject HttpClient Http', '@page "/archive"\n@implements IAsyncDisposable\n@inject HttpClient Http')
+          replace_once(
+              archive,
+              '''            <button class="button primary" disabled="@(Busy || !Status.Configured || !Status.AnalysisReady)" @onclick="AnalyzePendingAsync">\n                @(Analyzing ? "Advancing…" : "Advance archive")\n            </button>''',
+              '''            @if (Status.Advancement?.IsRunning == true)\n            {\n                <button class="button secondary" disabled="@Busy" @onclick="PauseAdvancementAsync">Pause archive</button>\n            }\n            else\n            {\n                <button class="button primary" disabled="@(Busy || !Status.Configured || !Status.AnalysisReady)" @onclick="AnalyzePendingAsync">Advance archive</button>\n            }''')
+          replace_once(
+              archive,
+              '''        <dl class="profile-details">\n            <div><dt>Detector</dt><dd>@Status.DetectorModelId · confidence @Status.DetectorConfidence</dd></div>\n            <div><dt>Embedder</dt><dd>@Status.EmbedderModelId</dd></div>\n            <div><dt>Profile</dt><dd><code>@(Status.ProfileHash is null ? "unavailable" : HashPrefix(Status.ProfileHash))</code></dd></div>\n        </dl>''',
+              '''        <dl class="profile-details">\n            <div><dt>Detector</dt><dd>@Status.DetectorModelId · confidence @Status.DetectorConfidence</dd></div>\n            <div><dt>Embedder</dt><dd>@Status.EmbedderModelId</dd></div>\n            <div><dt>Profile</dt><dd><code>@(Status.ProfileHash is null ? "unavailable" : HashPrefix(Status.ProfileHash))</code></dd></div>\n            <div><dt>Archive advancement</dt><dd>@AdvancementLabel(Status.Advancement)</dd></div>\n        </dl>\n\n        @if (!string.IsNullOrWhiteSpace(Status.Advancement?.Message))\n        {\n            <div class="notice">@Status.Advancement.Message</div>\n        }''')
+          replace_once(archive, '                            <th>Verify</th>\n                            <th>Missing</th>', '                            <th>Needs verify</th>\n                            <th>First verify</th>\n                            <th>Missing</th>')
+          replace_once(
+              archive,
+              '''                                <td class="@(folder.NeedsSourceVerificationImages + folder.UnverifiedSourceImages > 0 ? "failure-count" : null)">@(folder.NeedsSourceVerificationImages + folder.UnverifiedSourceImages)</td>\n                                <td>@folder.MissingImages</td>''',
+              '''                                <td class="@(folder.NeedsSourceVerificationImages > 0 ? "failure-count" : null)">@folder.NeedsSourceVerificationImages</td>\n                                <td class="@(folder.UnverifiedSourceImages > 0 ? "failure-count" : null)">@folder.UnverifiedSourceImages</td>\n                                <td>@folder.MissingImages</td>''')
+          replace_once(archive, '                            <th>Latest error</th>\n                        </tr>', '                            <th>Latest error</th>\n                            <th>View</th>\n                        </tr>')
+          replace_once(
+              archive,
+              '''                                <td class="archive-item-error">@(string.IsNullOrWhiteSpace(item.LastError) ? "—" : item.LastError)</td>\n                            </tr>''',
+              '''                                <td class="archive-item-error">@(string.IsNullOrWhiteSpace(item.LastError) ? "—" : item.LastError)</td>\n                                <td>\n                                    @if (!string.IsNullOrWhiteSpace(item.RevisionId))\n                                    {\n                                        <a class="button secondary" href="@($"/photo/{item.RevisionId}")">View</a>\n                                    }\n                                </td>\n                            </tr>''')
+          replace_once(
+              archive,
+              '''    private bool Busy { get; set; }\n    private bool Analyzing { get; set; }\n\n    protected override async Task OnInitializedAsync() => await RefreshAsync();''',
+              '''    private bool Busy { get; set; }\n    private CancellationTokenSource? AdvancementPolling { get; set; }\n\n    protected override async Task OnInitializedAsync()\n    {\n        await RefreshAsync();\n        StartAdvancementPollingIfNeeded();\n    }''')
+
+          start = archive and Path(archive).read_text(encoding="utf-8")
+          old_method = '''    private async Task AnalyzePendingAsync()\n    {\n        Busy = true;\n        Analyzing = true;\n        Error = null;\n        Message = null;\n        try\n        {\n            int previousFinished = Status?.LatestRun is ArchiveRunStatusResponse existing\n                ? existing.SucceededJobs + existing.FailedJobs + existing.CancelledJobs\n                : -1;\n            int steps = 0;\n            while (steps < 10000)\n            {\n                using HttpResponseMessage response = await Http.PostAsync("api/archive/analysis/step", content: null);\n                ArchiveAnalysisStepResponse result = await ReadResponseAsync<ArchiveAnalysisStepResponse>(response);\n                Status = result.Status;\n                steps++;\n\n                ArchiveRunStatusResponse? run = Status.LatestRun;\n                if (run is null || run.QueuedJobs == 0 && run.RunningJobs == 0)\n                {\n                    break;\n                }\n\n                int finished = run.SucceededJobs + run.FailedJobs + run.CancelledJobs;\n                if (finished <= previousFinished)\n                {\n                    Message = "Analysis is durable but no additional image was due in this step. Use Continue analysis later to resume queued work.";\n                    break;\n                }\n\n                previousFinished = finished;\n                await Task.Delay(75);\n            }\n\n            if (string.IsNullOrWhiteSpace(Message))\n            {\n                Message = Status?.Totals.PendingImages == 0\n                    ? "This archive step completed. If source verification or OneDrive downloading is still shown, use Advance archive again after content becomes local; the same action also retries durable proxy work."\n                    : "Archive advancement stopped with pending work remaining. Review failures or use Advance archive again.";\n            }\n\n            await LoadItemsAsync();\n        }\n        catch (Exception exception)\n        {\n            Error = exception.Message;\n        }\n        finally\n        {\n            Analyzing = false;\n            Busy = false;\n        }\n    }'''
+          new_method = '''    private async Task AnalyzePendingAsync()\n    {\n        Busy = true;\n        Error = null;\n        Message = null;\n        try\n        {\n            using HttpResponseMessage response = await Http.PostAsync("api/archive/advance/start", content: null);\n            Status = await ReadResponseAsync<ArchiveStatusResponse>(response);\n            Message = "Archive advancement started. Synchronization, OneDrive waits, analysis, proxy generation and managed release will continue without additional clicks.";\n            await LoadItemsAsync();\n            StartAdvancementPollingIfNeeded();\n        }\n        catch (Exception exception)\n        {\n            Error = exception.Message;\n        }\n        finally\n        {\n            Busy = false;\n        }\n    }\n\n    private async Task PauseAdvancementAsync()\n    {\n        Busy = true;\n        Error = null;\n        try\n        {\n            using HttpResponseMessage response = await Http.PostAsync("api/archive/advance/pause", content: null);\n            Status = await ReadResponseAsync<ArchiveStatusResponse>(response);\n            Message = "Archive advancement paused. Durable completed work is retained.";\n            StopAdvancementPolling();\n            await LoadItemsAsync();\n        }\n        catch (Exception exception)\n        {\n            Error = exception.Message;\n        }\n        finally\n        {\n            Busy = false;\n        }\n    }\n\n    private void StartAdvancementPollingIfNeeded()\n    {\n        if (Status?.Advancement?.IsRunning != true || AdvancementPolling is not null)\n        {\n            return;\n        }\n\n        AdvancementPolling = new CancellationTokenSource();\n        _ = PollAdvancementAsync(AdvancementPolling.Token);\n    }\n\n    private async Task PollAdvancementAsync(CancellationToken cancellationToken)\n    {\n        try\n        {\n            while (!cancellationToken.IsCancellationRequested)\n            {\n                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);\n                Status = await Http.GetFromJsonAsync<ArchiveStatusResponse>("api/archive/status", cancellationToken);\n                if (Status?.Configured == true)\n                {\n                    await LoadItemsAsync();\n                }\n                await InvokeAsync(StateHasChanged);\n\n                if (Status?.Advancement?.IsRunning != true)\n                {\n                    return;\n                }\n            }\n        }\n        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)\n        {\n        }\n        catch (Exception exception)\n        {\n            Error = $"Archive progress polling stopped: {exception.Message}";\n            await InvokeAsync(StateHasChanged);\n        }\n        finally\n        {\n            AdvancementPolling?.Dispose();\n            AdvancementPolling = null;\n        }\n    }\n\n    private void StopAdvancementPolling() => AdvancementPolling?.Cancel();'''
+          replace_once(archive, old_method, new_method)
+          replace_once(
+              archive,
+              '''    private static string HashPrefix(string hash) =>\n        hash[..Math.Min(12, hash.Length)];\n}''',
+              '''    private static string HashPrefix(string hash) =>\n        hash[..Math.Min(12, hash.Length)];\n\n    private static string AdvancementLabel(ArchiveAdvancementStatusResponse? advancement) => advancement?.State switch\n    {\n        "queued" => "Queued",\n        "syncing" => "Synchronizing",\n        "running" => "Running",\n        "waiting" => "Waiting for OneDrive",\n        "blocked" => "Blocked",\n        "paused" => "Paused",\n        "complete" => "Complete",\n        null => "Not started",\n        _ => advancement.State,\n    };\n\n    public ValueTask DisposeAsync()\n    {\n        StopAdvancementPolling();\n        return ValueTask.CompletedTask;\n    }\n}''')
+
+          # Work item: document the acceptance-discovered corrective slice.
+          wi = "docs/delivery/work-items/WI-0042-bounded-archive-storage.md"
+          replace_once(
+              wi,
+              '''- [ ] WI-0041 real-archive verification resumes only after the bounded storage/hydration workflow is implemented and locally verified.''',
+              '''- [ ] WI-0041 real-archive verification resumes only after the bounded storage/hydration workflow is implemented and locally verified.\n- [ ] One operator action can synchronize and continue the selected archive coverage through source verification, bounded OneDrive waits, analysis, proxy generation and managed release until complete, paused or genuinely blocked.\n- [ ] Normal photo viewing opens the durable review proxy rather than the fixed thumbnail, while full-resolution original hydration/view/release remains explicit.\n- [ ] Archive item status keeps OneDrive availability, source verification and analysis completion logically independent so an `OnlineOnly` analysed revision remains visible as analysed.''')
+          replace_once(
+              wi,
+              '''### Slice 4 — source re-verification, telemetry and local acceptance\n\nAdd online-only source-change/reverification state, storage telemetry and end-to-end verification using the selected proxy profile. Validate the chosen settings on the 560-image pilot corpus before WI-0041 proceeds to the real archive progression.''',
+              '''### Slice 4 — source re-verification, telemetry and local acceptance\n\nAdd online-only source-change/reverification state, storage telemetry and end-to-end verification using the selected proxy profile. Validate the chosen settings on the 560-image pilot corpus before WI-0041 proceeds to the real archive progression.\n\n### Slice 5 — unattended advancement, proxy-first viewing and orthogonal status\n\nThe combined human acceptance exposed three blockers before WI-0042 could be accepted: per-transition manual archive advancement did not scale, Collections opened the compatibility 480 × 320 thumbnail instead of a normal review-proxy viewer and exposed no original controls, and an analysed revision returned to `OnlineOnly` disappeared from the Archive analysed filter.\n\nSlice 5 adds durable server-owned one-click advancement that synchronizes first and automatically continues across OneDrive waits; a proxy-first photo viewer reachable from Collections and Archive with explicit original hydrate/open/release controls; and status semantics that preserve analysis completion independently of source availability. See `docs/operations/bounded-archive-slice5.md`.''')
+
+          acceptance = "docs/operations/bounded-archive-acceptance.md"
+          replace_once(
+              acceptance,
+              '''This procedure is the human acceptance gate for WI-0042 after Slices 1–4 are merged. It validates review proxies, explicit originals, bounded hydration, source re-verification and end-to-end archive advancement together.''',
+              '''This procedure is the human acceptance gate for WI-0042 after Slices 1–5 are merged. It validates review proxies, explicit originals, bounded hydration, source re-verification and end-to-end unattended archive advancement together.\n\nThe first Slices 1–4 acceptance attempt was intentionally paused after the maintainer found the Slice 5 blockers documented in `bounded-archive-slice5.md`. Do not resume or record the combined gate as passed until those corrections are merged and re-verified.''')
+          replace_once(
+              acceptance,
+              '''## 7. Full archive advancement\n\nAfter the focused checks pass, synchronize the intended permanent archive coverage and use **Advance archive** repeatedly. The operation is intentionally incremental: when OneDrive is still downloading a required source, the UI reports that state and a later advance continues from durable state.''',
+              '''## 7. Full archive advancement\n\nAfter the focused checks pass, add or retain the intended permanent archive coverage and use **Advance archive once**. The server synchronizes included coverage first and continues unattended through source verification, bounded hydration waits, analysis, durable proxy generation and managed release. The UI may be refreshed or closed without requiring per-file transition clicks; restart must resume durable running intent.\n\nVerify **Pause archive** stops scheduling further advancement without discarding completed durable work, and that starting advancement again resumes from the stored catalogue state.''')
+
+          context = "BUILD_CONTEXT.md"
+          replace_once(
+              context,
+              '''PR #111 merged the source re-verification slice. The combined acceptance is documented in `docs/operations/bounded-archive-acceptance.md`; do not infer that the real-machine gate passed merely from automated coverage.''',
+              '''PR #111 merged the source re-verification slice. The first combined Windows/OneDrive acceptance attempt was paused on 2026-08-10 after the maintainer found three acceptance blockers: archive advancement required repeated per-transition clicks, Collections opened the fixed thumbnail instead of a proxy-first viewer and had no original controls, and analysed online-only revisions disappeared from the Archive analysed filter.\n\nWI-0042 Slice 5 is active on `agent/WI-0042-slice5-unattended-archive` / draft PR #115. It adds durable one-click unattended advancement, proxy-first viewing with explicit original controls and orthogonal archive status. The combined acceptance remains pending and is documented in `docs/operations/bounded-archive-acceptance.md` plus `docs/operations/bounded-archive-slice5.md`.''')
+          replace_once(
+              context,
+              '''1. Complete automated review of WI-0053 Slice 1 / PR #114 and run private representative HEIC verification.\n2. Complete the combined WI-0042 human acceptance and deliberately accept the production proxy/hydration policy values.''',
+              '''1. Complete WI-0042 Slice 5 / PR #115 and resume the paused combined Windows/OneDrive acceptance.\n2. Complete the combined WI-0042 human acceptance and deliberately accept the production proxy/hydration policy values.''')
+
+          status = "docs/delivery/status/work-items.yaml"
+          replace_once(
+              status,
+              '''- id: WI-0042\n  title: Add bounded archive hydration and review proxies\n  milestone: M12\n  status: in_progress\n  owner: ai-agent\n  document: ../work-items/WI-0042-bounded-archive-storage.md\n  started_at: 2026-08-08\n  last_updated_at: 2026-08-09\n  branch: agent/WI-0042-source-reverification''',
+              '''- id: WI-0042\n  title: Add bounded archive hydration and review proxies\n  milestone: M12\n  status: in_progress\n  owner: ai-agent\n  document: ../work-items/WI-0042-bounded-archive-storage.md\n  started_at: 2026-08-08\n  last_updated_at: 2026-08-10\n  branch: agent/WI-0042-slice5-unattended-archive''')
+
+      - name: Generate living docs
+        shell: pwsh
+        run: dotnet run --project tools/PhotoIdentity.Docs -- generate
+
+      - name: Validate docs
+        shell: pwsh
+        run: |
+          dotnet run --project tools/PhotoIdentity.Docs -- validate
+          dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "Erik Wahlström"
+          git config user.email "54457926+erikwasa@users.noreply.github.com"
+          git add src/PhotoIdentity.Web/Pages/Collections.razor src/PhotoIdentity.Web/Pages/Archive.razor docs BUILD_CONTEXT.md
+          git commit -m "Implement WI-0042 Slice 5 operator workflow and docs"
+          git push origin HEAD:agent/WI-0042-slice5-unattended-archive
