@@ -20,16 +20,62 @@ public sealed class SqliteArchiveHydrationIdentityTransferRepository
         _database = database;
     }
 
+    public async Task<bool> MoveActiveRevisionLeaseToSourceAsync(
+        AssetId assetId,
+        DateTimeOffset transferredAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSchemasAsync(cancellationToken);
+        AssetRevisionId? managedRevisionId;
+        await using (SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken))
+        {
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT hydration.asset_revision_id
+                FROM asset_revision_managed_hydrations AS hydration
+                INNER JOIN asset_revisions AS revision
+                    ON revision.id = hydration.asset_revision_id
+                WHERE revision.asset_id = $asset_id
+                  AND hydration.released_at_utc IS NULL
+                  AND hydration.release_requested_at_utc IS NULL
+                ORDER BY hydration.requested_at_utc DESC, hydration.asset_revision_id
+                LIMIT 1;
+                """;
+            command.Parameters.AddWithValue("$asset_id", assetId.ToString());
+            object? value = await command.ExecuteScalarAsync(cancellationToken);
+            managedRevisionId = value is string id
+                ? AssetRevisionId.From(Guid.Parse(id))
+                : null;
+        }
+
+        return managedRevisionId is AssetRevisionId revisionId &&
+            await MoveRevisionLeaseToSourceCoreAsync(
+                revisionId,
+                assetId,
+                transferredAtUtc,
+                cancellationToken);
+    }
+
     public async Task<bool> MoveRevisionLeaseToSourceAsync(
         AssetRevisionId revisionId,
         AssetId assetId,
         DateTimeOffset transferredAtUtc,
         CancellationToken cancellationToken = default)
     {
-        // Force both lazy schemas to exist outside the transfer transaction.
-        _ = await new SqliteArchiveHydrationRepository(_database).GetActiveLeasesAsync(cancellationToken);
-        _ = await new SqliteArchiveSourceHydrationRepository(_database).GetActiveLeasesAsync(cancellationToken);
+        await EnsureSchemasAsync(cancellationToken);
+        return await MoveRevisionLeaseToSourceCoreAsync(
+            revisionId,
+            assetId,
+            transferredAtUtc,
+            cancellationToken);
+    }
 
+    private async Task<bool> MoveRevisionLeaseToSourceCoreAsync(
+        AssetRevisionId revisionId,
+        AssetId assetId,
+        DateTimeOffset transferredAtUtc,
+        CancellationToken cancellationToken)
+    {
         DateTimeOffset transferredAt = transferredAtUtc.ToUniversalTime();
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
@@ -44,13 +90,17 @@ public sealed class SqliteArchiveHydrationIdentityTransferRepository
                     hydration.requested_at_utc,
                     COALESCE(usage.last_needed_at_utc, hydration.requested_at_utc)
                 FROM asset_revision_managed_hydrations AS hydration
+                INNER JOIN asset_revisions AS revision
+                    ON revision.id = hydration.asset_revision_id
                 LEFT JOIN asset_revision_managed_hydration_usage AS usage
                     ON usage.asset_revision_id = hydration.asset_revision_id
                 WHERE hydration.asset_revision_id = $asset_revision_id
+                  AND revision.asset_id = $asset_id
                   AND hydration.released_at_utc IS NULL
                   AND hydration.release_requested_at_utc IS NULL;
                 """;
             read.Parameters.AddWithValue("$asset_revision_id", revisionId.ToString());
+            read.Parameters.AddWithValue("$asset_id", assetId.ToString());
             await using SqliteDataReader reader = await read.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
@@ -106,6 +156,13 @@ public sealed class SqliteArchiveHydrationIdentityTransferRepository
 
         transaction.Commit();
         return true;
+    }
+
+    private async Task EnsureSchemasAsync(CancellationToken cancellationToken)
+    {
+        // Force both lazy schemas to exist outside transfer transactions.
+        _ = await new SqliteArchiveHydrationRepository(_database).GetActiveLeasesAsync(cancellationToken);
+        _ = await new SqliteArchiveSourceHydrationRepository(_database).GetActiveLeasesAsync(cancellationToken);
     }
 
     private static string Format(DateTimeOffset value) =>
