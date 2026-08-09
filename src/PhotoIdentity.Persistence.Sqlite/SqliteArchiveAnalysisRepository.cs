@@ -135,11 +135,14 @@ public sealed class SqliteArchiveAnalysisRepository
                     LIMIT 1)
             LEFT JOIN archive_asset_availability AS availability
                 ON availability.asset_id = asset.id
+            LEFT JOIN archive_source_observations AS source_observation
+                ON source_observation.asset_id = asset.id
             LEFT JOIN asset_revision_analysis AS analysis
                 ON analysis.asset_revision_id = revision.id
                AND analysis.profile_hash = $profile_hash
             WHERE asset.source_id = $source_id
               AND asset.deleted_at_utc IS NULL
+              AND COALESCE(source_observation.verification_state, 'verified') = 'verified'
               AND (
                     COALESCE(availability.availability, 'local') = 'local'
                     OR ($include_hydratable = 1 AND availability.availability IN ('online-only', 'downloading'))
@@ -201,8 +204,11 @@ public sealed class SqliteArchiveAnalysisRepository
             INNER JOIN asset_revision_analysis AS analysis
                 ON analysis.asset_revision_id = revision.id
                AND analysis.profile_hash = $profile_hash
+            LEFT JOIN archive_source_observations AS source_observation
+                ON source_observation.asset_id = asset.id
             WHERE asset.source_id = $source_id
-              AND asset.deleted_at_utc IS NULL;
+              AND asset.deleted_at_utc IS NULL
+              AND COALESCE(source_observation.verification_state, 'verified') = 'verified';
             """;
         command.Parameters.AddWithValue("$source_id", sourceId.ToString());
         command.Parameters.AddWithValue("$profile_hash", profileHash.ToString());
@@ -250,7 +256,7 @@ public sealed class SqliteArchiveAnalysisRepository
 
     private async Task EnsureSchemaAsync(CancellationToken cancellationToken)
     {
-        await new SqliteArchiveAvailabilityRepository(_database).EnsureSchemaAsync(cancellationToken);
+        await new SqliteArchiveSourceObservationRepository(_database).EnsureSchemaAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
