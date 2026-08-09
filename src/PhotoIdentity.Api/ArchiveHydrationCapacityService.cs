@@ -88,14 +88,15 @@ public sealed class DriveArchiveStorageProbe : IArchiveStorageProbe
 }
 
 /// <summary>
-/// Serializes managed-hydration admission, reserves whole logical source sizes, observes active
-/// managed leases and requests LRU release when capacity is exhausted. OneDrive release is
-/// asynchronous, so requested eviction is never counted as free capacity until it is observed.
+/// Serializes all Photo-Identity-managed archive hydration admission. Both revision-level original
+/// access and pre-revision source verification share one budget/gate, so first-time online-only
+/// files cannot bypass the same reserve, byte and concurrency limits.
 /// </summary>
 public sealed class ArchiveHydrationCapacityService
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly SqliteArchiveHydrationRepository _hydrations;
+    private readonly SqliteArchiveSourceHydrationRepository _sourceHydrations;
     private readonly SqliteArchiveStorageRepository _storage;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
     private readonly IArchiveStorageProbe _probe;
@@ -108,6 +109,7 @@ public sealed class ArchiveHydrationCapacityService
     public ArchiveHydrationCapacityService(
         SqliteCatalogueDatabase database,
         SqliteArchiveHydrationRepository hydrations,
+        SqliteArchiveSourceHydrationRepository sourceHydrations,
         SqliteArchiveStorageRepository storage,
         IOneDriveFilesOnDemandPlatform platform,
         IArchiveStorageProbe probe,
@@ -117,6 +119,7 @@ public sealed class ArchiveHydrationCapacityService
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(hydrations);
+        ArgumentNullException.ThrowIfNull(sourceHydrations);
         ArgumentNullException.ThrowIfNull(storage);
         ArgumentNullException.ThrowIfNull(platform);
         ArgumentNullException.ThrowIfNull(probe);
@@ -125,6 +128,7 @@ public sealed class ArchiveHydrationCapacityService
         ArgumentNullException.ThrowIfNull(timeProvider);
         _database = database;
         _hydrations = hydrations;
+        _sourceHydrations = sourceHydrations;
         _storage = storage;
         _platform = platform;
         _probe = probe;
@@ -137,73 +141,32 @@ public sealed class ArchiveHydrationCapacityService
         }
     }
 
-    public async Task<ArchiveHydrationAdmission> ExecuteHydrationAdmissionAsync(
+    public Task<ArchiveHydrationAdmission> ExecuteHydrationAdmissionAsync(
         CatalogueProcessingAssetRevision revision,
         Func<Task> acceptedAction,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(revision);
-        ArgumentNullException.ThrowIfNull(acceptedAction);
+        return ExecuteAdmissionAsync(
+            revision.SizeBytes,
+            revision.RootLocator,
+            RevisionKey(revision.RevisionId),
+            acceptedAction,
+            cancellationToken);
+    }
 
-        if (!_configuration.TryGetPolicy(out ArchiveHydrationPolicy? policy, out string? policyMessage) || policy is null)
-        {
-            return new ArchiveHydrationAdmission(false, policyMessage, 0L);
-        }
-
-        await _admissionGate.WaitAsync(cancellationToken);
-        try
-        {
-            IReadOnlyList<ObservedManagedLease> observed = await ObserveActiveLeasesAsync(cancellationToken);
-            int downloading = observed.Count(item =>
-                !item.Lease.IsReleaseRequested && item.State.Availability == AssetAvailability.Downloading);
-            if (downloading >= policy.MaximumConcurrentOperations)
-            {
-                return new ArchiveHydrationAdmission(
-                    false,
-                    $"Managed hydration is at its concurrency limit ({policy.MaximumConcurrentOperations}). Retry after an active hydration completes.",
-                    0L);
-            }
-
-            long reservedBytes = observed
-                .Where(item => item.State.Availability is AssetAvailability.Local or AssetAvailability.Downloading)
-                .Sum(item => item.Lease.SizeBytes);
-            long availableFreeBytes = _probe.GetAvailableFreeSpaceBytes(revision.RootLocator);
-            bool exceedsManagedBudget = reservedBytes > policy.MaximumManagedHydrationBytes - revision.SizeBytes;
-            bool crossesFreeReserve = availableFreeBytes < revision.SizeBytes ||
-                availableFreeBytes - revision.SizeBytes < policy.MinimumFreeSpaceReserveBytes;
-
-            if (exceedsManagedBudget || crossesFreeReserve)
-            {
-                long bytesToReclaimForBudget = exceedsManagedBudget
-                    ? checked(reservedBytes + revision.SizeBytes - policy.MaximumManagedHydrationBytes)
-                    : 0L;
-                long bytesToReclaimForReserve = crossesFreeReserve
-                    ? checked(policy.MinimumFreeSpaceReserveBytes + revision.SizeBytes - availableFreeBytes)
-                    : 0L;
-                long requested = await RequestLeastRecentlyNeededReleaseAsync(
-                    observed,
-                    revision.RevisionId,
-                    Math.Max(bytesToReclaimForBudget, bytesToReclaimForReserve),
-                    cancellationToken);
-                string reason = exceedsManagedBudget && crossesFreeReserve
-                    ? "managed byte budget and free-space reserve"
-                    : exceedsManagedBudget ? "managed byte budget" : "free-space reserve";
-                string suffix = requested > 0
-                    ? $" Release was requested for {requested} managed byte(s); retry after OneDrive reports them online-only."
-                    : " No releasable Photo-Identity-owned originals are currently available.";
-                return new ArchiveHydrationAdmission(
-                    false,
-                    $"Hydration would violate the configured {reason}.{suffix}",
-                    requested);
-            }
-
-            await acceptedAction();
-            return new ArchiveHydrationAdmission(true, null, 0L);
-        }
-        finally
-        {
-            _admissionGate.Release();
-        }
+    public Task<ArchiveHydrationAdmission> ExecuteSourceHydrationAdmissionAsync(
+        ArchiveSourceObservation source,
+        Func<Task> acceptedAction,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        return ExecuteAdmissionAsync(
+            source.ObservedSizeBytes,
+            source.RootLocator,
+            SourceKey(source.AssetId),
+            acceptedAction,
+            cancellationToken);
     }
 
     public async Task<T> RunLargeReadAsync<T>(
@@ -230,6 +193,9 @@ public sealed class ArchiveHydrationCapacityService
 
     public Task TouchAsync(AssetRevisionId revisionId, CancellationToken cancellationToken = default) =>
         _hydrations.TouchAsync(revisionId, _timeProvider.GetUtcNow(), cancellationToken);
+
+    public Task TouchSourceAsync(AssetId assetId, CancellationToken cancellationToken = default) =>
+        _sourceHydrations.TouchAsync(assetId, _timeProvider.GetUtcNow(), cancellationToken);
 
     public async Task<ArchiveStorageSnapshot> GetStorageSnapshotAsync(
         CancellationToken cancellationToken = default)
@@ -284,32 +250,150 @@ public sealed class ArchiveHydrationCapacityService
             _proxyConfiguration.ProfileId);
     }
 
+    private async Task<ArchiveHydrationAdmission> ExecuteAdmissionAsync(
+        long requestedSizeBytes,
+        string rootLocator,
+        string excludedKey,
+        Func<Task> acceptedAction,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(requestedSizeBytes);
+        ArgumentException.ThrowIfNullOrWhiteSpace(rootLocator);
+        ArgumentNullException.ThrowIfNull(acceptedAction);
+
+        if (!_configuration.TryGetPolicy(out ArchiveHydrationPolicy? policy, out string? policyMessage) || policy is null)
+        {
+            return new ArchiveHydrationAdmission(false, policyMessage, 0L);
+        }
+
+        await _admissionGate.WaitAsync(cancellationToken);
+        try
+        {
+            IReadOnlyList<ObservedManagedLease> observed = await ObserveActiveLeasesAsync(cancellationToken);
+            int downloading = observed.Count(item =>
+                !item.Lease.IsReleaseRequested && item.State.Availability == AssetAvailability.Downloading);
+            if (downloading >= policy.MaximumConcurrentOperations)
+            {
+                return new ArchiveHydrationAdmission(
+                    false,
+                    $"Managed hydration is at its concurrency limit ({policy.MaximumConcurrentOperations}). Retry after an active hydration completes.",
+                    0L);
+            }
+
+            long reservedBytes = observed
+                .Where(item => item.State.Availability is AssetAvailability.Local or AssetAvailability.Downloading)
+                .Sum(item => item.Lease.SizeBytes);
+            long availableFreeBytes = _probe.GetAvailableFreeSpaceBytes(rootLocator);
+            bool exceedsManagedBudget = reservedBytes > policy.MaximumManagedHydrationBytes - requestedSizeBytes;
+            bool crossesFreeReserve = availableFreeBytes < requestedSizeBytes ||
+                availableFreeBytes - requestedSizeBytes < policy.MinimumFreeSpaceReserveBytes;
+
+            if (exceedsManagedBudget || crossesFreeReserve)
+            {
+                long bytesToReclaimForBudget = exceedsManagedBudget
+                    ? checked(reservedBytes + requestedSizeBytes - policy.MaximumManagedHydrationBytes)
+                    : 0L;
+                long bytesToReclaimForReserve = crossesFreeReserve
+                    ? checked(policy.MinimumFreeSpaceReserveBytes + requestedSizeBytes - availableFreeBytes)
+                    : 0L;
+                long requested = await RequestLeastRecentlyNeededReleaseAsync(
+                    observed,
+                    excludedKey,
+                    Math.Max(bytesToReclaimForBudget, bytesToReclaimForReserve),
+                    cancellationToken);
+                string reason = exceedsManagedBudget && crossesFreeReserve
+                    ? "managed byte budget and free-space reserve"
+                    : exceedsManagedBudget ? "managed byte budget" : "free-space reserve";
+                string suffix = requested > 0
+                    ? $" Release was requested for {requested} managed byte(s); retry after OneDrive reports them online-only."
+                    : " No releasable Photo-Identity-owned originals are currently available.";
+                return new ArchiveHydrationAdmission(
+                    false,
+                    $"Hydration would violate the configured {reason}.{suffix}",
+                    requested);
+            }
+
+            await acceptedAction();
+            return new ArchiveHydrationAdmission(true, null, 0L);
+        }
+        finally
+        {
+            _admissionGate.Release();
+        }
+    }
+
     private async Task<IReadOnlyList<ObservedManagedLease>> ObserveActiveLeasesAsync(
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<ArchiveManagedHydrationLease> leases = await _hydrations.GetActiveLeasesAsync(cancellationToken);
+        IReadOnlyList<ArchiveManagedHydrationLease> revisionLeases = await _hydrations.GetActiveLeasesAsync(cancellationToken);
+        IReadOnlyList<ArchiveManagedSourceHydrationLease> sourceLeases = await _sourceHydrations.GetActiveLeasesAsync(cancellationToken);
         List<ObservedManagedLease> observed = [];
-        foreach (ArchiveManagedHydrationLease lease in leases)
-        {
-            string? path = TryResolvePath(lease.RootLocator, lease.SourceKey);
-            OneDriveFilesOnDemandState state = path is null
-                ? new OneDriveFilesOnDemandState(AssetAvailability.Unavailable, false, false)
-                : _platform.GetState(path);
-            if (lease.IsReleaseRequested && state.Availability == AssetAvailability.OnlineOnly)
-            {
-                await _hydrations.MarkReleasedAsync(lease.AssetRevisionId, _timeProvider.GetUtcNow(), cancellationToken);
-                continue;
-            }
 
-            observed.Add(new ObservedManagedLease(lease, path, state));
+        foreach (ArchiveManagedHydrationLease lease in revisionLeases)
+        {
+            ManagedLease normalized = new(
+                RevisionKey(lease.AssetRevisionId),
+                lease.SizeBytes,
+                lease.RootLocator,
+                lease.SourceKey,
+                lease.LastNeededAtUtc,
+                lease.IsReleaseRequested,
+                lease.AssetRevisionId,
+                null);
+            if (await ObserveLeaseAsync(normalized, cancellationToken) is ObservedManagedLease value)
+            {
+                observed.Add(value);
+            }
+        }
+
+        foreach (ArchiveManagedSourceHydrationLease lease in sourceLeases)
+        {
+            ManagedLease normalized = new(
+                SourceKey(lease.AssetId),
+                lease.SizeBytes,
+                lease.RootLocator,
+                lease.SourceKey,
+                lease.LastNeededAtUtc,
+                lease.IsReleaseRequested,
+                null,
+                lease.AssetId);
+            if (await ObserveLeaseAsync(normalized, cancellationToken) is ObservedManagedLease value)
+            {
+                observed.Add(value);
+            }
         }
 
         return observed;
     }
 
+    private async Task<ObservedManagedLease?> ObserveLeaseAsync(
+        ManagedLease lease,
+        CancellationToken cancellationToken)
+    {
+        string? path = TryResolvePath(lease.RootLocator, lease.SourceKey);
+        OneDriveFilesOnDemandState state = path is null
+            ? new OneDriveFilesOnDemandState(AssetAvailability.Unavailable, false, false)
+            : _platform.GetState(path);
+        if (lease.IsReleaseRequested && state.Availability == AssetAvailability.OnlineOnly)
+        {
+            if (lease.RevisionId is AssetRevisionId revisionId)
+            {
+                await _hydrations.MarkReleasedAsync(revisionId, _timeProvider.GetUtcNow(), cancellationToken);
+            }
+            else if (lease.SourceAssetId is AssetId assetId)
+            {
+                await _sourceHydrations.MarkReleasedAsync(assetId, _timeProvider.GetUtcNow(), cancellationToken);
+            }
+
+            return null;
+        }
+
+        return new ObservedManagedLease(lease, path, state);
+    }
+
     private async Task<long> RequestLeastRecentlyNeededReleaseAsync(
         IReadOnlyList<ObservedManagedLease> observed,
-        AssetRevisionId excludedRevisionId,
+        string excludedKey,
         long bytesToReclaim,
         CancellationToken cancellationToken)
     {
@@ -321,18 +405,29 @@ public sealed class ArchiveHydrationCapacityService
         long requested = 0L;
         foreach (ObservedManagedLease candidate in observed
             .Where(item =>
-                item.Lease.AssetRevisionId != excludedRevisionId &&
+                !string.Equals(item.Lease.Key, excludedKey, StringComparison.Ordinal) &&
                 !item.Lease.IsReleaseRequested &&
                 item.State.Availability == AssetAvailability.Local &&
                 item.Path is not null)
             .OrderBy(item => item.Lease.LastNeededAtUtc)
-            .ThenBy(item => item.Lease.AssetRevisionId.ToString(), StringComparer.Ordinal))
+            .ThenBy(item => item.Lease.Key, StringComparer.Ordinal))
         {
             await _platform.RequestOnlineOnlyAsync(candidate.Path!, cancellationToken);
-            await _hydrations.MarkReleaseRequestedAsync(
-                candidate.Lease.AssetRevisionId,
-                _timeProvider.GetUtcNow(),
-                cancellationToken);
+            if (candidate.Lease.RevisionId is AssetRevisionId revisionId)
+            {
+                await _hydrations.MarkReleaseRequestedAsync(
+                    revisionId,
+                    _timeProvider.GetUtcNow(),
+                    cancellationToken);
+            }
+            else if (candidate.Lease.SourceAssetId is AssetId assetId)
+            {
+                await _sourceHydrations.MarkReleaseRequestedAsync(
+                    assetId,
+                    _timeProvider.GetUtcNow(),
+                    cancellationToken);
+            }
+
             requested = checked(requested + candidate.Lease.SizeBytes);
             if (requested >= bytesToReclaim)
             {
@@ -366,8 +461,21 @@ public sealed class ArchiveHydrationCapacityService
         }
     }
 
+    private static string RevisionKey(AssetRevisionId revisionId) => $"revision:{revisionId}";
+    private static string SourceKey(AssetId assetId) => $"source:{assetId}";
+
+    private sealed record ManagedLease(
+        string Key,
+        long SizeBytes,
+        string RootLocator,
+        string SourceKey,
+        DateTimeOffset LastNeededAtUtc,
+        bool IsReleaseRequested,
+        AssetRevisionId? RevisionId,
+        AssetId? SourceAssetId);
+
     private sealed record ObservedManagedLease(
-        ArchiveManagedHydrationLease Lease,
+        ManagedLease Lease,
         string? Path,
         OneDriveFilesOnDemandState State);
 }
