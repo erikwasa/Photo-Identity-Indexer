@@ -2,19 +2,21 @@
 
 ## Local ownership
 
-The local system owns assets, revisions, face occurrences, crops, model definitions, embeddings, people, labels, rejections, suggestions, evaluations and processing history.
+The local system owns assets, revisions, face occurrences, crops, model definitions, embeddings, people, assignments, rejections, suggestions, evaluations and processing history.
 
-## Disposable Azure compute
+## Disposable optional Azure compute
 
-Azure receives finite input bundles and returns finite result bundles. Destroying Azure resources must not lose project data.
+Azure receives finite input bundles and returns finite result bundles. Destroying Azure resources must not lose project data, and Azure is not required for the version-1 permanent-catalogue path.
 
 ## Replaceable models
 
-Detection and embedding implementations sit behind narrow application-owned interfaces. Model changes may regenerate derived data but cannot alter people or human labels.
+Detection and embedding implementations sit behind narrow application-owned interfaces. Model changes may regenerate derived data but cannot silently rewrite canonical people, assignments or review history.
 
-## Canonical human labels
+## Model-independent canonical identity
 
-A human confirmation belongs to a stable face occurrence, not an embedding, cluster, model-specific identifier or cloud run.
+A canonical identity assignment belongs to a stable face occurrence and person, not to an embedding, cluster, model-specific identifier or cloud run.
+
+The current runtime creates assignments through human review. ADR-0006 permits an explicitly enabled exact-model policy to create canonical automatic assignments once WI-0043 is implemented. Automatic assignments must retain full provenance and remain manually correctable through append-only history.
 
 ## Modular monolith first
 
@@ -26,8 +28,8 @@ Use C# for orchestration, inference, persistence, APIs, UI, bundles and Azure ex
 
 ## Read-only photo archive
 
-Never modify original photos. Store all derived data separately.
+Never modify original photos. Store all derived and canonical catalogue data separately.
 
-## Precision before recall
+## Conservative automatic decisions
 
-Prefer unknown faces over incorrect confident assignments.
+Prefer an unassigned or Unknown face over a weak confident assignment. Automatic identity assignment, when implemented and enabled, is restricted to a deliberately configured High-confidence policy and must be auditable and reversible.

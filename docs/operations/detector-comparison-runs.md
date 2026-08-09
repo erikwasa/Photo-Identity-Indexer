@@ -1,5 +1,7 @@
 # Detector comparison runs
 
+**Status: retained historical M16 evidence.** This is not the current detector-selection sequence. M16 is complete and CenterFace `centerface-2019-fp32`, confidence `0.5`, `single-pass`, is the selected permanent archive detector pipeline.
+
 This procedure records the completed governed M16 YuNet confidence sweep. The immutable confidence-0.9 baseline and every isolated threshold candidate must remain available in the private detector-evaluation root as durable evidence.
 
 ## Final governed status
@@ -10,7 +12,7 @@ This procedure records the completed governed M16 YuNet confidence sweep. The im
 - Confidence `0.6`: fully reviewed; failed the M16 gate.
 - Confidence `0.5`: fully reviewed; failed the M16 gate.
 
-The sweep completed on 2026-08-06. Do not rerun or overwrite any of these catalogues, logs, outputs, private comparisons or exports. Threshold tuning is insufficient; active detector work continues under WI-0036 using [Multi-scale detector runs](multiscale-detector-runs.md).
+The sweep completed on 2026-08-06. Do not rerun or overwrite any of these catalogues, logs, outputs, private comparisons or exports. Threshold tuning was insufficient; the later multi-scale YuNet experiments also failed, after which the governed CenterFace candidate passed M16.
 
 ## Invariants retained by every candidate
 
@@ -35,7 +37,7 @@ The completed confidence-0.9 authored session was frozen once under:
 <DetectorEvaluationRoot>\ground-truth
 ```
 
-It remains the reusable reference for later detector experiments. Do not create another baseline snapshot from a threshold candidate.
+It remains the reusable reference for the completed M16 evidence. Do not create another baseline snapshot from a threshold candidate.
 
 Freezing required all 100 photos to be complete and to satisfy:
 
@@ -136,4 +138,4 @@ The comparison export retained overall, five-plus, source-group and primary-cate
 
 ## Final decision
 
-All governed thresholds failed the complete gate. There is no approved threshold-only YuNet configuration. Preserve the records, close WI-0035 and continue with the governed multi-scale pipeline in WI-0036.
+All governed single-pass YuNet thresholds failed the complete gate. Multi-scale YuNet was evaluated next and also failed. The subsequent governed CenterFace confidence-0.5 single-pass candidate passed the complete M16 gate and is now the selected permanent archive detector pipeline. Preserve these YuNet records as historical evidence.

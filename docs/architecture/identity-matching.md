@@ -1,106 +1,92 @@
 # Recognition and identity matching
 
-Identity matching produces advisory evidence from model-versioned face embeddings. Human review remains the only authority for canonical identity assignments.
+Identity matching produces model-versioned evidence for canonical person assignments. Canonical assignments are independent of the recognition model that proposed them and remain auditable/reversible through review history.
 
-## Processing pipeline
+## Permanent archive processing profile
 
-The accepted local baseline uses:
+The governed permanent archive profile currently uses:
 
-- detector: `yunet-2023mar-fp32`;
-- five-point SFace alignment: `sface-five-point-v1`;
-- embedder: `sface-2021dec-fp32`; and
-- matcher: cosine similarity against human-confirmed exemplars from the same exact embedder revision.
+- detector: `centerface-2019-fp32`;
+- detector confidence: `0.5`;
+- detector pipeline: `single-pass`;
+- five-point SFace alignment: `sface-five-point-v1`; and
+- embedder: `sface-2021dec-fp32`.
 
-The governed candidate `sface-2021dec-int8` uses the same detector, alignment and external tensor contract while retaining a distinct model ID and SHA-256.
+The generic historical batch defaults still reference YuNet and must not be confused with the permanent archive profile.
 
 ## Exact model scope
 
-A matching or suggestion operation must identify the embedder by both:
+A matching or suggestion operation identifies the embedder by both model ID and exact SHA-256 hash. Embeddings, scores and thresholds from different revisions are not interchangeable.
 
-- model ID; and
-- exact SHA-256 hash.
+Model-specific embeddings and suggestions can coexist for the same canonical face occurrence without changing people or review history.
 
-Weights, quantisation, preprocessing, alignment, input dimensions or material runtime behavior are part of model identity. Embeddings, scores and thresholds from different revisions are not interchangeable.
+## Canonical assignment actors
 
-Baseline and candidate embeddings can coexist for the same face occurrence without changing people or review history.
+The current implementation creates identity assignments through human review. ADR-0006 establishes the accepted next direction: WI-0043 will allow an explicitly enabled exact-model policy to create canonical High-confidence automatic assignments.
+
+Both human and future automatic assignments use append-only canonical history. Automatic assignments must retain their model/score/policy provenance. Manual correction supersedes an earlier automatic assignment rather than deleting history.
 
 ## Exemplars
 
-Only active human-confirmed assignments become exemplars.
+An active canonical assignment may provide positive exemplar evidence when the required exact-model embedding exists.
 
-Suggestions do not become exemplars automatically. Rejected or unreviewed faces are not positive training evidence. A later model revision derives its own embeddings and suggestions while using the same canonical people and confirmed assignments.
+Until WI-0043 is implemented, the active exemplars are human-assigned faces only. After WI-0043, eligible active automatic assignments may also become exemplars in later regeneration runs.
 
-## Ranked suggestions
+Rejected faces, rejected face-person pairs, unreviewed faces and the planned Unknown review state are not positive exemplar evidence.
 
-Suggestion regeneration:
+## Ranked suggestions and regeneration
+
+The current matcher regeneration:
 
 1. loads embeddings for one exact model revision;
-2. builds person evidence from active confirmed exemplars;
-3. scores eligible unreviewed target faces;
-4. records ranked candidate people and score evidence;
+2. builds person evidence from active eligible exemplars;
+3. scores eligible unreviewed targets;
+4. records ranked candidate people, score and margin evidence;
 5. preserves rejected face-person exclusions; and
-6. leaves people, assignments, rejections and append-only review history unchanged.
+6. leaves canonical assignments/review history unchanged.
 
-The browser and collection API expose exact-model suggestion provenance. Advisory collection results require an explicit model ID, exact hash and minimum score.
+WI-0043 adds a policy phase after scoring. One regeneration must use a fixed exemplar snapshot: score all targets first, then apply qualifying High automatic assignments. Newly automatic exemplars cannot affect candidate scoring until a later regeneration.
 
-## Review-state rules
+WI-0045 later exposes regeneration through the normal browser workflow instead of requiring the CLI.
 
-- **Assigned** faces use active human-confirmed assignments.
-- **Unreviewed** faces have no active assignment or rejection and may have exact-model pending suggestions.
-- **Rejected** faces do not provide positive collection evidence for a person.
-- **All** collection evidence combines confirmed assignments with qualifying unreviewed suggestions only when the exact suggestion policy is supplied.
+## Review states
 
-No threshold creates a canonical label automatically.
+Current states are Unreviewed, Assigned and Rejected. WI-0047 adds Unknown as a distinct real-person-but-unidentified state.
 
-## Negative evidence
+- **Assigned** provides canonical person evidence.
+- **Unreviewed** is undecided and may have exact-model suggestions.
+- **Unknown** (planned) is a real face whose person is not known; it is not a person identity, exemplar or person-collection match.
+- **Rejected** represents a false/useless detection and provides no positive person evidence.
 
-A rejected face-person pair is durable human evidence. Regeneration must not propose the same pair again under the governed matching rules.
+A person-specific rejected suggestion remains durable negative evidence so the same face-person pair is not immediately proposed again under the governed rules.
 
-A general face rejection and a person-specific suggestion rejection are distinct review meanings, but neither can become positive evidence without a later explicit human assignment.
+## Confidence groups and automatic policy
 
-## Scoring and thresholds
+WI-0043 introduces configurable High, Medium and Low score groups for one exact model policy. The High boundary is also the only group eligible for automatic canonical assignment when the toggle is enabled.
 
-Cosine scores are meaningful only within one exact embedding revision and preprocessing contract. Validation can select an operating threshold for that revision. Held-out test results report performance without selecting a replacement threshold.
+Threshold changes govern future decisions and do not retroactively undo assignments. Scores remain exact-model-specific.
 
-When comparing revisions:
+## Model comparison boundary
 
-- use the same immutable source and detector scope;
-- preserve the same people and review history;
+When comparing embedding revisions:
+
+- use the same immutable source and detector population;
+- preserve the same canonical people/review history;
 - export the same deterministic split;
 - select thresholds independently under the same validation procedure; and
-- compare task quality, unknown rejection, confusion, throughput, storage and review effort.
+- compare quality, unknown rejection, confusion, throughput, storage and review effort.
 
-See the [multi-model comparison workflow](../operations/multi-model-comparison.md).
-
-## Accepted model recommendation
-
-The accepted private FP32-versus-INT8 comparison found both revisions correct on 20 representative manually reviewed faces and found no material practical quality advantage for INT8.
-
-Retain `sface-2021dec-fp32` as the current default embedder. Keep `sface-2021dec-int8` as a governed candidate for later runtime, Azure-consistency, cost or broader-corpus evidence.
-
-Final production selection remains a later decision; persisted human review data is independent of that decision.
-
-## Improvement boundary
-
-Future improvements can include:
-
-- more diverse confirmed exemplars;
-- age, pose and quality coverage;
-- improved negative-evidence handling;
-- person-specific or cohort-aware thresholds;
-- prototype/exemplar selection;
-- quality-aware ranking; and
-- rematching unknown faces under a new governed revision.
-
-Fine-tuning is deferred until application-level and data-quality improvements have been measured and exhausted.
+The completed FP32-versus-INT8 comparison used the earlier YuNet detector population and retained `sface-2021dec-fp32` because INT8 showed no material practical advantage. Because M16 later changed the face population to CenterFace, a production-model reaffirmation must use the selected CenterFace detections before claiming that the old comparison fully represents the permanent archive.
 
 ## Invariants
 
-- Human assignments and rejections are canonical.
-- Suggestions are derived, exact-model scoped and regenerable.
-- Suggestions never train suggestions automatically.
-- Rejected pairs remain excluded.
-- Model changes do not erase people or review history.
-- Scores from different revisions are never silently mixed.
+- Canonical people and identity/review history survive model replacement.
+- Derived embeddings and suggestions are exact-model scoped and regenerable.
+- Automatic assignments, once implemented, are canonical decisions with explicit provenance rather than hidden derived labels.
+- Regeneration uses a fixed exemplar snapshot before automatic assignments are applied.
+- Manual correction supersedes an automatic assignment and changes later exemplar evidence.
+- Rejected face-person pairs remain excluded.
+- Unknown and rejected faces do not become exemplars.
+- Scores from different model revisions are never silently mixed.
 
-See [Canonical data model](data-model.md), [Model manifests and governance](../models/model-governance.md) and the [Glossary](../glossary.md).
+See [ADR-0002](../decisions/ADR-0002-model-independent-labels.md), [ADR-0006](../decisions/ADR-0006-canonical-auto-assignment.md), [Canonical data model](data-model.md) and [Model governance](../models/model-governance.md).

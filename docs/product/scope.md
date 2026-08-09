@@ -1,33 +1,49 @@
-# Initial scope
+# Product scope
 
-## First working version
+Photo Identity Indexer is a private, local-first system for building and using a person/photo index over a personal archive.
 
-The first version is a local vertical slice that runs on a Windows development computer.
+## Version 1 scope
 
-It will:
+Version 1 establishes the permanent catalogue and proves that full-archive ingestion can begin safely on the Windows control plane.
 
-1. Read a representative local folder of approximately 500–3,000 photos.
-2. Detect faces and save padded and aligned crops.
-3. Generate SFace embeddings.
-4. Store metadata in SQLite.
-5. Present faces in a local browser review interface.
-6. Let the user create people and assign confirmed examples.
-7. Suggest identities for other faces.
-8. Let the user confirm or reject suggestions.
-9. Produce an initial accuracy and performance report.
+It includes:
 
-## Deferred from the first version
+1. A stable permanent archive root backed by the local OneDrive synchronisation client.
+2. Incremental recursive folder coverage under that root, including resynchronisation of previously included folders.
+3. Explicit source availability and verification state for local and Files On-Demand content.
+4. Decode support for the image formats needed by the archive, including HEIC/HEIF and the RAW variants found during archive inventory.
+5. The governed CenterFace face-detection pipeline, SFace alignment and model-versioned embeddings.
+6. A local SQLite catalogue with stable source, asset, revision, face and person identity plus append-only review history.
+7. A local browser application for face review, people maintenance, progress inspection and collection browsing.
+8. Identity suggestions with exact-model provenance and durable negative evidence.
+9. Bounded OneDrive hydration for analysis and explicit full-resolution viewing.
+10. Durable local review proxies so routine browsing does not require original-photo hydration.
+11. Resumable processing, completeness reporting, backup and restore.
+12. Read-only treatment of original photos.
 
-- Azure execution
-- Microsoft Graph
-- Azure application identities
-- GPU requirements
-- Public hosting
-- Cloud databases
-- Full processing of the 250 GB archive
-- Videos
-- Slideshows and collections
-- Neural-network fine-tuning
-- Automatic confirmation of suggestions
+Version 1 is complete when these capabilities are sufficient to start the permanent catalogue from the real archive. It does not require the entire archive to finish processing before the version is considered successful.
 
-The first product question is whether the selected detector and embedder identify important people accurately enough in this specific archive.
+## Planned after version 1
+
+The accepted roadmap then improves the permanent catalogue rather than replacing it:
+
+- complete full-archive coverage and add ongoing synchronisation;
+- add configurable High/Medium/Low identity confidence groups and optional canonical High-confidence automatic assignment;
+- add favorite people, Unknown review state and browser-triggered suggestion regeneration;
+- simplify the application around Review and Library and improve Windows startup/packaging;
+- extract EXIF capture metadata and location for smart collections; and
+- experiment with local visible-content tagging before selecting a production semantic-tagging approach.
+
+## Optional or deferred
+
+These are not required for the local product or for version 1:
+
+- Azure execution and checkpointing;
+- Microsoft Graph access to Personal OneDrive;
+- Azure application identities or managed identities;
+- public hosting or a cloud database;
+- GPU requirements;
+- neural-network fine-tuning; and
+- video processing.
+
+Azure remains an optional compute path for bounded jobs. The canonical catalogue, review workflow and source-of-truth decisions remain local.

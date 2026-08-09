@@ -1,19 +1,19 @@
 # Product vision
 
-Photo Identity Indexer is a private, model-independent face-indexing system for a personal photo archive.
+Photo Identity Indexer is a private, model-independent face and photo indexing system for a personal archive.
 
-The system will discover photos, detect faces, create reusable face crops, generate replaceable embeddings, let the user associate faces with named people, suggest identities, and record confirmations and rejections.
-
-The resulting person-photo index will later support albums, collections, slideshows, multi-person searches, additional tags and date- or event-based selections.
+The system discovers photos, detects faces, creates reusable derivatives, generates replaceable embeddings, maintains people and identity decisions, suggests identities and supports collections over the resulting catalogue. Later capabilities extend that catalogue with capture metadata, location and visible-content tags.
 
 The permanent centre of the system is:
 
 ```text
-Local photo assets
+Authoritative local/OneDrive photo assets
     +
-Canonical face occurrences
+Stable canonical asset and face identity
     +
-Human-confirmed people labels
+Auditable canonical people and review decisions
 ```
 
-OneDrive integration, Azure compute, recognition models, vector indexes, clustering algorithms and user interfaces must remain replaceable.
+Canonical identity decisions are independent of any one recognition model. They may originate from a human review action or, when the accepted automatic-assignment policy is implemented and enabled, from a model-scoped automatic decision with complete provenance. Either way, later correction must preserve history rather than rewriting it invisibly.
+
+OneDrive integration, Azure compute, recognition models, vector indexes, tagging models and user interfaces must remain replaceable. Original photos remain read-only.

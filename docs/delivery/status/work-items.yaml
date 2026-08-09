@@ -524,6 +524,7 @@ work_items:
   - WI-0022
   - WI-0041
   - WI-0042
+  - WI-0053
   blocker_notes: []
   evidence: []
 - id: WI-0024
@@ -1159,5 +1160,16 @@ work_items:
   blockers:
   - WI-0048
   - WI-0051
+  blocker_notes: []
+  evidence: []
+- id: WI-0053
+  title: Add HEIC and archive RAW image support
+  milestone: M12
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0053-heic-raw-support.md
+  blockers:
+  - WI-0006
+  - WI-0012
   blocker_notes: []
   evidence: []
