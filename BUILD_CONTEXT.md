@@ -28,7 +28,19 @@ PR #111 merged the source re-verification slice. The combined acceptance is docu
 
 **WI-0041 — Add incremental permanent archive ingestion** remains blocked on WI-0042 acceptance.
 
-**WI-0053 — Add HEIC and archive RAW image support** is newly scoped under M12 and is unblocked by its completed decoder/scanner prerequisites. It inventories the real archive and adds HEIC/HEIF plus every RAW variant actually present before version 1 is declared archive-ready.
+**WI-0053 — Add HEIC and archive RAW image support** is now being implemented on `agent/WI-0053-heic-support` / draft PR #114. Current maintainer evidence says the full archive contains a few HEIC files and no known RAW files. Slice 1 therefore makes HEIC/HEIF a first-class permanent-archive input while deliberately leaving RAW variants unsupported until an actual archive RAW format and private representative sample exist.
+
+The Slice 1 implementation:
+
+- recognizes HEIC/HEIF in local and OneDrive-aware source scanning;
+- uses a bundled HEIF decoder behind the existing `IImageDecoder` boundary while preserving the established JPEG/PNG OpenCV path;
+- shares that decoded-pixel path with durable review-proxy rendering;
+- includes HEIC/HEIF in archive proxy measurement;
+- adds a privacy-safe `archive inventory` command that reports aggregate extension/media-family/support counts without opening image content;
+- keeps unverified RAW media visible as unsupported rather than silently accepting it; and
+- adds automated source-recognition, inventory/privacy, HEIC read-delegate and corrupt-container coverage.
+
+A valid real HEIC binary is intentionally not committed solely for test coverage. Do not mark WI-0053 complete from CI alone. Private real-archive HEIC verification must still confirm actual decode, orientation, downstream CenterFace/SFace processing, durable proxy behavior, color appearance and representative runtime/memory. RAW format-specific verification becomes active when the archive actually contains RAW media.
 
 ## Selected permanent archive analysis profile
 
@@ -52,10 +64,10 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 
 ## Next concrete sequence
 
-1. Complete the combined WI-0042 human acceptance and deliberately accept the production proxy/hydration policy values.
-2. Unblock and complete WI-0041 permanent incremental ingestion.
-3. Implement/verify WI-0053 against private representative HEIC and RAW files from the real archive.
-4. Confirm the version-1 success criteria on the real Windows/OneDrive environment.
+1. Complete automated review of WI-0053 Slice 1 / PR #114 and run private representative HEIC verification.
+2. Complete the combined WI-0042 human acceptance and deliberately accept the production proxy/hydration policy values.
+3. Unblock and complete WI-0041 permanent incremental ingestion.
+4. Confirm the version-1 success criteria on the real Windows/OneDrive environment, including a privacy-safe archive media inventory; if no RAW is present, record that fact rather than inventing RAW implementation evidence.
 5. Begin the permanent catalogue from real archive coverage and expand it incrementally; do not create a replacement production database.
 
 M17 review automation may be scheduled around this work, but it does not change the version-1 gate above.
@@ -66,7 +78,7 @@ M17 review automation may be scheduled around this work, but it does not change 
 - SFace FP32 remains the current selected embedder pending any later CenterFace-population reaffirmation.
 - CenterFace confidence `0.5`, single-pass, passed the governed M16 detector gate and migration-safety pilot.
 - Collection-ready queries and neutral manifests are implemented.
-- Operator/architecture documentation and clean-setup validation were previously completed; this pass realigns them with the permanent-archive product direction.
+- Operator/architecture documentation and clean-setup validation were previously completed; the later archive-readiness pass realigned them with the permanent-archive product direction.
 
 ## Relevant planning and operation files
 

@@ -77,6 +77,45 @@ public sealed class ArchiveCommandTests
     }
 
     [Fact]
+    public async Task Inventory_reports_extension_families_without_private_paths_or_file_names()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string archiveRoot = Path.Combine(directory, "Kamerabilder");
+            string included = Path.Combine(archiveRoot, "2026", "08");
+            Directory.CreateDirectory(included);
+            await File.WriteAllBytesAsync(Path.Combine(included, "phone.heic"), [1]);
+            await File.WriteAllBytesAsync(Path.Combine(included, "camera.dng"), [2]);
+            await File.WriteAllBytesAsync(Path.Combine(included, "existing.jpg"), [3]);
+            await File.WriteAllBytesAsync(Path.Combine(included, "notes.txt"), [4]);
+
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            Assert.Equal(0, await RunAsync(
+                ["archive", "include", "--database", databasePath, "--root", archiveRoot, "--folder", "2026/08"]));
+
+            (int exitCode, string output, string error) = await RunWithOutputAsync(
+                ["archive", "inventory", "--database", databasePath]);
+
+            Assert.Equal(0, exitCode);
+            Assert.Equal(string.Empty, error);
+            Assert.Contains("archive-media-inventory: complete", output, StringComparison.Ordinal);
+            Assert.Contains("files-total: 4", output, StringComparison.Ordinal);
+            Assert.Contains("extension: .heic count=1 family=heif supported=true", output, StringComparison.Ordinal);
+            Assert.Contains("extension: .dng count=1 family=raw supported=false", output, StringComparison.Ordinal);
+            Assert.Contains("extension: .jpg count=1 family=jpeg supported=true", output, StringComparison.Ordinal);
+            Assert.Contains("extension: .txt count=1 family=other supported=false", output, StringComparison.Ordinal);
+            Assert.DoesNotContain("phone.heic", output, StringComparison.Ordinal);
+            Assert.DoesNotContain("camera.dng", output, StringComparison.Ordinal);
+            Assert.DoesNotContain(archiveRoot, output, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Include_rejects_a_different_archive_root_after_configuration()
     {
         string directory = CreateTemporaryDirectory();

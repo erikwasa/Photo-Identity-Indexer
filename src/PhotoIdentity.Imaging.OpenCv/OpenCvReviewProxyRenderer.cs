@@ -1,5 +1,8 @@
+using System.Runtime.InteropServices;
 using OpenCvSharp;
+using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.Imaging.OpenCv;
 
@@ -42,35 +45,19 @@ public sealed class OpenCvReviewProxyRenderer
 
         try
         {
-            using Mat source = Cv2.ImDecode(sourceBytes.ToArray(), ImreadModes.Color);
-            if (source.Empty())
+            ImageFrame image = OpenCvImageDecoder.DecodeEncoded(
+                sourceBytes,
+                new DecodeOptions(new ImageSize(profile.MaximumLongEdge, profile.MaximumLongEdge)),
+                cancellationToken);
+            if (image.Format != PixelFormat.Bgr24 ||
+                image.Stride != checked(image.Size.Width * ImageFrame.BytesPerPixel(PixelFormat.Bgr24)))
             {
-                throw new InvalidDataException("The source image could not be decoded as JPEG or PNG content.");
+                throw new InvalidDataException("The review-proxy decoder did not return packed BGR24 pixels.");
             }
 
-            double scale = Math.Min(
-                1d,
-                (double)profile.MaximumLongEdge / Math.Max(source.Cols, source.Rows));
-            int width = Math.Max(
-                1,
-                (int)Math.Round(source.Cols * scale, MidpointRounding.AwayFromZero));
-            int height = Math.Max(
-                1,
-                (int)Math.Round(source.Rows * scale, MidpointRounding.AwayFromZero));
-
-            using Mat prepared = new();
-            if (scale < 1d)
-            {
-                Cv2.Resize(
-                    source,
-                    prepared,
-                    new Size(width, height),
-                    interpolation: InterpolationFlags.Area);
-            }
-            else
-            {
-                source.CopyTo(prepared);
-            }
+            byte[] pixels = image.ToArray();
+            using Mat prepared = new(image.Size.Height, image.Size.Width, MatType.CV_8UC3);
+            Marshal.Copy(pixels, 0, prepared.Data, pixels.Length);
 
             cancellationToken.ThrowIfCancellationRequested();
             Cv2.ImEncode(
@@ -86,8 +73,12 @@ public sealed class OpenCvReviewProxyRenderer
             return new EncodedReviewProxy(
                 encoded,
                 ReviewProxyProfile.ContentType,
-                width,
-                height);
+                image.Size.Width,
+                image.Size.Height);
+        }
+        catch (ImageDecodingException exception)
+        {
+            throw new InvalidDataException("The source image could not be decoded for the review proxy.", exception);
         }
         catch (OpenCVException exception)
         {

@@ -24,7 +24,7 @@ public sealed record LocalFolderScanReport(
     IReadOnlyList<UnsupportedSourceFile> UnsupportedFiles);
 
 /// <summary>
-/// Enumerates JPEG and PNG files from a local directory without owning catalogue persistence.
+/// Enumerates supported image files from a local directory without owning catalogue persistence.
 /// </summary>
 public sealed class LocalFolderAssetSource : IAssetSource
 {
@@ -34,6 +34,8 @@ public sealed class LocalFolderAssetSource : IAssetSource
             [".jpg"] = "image/jpeg",
             [".jpeg"] = "image/jpeg",
             [".png"] = "image/png",
+            [".heic"] = "image/heic",
+            [".heif"] = "image/heif",
         };
 
     private readonly StringComparison _pathComparison;

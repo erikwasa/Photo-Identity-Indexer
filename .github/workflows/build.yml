@@ -102,8 +102,8 @@ jobs:
             (Join-Path $fixtureDirectory "corrupt.jpg"),
             [byte[]](0xff, 0xd8, 0xff, 0xd9))
           [IO.File]::WriteAllBytes(
-            (Join-Path $fixtureDirectory "unsupported.heic"),
-            [byte[]](0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63))
+            (Join-Path $fixtureDirectory "unsupported.gif"),
+            [Text.Encoding]::ASCII.GetBytes("GIF89a"))
 
       - name: Run Windows PowerShell mixed-media verification
         id: mixed-verification
@@ -118,7 +118,7 @@ jobs:
               ".artifacts/ci-verification/warning.jpg"
               ".artifacts/ci-verification/corrupt.jpg"
             ) `
-            -UnsupportedImage ".artifacts/ci-verification/unsupported.heic"
+            -UnsupportedImage ".artifacts/ci-verification/unsupported.gif"
 
       - name: Assert Windows PowerShell verification report
         shell: pwsh
@@ -151,7 +151,7 @@ jobs:
           }
 
           if ($report.unsupportedChecks.Count -ne 1 -or $report.unsupportedChecks[0].result -ne "passed") {
-            throw "Expected the unsupported HEIC check to pass."
+            throw "Expected the unsupported GIF check to pass."
           }
 
           $allChecks = @($report.decoderChecks) + @($report.unsupportedChecks)

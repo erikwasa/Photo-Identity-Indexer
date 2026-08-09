@@ -1,3 +1,4 @@
+using ImageMagick;
 using OpenCvSharp;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Imaging;
@@ -19,18 +20,33 @@ public sealed class OpenCvImageDecoder : IImageDecoder
         cancellationToken.ThrowIfCancellationRequested();
 
         byte[] encoded = await ReadAllAsync(source, cancellationToken);
-        ImageFileFormat format = ImageFileSignature.Detect(encoded);
+        return DecodeEncoded(encoded, options, cancellationToken);
+    }
 
+    internal static ImageFrame DecodeEncoded(
+        ReadOnlySpan<byte> encoded,
+        DecodeOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        ImageFileFormat format = ImageFileSignature.Detect(encoded);
         if (format == ImageFileFormat.Unsupported)
         {
             throw new ImageDecodingException(
                 ImageDecodingFailure.UnsupportedFormat,
-                "Only JPEG and PNG images are supported by the OpenCV decoder.");
+                "Only JPEG, PNG, HEIC and HEIF images are supported by the image decoder.");
         }
 
         try
         {
-            using Mat decoded = Cv2.ImDecode(encoded, ImreadModes.Color);
+            if (format == ImageFileFormat.Heif)
+            {
+                return DecodeHeif(encoded, options.MaximumSize, cancellationToken);
+            }
+
+            using Mat decoded = Cv2.ImDecode(encoded.ToArray(), ImreadModes.Color);
             if (decoded.Empty())
             {
                 throw new ImageDecodingException(
@@ -45,6 +61,13 @@ public sealed class OpenCvImageDecoder : IImageDecoder
         {
             throw;
         }
+        catch (MagickException exception)
+        {
+            throw new ImageDecodingException(
+                ImageDecodingFailure.CorruptMedia,
+                $"The {format} image could not be decoded.",
+                exception);
+        }
         catch (OpenCVException exception)
         {
             throw new ImageDecodingException(
@@ -52,6 +75,42 @@ public sealed class OpenCvImageDecoder : IImageDecoder
                 $"The {format} image could not be decoded.",
                 exception);
         }
+    }
+
+    private static ImageFrame DecodeHeif(
+        ReadOnlySpan<byte> encoded,
+        ImageSize? maximumSize,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        using MagickImage image = new(encoded.ToArray());
+        image.AutoOrient();
+        image.TransformColorSpace(ColorProfiles.SRGB);
+
+        if (maximumSize is not null &&
+            (image.Width > (uint)maximumSize.Value.Width ||
+             image.Height > (uint)maximumSize.Value.Height))
+        {
+            image.Resize(
+                (uint)maximumSize.Value.Width,
+                (uint)maximumSize.Value.Height);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        image.Strip();
+        using var pixels = image.GetPixels();
+        byte[] data = pixels.ToByteArray(PixelMapping.BGR)
+            ?? throw new ImageDecodingException(
+                ImageDecodingFailure.CorruptMedia,
+                "The HEIC/HEIF image did not expose decoded BGR pixels.");
+        int width = checked((int)image.Width);
+        int height = checked((int)image.Height);
+        ImageSize size = new(width, height);
+        return new ImageFrame(
+            size,
+            PixelFormat.Bgr24,
+            checked(width * ImageFrame.BytesPerPixel(PixelFormat.Bgr24)),
+            data);
     }
 
     private static async Task<byte[]> ReadAllAsync(
@@ -124,6 +183,7 @@ internal enum ImageFileFormat
     Unsupported,
     Jpeg,
     Png,
+    Heif,
 }
 
 internal static class ImageFileSignature
@@ -146,6 +206,45 @@ internal static class ImageFileSignature
             return ImageFileFormat.Png;
         }
 
+        if (IsHeif(encoded))
+        {
+            return ImageFileFormat.Heif;
+        }
+
         return ImageFileFormat.Unsupported;
     }
+
+    private static bool IsHeif(ReadOnlySpan<byte> encoded)
+    {
+        if (encoded.Length < 12 || !encoded.Slice(4, 4).SequenceEqual("ftyp"u8))
+        {
+            return false;
+        }
+
+        if (IsHeifBrand(encoded.Slice(8, 4)))
+        {
+            return true;
+        }
+
+        int scanEnd = Math.Min(encoded.Length, 64);
+        for (int offset = 16; offset + 4 <= scanEnd; offset += 4)
+        {
+            if (IsHeifBrand(encoded.Slice(offset, 4)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsHeifBrand(ReadOnlySpan<byte> brand) =>
+        brand.SequenceEqual("heic"u8) ||
+        brand.SequenceEqual("heix"u8) ||
+        brand.SequenceEqual("hevc"u8) ||
+        brand.SequenceEqual("hevx"u8) ||
+        brand.SequenceEqual("heim"u8) ||
+        brand.SequenceEqual("heis"u8) ||
+        brand.SequenceEqual("mif1"u8) ||
+        brand.SequenceEqual("msf1"u8);
 }
