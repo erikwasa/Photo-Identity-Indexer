@@ -8,7 +8,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class ArchiveHydrationIdentityTransferTests
 {
     [Fact]
-    public async Task Hash_mismatch_moves_managed_revision_ownership_back_to_source_until_reverification()
+    public async Task Hash_mismatch_moves_active_stale_revision_ownership_back_to_source_until_reverification()
     {
         string directory = Path.Combine(
             Path.GetTempPath(),
@@ -21,35 +21,48 @@ public sealed class ArchiveHydrationIdentityTransferTests
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 9, 9, 0, 0, TimeSpan.Zero);
             CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
-            SingleLocalSource scannerSource = new(source.Id, "photo.jpg", [1, 2, 3], now);
-            _ = await new SqliteArchiveSourceCatalogueScanner(database).ScanAsync(
+            MutableLocalSource scannerSource = new(source.Id, "photo.jpg", [1, 2, 3], now);
+            SqliteArchiveSourceCatalogueScanner scanner = new(database);
+            _ = await scanner.ScanAsync(
                 scannerSource,
                 source,
                 new SourceScanOptions(null, true),
                 now);
 
-            ArchiveSourceObservation observation = await FindObservationAsync(database, source.Id);
-            AssetRevisionId revisionId = Assert.IsType<AssetRevisionId>(observation.VerifiedRevisionId);
+            ArchiveSourceObservation initial = await FindObservationAsync(database, source.Id);
+            AssetRevisionId staleRevisionId = Assert.IsType<AssetRevisionId>(initial.VerifiedRevisionId);
             SqliteArchiveHydrationRepository revisionHydrations = new(database);
-            await revisionHydrations.ClaimAsync(revisionId, now.AddMinutes(1));
-            await revisionHydrations.TouchAsync(revisionId, now.AddMinutes(2));
+            await revisionHydrations.ClaimAsync(staleRevisionId, now.AddMinutes(1));
+            await revisionHydrations.TouchAsync(staleRevisionId, now.AddMinutes(2));
+
+            // A local sync can establish a newer revision while an older queued run still owns the
+            // physical hydration. The transfer must find that active lease by asset, not assume the
+            // newest catalogue revision is the lease owner.
+            scannerSource.Set([9, 8, 7, 6], now.AddMinutes(3));
+            _ = await scanner.ScanAsync(
+                scannerSource,
+                source,
+                new SourceScanOptions(null, true),
+                now.AddMinutes(3));
+            ArchiveSourceObservation newer = await FindObservationAsync(database, source.Id);
+            Assert.NotEqual(staleRevisionId, newer.VerifiedRevisionId);
 
             await new SqliteArchiveSourceVerificationStateRepository(database).MarkNeedsVerificationAsync(
-                observation.AssetId,
-                now.AddMinutes(3));
+                initial.AssetId,
+                now.AddMinutes(4));
 
             ArchiveManagedHydrationRecord revisionLease = Assert.IsType<ArchiveManagedHydrationRecord>(
-                await revisionHydrations.GetAsync(revisionId));
+                await revisionHydrations.GetAsync(staleRevisionId));
             Assert.False(revisionLease.IsActive);
 
             ArchiveManagedSourceHydrationRecord sourceLease = Assert.IsType<ArchiveManagedSourceHydrationRecord>(
-                await new SqliteArchiveSourceHydrationRepository(database).GetAsync(observation.AssetId));
+                await new SqliteArchiveSourceHydrationRepository(database).GetAsync(initial.AssetId));
             Assert.True(sourceLease.IsActive);
             Assert.False(sourceLease.IsReleaseRequested);
 
             ArchiveSourceObservation pending = Assert.IsType<ArchiveSourceObservation>(
                 await new SqliteArchiveSourceObservationRepository(database).GetNextPendingAsync(source.Id));
-            Assert.Equal(observation.AssetId, pending.AssetId);
+            Assert.Equal(initial.AssetId, pending.AssetId);
             Assert.Equal(ArchiveSourceVerificationState.NeedsSourceVerification, pending.VerificationState);
         }
         finally
@@ -77,14 +90,14 @@ public sealed class ArchiveHydrationIdentityTransferTests
             ?? throw new InvalidOperationException("Source observation was unavailable.");
     }
 
-    private sealed class SingleLocalSource : IAssetSource
+    private sealed class MutableLocalSource : IAssetSource
     {
         private readonly SourceId _sourceId;
         private readonly string _sourceKey;
-        private readonly byte[] _content;
-        private readonly DateTimeOffset _lastWriteTimeUtc;
+        private byte[] _content;
+        private DateTimeOffset _lastWriteTimeUtc;
 
-        public SingleLocalSource(
+        public MutableLocalSource(
             SourceId sourceId,
             string sourceKey,
             byte[] content,
@@ -92,6 +105,12 @@ public sealed class ArchiveHydrationIdentityTransferTests
         {
             _sourceId = sourceId;
             _sourceKey = sourceKey;
+            _content = content;
+            _lastWriteTimeUtc = lastWriteTimeUtc;
+        }
+
+        public void Set(byte[] content, DateTimeOffset lastWriteTimeUtc)
+        {
             _content = content;
             _lastWriteTimeUtc = lastWriteTimeUtc;
         }
