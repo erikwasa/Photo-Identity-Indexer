@@ -140,6 +140,9 @@ Before finalizing the proxy protocol, the maintainer should visually review a re
 - [ ] The 100-image evaluation set is used to choose the permanent proxy profile from measured candidates, with privacy-safe aggregate evidence retained.
 - [ ] The chosen proxy profile is validated on the 560-image pilot set and an aggregate storage estimate is recorded before real full-archive verification.
 - [ ] WI-0041 real-archive verification resumes only after the bounded storage/hydration workflow is implemented and locally verified.
+- [ ] One operator action can synchronize and continue the selected archive coverage through source verification, bounded OneDrive waits, analysis, proxy generation and managed release until complete, paused or genuinely blocked.
+- [ ] Normal photo viewing opens the durable review proxy rather than the fixed thumbnail, while full-resolution original hydration/view/release remains explicit.
+- [ ] Archive item status keeps OneDrive availability, source verification and analysis completion logically independent so an `OnlineOnly` analysed revision remains visible as analysed.
 
 ## Planned implementation slices
 
@@ -158,6 +161,12 @@ Add Photo-Identity-managed hydration ownership, free-space/budget checks, bounde
 ### Slice 4 — source re-verification, telemetry and local acceptance
 
 Add online-only source-change/reverification state, storage telemetry and end-to-end verification using the selected proxy profile. Validate the chosen settings on the 560-image pilot corpus before WI-0041 proceeds to the real archive progression.
+
+### Slice 5 — unattended advancement, proxy-first viewing and orthogonal status
+
+The combined human acceptance exposed three blockers before WI-0042 could be accepted: per-transition manual archive advancement did not scale, Collections opened the compatibility 480 × 320 thumbnail instead of a normal review-proxy viewer and exposed no original controls, and an analysed revision returned to `OnlineOnly` disappeared from the Archive analysed filter.
+
+Slice 5 adds durable server-owned one-click advancement that synchronizes first and automatically continues across OneDrive waits; a proxy-first photo viewer reachable from Collections and Archive with explicit original hydrate/open/release controls; and status semantics that preserve analysis completion independently of source availability. See `docs/operations/bounded-archive-slice5.md`.
 
 ## Scope boundary
 

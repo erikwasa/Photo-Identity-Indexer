@@ -1046,8 +1046,8 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0042-bounded-archive-storage.md
   started_at: 2026-08-08
-  last_updated_at: 2026-08-09
-  branch: agent/WI-0042-source-reverification
+  last_updated_at: 2026-08-10
+  branch: agent/WI-0042-slice5-unattended-archive
   blockers:
   - WI-0014
   - WI-0025

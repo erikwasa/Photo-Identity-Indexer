@@ -1,4 +1,5 @@
 @page "/archive"
+@implements IAsyncDisposable
 @inject HttpClient Http
 
 <PageTitle>Archive · Photo Identity</PageTitle>
@@ -133,16 +134,27 @@ else
                 <p class="eyebrow">Governed profile</p>
                 <h2 id="archive-analysis-heading">Archive analysis</h2>
             </div>
-            <button class="button primary" disabled="@(Busy || !Status.Configured || !Status.AnalysisReady)" @onclick="AnalyzePendingAsync">
-                @(Analyzing ? "Advancing…" : "Advance archive")
-            </button>
+            @if (Status.Advancement?.IsRunning == true)
+            {
+                <button class="button secondary" disabled="@Busy" @onclick="PauseAdvancementAsync">Pause archive</button>
+            }
+            else
+            {
+                <button class="button primary" disabled="@(Busy || !Status.Configured || !Status.AnalysisReady)" @onclick="AnalyzePendingAsync">Advance archive</button>
+            }
         </div>
 
         <dl class="profile-details">
             <div><dt>Detector</dt><dd>@Status.DetectorModelId · confidence @Status.DetectorConfidence</dd></div>
             <div><dt>Embedder</dt><dd>@Status.EmbedderModelId</dd></div>
             <div><dt>Profile</dt><dd><code>@(Status.ProfileHash is null ? "unavailable" : HashPrefix(Status.ProfileHash))</code></dd></div>
+            <div><dt>Archive advancement</dt><dd>@AdvancementLabel(Status.Advancement)</dd></div>
         </dl>
+
+        @if (!string.IsNullOrWhiteSpace(Status.Advancement?.Message))
+        {
+            <div class="notice">@Status.Advancement.Message</div>
+        }
 
         @if (!Status.AnalysisReady)
         {
@@ -200,7 +212,8 @@ else
                             <th>Analyzed</th>
                             <th>Pending</th>
                             <th>Failed</th>
-                            <th>Verify</th>
+                            <th>Needs verify</th>
+                            <th>First verify</th>
                             <th>Missing</th>
                         </tr>
                     </thead>
@@ -216,7 +229,8 @@ else
                                 <td>@AnalysisCount(folder.AnalysedImages)</td>
                                 <td>@AnalysisCount(folder.PendingImages)</td>
                                 <td class="@(folder.FailedImages > 0 ? "failure-count" : null)">@AnalysisCount(folder.FailedImages)</td>
-                                <td class="@(folder.NeedsSourceVerificationImages + folder.UnverifiedSourceImages > 0 ? "failure-count" : null)">@(folder.NeedsSourceVerificationImages + folder.UnverifiedSourceImages)</td>
+                                <td class="@(folder.NeedsSourceVerificationImages > 0 ? "failure-count" : null)">@folder.NeedsSourceVerificationImages</td>
+                                <td class="@(folder.UnverifiedSourceImages > 0 ? "failure-count" : null)">@folder.UnverifiedSourceImages</td>
                                 <td>@folder.MissingImages</td>
                             </tr>
                         }
@@ -280,6 +294,7 @@ else
                             <th>Source verification</th>
                             <th>Analysis</th>
                             <th>Latest error</th>
+                            <th>View</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -291,6 +306,12 @@ else
                                 <td><span class="archive-state state-@CssToken(item.SourceVerificationState)">@SourceVerificationLabel(item.SourceVerificationState)</span></td>
                                 <td><span class="archive-state state-@CssToken(item.AnalysisState)">@AnalysisStateLabel(item.AnalysisState)</span></td>
                                 <td class="archive-item-error">@(string.IsNullOrWhiteSpace(item.LastError) ? "—" : item.LastError)</td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(item.RevisionId))
+                                    {
+                                        <a class="button secondary" href="@($"/photo/{item.RevisionId}")">View</a>
+                                    }
+                                </td>
                             </tr>
                         }
                     </tbody>
@@ -320,9 +341,13 @@ else
     private bool Loading { get; set; } = true;
     private bool ItemLoading { get; set; }
     private bool Busy { get; set; }
-    private bool Analyzing { get; set; }
+    private CancellationTokenSource? AdvancementPolling { get; set; }
 
-    protected override async Task OnInitializedAsync() => await RefreshAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshAsync();
+        StartAdvancementPollingIfNeeded();
+    }
 
     private async Task RefreshAsync()
     {
@@ -428,46 +453,36 @@ else
     private async Task AnalyzePendingAsync()
     {
         Busy = true;
-        Analyzing = true;
         Error = null;
         Message = null;
         try
         {
-            int previousFinished = Status?.LatestRun is ArchiveRunStatusResponse existing
-                ? existing.SucceededJobs + existing.FailedJobs + existing.CancelledJobs
-                : -1;
-            int steps = 0;
-            while (steps < 10000)
-            {
-                using HttpResponseMessage response = await Http.PostAsync("api/archive/analysis/step", content: null);
-                ArchiveAnalysisStepResponse result = await ReadResponseAsync<ArchiveAnalysisStepResponse>(response);
-                Status = result.Status;
-                steps++;
+            using HttpResponseMessage response = await Http.PostAsync("api/archive/advance/start", content: null);
+            Status = await ReadResponseAsync<ArchiveStatusResponse>(response);
+            Message = "Archive advancement started. Synchronization, OneDrive waits, analysis, proxy generation and managed release will continue without additional clicks.";
+            await LoadItemsAsync();
+            StartAdvancementPollingIfNeeded();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
 
-                ArchiveRunStatusResponse? run = Status.LatestRun;
-                if (run is null || run.QueuedJobs == 0 && run.RunningJobs == 0)
-                {
-                    break;
-                }
-
-                int finished = run.SucceededJobs + run.FailedJobs + run.CancelledJobs;
-                if (finished <= previousFinished)
-                {
-                    Message = "Analysis is durable but no additional image was due in this step. Use Continue analysis later to resume queued work.";
-                    break;
-                }
-
-                previousFinished = finished;
-                await Task.Delay(75);
-            }
-
-            if (string.IsNullOrWhiteSpace(Message))
-            {
-                Message = Status?.Totals.PendingImages == 0
-                    ? "This archive step completed. If source verification or OneDrive downloading is still shown, use Advance archive again after content becomes local; the same action also retries durable proxy work."
-                    : "Archive advancement stopped with pending work remaining. Review failures or use Advance archive again.";
-            }
-
+    private async Task PauseAdvancementAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsync("api/archive/advance/pause", content: null);
+            Status = await ReadResponseAsync<ArchiveStatusResponse>(response);
+            Message = "Archive advancement paused. Durable completed work is retained.";
+            StopAdvancementPolling();
             await LoadItemsAsync();
         }
         catch (Exception exception)
@@ -476,10 +491,57 @@ else
         }
         finally
         {
-            Analyzing = false;
             Busy = false;
         }
     }
+
+    private void StartAdvancementPollingIfNeeded()
+    {
+        if (Status?.Advancement?.IsRunning != true || AdvancementPolling is not null)
+        {
+            return;
+        }
+
+        AdvancementPolling = new CancellationTokenSource();
+        _ = PollAdvancementAsync(AdvancementPolling.Token);
+    }
+
+    private async Task PollAdvancementAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                Status = await Http.GetFromJsonAsync<ArchiveStatusResponse>("api/archive/status", cancellationToken);
+                if (Status?.Configured == true)
+                {
+                    await LoadItemsAsync();
+                }
+                await InvokeAsync(StateHasChanged);
+
+                if (Status?.Advancement?.IsRunning != true)
+                {
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            Error = $"Archive progress polling stopped: {exception.Message}";
+            await InvokeAsync(StateHasChanged);
+        }
+        finally
+        {
+            AdvancementPolling?.Dispose();
+            AdvancementPolling = null;
+        }
+    }
+
+    private void StopAdvancementPolling() => AdvancementPolling?.Cancel();
 
     private async Task ApplyItemFiltersAsync()
     {
@@ -555,4 +617,23 @@ else
 
     private static string HashPrefix(string hash) =>
         hash[..Math.Min(12, hash.Length)];
+
+    private static string AdvancementLabel(ArchiveAdvancementStatusResponse? advancement) => advancement?.State switch
+    {
+        "queued" => "Queued",
+        "syncing" => "Synchronizing",
+        "running" => "Running",
+        "waiting" => "Waiting for OneDrive",
+        "blocked" => "Blocked",
+        "paused" => "Paused",
+        "complete" => "Complete",
+        null => "Not started",
+        _ => advancement.State,
+    };
+
+    public ValueTask DisposeAsync()
+    {
+        StopAdvancementPolling();
+        return ValueTask.CompletedTask;
+    }
 }

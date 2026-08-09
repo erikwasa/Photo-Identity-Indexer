@@ -251,12 +251,10 @@ else
                     {
                         <article class="collection-card">
                             <a class="collection-photo-link"
-                               href="@photo.ContentUrl"
-                               target="_blank"
-                               rel="noopener noreferrer"
+                               href="@($"/photo/{photo.RevisionId}")"
                                aria-label="@OpenPhotoLabel(photo)">
                                 <img class="collection-photo"
-                                     src="@photo.ContentUrl"
+                                     src="@photo.ThumbnailUrl"
                                      alt="@PhotoAltText(photo)"
                                      loading="lazy"
                                      decoding="async" />
