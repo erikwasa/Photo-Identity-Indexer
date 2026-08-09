@@ -37,3 +37,4 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - [**WI-0043 — Add configurable confidence groups and canonical auto-assignment**](../work-items/WI-0043-confidence-auto-assignment.md) — `proposed`; owner: `unassigned`
 - [**WI-0044 — Add favorite people**](../work-items/WI-0044-favorite-people.md) — `proposed`; owner: `unassigned`
 - [**WI-0047 — Add Unknown as a face review state**](../work-items/WI-0047-unknown-review-state.md) — `proposed`; owner: `unassigned`
+- [**WI-0053 — Add HEIC and archive RAW image support**](../work-items/WI-0053-heic-raw-support.md) — `proposed`; owner: `unassigned`

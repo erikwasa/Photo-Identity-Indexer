@@ -13,9 +13,10 @@
 - Keep the solution a modular monolith until an accepted ADR says otherwise.
 - Core/domain code must not expose EF Core, OpenCV, ONNX Runtime, Azure SDK or Microsoft Graph types.
 - Personal OneDrive is accessed through the Windows sync client, not Microsoft Graph.
-- Azure is disposable compute. It receives portable bundles and has no OneDrive credentials, managed identity or service principal.
-- Human-confirmed face labels are canonical. Embeddings, matches and clusters are replaceable derived data.
-- Do not modify original photos.
+- Azure is disposable optional compute. It receives portable bundles and has no OneDrive credentials, managed identity or service principal.
+- Canonical people and identity assignments are model-independent and auditable. The current runtime uses human review; ADR-0006 permits opt-in canonical automatic assignments with exact-model/policy provenance once WI-0043 is implemented.
+- Original photos are read-only and must not be modified.
+- The permanent archive uses one stable source identity with bounded local materialization; see ADR-0007.
 
 ## Scope discipline
 

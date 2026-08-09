@@ -4,18 +4,20 @@
 
 - [README and project orientation](../README.md)
 - [Local operator guide](operations/local-operator-guide.md)
+- [Operations documentation map](operations/index.md)
 - [Architecture overview](architecture/overview.md)
 - [Glossary](glossary.md)
 - [Current delivery status](delivery/status/current.md)
 - [Build context](../BUILD_CONTEXT.md)
 
-The local operator guide is the authoritative end-to-end command sequence. Specialized documents explain individual subsystems and must not duplicate or contradict that path.
+The local operator guide is the authoritative normal operating path. Specialized operations documents are classified in the operations index so completed experiment runbooks are not mistaken for current product instructions.
 
 ## Operations
 
+- [Operations documentation map](operations/index.md)
 - [Local operator guide](operations/local-operator-guide.md)
-- [Single-revision local evaluation](operations/local-evaluation.md)
-- [Multi-model comparison workflow](operations/multi-model-comparison.md)
+- [Review-proxy serving and bounded originals](operations/review-proxy-serving.md)
+- [Bounded archive acceptance](operations/bounded-archive-acceptance.md)
 - [SQLite persistence operations](operations/sqlite-persistence.md)
 
 ## Architecture
@@ -32,7 +34,8 @@ The local operator guide is the authoritative end-to-end command sequence. Speci
 ## Product
 
 - [Vision](product/vision.md)
-- [Initial scope](product/scope.md)
+- [Product scope](product/scope.md)
+- [Non-goals](product/non-goals.md)
 - [Success criteria](product/success-criteria.md)
 
 ## Sources and processing
@@ -53,11 +56,11 @@ The local operator guide is the authoritative end-to-end command sequence. Speci
 - [Identity-free execution](azure/identity-free-execution.md)
 - [Cost controls](azure/cost-controls.md)
 
-Azure is not required for the accepted local workflow. It remains an optional later scale-out path after clean-setup documentation validation.
+Azure is not required for version 1 or the accepted local permanent-catalogue workflow. It remains an optional later scale-out/experiment path.
 
 ## Delivery
 
-- [Local-first delivery plan](delivery/local-first-plan.md)
+- [Local-first delivery strategy](delivery/local-first-plan.md)
 - [Roadmap](delivery/roadmap.md)
 - [Milestones](delivery/milestones/)
 - [Work items](delivery/work-items/)
@@ -68,4 +71,6 @@ Azure is not required for the accepted local workflow. It remains an optional la
 
 ## Decisions
 
-Architecture decisions are stored under [`docs/decisions`](decisions/). Accepted ADRs describe current intent; superseding decisions must use a new ADR rather than rewriting history.
+- [Architecture decision index](decisions/index.md)
+
+Accepted ADRs describe current intent. Superseding decisions use a new ADR and retain the earlier record.

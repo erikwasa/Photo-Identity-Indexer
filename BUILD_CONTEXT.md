@@ -1,83 +1,84 @@
 # Build context
 
+## Current product target
+
+Version 1 is reached when the permanent catalogue can safely **begin** processing the real full archive. Version 1 does not require every archive asset to have finished processing.
+
+The version-1 archive-readiness gates are:
+
+1. WI-0042 — bounded hydration, source re-verification and durable review proxies;
+2. WI-0041 — stable permanent archive identity and incremental no-repeat ingestion after WI-0042 is accepted; and
+3. WI-0053 — HEIC/HEIF plus every RAW variant required by the real archive, with explicit unsupported state for any deliberate exception.
+
+See `docs/product/success-criteria.md` and `docs/delivery/local-first-plan.md` for the durable product/delivery definition.
+
 ## Current milestones
 
-- **M15 — Operator documentation and system guide**: `completed`
-- **M16 — Face detection recall**: `completed`
-- **M12 — Full archive processing**: `in_progress` while WI-0042 completes the bounded-storage prerequisite for WI-0041 and WI-0023.
+- **M12 — Full archive processing**: `in_progress`. It contains the version-1 archive-readiness work and later full-coverage completion.
+- **M17 — Identity review automation**: `ready`, but it is not a version-1 gate.
+- **M09 — Azure VM pilot without identities**: `ready` and optional; Azure is not required for version 1.
 
-## Current work
+## Active work
 
-**WI-0042 — Add bounded archive hydration and review proxies** remains `in_progress` until the maintainer performs the combined Slices 1–4 review/real-machine acceptance.
+**WI-0042 — Add bounded archive hydration and review proxies** remains `in_progress` pending the combined real Windows/OneDrive human acceptance gate.
 
-Merged implementation:
+Merged implementation includes deterministic versioned review proxies, proxy-backed collection browsing, explicit original hydrate/status/view/release, managed hydration ownership, free-space/byte/concurrency policy, LRU release of Photo-Identity-owned content, source-verification state and bounded first-time online-only source verification.
 
-- Slice 1: PRs #105/#106 — exact versioned review-proxy generation, durable proxy completion and measurement tooling.
-- Slice 2: PR #107 — proxy-backed collection thumbnails/previews and explicit authoritative-original resource semantics.
-- Slice 2: PR #109 — explicit OneDrive original hydrate/status/view/release with durable ownership and exact revision verification.
-- Slice 3: PR #110 — explicit free-space/managed-byte/concurrency policy, aggregate storage telemetry, LRU release of Photo-Identity-owned content, bounded archive analysis hydration, exact proxy generation settings, and analysis/proxy completion separation.
+PR #111 merged the source re-verification slice. The combined acceptance is documented in `docs/operations/bounded-archive-acceptance.md`; do not infer that the real-machine gate passed merely from automated coverage.
 
-The private 556-image `jpeg-1600-q78` scale run recorded 1,783,639,108 logical source bytes and 112,900,614 proxy bytes, with mean 203,058.7 bytes, median 181,032 bytes, p95 400,427 bytes and a 15.798x source-to-proxy compression ratio. The application still does not hard-code that profile as a production default because explicit human evidence for the earlier 100-image multi-candidate visual tuning decision has not yet been retained.
+**WI-0041 — Add incremental permanent archive ingestion** remains blocked on WI-0042 acceptance.
 
-**Slice 4 is active on `agent/WI-0042-source-reverification` / PR #111.** It closes the remaining source-identity gap:
+**WI-0053 — Add HEIC and archive RAW image support** is newly scoped under M12 and is unblocked by its completed decoder/scanner prerequisites. It inventories the real archive and adds HEIC/HEIF plus every RAW variant actually present before version 1 is declared archive-ready.
 
-1. archive sync retains lightweight size/last-write/media observations without opening OneDrive placeholders;
-2. previously verified sources become `needs-source-verification` when lightweight metadata diverges, while first-time online-only sources are `unverified`;
-3. metadata never creates an immutable revision: only a local SHA-256 read may establish/reselect the authoritative revision;
-4. verification requirements are sticky until authoritative bytes are successfully hashed, so later matching metadata cannot clear a prior divergence;
-5. first-time/unverified online-only items can use temporary asset-level managed hydration under the same free-space, managed-byte, concurrency and LRU policy as revision-level hydration;
-6. once SHA-256 establishes/reselects a revision, managed ownership transfers atomically to that revision so analysis/proxy/release can continue without double hydration;
-7. if an exact revision check fails while Photo Identity owns the local hydration, ownership first moves from whichever revision lease is actually active back to the source asset, then moves to the revision established by re-verification; this keeps working-set accounting and release responsibility correct even for stale queued revisions;
-8. analysis scheduling excludes `needs-source-verification` and `unverified` sources; exact hash verification is performed before the first job of a newly created run as well as before resumed queued jobs, and a mismatch explicitly re-enters the source-verification queue;
-9. if re-verification establishes a different current revision, any active analysis run queued against the prior revision is cancelled before it resumes;
-10. a source that returns to previously seen bytes reselects that existing immutable revision rather than creating a duplicate revision;
-11. logical archive-byte telemetry uses retained source observations so first-time online-only items are counted even before they have a revision;
-12. Archive API/UI expose source-verification state separately from OneDrive availability; and
-13. **Advance archive** remains available for source verification, online-only analysis and durable proxy retry rather than being disabled when local `PendingImages` is zero.
+## Selected permanent archive analysis profile
 
-Focused automated coverage proves that placeholder scans do not open content, metadata divergence requires re-verification, a first-time online-only item is hydrated/hashed and transfers managed ownership to its new revision, pre-revision hydration obeys the same managed-byte budget, previously seen content is reselected as current without duplicating immutable identity, source-verification state remains separate from availability, stale managed revision ownership is preserved through re-verification, and logical-source telemetry includes unverified online-only bytes. Existing Slice 3 working-set/capacity tests continue under the shared revision/source budget.
+M16 is complete. The governed permanent archive profile uses:
 
-The canonical work-item registry now also reflects WI-0042 as `in_progress`, started 2026-08-08, with `agent/WI-0042-source-reverification` as the active branch.
+- CenterFace `centerface-2019-fp32`;
+- confidence `0.5`;
+- `single-pass` detector pipeline;
+- SFace `sface-2021dec-fp32`; and
+- `sface-five-point-v1` alignment.
 
-## Human acceptance gate
+The generic historical `batch` defaults still use YuNet and must not be mistaken for the permanent archive profile.
 
-The real Windows/OneDrive acceptance from Slices 2–3 was intentionally deferred by the maintainer and is still **not passed**. After PR #111 is merged, perform the combined review in `docs/operations/bounded-archive-acceptance.md` rather than validating the slices separately.
+The previous FP32-versus-INT8 embedding comparison used the earlier YuNet face population. If production model selection is reaffirmed after the detector change, evaluate the exact models on the selected CenterFace population before treating the old comparison as definitive for the permanent archive.
 
-That review covers:
+## Accepted future direction
 
-- the missing 100-image multi-candidate proxy visual acceptance evidence;
-- normal proxy browsing without original hydration;
-- explicit original `online-only -> downloading -> ready -> releasing -> online-only` behavior;
-- preservation of pre-existing local/user-pinned originals;
-- configured free-space reserve, managed-byte budget, concurrency and LRU release behavior;
-- source re-verification using a disposable OneDrive-backed fixture rather than modifying authoritative production photos;
-- restart/recovery across hydration, verification, analysis, proxy and release stages; and
-- end-to-end bounded archive advancement with privacy-safe aggregate evidence only.
+ADR-0006 supersedes the earlier mandatory-human-confirmation rule. WI-0043 will add configurable confidence groups and optional canonical High-confidence automatic assignment. Automatic assignments will be auditable, can become exemplars on later regeneration runs and can be superseded by manual reassignment.
 
-WI-0041 remains blocked until that combined gate passes and the production hydration policy/profile values are deliberately accepted.
+ADR-0007 records the stable archive root plus bounded local materialization architecture.
+
+## Next concrete sequence
+
+1. Complete the combined WI-0042 human acceptance and deliberately accept the production proxy/hydration policy values.
+2. Unblock and complete WI-0041 permanent incremental ingestion.
+3. Implement/verify WI-0053 against private representative HEIC and RAW files from the real archive.
+4. Confirm the version-1 success criteria on the real Windows/OneDrive environment.
+5. Begin the permanent catalogue from real archive coverage and expand it incrementally; do not create a replacement production database.
+
+M17 review automation may be scheduled around this work, but it does not change the version-1 gate above.
 
 ## Completed gates
 
-- The 450–550-image local acceptance pilot passed restart/resume, cross-device review, deterministic export/evaluation, backup and restore.
-- SFace FP32 remains the selected local embedder after the governed FP32-versus-INT8 comparison.
-- CenterFace confidence `0.5`, single-pass, passed the governed M16 detector gate and its rollout/reconciliation was verified; M16 is complete.
-- Collection-ready queries and the neutral manifest passed automated validation plus private Windows/Pixel verification.
-- The operator/architecture documentation rewrite and independent clean-setup validation are complete; M15 is complete.
-- WI-0042 deterministic review-proxy generation, durable proxy metadata and measurement tooling are merged.
-- The private 556-image `jpeg-1600-q78` scale validation recorded a 15.798x source-to-proxy compression ratio.
-- Proxy-backed collection browsing and explicit preview/original API semantics are merged in PR #107.
-- The automated/core explicit-original lifecycle is merged in PR #109; its real OneDrive acceptance remains pending.
-- Slice 3 bounded storage/orchestration is merged in PR #110; its production policy tuning remains part of the combined acceptance.
+- The representative local acceptance pilot passed restart/resume, Windows/Pixel review, deterministic evaluation, backup and restore.
+- SFace FP32 remains the current selected embedder pending any later CenterFace-population reaffirmation.
+- CenterFace confidence `0.5`, single-pass, passed the governed M16 detector gate and migration-safety pilot.
+- Collection-ready queries and neutral manifests are implemented.
+- Operator/architecture documentation and clean-setup validation were previously completed; this pass realigns them with the permanent-archive product direction.
 
-## Relevant planning files
+## Relevant planning and operation files
 
+- `docs/product/success-criteria.md`
+- `docs/delivery/local-first-plan.md`
 - `docs/delivery/work-items/WI-0042-bounded-archive-storage.md`
 - `docs/delivery/work-items/WI-0041-incremental-archive-ingestion.md`
-- `docs/operations/review-proxy-measurement.md`
-- `docs/operations/review-proxy-serving.md`
+- `docs/delivery/work-items/WI-0053-heic-raw-support.md`
+- `docs/operations/index.md`
+- `docs/operations/local-operator-guide.md`
 - `docs/operations/bounded-archive-acceptance.md`
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/status/milestones.yaml`
 
 ## Automated validation
 
