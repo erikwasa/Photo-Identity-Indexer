@@ -20,7 +20,6 @@ public sealed class ArchiveSourceRevisionSelectionTests
             CatalogueSource catalogueSource = new(SourceId.New(), "local-folder", directory, t0);
             MutableLocalSource source = new(catalogueSource.Id, "photo.jpg", [1, 2, 3], t0);
             SqliteArchiveSourceCatalogueScanner scanner = new(database);
-            SqliteArchiveSourceObservationRepository observations = new(database);
 
             ArchiveSourceCatalogueScanSummary first = await scanner.ScanAsync(
                 source,
@@ -28,10 +27,7 @@ public sealed class ArchiveSourceRevisionSelectionTests
                 new SourceScanOptions(null, true),
                 t0);
             Assert.Equal(1, first.NewRevisionCount);
-            ArchiveSourceObservation afterFirst = Assert.IsType<ArchiveSourceObservation>(
-                await observations.GetNextPendingAsync(catalogueSource.Id) is null
-                    ? await FindObservationAsync(database, catalogueSource.Id)
-                    : null);
+            ArchiveSourceObservation afterFirst = await FindObservationAsync(database, catalogueSource.Id);
             AssetRevisionId revisionA = Assert.IsType<AssetRevisionId>(afterFirst.VerifiedRevisionId);
 
             source.Set([9, 8, 7, 6], t0.AddMinutes(1));
