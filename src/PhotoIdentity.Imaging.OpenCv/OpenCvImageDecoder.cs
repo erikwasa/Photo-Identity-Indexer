@@ -41,9 +41,12 @@ public sealed class OpenCvImageDecoder : IImageDecoder
 
         try
         {
-            using Mat decoded = format == ImageFileFormat.Heif
-                ? DecodeHeif(encoded)
-                : Cv2.ImDecode(encoded.ToArray(), ImreadModes.Color);
+            if (format == ImageFileFormat.Heif)
+            {
+                return DecodeHeif(encoded, options.MaximumSize, cancellationToken);
+            }
+
+            using Mat decoded = Cv2.ImDecode(encoded.ToArray(), ImreadModes.Color);
             if (decoded.Empty())
             {
                 throw new ImageDecodingException(
@@ -74,15 +77,37 @@ public sealed class OpenCvImageDecoder : IImageDecoder
         }
     }
 
-    private static Mat DecodeHeif(ReadOnlySpan<byte> encoded)
+    private static ImageFrame DecodeHeif(
+        ReadOnlySpan<byte> encoded,
+        ImageSize? maximumSize,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         using MagickImage image = new(encoded.ToArray());
         image.AutoOrient();
         image.TransformColorSpace(ColorProfiles.SRGB);
+
+        if (maximumSize is not null &&
+            (image.Width > (uint)maximumSize.Value.Width ||
+             image.Height > (uint)maximumSize.Value.Height))
+        {
+            image.Resize(
+                (uint)maximumSize.Value.Width,
+                (uint)maximumSize.Value.Height);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
         image.Strip();
-        image.Format = MagickFormat.Bmp;
-        byte[] bitmap = image.ToByteArray();
-        return Cv2.ImDecode(bitmap, ImreadModes.Color);
+        using var pixels = image.GetPixels();
+        byte[] data = pixels.ToByteArray(PixelMapping.BGR);
+        int width = checked((int)image.Width);
+        int height = checked((int)image.Height);
+        ImageSize size = new(width, height);
+        return new ImageFrame(
+            size,
+            PixelFormat.Bgr24,
+            checked(width * ImageFrame.BytesPerPixel(PixelFormat.Bgr24)),
+            data);
     }
 
     private static async Task<byte[]> ReadAllAsync(
