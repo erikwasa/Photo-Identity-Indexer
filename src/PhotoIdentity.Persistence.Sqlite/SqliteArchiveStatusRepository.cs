@@ -17,11 +17,14 @@ public sealed record CatalogueArchiveFolderStatus(
     int AnalysedImages,
     int PendingImages,
     int FailedImages,
+    int NeedsSourceVerificationImages,
+    int UnverifiedSourceImages,
     int MissingImages);
 
 public sealed record CatalogueArchiveItemStatus(
     string RelativePath,
     string Availability,
+    string SourceVerificationState,
     string AnalysisState,
     string? LastError);
 
@@ -44,8 +47,8 @@ public sealed record CatalogueArchiveRunStatus(
     int CancelledJobs);
 
 /// <summary>
-/// Reads permanent-archive coverage, OneDrive availability and exact-profile analysis state
-/// without exposing the configured source root.
+/// Reads permanent-archive coverage, OneDrive availability, source-verification state and
+/// exact-profile analysis state without exposing the configured source root.
 /// </summary>
 public sealed class SqliteArchiveStatusRepository
 {
@@ -76,7 +79,10 @@ public sealed class SqliteArchiveStatusRepository
                     asset.source_key,
                     asset.deleted_at_utc,
                     COALESCE(availability.availability, 'local') AS availability,
-                    revision.id AS revision_id
+                    revision.id AS revision_id,
+                    COALESCE(
+                        source_observation.verification_state,
+                        CASE WHEN revision.id IS NULL THEN 'unverified' ELSE 'verified' END) AS verification_state
                 FROM assets AS asset
                 LEFT JOIN archive_asset_availability AS availability
                     ON availability.asset_id = asset.id
@@ -87,6 +93,8 @@ public sealed class SqliteArchiveStatusRepository
                         WHERE candidate.asset_id = asset.id
                         ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                         LIMIT 1)
+                LEFT JOIN archive_source_observations AS source_observation
+                    ON source_observation.asset_id = asset.id
                 WHERE asset.source_id = $source_id
                   AND (
                       $folder = '' OR
@@ -112,26 +120,36 @@ public sealed class SqliteArchiveStatusRepository
                 WHERE row_number = 1
             )
             SELECT
-                SUM(CASE WHEN current.deleted_at_utc IS NULL THEN 1 ELSE 0 END) AS current_images,
-                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'local' THEN 1 ELSE 0 END) AS local_images,
-                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'online-only' THEN 1 ELSE 0 END) AS online_only_images,
-                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'downloading' THEN 1 ELSE 0 END) AS downloading_images,
-                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'unavailable' THEN 1 ELSE 0 END) AS unavailable_images,
-                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'error' THEN 1 ELSE 0 END) AS availability_error_images,
-                SUM(CASE WHEN current.deleted_at_utc IS NULL AND analysis.asset_revision_id IS NOT NULL THEN 1 ELSE 0 END) AS analysed_images,
+                SUM(CASE WHEN current.deleted_at_utc IS NULL THEN 1 ELSE 0 END),
+                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'local' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'online-only' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'downloading' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'unavailable' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN current.deleted_at_utc IS NULL AND current.availability = 'error' THEN 1 ELSE 0 END),
                 SUM(CASE WHEN current.deleted_at_utc IS NULL
+                              AND current.verification_state = 'verified'
+                              AND analysis.asset_revision_id IS NOT NULL THEN 1 ELSE 0 END),
+                SUM(CASE WHEN current.deleted_at_utc IS NULL
+                              AND current.verification_state = 'verified'
                               AND current.availability = 'local'
                               AND current.revision_id IS NOT NULL
                               AND analysis.asset_revision_id IS NULL
                               AND COALESCE(latest_job.status, '') <> 'failed'
-                         THEN 1 ELSE 0 END) AS pending_images,
+                         THEN 1 ELSE 0 END),
                 SUM(CASE WHEN current.deleted_at_utc IS NULL
+                              AND current.verification_state = 'verified'
                               AND current.availability = 'local'
                               AND current.revision_id IS NOT NULL
                               AND analysis.asset_revision_id IS NULL
                               AND latest_job.status = 'failed'
-                         THEN 1 ELSE 0 END) AS failed_images,
-                SUM(CASE WHEN current.deleted_at_utc IS NOT NULL THEN 1 ELSE 0 END) AS missing_images
+                         THEN 1 ELSE 0 END),
+                SUM(CASE WHEN current.deleted_at_utc IS NULL
+                              AND current.verification_state = 'needs-source-verification'
+                         THEN 1 ELSE 0 END),
+                SUM(CASE WHEN current.deleted_at_utc IS NULL
+                              AND current.verification_state = 'unverified'
+                         THEN 1 ELSE 0 END),
+                SUM(CASE WHEN current.deleted_at_utc IS NOT NULL THEN 1 ELSE 0 END)
             FROM current_revision AS current
             LEFT JOIN asset_revision_analysis AS analysis
                 ON analysis.asset_revision_id = current.revision_id
@@ -157,7 +175,9 @@ public sealed class SqliteArchiveStatusRepository
             ReadCount(reader, 6),
             ReadCount(reader, 7),
             ReadCount(reader, 8),
-            ReadCount(reader, 9));
+            ReadCount(reader, 9),
+            ReadCount(reader, 10),
+            ReadCount(reader, 11));
     }
 
     public async Task<CatalogueArchiveItemPage> GetItemsAsync(
@@ -186,6 +206,9 @@ public sealed class SqliteArchiveStatusRepository
                     asset.deleted_at_utc,
                     COALESCE(availability.availability, 'local') AS availability,
                     revision.id AS revision_id,
+                    COALESCE(
+                        source_observation.verification_state,
+                        CASE WHEN revision.id IS NULL THEN 'unverified' ELSE 'verified' END) AS verification_state,
                     analysis.asset_revision_id AS analysed_revision_id,
                     latest_job.status AS latest_job_status,
                     latest_job.error AS latest_job_error
@@ -199,6 +222,8 @@ public sealed class SqliteArchiveStatusRepository
                         WHERE candidate.asset_id = asset.id
                         ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
                         LIMIT 1)
+                LEFT JOIN archive_source_observations AS source_observation
+                    ON source_observation.asset_id = asset.id
                 LEFT JOIN asset_revision_analysis AS analysis
                     ON analysis.asset_revision_id = revision.id
                    AND analysis.profile_hash = $profile_hash
@@ -232,8 +257,11 @@ public sealed class SqliteArchiveStatusRepository
                 SELECT
                     source_key,
                     availability,
+                    verification_state,
                     CASE
                         WHEN deleted_at_utc IS NOT NULL THEN 'missing'
+                        WHEN verification_state = 'needs-source-verification' THEN 'needs-source-verification'
+                        WHEN verification_state = 'unverified' THEN 'unverified'
                         WHEN availability <> 'local' THEN 'unavailable'
                         WHEN analysed_revision_id IS NOT NULL THEN 'analysed'
                         WHEN latest_job_status = 'failed' THEN 'failed'
@@ -245,6 +273,7 @@ public sealed class SqliteArchiveStatusRepository
             SELECT
                 source_key,
                 availability,
+                verification_state,
                 analysis_state,
                 latest_job_error,
                 COUNT(*) OVER() AS total_count
@@ -268,14 +297,15 @@ public sealed class SqliteArchiveStatusRepository
         {
             if (items.Count == 0)
             {
-                total = reader.GetInt32(4);
+                total = reader.GetInt32(5);
             }
 
             items.Add(new CatalogueArchiveItemStatus(
                 reader.GetString(0),
                 reader.GetString(1),
                 reader.GetString(2),
-                reader.IsDBNull(3) ? null : reader.GetString(3)));
+                reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4)));
         }
 
         return new CatalogueArchiveItemPage(offset, limit, total, items);
@@ -332,7 +362,7 @@ public sealed class SqliteArchiveStatusRepository
 
     private async Task EnsureSchemasAsync(CancellationToken cancellationToken)
     {
-        await new SqliteArchiveAvailabilityRepository(_database).EnsureSchemaAsync(cancellationToken);
+        await new SqliteArchiveSourceObservationRepository(_database).EnsureSchemaAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -380,6 +410,8 @@ public sealed class SqliteArchiveStatusRepository
         "pending" => "pending",
         "failed" => "failed",
         "unavailable" => "unavailable",
+        "needs-source-verification" or "needs-verification" => "needs-source-verification",
+        "unverified" => "unverified",
         "missing" => "missing",
         _ => throw new ArgumentException($"Unknown archive item state '{state}'.", nameof(state)),
     };
