@@ -8,31 +8,48 @@
 
 ## Current work
 
-**WI-0042 — Add bounded archive hydration and review proxies** is `in_progress`. Slice 1 is merged in PRs #105 and #106. The exact `jpeg-1600-q78` profile was measured on 556 private pilot images: 1,783,639,108 logical source bytes produced 112,900,614 proxy bytes, with mean 203,058.7 bytes, median 181,032 bytes, p95 400,427 bytes and a 15.798x source-to-proxy compression ratio. Only privacy-safe aggregates are retained in Git.
+**WI-0042 — Add bounded archive hydration and review proxies** remains `in_progress` until the maintainer performs the combined Slices 1–4 review/real-machine acceptance.
 
-Proxy-backed browsing is merged in PR #107. Explicit original hydration/release is merged in PR #109: normal original GETs do not hydrate, managed ownership is durable and fail-closed, pre-existing local/user-pinned files are never claimed, and original bytes are size/SHA-256 verified before serving.
+Merged implementation:
 
-The real Windows/OneDrive Slice 2 acceptance is **still pending by maintainer request**. Do not mark it passed because later automated work proceeds. When the maintainer is available, verify proxy-no-hydration, explicit `online-only -> downloading -> ready`, verified original viewing, managed release back to online-only, and preservation of a pre-existing local/user-pinned original.
+- Slice 1: PRs #105/#106 — exact versioned review-proxy generation, durable proxy completion and measurement tooling.
+- Slice 2: PR #107 — proxy-backed collection thumbnails/previews and explicit authoritative-original resource semantics.
+- Slice 2: PR #109 — explicit OneDrive original hydrate/status/view/release with durable ownership and exact revision verification.
+- Slice 3: PR #110 — explicit free-space/managed-byte/concurrency policy, aggregate storage telemetry, LRU release of Photo-Identity-owned content, bounded archive analysis hydration, exact proxy generation settings, and analysis/proxy completion separation.
 
-**Slice 3 is active on `agent/WI-0042-bounded-hydration` / PR #110.** Current implementation adds:
+The private 556-image `jpeg-1600-q78` scale run recorded 1,783,639,108 logical source bytes and 112,900,614 proxy bytes, with mean 203,058.7 bytes, median 181,032 bytes, p95 400,427 bytes and a 15.798x source-to-proxy compression ratio. The application still does not hard-code that profile as a production default because explicit human evidence for the earlier 100-image multi-candidate visual tuning decision has not yet been retained.
 
-1. explicit minimum-free-space reserve, maximum managed-hydration bytes and maximum concurrent managed operations; no production values are guessed and managed hydration is disabled until all three are configured;
-2. serialized admission reserving each requested immutable revision's full logical size before OneDrive pinning;
-3. durable `last needed` tracking and least-recently-needed release of Photo-Identity-owned local originals under capacity pressure;
-4. asynchronous releases continue counting against the working set until OneDrive is observed online-only;
-5. managed revision-verification reads are bounded and `GET /api/archive/storage` reports logical source, free space, managed local/downloading/releasing/reserved and selected proxy bytes separately;
-6. automatic archive analysis can select already-versioned online-only/downloading revisions, request bounded hydration, persist observed availability transitions and proceed without a manual sync once local;
-7. exact proxy generation settings are explicit (`ReviewProxyMaximumLongEdge` and `ReviewProxyJpegQuality`) rather than inferred from `ReviewProxyProfileId`;
-8. analyzed current revisions missing the selected proxy are handled before more inference, so a proxy failure is retried from durable analysis completion rather than rerunning detector/embedder work; and
-9. after proxy durability, release is requested only when Photo Identity owns the hydration.
+**Slice 4 is active on `agent/WI-0042-source-reverification` / PR #111.** It closes the remaining source-identity gap:
 
-Automated coverage includes unconfigured-policy refusal, free-space reserve refusal, concurrency refusal, LRU managed eviction, a cumulative logical working set larger than the managed-byte budget while peak reservation remains bounded, explicit-original compatibility under deterministic policy, and local-only versus hydratable archive selection.
+1. archive sync retains lightweight size/last-write/media observations without opening OneDrive placeholders;
+2. previously verified sources become `needs-source-verification` when lightweight metadata diverges, while first-time online-only sources are `unverified`;
+3. metadata never creates an immutable revision: only a local SHA-256 read may establish/reselect the authoritative revision;
+4. verification requirements are sticky until authoritative bytes are successfully hashed, so later matching metadata cannot clear a prior divergence;
+5. first-time/unverified online-only items can use temporary asset-level managed hydration under the same free-space, managed-byte, concurrency and LRU policy as revision-level hydration;
+6. once SHA-256 establishes/reselects a revision, managed ownership transfers atomically to that revision so analysis/proxy/release can continue without double hydration;
+7. analysis scheduling excludes `needs-source-verification` and `unverified` sources; an exact pre-analysis/proxy hash mismatch explicitly re-enters the source-verification queue;
+8. if re-verification establishes a different current revision, any active analysis run queued against the prior revision is cancelled before it resumes;
+9. Archive API/UI expose source-verification state separately from OneDrive availability; and
+10. **Advance archive** remains available for source verification, online-only analysis and durable proxy retry rather than being disabled when local `PendingImages` is zero.
 
-Exact-head Windows CI is still required before PR #110 is review-ready. Slice 4 then adds online-only source-change/re-verification state and real-machine/end-to-end acceptance/policy tuning before WI-0041 resumes real-archive verification.
+Focused automated coverage proves that placeholder scans do not open content, metadata divergence requires re-verification, a first-time online-only item is hydrated/hashed and transfers managed ownership to its new revision, and pre-revision hydration obeys the same managed-byte budget. Existing Slice 3 working-set/capacity tests continue under the shared revision/source budget.
 
-The `jpeg-1600-q78` scale result is not hard-coded as a global proxy default. Before permanently freezing the profile, retain explicit human evidence that tuning candidates were compared and that the selected profile is visually acceptable for whole-photo browsing and identity-review context.
+## Human acceptance gate
 
-WI-0041 remains blocked by WI-0042. Its existing incremental archive coverage, availability and exact-analysis-profile work must remain intact; WI-0042 extends that archive model rather than creating a second catalogue.
+The real Windows/OneDrive acceptance from Slices 2–3 was intentionally deferred by the maintainer and is still **not passed**. After PR #111 is merged, perform the combined review in `docs/operations/bounded-archive-acceptance.md` rather than validating the slices separately.
+
+That review covers:
+
+- the missing 100-image multi-candidate proxy visual acceptance evidence;
+- normal proxy browsing without original hydration;
+- explicit original `online-only -> downloading -> ready -> releasing -> online-only` behavior;
+- preservation of pre-existing local/user-pinned originals;
+- configured free-space reserve, managed-byte budget, concurrency and LRU release behavior;
+- source re-verification using a disposable OneDrive-backed fixture rather than modifying authoritative production photos;
+- restart/recovery across hydration, verification, analysis, proxy and release stages; and
+- end-to-end bounded archive advancement with privacy-safe aggregate evidence only.
+
+WI-0041 remains blocked until that combined gate passes and the production hydration policy/profile values are deliberately accepted.
 
 ## Completed gates
 
@@ -45,6 +62,7 @@ WI-0041 remains blocked by WI-0042. Its existing incremental archive coverage, a
 - The private 556-image `jpeg-1600-q78` scale validation recorded a 15.798x source-to-proxy compression ratio.
 - Proxy-backed collection browsing and explicit preview/original API semantics are merged in PR #107.
 - The automated/core explicit-original lifecycle is merged in PR #109; its real OneDrive acceptance remains pending.
+- Slice 3 bounded storage/orchestration is merged in PR #110; its production policy tuning remains part of the combined acceptance.
 
 ## Relevant planning files
 
@@ -52,6 +70,7 @@ WI-0041 remains blocked by WI-0042. Its existing incremental archive coverage, a
 - `docs/delivery/work-items/WI-0041-incremental-archive-ingestion.md`
 - `docs/operations/review-proxy-measurement.md`
 - `docs/operations/review-proxy-serving.md`
+- `docs/operations/bounded-archive-acceptance.md`
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/status/milestones.yaml`
 
