@@ -36,10 +36,11 @@ The Slice 1 implementation:
 - uses a bundled HEIF decoder behind the existing `IImageDecoder` boundary while preserving the established JPEG/PNG OpenCV path;
 - shares that decoded-pixel path with durable review-proxy rendering;
 - includes HEIC/HEIF in archive proxy measurement;
+- adds a privacy-safe `archive inventory` command that reports aggregate extension/media-family/support counts without opening image content;
 - keeps unverified RAW media visible as unsupported rather than silently accepting it; and
-- adds automated source-recognition, HEIC decode/proxy and corrupt-container coverage.
+- adds automated source-recognition, inventory/privacy, HEIC read-delegate and corrupt-container coverage.
 
-Do not mark WI-0053 complete from CI alone. Private real-archive HEIC verification must still confirm orientation, downstream CenterFace/SFace processing, durable proxy behavior and representative runtime/memory. RAW format-specific verification becomes active when the archive actually contains RAW media.
+A valid real HEIC binary is intentionally not committed solely for test coverage. Do not mark WI-0053 complete from CI alone. Private real-archive HEIC verification must still confirm actual decode, orientation, downstream CenterFace/SFace processing, durable proxy behavior, color appearance and representative runtime/memory. RAW format-specific verification becomes active when the archive actually contains RAW media.
 
 ## Selected permanent archive analysis profile
 
