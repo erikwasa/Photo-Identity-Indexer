@@ -134,7 +134,7 @@ public static class Program
                           [--detector-pipeline single-pass|full-image-plus-tiles]
                           [--tile-size PIXELS] [--tile-overlap 0..<1]
                           [--merge-nms 0..1] [--max-attempts COUNT]
-              batch resume --database PATH --run RUN_ID [--max-ats COUNT]
+              batch resume --database PATH --run RUN_ID [--max-attempts COUNT]
               batch status --database PATH --run RUN_ID
               batch cancel --database PATH --run RUN_ID
 
