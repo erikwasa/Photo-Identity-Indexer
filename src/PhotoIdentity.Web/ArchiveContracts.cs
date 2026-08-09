@@ -17,6 +17,7 @@ public sealed record ArchiveFolderStatusResponse(
 
 public sealed record ArchiveItemStatusResponse(
     string RelativePath,
+    string? RevisionId,
     string Availability,
     string SourceVerificationState,
     string AnalysisState,
@@ -40,6 +41,12 @@ public sealed record ArchiveRunStatusResponse(
     int FailedJobs,
     int CancelledJobs);
 
+public sealed record ArchiveAdvancementStatusResponse(
+    string State,
+    bool IsRunning,
+    string? Message,
+    DateTimeOffset? UpdatedAtUtc);
+
 public sealed record ArchiveStatusResponse(
     bool Configured,
     string? RootName,
@@ -52,7 +59,8 @@ public sealed record ArchiveStatusResponse(
     string EmbedderModelId,
     ArchiveFolderStatusResponse Totals,
     IReadOnlyList<ArchiveFolderStatusResponse> Folders,
-    ArchiveRunStatusResponse? LatestRun);
+    ArchiveRunStatusResponse? LatestRun,
+    ArchiveAdvancementStatusResponse? Advancement);
 
 public sealed record ArchiveStorageStatusResponse(
     bool ArchiveConfigured,
