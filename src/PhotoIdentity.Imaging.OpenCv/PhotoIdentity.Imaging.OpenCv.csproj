@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <PackageReference Include="Magick.NET-Q8-x64" />
     <PackageReference Include="OpenCvSharp4" />
   </ItemGroup>
   <ItemGroup>
