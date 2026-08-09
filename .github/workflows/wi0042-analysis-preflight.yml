@@ -1,0 +1,56 @@
+name: WI-0042 analysis preflight
+
+on:
+  push:
+    branches:
+      - agent/WI-0042-source-reverification
+
+permissions:
+  contents: write
+
+jobs:
+  patch-preflight:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/WI-0042-source-reverification
+          fetch-depth: 0
+      - name: Require exact first-revision verification before starting a run
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = 'src/PhotoIdentity.Api/ArchiveBoundedAnalysisService.cs'
+          $text = [IO.File]::ReadAllText($path)
+          $marker = @'
+                  ArchiveAnalysisStartResult started = await coordinator.StartAsync(
+          '@
+          $replacement = @'
+                  CollectionOriginalAccessSnapshot? firstPendingStatus = await _originals.GetStatusAsync(
+                      localPending[0],
+                      cancellationToken);
+                  if (firstPendingStatus?.State != CollectionOriginalAccessService.ReadyState)
+                  {
+                      await PreparePendingRevisionAsync(localPending[0], cancellationToken);
+                      return new ArchiveBoundedAnalysisAdvanceResult(false);
+                  }
+
+                  await RecordAvailabilityAsync(localPending[0], AssetAvailability.Local, cancellationToken);
+                  ArchiveAnalysisStartResult started = await coordinator.StartAsync(
+          '@
+          if (-not $text.Contains($marker)) { throw 'New-run start marker was not found.' }
+          $text = $text.Replace($marker, $replacement)
+          [IO.File]::WriteAllText($path, $text, [Text.UTF8Encoding]::new($false))
+      - name: Commit preflight and remove temporary workflow
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git rm .github/workflows/wi0042-analysis-preflight.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/PhotoIdentity.Api/ArchiveBoundedAnalysisService.cs
+          git commit -m "Verify first archive revision before new analysis run"
+          if ($LASTEXITCODE -ne 0) { throw "git commit failed with exit code $LASTEXITCODE" }
+          git push origin HEAD:agent/WI-0042-source-reverification
+          if ($LASTEXITCODE -ne 0) { throw "git push failed with exit code $LASTEXITCODE" }
