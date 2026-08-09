@@ -124,15 +124,16 @@ else
     @if (Status.Totals.OnlineOnlyImages + Status.Totals.DownloadingImages > 0)
     {
         <div class="notice warning">
-            OneDrive placeholders are catalogued without opening their content. Use Advance archive to request only the verification or analysis hydration that is needed; Photo Identity applies the configured storage budget and releases only content it hydrated.
+            OneDrive placeholders are catalogued without opening their content. Advance archive synchronizes coverage and continues unattended through verification, bounded hydration, analysis, proxy generation and managed release. Photo Identity releases only content it hydrated.
         </div>
     }
 
     <section class="archive-analysis" aria-labelledby="archive-analysis-heading">
         <div class="section-heading">
             <div>
-                <p class="eyebrow">Governed profile</p>
-                <h2 id="archive-analysis-heading">Archive analysis</h2>
+                <p class="eyebrow">Unattended processing</p>
+                <h2 id="archive-analysis-heading">Archive advancement</h2>
+                <p>Start once and leave it running. The server waits for OneDrive transitions and continues until the selected coverage is complete, paused or blocked.</p>
             </div>
             @if (Status.Advancement?.IsRunning == true)
             {

@@ -132,14 +132,12 @@ public sealed class SqliteArchiveStatusRepository
                               AND analysis.asset_revision_id IS NOT NULL THEN 1 ELSE 0 END),
                 SUM(CASE WHEN current.deleted_at_utc IS NULL
                               AND current.verification_state = 'verified'
-                              AND current.availability = 'local'
                               AND current.revision_id IS NOT NULL
                               AND analysis.asset_revision_id IS NULL
                               AND COALESCE(latest_job.status, '') <> 'failed'
                          THEN 1 ELSE 0 END),
                 SUM(CASE WHEN current.deleted_at_utc IS NULL
                               AND current.verification_state = 'verified'
-                              AND current.availability = 'local'
                               AND current.revision_id IS NOT NULL
                               AND analysis.asset_revision_id IS NULL
                               AND latest_job.status = 'failed'
