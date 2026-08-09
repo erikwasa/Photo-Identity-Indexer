@@ -45,6 +45,11 @@ public static class Program
                         ArchiveProxyMeasureCommandOptions.Parse(args.Skip(2).ToArray()),
                         output,
                         cancellationToken),
+                "archive" when args.Length > 1 && args[1] == "inventory" =>
+                    await ArchiveMediaInventoryCommandRunner.RunAsync(
+                        ArchiveMediaInventoryCommandOptions.Parse(args.Skip(2).ToArray()),
+                        output,
+                        cancellationToken),
                 "archive" => await ArchiveCommandRunner.RunAsync(
                     ArchiveCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
@@ -112,6 +117,7 @@ public static class Program
               archive include --database PATH --root DIR --folder RELATIVE_DIR
               archive list --database PATH
               archive sync --database PATH
+              archive inventory --database PATH
               archive analyze --database PATH --output DIR
                               [--repository-root PATH] [--model-dir DIR]
                               [--max-attempts COUNT]
@@ -128,7 +134,7 @@ public static class Program
                           [--detector-pipeline single-pass|full-image-plus-tiles]
                           [--tile-size PIXELS] [--tile-overlap 0..<1]
                           [--merge-nms 0..1] [--max-attempts COUNT]
-              batch resume --database PATH --run RUN_ID [--max-attempts COUNT]
+              batch resume --database PATH --run RUN_ID [--max-ats COUNT]
               batch status --database PATH --run RUN_ID
               batch cancel --database PATH --run RUN_ID
 
@@ -177,8 +183,13 @@ public static class Program
             recursively included folder relative to that root. Adding a parent folder
             subsumes redundant child inclusions without changing source identity. Archive
             list reports the configured root and normalized coverage. Archive sync scans
-            every included folder and discovers new, changed and missing files without
-            tombstoning catalogue assets outside the selected coverage.
+            every included folder and discovers new, changed and missing supported files
+            without tombstoning catalogue assets outside the selected coverage.
+
+            Archive inventory scans only configured coverage and reports aggregate counts
+            by file extension, media family and current support state. It does not open image
+            content or print paths, so it can reveal future HEIC/RAW variants without hydrating
+            OneDrive placeholders or leaking private filenames.
 
             Archive analyze runs the governed CenterFace confidence-0.5 single-pass and
             SFace FP32 profile only for current immutable revisions that have not already
@@ -189,9 +200,9 @@ public static class Program
             durable job progress.
 
             Archive proxy measure is a pre-default measurement path. It renders every
-            supported JPEG/PNG source image with one or more exact profiles, writes those
-            derivatives outside the source root, and reports only aggregate logical source
-            bytes plus total/mean/median/p95 proxy bytes and source-to-proxy compression.
+            supported JPEG/PNG/HEIC/HEIF source image with one or more exact profiles, writes
+            those derivatives outside the source root, and reports only aggregate logical
+            source bytes plus total/mean/median/p95 proxy bytes and source-to-proxy compression.
             Candidate syntax is ID:MAX_LONG_EDGE:JPEG_QUALITY. Use at least two profiles for
             the 100-image tuning comparison and the one selected profile for the later
             560-image scale validation. The command never chooses or registers a permanent
@@ -224,7 +235,7 @@ public static class Program
             before replay-safe SQLite persistence. Face-crop jobs treat every 112x112 input
             as an already-aligned face and record explicit crop-input provenance.
 
-            The decode command reads JPEG or PNG content, applies EXIF orientation,
+            The decode command reads JPEG, PNG, HEIC or HEIF content, applies orientation,
             optionally downsizes it, and writes a normalised PNG without modifying the input.
 
             Evaluate export reads only human-assigned catalogue faces for exact detector and
