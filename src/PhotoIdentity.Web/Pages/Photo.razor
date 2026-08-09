@@ -1,0 +1,245 @@
+@page "/photo/{RevisionId}"
+@implements IAsyncDisposable
+@inject HttpClient Http
+
+<PageTitle>Photo · Photo Identity</PageTitle>
+
+<section class="hero collection-hero">
+    <div>
+        <p class="eyebrow">Photo viewer</p>
+        <h1>Review proxy</h1>
+        <p>Normal viewing uses the durable review proxy. Loading the authoritative original is always an explicit action.</p>
+    </div>
+    <a class="button secondary" href="/collections">Back to collections</a>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+
+<section class="collection-panel">
+    <div class="photo-viewer-frame">
+        <img class="photo-viewer-image"
+             src="@PreviewUrl"
+             alt="Review proxy for the selected photo"
+             decoding="async" />
+    </div>
+
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Authoritative original</p>
+            <h2>Full-resolution access</h2>
+        </div>
+        @if (Original is not null)
+        {
+            <span>@OriginalStateLabel(Original.State)</span>
+        }
+    </div>
+
+    @if (LoadingStatus)
+    {
+        <div class="empty-state compact"><p>Checking original availability…</p></div>
+    }
+    else if (Original is not null)
+    {
+        <dl class="profile-details">
+            <div><dt>State</dt><dd>@OriginalStateLabel(Original.State)</dd></div>
+            <div><dt>Managed by Photo Identity</dt><dd>@(Original.ManagedHydration ? "Yes" : "No")</dd></div>
+            <div><dt>User/OneDrive pinned</dt><dd>@(Original.IsPinned ? "Yes" : "No")</dd></div>
+        </dl>
+
+        @if (!string.IsNullOrWhiteSpace(Original.Message))
+        {
+            <div class="notice">@Original.Message</div>
+        }
+
+        <div class="collection-inline-actions">
+            @if (Original.CanRequestHydration)
+            {
+                <button type="button" class="button primary" disabled="@Busy" @onclick="HydrateAsync">
+                    @(Busy ? "Requesting…" : "Load original")
+                </button>
+            }
+            @if (Original.CanView)
+            {
+                <a class="button primary"
+                   href="@OriginalUrl"
+                   target="_blank"
+                   rel="noopener noreferrer">Open original</a>
+            }
+            @if (Original.CanRelease)
+            {
+                <button type="button" class="button secondary" disabled="@Busy" @onclick="ReleaseAsync">
+                    @(Busy ? "Requesting…" : "Release original")
+                </button>
+            }
+            <button type="button" class="button secondary" disabled="@(Busy || LoadingStatus)" @onclick="LoadStatusAsync">
+                Refresh original state
+            </button>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public string RevisionId { get; set; } = string.Empty;
+
+    private CollectionOriginalAccessResponse? Original { get; set; }
+    private bool LoadingStatus { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private CancellationTokenSource? PollCancellation { get; set; }
+
+    private string PreviewUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/preview";
+    private string OriginalUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original";
+    private string StatusUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original/status";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        StopPolling();
+        await LoadStatusAsync();
+        StartPollingIfNeeded();
+    }
+
+    private async Task LoadStatusAsync()
+    {
+        LoadingStatus = true;
+        Error = null;
+        try
+        {
+            Original = await Http.GetFromJsonAsync<CollectionOriginalAccessResponse>(StatusUrl);
+        }
+        catch (Exception exception)
+        {
+            Error = $"Original status could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            LoadingStatus = false;
+        }
+    }
+
+    private async Task HydrateAsync()
+    {
+        await InvokeOriginalActionAsync($"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original/hydrate");
+    }
+
+    private async Task ReleaseAsync()
+    {
+        await InvokeOriginalActionAsync($"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original/release");
+    }
+
+    private async Task InvokeOriginalActionAsync(string url)
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsync(url, content: null);
+            if (!response.IsSuccessStatusCode)
+            {
+                ArchiveErrorResponse? error = null;
+                try
+                {
+                    error = await response.Content.ReadFromJsonAsync<ArchiveErrorResponse>();
+                }
+                catch
+                {
+                    // Fall through to the HTTP status.
+                }
+
+                throw new InvalidOperationException(error?.Error ?? $"Original operation failed with HTTP {(int)response.StatusCode}.");
+            }
+
+            Original = await response.Content.ReadFromJsonAsync<CollectionOriginalAccessResponse>();
+            StartPollingIfNeeded();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void StartPollingIfNeeded()
+    {
+        if (Original?.State is not ("downloading" or "releasing"))
+        {
+            StopPolling();
+            return;
+        }
+
+        if (PollCancellation is not null)
+        {
+            return;
+        }
+
+        PollCancellation = new CancellationTokenSource();
+        _ = PollOriginalStateAsync(PollCancellation.Token);
+    }
+
+    private async Task PollOriginalStateAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                CollectionOriginalAccessResponse? state = await Http.GetFromJsonAsync<CollectionOriginalAccessResponse>(
+                    StatusUrl,
+                    cancellationToken);
+                if (state is null)
+                {
+                    return;
+                }
+
+                Original = state;
+                await InvokeAsync(StateHasChanged);
+                if (state.State is not ("downloading" or "releasing"))
+                {
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            Error = $"Original status polling stopped: {exception.Message}";
+            await InvokeAsync(StateHasChanged);
+        }
+        finally
+        {
+            PollCancellation?.Dispose();
+            PollCancellation = null;
+        }
+    }
+
+    private void StopPolling()
+    {
+        PollCancellation?.Cancel();
+    }
+
+    private static string OriginalStateLabel(string state) => state switch
+    {
+        "ready" => "Ready",
+        "online-only" => "Online-only",
+        "downloading" => "Downloading",
+        "releasing" => "Releasing",
+        "hash-mismatch" => "Needs source verification",
+        "unavailable" => "Unavailable",
+        "error" => "Error",
+        _ => state,
+    };
+
+    public ValueTask DisposeAsync()
+    {
+        StopPolling();
+        return ValueTask.CompletedTask;
+    }
+}
