@@ -1,20 +1,27 @@
 # PhotoIdentity.Imaging.OpenCv
 
-OpenCV-backed image decoding and transformation adapter.
+Image decoding and OpenCV-backed transformation adapter.
 
 ## Public boundary
 
-The module implements neutral `PhotoIdentity.Core` contracts and returns application-owned `ImageFrame` values. OpenCV `Mat` objects never cross the module boundary.
+The module implements neutral `PhotoIdentity.Core` contracts and returns application-owned `ImageFrame` values. OpenCV `Mat` and ImageMagick types never cross the module boundary.
 
 ## Decoder behaviour
 
-- Accepts JPEG and PNG content identified by file signature.
-- Applies EXIF orientation during decoding.
+- Accepts JPEG, PNG and HEIC/HEIF content identified by file signature/container brand.
+- Keeps the established OpenCV JPEG/PNG decode path.
+- Uses the bundled Magick.NET HEIF delegate for HEIC/HEIF, applies orientation, strips metadata from the intermediate render and returns the same packed BGR contract as other formats.
 - Converts decoded content to packed 8-bit BGR pixels.
 - Optionally downsizes to fit `DecodeOptions.MaximumSize` without upscaling.
 - Throws `ImageDecodingException` with `UnsupportedFormat` for other signatures.
-- Throws `ImageDecodingException` with `CorruptMedia` when JPEG or PNG content cannot be decoded.
+- Throws `ImageDecodingException` with `CorruptMedia` when recognized image content cannot be decoded.
 - Honours cancellation while reading the encoded stream.
+
+RAW formats are deliberately not accepted merely by extension. WI-0053 adds a RAW variant only after that format is found in the real archive and representative private input has established its rendering, orientation and resource-use policy.
+
+## Review proxies
+
+`OpenCvReviewProxyRenderer` uses the same `OpenCvImageDecoder` path before producing the configured metadata-free JPEG derivative. HEIC therefore has one rendered-pixel interpretation for archive analysis and normal review-proxy generation rather than separate format-specific implementations.
 
 ## Face crops
 
@@ -31,8 +38,6 @@ The module implements neutral `PhotoIdentity.Core` contracts and returns applica
 - degenerate landmarks and unsupported protocol IDs fail explicitly;
 - pixels outside the source image use constant zero boundary fill.
 
-HEIC and other formats remain future adapters rather than being hidden behind platform-specific behaviour in this module.
-
 ## Native runtime
 
-The library references only the managed `OpenCvSharp4` package. A host or test project must select the correct native runtime package for its operating system. The current Windows test project uses `OpenCvSharp4.runtime.win`.
+The library references managed OpenCvSharp plus the x64 Magick.NET package that carries its native ImageMagick runtime. A host or test project must still select the correct OpenCvSharp native runtime package for its operating system. The current application and CI target Windows x64; the current Windows test project uses `OpenCvSharp4.runtime.win`.
