@@ -127,3 +127,28 @@ milestones:
   document: ../milestones/M14-collection-api.md
   work_items:
   - WI-0025
+- id: M17
+  title: Identity review automation
+  status: proposed
+  document: ../milestones/M17-review-automation.md
+  work_items:
+  - WI-0043
+  - WI-0044
+  - WI-0045
+  - WI-0047
+- id: M18
+  title: Operator application experience
+  status: proposed
+  document: ../milestones/M18-application-experience.md
+  work_items:
+  - WI-0046
+  - WI-0048
+  - WI-0051
+  - WI-0052
+- id: M19
+  title: Photo metadata and semantic collections
+  status: proposed
+  document: ../milestones/M19-library-intelligence.md
+  work_items:
+  - WI-0049
+  - WI-0050
