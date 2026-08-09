@@ -128,6 +128,7 @@ public partial class Program
         app.MapBulkReviewEndpoints();
         app.MapBulkSuggestionReviewEndpoints();
         app.MapCollectionEndpoints();
+        app.MapCollectionProxyEndpoints();
         app.MapDetectorEvaluationEndpoints();
         app.MapDetectorEvaluationComparisonEndpoints();
         app.MapDetectorRolloutEndpoints();
