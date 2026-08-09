@@ -134,10 +134,15 @@ public sealed class ArchiveBoundedAnalysisService
 
         if (latest is not null)
         {
-            ProcessingRunSummary durable = await new SqliteProcessingRepository(_database)
-                .GetRunSummaryAsync(latest.RunId, cancellationToken);
+            SqliteProcessingRepository processing = new(_database);
+            ProcessingRunSummary durable = await processing.GetRunSummaryAsync(latest.RunId, cancellationToken);
             if (!durable.IsTerminal)
             {
+                if (!await EnsureNextDueJobReadyAsync(processing, latest.RunId, cancellationToken))
+                {
+                    return new ArchiveBoundedAnalysisAdvanceResult(false);
+                }
+
                 _ = await coordinator.ResumeAsync(
                     latest.RunId,
                     new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: 1),
@@ -182,6 +187,36 @@ public sealed class ArchiveBoundedAnalysisService
             proxyProfile,
             cancellationToken);
         return new ArchiveBoundedAnalysisAdvanceResult(started.ProcessingSummary is not null);
+    }
+
+    private async Task<bool> EnsureNextDueJobReadyAsync(
+        SqliteProcessingRepository processing,
+        ProcessingRunId runId,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<CatalogueProcessingJob> jobs = await processing.GetJobsAsync(runId, cancellationToken);
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        CatalogueProcessingJob? next = jobs
+            .Where(job => job.Status == ProcessingJobStatus.Queued && job.AvailableAtUtc <= now)
+            .OrderBy(job => job.AvailableAtUtc)
+            .ThenBy(job => job.Id.ToString(), StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (next is null)
+        {
+            return true;
+        }
+
+        CollectionOriginalAccessSnapshot? status = await _originals.GetStatusAsync(
+            next.AssetRevisionId,
+            cancellationToken);
+        if (status?.State == CollectionOriginalAccessService.ReadyState)
+        {
+            await RecordAvailabilityAsync(next.AssetRevisionId, AssetAvailability.Local, cancellationToken);
+            return true;
+        }
+
+        await PreparePendingRevisionAsync(next.AssetRevisionId, cancellationToken);
+        return false;
     }
 
     private async Task PreparePendingRevisionAsync(
