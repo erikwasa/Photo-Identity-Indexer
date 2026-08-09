@@ -11,9 +11,10 @@ namespace PhotoIdentity.Api;
 public sealed record ArchiveBoundedAnalysisAdvanceResult(bool StartedNewRun);
 
 /// <summary>
-/// Advances the permanent archive by at most one governed analysis attempt plus the durable
-/// proxy/release work associated with that attempt. Online-only revisions are hydrated through the
-/// same bounded storage policy used by explicit original viewing.
+/// Advances the permanent archive by at most one governed source-verification, analysis or
+/// post-analysis step. Lightweight source divergence is reconciled before inference, online-only
+/// content uses the same bounded hydration policy, and successful analysis remains independent
+/// from durable review-proxy completion.
 /// </summary>
 public sealed class ArchiveBoundedAnalysisService
 {
@@ -22,7 +23,9 @@ public sealed class ArchiveBoundedAnalysisService
     private readonly SqliteArchiveAnalysisRepository _analysis;
     private readonly SqliteArchivePostAnalysisRepository _postAnalysis;
     private readonly SqliteArchiveReviewProxyRepository _proxies;
+    private readonly SqliteArchiveSourceVerificationStateRepository _sourceVerificationState;
     private readonly CollectionOriginalAccessService _originals;
+    private readonly ArchiveSourceVerificationService _sourceVerification;
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
     private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _advanceGate = new(1, 1);
@@ -33,7 +36,9 @@ public sealed class ArchiveBoundedAnalysisService
         SqliteArchiveAnalysisRepository analysis,
         SqliteArchivePostAnalysisRepository postAnalysis,
         SqliteArchiveReviewProxyRepository proxies,
+        SqliteArchiveSourceVerificationStateRepository sourceVerificationState,
         CollectionOriginalAccessService originals,
+        ArchiveSourceVerificationService sourceVerification,
         ReviewProxyGenerationConfiguration proxyConfiguration,
         TimeProvider timeProvider)
     {
@@ -42,7 +47,9 @@ public sealed class ArchiveBoundedAnalysisService
         ArgumentNullException.ThrowIfNull(analysis);
         ArgumentNullException.ThrowIfNull(postAnalysis);
         ArgumentNullException.ThrowIfNull(proxies);
+        ArgumentNullException.ThrowIfNull(sourceVerificationState);
         ArgumentNullException.ThrowIfNull(originals);
+        ArgumentNullException.ThrowIfNull(sourceVerification);
         ArgumentNullException.ThrowIfNull(proxyConfiguration);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _database = database;
@@ -50,7 +57,9 @@ public sealed class ArchiveBoundedAnalysisService
         _analysis = analysis;
         _postAnalysis = postAnalysis;
         _proxies = proxies;
+        _sourceVerificationState = sourceVerificationState;
         _originals = originals;
+        _sourceVerification = sourceVerification;
         _proxyConfiguration = proxyConfiguration;
         _timeProvider = timeProvider;
     }
@@ -114,6 +123,36 @@ public sealed class ArchiveBoundedAnalysisService
             cancellationToken);
         Sha256Digest analysisProfileHash = analysisProfile.ComputeHash();
 
+        SqliteArchiveStatusRepository statusRepository = new(_database);
+        SqliteProcessingRepository processingRepository = new(_database);
+        CatalogueArchiveRunStatus? latest = await statusRepository.GetLatestRunAsync(
+            analysisProfileHash,
+            cancellationToken);
+
+        ArchiveSourceVerificationAdvanceResult verification = await _sourceVerification.AdvanceAsync(
+            coverage.Source.Id,
+            cancellationToken);
+        if (verification.WaitingForLocalContent)
+        {
+            return new ArchiveBoundedAnalysisAdvanceResult(false);
+        }
+
+        if (verification is { VerificationCompleted: true, NewRevision: true } && latest is not null)
+        {
+            ProcessingRunSummary durable = await processingRepository.GetRunSummaryAsync(
+                latest.RunId,
+                cancellationToken);
+            if (!durable.IsTerminal)
+            {
+                _ = await processingRepository.RequestCancellationAsync(
+                    latest.RunId,
+                    _timeProvider.GetUtcNow(),
+                    cancellationToken);
+            }
+
+            latest = null;
+        }
+
         // Finish durable proxy/release work before starting more inference. If this fails, the
         // analysis completion remains durable and a later call retries only this post-analysis step.
         if (await TryAdvancePostAnalysisAsync(
@@ -126,19 +165,37 @@ public sealed class ArchiveBoundedAnalysisService
             return new ArchiveBoundedAnalysisAdvanceResult(false);
         }
 
-        SqliteArchiveStatusRepository statusRepository = new(_database);
-        CatalogueArchiveRunStatus? latest = await statusRepository.GetLatestRunAsync(
-            analysisProfileHash,
-            cancellationToken);
-        ArchiveAnalysisCoordinator coordinator = new(_database, _timeProvider);
+        if (verification is
+            {
+                VerificationCompleted: true,
+                ManagedHydrationTransferred: true,
+                RevisionId: AssetRevisionId verifiedRevisionId,
+            } &&
+            await _analysis.IsCompletedAsync(verifiedRevisionId, analysisProfileHash, cancellationToken) &&
+            await _proxies.GetAsync(verifiedRevisionId, proxyProfile.Id, cancellationToken) is not null)
+        {
+            // Source verification had to hydrate content but this exact revision already has both
+            // durable analysis and proxy outputs. Nothing downstream still needs the local bytes.
+            CollectionOriginalAccessSnapshot? status = await _originals.GetStatusAsync(
+                verifiedRevisionId,
+                cancellationToken);
+            if (status?.ManagedHydration == true && status.CanRelease)
+            {
+                _ = await _originals.RequestReleaseAsync(verifiedRevisionId, cancellationToken);
+            }
 
+            return new ArchiveBoundedAnalysisAdvanceResult(false);
+        }
+
+        ArchiveAnalysisCoordinator coordinator = new(_database, _timeProvider);
         if (latest is not null)
         {
-            SqliteProcessingRepository processing = new(_database);
-            ProcessingRunSummary durable = await processing.GetRunSummaryAsync(latest.RunId, cancellationToken);
+            ProcessingRunSummary durable = await processingRepository.GetRunSummaryAsync(
+                latest.RunId,
+                cancellationToken);
             if (!durable.IsTerminal)
             {
-                if (!await EnsureNextDueJobReadyAsync(processing, latest.RunId, cancellationToken))
+                if (!await EnsureNextDueJobReadyAsync(processingRepository, latest.RunId, cancellationToken))
                 {
                     return new ArchiveBoundedAnalysisAdvanceResult(false);
                 }
@@ -215,6 +272,13 @@ public sealed class ArchiveBoundedAnalysisService
             return true;
         }
 
+        if (status?.State == CollectionOriginalAccessService.HashMismatchState)
+        {
+            await MarkRevisionNeedsVerificationAsync(next.AssetRevisionId, cancellationToken);
+            _ = await processing.RequestCancellationAsync(runId, _timeProvider.GetUtcNow(), cancellationToken);
+            return false;
+        }
+
         await PreparePendingRevisionAsync(next.AssetRevisionId, cancellationToken);
         return false;
     }
@@ -247,8 +311,8 @@ public sealed class ArchiveBoundedAnalysisService
                 return;
             case CollectionOriginalAccessService.HashMismatchState:
                 await RecordAvailabilityAsync(revisionId, AssetAvailability.Local, cancellationToken);
-                throw new InvalidOperationException(
-                    "A pending archive original no longer matches its immutable revision and requires source re-verification before analysis can continue.");
+                await MarkRevisionNeedsVerificationAsync(revisionId, cancellationToken);
+                return;
             default:
                 throw new InvalidOperationException(
                     "A pending archive original is unavailable for bounded analysis. Check archive availability and retry.");
@@ -302,8 +366,8 @@ public sealed class ArchiveBoundedAnalysisService
         if (status.State == CollectionOriginalAccessService.HashMismatchState)
         {
             await RecordAvailabilityAsync(revisionId, AssetAvailability.Local, cancellationToken);
-            throw new InvalidOperationException(
-                "An analyzed archive original no longer matches its immutable revision and requires source re-verification before its proxy can be generated.");
+            await MarkRevisionNeedsVerificationAsync(revisionId, cancellationToken);
+            return true;
         }
 
         if (status.State != CollectionOriginalAccessService.ReadyState)
@@ -338,6 +402,24 @@ public sealed class ArchiveBoundedAnalysisService
         }
 
         return true;
+    }
+
+    private async Task MarkRevisionNeedsVerificationAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken)
+    {
+        CatalogueProcessingAssetRevision? revision = await _catalogue.GetAssetRevisionAsync(
+            revisionId,
+            cancellationToken);
+        if (revision is null)
+        {
+            return;
+        }
+
+        await _sourceVerificationState.MarkNeedsVerificationAsync(
+            revision.AssetId,
+            _timeProvider.GetUtcNow(),
+            cancellationToken);
     }
 
     private async Task RecordAvailabilityAsync(
