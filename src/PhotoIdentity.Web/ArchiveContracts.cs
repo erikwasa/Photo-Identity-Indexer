@@ -51,6 +51,24 @@ public sealed record ArchiveStatusResponse(
     IReadOnlyList<ArchiveFolderStatusResponse> Folders,
     ArchiveRunStatusResponse? LatestRun);
 
+public sealed record ArchiveStorageStatusResponse(
+    bool ArchiveConfigured,
+    bool PolicyConfigured,
+    string? PolicyMessage,
+    long? MinimumFreeSpaceReserveBytes,
+    long? MaximumManagedHydrationBytes,
+    int? MaximumConcurrentOperations,
+    long LogicalSourceBytes,
+    long? AvailableFreeBytes,
+    long ManagedHydratedBytes,
+    long ManagedDownloadingBytes,
+    long ManagedReleasingBytes,
+    long ManagedReservedBytes,
+    int ActiveManagedOriginals,
+    int HydrationsInProgress,
+    long ReviewProxyBytes,
+    string? ReviewProxyProfileId);
+
 public sealed record ArchiveIncludeRequest(
     string? RootPath,
     string RelativeFolder);

@@ -8,41 +8,29 @@
 
 ## Current work
 
-**WI-0032 — Validate documentation from a clean setup** is complete. The human maintainer confirmed the remaining clean-setup acceptance criteria on 2026-08-09; M15 is closed. Only privacy-safe completion evidence is retained in Git.
+**WI-0042 — Add bounded archive hydration and review proxies** is `in_progress`. Slice 1 is merged in PRs #105 and #106. The exact `jpeg-1600-q78` profile was measured on 556 private pilot images: 1,783,639,108 logical source bytes produced 112,900,614 proxy bytes, with mean 203,058.7 bytes, median 181,032 bytes, p95 400,427 bytes and a 15.798x source-to-proxy compression ratio. Only privacy-safe aggregates are retained in Git.
 
-**WI-0042 — Add bounded archive hydration and review proxies** is `in_progress` on `agent/WI-0042-explicit-original-hydration`.
+Proxy-backed browsing is merged in PR #107. Explicit original hydration/release is merged in PR #109: normal original GETs do not hydrate, managed ownership is durable and fail-closed, pre-existing local/user-pinned files are never claimed, and original bytes are size/SHA-256 verified before serving.
 
-Slice 1 is merged in PRs #105 and #106. The exact `jpeg-1600-q78` profile was measured on 556 private pilot images: 1,783,639,108 logical source bytes produced 112,900,614 proxy bytes, with mean 203,058.7 bytes, median 181,032 bytes, p95 400,427 bytes and a 15.798x source-to-proxy compression ratio. Only these privacy-safe aggregate measurements are retained in Git.
+The real Windows/OneDrive Slice 2 acceptance is **still pending by maintainer request**. Do not mark it passed because later automated work proceeds. When the maintainer is available, verify proxy-no-hydration, explicit `online-only -> downloading -> ready`, verified original viewing, managed release back to online-only, and preservation of a pre-existing local/user-pinned original.
 
-The first Slice 2 increment is merged in PR #107. Collection contracts distinguish thumbnail, preview and authoritative-original resources. When `PhotoIdentity:ReviewProxyRoot` and `PhotoIdentity:ReviewProxyProfileId` are configured, normal collection thumbnails and previews use durable review proxies without requiring the original to remain local.
+**Slice 3 is active on `agent/WI-0042-bounded-hydration` / PR #110.** Current implementation adds:
 
-The active Slice 2 increment adds the explicit authoritative-original lifecycle:
+1. explicit minimum-free-space reserve, maximum managed-hydration bytes and maximum concurrent managed operations; no production values are guessed and managed hydration is disabled until all three are configured;
+2. serialized admission reserving each requested immutable revision's full logical size before OneDrive pinning;
+3. durable `last needed` tracking and least-recently-needed release of Photo-Identity-owned local originals under capacity pressure;
+4. asynchronous releases continue counting against the working set until OneDrive is observed online-only;
+5. managed revision-verification reads are bounded and `GET /api/archive/storage` reports logical source, free space, managed local/downloading/releasing/reserved and selected proxy bytes separately;
+6. automatic archive analysis can select already-versioned online-only/downloading revisions, request bounded hydration, persist observed availability transitions and proceed without a manual sync once local;
+7. exact proxy generation settings are explicit (`ReviewProxyMaximumLongEdge` and `ReviewProxyJpegQuality`) rather than inferred from `ReviewProxyProfileId`;
+8. analyzed current revisions missing the selected proxy are handled before more inference, so a proxy failure is retried from durable analysis completion rather than rerunning detector/embedder work; and
+9. after proxy durability, release is requested only when Photo Identity owns the hydration.
 
-1. `GET .../original` and legacy `.../content` never trigger hydration and serve bytes only after exact immutable revision size/SHA-256 verification;
-2. `GET .../original/status` reports online-only, downloading, ready, releasing, hash-mismatch, unavailable or error state;
-3. `POST .../original/hydrate` explicitly requests Windows OneDrive Files On-Demand hydration for an observed online-only item;
-4. Photo Identity persists ownership only after that explicit request is accepted, so pre-existing local or already pinned/downloading files are never claimed; and
-5. `POST .../original/release` fails closed unless Photo Identity has active durable ownership, then requests online-only state and clears ownership only after OneDrive reports the file online-only again.
+Automated coverage includes unconfigured-policy refusal, free-space reserve refusal, concurrency refusal, LRU managed eviction, a cumulative logical working set larger than the managed-byte budget while peak reservation remains bounded, explicit-original compatibility under deterministic policy, and local-only versus hydratable archive selection.
 
-The Windows implementation uses documented Files On-Demand pin attributes (`attrib +p` to request hydration, then `attrib -p` followed by `attrib +u` to release managed content). Pin/unpin transitions are asynchronous and are observed through the status endpoint. Command failures are path-free at the API boundary.
+Exact-head Windows CI is still required before PR #110 is review-ready. Slice 4 then adds online-only source-change/re-verification state and real-machine/end-to-end acceptance/policy tuning before WI-0041 resumes real-archive verification.
 
-Automated tests cover pin-state classification, durable/restart-safe ownership, no implicit hydration on original GET, preservation of pre-existing pinned/local content, explicit managed release and rejection of wrong-hash local bytes.
-
-## Next WI-0042 gate
-
-After PR #109 is green and merged, run one private Windows/OneDrive acceptance check against a real online-only archive original:
-
-1. confirm normal proxy preview does not hydrate the original;
-2. call the explicit hydrate action and observe `online-only -> downloading -> ready`;
-3. open the exact original and confirm the API serves it only after revision verification;
-4. call release and observe `releasing -> online-only`; and
-5. repeat with an already-local or user-pinned original and confirm Photo Identity reports it unmanaged and refuses automatic release.
-
-Retain only pass/fail and aggregate/path-free evidence. Do not commit source paths, filenames, pixels or identity data.
-
-Once that real Files On-Demand gate passes, Slice 3 adds configurable free-space reserve, managed-hydration byte budget, bounded concurrency, storage telemetry and safe policy-driven release/eviction. Slice 4 then adds online-only source re-verification and end-to-end local acceptance before WI-0041 resumes real-archive verification.
-
-The `jpeg-1600-q78` scale result is not hard-coded as a global proxy default yet. Before permanently freezing the profile, retain explicit human evidence that the tuning candidates were compared and that the selected profile is visually acceptable for whole-photo browsing and identity-review context.
+The `jpeg-1600-q78` scale result is not hard-coded as a global proxy default. Before permanently freezing the profile, retain explicit human evidence that tuning candidates were compared and that the selected profile is visually acceptable for whole-photo browsing and identity-review context.
 
 WI-0041 remains blocked by WI-0042. Its existing incremental archive coverage, availability and exact-analysis-profile work must remain intact; WI-0042 extends that archive model rather than creating a second catalogue.
 
@@ -56,6 +44,7 @@ WI-0041 remains blocked by WI-0042. Its existing incremental archive coverage, a
 - WI-0042 deterministic review-proxy generation, durable proxy metadata and measurement tooling are merged.
 - The private 556-image `jpeg-1600-q78` scale validation recorded a 15.798x source-to-proxy compression ratio.
 - Proxy-backed collection browsing and explicit preview/original API semantics are merged in PR #107.
+- The automated/core explicit-original lifecycle is merged in PR #109; its real OneDrive acceptance remains pending.
 
 ## Relevant planning files
 

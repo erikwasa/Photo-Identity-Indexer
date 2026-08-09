@@ -235,61 +235,23 @@ public static class ArchiveEndpoints
     private static async Task<IResult> AnalysisStepAsync(
         SqliteCatalogueDatabase database,
         ArchiveOperatorConfiguration operatorConfiguration,
+        ArchiveBoundedAnalysisService boundedAnalysis,
         CancellationToken cancellationToken)
     {
         try
         {
-            ArchiveCoverageConfiguration coverage = await new SqliteArchiveCoverageRepository(database)
-                .GetAsync(cancellationToken)
-                ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
-
-            if (!operatorConfiguration.TryResolveAnalysisConfiguration(
-                    out ArchiveAnalysisConfiguration? analysisConfiguration,
-                    out string? message) ||
-                analysisConfiguration is null)
-            {
-                throw new InvalidOperationException(message ?? "Archive analysis is not configured.");
-            }
-
-            LocalBatchConfiguration batchConfiguration = analysisConfiguration.ToBatchConfiguration(coverage.Source.RootLocator);
-            AnalysisProfileDefinition profile = await ArchiveAnalysisProfileFactory.CreateAsync(
-                batchConfiguration,
-                cancellationToken);
-            Sha256Digest profileHash = profile.ComputeHash();
-            SqliteArchiveStatusRepository statusRepository = new(database);
-            CatalogueArchiveRunStatus? latest = await statusRepository.GetLatestRunAsync(profileHash, cancellationToken);
-            ArchiveAnalysisCoordinator coordinator = new(database);
-
-            if (latest is not null)
-            {
-                ProcessingRunSummary durable = await new SqliteProcessingRepository(database)
-                    .GetRunSummaryAsync(latest.RunId, cancellationToken);
-                if (!durable.IsTerminal)
-                {
-                    _ = await coordinator.ResumeAsync(
-                        latest.RunId,
-                        new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: 1),
-                        cancellationToken);
-                    return Results.Ok(new ArchiveAnalysisStepResponse(
-                        false,
-                        await BuildStatusAsync(database, operatorConfiguration, cancellationToken)));
-                }
-            }
-
-            ArchiveAnalysisStartResult started = await coordinator.StartAsync(
-                analysisConfiguration,
-                new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: 1),
-                cancellationToken);
-            return Results.Ok(new ArchiveAnalysisStepResponse(
-                started.ProcessingSummary is not null,
-                await BuildStatusAsync(database, operatorConfiguration, cancellationToken)));
+ArchiveBoundedAnalysisAdvanceResult advanced = await boundedAnalysis.AdvanceAsync(
+    operatorConfiguration,
+    cancellationToken);
+return Results.Ok(new ArchiveAnalysisStepResponse(
+    advanced.StartedNewRun,
+    await BuildStatusAsync(database, operatorConfiguration, cancellationToken)));
         }
         catch (Exception exception)
         {
-            return BadRequest(exception);
+return BadRequest(exception);
         }
     }
-
     private static async Task<ArchiveStatusResponse> BuildStatusAsync(
         SqliteCatalogueDatabase database,
         ArchiveOperatorConfiguration operatorConfiguration,

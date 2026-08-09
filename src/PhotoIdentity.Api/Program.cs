@@ -1,3 +1,5 @@
+using System.Globalization;
+using Microsoft.Extensions.Configuration;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
@@ -21,6 +23,8 @@ public partial class Program
             builder.Configuration["PhotoIdentity:DetectorEvaluationRoot"] ?? defaultDetectorEvaluationRoot;
         string archiveAnalysisRoot =
             builder.Configuration["PhotoIdentity:ArchiveAnalysisOutputRoot"] ?? defaultArchiveAnalysisRoot;
+        string? reviewProxyRoot = builder.Configuration["PhotoIdentity:ReviewProxyRoot"];
+        string? reviewProxyProfileId = builder.Configuration["PhotoIdentity:ReviewProxyProfileId"];
 
         builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
         builder.Services.AddSingleton(new ArchiveOperatorConfiguration(
@@ -28,8 +32,17 @@ public partial class Program
             builder.Configuration["PhotoIdentity:RepositoryRoot"],
             builder.Configuration["PhotoIdentity:ModelDirectory"]));
         builder.Services.AddSingleton(new ReviewProxyServingConfiguration(
-            builder.Configuration["PhotoIdentity:ReviewProxyRoot"],
-            builder.Configuration["PhotoIdentity:ReviewProxyProfileId"]));
+            reviewProxyRoot,
+            reviewProxyProfileId));
+        builder.Services.AddSingleton(new ReviewProxyGenerationConfiguration(
+            reviewProxyRoot,
+            reviewProxyProfileId,
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:ReviewProxyMaximumLongEdge"),
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:ReviewProxyJpegQuality")));
+        builder.Services.AddSingleton(new ArchiveHydrationPolicyConfiguration(
+            ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MinimumFreeSpaceReserveBytes"),
+            ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MaximumManagedHydrationBytes"),
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:ArchiveHydration:MaximumConcurrentOperations")));
         builder.Services.AddSingleton<SqliteReviewRepository>();
         builder.Services.AddSingleton<SqliteReviewFilterRepository>();
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
@@ -44,14 +57,20 @@ public partial class Program
         builder.Services.AddSingleton<SqliteProcessingRepository>();
         builder.Services.AddSingleton<SqliteDetectorRolloutReviewRepository>();
         builder.Services.AddSingleton<SqliteDetectorRolloutApplicationRepository>();
+        builder.Services.AddSingleton<SqliteArchiveAnalysisRepository>();
         builder.Services.AddSingleton<SqliteArchiveReviewProxyRepository>();
+        builder.Services.AddSingleton<SqliteArchivePostAnalysisRepository>();
         builder.Services.AddSingleton<SqliteArchiveHydrationRepository>();
+        builder.Services.AddSingleton<SqliteArchiveStorageRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton<DetectorRolloutCropFileResolver>();
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();
         builder.Services.AddSingleton<CollectionReviewProxyFileResolver>();
         builder.Services.AddSingleton<CollectionOriginalAccessService>();
+        builder.Services.AddSingleton<ArchiveHydrationCapacityService>();
+        builder.Services.AddSingleton<ArchiveBoundedAnalysisService>();
         builder.Services.AddSingleton<IOneDriveFilesOnDemandPlatform, WindowsOneDriveFilesOnDemandPlatform>();
+        builder.Services.AddSingleton<IArchiveStorageProbe, DriveArchiveStorageProbe>();
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
@@ -106,8 +125,41 @@ public partial class Program
         app.MapDetectorEvaluationComparisonEndpoints();
         app.MapDetectorRolloutEndpoints();
         app.MapArchiveEndpoints();
+        app.MapArchiveStorageEndpoints();
         app.MapFallbackToFile("index.html");
 
         await app.RunAsync();
+    }
+
+    private static long? ParseOptionalLong(IConfiguration configuration, string key)
+    {
+        string? value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (long.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsed))
+        {
+            return parsed;
+        }
+
+        throw new InvalidOperationException($"Configuration '{key}' must be an integer byte count.");
+    }
+
+    private static int? ParseOptionalInt(IConfiguration configuration, string key)
+    {
+        string? value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed))
+        {
+            return parsed;
+        }
+
+        throw new InvalidOperationException($"Configuration '{key}' must be an integer.");
     }
 }
