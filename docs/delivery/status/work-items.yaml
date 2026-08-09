@@ -242,7 +242,7 @@ work_items:
   - type: workflow
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30173090694
   - type: merge_commit
-    value: d1fa036f131396ec05a175714736346f6cec23a8
+    value: d1fa036ea256f8d5c9f8133ab184747908f0d64e
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/18
   - type: workflow
