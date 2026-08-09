@@ -1052,3 +1052,112 @@ work_items:
   - WI-0025
   blocker_notes: []
   evidence: []
+- id: WI-0043
+  title: Add configurable confidence groups and canonical auto-assignment
+  milestone: M17
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0043-confidence-auto-assignment.md
+  blockers:
+  - WI-0016
+  - WI-0033
+  blocker_notes: []
+  evidence: []
+- id: WI-0044
+  title: Add favorite people
+  milestone: M17
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0044-favorite-people.md
+  blockers:
+  - WI-0015
+  blocker_notes: []
+  evidence: []
+- id: WI-0045
+  title: Regenerate identity matches from the web application
+  milestone: M17
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0045-web-match-regeneration.md
+  blockers:
+  - WI-0016
+  - WI-0043
+  blocker_notes: []
+  evidence: []
+- id: WI-0046
+  title: Simplify the application around Review and Library
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0046-simplified-application-shell.md
+  blockers:
+  - WI-0025
+  - WI-0045
+  - WI-0048
+  blocker_notes: []
+  evidence: []
+- id: WI-0047
+  title: Add Unknown as a face review state
+  milestone: M17
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0047-unknown-review-state.md
+  blockers:
+  - WI-0015
+  - WI-0016
+  blocker_notes: []
+  evidence: []
+- id: WI-0048
+  title: Add an operator configuration page
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0048-configuration-page.md
+  blockers:
+  - WI-0041
+  - WI-0043
+  blocker_notes: []
+  evidence: []
+- id: WI-0049
+  title: Experiment with visible-content image tagging
+  milestone: M19
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0049-visible-content-tagging-experiment.md
+  blockers:
+  - WI-0042
+  blocker_notes: []
+  evidence: []
+- id: WI-0050
+  title: Add EXIF metadata and smart collections
+  milestone: M19
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0050-exif-smart-collections.md
+  blockers:
+  - WI-0025
+  - WI-0041
+  - WI-0042
+  blocker_notes: []
+  evidence: []
+- id: WI-0051
+  title: Add a one-click Windows launcher
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0051-one-click-windows-launcher.md
+  blockers:
+  - WI-0041
+  blocker_notes: []
+  evidence: []
+- id: WI-0052
+  title: Package Photo Identity as a Windows application
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0052-packaged-windows-application.md
+  blockers:
+  - WI-0048
+  - WI-0051
+  blocker_notes: []
+  evidence: []

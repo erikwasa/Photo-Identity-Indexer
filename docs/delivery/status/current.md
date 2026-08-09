@@ -18,6 +18,7 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M09 — Azure VM pilot without identities**: `ready`
 - **M12 — Full archive processing**: `in_progress`
 - **M14 — Collection-ready API**: `completed`
+- **M17 — Identity review automation**: `ready`
 
 ## Active work
 
@@ -33,3 +34,6 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 ## Next ready work
 
 - [**WI-0020 — Run Azure VM pilot**](../work-items/WI-0020-azure-pilot.md) — `proposed`; owner: `unassigned`
+- [**WI-0043 — Add configurable confidence groups and canonical auto-assignment**](../work-items/WI-0043-confidence-auto-assignment.md) — `proposed`; owner: `unassigned`
+- [**WI-0044 — Add favorite people**](../work-items/WI-0044-favorite-people.md) — `proposed`; owner: `unassigned`
+- [**WI-0047 — Add Unknown as a face review state**](../work-items/WI-0047-unknown-review-state.md) — `proposed`; owner: `unassigned`
