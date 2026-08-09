@@ -18,20 +18,27 @@ public sealed record ArchiveSourceCatalogueScanSummary(
     int AvailabilityErrorCount,
     int NewRevisionCount,
     int UnchangedFileCount,
+    int VerifiedSourceCount,
+    int NeedsSourceVerificationCount,
+    int UnverifiedSourceCount,
     int MarkedDeletedCount);
 
 /// <summary>
 /// Catalogues permanent-archive presence and availability without opening OneDrive placeholders.
-/// Only locally available items are hashed and assigned immutable revisions.
+/// Lightweight size/last-write observations are retained for every item. Only locally available
+/// items are hashed; placeholder metadata can require later source verification but never creates
+/// an immutable revision by itself.
 /// </summary>
 public sealed class SqliteArchiveSourceCatalogueScanner
 {
     private readonly SqliteCatalogueDatabase _database;
+    private readonly SqliteArchiveSourceObservationRepository _observations;
 
     public SqliteArchiveSourceCatalogueScanner(SqliteCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+        _observations = new SqliteArchiveSourceObservationRepository(database);
     }
 
     public async Task<ArchiveSourceCatalogueScanSummary> ScanAsync(
@@ -45,7 +52,7 @@ public sealed class SqliteArchiveSourceCatalogueScanner
         ArgumentNullException.ThrowIfNull(catalogueSource);
         ArgumentNullException.ThrowIfNull(options);
 
-        await new SqliteArchiveAvailabilityRepository(_database).EnsureSchemaAsync(cancellationToken);
+        await _observations.EnsureSchemaAsync(cancellationToken);
         DateTimeOffset scannedAt = scannedAtUtc.ToUniversalTime();
         int supported = 0;
         int local = 0;
@@ -55,6 +62,9 @@ public sealed class SqliteArchiveSourceCatalogueScanner
         int availabilityErrors = 0;
         int newRevisions = 0;
         int unchanged = 0;
+        int verified = 0;
+        int needsVerification = 0;
+        int unverified = 0;
 
         await foreach (SourceAsset sourceAsset in source.EnumerateAsync(options, cancellationToken))
         {
@@ -100,7 +110,7 @@ public sealed class SqliteArchiveSourceCatalogueScanner
                 contentHash = new Sha256Digest(Convert.ToHexString(hash).ToLowerInvariant());
             }
 
-            bool inserted = await SaveObservationAsync(
+            ArchiveSourceObservationWriteResult result = await _observations.RecordScanObservationAsync(
                 catalogueSource,
                 sourceAsset,
                 contentHash,
@@ -108,7 +118,7 @@ public sealed class SqliteArchiveSourceCatalogueScanner
                 cancellationToken);
             if (contentHash is not null)
             {
-                if (inserted)
+                if (result.NewRevision)
                 {
                     newRevisions++;
                 }
@@ -116,6 +126,21 @@ public sealed class SqliteArchiveSourceCatalogueScanner
                 {
                     unchanged++;
                 }
+            }
+
+            switch (result.VerificationState)
+            {
+                case ArchiveSourceVerificationState.Verified:
+                    verified++;
+                    break;
+                case ArchiveSourceVerificationState.NeedsSourceVerification:
+                    needsVerification++;
+                    break;
+                case ArchiveSourceVerificationState.Unverified:
+                    unverified++;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
             }
         }
 
@@ -135,124 +160,10 @@ public sealed class SqliteArchiveSourceCatalogueScanner
             availabilityErrors,
             newRevisions,
             unchanged,
+            verified,
+            needsVerification,
+            unverified,
             deleted);
-    }
-
-    private async Task<bool> SaveObservationAsync(
-        CatalogueSource source,
-        SourceAsset sourceAsset,
-        Sha256Digest? contentHash,
-        DateTimeOffset scannedAtUtc,
-        CancellationToken cancellationToken)
-    {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteTransaction transaction = connection.BeginTransaction();
-
-        await UpsertSourceAsync(connection, transaction, source, cancellationToken);
-
-        AssetId proposedAssetId = AssetId.New();
-        using (SqliteCommand command = connection.CreateCommand())
-        {
-            command.Transaction = transaction;
-            command.CommandText = """
-                INSERT INTO assets (
-                    id,
-                    source_id,
-                    source_key,
-                    created_at_utc,
-                    last_seen_at_utc,
-                    deleted_at_utc)
-                VALUES (
-                    $id,
-                    $source_id,
-                    $source_key,
-                    $created_at_utc,
-                    $last_seen_at_utc,
-                    NULL)
-                ON CONFLICT(source_id, source_key) DO UPDATE SET
-                    last_seen_at_utc = excluded.last_seen_at_utc,
-                    deleted_at_utc = NULL;
-                """;
-            command.Parameters.AddWithValue("$id", proposedAssetId.ToString());
-            command.Parameters.AddWithValue("$source_id", source.Id.ToString());
-            command.Parameters.AddWithValue("$source_key", sourceAsset.Reference.ItemKey);
-            command.Parameters.AddWithValue("$created_at_utc", Format(scannedAtUtc));
-            command.Parameters.AddWithValue("$last_seen_at_utc", Format(scannedAtUtc));
-            await command.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        AssetId assetId;
-        using (SqliteCommand command = connection.CreateCommand())
-        {
-            command.Transaction = transaction;
-            command.CommandText = """
-                SELECT id
-                FROM assets
-                WHERE source_id = $source_id AND source_key = $source_key;
-                """;
-            command.Parameters.AddWithValue("$source_id", source.Id.ToString());
-            command.Parameters.AddWithValue("$source_key", sourceAsset.Reference.ItemKey);
-            object? value = await command.ExecuteScalarAsync(cancellationToken);
-            assetId = value is string id
-                ? AssetId.From(Guid.Parse(id))
-                : throw new InvalidOperationException("The archive asset was unavailable after it was persisted.");
-        }
-
-        using (SqliteCommand command = connection.CreateCommand())
-        {
-            command.Transaction = transaction;
-            command.CommandText = """
-                INSERT INTO archive_asset_availability (asset_id, availability, checked_at_utc)
-                VALUES ($asset_id, $availability, $checked_at_utc)
-                ON CONFLICT(asset_id) DO UPDATE SET
-                    availability = excluded.availability,
-                    checked_at_utc = excluded.checked_at_utc;
-                """;
-            command.Parameters.AddWithValue("$asset_id", assetId.ToString());
-            command.Parameters.AddWithValue(
-                "$availability",
-                SqliteArchiveAvailabilityRepository.ToStorageValue(sourceAsset.Availability));
-            command.Parameters.AddWithValue("$checked_at_utc", Format(scannedAtUtc));
-            await command.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        int inserted = 0;
-        if (contentHash is Sha256Digest resolvedHash)
-        {
-            using SqliteCommand command = connection.CreateCommand();
-            command.Transaction = transaction;
-            command.CommandText = """
-                INSERT INTO asset_revisions (
-                    id,
-                    asset_id,
-                    content_sha256,
-                    size_bytes,
-                    observed_at_utc,
-                    media_type,
-                    width,
-                    height)
-                VALUES (
-                    $id,
-                    $asset_id,
-                    $content_sha256,
-                    $size_bytes,
-                    $observed_at_utc,
-                    $media_type,
-                    NULL,
-                    NULL)
-                ON CONFLICT(asset_id, content_sha256) DO NOTHING;
-                """;
-            command.Parameters.AddWithValue("$id", AssetRevisionId.New().ToString());
-            command.Parameters.AddWithValue("$asset_id", assetId.ToString());
-            command.Parameters.AddWithValue("$content_sha256", resolvedHash.ToString());
-            command.Parameters.AddWithValue("$size_bytes", sourceAsset.SizeBytes);
-            command.Parameters.AddWithValue("$observed_at_utc", Format(scannedAtUtc));
-            command.Parameters.AddWithValue("$media_type", sourceAsset.MediaType);
-            inserted = await command.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        transaction.Commit();
-        return inserted == 1;
     }
 
     private async Task<int> MarkMissingAssetsAsync(
@@ -292,28 +203,6 @@ public sealed class SqliteArchiveSourceCatalogueScanner
         int updated = await command.ExecuteNonQueryAsync(cancellationToken);
         transaction.Commit();
         return updated;
-    }
-
-    private static async Task UpsertSourceAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        CatalogueSource source,
-        CancellationToken cancellationToken)
-    {
-        using SqliteCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            INSERT INTO sources (id, kind, root_locator, created_at_utc)
-            VALUES ($id, $kind, $root_locator, $created_at_utc)
-            ON CONFLICT(id) DO UPDATE SET
-                kind = excluded.kind,
-                root_locator = excluded.root_locator;
-            """;
-        command.Parameters.AddWithValue("$id", source.Id.ToString());
-        command.Parameters.AddWithValue("$kind", source.Kind);
-        command.Parameters.AddWithValue("$root_locator", source.RootLocator);
-        command.Parameters.AddWithValue("$created_at_utc", Format(source.CreatedAtUtc));
-        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static string Format(DateTimeOffset value) =>
