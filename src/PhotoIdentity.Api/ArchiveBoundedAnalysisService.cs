@@ -2,8 +2,8 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
-using PhotoIdentity.Web;
 using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
@@ -25,6 +25,7 @@ public sealed class ArchiveBoundedAnalysisService
     private readonly CollectionOriginalAccessService _originals;
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
     private readonly TimeProvider _timeProvider;
+    private readonly SemaphoreSlim _advanceGate = new(1, 1);
 
     public ArchiveBoundedAnalysisService(
         SqliteCatalogueDatabase database,
@@ -59,6 +60,21 @@ public sealed class ArchiveBoundedAnalysisService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(operatorConfiguration);
+        await _advanceGate.WaitAsync(cancellationToken);
+        try
+        {
+            return await AdvanceCoreAsync(operatorConfiguration, cancellationToken);
+        }
+        finally
+        {
+            _advanceGate.Release();
+        }
+    }
+
+    private async Task<ArchiveBoundedAnalysisAdvanceResult> AdvanceCoreAsync(
+        ArchiveOperatorConfiguration operatorConfiguration,
+        CancellationToken cancellationToken)
+    {
         ArchiveCoverageConfiguration coverage = await new SqliteArchiveCoverageRepository(_database)
             .GetAsync(cancellationToken)
             ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
@@ -79,6 +95,17 @@ public sealed class ArchiveBoundedAnalysisService
             proxyProfile is null)
         {
             throw new InvalidOperationException(proxyMessage ?? "Review proxy generation is not configured.");
+        }
+
+        ReviewProxyProfile? registeredProfile = await _proxies.GetProfileAsync(proxyProfile.Id, cancellationToken);
+        if (registeredProfile is not null &&
+            !string.Equals(
+                registeredProfile.ToCanonicalText(),
+                proxyProfile.ToCanonicalText(),
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Configured review proxy profile '{proxyProfile.Id}' does not match its durable registered settings.");
         }
 
         LocalBatchConfiguration batchConfiguration = analysisConfiguration.ToBatchConfiguration(coverage.Source.RootLocator);
@@ -166,14 +193,25 @@ public sealed class ArchiveBoundedAnalysisService
         switch (status.State)
         {
             case CollectionOriginalAccessService.ReadyState:
+                await RecordAvailabilityAsync(revisionId, AssetAvailability.Local, cancellationToken);
                 return;
             case CollectionOriginalAccessService.OnlineOnlyState:
-                _ = await _originals.RequestHydrationAsync(revisionId, cancellationToken);
+                await RecordAvailabilityAsync(revisionId, AssetAvailability.OnlineOnly, cancellationToken);
+                CollectionOriginalAccessSnapshot? requested = await _originals.RequestHydrationAsync(
+                    revisionId,
+                    cancellationToken);
+                if (requested?.State == CollectionOriginalAccessService.DownloadingState)
+                {
+                    await RecordAvailabilityAsync(revisionId, AssetAvailability.Downloading, cancellationToken);
+                }
                 return;
             case CollectionOriginalAccessService.DownloadingState:
+                await RecordAvailabilityAsync(revisionId, AssetAvailability.Downloading, cancellationToken);
+                return;
             case CollectionOriginalAccessService.ReleasingState:
                 return;
             case CollectionOriginalAccessService.HashMismatchState:
+                await RecordAvailabilityAsync(revisionId, AssetAvailability.Local, cancellationToken);
                 throw new InvalidOperationException(
                     "A pending archive original no longer matches its immutable revision and requires source re-verification before analysis can continue.");
             default:
@@ -204,17 +242,31 @@ public sealed class ArchiveBoundedAnalysisService
             ?? throw new InvalidOperationException("An analyzed archive revision could not be resolved for review-proxy generation.");
         if (status.State == CollectionOriginalAccessService.OnlineOnlyState)
         {
-            _ = await _originals.RequestHydrationAsync(revisionId, cancellationToken);
+            await RecordAvailabilityAsync(revisionId, AssetAvailability.OnlineOnly, cancellationToken);
+            CollectionOriginalAccessSnapshot? requested = await _originals.RequestHydrationAsync(
+                revisionId,
+                cancellationToken);
+            if (requested?.State == CollectionOriginalAccessService.DownloadingState)
+            {
+                await RecordAvailabilityAsync(revisionId, AssetAvailability.Downloading, cancellationToken);
+            }
             return true;
         }
 
-        if (status.State is CollectionOriginalAccessService.DownloadingState or CollectionOriginalAccessService.ReleasingState)
+        if (status.State == CollectionOriginalAccessService.DownloadingState)
+        {
+            await RecordAvailabilityAsync(revisionId, AssetAvailability.Downloading, cancellationToken);
+            return true;
+        }
+
+        if (status.State == CollectionOriginalAccessService.ReleasingState)
         {
             return true;
         }
 
         if (status.State == CollectionOriginalAccessService.HashMismatchState)
         {
+            await RecordAvailabilityAsync(revisionId, AssetAvailability.Local, cancellationToken);
             throw new InvalidOperationException(
                 "An analyzed archive original no longer matches its immutable revision and requires source re-verification before its proxy can be generated.");
         }
@@ -225,6 +277,7 @@ public sealed class ArchiveBoundedAnalysisService
                 "An analyzed archive original is unavailable for review-proxy generation. Check archive availability and retry.");
         }
 
+        await RecordAvailabilityAsync(revisionId, AssetAvailability.Local, cancellationToken);
         CatalogueProcessingAssetRevision revision = await _catalogue.GetAssetRevisionAsync(revisionId, cancellationToken)
             ?? throw new InvalidOperationException("The analyzed archive revision disappeared before proxy generation.");
         string sourcePath = ResolveSourcePath(revision.RootLocator, revision.SourceKey);
@@ -238,14 +291,36 @@ public sealed class ArchiveBoundedAnalysisService
             _timeProvider.GetUtcNow(),
             cancellationToken);
 
-        // Only managed hydration is releasable. Pre-existing local/user-pinned originals remain
-        // local because RequestReleaseAsync fails closed for them, so inspect ownership first.
         if (status.ManagedHydration)
         {
-            _ = await _originals.RequestReleaseAsync(revisionId, cancellationToken);
+            CollectionOriginalAccessSnapshot? released = await _originals.RequestReleaseAsync(
+                revisionId,
+                cancellationToken);
+            if (released?.State == CollectionOriginalAccessService.OnlineOnlyState)
+            {
+                await RecordAvailabilityAsync(revisionId, AssetAvailability.OnlineOnly, cancellationToken);
+            }
         }
 
         return true;
+    }
+
+    private async Task RecordAvailabilityAsync(
+        AssetRevisionId revisionId,
+        AssetAvailability availability,
+        CancellationToken cancellationToken)
+    {
+        CatalogueProcessingAssetRevision? revision = await _catalogue.GetAssetRevisionAsync(revisionId, cancellationToken);
+        if (revision is null)
+        {
+            return;
+        }
+
+        await new SqliteArchiveAvailabilityRepository(_database).RecordAsync(
+            revision.AssetId,
+            availability,
+            _timeProvider.GetUtcNow(),
+            cancellationToken);
     }
 
     private static string ResolveSourcePath(string rootLocator, string sourceKey)
