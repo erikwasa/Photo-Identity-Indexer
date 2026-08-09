@@ -1,0 +1,225 @@
+using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Source.Local;
+using PhotoIdentity.Worker;
+
+namespace PhotoIdentity.Api;
+
+public sealed class ArchiveAdvancementHostedService : BackgroundService
+{
+    private static readonly TimeSpan IdleDelay = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan ActiveDelay = TimeSpan.FromMilliseconds(500);
+
+    private readonly SqliteCatalogueDatabase _database;
+    private readonly SqliteArchiveAdvancementRepository _control;
+    private readonly SqliteArchiveSourceObservationRepository _observations;
+    private readonly SqliteArchiveAnalysisRepository _analysis;
+    private readonly SqliteArchivePostAnalysisRepository _postAnalysis;
+    private readonly SqliteArchiveHydrationRepository _hydrations;
+    private readonly SqliteArchiveSourceHydrationRepository _sourceHydrations;
+    private readonly ArchiveHydrationCapacityService _capacity;
+    private readonly ArchiveBoundedAnalysisService _boundedAnalysis;
+    private readonly ArchiveOperatorConfiguration _operatorConfiguration;
+    private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
+    private readonly TimeProvider _timeProvider;
+
+    public ArchiveAdvancementHostedService(
+        SqliteCatalogueDatabase database,
+        SqliteArchiveAdvancementRepository control,
+        SqliteArchiveSourceObservationRepository observations,
+        SqliteArchiveAnalysisRepository analysis,
+        SqliteArchivePostAnalysisRepository postAnalysis,
+        SqliteArchiveHydrationRepository hydrations,
+        SqliteArchiveSourceHydrationRepository sourceHydrations,
+        ArchiveHydrationCapacityService capacity,
+        ArchiveBoundedAnalysisService boundedAnalysis,
+        ArchiveOperatorConfiguration operatorConfiguration,
+        ReviewProxyGenerationConfiguration proxyConfiguration,
+        TimeProvider timeProvider)
+    {
+        _database = database;
+        _control = control;
+        _observations = observations;
+        _analysis = analysis;
+        _postAnalysis = postAnalysis;
+        _hydrations = hydrations;
+        _sourceHydrations = sourceHydrations;
+        _capacity = capacity;
+        _boundedAnalysis = boundedAnalysis;
+        _operatorConfiguration = operatorConfiguration;
+        _proxyConfiguration = proxyConfiguration;
+        _timeProvider = timeProvider;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            ArchiveCoverageConfiguration? coverage = await new SqliteArchiveCoverageRepository(_database)
+                .GetAsync(stoppingToken);
+            if (coverage is null)
+            {
+                await Task.Delay(IdleDelay, stoppingToken);
+                continue;
+            }
+
+            ArchiveAdvancementState? control = await _control.GetAsync(coverage.Source.Id, stoppingToken);
+            if (control?.IsRequested != true)
+            {
+                await Task.Delay(IdleDelay, stoppingToken);
+                continue;
+            }
+
+            try
+            {
+                if (control.SyncRequired)
+                {
+                    await _control.UpdateRuntimeAsync(
+                        coverage.Source.Id,
+                        "syncing",
+                        syncRequired: null,
+                        "Synchronizing included folders before archive processing.",
+                        _timeProvider.GetUtcNow(),
+                        stoppingToken);
+                    await SynchronizeAsync(coverage, stoppingToken);
+                    await _control.UpdateRuntimeAsync(
+                        coverage.Source.Id,
+                        "running",
+                        syncRequired: false,
+                        "Archive synchronization completed; processing is continuing.",
+                        _timeProvider.GetUtcNow(),
+                        stoppingToken);
+                }
+
+                _ = await _boundedAnalysis.AdvanceAsync(_operatorConfiguration, stoppingToken);
+                ArchiveAdvancementWorkState work = await GetWorkStateAsync(coverage, stoppingToken);
+                if (!work.HasWork)
+                {
+                    await _control.CompleteAsync(coverage.Source.Id, _timeProvider.GetUtcNow(), stoppingToken);
+                    continue;
+                }
+
+                await _control.UpdateRuntimeAsync(
+                    coverage.Source.Id,
+                    work.WaitingForOneDrive ? "waiting" : "running",
+                    syncRequired: null,
+                    work.WaitingForOneDrive
+                        ? "Waiting for OneDrive to finish a managed download or release."
+                        : "Archive processing is continuing.",
+                    _timeProvider.GetUtcNow(),
+                    stoppingToken);
+                await Task.Delay(work.WaitingForOneDrive ? IdleDelay : ActiveDelay, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception exception)
+            {
+                if (IsRetryableTransition(exception))
+                {
+                    await _control.UpdateRuntimeAsync(
+                        coverage.Source.Id,
+                        "waiting",
+                        syncRequired: null,
+                        exception.Message,
+                        _timeProvider.GetUtcNow(),
+                        stoppingToken);
+                    await Task.Delay(IdleDelay, stoppingToken);
+                    continue;
+                }
+
+                await _control.BlockAsync(
+                    coverage.Source.Id,
+                    exception.Message,
+                    _timeProvider.GetUtcNow(),
+                    stoppingToken);
+            }
+        }
+    }
+
+    private async Task SynchronizeAsync(
+        ArchiveCoverageConfiguration coverage,
+        CancellationToken cancellationToken)
+    {
+        LocalFolderAssetSource source = new(coverage.Source.Id, coverage.Source.RootLocator);
+        _ = await new LocalArchiveSyncCoordinator(_database).SyncAsync(
+            source,
+            coverage.Source,
+            coverage.IncludedFolders,
+            _timeProvider.GetUtcNow(),
+            cancellationToken);
+    }
+
+    private async Task<ArchiveAdvancementWorkState> GetWorkStateAsync(
+        ArchiveCoverageConfiguration coverage,
+        CancellationToken cancellationToken)
+    {
+        if (!_operatorConfiguration.TryResolveAnalysisConfiguration(
+                out ArchiveAnalysisConfiguration? analysisConfiguration,
+                out string? analysisMessage) ||
+            analysisConfiguration is null)
+        {
+            throw new InvalidOperationException(analysisMessage ?? "Archive analysis is not configured.");
+        }
+
+        if (!_proxyConfiguration.TryResolve(
+                out _,
+                out ReviewProxyProfile? proxyProfile,
+                out string? proxyMessage) ||
+            proxyProfile is null)
+        {
+            throw new InvalidOperationException(proxyMessage ?? "Review proxy generation is not configured.");
+        }
+
+        LocalBatchConfiguration batchConfiguration = analysisConfiguration.ToBatchConfiguration(coverage.Source.RootLocator);
+        AnalysisProfileDefinition analysisProfile = await ArchiveAnalysisProfileFactory.CreateAsync(
+            batchConfiguration,
+            cancellationToken);
+        var profileHash = analysisProfile.ComputeHash();
+
+        bool sourcePending = await _observations.GetNextPendingAsync(coverage.Source.Id, cancellationToken) is not null;
+        bool proxyPending = await _postAnalysis.GetNextMissingProxyRevisionAsync(
+            coverage.Source.Id,
+            profileHash,
+            proxyProfile.Id,
+            cancellationToken) is not null;
+        bool analysisPending = (await _analysis.GetPendingCurrentRevisionIdsAsync(
+            coverage.Source.Id,
+            profileHash,
+            includeHydratable: true,
+            cancellationToken)).Count > 0;
+
+        CatalogueArchiveRunStatus? latest = await new SqliteArchiveStatusRepository(_database)
+            .GetLatestRunAsync(profileHash, cancellationToken);
+        bool activeRun = latest is not null && (latest.QueuedJobs > 0 || latest.RunningJobs > 0);
+
+        // Observing the storage snapshot reconciles durable release ownership once OneDrive has
+        // actually made a managed file online-only.
+        ArchiveStorageSnapshot storage = await _capacity.GetStorageSnapshotAsync(cancellationToken);
+        IReadOnlyList<ArchiveManagedHydrationLease> revisionLeases = await _hydrations.GetActiveLeasesAsync(cancellationToken);
+        IReadOnlyList<ArchiveManagedSourceHydrationLease> sourceLeases = await _sourceHydrations.GetActiveLeasesAsync(cancellationToken);
+        bool releasePending = revisionLeases.Any(value => value.IsReleaseRequested) ||
+            sourceLeases.Any(value => value.IsReleaseRequested);
+        bool waiting = storage.HydrationsInProgress > 0 || storage.ManagedReleasingBytes > 0 || releasePending;
+
+        return new ArchiveAdvancementWorkState(
+            sourcePending || proxyPending || analysisPending || activeRun || releasePending,
+            waiting);
+    }
+
+    private static bool IsRetryableTransition(Exception exception)
+    {
+        if (exception is not InvalidOperationException)
+        {
+            return false;
+        }
+
+        string message = exception.Message;
+        return message.Contains("Retry after", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("currently being released", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("concurrency limit", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed record ArchiveAdvancementWorkState(bool HasWork, bool WaitingForOneDrive);
+}
