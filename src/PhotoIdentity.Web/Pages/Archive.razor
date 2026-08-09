@@ -261,16 +261,34 @@ else
                 </select>
             </div>
             <div>
-                <label class="field-label" for="archive-item-state">State</label>
-                <select id="archive-item-state" @bind="ItemState" @bind:after="ApplyItemFiltersAsync" disabled="@(Busy || ItemLoading)">
-                    <option value="all">All states</option>
-                    <option value="pending">Pending analysis</option>
-                    <option value="failed">Processing failed</option>
-                    <option value="needs-source-verification">Needs source verification</option>
-                    <option value="unverified">First source verification</option>
-                    <option value="unavailable">Not local</option>
-                    <option value="missing">Missing</option>
+                <label class="field-label" for="archive-item-availability">Availability</label>
+                <select id="archive-item-availability" @bind="ItemAvailability" @bind:after="ApplyItemFiltersAsync" disabled="@(Busy || ItemLoading)">
+                    <option value="all">All availability</option>
+                    <option value="local">Local</option>
+                    <option value="online-only">Online-only</option>
+                    <option value="downloading">Downloading</option>
+                    <option value="unavailable">Unavailable</option>
+                    <option value="error">Availability error</option>
+                </select>
+            </div>
+            <div>
+                <label class="field-label" for="archive-item-verification">Source verification</label>
+                <select id="archive-item-verification" @bind="ItemVerification" @bind:after="ApplyItemFiltersAsync" disabled="@(Busy || ItemLoading)">
+                    <option value="all">All verification</option>
+                    <option value="verified">Verified</option>
+                    <option value="needs-source-verification">Needs verification</option>
+                    <option value="unverified">First verification</option>
+                </select>
+            </div>
+            <div>
+                <label class="field-label" for="archive-item-analysis">Analysis</label>
+                <select id="archive-item-analysis" @bind="ItemAnalysis" @bind:after="ApplyItemFiltersAsync" disabled="@(Busy || ItemLoading)">
+                    <option value="all">All analysis</option>
                     <option value="analysed">Analyzed</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
+                    <option value="not-ready">Not ready for analysis</option>
+                    <option value="missing">Missing</option>
                 </select>
             </div>
         </div>
@@ -334,7 +352,9 @@ else
     private string RootPath { get; set; } = string.Empty;
     private string RelativeFolder { get; set; } = string.Empty;
     private string ItemFolder { get; set; } = string.Empty;
-    private string ItemState { get; set; } = "all";
+    private string ItemAvailability { get; set; } = "all";
+    private string ItemVerification { get; set; } = "all";
+    private string ItemAnalysis { get; set; } = "all";
     private int ItemOffset { get; set; }
     private string? Error { get; set; }
     private string? Message { get; set; }
@@ -387,8 +407,8 @@ else
         ItemLoading = true;
         try
         {
-            string query = $"state={Uri.EscapeDataString(ItemState)}&folder={Uri.EscapeDataString(ItemFolder)}&offset={ItemOffset}&limit={ItemPageSize}";
-            ItemPage = await Http.GetFromJsonAsync<ArchiveItemPageResponse>($"api/archive/items?{query}");
+            string query = $"availability={Uri.EscapeDataString(ItemAvailability)}&verification={Uri.EscapeDataString(ItemVerification)}&analysis={Uri.EscapeDataString(ItemAnalysis)}&folder={Uri.EscapeDataString(ItemFolder)}&offset={ItemOffset}&limit={ItemPageSize}";
+            ItemPage = await Http.GetFromJsonAsync<ArchiveItemPageResponse>($"api/archive/items/filter?{query}");
         }
         catch (Exception exception)
         {
@@ -606,6 +626,7 @@ else
         "analysed" => "Analyzed",
         "pending" => "Pending",
         "failed" => "Failed",
+        "not-ready" => "Not ready",
         "unavailable" => "Not local",
         "needs-source-verification" => "Needs source verification",
         "unverified" => "First source verification",
