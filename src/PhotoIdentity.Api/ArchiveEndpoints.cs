@@ -129,6 +129,7 @@ public static class ArchiveEndpoints
                     .Select(item => new ArchiveItemStatusResponse(
                         item.RelativePath,
                         item.Availability,
+                        item.SourceVerificationState,
                         item.AnalysisState,
                         item.LastError))
                     .ToArray()));
@@ -223,6 +224,9 @@ public static class ArchiveEndpoints
                 summary.AvailabilityErrorCount,
                 summary.NewRevisionCount,
                 summary.UnchangedFileCount,
+                summary.VerifiedSourceCount,
+                summary.NeedsSourceVerificationCount,
+                summary.UnverifiedSourceCount,
                 summary.MarkedDeletedCount,
                 status));
         }
@@ -240,18 +244,19 @@ public static class ArchiveEndpoints
     {
         try
         {
-ArchiveBoundedAnalysisAdvanceResult advanced = await boundedAnalysis.AdvanceAsync(
-    operatorConfiguration,
-    cancellationToken);
-return Results.Ok(new ArchiveAnalysisStepResponse(
-    advanced.StartedNewRun,
-    await BuildStatusAsync(database, operatorConfiguration, cancellationToken)));
+            ArchiveBoundedAnalysisAdvanceResult advanced = await boundedAnalysis.AdvanceAsync(
+                operatorConfiguration,
+                cancellationToken);
+            return Results.Ok(new ArchiveAnalysisStepResponse(
+                advanced.StartedNewRun,
+                await BuildStatusAsync(database, operatorConfiguration, cancellationToken)));
         }
         catch (Exception exception)
         {
-return BadRequest(exception);
+            return BadRequest(exception);
         }
     }
+
     private static async Task<ArchiveStatusResponse> BuildStatusAsync(
         SqliteCatalogueDatabase database,
         ArchiveOperatorConfiguration operatorConfiguration,
@@ -259,7 +264,7 @@ return BadRequest(exception);
     {
         ArchiveCoverageConfiguration? configured = await new SqliteArchiveCoverageRepository(database)
             .GetAsync(cancellationToken);
-        ArchiveFolderStatusResponse empty = new("", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        ArchiveFolderStatusResponse empty = new("", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         if (configured is null)
         {
             return new ArchiveStatusResponse(
@@ -373,6 +378,8 @@ return BadRequest(exception);
         status.AnalysedImages,
         status.PendingImages,
         status.FailedImages,
+        status.NeedsSourceVerificationImages,
+        status.UnverifiedSourceImages,
         status.MissingImages);
 
     private static ArchiveRunStatusResponse ToResponse(CatalogueArchiveRunStatus run) => new(
