@@ -78,6 +78,7 @@ public sealed class OpenCvImageDecoder : IImageDecoder
     {
         using MagickImage image = new(encoded.ToArray());
         image.AutoOrient();
+        image.TransformColorSpace(ColorProfiles.SRGB);
         image.Strip();
         image.Format = MagickFormat.Bmp;
         byte[] bitmap = image.ToByteArray();
