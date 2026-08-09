@@ -69,6 +69,10 @@ internal static class DecodeCommandRunner
             await encoder.EncodeAsync(frame, destination, cancellationToken);
             stopwatch.Stop();
 
+            using Process process = Process.GetCurrentProcess();
+            process.Refresh();
+            long peakWorkingSetBytes = process.PeakWorkingSet64;
+
             byte[] hashAfter = await ComputeHashAsync(inputPath, cancellationToken);
             bool inputUnchanged = hashBefore.AsSpan().SequenceEqual(hashAfter);
 
@@ -80,6 +84,7 @@ internal static class DecodeCommandRunner
                 PixelFormat: frame.Format.ToString(),
                 Stride: frame.Stride,
                 ElapsedMilliseconds: stopwatch.ElapsedMilliseconds,
+                PeakWorkingSetBytes: peakWorkingSetBytes,
                 InputUnchanged: inputUnchanged,
                 OutputFileName: Path.GetFileName(outputPath));
 
@@ -91,6 +96,7 @@ internal static class DecodeCommandRunner
             output.WriteLine($"decoded: {frame.Size.Width}x{frame.Size.Height} {frame.Format}");
             output.WriteLine($"output: {outputPath}");
             output.WriteLine($"elapsed-ms: {stopwatch.ElapsedMilliseconds}");
+            output.WriteLine($"peak-working-set-bytes: {peakWorkingSetBytes}");
             output.WriteLine($"input-unchanged: {inputUnchanged.ToString().ToLowerInvariant()}");
 
             if (options.Verbose)
@@ -167,6 +173,7 @@ internal static class DecodeCommandRunner
         string PixelFormat,
         int Stride,
         long ElapsedMilliseconds,
+        long PeakWorkingSetBytes,
         bool InputUnchanged,
         string OutputFileName);
 }
@@ -259,8 +266,11 @@ internal sealed record DecodeCommandOptions(
             throw new ArgumentException($"Option '{option}' may be supplied only once.");
         }
 
-        return int.TryParse(value, out int parsed) && parsed > 0
-            ? parsed
-            : throw new ArgumentException($"Option '{option}' requires a positive integer.");
+        if (!int.TryParse(value, out int result) || result <= 0)
+        {
+            throw new ArgumentException($"Option '{option}' requires a positive integer.");
+        }
+
+        return result;
     }
 }
