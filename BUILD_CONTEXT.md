@@ -27,12 +27,17 @@ The private 556-image `jpeg-1600-q78` scale run recorded 1,783,639,108 logical s
 4. verification requirements are sticky until authoritative bytes are successfully hashed, so later matching metadata cannot clear a prior divergence;
 5. first-time/unverified online-only items can use temporary asset-level managed hydration under the same free-space, managed-byte, concurrency and LRU policy as revision-level hydration;
 6. once SHA-256 establishes/reselects a revision, managed ownership transfers atomically to that revision so analysis/proxy/release can continue without double hydration;
-7. analysis scheduling excludes `needs-source-verification` and `unverified` sources; an exact pre-analysis/proxy hash mismatch explicitly re-enters the source-verification queue;
-8. if re-verification establishes a different current revision, any active analysis run queued against the prior revision is cancelled before it resumes;
-9. Archive API/UI expose source-verification state separately from OneDrive availability; and
-10. **Advance archive** remains available for source verification, online-only analysis and durable proxy retry rather than being disabled when local `PendingImages` is zero.
+7. if an exact revision check fails while Photo Identity owns the local hydration, ownership first moves from whichever revision lease is actually active back to the source asset, then moves to the revision established by re-verification; this keeps working-set accounting and release responsibility correct even for stale queued revisions;
+8. analysis scheduling excludes `needs-source-verification` and `unverified` sources; exact hash verification is performed before the first job of a newly created run as well as before resumed queued jobs, and a mismatch explicitly re-enters the source-verification queue;
+9. if re-verification establishes a different current revision, any active analysis run queued against the prior revision is cancelled before it resumes;
+10. a source that returns to previously seen bytes reselects that existing immutable revision rather than creating a duplicate revision;
+11. logical archive-byte telemetry uses retained source observations so first-time online-only items are counted even before they have a revision;
+12. Archive API/UI expose source-verification state separately from OneDrive availability; and
+13. **Advance archive** remains available for source verification, online-only analysis and durable proxy retry rather than being disabled when local `PendingImages` is zero.
 
-Focused automated coverage proves that placeholder scans do not open content, metadata divergence requires re-verification, a first-time online-only item is hydrated/hashed and transfers managed ownership to its new revision, and pre-revision hydration obeys the same managed-byte budget. Existing Slice 3 working-set/capacity tests continue under the shared revision/source budget.
+Focused automated coverage proves that placeholder scans do not open content, metadata divergence requires re-verification, a first-time online-only item is hydrated/hashed and transfers managed ownership to its new revision, pre-revision hydration obeys the same managed-byte budget, previously seen content is reselected as current without duplicating immutable identity, source-verification state remains separate from availability, stale managed revision ownership is preserved through re-verification, and logical-source telemetry includes unverified online-only bytes. Existing Slice 3 working-set/capacity tests continue under the shared revision/source budget.
+
+The canonical work-item registry now also reflects WI-0042 as `in_progress`, started 2026-08-08, with `agent/WI-0042-source-reverification` as the active branch.
 
 ## Human acceptance gate
 
