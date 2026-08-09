@@ -11,11 +11,14 @@ public sealed record ArchiveFolderStatusResponse(
     int AnalysedImages,
     int PendingImages,
     int FailedImages,
+    int NeedsSourceVerificationImages,
+    int UnverifiedSourceImages,
     int MissingImages);
 
 public sealed record ArchiveItemStatusResponse(
     string RelativePath,
     string Availability,
+    string SourceVerificationState,
     string AnalysisState,
     string? LastError);
 
@@ -82,6 +85,9 @@ public sealed record ArchiveSyncResponse(
     int AvailabilityErrors,
     int NewRevisions,
     int UnchangedFiles,
+    int VerifiedSources,
+    int NeedsSourceVerification,
+    int UnverifiedSources,
     int MarkedMissing,
     ArchiveStatusResponse Status);
 
