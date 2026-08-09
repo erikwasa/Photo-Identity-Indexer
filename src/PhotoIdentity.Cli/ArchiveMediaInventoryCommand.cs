@@ -77,16 +77,8 @@ internal static class ArchiveMediaInventoryCommandRunner
                 continue;
             }
 
-            EnumerationOptions enumeration = new()
+            foreach (string path in EnumerateFiles(root, cancellationToken))
             {
-                RecurseSubdirectories = true,
-                IgnoreInaccessible = false,
-                AttributesToSkip = FileAttributes.ReparsePoint,
-                ReturnSpecialDirectories = false,
-            };
-            foreach (string path in Directory.EnumerateFiles(root, "*", enumeration))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
                 string fullPath = Path.GetFullPath(path);
                 if (!observedPaths.Add(fullPath))
                 {
@@ -110,6 +102,34 @@ internal static class ArchiveMediaInventoryCommandRunner
         }
 
         return 0;
+    }
+
+    private static IEnumerable<string> EnumerateFiles(
+        string root,
+        CancellationToken cancellationToken)
+    {
+        Queue<string> directories = new();
+        directories.Enqueue(root);
+
+        while (directories.TryDequeue(out string? directory))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (string file in Directory.EnumerateFiles(directory))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return file;
+            }
+
+            foreach (string child in Directory.EnumerateDirectories(directory))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                FileAttributes attributes = File.GetAttributes(child);
+                if ((attributes & FileAttributes.ReparsePoint) == 0)
+                {
+                    directories.Enqueue(child);
+                }
+            }
+        }
     }
 
     private static (string Family, bool Supported) Classify(string extension) =>
