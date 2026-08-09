@@ -129,7 +129,7 @@ milestones:
   - WI-0025
 - id: M17
   title: Identity review automation
-  status: proposed
+  status: ready
   document: ../milestones/M17-review-automation.md
   work_items:
   - WI-0043
