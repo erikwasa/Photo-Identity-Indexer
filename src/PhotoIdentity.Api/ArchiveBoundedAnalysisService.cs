@@ -233,6 +233,16 @@ public sealed class ArchiveBoundedAnalysisService
             return new ArchiveBoundedAnalysisAdvanceResult(false);
         }
 
+        CollectionOriginalAccessSnapshot? firstPendingStatus = await _originals.GetStatusAsync(
+            localPending[0],
+            cancellationToken);
+        if (firstPendingStatus?.State != CollectionOriginalAccessService.ReadyState)
+        {
+            await PreparePendingRevisionAsync(localPending[0], cancellationToken);
+            return new ArchiveBoundedAnalysisAdvanceResult(false);
+        }
+
+        await RecordAvailabilityAsync(localPending[0], AssetAvailability.Local, cancellationToken);
         ArchiveAnalysisStartResult started = await coordinator.StartAsync(
             analysisConfiguration,
             new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: 1),
