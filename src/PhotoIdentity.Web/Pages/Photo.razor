@@ -8,7 +8,7 @@
     <div>
         <p class="eyebrow">Photo viewer</p>
         <h1>Review proxy</h1>
-        <p>Normal viewing uses the durable review proxy. Loading the authoritative original is always an explicit action.</p>
+        <p>Normal viewing uses only the durable review proxy. Loading the authoritative original is always an explicit action.</p>
     </div>
     <a class="button secondary" href="/collections">Back to collections</a>
 </section>
@@ -21,7 +21,7 @@
 <section class="collection-panel">
     <div class="photo-viewer-frame">
         <img class="photo-viewer-image"
-             src="@PreviewUrl"
+             src="@ProxyUrl"
              alt="Review proxy for the selected photo"
              decoding="async" />
     </div>
@@ -91,7 +91,7 @@
     private string? Error { get; set; }
     private CancellationTokenSource? PollCancellation { get; set; }
 
-    private string PreviewUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/preview";
+    private string ProxyUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/proxy";
     private string OriginalUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original";
     private string StatusUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original/status";
 
