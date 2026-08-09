@@ -23,6 +23,8 @@ public partial class Program
             builder.Configuration["PhotoIdentity:DetectorEvaluationRoot"] ?? defaultDetectorEvaluationRoot;
         string archiveAnalysisRoot =
             builder.Configuration["PhotoIdentity:ArchiveAnalysisOutputRoot"] ?? defaultArchiveAnalysisRoot;
+        string? reviewProxyRoot = builder.Configuration["PhotoIdentity:ReviewProxyRoot"];
+        string? reviewProxyProfileId = builder.Configuration["PhotoIdentity:ReviewProxyProfileId"];
 
         builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
         builder.Services.AddSingleton(new ArchiveOperatorConfiguration(
@@ -30,8 +32,13 @@ public partial class Program
             builder.Configuration["PhotoIdentity:RepositoryRoot"],
             builder.Configuration["PhotoIdentity:ModelDirectory"]));
         builder.Services.AddSingleton(new ReviewProxyServingConfiguration(
-            builder.Configuration["PhotoIdentity:ReviewProxyRoot"],
-            builder.Configuration["PhotoIdentity:ReviewProxyProfileId"]));
+            reviewProxyRoot,
+            reviewProxyProfileId));
+        builder.Services.AddSingleton(new ReviewProxyGenerationConfiguration(
+            reviewProxyRoot,
+            reviewProxyProfileId,
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:ReviewProxyMaximumLongEdge"),
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:ReviewProxyJpegQuality")));
         builder.Services.AddSingleton(new ArchiveHydrationPolicyConfiguration(
             ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MinimumFreeSpaceReserveBytes"),
             ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MaximumManagedHydrationBytes"),
@@ -50,7 +57,9 @@ public partial class Program
         builder.Services.AddSingleton<SqliteProcessingRepository>();
         builder.Services.AddSingleton<SqliteDetectorRolloutReviewRepository>();
         builder.Services.AddSingleton<SqliteDetectorRolloutApplicationRepository>();
+        builder.Services.AddSingleton<SqliteArchiveAnalysisRepository>();
         builder.Services.AddSingleton<SqliteArchiveReviewProxyRepository>();
+        builder.Services.AddSingleton<SqliteArchivePostAnalysisRepository>();
         builder.Services.AddSingleton<SqliteArchiveHydrationRepository>();
         builder.Services.AddSingleton<SqliteArchiveStorageRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
@@ -59,6 +68,7 @@ public partial class Program
         builder.Services.AddSingleton<CollectionReviewProxyFileResolver>();
         builder.Services.AddSingleton<CollectionOriginalAccessService>();
         builder.Services.AddSingleton<ArchiveHydrationCapacityService>();
+        builder.Services.AddSingleton<ArchiveBoundedAnalysisService>();
         builder.Services.AddSingleton<IOneDriveFilesOnDemandPlatform, WindowsOneDriveFilesOnDemandPlatform>();
         builder.Services.AddSingleton<IArchiveStorageProbe, DriveArchiveStorageProbe>();
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
