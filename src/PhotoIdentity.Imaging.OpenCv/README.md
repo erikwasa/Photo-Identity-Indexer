@@ -10,9 +10,10 @@ The module implements neutral `PhotoIdentity.Core` contracts and returns applica
 
 - Accepts JPEG, PNG and HEIC/HEIF content identified by file signature/container brand.
 - Keeps the established OpenCV JPEG/PNG decode path.
-- Uses the bundled Magick.NET HEIF delegate for HEIC/HEIF, applies orientation, strips metadata from the intermediate render and returns the same packed BGR contract as other formats.
+- Uses the bundled Magick.NET HEIF delegate for HEIC/HEIF, applies orientation, converts an embedded color profile to sRGB when present, strips metadata and exports packed BGR pixels directly.
+- Optionally downsizes HEIC/HEIF inside the ImageMagick path before pixel export when `DecodeOptions.MaximumSize` is supplied, avoiding an unnecessary full-size intermediate render for proxy/preview work.
 - Converts decoded content to packed 8-bit BGR pixels.
-- Optionally downsizes to fit `DecodeOptions.MaximumSize` without upscaling.
+- Optionally downsizes JPEG/PNG to fit `DecodeOptions.MaximumSize` without upscaling.
 - Throws `ImageDecodingException` with `UnsupportedFormat` for other signatures.
 - Throws `ImageDecodingException` with `CorruptMedia` when recognized image content cannot be decoded.
 - Honours cancellation while reading the encoded stream.
