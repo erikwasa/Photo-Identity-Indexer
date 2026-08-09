@@ -1,5 +1,6 @@
 using ImageMagick;
 using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
 using Xunit;
 
@@ -13,7 +14,8 @@ public sealed class HeicImageDecoderTests
     public void Bundled_imagemagick_runtime_exposes_a_heic_read_delegate()
     {
         var heic = Assert.Single(
-            MagickNET.SupportedFormats.Where(format => format.Format == MagickFormat.Heic));
+            MagickNET.SupportedFormats,
+            format => format.Format == MagickFormat.Heic);
 
         Assert.True(heic.SupportsReading);
     }
