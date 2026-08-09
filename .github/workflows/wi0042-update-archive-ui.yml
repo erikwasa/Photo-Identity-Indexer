@@ -24,94 +24,43 @@ jobs:
           $path = 'src/PhotoIdentity.Web/Pages/Archive.razor'
           $text = [IO.File]::ReadAllText($path)
 
-          function Replace-Exact([string]$old, [string]$new) {
-            if (-not $script:text.Contains($old)) { throw "Archive UI marker not found: $($old.Substring(0, [Math]::Min(80, $old.Length)))" }
+          function Replace-Required([string]$old, [string]$new) {
+            if (-not $script:text.Contains($old)) { throw "Archive UI marker not found: $old" }
             $script:text = $script:text.Replace($old, $new)
           }
 
-          Replace-Exact '        <p>Add recursive folders under one stable source root, synchronize changed files and OneDrive availability, and analyze only locally available revisions that still need the governed CenterFace/SFace profile.</p>' '        <p>Add recursive folders under one stable source root, synchronize lightweight OneDrive observations, verify changed or first-time online-only sources under the bounded storage policy, and analyze exact immutable revisions with the governed CenterFace/SFace profile.</p>'
+          Replace-Required 'Add recursive folders under one stable source root, synchronize changed files and OneDrive availability, and analyze only locally available revisions that still need the governed CenterFace/SFace profile.' 'Add recursive folders under one stable source root, synchronize lightweight OneDrive observations, verify changed or first-time online-only sources under the bounded storage policy, and analyze exact immutable revisions with the governed CenterFace/SFace profile.'
+          Replace-Required 'OneDrive placeholders are catalogued but not opened. Hydrate them with the OneDrive sync client, then sync again before analysis.' 'OneDrive placeholders are catalogued without opening their content. Use Advance archive to request only the verification or analysis hydration that is needed; Photo Identity applies the configured storage budget and releases only content it hydrated.'
+          Replace-Required 'disabled="@(Busy || !Status.Configured || !Status.AnalysisReady || Status.Totals.PendingImages == 0)" @onclick="AnalyzePendingAsync"' 'disabled="@(Busy || !Status.Configured || !Status.AnalysisReady)" @onclick="AnalyzePendingAsync"'
+          Replace-Required '@(Analyzing ? "Analyzing…" : Status.LatestRun is { QueuedJobs: > 0 } ? "Continue analysis" : "Analyze pending")' '@(Analyzing ? "Advancing…" : "Advance archive")'
+          Replace-Required 'Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged local, {result.OnlineOnlyFiles} online-only, {result.DownloadingFiles} downloading, {result.AvailabilityErrors + result.UnavailableFiles} availability issue(s), {result.MarkedMissing} marked missing.' 'Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged local, {result.NeedsSourceVerification} needing re-verification, {result.UnverifiedSources} awaiting first verification, {result.OnlineOnlyFiles} online-only, {result.DownloadingFiles} downloading, {result.AvailabilityErrors + result.UnavailableFiles} availability issue(s), {result.MarkedMissing} marked missing.'
+          Replace-Required 'Archive analysis is up to date for locally available images in the current profile.' 'This archive step completed. If source verification or OneDrive downloading is still shown, use Advance archive again after content becomes local; the same action also retries durable proxy work.'
+          Replace-Required 'Archive analysis stopped with pending work remaining. Review failures or continue the run.' 'Archive advancement stopped with pending work remaining. Review failures or use Advance archive again.'
 
-          Replace-Exact @'
-              <article class="@(Status.Totals.FailedImages > 0 ? "attention" : null)">
-                  <span>Failed</span>
-                  <strong>@AnalysisCount(Status.Totals.FailedImages)</strong>
-              </article>
-          '@ @'
-              <article class="@(Status.Totals.NeedsSourceVerificationImages > 0 ? "attention" : null)">
-                  <span>Needs verification</span>
-                  <strong>@Status.Totals.NeedsSourceVerificationImages</strong>
-              </article>
-              <article class="@(Status.Totals.UnverifiedSourceImages > 0 ? "attention" : null)">
-                  <span>First verification</span>
-                  <strong>@Status.Totals.UnverifiedSourceImages</strong>
-              </article>
-              <article class="@(Status.Totals.FailedImages > 0 ? "attention" : null)">
-                  <span>Failed</span>
-                  <strong>@AnalysisCount(Status.Totals.FailedImages)</strong>
-              </article>
-          '@
+          $failedCard = '        <article class="@(Status.Totals.FailedImages > 0 ? "attention" : null)">'
+          $verificationCards = @'
+                  <article class="@(Status.Totals.NeedsSourceVerificationImages > 0 ? "attention" : null)">
+                      <span>Needs verification</span>
+                      <strong>@Status.Totals.NeedsSourceVerificationImages</strong>
+                  </article>
+                  <article class="@(Status.Totals.UnverifiedSourceImages > 0 ? "attention" : null)">
+                      <span>First verification</span>
+                      <strong>@Status.Totals.UnverifiedSourceImages</strong>
+                  </article>
+          '@ -replace '(?m)^ {12}', ''
+          Replace-Required $failedCard ($verificationCards + $failedCard)
 
-          Replace-Exact @'
-          @if (Status.Totals.OnlineOnlyImages + Status.Totals.DownloadingImages > 0)
-          {
-              <div class="notice warning">
-                  OneDrive placeholders are catalogued but not opened. Hydrate them with the OneDrive sync client, then sync again before analysis.
-              </div>
-          }
-          '@ @'
-          @if (Status.Totals.OnlineOnlyImages + Status.Totals.DownloadingImages > 0)
-          {
-              <div class="notice warning">
-                  OneDrive placeholders are catalogued without opening their content. Use Advance archive to request only the verification or analysis hydration that is needed; Photo Identity applies the configured storage budget and releases only content it hydrated.
-              </div>
-          }
-          '@
+          Replace-Required '                            <th>Failed</th>' "                            <th>Failed</th>`r`n                            <th>Verify</th>"
+          Replace-Required '                                <td class="@(folder.FailedImages > 0 ? "failure-count" : null)">@AnalysisCount(folder.FailedImages)</td>' "                                <td class=`"@(folder.FailedImages > 0 ? `"failure-count`" : null)`">@AnalysisCount(folder.FailedImages)</td>`r`n                                <td class=`"@(folder.NeedsSourceVerificationImages + folder.UnverifiedSourceImages > 0 ? `"failure-count`" : null)`">@(folder.NeedsSourceVerificationImages + folder.UnverifiedSourceImages)</td>"
+          Replace-Required '                    <option value="failed">Processing failed</option>' "                    <option value=`"failed`">Processing failed</option>`r`n                    <option value=`"needs-source-verification`">Needs source verification</option>`r`n                    <option value=`"unverified`">First source verification</option>"
+          Replace-Required '                            <th>Availability</th>' "                            <th>Availability</th>`r`n                            <th>Source verification</th>"
+          Replace-Required '                                <td><span class="archive-state state-@CssToken(item.Availability)">@AvailabilityLabel(item.Availability)</span></td>' "                                <td><span class=`"archive-state state-@CssToken(item.Availability)`">@AvailabilityLabel(item.Availability)</span></td>`r`n                                <td><span class=`"archive-state state-@CssToken(item.SourceVerificationState)`">@SourceVerificationLabel(item.SourceVerificationState)</span></td>"
 
-          Replace-Exact @'
-              <button class="button primary" disabled="@(Busy || !Status.Configured || !Status.AnalysisReady || Status.Totals.PendingImages == 0)" @onclick="AnalyzePendingAsync">
-                  @(Analyzing ? "Analyzing…" : Status.LatestRun is { QueuedJobs: > 0 } ? "Continue analysis" : "Analyze pending")
-              </button>
-          '@ @'
-              <button class="button primary" disabled="@(Busy || !Status.Configured || !Status.AnalysisReady)" @onclick="AnalyzePendingAsync">
-                  @(Analyzing ? "Advancing…" : "Advance archive")
-              </button>
-          '@
-
-          Replace-Exact '                            <th>Failed</th>`r`n                            <th>Missing</th>' '                            <th>Failed</th>`r`n                            <th>Verify</th>`r`n                            <th>Missing</th>'
-          Replace-Exact '                                <td class="@(folder.FailedImages > 0 ? "failure-count" : null)">@AnalysisCount(folder.FailedImages)</td>`r`n                                <td>@folder.MissingImages</td>' '                                <td class="@(folder.FailedImages > 0 ? "failure-count" : null)">@AnalysisCount(folder.FailedImages)</td>`r`n                                <td class="@(folder.NeedsSourceVerificationImages + folder.UnverifiedSourceImages > 0 ? "failure-count" : null)">@(folder.NeedsSourceVerificationImages + folder.UnverifiedSourceImages)</td>`r`n                                <td>@folder.MissingImages</td>'
-
-          Replace-Exact '                    <option value="failed">Processing failed</option>`r`n                    <option value="unavailable">Not local</option>' '                    <option value="failed">Processing failed</option>`r`n                    <option value="needs-source-verification">Needs source verification</option>`r`n                    <option value="unverified">First source verification</option>`r`n                    <option value="unavailable">Not local</option>'
-
-          Replace-Exact '                            <th>Availability</th>`r`n                            <th>Analysis</th>' '                            <th>Availability</th>`r`n                            <th>Source verification</th>`r`n                            <th>Analysis</th>'
-          Replace-Exact '                                <td><span class="archive-state state-@CssToken(item.Availability)">@AvailabilityLabel(item.Availability)</span></td>`r`n                                <td><span class="archive-state state-@CssToken(item.AnalysisState)">@AnalysisStateLabel(item.AnalysisState)</span></td>' '                                <td><span class="archive-state state-@CssToken(item.Availability)">@AvailabilityLabel(item.Availability)</span></td>`r`n                                <td><span class="archive-state state-@CssToken(item.SourceVerificationState)">@SourceVerificationLabel(item.SourceVerificationState)</span></td>`r`n                                <td><span class="archive-state state-@CssToken(item.AnalysisState)">@AnalysisStateLabel(item.AnalysisState)</span></td>'
-
-          Replace-Exact '            Message = $"Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged local, {result.OnlineOnlyFiles} online-only, {result.DownloadingFiles} downloading, {result.AvailabilityErrors + result.UnavailableFiles} availability issue(s), {result.MarkedMissing} marked missing.";' '            Message = $"Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged local, {result.NeedsSourceVerification} needing re-verification, {result.UnverifiedSources} awaiting first verification, {result.OnlineOnlyFiles} online-only, {result.DownloadingFiles} downloading, {result.AvailabilityErrors + result.UnavailableFiles} availability issue(s), {result.MarkedMissing} marked missing.";'
-
-          Replace-Exact @'
-                  Message = Status?.Totals.PendingImages == 0
-                      ? "Archive analysis is up to date for locally available images in the current profile."
-                      : "Archive analysis stopped with pending work remaining. Review failures or continue the run.";
-          '@ @'
-                  int sourceVerification = (Status?.Totals.NeedsSourceVerificationImages ?? 0) + (Status?.Totals.UnverifiedSourceImages ?? 0);
-                  Message = sourceVerification > 0
-                      ? "Archive advancement is waiting for authoritative source verification. If OneDrive is downloading, use Advance archive again after the file becomes local."
-                      : Status?.Totals.PendingImages == 0
-                          ? "This archive step completed. Advance archive is safe to run again; it will also retry any durable post-analysis proxy work."
-                          : "Archive advancement stopped with pending work remaining. Review failures or advance again.";
-          '@
-
-          Replace-Exact @'
-              "unavailable" => "Not local",
-              "missing" => "Missing",
-          '@ @'
-              "unavailable" => "Not local",
-              "needs-source-verification" => "Needs source verification",
-              "unverified" => "First source verification",
-              "missing" => "Missing",
-          '@
+          Replace-Required '        "unavailable" => "Not local",' "        `"unavailable`" => `"Not local`",`r`n        `"needs-source-verification`" => `"Needs source verification`",`r`n        `"unverified`" => `"First source verification`","
 
           $marker = '    private static string AnalysisStateLabel(string state) => state switch'
-          $insert = @'
+          if (-not $text.Contains($marker)) { throw 'AnalysisStateLabel marker not found.' }
+          $helper = @'
               private static string SourceVerificationLabel(string state) => state switch
               {
                   "verified" => "Verified",
@@ -121,9 +70,7 @@ jobs:
               };
 
           '@ -replace '(?m)^ {12}', ''
-          $idx = $text.IndexOf($marker, [StringComparison]::Ordinal)
-          if ($idx -lt 0) { throw 'AnalysisStateLabel marker not found.' }
-          $text = $text.Insert($idx, $insert)
+          $text = $text.Replace($marker, $helper + $marker)
           [IO.File]::WriteAllText($path, $text, [Text.UTF8Encoding]::new($false))
       - name: Commit UI update and remove temporary workflow
         shell: pwsh
