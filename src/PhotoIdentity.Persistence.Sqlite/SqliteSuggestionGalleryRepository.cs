@@ -7,6 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
 /// Provides one-query suggestion-aware review pages and navigation for one exact model revision.
+/// Confidence grouping is evaluated from the same exact-model persisted policy used by automatic assignment.
 /// </summary>
 public sealed class SqliteSuggestionGalleryRepository
 {
@@ -112,11 +113,13 @@ public sealed class SqliteSuggestionGalleryRepository
         """;
 
     private readonly SqliteCatalogueDatabase _database;
+    private readonly SqliteIdentitySuggestionPolicyRepository _policyRepository;
 
     public SqliteSuggestionGalleryRepository(SqliteCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+        _policyRepository = new SqliteIdentitySuggestionPolicyRepository(database);
     }
 
     public async Task<CatalogueSuggestionGalleryPage> GetFacesAsync(
@@ -127,6 +130,7 @@ public sealed class SqliteSuggestionGalleryRepository
         string state = CatalogueReviewStates.Unreviewed,
         ProcessingRunId? processingRunId = null,
         string sort = CatalogueSuggestionGallerySorts.CreatedDescending,
+        string confidenceGroup = CatalogueSuggestionConfidenceFilters.All,
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
@@ -135,7 +139,8 @@ public sealed class SqliteSuggestionGalleryRepository
             throw new ArgumentOutOfRangeException(nameof(limit), "Suggestion gallery page size must be between 1 and 200.");
         }
 
-        string predicate = BuildPredicate(state, processingRunId);
+        IdentitySuggestionPolicy policy = await _policyRepository.GetAsync(modelId, modelHash, cancellationToken);
+        string predicate = BuildPredicate(state, processingRunId, confidenceGroup);
         string orderBy = SortExpression(sort);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
 
@@ -149,7 +154,7 @@ public sealed class SqliteSuggestionGalleryRepository
             ORDER BY {orderBy}
             LIMIT $limit OFFSET $offset;
             """;
-        AddParameters(command, modelId, modelHash, processingRunId);
+        AddParameters(command, modelId, modelHash, processingRunId, policy);
         command.Parameters.AddWithValue("$limit", limit);
         command.Parameters.AddWithValue("$offset", offset);
 
@@ -158,7 +163,7 @@ public sealed class SqliteSuggestionGalleryRepository
         {
             while (await reader.ReadAsync(cancellationToken))
             {
-                items.Add(ReadFace(reader));
+                items.Add(ReadFace(reader, policy));
             }
         }
 
@@ -169,7 +174,7 @@ public sealed class SqliteSuggestionGalleryRepository
             {From}
             WHERE {predicate};
             """;
-        AddParameters(countCommand, modelId, modelHash, processingRunId);
+        AddParameters(countCommand, modelId, modelHash, processingRunId, policy);
         object? count = await countCommand.ExecuteScalarAsync(cancellationToken);
         return new CatalogueSuggestionGalleryPage(
             items,
@@ -185,10 +190,12 @@ public sealed class SqliteSuggestionGalleryRepository
         string state = CatalogueReviewStates.Unreviewed,
         ProcessingRunId? processingRunId = null,
         string sort = CatalogueSuggestionGallerySorts.CreatedDescending,
+        string confidenceGroup = CatalogueSuggestionConfidenceFilters.All,
         CancellationToken cancellationToken = default)
     {
         string normalizedSort = NormalizeSort(sort);
-        string predicate = BuildPredicate(state, processingRunId);
+        IdentitySuggestionPolicy policy = await _policyRepository.GetAsync(modelId, modelHash, cancellationToken);
+        string predicate = BuildPredicate(state, processingRunId, confidenceGroup);
         string orderBy = SortExpression(normalizedSort);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
 
@@ -209,7 +216,7 @@ public sealed class SqliteSuggestionGalleryRepository
             FROM scoped_faces
             WHERE id = $face_occurrence_id;
             """;
-        AddParameters(command, modelId, modelHash, processingRunId);
+        AddParameters(command, modelId, modelHash, processingRunId, policy);
         command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
 
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -226,9 +233,12 @@ public sealed class SqliteSuggestionGalleryRepository
             normalizedSort);
     }
 
-    private static string BuildPredicate(string state, ProcessingRunId? processingRunId)
+    private static string BuildPredicate(
+        string state,
+        ProcessingRunId? processingRunId,
+        string confidenceGroup)
     {
-        List<string> predicates = [StatePredicate(state)];
+        List<string> predicates = [StatePredicate(state), ConfidencePredicate(confidenceGroup)];
         if (processingRunId is not null)
         {
             predicates.Add("""
@@ -247,10 +257,14 @@ public sealed class SqliteSuggestionGalleryRepository
         SqliteCommand command,
         ModelId modelId,
         Sha256Digest modelHash,
-        ProcessingRunId? processingRunId)
+        ProcessingRunId? processingRunId,
+        IdentitySuggestionPolicy policy)
     {
         command.Parameters.AddWithValue("$model_id", modelId.ToString());
         command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
+        command.Parameters.AddWithValue("$high_score_threshold", policy.HighScoreThreshold);
+        command.Parameters.AddWithValue("$high_margin_threshold", policy.HighMarginThreshold);
+        command.Parameters.AddWithValue("$medium_score_threshold", policy.MediumScoreThreshold);
         if (processingRunId is ProcessingRunId runId)
         {
             command.Parameters.AddWithValue("$processing_run_id", runId.ToString());
@@ -272,6 +286,47 @@ public sealed class SqliteSuggestionGalleryRepository
         };
     }
 
+    private static string ConfidencePredicate(string confidenceGroup) => NormalizeConfidenceGroup(confidenceGroup) switch
+    {
+        CatalogueSuggestionConfidenceFilters.All => "1 = 1",
+        CatalogueSuggestionConfidenceFilters.High => """
+            top_suggestion.suggestion_id IS NOT NULL
+            AND top_suggestion.score >= $high_score_threshold
+            AND top_suggestion.score_margin IS NOT NULL
+            AND top_suggestion.score_margin >= $high_margin_threshold
+            """,
+        CatalogueSuggestionConfidenceFilters.Medium => """
+            top_suggestion.suggestion_id IS NOT NULL
+            AND top_suggestion.score >= $medium_score_threshold
+            AND NOT (
+                top_suggestion.score >= $high_score_threshold
+                AND top_suggestion.score_margin IS NOT NULL
+                AND top_suggestion.score_margin >= $high_margin_threshold)
+            """,
+        CatalogueSuggestionConfidenceFilters.Low => """
+            top_suggestion.suggestion_id IS NOT NULL
+            AND top_suggestion.score < $medium_score_threshold
+            """,
+        _ => throw new ArgumentOutOfRangeException(nameof(confidenceGroup)),
+    };
+
+    private static string NormalizeConfidenceGroup(string confidenceGroup)
+    {
+        string normalized = string.IsNullOrWhiteSpace(confidenceGroup)
+            ? CatalogueSuggestionConfidenceFilters.All
+            : confidenceGroup.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            CatalogueSuggestionConfidenceFilters.All => normalized,
+            CatalogueSuggestionConfidenceFilters.High => normalized,
+            CatalogueSuggestionConfidenceFilters.Medium => normalized,
+            CatalogueSuggestionConfidenceFilters.Low => normalized,
+            _ => throw new ArgumentException(
+                $"Unsupported suggestion confidence group '{confidenceGroup}'.",
+                nameof(confidenceGroup)),
+        };
+    }
+
     private static string NormalizeSort(string sort)
     {
         string normalized = string.IsNullOrWhiteSpace(sort)
@@ -281,6 +336,7 @@ public sealed class SqliteSuggestionGalleryRepository
         {
             CatalogueSuggestionGallerySorts.CreatedDescending => normalized,
             CatalogueSuggestionGallerySorts.SuggestedPerson => normalized,
+            CatalogueSuggestionGallerySorts.ConfidenceGroup => normalized,
             CatalogueSuggestionGallerySorts.ScoreMarginDescending => normalized,
             CatalogueSuggestionGallerySorts.ScoreMarginAscending => normalized,
             CatalogueSuggestionGallerySorts.ScoreDescending => normalized,
@@ -297,6 +353,16 @@ public sealed class SqliteSuggestionGalleryRepository
             "CASE WHEN top_suggestion.suggestion_id IS NULL THEN 1 ELSE 0 END, " +
             "top_suggestion.display_name COLLATE NOCASE, top_suggestion.suggested_person_id, " +
             "top_suggestion.score_margin DESC, top_suggestion.score DESC, " +
+            "face_occurrences.created_at_utc DESC, face_occurrences.id",
+        CatalogueSuggestionGallerySorts.ConfidenceGroup =>
+            "CASE " +
+            "WHEN top_suggestion.suggestion_id IS NULL THEN 3 " +
+            "WHEN top_suggestion.score >= $high_score_threshold " +
+            "AND top_suggestion.score_margin IS NOT NULL " +
+            "AND top_suggestion.score_margin >= $high_margin_threshold THEN 0 " +
+            "WHEN top_suggestion.score >= $medium_score_threshold THEN 1 " +
+            "ELSE 2 END, " +
+            "top_suggestion.score DESC, top_suggestion.score_margin DESC, " +
             "face_occurrences.created_at_utc DESC, face_occurrences.id",
         CatalogueSuggestionGallerySorts.ScoreMarginDescending =>
             "CASE WHEN top_suggestion.suggestion_id IS NULL THEN 1 ELSE 0 END, " +
@@ -318,7 +384,9 @@ public sealed class SqliteSuggestionGalleryRepository
         _ => throw new ArgumentOutOfRangeException(nameof(sort)),
     };
 
-    private static CatalogueSuggestionGalleryFace ReadFace(SqliteDataReader reader)
+    private static CatalogueSuggestionGalleryFace ReadFace(
+        SqliteDataReader reader,
+        IdentitySuggestionPolicy policy)
     {
         string sourceKey = reader.GetString(3).Replace('\\', '/');
         string photoName = Path.GetFileName(sourceKey);
@@ -331,9 +399,13 @@ public sealed class SqliteSuggestionGalleryRepository
             assignedPersonId is PersonId personId && assignedPersonName is not null
                 ? new CatalogueReviewPerson(personId, assignedPersonName)
                 : null;
-        CatalogueSuggestionGalleryTopSuggestion? topSuggestion = reader.IsDBNull(14)
-            ? null
-            : new CatalogueSuggestionGalleryTopSuggestion(
+
+        CatalogueSuggestionGalleryTopSuggestion? topSuggestion = null;
+        if (!reader.IsDBNull(14))
+        {
+            double score = reader.GetDouble(20);
+            double? scoreMargin = reader.IsDBNull(21) ? null : reader.GetDouble(21);
+            topSuggestion = new CatalogueSuggestionGalleryTopSuggestion(
                 reader.GetInt64(14),
                 new CatalogueReviewPerson(
                     PersonId.From(Guid.Parse(reader.GetString(15))),
@@ -341,10 +413,13 @@ public sealed class SqliteSuggestionGalleryRepository
                 new ModelId(reader.GetString(17)),
                 new Sha256Digest(reader.GetString(18)),
                 reader.GetInt32(19),
-                reader.GetDouble(20),
-                reader.IsDBNull(21) ? null : reader.GetDouble(21),
+                score,
+                scoreMargin,
                 reader.GetString(22),
-                Parse(reader.GetString(23)));
+                Parse(reader.GetString(23)),
+                policy.Classify(score, scoreMargin));
+        }
+
         string reviewState = actionKind switch
         {
             CatalogueReviewActionKinds.Assign => CatalogueReviewStates.Assigned,

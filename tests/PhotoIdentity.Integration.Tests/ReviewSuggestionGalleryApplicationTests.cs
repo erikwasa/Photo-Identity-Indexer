@@ -40,7 +40,39 @@ public sealed class ReviewSuggestionGalleryApplicationTests
             Assert.Equal(0.20, Assert.IsType<double>(adaSuggestion.ScoreMargin), 6);
             Assert.Equal("sface", adaSuggestion.ModelId);
             Assert.Equal(seeded.ModelHash, adaSuggestion.ModelHash);
+            Assert.Equal(IdentitySuggestionConfidenceGroups.High, adaSuggestion.ConfidenceGroup);
+
+            ReviewTopSuggestionResponse bobSuggestion = Assert.IsType<ReviewTopSuggestionResponse>(
+                byPerson.Items[1].TopSuggestion);
+            Assert.Equal(IdentitySuggestionConfidenceGroups.Medium, bobSuggestion.ConfidenceGroup);
             Assert.Null(byPerson.Items[2].TopSuggestion);
+
+            ReviewFacePageResponse confidenceFirst = await GetPageAsync(client, scope, "confidence-group");
+            Assert.Equal(
+                new[] { seeded.AdaFaceId, seeded.BobFaceId, seeded.NoSuggestionFaceId },
+                confidenceFirst.Items.Select(face => face.Id).ToArray());
+
+            ReviewFacePageResponse highOnly = await GetPageAsync(
+                client,
+                scope,
+                "confidence-group",
+                IdentitySuggestionConfidenceGroups.High);
+            Assert.Equal(new[] { seeded.AdaFaceId }, highOnly.Items.Select(face => face.Id).ToArray());
+
+            ReviewFacePageResponse mediumOnly = await GetPageAsync(
+                client,
+                scope,
+                "confidence-group",
+                IdentitySuggestionConfidenceGroups.Medium);
+            Assert.Equal(new[] { seeded.BobFaceId }, mediumOnly.Items.Select(face => face.Id).ToArray());
+
+            ReviewFacePageResponse lowOnly = await GetPageAsync(
+                client,
+                scope,
+                "confidence-group",
+                IdentitySuggestionConfidenceGroups.Low);
+            Assert.Empty(lowOnly.Items);
+            Assert.Equal(0, lowOnly.Total);
 
             ReviewFacePageResponse easyFirst = await GetPageAsync(client, scope, "margin-desc");
             Assert.Equal(
@@ -118,6 +150,19 @@ public sealed class ReviewSuggestionGalleryApplicationTests
             Assert.Null(afterMutation.NextFaceId);
             Assert.Equal(2, afterMutation.Position);
             Assert.Equal(2, afterMutation.Total);
+
+            string highDetailsScope =
+                $"state=unreviewed&{modelScope}&sort=confidence-group&confidenceGroup=high";
+            ReviewFaceDetailsResponse adaDetails = Assert.IsType<ReviewFaceDetailsResponse>(
+                await client.GetFromJsonAsync<ReviewFaceDetailsResponse>(
+                    $"/api/review/suggestion-faces/{seeded.AdaFaceId}?{highDetailsScope}"));
+            ReviewFaceNavigationResponse highNavigation = Assert.IsType<ReviewFaceNavigationResponse>(
+                adaDetails.Navigation);
+            Assert.Null(highNavigation.PreviousFaceId);
+            Assert.Null(highNavigation.NextFaceId);
+            Assert.Equal(1, highNavigation.Position);
+            Assert.Equal(1, highNavigation.Total);
+            Assert.Equal("confidence-group", highNavigation.Sort);
         }
         finally
         {
@@ -126,7 +171,7 @@ public sealed class ReviewSuggestionGalleryApplicationTests
     }
 
     [Fact]
-    public async Task Gallery_requires_exact_model_revision_and_rejects_unknown_sort()
+    public async Task Gallery_requires_exact_model_revision_and_rejects_unknown_sort_or_confidence_group()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -147,6 +192,12 @@ public sealed class ReviewSuggestionGalleryApplicationTests
                 $"/api/review/suggestion-faces?state=unreviewed" +
                 $"&modelId=sface&modelHash={seeded.ModelHash}&sort=alphabetical");
             Assert.Equal(HttpStatusCode.BadRequest, invalidSort.StatusCode);
+
+            using HttpResponseMessage invalidConfidenceGroup = await client.GetAsync(
+                $"/api/review/suggestion-faces?state=unreviewed" +
+                $"&modelId=sface&modelHash={seeded.ModelHash}" +
+                "&sort=confidence-group&confidenceGroup=very-high");
+            Assert.Equal(HttpStatusCode.BadRequest, invalidConfidenceGroup.StatusCode);
         }
         finally
         {
@@ -157,10 +208,12 @@ public sealed class ReviewSuggestionGalleryApplicationTests
     private static async Task<ReviewFacePageResponse> GetPageAsync(
         HttpClient client,
         string scope,
-        string sort) =>
+        string sort,
+        string confidenceGroup = CatalogueSuggestionConfidenceFilters.All) =>
         Assert.IsType<ReviewFacePageResponse>(
             await client.GetFromJsonAsync<ReviewFacePageResponse>(
-                $"/api/review/suggestion-faces?state=unreviewed&{scope}&sort={sort}&limit=10"));
+                $"/api/review/suggestion-faces?state=unreviewed&{scope}&sort={sort}" +
+                $"&confidenceGroup={confidenceGroup}&limit=10"));
 
     private static async Task<SeededGallery> SeedGalleryAsync(SqliteCatalogueDatabase database)
     {

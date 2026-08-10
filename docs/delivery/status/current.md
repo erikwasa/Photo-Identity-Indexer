@@ -18,12 +18,13 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 - **M09 — Azure VM pilot without identities**: `ready`
 - **M12 — Full archive processing**: `in_progress`
 - **M14 — Collection-ready API**: `completed`
-- **M17 — Identity review automation**: `ready`
+- **M17 — Identity review automation**: `in_progress`
 
 ## Active work
 
 - [**WI-0041 — Add incremental permanent archive ingestion**](../work-items/WI-0041-incremental-archive-ingestion.md) — `blocked`; owner: `ai-agent`
 - [**WI-0042 — Add bounded archive hydration and review proxies**](../work-items/WI-0042-bounded-archive-storage.md) — `in_progress`; owner: `ai-agent`
+- [**WI-0043 — Add configurable confidence groups and canonical auto-assignment**](../work-items/WI-0043-confidence-auto-assignment.md) — `in_review`; owner: `ai-agent`
 
 ## Recently completed
 
@@ -34,7 +35,6 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 ## Next ready work
 
 - [**WI-0020 — Run Azure VM pilot**](../work-items/WI-0020-azure-pilot.md) — `proposed`; owner: `unassigned`
-- [**WI-0043 — Add configurable confidence groups and canonical auto-assignment**](../work-items/WI-0043-confidence-auto-assignment.md) — `proposed`; owner: `unassigned`
 - [**WI-0044 — Add favorite people**](../work-items/WI-0044-favorite-people.md) — `proposed`; owner: `unassigned`
 - [**WI-0047 — Add Unknown as a face review state**](../work-items/WI-0047-unknown-review-state.md) — `proposed`; owner: `unassigned`
 - [**WI-0053 — Add HEIC and archive RAW image support**](../work-items/WI-0053-heic-raw-support.md) — `proposed`; owner: `unassigned`

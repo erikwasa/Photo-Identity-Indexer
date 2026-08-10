@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 10;
+    public const int CurrentSchemaVersion = 11;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -486,6 +486,26 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 10;
         """;
 
+    private const string VersionElevenMigration = """
+        CREATE TABLE identity_suggestion_policies (
+            model_id TEXT NOT NULL,
+            model_hash TEXT NOT NULL,
+            policy_version INTEGER NOT NULL CHECK (policy_version >= 1),
+            auto_assign_enabled INTEGER NOT NULL CHECK (auto_assign_enabled IN (0, 1)),
+            high_score_threshold REAL NOT NULL CHECK (high_score_threshold >= 0 AND high_score_threshold <= 1),
+            high_margin_threshold REAL NOT NULL CHECK (high_margin_threshold >= 0 AND high_margin_threshold <= 2),
+            medium_score_threshold REAL NOT NULL CHECK (medium_score_threshold >= 0 AND medium_score_threshold <= 1),
+            updated_by TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            PRIMARY KEY (model_id, model_hash),
+            CHECK (medium_score_threshold <= high_score_threshold)
+        );
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (11, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 11;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -579,6 +599,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 10)
         {
             await ApplyMigrationAsync(connection, VersionTenMigration, cancellationToken);
+            version = 10;
+        }
+
+        if (version < 11)
+        {
+            await ApplyMigrationAsync(connection, VersionElevenMigration, cancellationToken);
         }
     }
 
