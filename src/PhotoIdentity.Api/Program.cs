@@ -48,6 +48,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
         builder.Services.AddSingleton<SqliteSuggestionGalleryRepository>();
         builder.Services.AddSingleton<SqliteIdentitySuggestionPolicyRepository>();
+        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationModelRepository>();
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationRepository>();
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationScorer>();
         builder.Services.AddSingleton<SqliteIdentityAutoAssignmentService>();
