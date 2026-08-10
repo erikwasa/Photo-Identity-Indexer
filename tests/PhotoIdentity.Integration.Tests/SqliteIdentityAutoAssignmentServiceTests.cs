@@ -87,14 +87,16 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             CatalogueReviewIdentitySuggestion suggestion = Assert.Single(
                 await new SqliteReviewSuggestionRepository(database).GetSuggestionsAsync(target));
             Assert.Equal("accepted", suggestion.Status);
-            Assert.NotNull(suggestion.LatestAction);
-            Assert.Equal(SqliteIdentityAutoAssignmentService.AutomaticActor, suggestion.LatestAction.Actor);
-            Assert.Contains("model-id=sface", suggestion.LatestAction.Note, StringComparison.Ordinal);
-            Assert.Contains($"model-hash={EmbeddingModelHash}", suggestion.LatestAction.Note, StringComparison.Ordinal);
-            Assert.Contains("high-confidence-threshold=1", suggestion.LatestAction.Note, StringComparison.Ordinal);
+            CatalogueReviewSuggestionAction action = Assert.IsType<CatalogueReviewSuggestionAction>(
+                suggestion.LatestAction);
+            string note = Assert.IsType<string>(action.Note);
+            Assert.Equal(SqliteIdentityAutoAssignmentService.AutomaticActor, action.Actor);
+            Assert.Contains("model-id=sface", note, StringComparison.Ordinal);
+            Assert.Contains($"model-hash={EmbeddingModelHash}", note, StringComparison.Ordinal);
+            Assert.Contains("high-confidence-threshold=1", note, StringComparison.Ordinal);
 
-            ActiveAssignment? assignment = await ReadActiveAssignmentAsync(database, target);
-            Assert.NotNull(assignment);
+            ActiveAssignment assignment = Assert.IsType<ActiveAssignment>(
+                await ReadActiveAssignmentAsync(database, target));
             Assert.Equal(person.Id, assignment.PersonId);
             Assert.Equal(SqliteIdentityAutoAssignmentService.AutomaticActor, assignment.Actor);
         }
@@ -132,8 +134,8 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
                     new IdentityAutoAssignmentOptions(Enabled: true, HighConfidenceThreshold: 0.70));
 
             Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), summary);
-            ActiveAssignment? assignment = await ReadActiveAssignmentAsync(database, target);
-            Assert.NotNull(assignment);
+            ActiveAssignment assignment = Assert.IsType<ActiveAssignment>(
+                await ReadActiveAssignmentAsync(database, target));
             Assert.Equal(manualPerson.Id, assignment.PersonId);
             Assert.Equal("human:manual", assignment.Actor);
         }
@@ -185,8 +187,8 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
                 options);
 
             Assert.Equal(new IdentityAutoAssignmentSummary(1, 1, 0), secondPass);
-            ActiveAssignment? propagated = await ReadActiveAssignmentAsync(database, secondTarget);
-            Assert.NotNull(propagated);
+            ActiveAssignment propagated = Assert.IsType<ActiveAssignment>(
+                await ReadActiveAssignmentAsync(database, secondTarget));
             Assert.Equal(person.Id, propagated.PersonId);
             Assert.Equal(SqliteIdentityAutoAssignmentService.AutomaticActor, propagated.Actor);
         }
