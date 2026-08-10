@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
 /// Provides one-query suggestion-aware review pages and navigation for one exact model revision.
-/// Confidence grouping is evaluated from the same persisted policy used by automatic assignment.
+/// Confidence grouping is evaluated from the same exact-model persisted policy used by automatic assignment.
 /// </summary>
 public sealed class SqliteSuggestionGalleryRepository
 {
@@ -139,7 +139,7 @@ public sealed class SqliteSuggestionGalleryRepository
             throw new ArgumentOutOfRangeException(nameof(limit), "Suggestion gallery page size must be between 1 and 200.");
         }
 
-        IdentitySuggestionPolicy policy = await _policyRepository.GetAsync(cancellationToken);
+        IdentitySuggestionPolicy policy = await _policyRepository.GetAsync(modelId, modelHash, cancellationToken);
         string predicate = BuildPredicate(state, processingRunId, confidenceGroup);
         string orderBy = SortExpression(sort);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
@@ -194,7 +194,7 @@ public sealed class SqliteSuggestionGalleryRepository
         CancellationToken cancellationToken = default)
     {
         string normalizedSort = NormalizeSort(sort);
-        IdentitySuggestionPolicy policy = await _policyRepository.GetAsync(cancellationToken);
+        IdentitySuggestionPolicy policy = await _policyRepository.GetAsync(modelId, modelHash, cancellationToken);
         string predicate = BuildPredicate(state, processingRunId, confidenceGroup);
         string orderBy = SortExpression(normalizedSort);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
