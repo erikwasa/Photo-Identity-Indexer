@@ -31,6 +31,7 @@ public static class IdentityMatchRegenerationEndpoints
     private static async Task<IResult> GetAsync(
         SqliteIdentityMatchRegenerationRepository repository,
         SqliteIdentitySuggestionPolicyRepository policyRepository,
+        SqliteIdentityMatchEvidenceVersionReader evidenceReader,
         string? modelId,
         string? modelHash,
         CancellationToken cancellationToken)
@@ -72,10 +73,21 @@ public static class IdentityMatchRegenerationEndpoints
             });
         }
 
-        bool evidenceMatches = await repository.EvidenceStillMatchesAsync(run, cancellationToken);
+        IdentityMatchEvidenceVersion currentEvidence = await evidenceReader.ReadAsync(
+            parsedModelId,
+            parsedModelHash,
+            cancellationToken);
+        IdentityMatchEvidenceVersion expectedEvidence =
+            string.Equals(run.Status, IdentityMatchRegenerationStatuses.Completed, StringComparison.Ordinal)
+                ? SqliteIdentityMatchEvidenceVersionReader.ExpectedAfterAutomaticAssignments(
+                    run.EvidenceVersion,
+                    run.AutomaticallyAssignedCount)
+                : run.EvidenceVersion;
+        bool evidenceMatches = currentEvidence == expectedEvidence;
         bool stale = string.Equals(run.Status, IdentityMatchRegenerationStatuses.Stale, StringComparison.Ordinal)
             || string.Equals(run.Status, IdentityMatchRegenerationStatuses.Failed, StringComparison.Ordinal)
-            || (!run.IsActive && (!evidenceMatches || run.PolicyVersion != policy.Version));
+            || !evidenceMatches
+            || (!run.IsActive && run.PolicyVersion != policy.Version);
 
         return Results.Ok(ToResponse(run, stale));
     }
