@@ -113,7 +113,7 @@ else if (Details is not null)
                     <option value="">Choose a person</option>
                     @foreach (ReviewPersonResponse person in People)
                     {
-                        <option value="@person.Id">@person.DisplayName</option>
+                        <option value="@person.Id">@PersonLabel(person)</option>
                     }
                 </select>
                 <button class="button primary full-width"
@@ -449,7 +449,8 @@ else if (Details is not null)
 
             People = People
                 .Append(created)
-                .OrderBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(person => person.IsFavorite)
+                .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(person => person.Id, StringComparer.Ordinal)
                 .ToArray();
             SelectedPersonId = created.Id;
@@ -597,6 +598,9 @@ else if (Details is not null)
 
     private static string HashPrefix(string hash) =>
         string.IsNullOrEmpty(hash) ? "—" : hash[..Math.Min(12, hash.Length)];
+
+    private static string PersonLabel(ReviewPersonResponse person) =>
+        person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
 
     private static async Task RequireSuccessAsync(HttpResponseMessage response)
     {
