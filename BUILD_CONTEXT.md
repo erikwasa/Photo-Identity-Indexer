@@ -10,43 +10,27 @@ The version-1 archive-readiness gates are:
 2. WI-0041 — stable permanent archive identity and incremental no-repeat ingestion after WI-0042 is accepted; and
 3. WI-0053 — HEIC/HEIF plus every RAW variant required by the real archive, with explicit unsupported state for any deliberate exception.
 
+All three archive-readiness work-item gates are now human-verified. The remaining version-1 step is to confirm the product success criteria on the real Windows/OneDrive environment after the active archive-UI follow-up is accepted.
+
 See `docs/product/success-criteria.md` and `docs/delivery/local-first-plan.md` for the durable product/delivery definition.
 
 ## Current milestones
 
-- **M12 — Full archive processing**: `in_progress`. It contains the version-1 archive-readiness work and later full-coverage completion.
-- **M17 — Identity review automation**: `ready`, but it is not a version-1 gate.
+- **M12 — Full archive processing**: `in_progress`. The version-1 archive-readiness work-item gates are complete, while M12 continues through later full-coverage completion.
+- **M17 — Identity review automation**: `in_progress`. WI-0043, WI-0044 and WI-0047 are merged into `m17` and in review; WI-0045 is the remaining implementation item. Draft PR #122 is the `m17` to `main` integration and milestone-verification boundary.
 - **M09 — Azure VM pilot without identities**: `ready` and optional; Azure is not required for version 1.
 
 ## Active work
 
-**WI-0042 — Add bounded archive hydration and review proxies** remains `in_progress` pending the combined real Windows/OneDrive human acceptance gate.
+**WI-0054 — Polish archive viewing, progress and availability** is `in_review`. Its implementation was merged in PR #118 after the maintainer completed real Windows/OneDrive verification of WI-0042 and WI-0041 on 2026-08-10; human verification of the three follow-up cases remains the completion step.
 
-Merged implementation includes deterministic versioned review proxies, proxy-backed collection browsing, explicit original hydrate/status/view/release, managed hydration ownership, free-space/byte/concurrency policy, LRU release of Photo-Identity-owned content, source-verification state and bounded first-time online-only source verification.
+The focused follow-up fixes three post-acceptance usability inconsistencies: local verified pending revisions need a safe viewer fallback before their durable proxy exists; latest-run progress must be distinguished from cumulative archive analysis; and explicit original status/hydration observations must reconcile the persisted Archive availability state. The accepted WI-0042 managed-release and bounded-storage policy remains unchanged.
 
-PR #111 merged the source re-verification slice. The first combined Windows/OneDrive acceptance attempt was paused on 2026-08-10 after the maintainer found three acceptance blockers: archive advancement required repeated per-transition clicks, Collections opened the fixed thumbnail instead of a proxy-first viewer and had no original controls, and analysed online-only revisions disappeared from the Archive analysed filter.
+**M17 integrated review automation** is now under milestone-wide verification. WI-0043 provides exact-model configurable confidence groups and optional canonical High-confidence auto-assignment using both rank-1 score and rank-1/rank-2 gap; automatic assignment remains disabled by default pending representative private-sample threshold tuning. WI-0044 adds favorite people without changing matcher evidence, and WI-0047 adds the reversible Unknown review state without creating synthetic identities. Desktop and narrow/mobile integrated UI verification remains before these items are completed.
 
-WI-0042 Slice 5 is active on `agent/WI-0042-slice5-unattended-archive` / draft PR #115. It adds durable one-click unattended advancement, proxy-first viewing with explicit original controls and orthogonal archive status. The combined acceptance remains pending and is documented in `docs/operations/bounded-archive-acceptance.md` plus `docs/operations/bounded-archive-slice5.md`.
+**WI-0045 — Regenerate identity matches from the web application** is the remaining M17 implementation item. It should be built on the latest `m17` integration state while the milestone-wide human verification of the already merged review features proceeds.
 
-**WI-0041 — Add incremental permanent archive ingestion** remains blocked on WI-0042 acceptance.
-
-**WI-0053 — Add HEIC and archive RAW image support** is now being implemented on `agent/WI-0053-heic-support` / draft PR #114. Current maintainer evidence says the full archive contains a few HEIC files and no known RAW files. Slice 1 therefore makes HEIC/HEIF a first-class permanent-archive input while deliberately leaving RAW variants unsupported until an actual archive RAW format and private representative sample exist.
-
-The Slice 1 implementation:
-
-- recognizes HEIC/HEIF in local and OneDrive-aware source scanning;
-- uses a bundled HEIF decoder behind the existing `IImageDecoder` boundary while preserving the established JPEG/PNG OpenCV path;
-- shares that decoded-pixel path with durable review-proxy rendering;
-- includes HEIC/HEIF in archive proxy measurement;
-- adds a privacy-safe `archive inventory` command that reports aggregate extension/media-family/support counts without opening image content;
-- keeps unverified RAW media visible as unsupported rather than silently accepting it; and
-- adds automated source-recognition, inventory/privacy, HEIC read-delegate and corrupt-container coverage.
-
-A valid real HEIC binary is intentionally not committed solely for test coverage. Do not mark WI-0053 complete from CI alone. Private real-archive HEIC verification must still confirm actual decode, orientation, downstream CenterFace/SFace processing, durable proxy behavior, color appearance and representative runtime/memory. RAW format-specific verification becomes active when the archive actually contains RAW media.
-
-**WI-0043 — Add configurable confidence groups and canonical auto-assignment** is implemented on `wi-0043` / PR #116 targeting the M17 integration branch. The implementation persists an independent versioned suggestion policy for each exact embedding-model revision, keeps automatic assignment disabled by default, defines High using both rank-1 score and the rank-1/rank-2 score gap, exposes High/Medium/Low grouping in the unified Faces queue, and promotes only qualifying High suggestions after a fixed scoring snapshot when enabled. Automatic decisions retain exact model, score, margin, threshold and policy-version provenance; later manual reassignment becomes the active exemplar identity without deleting history. Schema version 11 owns the exact-model policy table so policy persistence follows the normal catalogue migration lifecycle.
-
-Automated coverage includes score and rank-gap boundaries, missing rank-2 margin, exact-model policy isolation/versioning, toggle behavior, fixed-snapshot non-cascade behavior, queue filtering/order, provenance, threshold-history preservation and manual supersession. Before routine auto-assignment is enabled, the maintainer must still tune representative score and rank-gap thresholds against a private reviewed sample. Until that human verification is complete, WI-0043 should remain in review rather than completed.
+**WI-0053 — Add HEIC and archive RAW image support** is `completed` and human-verified as of 2026-08-11. HEIC/HEIF is supported through the production image contract and review-proxy path, privacy-safe archive inventory/reporting is in place, representative private HEIC files were successfully decoded with correct visual output and unchanged originals, and the current archive has no known RAW variants. A future newly observed RAW format reopens only that format-specific decoder/verification requirement rather than invalidating the current completion evidence.
 
 ## Selected permanent archive analysis profile
 
@@ -64,23 +48,23 @@ The previous FP32-versus-INT8 embedding comparison used the earlier YuNet face p
 
 ## Accepted future direction
 
-ADR-0006 supersedes the earlier mandatory-human-confirmation rule. WI-0043 implements configurable High/Medium/Low suggestion groups plus optional canonical High-confidence automatic assignment. Each exact embedding-model revision owns its own policy/version stream. High requires both an absolute rank-1 score threshold and a configurable minimum rank-1/rank-2 gap. Automatic assignments are auditable, can become exemplars on later regeneration runs and can be superseded by manual reassignment.
+ADR-0006 supersedes the earlier mandatory-human-confirmation rule and is implemented by WI-0043. Suggestion policy is scoped to an exact embedding-model revision, High confidence requires both absolute rank-1 score and a configurable rank-1/rank-2 gap, and optional automatic assignments use the canonical acceptance boundary with audit provenance. Automatic assignments can become exemplars only on later regeneration runs and can be superseded by manual reassignment. The feature remains disabled by default until the maintainer accepts tuned thresholds on a representative private reviewed sample.
 
 ADR-0007 records the stable archive root plus bounded local materialization architecture.
 
 ## Next concrete sequence
 
-1. Complete WI-0042 Slice 5 / PR #115 and resume the paused combined Windows/OneDrive acceptance.
-2. Complete the combined WI-0042 human acceptance and deliberately accept the production proxy/hydration policy values.
-3. Unblock and complete WI-0041 permanent incremental ingestion.
-4. Confirm the version-1 success criteria on the real Windows/OneDrive environment, including a privacy-safe archive media inventory; if no RAW is present, record that fact rather than inventing RAW implementation evidence.
-5. Begin the permanent catalogue from real archive coverage and expand it incrementally; do not create a replacement production database.
-6. In parallel with the version-1 gate, review WI-0043 / PR #116 and tune High score, High rank-gap and Medium thresholds on a private reviewed sample before enabling automatic assignment for routine archive use.
-
-M17 review automation does not change the version-1 gate above.
+1. Continue milestone-wide M17 verification of confidence grouping/auto-assignment safety, favorite people and Unknown behavior on desktop and narrow/mobile review surfaces.
+2. Implement WI-0045 on the latest `m17` integration branch and merge it into M17 once automated verification is green.
+3. Complete M17 human verification, update the four M17 work items to their verified states, then make draft PR #122 ready for final merge to `main`.
+4. Complete human verification of WI-0054 archive viewer/progress/availability polish for the three reported post-acceptance cases.
+5. Confirm the version-1 success criteria on the real Windows/OneDrive environment and continue permanent-catalogue archive coverage incrementally; do not create a replacement production database.
 
 ## Completed gates
 
+- WI-0042 bounded archive hydration, source re-verification, durable review proxies and managed-release behavior are human-verified on the real Windows/OneDrive archive.
+- WI-0041 stable permanent archive identity, overlapping coverage, incremental rescan and no-repeat processing are human-verified on the real Windows/OneDrive archive.
+- WI-0053 HEIC/HEIF support, explicit RAW visibility policy and private HEIC verification are human-verified; no RAW variants are currently known in the maintained archive.
 - The representative local acceptance pilot passed restart/resume, Windows/Pixel review, deterministic evaluation, backup and restore.
 - SFace FP32 remains the current selected embedder pending any later CenterFace-population reaffirmation.
 - CenterFace confidence `0.5`, single-pass, passed the governed M16 detector gate and migration-safety pilot.
@@ -91,11 +75,14 @@ M17 review automation does not change the version-1 gate above.
 
 - `docs/product/success-criteria.md`
 - `docs/delivery/local-first-plan.md`
+- `docs/delivery/milestones/M17-review-automation.md`
+- `docs/delivery/work-items/WI-0043-confidence-auto-assignment.md`
+- `docs/delivery/work-items/WI-0044-favorite-people.md`
+- `docs/delivery/work-items/WI-0045-web-match-regeneration.md`
+- `docs/delivery/work-items/WI-0047-unknown-review-state.md`
 - `docs/delivery/work-items/WI-0042-bounded-archive-storage.md`
 - `docs/delivery/work-items/WI-0041-incremental-archive-ingestion.md`
-- `docs/delivery/work-items/WI-0043-confidence-auto-assignment.md`
 - `docs/delivery/work-items/WI-0053-heic-raw-support.md`
-- `docs/architecture/identity-matching.md`
 - `docs/operations/index.md`
 - `docs/operations/local-operator-guide.md`
 - `docs/operations/bounded-archive-acceptance.md`

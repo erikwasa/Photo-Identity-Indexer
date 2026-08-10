@@ -53,7 +53,7 @@ The final `1970` sync must reuse the already catalogued `1970/01` and `1970/02` 
 - [x] The operator can add an archive folder and trigger synchronization without changing the permanent source root.
 - [x] OneDrive-local availability is surfaced distinctly from processing failure.
 - [x] The permanent catalogue defaults to the selected local CenterFace confidence `0.5` single-pass detector and SFace FP32 embedder unless an explicit governed model change is made.
-- [ ] The `1970/01` -> `1970/02` -> `1970` progression is covered by automated integration tests and Windows operator verification.
+- [x] The `1970/01` -> `1970/02` -> `1970` progression is covered by automated integration tests and Windows operator verification.
 
 ## Implementation slices
 
@@ -107,3 +107,7 @@ WI-0041 is blocked on [WI-0042](WI-0042-bounded-archive-storage.md), which adds 
 ## Scope boundary
 
 This work starts a fresh permanent catalogue from original archive paths. It does not migrate the disposable 560-image pilot catalogue into production. Detector migration of an already reviewed permanent catalogue remains the dedicated reconciliation problem solved by WI-0038.
+
+## Verification completion
+
+The maintainer completed the required real Windows/OneDrive verification on 2026-08-10. Privacy-sensitive local details remain outside Git.

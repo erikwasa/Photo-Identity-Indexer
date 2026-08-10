@@ -115,6 +115,7 @@ milestones:
   - WI-0041
   - WI-0042
   - WI-0053
+  - WI-0054
   - WI-0023
 - id: M13
   title: Ongoing local synchronisation
@@ -139,7 +140,7 @@ milestones:
   - WI-0047
 - id: M18
   title: Operator application experience
-  status: proposed
+  status: ready
   document: ../milestones/M18-application-experience.md
   work_items:
   - WI-0046
@@ -148,7 +149,7 @@ milestones:
   - WI-0052
 - id: M19
   title: Photo metadata and semantic collections
-  status: proposed
+  status: ready
   document: ../milestones/M19-library-intelligence.md
   work_items:
   - WI-0049

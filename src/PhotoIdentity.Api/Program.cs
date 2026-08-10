@@ -79,6 +79,7 @@ public partial class Program
         builder.Services.AddSingleton<IOneDriveFilesOnDemandPlatform, WindowsOneDriveFilesOnDemandPlatform>();
         builder.Services.AddSingleton<IArchiveStorageProbe, DriveArchiveStorageProbe>();
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
+        builder.Services.AddSingleton<OpenCvReviewProxyRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddHostedService<ArchiveAdvancementHostedService>();
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
@@ -131,6 +132,7 @@ public partial class Program
         app.MapBulkSuggestionReviewEndpoints();
         app.MapCollectionEndpoints();
         app.MapCollectionProxyEndpoints();
+        app.MapCollectionViewerPreviewEndpoints();
         app.MapDetectorEvaluationEndpoints();
         app.MapDetectorEvaluationComparisonEndpoints();
         app.MapDetectorRolloutEndpoints();

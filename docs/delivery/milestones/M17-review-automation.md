@@ -24,6 +24,14 @@ WI-0043 intentionally changes the earlier identity-matching policy. When automat
 
 The automatic policy remains user-controlled and disabled by default. Threshold changes affect future matching runs; they do not silently rewrite earlier canonical decisions.
 
+## Verification status
+
+As of 2026-08-11, WI-0043, WI-0044 and WI-0047 are merged into the `m17` integration branch and are in review. Automated build, regression, documentation, review-smoke and Windows verification gates are green for their final work-item heads.
+
+Milestone-wide human verification remains for the integrated desktop and narrow/mobile review flows. WI-0043 additionally requires representative private-sample tuning of the High score, rank-1/rank-2 gap and Medium thresholds before routine automatic assignment is enabled; automatic assignment remains disabled by default while that tuning is performed.
+
+WI-0045 is the remaining implementation item. The draft `m17` to `main` milestone PR is the integration and verification boundary; it stays draft until WI-0045 is merged and the milestone-wide verification is complete.
+
 ## Exit criteria
 
 - Suggestion groups and automatic-assignment policy are persisted and adjustable.

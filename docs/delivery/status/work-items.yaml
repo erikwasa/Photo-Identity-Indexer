@@ -722,7 +722,7 @@ work_items:
   blocker_notes: []
   evidence:
   - type: human_verification
-    value: Private same-corpus FP32-versus-INT8 comparison and manual suggestion review completed locally on Windows on 2026-08-01. Twenty representative faces were correct under both exact revisions with no material practical difference; retain the FP32 baseline. The detailed record remains private.
+    value: Private same-corpus FP32-versus-INT8 comparison and manual suggestion review completed locally on 2026-08-01. Twenty representative faces were correct under both exact revisions with no material practical difference; retain the FP32 baseline. The detailed record remains private.
 - id: WI-0031
   title: Rewrite operator and architecture documentation
   milestone: M15
@@ -1025,11 +1025,14 @@ work_items:
 - id: WI-0041
   title: Add incremental permanent archive ingestion
   milestone: M12
-  status: blocked
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0041-incremental-archive-ingestion.md
   started_at: 2026-08-08
-  last_updated_at: 2026-08-08
+  completed_at: 2026-08-10
+  verified_at: 2026-08-10
+  verified_by: human
+  last_updated_at: 2026-08-10
   branch: agent/WI-0041-incremental-archive-ingestion
   blockers:
   - WI-0013
@@ -1038,21 +1041,28 @@ work_items:
   - WI-0037
   - WI-0042
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: human_verification
+    value: Maintainer verified incremental permanent archive ingestion on the real Windows/OneDrive archive on 2026-08-10, including overlapping parent/child coverage, no-repeat processing and discovery of new files in previously included folders.
 - id: WI-0042
   title: Add bounded archive hydration and review proxies
   milestone: M12
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0042-bounded-archive-storage.md
   started_at: 2026-08-08
+  completed_at: 2026-08-10
+  verified_at: 2026-08-10
+  verified_by: human
   last_updated_at: 2026-08-10
   branch: agent/WI-0042-slice5-unattended-archive
   blockers:
   - WI-0014
   - WI-0025
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: human_verification
+    value: Maintainer verified the real Windows/OneDrive bounded archive workflow on 2026-08-10, including unattended advancement, proxy/original viewing, managed release, source re-verification and accepted storage-policy behavior.
 - id: WI-0043
   title: Add configurable confidence groups and canonical auto-assignment
   milestone: M17
@@ -1060,28 +1070,40 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0043-confidence-auto-assignment.md
   started_at: 2026-08-10
-  last_updated_at: 2026-08-10
+  last_updated_at: 2026-08-11
   branch: wi-0043
   blockers:
   - WI-0016
   - WI-0033
   blocker_notes:
-  - Private reviewed-sample threshold tuning remains required before completion and routine auto-assignment.
+  - Private reviewed-sample threshold tuning and milestone-wide UI verification remain required before completion and routine auto-assignment; automatic assignment remains disabled by default.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/116
   - type: workflow
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31429588957
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31430785546
+  - type: merge_commit
+    value: b275103baca69a8ca947b88607ff8ae517804944
 - id: WI-0044
   title: Add favorite people
   milestone: M17
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0044-favorite-people.md
+  started_at: 2026-08-10
+  last_updated_at: 2026-08-11
+  branch: wi-0044
   blockers:
   - WI-0015
-  blocker_notes: []
-  evidence: []
+  blocker_notes:
+  - Milestone-wide desktop and narrow/mobile verification remains before completion.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/117
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31435193480
+  - type: merge_commit
+    value: fe6fd4696a8eaa90d274db322f27a49ac72d3b22
 - id: WI-0045
   title: Regenerate identity matches from the web application
   milestone: M17
@@ -1108,14 +1130,24 @@ work_items:
 - id: WI-0047
   title: Add Unknown as a face review state
   milestone: M17
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0047-unknown-review-state.md
+  started_at: 2026-08-10
+  last_updated_at: 2026-08-11
+  branch: wi-0047
   blockers:
   - WI-0015
   - WI-0016
-  blocker_notes: []
-  evidence: []
+  blocker_notes:
+  - Milestone-wide desktop and narrow/mobile verification remains before completion.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/119
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31439710560
+  - type: merge_commit
+    value: b44f3798ac511bf6addc804e2fb5b641c8d7790c
 - id: WI-0048
   title: Add an operator configuration page
   milestone: M18
@@ -1173,11 +1205,39 @@ work_items:
 - id: WI-0053
   title: Add HEIC and archive RAW image support
   milestone: M12
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0053-heic-raw-support.md
+  started_at: 2026-08-09
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
+  last_updated_at: 2026-08-11
+  branch: agent/WI-0053-heic-support
   blockers:
   - WI-0006
   - WI-0012
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/114
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31337366611
+  - type: merge_commit
+    value: f0ae6bfef856b9055bb652b4d1290f353e4c62d1
+  - type: human_verification
+    value: Maintainer declared WI-0053 verified on 2026-08-11 after representative private HEIC files decoded successfully with correct visual output, expected orientation/dimensions, accepted runtime and peak working set, unchanged originals, governed archive analysis and durable proxy behavior; the maintained archive currently has no known RAW variants, so any future newly observed RAW format reopens format-specific verification rather than being silently skipped.
+- id: WI-0054
+  title: Polish archive viewing, progress and availability
+  milestone: M12
+  status: in_review
+  owner: ai-agent
+  document: ../work-items/WI-0054-archive-ui-polish.md
+  started_at: 2026-08-10
+  last_updated_at: 2026-08-10
+  branch: agent/WI-0054-archive-ui-polish
+  blockers:
+  - WI-0041
+  - WI-0042
   blocker_notes: []
   evidence: []
