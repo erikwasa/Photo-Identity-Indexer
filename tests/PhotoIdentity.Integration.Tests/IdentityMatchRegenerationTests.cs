@@ -44,7 +44,6 @@ public sealed class IdentityMatchRegenerationTests
             Assert.Equal(seed.Target, first.FaceOccurrenceId);
             Assert.Equal("running", first.Status);
 
-            // Simulate an application restart: a durable running target is reclaimed rather than lost.
             CatalogueIdentityMatchRegenerationTarget reclaimed = Assert.IsType<CatalogueIdentityMatchRegenerationTarget>(
                 await repository.ClaimNextTargetAsync(run.Id, now.AddMinutes(13)));
             Assert.Equal(first.FaceOccurrenceId, reclaimed.FaceOccurrenceId);
@@ -97,6 +96,7 @@ public sealed class IdentityMatchRegenerationTests
                 new SqliteIdentityMatchRegenerationScorer(database, clock),
                 new SqliteIdentitySuggestionPolicyRepository(database, clock),
                 new SqliteIdentityAutoAssignmentService(database, clock),
+                new SqliteIdentityMatchEvidenceVersionReader(database),
                 clock);
 
             Assert.True(await worker.AdvanceOnceAsync());
@@ -164,6 +164,7 @@ public sealed class IdentityMatchRegenerationTests
                 new SqliteIdentityMatchRegenerationScorer(database, clock),
                 policies,
                 new SqliteIdentityAutoAssignmentService(database, clock),
+                new SqliteIdentityMatchEvidenceVersionReader(database),
                 clock);
 
             Assert.True(await worker.AdvanceOnceAsync());
@@ -175,6 +176,14 @@ public sealed class IdentityMatchRegenerationTests
             Assert.Equal(run.Id, completed.Id);
             Assert.Equal(IdentityMatchRegenerationStatuses.Completed, completed.Status);
             Assert.Equal(1, completed.AutomaticallyAssignedCount);
+
+            IdentityMatchEvidenceVersion current = await new SqliteIdentityMatchEvidenceVersionReader(database)
+                .ReadAsync(EmbeddingModelId, EmbeddingModelHash);
+            Assert.Equal(
+                SqliteIdentityMatchEvidenceVersionReader.ExpectedAfterAutomaticAssignments(
+                    run.EvidenceVersion,
+                    completed.AutomaticallyAssignedCount),
+                current);
 
             ActiveAssignment assignment = Assert.IsType<ActiveAssignment>(
                 await ReadActiveAssignmentAsync(database, seed.Target));
