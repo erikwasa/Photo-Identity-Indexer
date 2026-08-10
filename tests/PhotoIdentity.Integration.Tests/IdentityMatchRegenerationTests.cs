@@ -150,7 +150,7 @@ public sealed class IdentityMatchRegenerationTests
                 highScoreThreshold: 0.90,
                 highMarginThreshold: 0.50,
                 mediumScoreThreshold: 0.50,
-                updatedBy: "test:policy");
+                actor: "test:policy");
 
             SqliteIdentityMatchRegenerationRepository repository = new(database);
             CatalogueIdentityMatchRegenerationRun run = await repository.StartAsync(
