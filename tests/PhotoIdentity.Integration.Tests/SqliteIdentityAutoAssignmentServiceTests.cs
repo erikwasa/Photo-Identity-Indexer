@@ -23,10 +23,13 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             DateTimeOffset now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
             FaceOccurrenceId target = await SeedFaceAsync(database, [1f, 0f], 0, now);
             FaceOccurrenceId exemplar = await SeedFaceAsync(database, [1f, 0f], 1, now);
+            FaceOccurrenceId decoyExemplar = await SeedFaceAsync(database, [-1f, 0f], 2, now);
 
             SqliteReviewRepository reviews = new(database);
             CatalogueReviewPerson person = await reviews.CreatePersonAsync("First", now);
             await reviews.AssignAsync(exemplar, person.Id, "human:test", now.AddMinutes(1));
+            CatalogueReviewPerson decoy = await reviews.CreatePersonAsync("Decoy", now.AddMinutes(2));
+            await reviews.AssignAsync(decoyExemplar, decoy.Id, "human:test", now.AddMinutes(3));
 
             SqliteIdentityMatcher matcher = new(database);
             _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
@@ -39,7 +42,8 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
 
             Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), summary);
             CatalogueReviewIdentitySuggestion suggestion = Assert.Single(
-                await new SqliteReviewSuggestionRepository(database).GetSuggestionsAsync(target));
+                await new SqliteReviewSuggestionRepository(database).GetSuggestionsAsync(target),
+                candidate => candidate.Rank == 1);
             Assert.Equal("pending", suggestion.Status);
             Assert.Null(await ReadActiveAssignmentAsync(database, target));
         }
@@ -50,7 +54,120 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
     }
 
     [Fact]
-    public async Task Enabled_options_accept_threshold_boundary_with_provenance_and_are_idempotent()
+    public async Task Enabled_options_accept_score_and_margin_boundaries_with_provenance_and_are_idempotent()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            DateTimeOffset now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
+            FaceOccurrenceId target = await SeedFaceAsync(database, [1f, 0f], 0, now);
+            FaceOccurrenceId exemplar = await SeedFaceAsync(database, [1f, 0f], 1, now);
+            FaceOccurrenceId decoyExemplar = await SeedFaceAsync(database, [0f, 1f], 2, now);
+
+            SqliteReviewRepository reviews = new(database);
+            CatalogueReviewPerson person = await reviews.CreatePersonAsync("First", now);
+            await reviews.AssignAsync(exemplar, person.Id, "human:test", now.AddMinutes(1));
+            CatalogueReviewPerson decoy = await reviews.CreatePersonAsync("Decoy", now.AddMinutes(2));
+            await reviews.AssignAsync(decoyExemplar, decoy.Id, "human:test", now.AddMinutes(3));
+
+            SqliteIdentityMatcher matcher = new(database);
+            _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
+
+            SqliteIdentityAutoAssignmentService service = new(
+                database,
+                new FixedTimeProvider(now.AddMinutes(4)));
+            IdentityAutoAssignmentOptions options = new(
+                Enabled: true,
+                HighScoreThreshold: 1.0,
+                HighMarginThreshold: 1.0);
+            IdentityAutoAssignmentSummary first = await service.ApplyAsync(
+                EmbeddingModelId,
+                EmbeddingModelHash,
+                options);
+            IdentityAutoAssignmentSummary second = await service.ApplyAsync(
+                EmbeddingModelId,
+                EmbeddingModelHash,
+                options);
+
+            Assert.Equal(new IdentityAutoAssignmentSummary(1, 1, 0), first);
+            Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), second);
+
+            CatalogueReviewIdentitySuggestion suggestion = Assert.Single(
+                await new SqliteReviewSuggestionRepository(database).GetSuggestionsAsync(target),
+                candidate => candidate.Rank == 1);
+            Assert.Equal("accepted", suggestion.Status);
+            CatalogueReviewSuggestionAction action = Assert.IsType<CatalogueReviewSuggestionAction>(
+                suggestion.LatestAction);
+            string note = Assert.IsType<string>(action.Note);
+            Assert.Equal(SqliteIdentityAutoAssignmentService.AutomaticActor, action.Actor);
+            Assert.Contains("model-id=sface", note, StringComparison.Ordinal);
+            Assert.Contains($"model-hash={EmbeddingModelHash}", note, StringComparison.Ordinal);
+            Assert.Contains("score=1", note, StringComparison.Ordinal);
+            Assert.Contains("rank1-rank2-margin=1", note, StringComparison.Ordinal);
+            Assert.Contains("high-score-threshold=1", note, StringComparison.Ordinal);
+            Assert.Contains("high-margin-threshold=1", note, StringComparison.Ordinal);
+
+            ActiveAssignment assignment = Assert.IsType<ActiveAssignment>(
+                await ReadActiveAssignmentAsync(database, target));
+            Assert.Equal(person.Id, assignment.PersonId);
+            Assert.Equal(SqliteIdentityAutoAssignmentService.AutomaticActor, assignment.Actor);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Strong_rank1_score_is_not_high_when_rank2_gap_is_too_small()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            DateTimeOffset now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
+            FaceOccurrenceId target = await SeedFaceAsync(database, [1f, 0f], 0, now);
+            FaceOccurrenceId firstExemplar = await SeedFaceAsync(database, [1f, 0f], 1, now);
+            FaceOccurrenceId secondExemplar = await SeedFaceAsync(database, [0.8f, 0.6f], 2, now);
+
+            SqliteReviewRepository reviews = new(database);
+            CatalogueReviewPerson firstPerson = await reviews.CreatePersonAsync("First", now);
+            await reviews.AssignAsync(firstExemplar, firstPerson.Id, "human:test", now.AddMinutes(1));
+            CatalogueReviewPerson secondPerson = await reviews.CreatePersonAsync("Second", now.AddMinutes(2));
+            await reviews.AssignAsync(secondExemplar, secondPerson.Id, "human:test", now.AddMinutes(3));
+
+            SqliteIdentityMatcher matcher = new(database);
+            _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
+            CatalogueRankedIdentitySuggestion rank1 = Assert.Single(
+                await matcher.GetRankedSuggestionsAsync(target, EmbeddingModelId, EmbeddingModelHash),
+                suggestion => suggestion.Rank == 1);
+            Assert.True(rank1.Score >= 0.90);
+            Assert.NotNull(rank1.ScoreMargin);
+            Assert.True(rank1.ScoreMargin < 0.25);
+
+            IdentityAutoAssignmentSummary summary = await new SqliteIdentityAutoAssignmentService(database)
+                .ApplyAsync(
+                    EmbeddingModelId,
+                    EmbeddingModelHash,
+                    new IdentityAutoAssignmentOptions(
+                        Enabled: true,
+                        HighScoreThreshold: 0.90,
+                        HighMarginThreshold: 0.25));
+
+            Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), summary);
+            Assert.Null(await ReadActiveAssignmentAsync(database, target));
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Missing_rank2_gap_does_not_qualify_for_high_auto_assignment()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -67,38 +184,23 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
 
             SqliteIdentityMatcher matcher = new(database);
             _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
+            CatalogueRankedIdentitySuggestion rank1 = Assert.Single(
+                await matcher.GetRankedSuggestionsAsync(target, EmbeddingModelId, EmbeddingModelHash));
+            Assert.Equal(1, rank1.Rank);
+            Assert.Equal(1.0, rank1.Score, 10);
+            Assert.Null(rank1.ScoreMargin);
 
-            SqliteIdentityAutoAssignmentService service = new(
-                database,
-                new FixedTimeProvider(now.AddMinutes(2)));
-            IdentityAutoAssignmentOptions options = new(Enabled: true, HighConfidenceThreshold: 1.0);
-            IdentityAutoAssignmentSummary first = await service.ApplyAsync(
-                EmbeddingModelId,
-                EmbeddingModelHash,
-                options);
-            IdentityAutoAssignmentSummary second = await service.ApplyAsync(
-                EmbeddingModelId,
-                EmbeddingModelHash,
-                options);
+            IdentityAutoAssignmentSummary summary = await new SqliteIdentityAutoAssignmentService(database)
+                .ApplyAsync(
+                    EmbeddingModelId,
+                    EmbeddingModelHash,
+                    new IdentityAutoAssignmentOptions(
+                        Enabled: true,
+                        HighScoreThreshold: 0.90,
+                        HighMarginThreshold: 0));
 
-            Assert.Equal(new IdentityAutoAssignmentSummary(1, 1, 0), first);
-            Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), second);
-
-            CatalogueReviewIdentitySuggestion suggestion = Assert.Single(
-                await new SqliteReviewSuggestionRepository(database).GetSuggestionsAsync(target));
-            Assert.Equal("accepted", suggestion.Status);
-            CatalogueReviewSuggestionAction action = Assert.IsType<CatalogueReviewSuggestionAction>(
-                suggestion.LatestAction);
-            string note = Assert.IsType<string>(action.Note);
-            Assert.Equal(SqliteIdentityAutoAssignmentService.AutomaticActor, action.Actor);
-            Assert.Contains("model-id=sface", note, StringComparison.Ordinal);
-            Assert.Contains($"model-hash={EmbeddingModelHash}", note, StringComparison.Ordinal);
-            Assert.Contains("high-confidence-threshold=1", note, StringComparison.Ordinal);
-
-            ActiveAssignment assignment = Assert.IsType<ActiveAssignment>(
-                await ReadActiveAssignmentAsync(database, target));
-            Assert.Equal(person.Id, assignment.PersonId);
-            Assert.Equal(SqliteIdentityAutoAssignmentService.AutomaticActor, assignment.Actor);
+            Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), summary);
+            Assert.Null(await ReadActiveAssignmentAsync(database, target));
         }
         finally
         {
@@ -117,21 +219,27 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             DateTimeOffset now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
             FaceOccurrenceId target = await SeedFaceAsync(database, [1f, 0f], 0, now);
             FaceOccurrenceId exemplar = await SeedFaceAsync(database, [1f, 0f], 1, now);
+            FaceOccurrenceId decoyExemplar = await SeedFaceAsync(database, [-1f, 0f], 2, now);
 
             SqliteReviewRepository reviews = new(database);
             CatalogueReviewPerson suggestedPerson = await reviews.CreatePersonAsync("Suggested", now);
             await reviews.AssignAsync(exemplar, suggestedPerson.Id, "human:test", now.AddMinutes(1));
-            CatalogueReviewPerson manualPerson = await reviews.CreatePersonAsync("Manual", now.AddMinutes(2));
+            CatalogueReviewPerson decoy = await reviews.CreatePersonAsync("Decoy", now.AddMinutes(2));
+            await reviews.AssignAsync(decoyExemplar, decoy.Id, "human:test", now.AddMinutes(3));
+            CatalogueReviewPerson manualPerson = await reviews.CreatePersonAsync("Manual", now.AddMinutes(4));
 
             SqliteIdentityMatcher matcher = new(database);
             _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
-            await reviews.AssignAsync(target, manualPerson.Id, "human:manual", now.AddMinutes(3));
+            await reviews.AssignAsync(target, manualPerson.Id, "human:manual", now.AddMinutes(5));
 
             IdentityAutoAssignmentSummary summary = await new SqliteIdentityAutoAssignmentService(database)
                 .ApplyAsync(
                     EmbeddingModelId,
                     EmbeddingModelHash,
-                    new IdentityAutoAssignmentOptions(Enabled: true, HighConfidenceThreshold: 0.70));
+                    new IdentityAutoAssignmentOptions(
+                        Enabled: true,
+                        HighScoreThreshold: 0.70,
+                        HighMarginThreshold: 0.10));
 
             Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), summary);
             ActiveAssignment assignment = Assert.IsType<ActiveAssignment>(
@@ -155,16 +263,22 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             await database.InitializeAsync();
             DateTimeOffset now = new(2026, 8, 10, 12, 0, 0, TimeSpan.Zero);
             FaceOccurrenceId originalExemplar = await SeedFaceAsync(database, [1f, 0f], 0, now);
-            FaceOccurrenceId firstTarget = await SeedFaceAsync(database, [0.8f, 0.6f], 1, now);
-            FaceOccurrenceId secondTarget = await SeedFaceAsync(database, [0f, 1f], 2, now);
+            FaceOccurrenceId decoyExemplar = await SeedFaceAsync(database, [-1f, 0f], 1, now);
+            FaceOccurrenceId firstTarget = await SeedFaceAsync(database, [0.8f, 0.6f], 2, now);
+            FaceOccurrenceId secondTarget = await SeedFaceAsync(database, [0f, 1f], 3, now);
 
             SqliteReviewRepository reviews = new(database);
             CatalogueReviewPerson person = await reviews.CreatePersonAsync("First", now);
             await reviews.AssignAsync(originalExemplar, person.Id, "human:test", now.AddMinutes(1));
+            CatalogueReviewPerson decoy = await reviews.CreatePersonAsync("Decoy", now.AddMinutes(2));
+            await reviews.AssignAsync(decoyExemplar, decoy.Id, "human:test", now.AddMinutes(3));
 
             SqliteIdentityMatcher matcher = new(database);
             SqliteIdentityAutoAssignmentService service = new(database);
-            IdentityAutoAssignmentOptions options = new(Enabled: true, HighConfidenceThreshold: 0.50);
+            IdentityAutoAssignmentOptions options = new(
+                Enabled: true,
+                HighScoreThreshold: 0.50,
+                HighMarginThreshold: 0.50);
 
             _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
             IdentityAutoAssignmentSummary firstPass = await service.ApplyAsync(
@@ -177,8 +291,9 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             Assert.Null(await ReadActiveAssignmentAsync(database, secondTarget));
 
             CatalogueReviewIdentitySuggestion secondTargetFirstSuggestion = Assert.Single(
-                await new SqliteReviewSuggestionRepository(database).GetSuggestionsAsync(secondTarget));
-            Assert.True(secondTargetFirstSuggestion.Score < options.HighConfidenceThreshold);
+                await new SqliteReviewSuggestionRepository(database).GetSuggestionsAsync(secondTarget),
+                suggestion => suggestion.Rank == 1);
+            Assert.True(secondTargetFirstSuggestion.Score < options.HighScoreThreshold);
 
             _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
             IdentityAutoAssignmentSummary secondPass = await service.ApplyAsync(
