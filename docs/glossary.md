@@ -4,7 +4,7 @@ This glossary defines terms used across Photo Identity Indexer documentation, co
 
 ## Assignment
 
-A canonical action that identifies one face occurrence as a person. The current runtime creates assignments through human review; ADR-0006 permits an explicitly enabled High-confidence automatic policy to create assignments once WI-0043 is implemented. Active assignments are canonical identity data. Later undo or correction is recorded through append-only history.
+A canonical action that identifies one face occurrence as a person. Assignments may be created through human review or through an explicitly enabled exact-model High-confidence automatic policy. Active assignments are canonical identity data. Later undo or correction is recorded through append-only history.
 
 ## Asset
 
@@ -20,7 +20,7 @@ A portable, checksummed package used to move explicitly selected processing inpu
 
 ## Canonical data
 
-Data whose loss cannot be repaired safely by rerunning a model. In this system it includes people, active assignments and rejections, append-only assignment/review history, source/revision identity and governed processing records. A future governed automatic assignment is canonical because an explicit policy promotes the decision into history; its underlying suggestion and embedding remain derived.
+Data whose loss cannot be repaired safely by rerunning a model. In this system it includes people, active assignments, Unknown and false-detection decisions, append-only assignment/review history, source/revision identity and governed processing records. A governed automatic assignment is canonical because an explicit policy promotes the decision into history; its underlying suggestion and embedding remain derived.
 
 ## Catalogue
 
@@ -28,7 +28,7 @@ The local SQLite database plus the referenced governed artefact state used by Ph
 
 ## Collection
 
-A query result containing photos that match one or more selected people under explicit any/all, review-state and optional exact-suggestion policies. The browser presents collections locally; neutral manifests expose opaque HTTP resource URLs without filesystem paths.
+A query result containing photos that match one or more selected people under explicit any/all, review-state and optional exact-suggestion policies. Unknown faces do not satisfy person-based collection evidence while Unknown is active. The browser presents collections locally; neutral manifests expose opaque HTTP resource URLs without filesystem paths.
 
 ## Derived artefact
 
@@ -40,7 +40,7 @@ A model-produced numeric vector representing one aligned face crop. Embeddings a
 
 ## Exemplar
 
-An actively assigned face used as positive identity evidence for matching under one exact embedding revision. The current implementation uses human-assigned exemplars. After WI-0043, eligible automatic assignments may become exemplars in later regeneration runs; a newly automatic assignment never feeds back into the same regeneration run that created it.
+An actively assigned face used as positive identity evidence for matching under one exact embedding revision. Human and eligible automatic assignments may become exemplars. A newly automatic assignment never feeds back into the same regeneration run that created it. Unknown and false-detection faces are not exemplars.
 
 ## Face occurrence
 
@@ -68,7 +68,7 @@ A model-versioned measurement attached to a stable catalogue object. A detector 
 
 ## Person
 
-A canonical human-maintained identity with a stable internal ID and display name. People are shared across model revisions and remain local to the trusted control plane.
+A canonical human-maintained identity with a stable internal ID and display name. People are shared across model revisions and remain local to the trusted control plane. Unknown is a face-review state and never creates a synthetic Person.
 
 ## Processing run
 
@@ -76,11 +76,11 @@ A persisted batch configuration and its jobs. It records selected model IDs and 
 
 ## Rejection
 
-A human review action stating that a face is not the selected person, or that a face should remain rejected from assignment. Rejected face-person evidence is preserved and prevents the same advisory pair from being proposed again under the governed matching rules.
+A review decision may reject a face-person suggestion as an incorrect identity match, or reject a detected face as a false/useless detection. Rejected face-person evidence is preserved and prevents the same advisory pair from being proposed again under the governed matching rules. A false-detection face rejection is distinct from Unknown, which says the face is real but the identity is not known.
 
 ## Review action
 
-An append-only canonical decision such as assignment, rejection, undo, rename or merge. Most current review actions are human. Future automatic assignment is recorded as an explicitly attributed canonical action rather than hidden model state. Current state is derived from active history.
+An append-only canonical decision such as assignment, Unknown, false-detection rejection or undo. Person rename and merge are separately audited maintenance actions. Automatic assignment is recorded as an explicitly attributed canonical action rather than hidden model state. Current face state is derived from the newest unreversed assignment, Unknown or false-detection rejection.
 
 ## Review proxy
 
@@ -92,11 +92,11 @@ A configured local filesystem boundary containing photos. Personal OneDrive is r
 
 ## Suggestion
 
-Derived identity evidence generated from one exact embedding-model revision. Suggestions carry scores, ranking/margin evidence and provenance. A suggestion is not itself canonical. The current runtime requires human review to create assignments; WI-0043 will allow a qualifying High suggestion to create a separate canonical automatic assignment when the explicit policy is enabled.
+Derived identity evidence generated from one exact embedding-model revision. Suggestions carry scores, ranking/margin evidence and provenance. A suggestion is not itself canonical. A qualifying High rank-1 suggestion may create a separate canonical automatic assignment only when that exact model revision's persisted automatic-assignment policy is explicitly enabled.
 
 ## Unknown
 
-A planned face-review state for a real person whose identity is not currently known. Unknown is not a synthetic Person identity, is not positive exemplar evidence and does not satisfy a person-based collection until the face is later assigned. This state is planned under WI-0047.
+A canonical face-review state for a real detected face whose identity is not currently known. Unknown has no PersonId and does not create a synthetic Person. It is distinct from false-detection rejection, is not positive exemplar evidence, is excluded from ordinary matcher targets and person collections, and can later be superseded by a normal manual assignment without erasing its audit history. An explicit future-safe rematch scope may regenerate advisory suggestions for Unknown faces without changing their stored review state or enabling automatic assignment.
 
 ## Thumbnail
 
