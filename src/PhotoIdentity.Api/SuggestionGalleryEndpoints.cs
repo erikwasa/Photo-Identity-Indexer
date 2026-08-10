@@ -24,6 +24,7 @@ public static class SuggestionGalleryEndpoints
         string state = CatalogueReviewStates.Unreviewed,
         string? processingRunId = null,
         string sort = CatalogueSuggestionGallerySorts.CreatedDescending,
+        string confidenceGroup = CatalogueSuggestionConfidenceFilters.All,
         CancellationToken cancellationToken = default)
     {
         if (!TryModelRevision(modelId, modelHash, out ModelId parsedModelId, out Sha256Digest parsedModelHash) ||
@@ -42,6 +43,7 @@ public static class SuggestionGalleryEndpoints
                 state,
                 parsedRunId,
                 sort,
+                confidenceGroup,
                 cancellationToken);
             return Results.Ok(new ReviewFacePageResponse(
                 page.Items.Select(ToResponse).ToArray(),
@@ -64,6 +66,7 @@ public static class SuggestionGalleryEndpoints
         string state = CatalogueReviewStates.Unreviewed,
         string? processingRunId = null,
         string sort = CatalogueSuggestionGallerySorts.CreatedDescending,
+        string confidenceGroup = CatalogueSuggestionConfidenceFilters.All,
         CancellationToken cancellationToken = default)
     {
         if (!TryFaceOccurrenceId(id, out FaceOccurrenceId faceOccurrenceId) ||
@@ -91,6 +94,7 @@ public static class SuggestionGalleryEndpoints
                 state,
                 parsedRunId,
                 sort,
+                confidenceGroup,
                 cancellationToken);
             return Results.Ok(new ReviewFaceDetailsResponse(
                 ToResponse(face),
@@ -145,7 +149,8 @@ public static class SuggestionGalleryEndpoints
         suggestion.Score,
         suggestion.ScoreMargin,
         suggestion.Status,
-        suggestion.GeneratedAtUtc);
+        suggestion.GeneratedAtUtc,
+        suggestion.ConfidenceGroup);
 
     private static ReviewPersonResponse ToResponse(CatalogueReviewPerson person) =>
         new(person.Id.ToString(), person.DisplayName);
