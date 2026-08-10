@@ -36,11 +36,11 @@ Unknown people are legitimate face detections and should not be rejected as fals
 
 ## Acceptance criteria
 
-- [ ] A face can be marked Unknown and later undone or assigned to a person.
-- [ ] Unknown is visibly distinct from false-detection rejection.
-- [ ] Unknown faces do not become exemplars, ordinary suggestion targets or person-collection evidence.
-- [ ] Later manual assignment becomes the active canonical identity while preserving the Unknown history.
-- [ ] Review counts and filters include Unknown explicitly.
+- [x] A face can be marked Unknown and later undone or assigned to a person.
+- [x] Unknown is visibly distinct from false-detection rejection.
+- [x] Unknown faces do not become exemplars, ordinary suggestion targets or person-collection evidence.
+- [x] Later manual assignment becomes the active canonical identity while preserving the Unknown history.
+- [x] Review counts and filters include Unknown explicitly.
 
 ## Verification requirements
 
@@ -48,7 +48,8 @@ Automated review-state/matcher/collection regression tests plus human UI verific
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: schema-v12 review-action migration; canonical review/filter/suggestion/bulk repositories and API; matcher, auto-assignment, collection, person-audit and evaluation evidence boundaries; Home/Face Details/face-card UI; architecture/glossary documentation; migration compatibility fixtures; and dedicated Unknown regression coverage.
+- Trade-offs: Unknown remains a human-controlled canonical face state. Normal regeneration excludes it; the explicit `UnreviewedAndUnknown` matcher scope can regenerate advisory suggestions for a deliberate future revisit without changing the stored Unknown state. Automatic assignment still refuses Unknown, and suggestion accept/reject requires the active Unknown decision to be undone first. Direct manual assignment is the intentional supersession path and preserves append-only history.
+- Integration cleanup: schema version 12 centralizes WI-0044 `person_favorites` in the normal migration lifecycle and moves favorite OR-consolidation into the canonical person-merge transaction, closing the branch-isolation debt recorded by WI-0044.
+- Deferred work: desktop and narrow/mobile browser verification is intentionally deferred to the milestone-wide M17 review. No automatic Unknown-rematch workflow or browser trigger is added; only the future-safe persistence/matcher scope exists.
+- Verification: GitHub Actions run `31438925940` passed restore, Release build, the full automated test suite, living-document validation, generated-document checks, review-application smoke verification, Windows PowerShell mixed-media verification and report assertion. Dedicated tests cover Unknown persistence/filtering, distinction from false detection, assignment/undo supersession history, default matcher exclusion, explicit advisory rematch, auto-assignment refusal, collection exclusion and hidden older assignments not becoming exemplars.

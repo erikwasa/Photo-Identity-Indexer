@@ -7,6 +7,12 @@ using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
+public enum IdentityMatchTargetScope
+{
+    UnreviewedOnly,
+    UnreviewedAndUnknown,
+}
+
 public sealed record IdentityMatchSummary(
     int TargetCount,
     int SuggestedTargetCount,
@@ -25,7 +31,9 @@ public sealed record CatalogueRankedIdentitySuggestion(
     DateTimeOffset GeneratedAtUtc);
 
 /// <summary>
-/// Regenerates exact cosine-similarity suggestions from current human-confirmed exemplars.
+/// Regenerates exact cosine-similarity suggestions from current canonical exemplars.
+/// Normal regeneration targets only unreviewed faces. An explicit target scope may include
+/// Unknown faces for intentional future rematching without changing their stored review state.
 /// Suggestions never write canonical labels, and reviewed suggestion states are preserved.
 /// </summary>
 public sealed class SqliteIdentityMatcher
@@ -45,11 +53,29 @@ public sealed class SqliteIdentityMatcher
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
+    public Task<IdentityMatchSummary> RegenerateAsync(
+        ModelId modelId,
+        Sha256Digest modelHash,
+        CancellationToken cancellationToken = default) =>
+        RegenerateAsync(
+            modelId,
+            modelHash,
+            IdentityMatchTargetScope.UnreviewedOnly,
+            cancellationToken);
+
     public async Task<IdentityMatchSummary> RegenerateAsync(
         ModelId modelId,
         Sha256Digest modelHash,
+        IdentityMatchTargetScope targetScope,
         CancellationToken cancellationToken = default)
     {
+        if (targetScope is not (
+            IdentityMatchTargetScope.UnreviewedOnly or
+            IdentityMatchTargetScope.UnreviewedAndUnknown))
+        {
+            throw new ArgumentOutOfRangeException(nameof(targetScope));
+        }
+
         await _database.InitializeAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
@@ -66,6 +92,7 @@ public sealed class SqliteIdentityMatcher
             transaction,
             modelId,
             modelHash,
+            targetScope,
             cancellationToken);
         HashSet<RejectedPair> rejectedPairs = await ReadRejectedPairsAsync(
             connection,
@@ -230,7 +257,7 @@ public sealed class SqliteIdentityMatcher
                         PARTITION BY face_occurrence_id
                         ORDER BY id DESC) AS row_number
                 FROM review_actions
-                WHERE action_kind IN ('assign', 'reject')
+                WHERE action_kind IN ('assign', 'unknown', 'reject')
                   AND reversed_at_utc IS NULL
             ),
             confirmed_faces AS (
@@ -299,6 +326,7 @@ public sealed class SqliteIdentityMatcher
         SqliteTransaction transaction,
         ModelId modelId,
         Sha256Digest modelHash,
+        IdentityMatchTargetScope targetScope,
         CancellationToken cancellationToken)
     {
         using SqliteCommand command = connection.CreateCommand();
@@ -307,11 +335,12 @@ public sealed class SqliteIdentityMatcher
             WITH latest_review AS (
                 SELECT
                     face_occurrence_id,
+                    action_kind,
                     ROW_NUMBER() OVER (
                         PARTITION BY face_occurrence_id
                         ORDER BY id DESC) AS row_number
                 FROM review_actions
-                WHERE action_kind IN ('assign', 'reject')
+                WHERE action_kind IN ('assign', 'unknown', 'reject')
                   AND reversed_at_utc IS NULL
             ),
             legacy_confirmed AS (
@@ -349,7 +378,8 @@ public sealed class SqliteIdentityMatcher
                   SELECT 1
                   FROM latest_review AS review
                   WHERE review.face_occurrence_id = matching.face_occurrence_id
-                    AND review.row_number = 1)
+                    AND review.row_number = 1
+                    AND ($include_unknown = 0 OR review.action_kind <> 'unknown'))
               AND NOT EXISTS (
                   SELECT 1
                   FROM legacy_confirmed AS confirmed
@@ -358,6 +388,9 @@ public sealed class SqliteIdentityMatcher
             """;
         command.Parameters.AddWithValue("$model_id", modelId.ToString());
         command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
+        command.Parameters.AddWithValue(
+            "$include_unknown",
+            targetScope == IdentityMatchTargetScope.UnreviewedAndUnknown ? 1 : 0);
 
         List<StoredEmbedding> targets = [];
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);

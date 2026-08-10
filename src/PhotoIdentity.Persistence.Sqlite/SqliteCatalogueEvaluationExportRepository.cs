@@ -175,7 +175,7 @@ public sealed class SqliteCatalogueEvaluationExportRepository
                         PARTITION BY review_actions.face_occurrence_id
                         ORDER BY review_actions.id DESC) AS row_number
                 FROM review_actions
-                WHERE review_actions.action_kind IN ('assign', 'reject')
+                WHERE review_actions.action_kind IN ('assign', 'unknown', 'reject')
                   AND review_actions.reversed_at_utc IS NULL
             ),
             matching_embedding AS (

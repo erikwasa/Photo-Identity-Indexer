@@ -263,7 +263,7 @@ public sealed class SqliteReviewSuggestionRepository
             SELECT 1
             FROM review_actions
             WHERE face_occurrence_id = $face_occurrence_id
-              AND action_kind IN ('assign', 'reject')
+              AND action_kind IN ('assign', 'unknown', 'reject')
               AND reversed_at_utc IS NULL
             LIMIT 1;
             """;

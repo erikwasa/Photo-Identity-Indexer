@@ -18,6 +18,7 @@ public static class ReviewEndpoints
         group.MapGet("/people", GetPeopleAsync);
         group.MapPost("/people", CreatePersonAsync);
         group.MapPost("/faces/{id}/assign", AssignAsync);
+        group.MapPost("/faces/{id}/unknown", MarkUnknownAsync);
         group.MapPost("/faces/{id}/reject", RejectAsync);
         group.MapPost("/faces/{id}/undo", UndoAsync);
 
@@ -248,10 +249,36 @@ public static class ReviewEndpoints
         }
     }
 
-    private static async Task<IResult> RejectAsync(
+    private static Task<IResult> MarkUnknownAsync(
         string id,
         ReviewFaceActionRequest request,
         SqliteReviewRepository repository,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken) =>
+        RecordPersonlessDecisionAsync(
+            id,
+            request,
+            repository.MarkUnknownAsync,
+            timeProvider,
+            cancellationToken);
+
+    private static Task<IResult> RejectAsync(
+        string id,
+        ReviewFaceActionRequest request,
+        SqliteReviewRepository repository,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken) =>
+        RecordPersonlessDecisionAsync(
+            id,
+            request,
+            repository.RejectAsync,
+            timeProvider,
+            cancellationToken);
+
+    private static async Task<IResult> RecordPersonlessDecisionAsync(
+        string id,
+        ReviewFaceActionRequest request,
+        Func<FaceOccurrenceId, string, DateTimeOffset, string?, CancellationToken, Task<CatalogueReviewAction>> action,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -262,13 +289,13 @@ public static class ReviewEndpoints
 
         try
         {
-            CatalogueReviewAction action = await repository.RejectAsync(
+            CatalogueReviewAction result = await action(
                 faceOccurrenceId,
                 request.Actor,
                 timeProvider.GetUtcNow(),
                 request.Note,
                 cancellationToken);
-            return Results.Ok(ToResponse(action));
+            return Results.Ok(ToResponse(result));
         }
         catch (KeyNotFoundException)
         {

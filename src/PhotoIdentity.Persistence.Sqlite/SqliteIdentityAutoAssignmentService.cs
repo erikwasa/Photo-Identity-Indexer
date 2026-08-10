@@ -15,7 +15,8 @@ public sealed record IdentityAutoAssignmentSummary(
 /// persisted exact-model confidence policy: only High suggestions may be promoted, and
 /// High requires both the absolute rank-1 score and rank-1/rank-2 score gap. The service
 /// is deliberately separate from ranking so one regeneration always scores from one fixed
-/// exemplar snapshot.
+/// exemplar snapshot. Unknown faces remain human-controlled even if an intentional rematch
+/// later produces advisory suggestions for them.
 /// </summary>
 public sealed class SqliteIdentityAutoAssignmentService
 {
@@ -129,7 +130,7 @@ public sealed class SqliteIdentityAutoAssignmentService
                   SELECT 1
                   FROM review_actions AS action
                   WHERE action.face_occurrence_id = ranking.face_occurrence_id
-                    AND action.action_kind IN ('assign', 'reject')
+                    AND action.action_kind IN ('assign', 'unknown', 'reject')
                     AND action.reversed_at_utc IS NULL)
             ORDER BY ranking.face_occurrence_id;
             """;

@@ -5,6 +5,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 public static class CatalogueBulkReviewActionKinds
 {
     public const string Assign = "assign";
+    public const string Unknown = "unknown";
     public const string Reject = "reject";
 }
 

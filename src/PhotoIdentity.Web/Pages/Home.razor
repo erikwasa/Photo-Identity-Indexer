@@ -8,7 +8,7 @@
     <div>
         <p class="eyebrow">Human review queue</p>
         <h1>Review detected faces</h1>
-        <p>Filter, sort, assign, reject, undo, or accept ranked suggestions from one continuous local queue.</p>
+        <p>Filter, sort, assign, mark a real face as an unknown person, reject false detections, undo, or accept ranked suggestions from one continuous local queue.</p>
     </div>
 
     <form class="person-creator" @onsubmit="CreatePersonAsync" @onsubmit:preventDefault>
@@ -156,6 +156,7 @@
                             <option value="accept-suggestions">Accept selected top suggestions</option>
                         }
                         <option value="assign">Assign to one person</option>
+                        <option value="unknown">Unknown person</option>
                         <option value="reject">Reject as false detections</option>
                     </select>
                 </div>
@@ -215,9 +216,13 @@
                         {
                             <p>They will be assigned to <strong>@preview.Person?.DisplayName</strong>.</p>
                         }
+                        else if (preview.Action == "unknown")
+                        {
+                            <p>They will be recorded as real faces whose identity is currently unknown.</p>
+                        }
                         else
                         {
-                            <p>They will be recorded as rejected face detections.</p>
+                            <p>They will be recorded as rejected false detections.</p>
                         }
                         @if (preview.SkippedCount > 0)
                         {
@@ -286,6 +291,7 @@ else
                       SelectionChanged="SetFaceSelection"
                       AcceptSuggestionRequested="AcceptSuggestionAsync"
                       AssignRequested="AssignAsync"
+                      UnknownRequested="MarkUnknownAsync"
                       RejectRequested="RejectAsync"
                       UndoRequested="UndoAsync" />
         }
@@ -324,7 +330,8 @@ else
     [
         ("unreviewed", "Needs review"),
         ("assigned", "Assigned"),
-        ("rejected", "Rejected"),
+        ("unknown", "Unknown"),
+        ("rejected", "False detections"),
         ("all", "All"),
     ];
 
@@ -436,14 +443,18 @@ else
         (BulkAction switch
         {
             "assign" => !string.IsNullOrWhiteSpace(BulkPersonId),
+            "unknown" => true,
             "reject" => true,
             AcceptSuggestionsAction => SharedSuggestedPerson is not null &&
                                        SelectedFaces.All(face => face.TopSuggestion?.Status == "pending"),
             _ => false,
         });
-    private string BulkCommitNoun => BulkPreview?.Action == "reject"
-        ? (BulkPreview.AffectedCount == 1 ? "rejection" : "rejections")
-        : (BulkPreview?.AffectedCount == 1 ? "assignment" : "assignments");
+    private string BulkCommitNoun => BulkPreview?.Action switch
+    {
+        "reject" => BulkPreview.AffectedCount == 1 ? "false detection" : "false detections",
+        "unknown" => BulkPreview.AffectedCount == 1 ? "Unknown decision" : "Unknown decisions",
+        _ => BulkPreview?.AffectedCount == 1 ? "assignment" : "assignments",
+    };
 
     protected override async Task OnParametersSetAsync()
     {
@@ -861,9 +872,12 @@ else
                 await RequireSuccessAsync(response);
                 BulkReviewCommitResponse result = await response.Content.ReadFromJsonAsync<BulkReviewCommitResponse>()
                     ?? throw new InvalidOperationException("The bulk commit response was empty.");
-                string noun = result.Action == "reject"
-                    ? (result.AffectedCount == 1 ? "face rejection" : "face rejections")
-                    : (result.AffectedCount == 1 ? "face assignment" : "face assignments");
+                string noun = result.Action switch
+                {
+                    "reject" => result.AffectedCount == 1 ? "false detection" : "false detections",
+                    "unknown" => result.AffectedCount == 1 ? "Unknown decision" : "Unknown decisions",
+                    _ => result.AffectedCount == 1 ? "face assignment" : "face assignments",
+                };
                 Message = $"Committed {result.AffectedCount} {noun}.";
             }
             else
@@ -900,12 +914,20 @@ else
             "Face assignment saved.");
     }
 
+    private async Task MarkUnknownAsync(string faceId)
+    {
+        await ApplyActionAsync(
+            $"api/review/faces/{Uri.EscapeDataString(faceId)}/unknown",
+            new ReviewFaceActionRequest(Actor),
+            "Face marked as an unknown person.");
+    }
+
     private async Task RejectAsync(string faceId)
     {
         await ApplyActionAsync(
             $"api/review/faces/{Uri.EscapeDataString(faceId)}/reject",
             new ReviewFaceActionRequest(Actor),
-            "Face rejected.");
+            "False detection saved.");
     }
 
     private async Task UndoAsync(string faceId)

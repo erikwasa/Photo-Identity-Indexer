@@ -67,8 +67,11 @@
             <button class="button primary" disabled="@(string.IsNullOrWhiteSpace(SelectedPersonId) || Busy)" @onclick="AssignAsync">
                 Assign
             </button>
-            <button class="button danger" disabled="@Busy" @onclick="RejectAsync">
-                Reject
+            <button class="button secondary" disabled="@(Face.State == "unknown" || Busy)" @onclick="MarkUnknownAsync">
+                Unknown person
+            </button>
+            <button class="button danger" disabled="@(Face.State == "rejected" || Busy)" @onclick="RejectAsync">
+                False detection
             </button>
             <button class="button secondary" disabled="@(Face.State == "unreviewed" || Busy)" @onclick="UndoAsync">
                 Undo
@@ -105,6 +108,9 @@
     public EventCallback<(string FaceId, string PersonId)> AssignRequested { get; set; }
 
     [Parameter]
+    public EventCallback<string> UnknownRequested { get; set; }
+
+    [Parameter]
     public EventCallback<string> RejectRequested { get; set; }
 
     [Parameter]
@@ -124,7 +130,8 @@
     private string StateLabel => Face.State switch
     {
         "assigned" => "Assigned",
-        "rejected" => "Rejected",
+        "unknown" => "Unknown person",
+        "rejected" => "False detection",
         _ => "Needs review",
     };
 
@@ -175,6 +182,19 @@
         try
         {
             await AssignRequested.InvokeAsync((Face.Id, SelectedPersonId));
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task MarkUnknownAsync()
+    {
+        Busy = true;
+        try
+        {
+            await UnknownRequested.InvokeAsync(Face.Id);
         }
         finally
         {

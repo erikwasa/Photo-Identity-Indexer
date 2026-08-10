@@ -36,17 +36,21 @@ Baseline and candidate embeddings coexist. Embeddings from different revisions m
 
 ## People and assignment history
 
-A **person** has a stable internal ID and human-maintained display name. People are shared across all model revisions.
+A **person** has a stable internal ID and human-maintained display name. People are shared across all model revisions. A favorite flag is a local selection preference associated with a Person; it is stored independently from identity evidence and never changes matcher scores or exemplar eligibility.
 
-Canonical identity decisions are append-only actions. Human assignment, rejection, undo and person-maintenance operations such as rename or merge remain canonical review actions. An explicitly enabled identity-suggestion policy may also promote a qualifying High rank-1 suggestion into a canonical assignment through the same governed acceptance boundary.
+Canonical face review decisions are append-only actions. Human assignment, Unknown, false-detection rejection and undo actions remain canonical review history. Person-maintenance operations such as rename or merge have their own append-only maintenance history. An explicitly enabled identity-suggestion policy may also promote a qualifying High rank-1 suggestion into a canonical assignment through the same governed acceptance boundary.
+
+An **Unknown** face decision represents a real detected face whose identity is currently unknown. It has no PersonId and never creates a synthetic Person. Unknown is distinct from false-detection rejection, which says the detection itself should not be treated as a real face for identity review.
 
 Automatic assignments record the automatic actor plus exact model revision, rank-1 score, rank-1/rank-2 margin, policy version and thresholds. A later manual reassignment supersedes the earlier active assignment through history rather than erasing it.
 
-Current state is derived from active history. An active assignment is canonical identity data regardless of whether its allowed actor was human or the enabled governed automatic policy. A rejection preserves negative evidence. Merged people resolve to a surviving canonical person without rewriting model provenance or historical assignment evidence.
+Current face state is derived from the newest unreversed assignment, Unknown or rejection action. An active assignment is canonical identity data regardless of whether its allowed actor was human or the enabled governed automatic policy. An active Unknown decision hides any older assignment from current identity evidence without deleting that assignment. A later manual assignment can supersede Unknown; undoing that assignment reveals the earlier still-active Unknown action. Merged people resolve to a surviving canonical person without rewriting model provenance or historical assignment evidence.
 
 ## Exemplars, suggestions and confidence policy
 
 An **exemplar** is an actively assigned face eligible to provide positive identity evidence for one exact embedding revision. Human and automatic assignments can both become exemplars, but an automatic assignment created after one regeneration's scoring phase cannot enter that same regeneration's exemplar snapshot. It becomes eligible on a later run.
+
+Unknown and rejected faces are not exemplars. An older assignment hidden by a newer active Unknown or rejection decision is likewise not active exemplar evidence.
 
 An **identity suggestion** is derived model-scoped evidence. It identifies:
 
@@ -68,7 +72,7 @@ High classification requires both the High score and High margin conditions. A m
 
 A suggestion is not canonical merely because it exists. Only an explicit human action or the enabled exact-model automatic-assignment policy may create canonical assignment history. Changing one model revision's policy changes future classification and promotion decisions for that exact revision only; it does not rewrite historical assignments or alter another model revision's thresholds. Rejected face-person pairs remain excluded under the governed matching rules.
 
-The planned Unknown review state represents a real but currently unidentified person without creating a synthetic Person row. Unknown faces are not exemplars or person-collection evidence until later assigned.
+Normal regeneration targets Unreviewed faces. Unknown faces are excluded by default, but an explicit future-safe matcher scope may intentionally regenerate advisory suggestions for Unknown without changing their canonical Unknown state. Automatic assignment still excludes any face with active Unknown state, so such rematching requires a later human action to change canonical identity.
 
 ## Processing runs and jobs
 
@@ -92,11 +96,13 @@ Evaluation exports are neutral private manifests derived from a reviewed catalog
 - deterministic split policy and seed; and
 - gallery, validation and held-out test membership.
 
-Evaluation reports are derived and reproducible. Validation may select thresholds; held-out test data only reports final performance.
+Evaluation reports are derived and reproducible. Validation may select thresholds; held-out test data only reports final performance. Only active assignments are person identity evidence; Unknown and rejected faces are not exported as assigned identities.
 
 ## Collection data
 
 Collection queries read canonical people/assignment state plus optional exact-model suggestion evidence. They return opaque asset/revision identifiers, media metadata and matched-person evidence.
+
+Unknown faces are excluded from person collections, including from optional suggestion-backed collection matches while Unknown is active.
 
 The collection browser uses versioned review proxies where configured. Neutral manifests expose opaque HTTP resource URLs rather than local source roots, source keys, filenames or crop paths.
 
@@ -113,8 +119,8 @@ Validated import matches known revision IDs, verifies checksums and provenance, 
 | Canonical or governed | Derived and regenerable |
 |---|---|
 | Source, asset and revision identity | Detector observations |
-| People | Crops, thumbnails and review proxies |
-| Assignments and rejections | Embeddings |
+| People and favorite-selection preferences | Crops, thumbnails and review proxies |
+| Assignments, Unknown decisions and false-detection rejections | Embeddings |
 | Append-only assignment/review history | Suggestions and rankings |
 | Exact-model identity-suggestion policies and versions | Confidence classification under the current exact-model policy |
 | Processing-run/job state | Evaluation manifests and reports |

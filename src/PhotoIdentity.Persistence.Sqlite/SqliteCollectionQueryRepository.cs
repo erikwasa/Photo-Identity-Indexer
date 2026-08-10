@@ -50,7 +50,7 @@ public sealed record CatalogueCollectionPhotoPage(
 
 /// <summary>
 /// Queries path-free photo manifests from active confirmed assignments and, only when explicitly enabled,
-/// top-ranked pending suggestions from one exact model revision.
+/// top-ranked pending suggestions from one exact model revision. Unknown faces are excluded from both paths.
 /// </summary>
 public sealed class SqliteCollectionQueryRepository
 {
@@ -62,7 +62,7 @@ public sealed class SqliteCollectionQueryRepository
                     PARTITION BY face_occurrence_id
                     ORDER BY id DESC) AS row_number
             FROM review_actions
-            WHERE action_kind IN ('assign', 'reject')
+            WHERE action_kind IN ('assign', 'unknown', 'reject')
               AND reversed_at_utc IS NULL
         ),
         latest_observation AS (
