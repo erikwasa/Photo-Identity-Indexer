@@ -33,11 +33,11 @@ The canonical people list will become increasingly long. Alphabetical selection 
 
 ## Acceptance criteria
 
-- [ ] A person can be marked and unmarked as favorite.
-- [ ] Favorite state persists across application restarts and person rename.
-- [ ] Favorites appear first in all normal person selectors with stable alphabetical ordering inside each group.
-- [ ] Favorite state does not affect matcher evidence or scores.
-- [ ] Person merge has defined, tested favorite-state behavior.
+- [x] A person can be marked and unmarked as favorite.
+- [x] Favorite state persists across application restarts and person rename.
+- [x] Favorites appear first in all normal person selectors with stable alphabetical ordering inside each group.
+- [x] Favorite state does not affect matcher evidence or scores.
+- [x] Person merge has defined, tested favorite-state behavior.
 
 ## Verification requirements
 
@@ -45,7 +45,8 @@ Automated persistence/query tests plus browser verification on desktop and narro
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: favorite-person persistence, review/maintenance API contracts and endpoints, people maintenance controls, Face Details favorite control, face-card assignment labels, collection ordering, and integration coverage.
+- Trade-offs: while M17 work-item branches remain isolated, `person_favorites` is created idempotently by `SqliteFavoritePeopleRepository` rather than claiming schema migration version 11, which is already introduced independently by WI-0043. During M17 integration this table must be promoted into the next numbered central SQLite migration. Favorite consolidation currently follows the canonical person merge in the endpoint; integration should fold that small preference consolidation into the canonical merge transaction when the shared migration is introduced.
+- Merge policy: the surviving person is favorite when either the source or target person was favorite; rename never changes favorite state.
+- Deferred work: desktop and narrow/mobile browser verification is intentionally deferred to the milestone-wide M17 review. No matcher prior or scoring behavior is introduced.
+- Commands run: GitHub Actions Release build/test/documentation/review/Windows verification workflow for PR #117; exact successful run is recorded in delivery evidence after the final branch head completes.
