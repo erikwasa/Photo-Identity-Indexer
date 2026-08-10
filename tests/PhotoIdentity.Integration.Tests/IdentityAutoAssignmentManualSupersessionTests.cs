@@ -31,19 +31,18 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
             CatalogueReviewPerson secondPerson = await reviews.CreatePersonAsync("Second", now.AddMinutes(2));
             await reviews.AssignAsync(secondExemplar, secondPerson.Id, "human:test", now.AddMinutes(3));
 
+            SqliteIdentitySuggestionPolicyRepository policies = new(database);
+            IdentitySuggestionPolicy enabledPolicy = await policies.UpdateAsync(
+                autoAssignEnabled: true,
+                highScoreThreshold: 0.75,
+                highMarginThreshold: 0.10,
+                mediumScoreThreshold: 0.50,
+                actor: "test:policy");
+
             SqliteIdentityMatcher matcher = new(database);
             _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
-
-            IdentitySuggestionPolicy policy = new(
-                Version: 1,
-                AutoAssignEnabled: true,
-                HighScoreThreshold: 0.75,
-                HighMarginThreshold: 0.10,
-                MediumScoreThreshold: 0.50,
-                UpdatedBy: "test:policy",
-                UpdatedAtUtc: now.AddMinutes(4));
             IdentityAutoAssignmentSummary automatic = await new SqliteIdentityAutoAssignmentService(database)
-                .ApplyAsync(EmbeddingModelId, EmbeddingModelHash, policy);
+                .ApplyAsync(EmbeddingModelId, EmbeddingModelHash);
 
             Assert.Equal(new IdentityAutoAssignmentSummary(1, 1, 0), automatic);
             CatalogueReviewAction automaticAction = Assert.Single(
@@ -51,6 +50,22 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
                 action => action.Kind == CatalogueReviewActionKinds.Assign);
             Assert.Equal(firstPerson.Id, automaticAction.PersonId);
             Assert.Equal(SqliteIdentityAutoAssignmentService.AutomaticActor, automaticAction.Actor);
+            Assert.Contains($"policy-version={enabledPolicy.Version}", automaticAction.Note, StringComparison.Ordinal);
+
+            IdentitySuggestionPolicy tightenedPolicy = await policies.UpdateAsync(
+                autoAssignEnabled: false,
+                highScoreThreshold: 0.95,
+                highMarginThreshold: 0.50,
+                mediumScoreThreshold: 0.80,
+                actor: "human:policy-change");
+            Assert.True(tightenedPolicy.Version > enabledPolicy.Version);
+
+            IReadOnlyList<CatalogueReviewAction> afterPolicyChange = await reviews.GetActionsAsync(automaticTarget);
+            CatalogueReviewAction retainedAutomatic = Assert.Single(
+                afterPolicyChange,
+                action => action.Kind == CatalogueReviewActionKinds.Assign);
+            Assert.Equal(automaticAction.Id, retainedAutomatic.Id);
+            Assert.Equal(firstPerson.Id, retainedAutomatic.PersonId);
 
             CatalogueReviewAction manualAction = await reviews.AssignAsync(
                 automaticTarget,
