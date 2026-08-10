@@ -119,7 +119,6 @@ public static class PersonMaintenanceEndpoints
         string id,
         MergePersonRequest request,
         SqlitePersonMaintenanceRepository repository,
-        SqliteCatalogueDatabase database,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -131,19 +130,13 @@ public static class PersonMaintenanceEndpoints
 
         try
         {
-            DateTimeOffset now = timeProvider.GetUtcNow();
             CataloguePersonMaintenanceAction action = await repository.MergeAsync(
                 sourcePersonId,
                 targetPersonId,
                 request.ConfirmIrreversible,
                 request.Actor,
-                now,
+                timeProvider.GetUtcNow(),
                 request.Note,
-                cancellationToken);
-            await new SqliteFavoritePeopleRepository(database).ConsolidateMergeAsync(
-                sourcePersonId,
-                targetPersonId,
-                now,
                 cancellationToken);
             return Results.Ok(ToResponse(action));
         }
