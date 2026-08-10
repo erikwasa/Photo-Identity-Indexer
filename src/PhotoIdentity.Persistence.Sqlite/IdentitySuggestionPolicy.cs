@@ -114,7 +114,6 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
         await _database.InitializeAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
-        await EnsureSchemaAsync(connection, transaction, cancellationToken);
         await EnsureDefaultAsync(connection, transaction, modelId, modelHash, cancellationToken);
         IdentitySuggestionPolicy policy = await ReadAsync(
             connection,
@@ -140,7 +139,6 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
         await _database.InitializeAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
-        await EnsureSchemaAsync(connection, transaction, cancellationToken);
         await EnsureDefaultAsync(connection, transaction, modelId, modelHash, cancellationToken);
         IdentitySuggestionPolicy current = await ReadAsync(
             connection,
@@ -188,31 +186,6 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
         transaction.Commit();
         return updated;
-    }
-
-    private static async Task EnsureSchemaAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        CancellationToken cancellationToken)
-    {
-        using SqliteCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            CREATE TABLE IF NOT EXISTS identity_suggestion_policies (
-                model_id TEXT NOT NULL,
-                model_hash TEXT NOT NULL,
-                policy_version INTEGER NOT NULL CHECK (policy_version >= 1),
-                auto_assign_enabled INTEGER NOT NULL CHECK (auto_assign_enabled IN (0, 1)),
-                high_score_threshold REAL NOT NULL CHECK (high_score_threshold >= 0 AND high_score_threshold <= 1),
-                high_margin_threshold REAL NOT NULL CHECK (high_margin_threshold >= 0 AND high_margin_threshold <= 2),
-                medium_score_threshold REAL NOT NULL CHECK (medium_score_threshold >= 0 AND medium_score_threshold <= 1),
-                updated_by TEXT NOT NULL,
-                updated_at_utc TEXT NOT NULL,
-                PRIMARY KEY (model_id, model_hash),
-                CHECK (medium_score_threshold <= high_score_threshold)
-            );
-            """;
-        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private async Task EnsureDefaultAsync(
