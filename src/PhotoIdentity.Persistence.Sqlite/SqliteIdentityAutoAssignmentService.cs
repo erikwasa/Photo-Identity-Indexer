@@ -12,9 +12,9 @@ public sealed record IdentityAutoAssignmentSummary(
 /// <summary>
 /// Promotes qualifying persisted rank-1 matcher suggestions through the same canonical
 /// suggestion-acceptance boundary used by manual review. Eligibility comes from the
-/// persisted confidence-group policy: only High suggestions may be promoted, and High
-/// requires both the absolute rank-1 score and rank-1/rank-2 score gap. The service is
-/// deliberately separate from ranking so one regeneration always scores from one fixed
+/// persisted exact-model confidence policy: only High suggestions may be promoted, and
+/// High requires both the absolute rank-1 score and rank-1/rank-2 score gap. The service
+/// is deliberately separate from ranking so one regeneration always scores from one fixed
 /// exemplar snapshot.
 /// </summary>
 public sealed class SqliteIdentityAutoAssignmentService
@@ -40,7 +40,7 @@ public sealed class SqliteIdentityAutoAssignmentService
     {
         IdentitySuggestionPolicy policy = await new SqliteIdentitySuggestionPolicyRepository(
             _database,
-            _timeProvider).GetAsync(cancellationToken);
+            _timeProvider).GetAsync(modelId, modelHash, cancellationToken);
         return await ApplyAsync(modelId, modelHash, policy, cancellationToken);
     }
 
