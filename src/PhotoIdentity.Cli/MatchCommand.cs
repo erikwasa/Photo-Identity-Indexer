@@ -10,7 +10,8 @@ internal sealed record MatchCommandOptions(
     ModelId EmbedderModelId,
     Sha256Digest EmbedderModelHash,
     bool AutoAssign,
-    double AutoAssignThreshold)
+    double HighScoreThreshold,
+    double HighMarginThreshold)
 {
     public static MatchCommandOptions Parse(string[] args)
     {
@@ -22,7 +23,8 @@ internal sealed record MatchCommandOptions(
         string? databasePath = null;
         string? embedderId = null;
         string? embedderHash = null;
-        string? autoAssignThreshold = null;
+        string? highScoreThreshold = null;
+        string? highMarginThreshold = null;
         bool autoAssign = false;
         bool autoAssignSeen = false;
 
@@ -56,8 +58,11 @@ internal sealed record MatchCommandOptions(
                 case "--embedder-hash":
                     embedderHash = Single(embedderHash, value, option);
                     break;
-                case "--auto-assign-threshold":
-                    autoAssignThreshold = Single(autoAssignThreshold, value, option);
+                case "--high-score-threshold":
+                    highScoreThreshold = Single(highScoreThreshold, value, option);
+                    break;
+                case "--high-margin-threshold":
+                    highMarginThreshold = Single(highMarginThreshold, value, option);
                     break;
                 default:
                     throw new ArgumentException($"Unknown option '{option}'.");
@@ -76,27 +81,47 @@ internal sealed record MatchCommandOptions(
             throw new ArgumentException("Option '--embedder-hash' must be a 64-character SHA-256 value.");
         }
 
-        double threshold = IdentityAutoAssignmentOptions.DefaultHighConfidenceThreshold;
-        if (autoAssignThreshold is not null
-            && (!double.TryParse(
-                    autoAssignThreshold,
-                    NumberStyles.Float,
-                    CultureInfo.InvariantCulture,
-                    out threshold)
-                || !double.IsFinite(threshold)
-                || threshold < 0
-                || threshold > 1))
-        {
-            throw new ArgumentException(
-                "Option '--auto-assign-threshold' must be a number between 0 and 1.");
-        }
+        double scoreThreshold = ParseThreshold(
+            highScoreThreshold,
+            IdentityAutoAssignmentOptions.DefaultHighScoreThreshold,
+            "--high-score-threshold",
+            1);
+        double marginThreshold = ParseThreshold(
+            highMarginThreshold,
+            IdentityAutoAssignmentOptions.DefaultHighMarginThreshold,
+            "--high-margin-threshold",
+            2);
 
         return new MatchCommandOptions(
             Path.GetFullPath(databasePath),
             new ModelId(embedderId.Trim()),
             new Sha256Digest(normalizedHash),
             autoAssign,
-            threshold);
+            scoreThreshold,
+            marginThreshold);
+    }
+
+    private static double ParseThreshold(
+        string? value,
+        double defaultValue,
+        string option,
+        double maximum)
+    {
+        if (value is null)
+        {
+            return defaultValue;
+        }
+
+        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsed)
+            || !double.IsFinite(parsed)
+            || parsed < 0
+            || parsed > maximum)
+        {
+            throw new ArgumentException(
+                $"Option '{option}' must be a number between 0 and {maximum.ToString("0.###", CultureInfo.InvariantCulture)}.");
+        }
+
+        return parsed;
     }
 
     private static string Single(string? current, string value, string option)
@@ -143,7 +168,10 @@ internal static class MatchCommandRunner
         IdentityAutoAssignmentSummary autoAssignmentSummary = await autoAssignmentService.ApplyAsync(
             options.EmbedderModelId,
             options.EmbedderModelHash,
-            new IdentityAutoAssignmentOptions(options.AutoAssign, options.AutoAssignThreshold),
+            new IdentityAutoAssignmentOptions(
+                options.AutoAssign,
+                options.HighScoreThreshold,
+                options.HighMarginThreshold),
             cancellationToken);
 
         output.WriteLine($"model-id: {options.EmbedderModelId}");
@@ -152,7 +180,8 @@ internal static class MatchCommandRunner
         output.WriteLine($"suggested-targets: {summary.SuggestedTargetCount}");
         output.WriteLine($"suggestions: {summary.SuggestionCount}");
         output.WriteLine($"auto-assignment-enabled: {options.AutoAssign.ToString().ToLowerInvariant()}");
-        output.WriteLine($"auto-assignment-threshold: {options.AutoAssignThreshold.ToString("0.###", CultureInfo.InvariantCulture)}");
+        output.WriteLine($"high-score-threshold: {options.HighScoreThreshold.ToString("0.###", CultureInfo.InvariantCulture)}");
+        output.WriteLine($"high-margin-threshold: {options.HighMarginThreshold.ToString("0.###", CultureInfo.InvariantCulture)}");
         output.WriteLine($"auto-assignment-candidates: {autoAssignmentSummary.CandidateCount}");
         output.WriteLine($"auto-assigned: {autoAssignmentSummary.AssignedCount}");
         output.WriteLine($"auto-assignment-skipped: {autoAssignmentSummary.SkippedCount}");
