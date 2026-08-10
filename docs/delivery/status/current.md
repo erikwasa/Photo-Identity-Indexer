@@ -24,7 +24,7 @@ Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.
 
 ## Active work
 
-- [**WI-0054 — Polish archive viewing, progress and availability**](../work-items/WI-0054-archive-ui-polish.md) — `in_progress`; owner: `ai-agent`
+- [**WI-0054 — Polish archive viewing, progress and availability**](../work-items/WI-0054-archive-ui-polish.md) — `in_review`; owner: `ai-agent`
 
 ## Recently completed
 

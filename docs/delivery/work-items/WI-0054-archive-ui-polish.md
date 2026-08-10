@@ -42,14 +42,14 @@ The maintainer verified WI-0042 and WI-0041 on the real archive on 2026-08-10 an
 
 ## Acceptance criteria
 
-- [ ] `Local + Verified + Pending` archive revisions can be viewed at normal review size even when their durable proxy has not yet been generated.
-- [ ] Viewing an online-only revision with no proxy never hydrates the original as a GET side effect.
-- [ ] A missing preview is represented by an explanatory UI state rather than a broken image.
-- [ ] The Archive page labels latest processing-run progress explicitly and separately reports cumulative archive analysis.
-- [ ] Calling explicit original status/hydrate/release updates the persisted Archive availability observation to the live OneDrive state.
-- [ ] A managed explicit hydration may still be released by later archive advancement under the existing WI-0042 ownership policy.
-- [ ] Regression tests cover local viewer fallback, no implicit online-only hydration and availability reconciliation.
-- [ ] Full build/test/docs verification remains green.
+- [x] `Local + Verified + Pending` archive revisions can be viewed at normal review size even when their durable proxy has not yet been generated.
+- [x] Viewing an online-only revision with no proxy never hydrates the original as a GET side effect.
+- [x] A missing preview is represented by an explanatory UI state rather than a broken image.
+- [x] The Archive page labels latest processing-run progress explicitly and separately reports cumulative archive analysis.
+- [x] Calling explicit original status/hydrate/release updates the persisted Archive availability observation to the live OneDrive state.
+- [x] A managed explicit hydration may still be released by later archive advancement under the existing WI-0042 ownership policy.
+- [x] Regression tests cover local viewer fallback, no implicit online-only hydration and availability reconciliation.
+- [x] Full build/test/docs verification remains green.
 
 ## Implementation notes
 

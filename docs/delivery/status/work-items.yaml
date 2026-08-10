@@ -1186,7 +1186,7 @@ work_items:
 - id: WI-0054
   title: Polish archive viewing, progress and availability
   milestone: M12
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0054-archive-ui-polish.md
   started_at: 2026-08-10
