@@ -22,7 +22,13 @@
         @if (Face.TopSuggestion is ReviewTopSuggestionResponse suggestion)
         {
             <section class="top-suggestion" aria-label="Top identity suggestion">
-                <p class="eyebrow">Top suggestion</p>
+                <div class="face-heading">
+                    <p class="eyebrow">Top suggestion</p>
+                    @if (!string.IsNullOrWhiteSpace(suggestion.ConfidenceGroup))
+                    {
+                        <span class="state-badge">@ConfidenceGroupLabel(suggestion.ConfidenceGroup)</span>
+                    }
+                </div>
                 <strong>@suggestion.Person.DisplayName</strong>
                 <p>Score @suggestion.Score.ToString("F4") · Margin @MarginLabel(suggestion.ScoreMargin)</p>
                 @if (CanAcceptTopSuggestion)
@@ -201,6 +207,14 @@
             Busy = false;
         }
     }
+
+    private static string ConfidenceGroupLabel(string value) => value.ToLowerInvariant() switch
+    {
+        "high" => "High",
+        "medium" => "Medium",
+        "low" => "Low",
+        _ => value,
+    };
 
     private static string MarginLabel(double? margin) => margin is double value
         ? value.ToString("F4")
