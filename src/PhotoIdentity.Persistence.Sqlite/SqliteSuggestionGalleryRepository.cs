@@ -19,7 +19,7 @@ public sealed class SqliteSuggestionGalleryRepository
                     PARTITION BY face_occurrence_id
                     ORDER BY id DESC) AS row_number
             FROM review_actions
-            WHERE action_kind IN ('assign', 'reject')
+            WHERE action_kind IN ('assign', 'unknown', 'reject')
               AND reversed_at_utc IS NULL
         ),
         latest_crop AS (
@@ -280,6 +280,7 @@ public sealed class SqliteSuggestionGalleryRepository
         {
             CatalogueReviewStates.Unreviewed => "latest_action.id IS NULL",
             CatalogueReviewStates.Assigned => "latest_action.action_kind = 'assign'",
+            CatalogueReviewStates.Unknown => "latest_action.action_kind = 'unknown'",
             CatalogueReviewStates.Rejected => "latest_action.action_kind = 'reject'",
             "all" => "1 = 1",
             _ => throw new ArgumentException($"Unsupported review state '{state}'.", nameof(state)),
@@ -423,6 +424,7 @@ public sealed class SqliteSuggestionGalleryRepository
         string reviewState = actionKind switch
         {
             CatalogueReviewActionKinds.Assign => CatalogueReviewStates.Assigned,
+            CatalogueReviewActionKinds.Unknown => CatalogueReviewStates.Unknown,
             CatalogueReviewActionKinds.Reject => CatalogueReviewStates.Rejected,
             _ => CatalogueReviewStates.Unreviewed,
         };
