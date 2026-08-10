@@ -64,4 +64,5 @@ The maintainer verified WI-0042 and WI-0041 on the real archive on 2026-08-10 an
 - Files changed: `src/PhotoIdentity.Api/CollectionOriginalAccessService.cs`, `src/PhotoIdentity.Api/CollectionViewerPreviewEndpoints.cs`, `src/PhotoIdentity.Api/Program.cs`, `src/PhotoIdentity.Web/Pages/Photo.razor`, `src/PhotoIdentity.Web/Pages/Archive.razor`, integration tests and operator docs.
 - Trade-offs: transient fallback rendering performs an exact SHA-256 verification/read when no durable proxy exists; this is intentionally preferred to implicit hydration or serving unverified bytes.
 - Deferred work: parallel unattended archive advancement remains outside this work item.
+- Validation: GitHub Actions build run 802 (`31436697991`) passed Release build, the full automated test suite, living/generated documentation checks, hosted review smoke, Windows mixed-media verification and report assertions on product head `7146510b66372adb318be66d31b67c6106a37964` before the status-only review transition.
 - Commands run: repository CI plus `PhotoIdentity.Docs validate/generate --check` before review.
