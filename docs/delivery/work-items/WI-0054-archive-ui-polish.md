@@ -51,9 +51,17 @@ The maintainer verified WI-0042 and WI-0041 on the real archive on 2026-08-10 an
 - [ ] Regression tests cover local viewer fallback, no implicit online-only hydration and availability reconciliation.
 - [ ] Full build/test/docs verification remains green.
 
+## Implementation notes
+
+- Added `/api/collections/photos/{revisionId}/viewer-preview`: durable proxy first; otherwise a transient review-sized JPEG may be rendered only from `CollectionOriginalAccessService.OpenVerifiedAsync`, which never hydrates and only opens already-local exact-revision bytes.
+- The viewer now exposes an explanatory no-preview state when neither a proxy nor an already-local verified original is available.
+- Explicit original access now persists every observed OneDrive availability state into the Archive availability table.
+- The Archive processing counter is relabelled `Latest run progress`; cumulative archive analysis remains the top-level `Analyzed` count.
+- Managed-hydration release semantics remain unchanged.
+
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: `src/PhotoIdentity.Api/CollectionOriginalAccessService.cs`, `src/PhotoIdentity.Api/CollectionViewerPreviewEndpoints.cs`, `src/PhotoIdentity.Api/Program.cs`, `src/PhotoIdentity.Web/Pages/Photo.razor`, `src/PhotoIdentity.Web/Pages/Archive.razor`, integration tests and operator docs.
+- Trade-offs: transient fallback rendering performs an exact SHA-256 verification/read when no durable proxy exists; this is intentionally preferred to implicit hydration or serving unverified bytes.
+- Deferred work: parallel unattended archive advancement remains outside this work item.
+- Commands run: repository CI plus `PhotoIdentity.Docs validate/generate --check` before review.
