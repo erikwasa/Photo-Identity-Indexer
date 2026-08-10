@@ -19,7 +19,7 @@ public sealed class SqlitePersonAuditRepository
                     PARTITION BY face_occurrence_id
                     ORDER BY id DESC) AS row_number
             FROM review_actions
-            WHERE action_kind IN ('assign', 'reject')
+            WHERE action_kind IN ('assign', 'unknown', 'reject')
               AND reversed_at_utc IS NULL
         ),
         latest_crop AS (
