@@ -156,13 +156,18 @@ internal static class MatchCommandRunner
 
         SqliteCatalogueDatabase database = new(options.DatabasePath);
         SqliteIdentitySuggestionPolicyRepository policyRepository = new(database);
-        IdentitySuggestionPolicy policy = await policyRepository.GetAsync(cancellationToken);
+        IdentitySuggestionPolicy policy = await policyRepository.GetAsync(
+            options.EmbedderModelId,
+            options.EmbedderModelHash,
+            cancellationToken);
         if (options.AutoAssign is not null
             || options.HighScoreThreshold is not null
             || options.HighMarginThreshold is not null
             || options.MediumScoreThreshold is not null)
         {
             policy = await policyRepository.UpdateAsync(
+                options.EmbedderModelId,
+                options.EmbedderModelHash,
                 options.AutoAssign ?? policy.AutoAssignEnabled,
                 options.HighScoreThreshold ?? policy.HighScoreThreshold,
                 options.HighMarginThreshold ?? policy.HighMarginThreshold,
