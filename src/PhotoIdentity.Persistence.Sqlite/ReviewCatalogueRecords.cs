@@ -7,12 +7,14 @@ public static class CatalogueReviewStates
 {
     public const string Unreviewed = "unreviewed";
     public const string Assigned = "assigned";
+    public const string Unknown = "unknown";
     public const string Rejected = "rejected";
 }
 
 public static class CatalogueReviewActionKinds
 {
     public const string Assign = "assign";
+    public const string Unknown = "unknown";
     public const string Reject = "reject";
     public const string Undo = "undo";
 }
