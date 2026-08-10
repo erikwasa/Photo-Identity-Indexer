@@ -1,0 +1,199 @@
+@page "/suggestion-policy"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Suggestion policy · Photo Identity</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Identity matching</p>
+        <h1>Suggestion confidence policy</h1>
+        <p>Configure High and Medium confidence boundaries. High requires both the rank-1 score and the gap over rank 2.</p>
+    </div>
+</section>
+
+@if (Loading)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading suggestion policy…</p>
+    </section>
+}
+else if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+else if (Policy is IdentitySuggestionPolicyResponse policy)
+{
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <div class="notice success" role="status">@Message</div>
+    }
+
+    <section class="review-filter-panel" aria-labelledby="policy-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Policy version @policy.Version</p>
+                <h2 id="policy-heading">Confidence boundaries</h2>
+            </div>
+            <span class="model-summary">Updated by @policy.UpdatedBy</span>
+        </div>
+
+        <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <div class="review-filter-grid">
+                <div>
+                    <label class="field-label" for="high-score">High minimum rank-1 score</label>
+                    <input id="high-score"
+                           type="number"
+                           min="0"
+                           max="1"
+                           step="0.01"
+                           @bind="HighScoreThreshold"
+                           disabled="@Saving" />
+                    <p>Rank 1 must meet or exceed this absolute score.</p>
+                </div>
+
+                <div>
+                    <label class="field-label" for="high-margin">High minimum rank-1/rank-2 gap</label>
+                    <input id="high-margin"
+                           type="number"
+                           min="0"
+                           max="2"
+                           step="0.01"
+                           @bind="HighMarginThreshold"
+                           disabled="@Saving" />
+                    <p>A missing or smaller rank-2 gap is never High.</p>
+                </div>
+
+                <div>
+                    <label class="field-label" for="medium-score">Medium minimum rank-1 score</label>
+                    <input id="medium-score"
+                           type="number"
+                           min="0"
+                           max="1"
+                           step="0.01"
+                           @bind="MediumScoreThreshold"
+                           disabled="@Saving" />
+                    <p>Suggestions below this score are Low. Strong but ambiguous suggestions fall back to Medium.</p>
+                </div>
+            </div>
+
+            <label class="field-label" for="auto-assign">
+                <input id="auto-assign"
+                       type="checkbox"
+                       @bind="AutoAssignEnabled"
+                       disabled="@Saving" />
+                Automatically assign High suggestions after regeneration
+            </label>
+
+            <div class="card-actions">
+                <button type="submit" class="button primary" disabled="@Saving">
+                    @(Saving ? "Saving…" : "Save policy")
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <section class="review-filter-panel" aria-labelledby="policy-rule-heading">
+        <p class="eyebrow">Classification rule</p>
+        <h2 id="policy-rule-heading">How High is decided</h2>
+        <p><strong>High</strong>: rank-1 score ≥ @HighScoreThreshold.ToString("0.###") and rank-1 minus rank-2 score ≥ @HighMarginThreshold.ToString("0.###").</p>
+        <p><strong>Medium</strong>: not High, but rank-1 score ≥ @MediumScoreThreshold.ToString("0.###").</p>
+        <p><strong>Low</strong>: rank-1 score below @MediumScoreThreshold.ToString("0.###").</p>
+    </section>
+}
+
+@code {
+    private const string Actor = "local-reviewer";
+
+    private IdentitySuggestionPolicyResponse? Policy { get; set; }
+    private bool AutoAssignEnabled { get; set; }
+    private double HighScoreThreshold { get; set; }
+    private double HighMarginThreshold { get; set; }
+    private double MediumScoreThreshold { get; set; }
+    private bool Loading { get; set; } = true;
+    private bool Saving { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Policy = await Http.GetFromJsonAsync<IdentitySuggestionPolicyResponse>(
+                "api/review/suggestion-policy");
+            if (Policy is null)
+            {
+                Error = "The suggestion policy response was empty.";
+                return;
+            }
+
+            CopyFromPolicy(Policy);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        Saving = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            UpdateIdentitySuggestionPolicyRequest request = new(
+                AutoAssignEnabled,
+                HighScoreThreshold,
+                HighMarginThreshold,
+                MediumScoreThreshold,
+                Actor);
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                "api/review/suggestion-policy",
+                request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Policy = await response.Content.ReadFromJsonAsync<IdentitySuggestionPolicyResponse>();
+            if (Policy is null)
+            {
+                Error = "The saved suggestion policy response was empty.";
+                return;
+            }
+
+            CopyFromPolicy(Policy);
+            Message = $"Suggestion policy version {Policy.Version} saved.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Saving = false;
+        }
+    }
+
+    private void CopyFromPolicy(IdentitySuggestionPolicyResponse policy)
+    {
+        AutoAssignEnabled = policy.AutoAssignEnabled;
+        HighScoreThreshold = policy.HighScoreThreshold;
+        HighMarginThreshold = policy.HighMarginThreshold;
+        MediumScoreThreshold = policy.MediumScoreThreshold;
+    }
+}
