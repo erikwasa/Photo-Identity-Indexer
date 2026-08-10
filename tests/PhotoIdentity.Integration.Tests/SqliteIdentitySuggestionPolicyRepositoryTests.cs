@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
@@ -5,6 +6,11 @@ namespace PhotoIdentity_Integration_Tests;
 
 public sealed class SqliteIdentitySuggestionPolicyRepositoryTests
 {
+    private static readonly ModelId ModelA = new("sface-a");
+    private static readonly Sha256Digest ModelHashA = new(new string('a', 64));
+    private static readonly ModelId ModelB = new("sface-b");
+    private static readonly Sha256Digest ModelHashB = new(new string('b', 64));
+
     [Fact]
     public async Task Default_policy_is_persisted_with_auto_assignment_disabled()
     {
@@ -17,8 +23,8 @@ public sealed class SqliteIdentitySuggestionPolicyRepositoryTests
                 database,
                 new FixedTimeProvider(new DateTimeOffset(2026, 8, 10, 12, 0, 0, TimeSpan.Zero)));
 
-            IdentitySuggestionPolicy first = await repository.GetAsync();
-            IdentitySuggestionPolicy second = await repository.GetAsync();
+            IdentitySuggestionPolicy first = await repository.GetAsync(ModelA, ModelHashA);
+            IdentitySuggestionPolicy second = await repository.GetAsync(ModelA, ModelHashA);
 
             Assert.Equal(1, first.Version);
             Assert.False(first.AutoAssignEnabled);
@@ -48,18 +54,22 @@ public sealed class SqliteIdentitySuggestionPolicyRepositoryTests
                 new FixedTimeProvider(now));
 
             IdentitySuggestionPolicy updated = await repository.UpdateAsync(
+                ModelA,
+                ModelHashA,
                 autoAssignEnabled: true,
                 highScoreThreshold: 0.82,
                 highMarginThreshold: 0.14,
                 mediumScoreThreshold: 0.55,
                 actor: "human:test");
             IdentitySuggestionPolicy unchanged = await repository.UpdateAsync(
+                ModelA,
+                ModelHashA,
                 autoAssignEnabled: true,
                 highScoreThreshold: 0.82,
                 highMarginThreshold: 0.14,
                 mediumScoreThreshold: 0.55,
                 actor: "human:other");
-            IdentitySuggestionPolicy persisted = await repository.GetAsync();
+            IdentitySuggestionPolicy persisted = await repository.GetAsync(ModelA, ModelHashA);
 
             Assert.Equal(2, updated.Version);
             Assert.True(updated.AutoAssignEnabled);
@@ -69,6 +79,43 @@ public sealed class SqliteIdentitySuggestionPolicyRepositoryTests
             Assert.Equal("human:test", updated.UpdatedBy);
             Assert.Equal(updated, unchanged);
             Assert.Equal(updated, persisted);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Policy_values_and_versions_are_isolated_by_exact_model_revision()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            SqliteIdentitySuggestionPolicyRepository repository = new(database);
+
+            IdentitySuggestionPolicy updatedA = await repository.UpdateAsync(
+                ModelA,
+                ModelHashA,
+                autoAssignEnabled: true,
+                highScoreThreshold: 0.86,
+                highMarginThreshold: 0.18,
+                mediumScoreThreshold: 0.61,
+                actor: "human:model-a");
+            IdentitySuggestionPolicy defaultB = await repository.GetAsync(ModelB, ModelHashB);
+            IdentitySuggestionPolicy persistedA = await repository.GetAsync(ModelA, ModelHashA);
+
+            Assert.Equal(2, updatedA.Version);
+            Assert.True(updatedA.AutoAssignEnabled);
+            Assert.Equal(updatedA, persistedA);
+
+            Assert.Equal(1, defaultB.Version);
+            Assert.False(defaultB.AutoAssignEnabled);
+            Assert.Equal(IdentitySuggestionPolicy.DefaultHighScoreThreshold, defaultB.HighScoreThreshold);
+            Assert.Equal(IdentitySuggestionPolicy.DefaultHighMarginThreshold, defaultB.HighMarginThreshold);
+            Assert.Equal(IdentitySuggestionPolicy.DefaultMediumScoreThreshold, defaultB.MediumScoreThreshold);
         }
         finally
         {
@@ -88,6 +135,8 @@ public sealed class SqliteIdentitySuggestionPolicyRepositoryTests
 
             ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(
                 () => repository.UpdateAsync(
+                    ModelA,
+                    ModelHashA,
                     autoAssignEnabled: false,
                     highScoreThreshold: 0.70,
                     highMarginThreshold: 0.10,
