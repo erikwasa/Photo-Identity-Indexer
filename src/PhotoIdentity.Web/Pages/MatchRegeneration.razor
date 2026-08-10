@@ -19,7 +19,7 @@
             <p class="eyebrow">Exact model revision</p>
             <h2 id="regeneration-model-heading">Suggestion model</h2>
         </div>
-        @if (SelectedModel is ReviewModelRevisionFilterResponse selected)
+        @if (SelectedModel is RegenerationModelResponse selected)
         {
             <span class="model-summary">@selected.ModelId · @HashPrefix(selected.ModelHash)</span>
         }
@@ -31,10 +31,10 @@
             <select id="regeneration-model"
                     @bind="SelectedModelIndex"
                     @bind:after="ChangeModelAsync"
-                    disabled="@(Loading || Options.ModelRevisions.Count == 0)">
-                @for (int index = 0; index < Options.ModelRevisions.Count; index++)
+                    disabled="@(Loading || Models.Count == 0)">
+                @for (int index = 0; index < Models.Count; index++)
                 {
-                    ReviewModelRevisionFilterResponse model = Options.ModelRevisions[index];
+                    RegenerationModelResponse model = Models[index];
                     <option value="@index">@ModelLabel(model)</option>
                 }
             </select>
@@ -66,8 +66,8 @@
 else if (SelectedModel is null)
 {
     <section class="empty-state">
-        <h2>No suggestion model is available</h2>
-        <p>Process faces with an embedding model before regenerating identity suggestions.</p>
+        <h2>No embedding model is available</h2>
+        <p>Process faces with an embedding model before generating identity suggestions.</p>
     </section>
 }
 else if (State is MatchRegenerationStateResponse state)
@@ -148,7 +148,7 @@ else if (State is MatchRegenerationStateResponse state)
     private const string Actor = "review-ui:match-regeneration";
     private static readonly TimeSpan PollDelay = TimeSpan.FromSeconds(1);
 
-    private ReviewFilterOptionsResponse Options { get; set; } = new([], []);
+    private IReadOnlyList<RegenerationModelResponse> Models { get; set; } = [];
     private string SelectedModelIndex { get; set; } = "";
     private MatchRegenerationStateResponse? State { get; set; }
     private bool Loading { get; set; }
@@ -157,13 +157,13 @@ else if (State is MatchRegenerationStateResponse state)
     private string? Message { get; set; }
     private CancellationTokenSource? PollCancellation { get; set; }
 
-    private ReviewModelRevisionFilterResponse? SelectedModel =>
+    private RegenerationModelResponse? SelectedModel =>
         int.TryParse(SelectedModelIndex, out int modelIndex) &&
-        modelIndex >= 0 && modelIndex < Options.ModelRevisions.Count
-            ? Options.ModelRevisions[modelIndex]
+        modelIndex >= 0 && modelIndex < Models.Count
+            ? Models[modelIndex]
             : null;
 
-    private string FacesUrl => SelectedModel is ReviewModelRevisionFilterResponse model
+    private string FacesUrl => SelectedModel is RegenerationModelResponse model
         ? $"/?state=unreviewed&sort=confidence-group&confidenceGroup=all&modelId={Uri.EscapeDataString(model.ModelId)}&modelHash={Uri.EscapeDataString(model.ModelHash)}"
         : "/";
 
@@ -172,9 +172,9 @@ else if (State is MatchRegenerationStateResponse state)
         Loading = true;
         try
         {
-            Options = await Http.GetFromJsonAsync<ReviewFilterOptionsResponse>("api/review/filters")
-                ?? new ReviewFilterOptionsResponse([], []);
-            SelectedModelIndex = Options.ModelRevisions.Count > 0 ? "0" : "";
+            Models = await Http.GetFromJsonAsync<RegenerationModelResponse[]>("api/review/match-regeneration/models")
+                ?? [];
+            SelectedModelIndex = Models.Count > 0 ? "0" : "";
             await LoadStateAsync();
         }
         catch (Exception exception)
@@ -198,7 +198,7 @@ else if (State is MatchRegenerationStateResponse state)
 
     private async Task LoadStateAsync()
     {
-        if (SelectedModel is not ReviewModelRevisionFilterResponse model)
+        if (SelectedModel is not RegenerationModelResponse model)
         {
             State = null;
             return;
@@ -227,7 +227,7 @@ else if (State is MatchRegenerationStateResponse state)
 
     private async Task StartAsync()
     {
-        if (Starting || SelectedModel is not ReviewModelRevisionFilterResponse model)
+        if (Starting || SelectedModel is not RegenerationModelResponse model)
         {
             return;
         }
@@ -310,7 +310,7 @@ else if (State is MatchRegenerationStateResponse state)
         return ValueTask.CompletedTask;
     }
 
-    private static string BuildApiUrl(ReviewModelRevisionFilterResponse model) =>
+    private static string BuildApiUrl(RegenerationModelResponse model) =>
         $"api/review/match-regeneration?modelId={Uri.EscapeDataString(model.ModelId)}&modelHash={Uri.EscapeDataString(model.ModelHash)}";
 
     private static string StatusHeading(MatchRegenerationStateResponse state) => state.Status switch
@@ -353,7 +353,7 @@ else if (State is MatchRegenerationStateResponse state)
             ? (state.IsActive ? 0 : 100)
             : Math.Clamp(100.0 * state.ProcessedTargetCount / state.TargetCount, 0, 100);
 
-    private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
+    private static string ModelLabel(RegenerationModelResponse model) =>
         $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
 
     private static string HashPrefix(string hash) => hash[..Math.Min(12, hash.Length)];
@@ -371,6 +371,11 @@ else if (State is MatchRegenerationStateResponse state)
                 ? $"The regeneration request failed with status {(int)response.StatusCode}."
                 : detail);
     }
+
+    private sealed record RegenerationModelResponse(
+        string ModelId,
+        string ModelHash,
+        int FaceCount);
 
     private sealed record MatchRegenerationStateResponse(
         Guid? RunId,
