@@ -9,9 +9,23 @@ public static class IdentityMatchRegenerationEndpoints
     public static IEndpointRouteBuilder MapIdentityMatchRegenerationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/review/match-regeneration");
+        group.MapGet("/models", ListModelsAsync);
         group.MapGet("", GetAsync);
         group.MapPost("", StartAsync);
         return endpoints;
+    }
+
+    private static async Task<IResult> ListModelsAsync(
+        SqliteIdentityMatchRegenerationModelRepository models,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<CatalogueIdentityMatchModelRevision> revisions = await models.ListAsync(cancellationToken);
+        return Results.Ok(revisions.Select(model => new
+        {
+            ModelId = model.ModelId.ToString(),
+            ModelHash = model.ModelHash.ToString(),
+            model.FaceCount,
+        }));
     }
 
     private static async Task<IResult> GetAsync(
