@@ -56,7 +56,7 @@ An **identity suggestion** is derived model-scoped evidence. It identifies:
 - score, rank and rank-1/rank-2 margin evidence; and
 - lifecycle state such as pending or superseded by later regeneration/review.
 
-The singleton **identity suggestion policy** is governed local configuration with a monotonic policy version. It persists:
+Each exact embedding-model revision has its own **identity suggestion policy** and monotonic policy-version stream. This keeps score calibration isolated when multiple model revisions coexist. Each exact-model policy persists:
 
 - whether automatic assignment is enabled;
 - the minimum High rank-1 score;
@@ -66,7 +66,7 @@ The singleton **identity suggestion policy** is governed local configuration wit
 
 High classification requires both the High score and High margin conditions. A missing or insufficient rank-2 margin cannot be High. Suggestions that meet the Medium score floor but not both High conditions are Medium; lower scores are Low.
 
-A suggestion is not canonical merely because it exists. Only an explicit human action or the enabled automatic-assignment policy may create canonical assignment history. Changing policy thresholds changes future classification and promotion decisions only; it does not rewrite historical assignments. Rejected face-person pairs remain excluded under the governed matching rules.
+A suggestion is not canonical merely because it exists. Only an explicit human action or the enabled exact-model automatic-assignment policy may create canonical assignment history. Changing one model revision's policy changes future classification and promotion decisions for that exact revision only; it does not rewrite historical assignments or alter another model revision's thresholds. Rejected face-person pairs remain excluded under the governed matching rules.
 
 The planned Unknown review state represents a real but currently unidentified person without creating a synthetic Person row. Unknown faces are not exemplars or person-collection evidence until later assigned.
 
@@ -116,7 +116,7 @@ Validated import matches known revision IDs, verifies checksums and provenance, 
 | People | Crops, thumbnails and review proxies |
 | Assignments and rejections | Embeddings |
 | Append-only assignment/review history | Suggestions and rankings |
-| Identity-suggestion policy and version | Confidence classification under the current policy |
+| Exact-model identity-suggestion policies and versions | Confidence classification under the current exact-model policy |
 | Processing-run/job state | Evaluation manifests and reports |
 | Bundle import/provenance records | Portable processing outputs |
 
