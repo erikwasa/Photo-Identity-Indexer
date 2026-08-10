@@ -38,27 +38,35 @@ Baseline and candidate embeddings coexist. Embeddings from different revisions m
 
 A **person** has a stable internal ID and human-maintained display name. People are shared across all model revisions.
 
-Canonical identity decisions are append-only actions. The current runtime records human assignment, rejection, undo and person-maintenance operations such as rename or merge. ADR-0006 adds an accepted future action source: WI-0043 may create an automatic canonical assignment when an explicitly enabled exact-model High-confidence policy qualifies.
+Canonical identity decisions are append-only actions. Human assignment, rejection, undo and person-maintenance operations such as rename or merge remain canonical review actions. An explicitly enabled identity-suggestion policy may also promote a qualifying High rank-1 suggestion into a canonical assignment through the same governed acceptance boundary.
 
-Automatic assignments must record the actor/source plus exact model, score and policy evidence. A later manual reassignment supersedes the earlier active assignment through history rather than erasing it.
+Automatic assignments record the automatic actor plus exact model revision, rank-1 score, rank-1/rank-2 margin, policy version and thresholds. A later manual reassignment supersedes the earlier active assignment through history rather than erasing it.
 
-Current state is derived from active history. An active assignment is canonical identity data regardless of whether its allowed actor was human or an enabled governed automatic policy. A rejection preserves negative evidence. Merged people resolve to a surviving canonical person without rewriting model provenance or historical assignment evidence.
+Current state is derived from active history. An active assignment is canonical identity data regardless of whether its allowed actor was human or the enabled governed automatic policy. A rejection preserves negative evidence. Merged people resolve to a surviving canonical person without rewriting model provenance or historical assignment evidence.
 
-## Exemplars and suggestions
+## Exemplars, suggestions and confidence policy
 
-An **exemplar** is an actively assigned face eligible to provide positive identity evidence for one exact embedding revision.
-
-Until WI-0043 is implemented, exemplars come from human assignments only. After WI-0043, qualifying active automatic assignments may also become exemplars in later regeneration runs. A regeneration uses a fixed exemplar snapshot so assignments created during that run do not feed back into its own scoring.
+An **exemplar** is an actively assigned face eligible to provide positive identity evidence for one exact embedding revision. Human and automatic assignments can both become exemplars, but an automatic assignment created after one regeneration's scoring phase cannot enter that same regeneration's exemplar snapshot. It becomes eligible on a later run.
 
 An **identity suggestion** is derived model-scoped evidence. It identifies:
 
 - the target face occurrence;
 - the suggested person;
 - the exact embedding model ID and hash;
-- score, margin and ranking evidence; and
+- score, rank and rank-1/rank-2 margin evidence; and
 - lifecycle state such as pending or superseded by later regeneration/review.
 
-A suggestion is not canonical merely because it exists. Only an explicit human action or the implemented/enabled automatic-assignment policy may create canonical assignment history. Rejected face-person pairs remain excluded under the governed matching rules.
+The singleton **identity suggestion policy** is governed local configuration with a monotonic policy version. It persists:
+
+- whether automatic assignment is enabled;
+- the minimum High rank-1 score;
+- the minimum High rank-1/rank-2 score gap;
+- the Medium score floor; and
+- who changed the policy and when.
+
+High classification requires both the High score and High margin conditions. A missing or insufficient rank-2 margin cannot be High. Suggestions that meet the Medium score floor but not both High conditions are Medium; lower scores are Low.
+
+A suggestion is not canonical merely because it exists. Only an explicit human action or the enabled automatic-assignment policy may create canonical assignment history. Changing policy thresholds changes future classification and promotion decisions only; it does not rewrite historical assignments. Rejected face-person pairs remain excluded under the governed matching rules.
 
 The planned Unknown review state represents a real but currently unidentified person without creating a synthetic Person row. Unknown faces are not exemplars or person-collection evidence until later assigned.
 
@@ -108,6 +116,7 @@ Validated import matches known revision IDs, verifies checksums and provenance, 
 | People | Crops, thumbnails and review proxies |
 | Assignments and rejections | Embeddings |
 | Append-only assignment/review history | Suggestions and rankings |
+| Identity-suggestion policy and version | Confidence classification under the current policy |
 | Processing-run/job state | Evaluation manifests and reports |
 | Bundle import/provenance records | Portable processing outputs |
 
@@ -117,6 +126,6 @@ Derived data is still biometric or private and must be protected accordingly.
 
 Every derived result must be traceable to the immutable source revision, exact model ID and hash, material preprocessing/alignment contract and processing run or import that produced it.
 
-Every automatic canonical assignment, once WI-0043 is implemented, must additionally retain the exact matching policy and evidence that promoted it from derived suggestion evidence into canonical history.
+Every automatic canonical assignment must additionally retain the exact model revision, score and rank-gap evidence plus the policy version and thresholds that promoted it from derived suggestion evidence into canonical history.
 
 See the [Glossary](../glossary.md), [Recognition and identity matching](identity-matching.md), [ADR-0006](../decisions/ADR-0006-canonical-auto-assignment.md), [ADR-0007](../decisions/ADR-0007-permanent-archive-bounded-storage.md) and [SQLite persistence operations](../operations/sqlite-persistence.md).
