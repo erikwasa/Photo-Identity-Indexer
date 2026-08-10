@@ -31,6 +31,8 @@ Before the permanent catalogue is declared ready to begin full-archive creation:
 - WI-0053 supports HEIC/HEIF and the RAW variants required by the real archive, with explicit state for any deliberate exception; and
 - the product version-1 success criteria are satisfied on the real Windows/OneDrive environment.
 
+As of 2026-08-11, WI-0042, WI-0041 and WI-0053 are all human-verified. The maintained archive currently has no known RAW variants, so WI-0053 is complete under its explicit conditional RAW rule: a newly observed RAW format must be surfaced and verified before that format can be processed, rather than being silently omitted. The remaining version-1 readiness step is the final real-environment product-success confirmation after the active WI-0054 archive-UI follow-up is accepted.
+
 ## Exit criteria
 
 The permanent ingestion and bounded-storage workflows are proven against the real archive, every intended archive area is explicitly covered or excluded, and every eligible asset has a completed, pending, unavailable, unsupported, permanently failed, deleted or explicitly excluded state. Required HEIC/HEIF and archive RAW variants are represented in that completeness accounting rather than being silently omitted.

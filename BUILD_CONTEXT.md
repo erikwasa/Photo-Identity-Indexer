@@ -10,21 +10,23 @@ The version-1 archive-readiness gates are:
 2. WI-0041 — stable permanent archive identity and incremental no-repeat ingestion after WI-0042 is accepted; and
 3. WI-0053 — HEIC/HEIF plus every RAW variant required by the real archive, with explicit unsupported state for any deliberate exception.
 
+All three archive-readiness work-item gates are now human-verified. The remaining version-1 step is to confirm the product success criteria on the real Windows/OneDrive environment after the active archive-UI follow-up is accepted.
+
 See `docs/product/success-criteria.md` and `docs/delivery/local-first-plan.md` for the durable product/delivery definition.
 
 ## Current milestones
 
-- **M12 — Full archive processing**: `in_progress`. It contains the version-1 archive-readiness work and later full-coverage completion.
+- **M12 — Full archive processing**: `in_progress`. The version-1 archive-readiness work-item gates are complete, while M12 continues through later full-coverage completion.
 - **M17 — Identity review automation**: `ready`, but it is not a version-1 gate.
 - **M09 — Azure VM pilot without identities**: `ready` and optional; Azure is not required for version 1.
 
 ## Active work
 
-**WI-0054 — Polish archive viewing, progress and availability** is `in_progress` on `agent/WI-0054-archive-ui-polish` after the maintainer completed real Windows/OneDrive verification of WI-0042 and WI-0041 on 2026-08-10.
+**WI-0054 — Polish archive viewing, progress and availability** is `in_review`. Its implementation was merged in PR #118 after the maintainer completed real Windows/OneDrive verification of WI-0042 and WI-0041 on 2026-08-10; human verification of the three follow-up cases remains the completion step.
 
 The focused follow-up fixes three post-acceptance usability inconsistencies: local verified pending revisions need a safe viewer fallback before their durable proxy exists; latest-run progress must be distinguished from cumulative archive analysis; and explicit original status/hydration observations must reconcile the persisted Archive availability state. The accepted WI-0042 managed-release and bounded-storage policy remains unchanged.
 
-**WI-0053 — Add HEIC and archive RAW image support** remains a version-1 archive-readiness gate. Current maintainer evidence says the full archive contains a few HEIC files and no known RAW files; representative private HEIC verification and the privacy-safe archive media inventory remain the required completion evidence.
+**WI-0053 — Add HEIC and archive RAW image support** is `completed` and human-verified as of 2026-08-11. HEIC/HEIF is supported through the production image contract and review-proxy path, privacy-safe archive inventory/reporting is in place, representative private HEIC files were successfully decoded with correct visual output and unchanged originals, and the current archive has no known RAW variants. A future newly observed RAW format reopens only that format-specific decoder/verification requirement rather than invalidating the current completion evidence.
 
 ## Selected permanent archive analysis profile
 
@@ -48,15 +50,17 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 
 ## Next concrete sequence
 
-1. Complete WI-0054 archive viewer/progress/availability polish and verify the three reported post-acceptance cases.
-2. Complete WI-0053 private real-archive HEIC verification and privacy-safe media inventory; if no RAW is present, record that fact rather than inventing RAW implementation evidence.
-3. Confirm the version-1 success criteria on the real Windows/OneDrive environment.
-4. Begin/continue the permanent catalogue from real archive coverage and expand it incrementally; do not create a replacement production database.
+1. Complete human verification of WI-0054 archive viewer/progress/availability polish for the three reported post-acceptance cases.
+2. Confirm the version-1 success criteria on the real Windows/OneDrive environment now that WI-0042, WI-0041 and WI-0053 are accepted.
+3. Begin/continue the permanent catalogue from real archive coverage and expand it incrementally; do not create a replacement production database.
 
 M17 review automation may be scheduled around this work, but it does not change the version-1 gate above.
 
 ## Completed gates
 
+- WI-0042 bounded archive hydration, source re-verification, durable review proxies and managed-release behavior are human-verified on the real Windows/OneDrive archive.
+- WI-0041 stable permanent archive identity, overlapping coverage, incremental rescan and no-repeat processing are human-verified on the real Windows/OneDrive archive.
+- WI-0053 HEIC/HEIF support, explicit RAW visibility policy and private HEIC verification are human-verified; no RAW variants are currently known in the maintained archive.
 - The representative local acceptance pilot passed restart/resume, Windows/Pixel review, deterministic evaluation, backup and restore.
 - SFace FP32 remains the current selected embedder pending any later CenterFace-population reaffirmation.
 - CenterFace confidence `0.5`, single-pass, passed the governed M16 detector gate and migration-safety pilot.
