@@ -22,6 +22,8 @@ The maintainer verified WI-0042 and WI-0041 on the real archive on 2026-08-10 an
 2. Archive `Progress` shows only the latest processing run (for example `71 / 71`) and is easily mistaken for cumulative archive analysis, which can already be higher (for example `126`).
 3. Explicit original hydration is observed live by `/original/status`, but Archive can continue showing the previous persisted `online-only` availability until another archive operation records the transition.
 
+After PR #118 was merged, a 20-image mixed local/online-only acceptance run exposed one more progress issue: the displayed latest analysis run repeatedly changed IDs and reset from `1 / 8` to `0 / 8` while first-time online-only sources were being verified. The analysis results remained durable, but first-time verification of unrelated assets was cancelling active run snapshots more broadly than necessary, and the UI was exposing those internal batch replacements as operator progress.
+
 ## In scope
 
 - Keep normal viewing free of implicit OneDrive hydration.
@@ -50,6 +52,8 @@ The maintainer verified WI-0042 and WI-0041 on the real archive on 2026-08-10 an
 - [x] A managed explicit hydration may still be released by later archive advancement under the existing WI-0042 ownership policy.
 - [x] Regression tests cover local viewer fallback, no implicit online-only hydration and availability reconciliation.
 - [x] Full build/test/docs verification remains green.
+- [ ] First-time verification of an unrelated asset does not cancel a nonterminal analysis batch; cancellation is reserved for a stale queued/running revision of the same asset.
+- [ ] Active Archive advancement shows stable archive-stage counters rather than the replaceable internal analysis-batch ID/progress.
 
 ## Implementation notes
 

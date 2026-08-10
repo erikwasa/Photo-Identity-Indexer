@@ -162,23 +162,44 @@ else
             <div class="notice warning">@Status.AnalysisMessage</div>
         }
 
-        @if (Status.LatestRun is ArchiveRunStatusResponse run)
+        @if (Status.Advancement?.IsRunning == true)
         {
             <div class="run-progress">
                 <div>
-                    <span>Latest run</span>
+                    <span>Analysis coverage</span>
+                    <strong>@AnalysisCount(Status.Totals.AnalysedImages) / @Status.Totals.CurrentImages</strong>
+                </div>
+                <div>
+                    <span>Awaiting source verification</span>
+                    <strong>@(Status.Totals.NeedsSourceVerificationImages + Status.Totals.UnverifiedSourceImages)</strong>
+                </div>
+                <div>
+                    <span>Pending analysis</span>
+                    <strong>@AnalysisCount(Status.Totals.PendingImages)</strong>
+                </div>
+                <div>
+                    <span>Downloading</span>
+                    <strong>@Status.Totals.DownloadingImages</strong>
+                </div>
+            </div>
+        }
+        else if (Status.LatestRun is ArchiveRunStatusResponse run)
+        {
+            <div class="run-progress">
+                <div>
+                    <span>Latest analysis batch</span>
                     <code>@run.RunId</code>
                 </div>
                 <div>
-                    <span>Status</span>
+                    <span>Batch status</span>
                     <strong>@run.Status</strong>
                 </div>
                 <div>
-                    <span>Latest run progress</span>
+                    <span>Batch jobs</span>
                     <strong>@(run.SucceededJobs + run.FailedJobs + run.CancelledJobs) / @run.TotalJobs</strong>
                 </div>
                 <div>
-                    <span>Queued in latest run</span>
+                    <span>Queued in batch</span>
                     <strong>@run.QueuedJobs</strong>
                 </div>
             </div>

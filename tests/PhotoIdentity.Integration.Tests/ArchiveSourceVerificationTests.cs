@@ -138,6 +138,8 @@ public sealed class ArchiveSourceVerificationTests
             ArchiveSourceVerificationAdvanceResult verified = await verification.AdvanceAsync(catalogueSource.Id);
             Assert.True(verified.VerificationCompleted);
             Assert.NotNull(verified.RevisionId);
+            Assert.Null(verified.PreviousRevisionId);
+            Assert.False(verified.RevisionChanged);
             Assert.True(verified.NewRevision);
             Assert.True(verified.ManagedHydrationTransferred);
 
