@@ -14,4 +14,6 @@ Archive summary counts are cumulative for the currently catalogued archive. The 
 
 Every explicit original status/view/hydrate/release operation that observes OneDrive availability records that observation in `archive_asset_availability`. Returning to Archive therefore reflects a recently observed transition such as `online-only -> downloading -> local -> online-only` without requiring `Advance archive` solely to refresh the persisted availability state.
 
+This reconciliation is observation-driven rather than a background filesystem poll: Archive reflects the most recent state Photo Identity has actually observed through sync, advancement or explicit original access.
+
 This does not change managed-hydration ownership. If Photo Identity explicitly hydrated an online-only original, later archive advancement may still release that managed original once durable processing no longer needs it, subject to the accepted WI-0042 storage policy.
