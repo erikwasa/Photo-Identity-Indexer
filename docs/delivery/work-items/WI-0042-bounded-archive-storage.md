@@ -125,24 +125,24 @@ Before finalizing the proxy protocol, the maintainer should visually review a re
 
 ## Acceptance criteria
 
-- [ ] One durable, versioned review proxy can be generated idempotently for an immutable source revision and stored outside the OneDrive source root.
-- [ ] Proxy metadata includes the exact derivative protocol/settings, encoded size and content hash, and proxy completion is tracked separately from detector/embedder analysis completion.
-- [ ] Normal collection/review browsing remains usable when the authoritative original is `OnlineOnly`, using the stored proxy without hydrating the original.
-- [ ] Full-resolution viewing is an explicit operator action and never occurs as an accidental side effect of a normal thumbnail/photo GET.
-- [ ] Photo Identity can explicitly hydrate an online-only authoritative original, wait for local availability, verify/process it, and later release it when and only when Photo Identity owns that hydration.
-- [ ] Files already local or user-pinned before Photo Identity touches them are never automatically released by Photo Identity.
-- [ ] Archive processing enforces configurable free-space reserve, managed-hydration byte budget and concurrency limits before requesting more source content.
-- [ ] A successfully analysed revision can return to `OnlineOnly` without losing its exact-profile completion, face data, embeddings, identities, review history or proxy.
-- [ ] A proxy-generation failure can be retried without rerunning already-successful detector/embedder inference.
-- [ ] Lightweight source observations can mark an online-only previously verified asset as needing source verification; content is hydrated and rehashed before a new immutable revision is decided.
-- [ ] Archive/UI status reports permanent proxy storage and managed hydrated-original storage separately from logical source size.
-- [ ] A bounded-processing integration test proves that cumulative logical source size may exceed the configured managed working-set budget while peak Photo-Identity-managed hydration remains within that budget.
-- [ ] The 100-image evaluation set is used to choose the permanent proxy profile from measured candidates, with privacy-safe aggregate evidence retained.
-- [ ] The chosen proxy profile is validated on the 560-image pilot set and an aggregate storage estimate is recorded before real full-archive verification.
-- [ ] WI-0041 real-archive verification resumes only after the bounded storage/hydration workflow is implemented and locally verified.
-- [ ] One operator action can synchronize and continue the selected archive coverage through source verification, bounded OneDrive waits, analysis, proxy generation and managed release until complete, paused or genuinely blocked.
-- [ ] Normal photo viewing opens the durable review proxy rather than the fixed thumbnail, while full-resolution original hydration/view/release remains explicit.
-- [ ] Archive item status keeps OneDrive availability, source verification and analysis completion logically independent so an `OnlineOnly` analysed revision remains visible as analysed.
+- [x] One durable, versioned review proxy can be generated idempotently for an immutable source revision and stored outside the OneDrive source root.
+- [x] Proxy metadata includes the exact derivative protocol/settings, encoded size and content hash, and proxy completion is tracked separately from detector/embedder analysis completion.
+- [x] Normal collection/review browsing remains usable when the authoritative original is `OnlineOnly`, using the stored proxy without hydrating the original.
+- [x] Full-resolution viewing is an explicit operator action and never occurs as an accidental side effect of a normal thumbnail/photo GET.
+- [x] Photo Identity can explicitly hydrate an online-only authoritative original, wait for local availability, verify/process it, and later release it when and only when Photo Identity owns that hydration.
+- [x] Files already local or user-pinned before Photo Identity touches them are never automatically released by Photo Identity.
+- [x] Archive processing enforces configurable free-space reserve, managed-hydration byte budget and concurrency limits before requesting more source content.
+- [x] A successfully analysed revision can return to `OnlineOnly` without losing its exact-profile completion, face data, embeddings, identities, review history or proxy.
+- [x] A proxy-generation failure can be retried without rerunning already-successful detector/embedder inference.
+- [x] Lightweight source observations can mark an online-only previously verified asset as needing source verification; content is hydrated and rehashed before a new immutable revision is decided.
+- [x] Archive/UI status reports permanent proxy storage and managed hydrated-original storage separately from logical source size.
+- [x] A bounded-processing integration test proves that cumulative logical source size may exceed the configured managed working-set budget while peak Photo-Identity-managed hydration remains within that budget.
+- [x] The 100-image evaluation set is used to choose the permanent proxy profile from measured candidates, with privacy-safe aggregate evidence retained.
+- [x] The chosen proxy profile is validated on the 560-image pilot set and an aggregate storage estimate is recorded before real full-archive verification.
+- [x] WI-0041 real-archive verification resumes only after the bounded storage/hydration workflow is implemented and locally verified.
+- [x] One operator action can synchronize and continue the selected archive coverage through source verification, bounded OneDrive waits, analysis, proxy generation and managed release until complete, paused or genuinely blocked.
+- [x] Normal photo viewing opens the durable review proxy rather than the fixed thumbnail, while full-resolution original hydration/view/release remains explicit.
+- [x] Archive item status keeps OneDrive availability, source verification and analysis completion logically independent so an `OnlineOnly` analysed revision remains visible as analysed.
 
 ## Planned implementation slices
 
@@ -171,3 +171,7 @@ Slice 5 adds durable server-owned one-click advancement that synchronizes first 
 ## Scope boundary
 
 This work does not migrate the disposable 560-image pilot catalogue into the permanent catalogue, upload proxies to OneDrive, replace originals with lossy content, or make proxies authoritative detector inputs. The two existing private image sets are measurement/acceptance corpora only; only privacy-safe aggregate results belong in repository evidence.
+
+## Verification completion
+
+The maintainer completed the required real Windows/OneDrive verification on 2026-08-10. Privacy-sensitive local details remain outside Git.

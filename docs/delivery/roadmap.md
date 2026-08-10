@@ -22,8 +22,8 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M13 | Ongoing local synchronisation | proposed |
 | M14 | Collection-ready API | completed |
 | M17 | Identity review automation | ready |
-| M18 | Operator application experience | proposed |
-| M19 | Photo metadata and semantic collections | proposed |
+| M18 | Operator application experience | ready |
+| M19 | Photo metadata and semantic collections | ready |
 
 Expected evolution:
 

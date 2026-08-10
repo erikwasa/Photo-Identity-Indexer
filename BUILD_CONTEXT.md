@@ -20,29 +20,11 @@ See `docs/product/success-criteria.md` and `docs/delivery/local-first-plan.md` f
 
 ## Active work
 
-**WI-0042 — Add bounded archive hydration and review proxies** remains `in_progress` pending the combined real Windows/OneDrive human acceptance gate.
+**WI-0054 — Polish archive viewing, progress and availability** is `in_progress` on `agent/WI-0054-archive-ui-polish` after the maintainer completed real Windows/OneDrive verification of WI-0042 and WI-0041 on 2026-08-10.
 
-Merged implementation includes deterministic versioned review proxies, proxy-backed collection browsing, explicit original hydrate/status/view/release, managed hydration ownership, free-space/byte/concurrency policy, LRU release of Photo-Identity-owned content, source-verification state and bounded first-time online-only source verification.
+The focused follow-up fixes three post-acceptance usability inconsistencies: local verified pending revisions need a safe viewer fallback before their durable proxy exists; latest-run progress must be distinguished from cumulative archive analysis; and explicit original status/hydration observations must reconcile the persisted Archive availability state. The accepted WI-0042 managed-release and bounded-storage policy remains unchanged.
 
-PR #111 merged the source re-verification slice. The first combined Windows/OneDrive acceptance attempt was paused on 2026-08-10 after the maintainer found three acceptance blockers: archive advancement required repeated per-transition clicks, Collections opened the fixed thumbnail instead of a proxy-first viewer and had no original controls, and analysed online-only revisions disappeared from the Archive analysed filter.
-
-WI-0042 Slice 5 is active on `agent/WI-0042-slice5-unattended-archive` / draft PR #115. It adds durable one-click unattended advancement, proxy-first viewing with explicit original controls and orthogonal archive status. The combined acceptance remains pending and is documented in `docs/operations/bounded-archive-acceptance.md` plus `docs/operations/bounded-archive-slice5.md`.
-
-**WI-0041 — Add incremental permanent archive ingestion** remains blocked on WI-0042 acceptance.
-
-**WI-0053 — Add HEIC and archive RAW image support** is now being implemented on `agent/WI-0053-heic-support` / draft PR #114. Current maintainer evidence says the full archive contains a few HEIC files and no known RAW files. Slice 1 therefore makes HEIC/HEIF a first-class permanent-archive input while deliberately leaving RAW variants unsupported until an actual archive RAW format and private representative sample exist.
-
-The Slice 1 implementation:
-
-- recognizes HEIC/HEIF in local and OneDrive-aware source scanning;
-- uses a bundled HEIF decoder behind the existing `IImageDecoder` boundary while preserving the established JPEG/PNG OpenCV path;
-- shares that decoded-pixel path with durable review-proxy rendering;
-- includes HEIC/HEIF in archive proxy measurement;
-- adds a privacy-safe `archive inventory` command that reports aggregate extension/media-family/support counts without opening image content;
-- keeps unverified RAW media visible as unsupported rather than silently accepting it; and
-- adds automated source-recognition, inventory/privacy, HEIC read-delegate and corrupt-container coverage.
-
-A valid real HEIC binary is intentionally not committed solely for test coverage. Do not mark WI-0053 complete from CI alone. Private real-archive HEIC verification must still confirm actual decode, orientation, downstream CenterFace/SFace processing, durable proxy behavior, color appearance and representative runtime/memory. RAW format-specific verification becomes active when the archive actually contains RAW media.
+**WI-0053 — Add HEIC and archive RAW image support** remains a version-1 archive-readiness gate. Current maintainer evidence says the full archive contains a few HEIC files and no known RAW files; representative private HEIC verification and the privacy-safe archive media inventory remain the required completion evidence.
 
 ## Selected permanent archive analysis profile
 
@@ -66,11 +48,10 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 
 ## Next concrete sequence
 
-1. Complete WI-0042 Slice 5 / PR #115 and resume the paused combined Windows/OneDrive acceptance.
-2. Complete the combined WI-0042 human acceptance and deliberately accept the production proxy/hydration policy values.
-3. Unblock and complete WI-0041 permanent incremental ingestion.
-4. Confirm the version-1 success criteria on the real Windows/OneDrive environment, including a privacy-safe archive media inventory; if no RAW is present, record that fact rather than inventing RAW implementation evidence.
-5. Begin the permanent catalogue from real archive coverage and expand it incrementally; do not create a replacement production database.
+1. Complete WI-0054 archive viewer/progress/availability polish and verify the three reported post-acceptance cases.
+2. Complete WI-0053 private real-archive HEIC verification and privacy-safe media inventory; if no RAW is present, record that fact rather than inventing RAW implementation evidence.
+3. Confirm the version-1 success criteria on the real Windows/OneDrive environment.
+4. Begin/continue the permanent catalogue from real archive coverage and expand it incrementally; do not create a replacement production database.
 
 M17 review automation may be scheduled around this work, but it does not change the version-1 gate above.
 
