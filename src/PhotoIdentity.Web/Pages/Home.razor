@@ -84,6 +84,19 @@
         </div>
 
         <div>
+            <label class="field-label" for="review-confidence-group">Confidence group</label>
+            <select id="review-confidence-group"
+                    @bind="ConfidenceGroup"
+                    @bind:after="ApplyFiltersAsync"
+                    disabled="@(Loading || SelectedModel is null)">
+                @foreach ((string Value, string Label) option in ConfidenceFilters)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </select>
+        </div>
+
+        <div>
             <label class="field-label" for="review-sort">Order</label>
             <select id="review-sort"
                     @bind="Sort"
@@ -305,6 +318,7 @@ else
     private const string CreatedSort = "created-desc";
     private const string DefaultSuggestionSort = "suggested-person";
     private const string AcceptSuggestionsAction = "accept-suggestions";
+    private const string AllConfidenceGroups = "all";
 
     private static readonly (string Value, string Label)[] StateFilters =
     [
@@ -314,10 +328,19 @@ else
         ("all", "All"),
     ];
 
+    private static readonly (string Value, string Label)[] ConfidenceFilters =
+    [
+        (AllConfidenceGroups, "All confidence groups"),
+        ("high", "High"),
+        ("medium", "Medium"),
+        ("low", "Low"),
+    ];
+
     private static readonly (string Value, string Label, bool RequiresModel)[] SortOptions =
     [
         (CreatedSort, "Newest first", false),
         ("suggested-person", "Suggested person", true),
+        ("confidence-group", "Confidence group (High first)", true),
         ("margin-desc", "Easiest suggestions", true),
         ("margin-asc", "Most ambiguous suggestions", true),
         ("score-desc", "Highest suggestion score", true),
@@ -339,6 +362,9 @@ else
     [Parameter, SupplyParameterFromQuery(Name = "modelHash")]
     public string? QueryModelHash { get; set; }
 
+    [Parameter, SupplyParameterFromQuery(Name = "confidenceGroup")]
+    public string? QueryConfidenceGroup { get; set; }
+
     [Parameter, SupplyParameterFromQuery(Name = "loaded")]
     public int QueryLoaded { get; set; }
 
@@ -350,6 +376,7 @@ else
     private BulkSuggestionPreviewResponse? SuggestionBulkPreview { get; set; }
     private string State { get; set; } = "unreviewed";
     private string Sort { get; set; } = DefaultSuggestionSort;
+    private string ConfidenceGroup { get; set; } = AllConfidenceGroups;
     private string SelectedRunIndex { get; set; } = "";
     private string SelectedModelIndex { get; set; } = "";
     private string NewPersonName { get; set; } = "";
@@ -481,6 +508,11 @@ else
         }
         SelectedModelIndex = modelIndex >= 0 ? modelIndex.ToString() : "";
 
+        ConfidenceGroup = SelectedModel is not null &&
+                          ConfidenceFilters.Any(option => option.Value == QueryConfidenceGroup)
+            ? QueryConfidenceGroup!
+            : AllConfidenceGroups;
+
         string fallbackSort = SelectedModel is null ? CreatedSort : DefaultSuggestionSort;
         Sort = SortOptions.Any(option => option.Value == QuerySort && (!option.RequiresModel || SelectedModel is not null))
             ? QuerySort!
@@ -563,6 +595,7 @@ else
         {
             query.Add($"modelId={Uri.EscapeDataString(model.ModelId)}");
             query.Add($"modelHash={Uri.EscapeDataString(model.ModelHash)}");
+            query.Add($"confidenceGroup={Uri.EscapeDataString(ConfidenceGroup)}");
             return $"api/review/suggestion-faces?{string.Join("&", query)}";
         }
 
@@ -593,6 +626,7 @@ else
         if (SelectedModel is null)
         {
             Sort = CreatedSort;
+            ConfidenceGroup = AllConfidenceGroups;
             if (BulkAction == AcceptSuggestionsAction)
             {
                 BulkAction = "assign";
@@ -676,6 +710,7 @@ else
         {
             query.Add($"modelId={Uri.EscapeDataString(model.ModelId)}");
             query.Add($"modelHash={Uri.EscapeDataString(model.ModelHash)}");
+            query.Add($"confidenceGroup={Uri.EscapeDataString(ConfidenceGroup)}");
         }
         if (includeLoaded)
         {
