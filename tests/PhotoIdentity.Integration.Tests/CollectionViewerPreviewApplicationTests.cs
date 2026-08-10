@@ -186,6 +186,7 @@ public sealed class CollectionViewerPreviewApplicationTests
 
     private static void DeleteTemporaryDirectory(string directory)
     {
+        SqliteConnection.ClearAllPools();
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);
