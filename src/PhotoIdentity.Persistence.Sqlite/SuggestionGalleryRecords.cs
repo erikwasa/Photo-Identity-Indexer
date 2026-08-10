@@ -32,7 +32,7 @@ public sealed record CatalogueSuggestionGalleryTopSuggestion(
     double? ScoreMargin,
     string Status,
     DateTimeOffset GeneratedAtUtc,
-    string ConfidenceGroup);
+    string ConfidenceGroup = "");
 
 public sealed record CatalogueSuggestionGalleryFace(
     FaceOccurrenceId Id,
