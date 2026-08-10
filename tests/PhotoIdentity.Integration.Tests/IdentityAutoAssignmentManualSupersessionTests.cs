@@ -50,7 +50,8 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
                 action => action.Kind == CatalogueReviewActionKinds.Assign);
             Assert.Equal(firstPerson.Id, automaticAction.PersonId);
             Assert.Equal(SqliteIdentityAutoAssignmentService.AutomaticActor, automaticAction.Actor);
-            Assert.Contains($"policy-version={enabledPolicy.Version}", automaticAction.Note, StringComparison.Ordinal);
+            string automaticNote = Assert.IsType<string>(automaticAction.Note);
+            Assert.Contains($"policy-version={enabledPolicy.Version}", automaticNote, StringComparison.Ordinal);
 
             IdentitySuggestionPolicy tightenedPolicy = await policies.UpdateAsync(
                 autoAssignEnabled: false,
