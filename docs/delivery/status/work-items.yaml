@@ -1175,14 +1175,28 @@ work_items:
 - id: WI-0053
   title: Add HEIC and archive RAW image support
   milestone: M12
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0053-heic-raw-support.md
+  started_at: 2026-08-09
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
+  last_updated_at: 2026-08-11
+  branch: agent/WI-0053-heic-support
   blockers:
   - WI-0006
   - WI-0012
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/114
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31337366611
+  - type: merge_commit
+    value: f0ae6bfef856b9055bb652b4d1290f353e4c62d1
+  - type: human_verification
+    value: Maintainer declared WI-0053 verified on 2026-08-11 after representative private HEIC files decoded successfully with correct visual output, expected orientation/dimensions, accepted runtime and peak working set, unchanged originals, governed archive analysis and durable proxy behavior; the maintained archive currently has no known RAW variants, so any future newly observed RAW format reopens format-specific verification rather than being silently skipped.
 - id: WI-0054
   title: Polish archive viewing, progress and availability
   milestone: M12
