@@ -1,0 +1,48 @@
+name: WI-0054 review transition
+
+on:
+  push:
+    branches:
+      - agent/WI-0054-archive-ui-polish
+    paths:
+      - .github/workflows/wi0054-review-transition.yml
+
+permissions:
+  contents: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/WI-0054-archive-ui-polish
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Record implemented acceptance criteria
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('docs/delivery/work-items/WI-0054-archive-ui-polish.md')
+          text = path.read_text(encoding='utf-8').replace('- [ ]', '- [x]')
+          path.write_text(text, encoding='utf-8')
+          PY
+      - name: Move WI-0054 to review
+        shell: bash
+        run: |
+          dotnet run --project tools/PhotoIdentity.Docs -- validate
+          dotnet run --project tools/PhotoIdentity.Docs -- review WI-0054
+          dotnet run --project tools/PhotoIdentity.Docs -- validate
+          dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+      - name: Commit transition and remove workflow
+        shell: bash
+        run: |
+          git rm .github/workflows/wi0054-review-transition.yml
+          git config user.name "Erik Wahlström"
+          git config user.email "54457926+erikwasa@users.noreply.github.com"
+          git add docs/delivery
+          git commit -m "Move WI-0054 to review"
+          git push origin HEAD:agent/WI-0054-archive-ui-polish
