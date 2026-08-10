@@ -74,9 +74,21 @@ A suggestion is not canonical merely because it exists. Only an explicit human a
 
 Normal regeneration targets Unreviewed faces. Unknown faces are excluded by default, but an explicit future-safe matcher scope may intentionally regenerate advisory suggestions for Unknown without changing their canonical Unknown state. Automatic assignment still excludes any face with active Unknown state, so such rematching requires a later human action to change canonical identity.
 
-## Processing runs and jobs
+## Processing and regeneration runs
 
 A **processing run** persists source scope, output location, selected model IDs and operational policy. Its jobs and attempts record pending, running, completed and failed work so an interrupted run can resume without changing models or duplicating canonical revision identity.
+
+A browser-triggered **identity match regeneration run** is separate operational state for derived suggestion work. It is scoped to one exact embedding-model revision and persists:
+
+- the exact model ID/hash and captured suggestion-policy version;
+- an identity-evidence version built from canonical review/suggestion decisions, person merges and exact-model embeddings;
+- the snapshotted eligible target face IDs and deterministic target order;
+- pending/running/completed/error target state; and
+- processed-target, suggested-target, suggestion, automatic-assignment and error counters plus timestamps/error text.
+
+Only one active browser regeneration is allowed for an exact model revision. A running target remains durable so it can be reclaimed after an application restart. If identity evidence changes before finalization, the run becomes stale and a new run must be started from the current catalogue state. A policy-version change also prevents finalization under different automatic-assignment thresholds.
+
+Regeneration run/target records are operational state rather than canonical identity evidence. The suggestions and rankings they generate remain derived and replaceable; any enabled automatic assignment is promoted separately through canonical review history only after the complete fixed-snapshot scoring phase.
 
 Run state is canonical operational data. Individual model outputs remain derived.
 
@@ -123,7 +135,7 @@ Validated import matches known revision IDs, verifies checksums and provenance, 
 | Assignments, Unknown decisions and false-detection rejections | Embeddings |
 | Append-only assignment/review history | Suggestions and rankings |
 | Exact-model identity-suggestion policies and versions | Confidence classification under the current exact-model policy |
-| Processing-run/job state | Evaluation manifests and reports |
+| Processing/regeneration run and job-control state | Evaluation manifests and reports |
 | Bundle import/provenance records | Portable processing outputs |
 
 Derived data is still biometric or private and must be protected accordingly.
