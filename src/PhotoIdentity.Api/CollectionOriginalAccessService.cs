@@ -33,6 +33,7 @@ public sealed class CollectionOriginalAccessService
 
     private readonly SqliteLocalBatchRepository _catalogue;
     private readonly SqliteArchiveHydrationRepository _hydrations;
+    private readonly SqliteArchiveAvailabilityRepository _availability;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly TimeProvider _timeProvider;
@@ -41,17 +42,20 @@ public sealed class CollectionOriginalAccessService
     public CollectionOriginalAccessService(
         SqliteLocalBatchRepository catalogue,
         SqliteArchiveHydrationRepository hydrations,
+        SqliteArchiveAvailabilityRepository availability,
         IOneDriveFilesOnDemandPlatform platform,
         ArchiveHydrationCapacityService capacity,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(catalogue);
         ArgumentNullException.ThrowIfNull(hydrations);
+        ArgumentNullException.ThrowIfNull(availability);
         ArgumentNullException.ThrowIfNull(platform);
         ArgumentNullException.ThrowIfNull(capacity);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _catalogue = catalogue;
         _hydrations = hydrations;
+        _availability = availability;
         _platform = platform;
         _capacity = capacity;
         _timeProvider = timeProvider;
@@ -71,7 +75,7 @@ public sealed class CollectionOriginalAccessService
         }
 
         ArchiveManagedHydrationRecord? ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
-        OneDriveFilesOnDemandState platformState = _platform.GetState(resolved.Path);
+        OneDriveFilesOnDemandState platformState = await ObserveStateAsync(resolved, cancellationToken);
 
         if (ownership is { IsActive: true, IsReleaseRequested: true } &&
             platformState.Availability == AssetAvailability.OnlineOnly)
@@ -141,7 +145,7 @@ public sealed class CollectionOriginalAccessService
                 "The original is currently being released. Wait for it to become online-only before hydrating it again.");
         }
 
-        OneDriveFilesOnDemandState state = _platform.GetState(resolved.Path);
+        OneDriveFilesOnDemandState state = await ObserveStateAsync(resolved, cancellationToken);
         if (state.Availability == AssetAvailability.OnlineOnly)
         {
             ArchiveHydrationAdmission admission = await _capacity.ExecuteHydrationAdmissionAsync(
@@ -201,7 +205,7 @@ public sealed class CollectionOriginalAccessService
                 "The original was not hydrated by Photo Identity and cannot be released automatically.");
         }
 
-        OneDriveFilesOnDemandState state = _platform.GetState(resolved.Path);
+        OneDriveFilesOnDemandState state = await ObserveStateAsync(resolved, cancellationToken);
         if (state.Availability == AssetAvailability.OnlineOnly)
         {
             await _hydrations.MarkReleasedAsync(
@@ -249,7 +253,7 @@ public sealed class CollectionOriginalAccessService
             return null;
         }
 
-        OneDriveFilesOnDemandState state = _platform.GetState(resolved.Path);
+        OneDriveFilesOnDemandState state = await ObserveStateAsync(resolved, cancellationToken);
         if (state.Availability != AssetAvailability.Local)
         {
             return null;
@@ -266,6 +270,19 @@ public sealed class CollectionOriginalAccessService
         }
 
         return verified;
+    }
+
+    private async Task<OneDriveFilesOnDemandState> ObserveStateAsync(
+        ResolvedOriginal resolved,
+        CancellationToken cancellationToken)
+    {
+        OneDriveFilesOnDemandState state = _platform.GetState(resolved.Path);
+        await _availability.RecordAsync(
+            resolved.Revision.AssetId,
+            state.Availability,
+            _timeProvider.GetUtcNow(),
+            cancellationToken);
+        return state;
     }
 
     private static async Task<VerifiedCollectionOriginal?> OpenVerifiedCoreAsync(

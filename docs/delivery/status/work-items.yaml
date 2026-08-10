@@ -1025,11 +1025,14 @@ work_items:
 - id: WI-0041
   title: Add incremental permanent archive ingestion
   milestone: M12
-  status: blocked
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0041-incremental-archive-ingestion.md
   started_at: 2026-08-08
-  last_updated_at: 2026-08-08
+  completed_at: 2026-08-10
+  verified_at: 2026-08-10
+  verified_by: human
+  last_updated_at: 2026-08-10
   branch: agent/WI-0041-incremental-archive-ingestion
   blockers:
   - WI-0013
@@ -1038,21 +1041,28 @@ work_items:
   - WI-0037
   - WI-0042
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: human_verification
+    value: Maintainer verified incremental permanent archive ingestion on the real Windows/OneDrive archive on 2026-08-10, including overlapping parent/child coverage, no-repeat processing and discovery of new files in previously included folders.
 - id: WI-0042
   title: Add bounded archive hydration and review proxies
   milestone: M12
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0042-bounded-archive-storage.md
   started_at: 2026-08-08
+  completed_at: 2026-08-10
+  verified_at: 2026-08-10
+  verified_by: human
   last_updated_at: 2026-08-10
   branch: agent/WI-0042-slice5-unattended-archive
   blockers:
   - WI-0014
   - WI-0025
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: human_verification
+    value: Maintainer verified the real Windows/OneDrive bounded archive workflow on 2026-08-10, including unattended advancement, proxy/original viewing, managed release, source re-verification and accepted storage-policy behavior.
 - id: WI-0043
   title: Add configurable confidence groups and canonical auto-assignment
   milestone: M17
@@ -1171,5 +1181,19 @@ work_items:
   blockers:
   - WI-0006
   - WI-0012
+  blocker_notes: []
+  evidence: []
+- id: WI-0054
+  title: Polish archive viewing, progress and availability
+  milestone: M12
+  status: in_review
+  owner: ai-agent
+  document: ../work-items/WI-0054-archive-ui-polish.md
+  started_at: 2026-08-10
+  last_updated_at: 2026-08-10
+  branch: agent/WI-0054-archive-ui-polish
+  blockers:
+  - WI-0041
+  - WI-0042
   blocker_notes: []
   evidence: []
