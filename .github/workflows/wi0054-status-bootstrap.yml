@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - name: Prepare canonical registry and verified work-item notes
+      - name: Prepare new work item and verified notes
         shell: bash
         run: |
           python - <<'PY'
@@ -30,24 +30,20 @@ jobs:
           registry = Path('docs/delivery/status/work-items.yaml')
           text = registry.read_text(encoding='utf-8')
           if '- id: WI-0054\n' not in text:
-              text = text.rstrip() + '''\n- id: WI-0054
-  title: Polish archive viewing, progress and availability
-  milestone: M12
-  status: ready
-  owner: unassigned
-  document: ../work-items/WI-0054-archive-ui-polish.md
-  blockers:
-  - WI-0041
-  - WI-0042
-  blocker_notes: []
-  evidence: []
-'''
-          marker = '- id: WI-0041\n'
-          start = text.index(marker)
-          end = text.index('\n- id: WI-0042\n', start)
-          block = text[start:end]
-          block = block.replace('  status: blocked\n', '  status: ready\n', 1)
-          text = text[:start] + block + text[end:]
+              addition = (
+                  "\n- id: WI-0054\n"
+                  "  title: Polish archive viewing, progress and availability\n"
+                  "  milestone: M12\n"
+                  "  status: proposed\n"
+                  "  owner: unassigned\n"
+                  "  document: ../work-items/WI-0054-archive-ui-polish.md\n"
+                  "  blockers:\n"
+                  "  - WI-0041\n"
+                  "  - WI-0042\n"
+                  "  blocker_notes: []\n"
+                  "  evidence: []\n"
+              )
+              text = text.rstrip() + addition
           registry.write_text(text, encoding='utf-8')
 
           for path in [
@@ -55,17 +51,30 @@ jobs:
               Path('docs/delivery/work-items/WI-0042-bounded-archive-storage.md'),
           ]:
               value = path.read_text(encoding='utf-8').replace('- [ ]', '- [x]')
-              note = '\n\n## Verification completion\n\nThe maintainer completed the required real Windows/OneDrive verification on 2026-08-10. Privacy-sensitive local details remain outside Git.\n'
+              note = "\n\n## Verification completion\n\nThe maintainer completed the required real Windows/OneDrive verification on 2026-08-10. Privacy-sensitive local details remain outside Git.\n"
               if '## Verification completion' not in value:
                   value = value.rstrip() + note
               path.write_text(value, encoding='utf-8')
           PY
-      - name: Complete WI-0042 and WI-0041, then start WI-0054
+      - name: Complete WI-0042
         shell: bash
         run: |
           dotnet run --project tools/PhotoIdentity.Docs -- validate
           dotnet run --project tools/PhotoIdentity.Docs -- review WI-0042
           dotnet run --project tools/PhotoIdentity.Docs -- complete WI-0042 --evidence-type human_verification --evidence-value "Maintainer verified the real Windows/OneDrive bounded archive workflow on 2026-08-10, including unattended advancement, proxy/original viewing, managed release, source re-verification and accepted storage-policy behavior." --verified-by human
+      - name: Unblock and complete WI-0041, then start WI-0054
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          registry = Path('docs/delivery/status/work-items.yaml')
+          text = registry.read_text(encoding='utf-8')
+          start = text.index('- id: WI-0041\n')
+          end = text.index('\n- id: WI-0042\n', start)
+          block = text[start:end].replace('  status: blocked\n', '  status: ready\n', 1)
+          registry.write_text(text[:start] + block + text[end:], encoding='utf-8')
+          PY
+          dotnet run --project tools/PhotoIdentity.Docs -- validate
           dotnet run --project tools/PhotoIdentity.Docs -- start WI-0041 --owner ai-agent --branch agent/WI-0041-incremental-archive-ingestion
           dotnet run --project tools/PhotoIdentity.Docs -- review WI-0041
           dotnet run --project tools/PhotoIdentity.Docs -- complete WI-0041 --evidence-type human_verification --evidence-value "Maintainer verified incremental permanent archive ingestion on the real Windows/OneDrive archive on 2026-08-10, including overlapping parent/child coverage, no-repeat processing and discovery of new files in previously included folders." --verified-by human
@@ -79,30 +88,34 @@ jobs:
           text = path.read_text(encoding='utf-8')
           start = text.index('## Active work\n')
           end = text.index('\n## Selected permanent archive analysis profile', start)
-          replacement = '''## Active work
-
-**WI-0054 — Polish archive viewing, progress and availability** is `in_progress` on `agent/WI-0054-archive-ui-polish` after the maintainer completed real Windows/OneDrive verification of WI-0042 and WI-0041 on 2026-08-10.
-
-The focused follow-up fixes three post-acceptance usability inconsistencies: local verified pending revisions need a safe viewer fallback before their durable proxy exists; latest-run progress must be distinguished from cumulative archive analysis; and explicit original status/hydration observations must reconcile the persisted Archive availability state. The accepted WI-0042 managed-release and bounded-storage policy remains unchanged.
-
-**WI-0053 — Add HEIC and archive RAW image support** remains a version-1 archive-readiness gate. Current maintainer evidence says the full archive contains a few HEIC files and no known RAW files; representative private HEIC verification and the privacy-safe archive media inventory remain the required completion evidence.
-'''
+          replacement = "\n".join([
+              '## Active work',
+              '',
+              '**WI-0054 — Polish archive viewing, progress and availability** is `in_progress` on `agent/WI-0054-archive-ui-polish` after the maintainer completed real Windows/OneDrive verification of WI-0042 and WI-0041 on 2026-08-10.',
+              '',
+              'The focused follow-up fixes three post-acceptance usability inconsistencies: local verified pending revisions need a safe viewer fallback before their durable proxy exists; latest-run progress must be distinguished from cumulative archive analysis; and explicit original status/hydration observations must reconcile the persisted Archive availability state. The accepted WI-0042 managed-release and bounded-storage policy remains unchanged.',
+              '',
+              '**WI-0053 — Add HEIC and archive RAW image support** remains a version-1 archive-readiness gate. Current maintainer evidence says the full archive contains a few HEIC files and no known RAW files; representative private HEIC verification and the privacy-safe archive media inventory remain the required completion evidence.',
+              '',
+          ])
           text = text[:start] + replacement + text[end:]
           next_start = text.index('## Next concrete sequence\n')
           next_end = text.index('\n## Completed gates', next_start)
-          next_replacement = '''## Next concrete sequence
-
-1. Complete WI-0054 archive viewer/progress/availability polish and verify the three reported post-acceptance cases.
-2. Complete WI-0053 private real-archive HEIC verification and privacy-safe media inventory; if no RAW is present, record that fact rather than inventing RAW implementation evidence.
-3. Confirm the version-1 success criteria on the real Windows/OneDrive environment.
-4. Begin/continue the permanent catalogue from real archive coverage and expand it incrementally; do not create a replacement production database.
-
-M17 review automation may be scheduled around this work, but it does not change the version-1 gate above.
-'''
+          next_replacement = "\n".join([
+              '## Next concrete sequence',
+              '',
+              '1. Complete WI-0054 archive viewer/progress/availability polish and verify the three reported post-acceptance cases.',
+              '2. Complete WI-0053 private real-archive HEIC verification and privacy-safe media inventory; if no RAW is present, record that fact rather than inventing RAW implementation evidence.',
+              '3. Confirm the version-1 success criteria on the real Windows/OneDrive environment.',
+              '4. Begin/continue the permanent catalogue from real archive coverage and expand it incrementally; do not create a replacement production database.',
+              '',
+              'M17 review automation may be scheduled around this work, but it does not change the version-1 gate above.',
+              '',
+          ])
           text = text[:next_start] + next_replacement + text[next_end:]
           path.write_text(text, encoding='utf-8')
           PY
-      - name: Validate and remove bootstrap workflow
+      - name: Validate and commit canonical status
         shell: bash
         run: |
           dotnet run --project tools/PhotoIdentity.Docs -- validate
