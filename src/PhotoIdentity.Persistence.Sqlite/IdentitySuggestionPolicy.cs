@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -84,9 +85,10 @@ public sealed record IdentitySuggestionPolicy(
 }
 
 /// <summary>
-/// Stores the singleton review policy used to classify exact-model rank-1 suggestions.
-/// Policy versions are monotonic so an automatic assignment can retain the exact decision
-/// evidence even after future threshold changes.
+/// Stores one versioned confidence policy per exact embedding-model revision. Thresholds
+/// are deliberately not shared across revisions because score calibration is model scoped.
+/// Policy versions are monotonic within each model revision so automatic assignments can
+/// retain the exact decision evidence after future threshold changes.
 /// </summary>
 public sealed class SqliteIdentitySuggestionPolicyRepository
 {
@@ -105,19 +107,28 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
     }
 
     public async Task<IdentitySuggestionPolicy> GetAsync(
+        ModelId modelId,
+        Sha256Digest modelHash,
         CancellationToken cancellationToken = default)
     {
         await _database.InitializeAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
         await EnsureSchemaAsync(connection, transaction, cancellationToken);
-        await EnsureDefaultAsync(connection, transaction, cancellationToken);
-        IdentitySuggestionPolicy policy = await ReadAsync(connection, transaction, cancellationToken);
+        await EnsureDefaultAsync(connection, transaction, modelId, modelHash, cancellationToken);
+        IdentitySuggestionPolicy policy = await ReadAsync(
+            connection,
+            transaction,
+            modelId,
+            modelHash,
+            cancellationToken);
         transaction.Commit();
         return policy;
     }
 
     public async Task<IdentitySuggestionPolicy> UpdateAsync(
+        ModelId modelId,
+        Sha256Digest modelHash,
         bool autoAssignEnabled,
         double highScoreThreshold,
         double highMarginThreshold,
@@ -130,8 +141,13 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
         await EnsureSchemaAsync(connection, transaction, cancellationToken);
-        await EnsureDefaultAsync(connection, transaction, cancellationToken);
-        IdentitySuggestionPolicy current = await ReadAsync(connection, transaction, cancellationToken);
+        await EnsureDefaultAsync(connection, transaction, modelId, modelHash, cancellationToken);
+        IdentitySuggestionPolicy current = await ReadAsync(
+            connection,
+            transaction,
+            modelId,
+            modelHash,
+            cancellationToken);
 
         IdentitySuggestionPolicy proposed = new(
             current.Version,
@@ -156,7 +172,7 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
         using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            UPDATE identity_suggestion_policy
+            UPDATE identity_suggestion_policies
             SET policy_version = $policy_version,
                 auto_assign_enabled = $auto_assign_enabled,
                 high_score_threshold = $high_score_threshold,
@@ -164,8 +180,10 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
                 medium_score_threshold = $medium_score_threshold,
                 updated_by = $updated_by,
                 updated_at_utc = $updated_at_utc
-            WHERE id = 1;
+            WHERE model_id = $model_id
+              AND model_hash = $model_hash;
             """;
+        AddModelParameters(command, modelId, modelHash);
         AddPolicyParameters(command, updated);
         await command.ExecuteNonQueryAsync(cancellationToken);
         transaction.Commit();
@@ -180,8 +198,9 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
         using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            CREATE TABLE IF NOT EXISTS identity_suggestion_policy (
-                id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+            CREATE TABLE IF NOT EXISTS identity_suggestion_policies (
+                model_id TEXT NOT NULL,
+                model_hash TEXT NOT NULL,
                 policy_version INTEGER NOT NULL CHECK (policy_version >= 1),
                 auto_assign_enabled INTEGER NOT NULL CHECK (auto_assign_enabled IN (0, 1)),
                 high_score_threshold REAL NOT NULL CHECK (high_score_threshold >= 0 AND high_score_threshold <= 1),
@@ -189,6 +208,7 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
                 medium_score_threshold REAL NOT NULL CHECK (medium_score_threshold >= 0 AND medium_score_threshold <= 1),
                 updated_by TEXT NOT NULL,
                 updated_at_utc TEXT NOT NULL,
+                PRIMARY KEY (model_id, model_hash),
                 CHECK (medium_score_threshold <= high_score_threshold)
             );
             """;
@@ -198,13 +218,16 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
     private async Task EnsureDefaultAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
+        ModelId modelId,
+        Sha256Digest modelHash,
         CancellationToken cancellationToken)
     {
         using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
-            INSERT OR IGNORE INTO identity_suggestion_policy (
-                id,
+            INSERT OR IGNORE INTO identity_suggestion_policies (
+                model_id,
+                model_hash,
                 policy_version,
                 auto_assign_enabled,
                 high_score_threshold,
@@ -213,7 +236,8 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
                 updated_by,
                 updated_at_utc)
             VALUES (
-                1,
+                $model_id,
+                $model_hash,
                 1,
                 0,
                 $high_score_threshold,
@@ -222,6 +246,7 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
                 $updated_by,
                 $updated_at_utc);
             """;
+        AddModelParameters(command, modelId, modelHash);
         command.Parameters.AddWithValue("$high_score_threshold", IdentitySuggestionPolicy.DefaultHighScoreThreshold);
         command.Parameters.AddWithValue("$high_margin_threshold", IdentitySuggestionPolicy.DefaultHighMarginThreshold);
         command.Parameters.AddWithValue("$medium_score_threshold", IdentitySuggestionPolicy.DefaultMediumScoreThreshold);
@@ -233,6 +258,8 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
     private static async Task<IdentitySuggestionPolicy> ReadAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
+        ModelId modelId,
+        Sha256Digest modelHash,
         CancellationToken cancellationToken)
     {
         using SqliteCommand command = connection.CreateCommand();
@@ -246,13 +273,15 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
                 medium_score_threshold,
                 updated_by,
                 updated_at_utc
-            FROM identity_suggestion_policy
-            WHERE id = 1;
+            FROM identity_suggestion_policies
+            WHERE model_id = $model_id
+              AND model_hash = $model_hash;
             """;
+        AddModelParameters(command, modelId, modelHash);
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
-            throw new InvalidOperationException("The identity suggestion policy could not be initialized.");
+            throw new InvalidOperationException("The exact-model identity suggestion policy could not be initialized.");
         }
 
         IdentitySuggestionPolicy policy = new(
@@ -265,6 +294,15 @@ public sealed class SqliteIdentitySuggestionPolicyRepository
             Parse(reader.GetString(6)));
         policy.Validate();
         return policy;
+    }
+
+    private static void AddModelParameters(
+        SqliteCommand command,
+        ModelId modelId,
+        Sha256Digest modelHash)
+    {
+        command.Parameters.AddWithValue("$model_id", modelId.ToString());
+        command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
     }
 
     private static void AddPolicyParameters(SqliteCommand command, IdentitySuggestionPolicy policy)
