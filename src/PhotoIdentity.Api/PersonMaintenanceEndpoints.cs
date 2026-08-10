@@ -11,6 +11,7 @@ public static class PersonMaintenanceEndpoints
         RouteGroupBuilder group = endpoints.MapGroup("/api/review/people");
         group.MapGet("/maintenance", GetPeopleAsync);
         group.MapGet("/maintenance/history", GetHistoryAsync);
+        group.MapPut("/{id}/favorite", SetFavoriteAsync);
         group.MapPost("/{id}/rename", RenameAsync);
         group.MapPost("/{id}/merge", MergeAsync);
         return endpoints;
@@ -18,11 +19,19 @@ public static class PersonMaintenanceEndpoints
 
     private static async Task<IResult> GetPeopleAsync(
         SqlitePersonMaintenanceRepository repository,
+        SqliteCatalogueDatabase database,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<CataloguePersonMaintenancePerson> people =
             await repository.GetPeopleAsync(cancellationToken);
-        return Results.Ok(people.Select(ToResponse).ToArray());
+        IReadOnlySet<PersonId> favorites = await new SqliteFavoritePeopleRepository(database)
+            .GetFavoritePersonIdsAsync(cancellationToken);
+        return Results.Ok(people
+            .OrderByDescending(person => favorites.Contains(person.Id))
+            .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(person => person.Id.ToString(), StringComparer.Ordinal)
+            .Select(person => ToResponse(person, favorites.Contains(person.Id)))
+            .ToArray());
     }
 
     private static async Task<IResult> GetHistoryAsync(
@@ -39,6 +48,33 @@ public static class PersonMaintenanceEndpoints
         catch (ArgumentException exception)
         {
             return BadRequest(exception.Message);
+        }
+    }
+
+    private static async Task<IResult> SetFavoriteAsync(
+        string id,
+        SetPersonFavoriteRequest request,
+        SqliteCatalogueDatabase database,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        if (!TryPersonId(id, out PersonId personId))
+        {
+            return BadRequest("The person identifier is invalid.");
+        }
+
+        try
+        {
+            await new SqliteFavoritePeopleRepository(database).SetFavoriteAsync(
+                personId,
+                request.IsFavorite,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
+            return Results.NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
         }
     }
 
@@ -83,6 +119,7 @@ public static class PersonMaintenanceEndpoints
         string id,
         MergePersonRequest request,
         SqlitePersonMaintenanceRepository repository,
+        SqliteCatalogueDatabase database,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -94,13 +131,19 @@ public static class PersonMaintenanceEndpoints
 
         try
         {
+            DateTimeOffset now = timeProvider.GetUtcNow();
             CataloguePersonMaintenanceAction action = await repository.MergeAsync(
                 sourcePersonId,
                 targetPersonId,
                 request.ConfirmIrreversible,
                 request.Actor,
-                timeProvider.GetUtcNow(),
+                now,
                 request.Note,
+                cancellationToken);
+            await new SqliteFavoritePeopleRepository(database).ConsolidateMergeAsync(
+                sourcePersonId,
+                targetPersonId,
+                now,
                 cancellationToken);
             return Results.Ok(ToResponse(action));
         }
@@ -119,11 +162,13 @@ public static class PersonMaintenanceEndpoints
     }
 
     private static PersonMaintenancePersonResponse ToResponse(
-        CataloguePersonMaintenancePerson person) => new(
+        CataloguePersonMaintenancePerson person,
+        bool isFavorite) => new(
             person.Id.ToString(),
             person.DisplayName,
             person.LabelCount,
-            person.SuggestionCount);
+            person.SuggestionCount,
+            isFavorite);
 
     private static PersonMaintenanceActionResponse ToResponse(
         CataloguePersonMaintenanceAction action) => new(

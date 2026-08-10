@@ -8,7 +8,7 @@
     <div>
         <p class="eyebrow">Canonical identity maintenance</p>
         <h1>Maintain people</h1>
-        <p>Rename a person with reversible audit history, or consolidate duplicates with an explicitly irreversible merge.</p>
+        <p>Rename a person with reversible audit history, consolidate duplicates with an explicitly irreversible merge, and keep frequently used people at the top of selectors.</p>
     </div>
 
     <form class="person-creator" @onsubmit="CreatePersonAsync" @onsubmit:preventDefault>
@@ -58,9 +58,16 @@ else
         @foreach (PersonMaintenancePersonResponse person in ActivePeople)
         {
             <article class="person-summary-card">
-                <strong>@person.DisplayName</strong>
+                <strong>@FavoriteLabel(person)</strong>
                 <span>@person.LabelCount label@(person.LabelCount == 1 ? "" : "s")</span>
                 <span>@person.SuggestionCount suggestion@(person.SuggestionCount == 1 ? "" : "s")</span>
+                <button type="button"
+                        class="button secondary"
+                        disabled="@Busy"
+                        aria-pressed="@person.IsFavorite"
+                        @onclick="() => ToggleFavoriteAsync(person)">
+                    @(person.IsFavorite ? "Remove favorite" : "Add favorite")
+                </button>
             </article>
         }
     </section>
@@ -75,7 +82,7 @@ else
             <select id="person-to-maintain" @bind="SelectedPersonId" @bind:after="SelectedPersonChanged">
                 @foreach (PersonMaintenancePersonResponse person in ActivePeople)
                 {
-                    <option value="@person.Id">@person.DisplayName</option>
+                    <option value="@person.Id">@FavoriteLabel(person)</option>
                 }
             </select>
 
@@ -102,13 +109,13 @@ else
         <section class="maintenance-card danger-zone">
             <p class="eyebrow">Irreversible operation</p>
             <h2>Merge duplicate people</h2>
-            <p>Labels, reviewed assignments and suggestions move to the surviving person. The source person is permanently retired.</p>
+            <p>Labels, reviewed assignments and suggestions move to the surviving person. If either person is a favorite, the survivor remains a favorite. The source person is permanently retired.</p>
 
             <label class="field-label" for="merge-target">Surviving person</label>
             <select id="merge-target" @bind="MergeTargetId" disabled="@(MergeTargets.Count == 0)">
                 @foreach (PersonMaintenancePersonResponse person in MergeTargets)
                 {
-                    <option value="@person.Id">@person.DisplayName</option>
+                    <option value="@person.Id">@FavoriteLabel(person)</option>
                 }
             </select>
 
@@ -249,6 +256,18 @@ else
         }
     }
 
+    private async Task ToggleFavoriteAsync(PersonMaintenancePersonResponse person)
+    {
+        bool favorite = !person.IsFavorite;
+        await ApplyAsync(
+            () => Http.PutAsJsonAsync(
+                $"api/review/people/{Uri.EscapeDataString(person.Id)}/favorite",
+                new SetPersonFavoriteRequest(favorite)),
+            favorite
+                ? $"Added {person.DisplayName} to favorites."
+                : $"Removed {person.DisplayName} from favorites.");
+    }
+
     private async Task RenameAsync()
     {
         string personId = SelectedPersonId;
@@ -298,6 +317,9 @@ else
             Busy = false;
         }
     }
+
+    private static string FavoriteLabel(PersonMaintenancePersonResponse person) =>
+        person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
 
     private static string ActionLabel(PersonMaintenanceActionResponse action) => action.Kind switch
     {

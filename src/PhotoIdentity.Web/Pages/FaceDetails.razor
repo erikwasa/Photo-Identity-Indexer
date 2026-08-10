@@ -100,7 +100,7 @@ else if (Details is not null)
             <div>
                 <p class="eyebrow">Explicit correction</p>
                 <h2>Assign any person</h2>
-                <p class="suggestion-guidance">Use this when the correct person is absent from the ranked suggestions. A successful queue assignment advances to the next face.</p>
+                <p class="suggestion-guidance">Use this when the correct person is absent from the ranked suggestions. Favorites stay at the top and can be changed here without affecting identity evidence. A successful queue assignment advances to the next face.</p>
             </div>
         </div>
 
@@ -113,9 +113,18 @@ else if (Details is not null)
                     <option value="">Choose a person</option>
                     @foreach (ReviewPersonResponse person in People)
                     {
-                        <option value="@person.Id">@person.DisplayName</option>
+                        <option value="@person.Id">@PersonLabel(person)</option>
                     }
                 </select>
+                @if (SelectedPerson is ReviewPersonResponse selectedPerson)
+                {
+                    <button class="button secondary full-width"
+                            disabled="@ActionBusy"
+                            aria-pressed="@selectedPerson.IsFavorite"
+                            @onclick="ToggleSelectedFavoriteAsync">
+                        @(selectedPerson.IsFavorite ? "Remove selected favorite" : "Add selected person to favorites")
+                    </button>
+                }
                 <button class="button primary full-width"
                         disabled="@(ActionBusy || string.IsNullOrWhiteSpace(SelectedPersonId))"
                         @onclick="AssignSelectedPersonAsync">
@@ -318,6 +327,8 @@ else if (Details is not null)
     private bool CanReviewSuggestions =>
         !ActionBusy && string.Equals(Details?.Face.State, "unreviewed", StringComparison.Ordinal);
     private string SafeReturnUrl => IsSafeRelativeUrl(ReturnUrl) ? ReturnUrl! : "/";
+    private ReviewPersonResponse? SelectedPerson =>
+        People.FirstOrDefault(person => person.Id == SelectedPersonId);
 
     private string StateLabel => Details?.Face.State switch
     {
@@ -379,6 +390,38 @@ else if (Details is not null)
         else if (People.All(person => person.Id != SelectedPersonId))
         {
             SelectedPersonId = "";
+        }
+    }
+
+    private async Task ToggleSelectedFavoriteAsync()
+    {
+        if (SelectedPerson is not ReviewPersonResponse person)
+        {
+            return;
+        }
+
+        bool favorite = !person.IsFavorite;
+        ActionBusy = true;
+        ActionError = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                $"api/review/people/{Uri.EscapeDataString(person.Id)}/favorite",
+                new SetPersonFavoriteRequest(favorite));
+            await RequireSuccessAsync(response);
+            People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+            Message = favorite
+                ? $"Added {person.DisplayName} to favorites."
+                : $"Removed {person.DisplayName} from favorites.";
+        }
+        catch (Exception exception)
+        {
+            ActionError = exception.Message;
+        }
+        finally
+        {
+            ActionBusy = false;
         }
     }
 
@@ -449,7 +492,8 @@ else if (Details is not null)
 
             People = People
                 .Append(created)
-                .OrderBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(person => person.IsFavorite)
+                .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(person => person.Id, StringComparer.Ordinal)
                 .ToArray();
             SelectedPersonId = created.Id;
@@ -597,6 +641,9 @@ else if (Details is not null)
 
     private static string HashPrefix(string hash) =>
         string.IsNullOrEmpty(hash) ? "—" : hash[..Math.Min(12, hash.Length)];
+
+    private static string PersonLabel(ReviewPersonResponse person) =>
+        person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
 
     private static async Task RequireSuccessAsync(HttpResponseMessage response)
     {

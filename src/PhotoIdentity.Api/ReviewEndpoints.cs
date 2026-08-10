@@ -180,10 +180,18 @@ public static class ReviewEndpoints
 
     private static async Task<IResult> GetPeopleAsync(
         SqliteReviewRepository repository,
+        SqliteCatalogueDatabase database,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<CatalogueReviewPerson> people = await repository.GetPeopleAsync(cancellationToken);
-        return Results.Ok(people.Select(ToResponse).ToArray());
+        IReadOnlySet<PersonId> favorites = await new SqliteFavoritePeopleRepository(database)
+            .GetFavoritePersonIdsAsync(cancellationToken);
+        return Results.Ok(people
+            .OrderByDescending(person => favorites.Contains(person.Id))
+            .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(person => person.Id.ToString(), StringComparer.Ordinal)
+            .Select(person => ToResponse(person, favorites.Contains(person.Id)))
+            .ToArray());
     }
 
     private static async Task<IResult> CreatePersonAsync(
@@ -314,8 +322,8 @@ public static class ReviewEndpoints
         face.Person is null ? null : ToResponse(face.Person),
         face.CreatedAtUtc);
 
-    private static ReviewPersonResponse ToResponse(CatalogueReviewPerson person) =>
-        new(person.Id.ToString(), person.DisplayName);
+    private static ReviewPersonResponse ToResponse(CatalogueReviewPerson person, bool isFavorite = false) =>
+        new(person.Id.ToString(), person.DisplayName, isFavorite);
 
     private static ReviewActionResponse ToResponse(CatalogueReviewAction action) => new(
         action.Id,

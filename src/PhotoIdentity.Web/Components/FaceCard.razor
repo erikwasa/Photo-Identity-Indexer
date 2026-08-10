@@ -59,7 +59,7 @@
             <option value="">Choose a person</option>
             @foreach (ReviewPersonResponse person in People)
             {
-                <option value="@person.Id">@person.DisplayName</option>
+                <option value="@person.Id">@PersonLabel(person)</option>
             }
         </select>
 
@@ -207,6 +207,9 @@
             Busy = false;
         }
     }
+
+    private static string PersonLabel(ReviewPersonResponse person) =>
+        person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
 
     private static string ConfidenceGroupLabel(string value) => value.ToLowerInvariant() switch
     {

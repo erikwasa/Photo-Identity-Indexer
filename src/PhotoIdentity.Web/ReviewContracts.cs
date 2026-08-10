@@ -1,6 +1,6 @@
 namespace PhotoIdentity.Web.Contracts;
 
-public sealed record ReviewPersonResponse(string Id, string DisplayName);
+public sealed record ReviewPersonResponse(string Id, string DisplayName, bool IsFavorite = false);
 
 public sealed record ReviewTopSuggestionResponse(
     long Id,
@@ -146,7 +146,8 @@ public sealed record PersonMaintenancePersonResponse(
     string Id,
     string DisplayName,
     int LabelCount,
-    int SuggestionCount);
+    int SuggestionCount,
+    bool IsFavorite = false);
 
 public sealed record PersonMaintenanceActionResponse(
     long Id,
@@ -191,6 +192,8 @@ public sealed record MergePersonRequest(
     bool ConfirmIrreversible,
     string Actor,
     string? Note = null);
+
+public sealed record SetPersonFavoriteRequest(bool IsFavorite);
 
 public sealed record AssignFaceRequest(string PersonId, string Actor, string? Note = null);
 
