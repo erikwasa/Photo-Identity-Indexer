@@ -24,25 +24,16 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           path = Path('tests/PhotoIdentity.Integration.Tests/CollectionViewerPreviewApplicationTests.cs')
-          text = path.read_text(encoding='utf-8')
-          old = '''    private static void DeleteTemporaryDirectory(string directory)
-    {
-        if (Directory.Exists(directory))
-        {
-            Directory.Delete(directory, recursive: true);
-        }
-    }'''
-          new = '''    private static void DeleteTemporaryDirectory(string directory)
-    {
-        SqliteConnection.ClearAllPools();
-        if (Directory.Exists(directory))
-        {
-            Directory.Delete(directory, recursive: true);
-        }
-    }'''
-          if old not in text:
-              raise SystemExit('Expected cleanup method was not found.')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          lines = path.read_text(encoding='utf-8').splitlines()
+          marker = '    private static void DeleteTemporaryDirectory(string directory)'
+          index = lines.index(marker)
+          brace = index + 1
+          if lines[brace].strip() != '{':
+              raise SystemExit('Unexpected cleanup method shape.')
+          insertion = '        SqliteConnection.ClearAllPools();'
+          if insertion not in lines[index:index + 5]:
+              lines.insert(brace + 1, insertion)
+          path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
           PY
       - name: Commit patch and remove workflow
         shell: bash
