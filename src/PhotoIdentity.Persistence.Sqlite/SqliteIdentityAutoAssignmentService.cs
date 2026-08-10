@@ -14,12 +14,12 @@ public sealed record IdentityAutoAssignmentOptions(
     public void Validate()
     {
         if (!double.IsFinite(HighConfidenceThreshold)
-            || HighConfidenceThreshold < -1
+            || HighConfidenceThreshold < 0
             || HighConfidenceThreshold > 1)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(HighConfidenceThreshold),
-                "The automatic-assignment confidence threshold must be between -1 and 1.");
+                "The automatic-assignment confidence threshold must be between 0 and 1.");
         }
     }
 }
