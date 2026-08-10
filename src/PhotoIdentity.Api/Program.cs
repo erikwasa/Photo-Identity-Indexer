@@ -51,6 +51,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationModelRepository>();
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationRepository>();
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationScorer>();
+        builder.Services.AddSingleton<SqliteIdentityMatchEvidenceVersionReader>();
         builder.Services.AddSingleton<SqliteIdentityAutoAssignmentService>();
         builder.Services.AddSingleton<SqlitePersonAuditRepository>();
         builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
