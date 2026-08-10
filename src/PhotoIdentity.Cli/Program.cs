@@ -178,6 +178,10 @@ public static class Program
 
               match regenerate --database PATH --embedder-id ID
                                --embedder-hash SHA256
+                               [--auto-assign on|off]
+                               [--high-score-threshold 0..1]
+                               [--high-margin-threshold 0..2]
+                               [--medium-score-threshold 0..1]
 
             Archive include configures one permanent local archive root and stores a
             recursively included folder relative to that root. Adding a parent folder
@@ -250,8 +254,14 @@ public static class Program
             modifying the source image.
 
             Match regenerate rebuilds ranked suggestions for one exact embedding model
-            revision. It uses current human-confirmed exemplars, preserves rejected
-            face-person exclusions and never creates or changes canonical labels.
+            revision from the current canonical exemplar snapshot while preserving rejected
+            face-person exclusions. Confidence groups come from the persisted versioned
+            suggestion policy. High requires both the configured rank-1 score threshold and
+            the configured minimum rank-1/rank-2 score gap. Automatic assignment is disabled
+            by default; when enabled, qualifying High rank-1 suggestions are promoted only
+            after all targets have been scored, so newly automatic exemplars cannot cascade
+            through the same regeneration. Optional policy arguments update the persisted
+            policy before the run.
             """);
     }
 }
