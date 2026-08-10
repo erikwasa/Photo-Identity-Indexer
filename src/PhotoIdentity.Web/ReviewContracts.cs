@@ -11,7 +11,24 @@ public sealed record ReviewTopSuggestionResponse(
     double Score,
     double? ScoreMargin,
     string Status,
-    DateTimeOffset GeneratedAtUtc);
+    DateTimeOffset GeneratedAtUtc,
+    string? ConfidenceGroup = null);
+
+public sealed record IdentitySuggestionPolicyResponse(
+    int Version,
+    bool AutoAssignEnabled,
+    double HighScoreThreshold,
+    double HighMarginThreshold,
+    double MediumScoreThreshold,
+    string UpdatedBy,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record UpdateIdentitySuggestionPolicyRequest(
+    bool AutoAssignEnabled,
+    double HighScoreThreshold,
+    double HighMarginThreshold,
+    double MediumScoreThreshold,
+    string Actor);
 
 public sealed record ReviewFaceResponse(
     string Id,
