@@ -74,6 +74,13 @@ jobs:
           end = text.index('\n- id: WI-0042\n', start)
           block = text[start:end].replace('  status: blocked\n', '  status: ready\n', 1)
           registry.write_text(text[:start] + block + text[end:], encoding='utf-8')
+
+          milestones = Path('docs/delivery/status/milestones.yaml')
+          milestone_text = milestones.read_text(encoding='utf-8')
+          m12_start = milestone_text.index('- id: M12\n')
+          m12_end = milestone_text.index('\n- id: M13\n', m12_start)
+          m12_block = milestone_text[m12_start:m12_end].replace('  status: blocked\n', '  status: ready\n', 1)
+          milestones.write_text(milestone_text[:m12_start] + m12_block + milestone_text[m12_end:], encoding='utf-8')
           PY
           dotnet run --project tools/PhotoIdentity.Docs -- validate
           dotnet run --project tools/PhotoIdentity.Docs -- start WI-0041 --owner ai-agent --branch agent/WI-0041-incremental-archive-ingestion
