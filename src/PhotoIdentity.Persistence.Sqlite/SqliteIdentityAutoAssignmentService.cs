@@ -4,36 +4,6 @@ using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
-public sealed record IdentityAutoAssignmentOptions(
-    bool Enabled = false,
-    double HighScoreThreshold = 0.70,
-    double HighMarginThreshold = 0.10)
-{
-    public const double DefaultHighScoreThreshold = 0.70;
-    public const double DefaultHighMarginThreshold = 0.10;
-
-    public void Validate()
-    {
-        if (!double.IsFinite(HighScoreThreshold)
-            || HighScoreThreshold < 0
-            || HighScoreThreshold > 1)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(HighScoreThreshold),
-                "The automatic-assignment High score threshold must be between 0 and 1.");
-        }
-
-        if (!double.IsFinite(HighMarginThreshold)
-            || HighMarginThreshold < 0
-            || HighMarginThreshold > 2)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(HighMarginThreshold),
-                "The automatic-assignment High rank-1/rank-2 margin threshold must be between 0 and 2.");
-        }
-    }
-}
-
 public sealed record IdentityAutoAssignmentSummary(
     int CandidateCount,
     int AssignedCount,
@@ -41,10 +11,11 @@ public sealed record IdentityAutoAssignmentSummary(
 
 /// <summary>
 /// Promotes qualifying persisted rank-1 matcher suggestions through the same canonical
-/// suggestion-acceptance boundary used by manual review. A High candidate must satisfy
-/// both the absolute rank-1 score threshold and the configured rank-1/rank-2 score gap.
-/// The service is deliberately separate from ranking so one regeneration always scores
-/// from one fixed exemplar snapshot.
+/// suggestion-acceptance boundary used by manual review. Eligibility comes from the
+/// persisted confidence-group policy: only High suggestions may be promoted, and High
+/// requires both the absolute rank-1 score and rank-1/rank-2 score gap. The service is
+/// deliberately separate from ranking so one regeneration always scores from one fixed
+/// exemplar snapshot.
 /// </summary>
 public sealed class SqliteIdentityAutoAssignmentService
 {
@@ -65,13 +36,24 @@ public sealed class SqliteIdentityAutoAssignmentService
     public async Task<IdentityAutoAssignmentSummary> ApplyAsync(
         ModelId modelId,
         Sha256Digest modelHash,
-        IdentityAutoAssignmentOptions options,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(options);
-        options.Validate();
+        IdentitySuggestionPolicy policy = await new SqliteIdentitySuggestionPolicyRepository(
+            _database,
+            _timeProvider).GetAsync(cancellationToken);
+        return await ApplyAsync(modelId, modelHash, policy, cancellationToken);
+    }
 
-        if (!options.Enabled)
+    public async Task<IdentityAutoAssignmentSummary> ApplyAsync(
+        ModelId modelId,
+        Sha256Digest modelHash,
+        IdentitySuggestionPolicy policy,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        policy.Validate();
+
+        if (!policy.AutoAssignEnabled)
         {
             return new IdentityAutoAssignmentSummary(0, 0, 0);
         }
@@ -80,8 +62,8 @@ public sealed class SqliteIdentityAutoAssignmentService
         IReadOnlyList<AutoAssignmentCandidate> candidates = await ReadCandidatesAsync(
             modelId,
             modelHash,
-            options.HighScoreThreshold,
-            options.HighMarginThreshold,
+            policy.HighScoreThreshold,
+            policy.HighMarginThreshold,
             cancellationToken);
 
         SqliteReviewSuggestionRepository reviewSuggestions = new(_database);
@@ -91,7 +73,7 @@ public sealed class SqliteIdentityAutoAssignmentService
         {
             DateTimeOffset decidedAtUtc = _timeProvider.GetUtcNow().ToUniversalTime();
             string note = FormattableString.Invariant(
-                $"Automatic assignment from persisted High rank-1 identity suggestion; model-id={modelId}; model-hash={modelHash}; score={candidate.Score:R}; rank1-rank2-margin={candidate.ScoreMargin:R}; high-score-threshold={options.HighScoreThreshold:R}; high-margin-threshold={options.HighMarginThreshold:R}.");
+                $"Automatic assignment from persisted High rank-1 identity suggestion; model-id={modelId}; model-hash={modelHash}; score={candidate.Score:R}; rank1-rank2-margin={candidate.ScoreMargin:R}; policy-version={policy.Version}; high-score-threshold={policy.HighScoreThreshold:R}; high-margin-threshold={policy.HighMarginThreshold:R}; medium-score-threshold={policy.MediumScoreThreshold:R}.");
 
             try
             {
