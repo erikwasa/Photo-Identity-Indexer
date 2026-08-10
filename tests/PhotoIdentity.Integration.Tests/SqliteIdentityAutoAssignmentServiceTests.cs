@@ -13,7 +13,7 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
     private static readonly Sha256Digest EmbeddingModelHash = new(new string('e', 64));
 
     [Fact]
-    public async Task Disabled_options_leave_high_confidence_suggestion_pending()
+    public async Task Default_persisted_policy_leaves_high_confidence_suggestion_pending()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -34,11 +34,8 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             SqliteIdentityMatcher matcher = new(database);
             _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
 
-            SqliteIdentityAutoAssignmentService service = new(database);
-            IdentityAutoAssignmentSummary summary = await service.ApplyAsync(
-                EmbeddingModelId,
-                EmbeddingModelHash,
-                new IdentityAutoAssignmentOptions());
+            IdentityAutoAssignmentSummary summary = await new SqliteIdentityAutoAssignmentService(database)
+                .ApplyAsync(EmbeddingModelId, EmbeddingModelHash);
 
             Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), summary);
             CatalogueReviewIdentitySuggestion suggestion = Assert.Single(
@@ -54,7 +51,7 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
     }
 
     [Fact]
-    public async Task Enabled_options_accept_score_and_margin_boundaries_with_provenance_and_are_idempotent()
+    public async Task Enabled_policy_accepts_score_and_margin_boundaries_with_provenance_and_is_idempotent()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -78,18 +75,20 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             SqliteIdentityAutoAssignmentService service = new(
                 database,
                 new FixedTimeProvider(now.AddMinutes(4)));
-            IdentityAutoAssignmentOptions options = new(
-                Enabled: true,
-                HighScoreThreshold: 1.0,
-                HighMarginThreshold: 1.0);
+            IdentitySuggestionPolicy policy = CreatePolicy(
+                enabled: true,
+                highScore: 1.0,
+                highMargin: 1.0,
+                mediumScore: 0.50,
+                version: 7);
             IdentityAutoAssignmentSummary first = await service.ApplyAsync(
                 EmbeddingModelId,
                 EmbeddingModelHash,
-                options);
+                policy);
             IdentityAutoAssignmentSummary second = await service.ApplyAsync(
                 EmbeddingModelId,
                 EmbeddingModelHash,
-                options);
+                policy);
 
             Assert.Equal(new IdentityAutoAssignmentSummary(1, 1, 0), first);
             Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), second);
@@ -106,6 +105,7 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             Assert.Contains($"model-hash={EmbeddingModelHash}", note, StringComparison.Ordinal);
             Assert.Contains("score=1", note, StringComparison.Ordinal);
             Assert.Contains("rank1-rank2-margin=1", note, StringComparison.Ordinal);
+            Assert.Contains("policy-version=7", note, StringComparison.Ordinal);
             Assert.Contains("high-score-threshold=1", note, StringComparison.Ordinal);
             Assert.Contains("high-margin-threshold=1", note, StringComparison.Ordinal);
 
@@ -148,14 +148,15 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             Assert.NotNull(rank1.ScoreMargin);
             Assert.True(rank1.ScoreMargin < 0.25);
 
+            IdentitySuggestionPolicy policy = CreatePolicy(
+                enabled: true,
+                highScore: 0.90,
+                highMargin: 0.25,
+                mediumScore: 0.50);
+            Assert.Equal(IdentitySuggestionConfidenceGroups.Medium, policy.Classify(rank1.Score, rank1.ScoreMargin));
+
             IdentityAutoAssignmentSummary summary = await new SqliteIdentityAutoAssignmentService(database)
-                .ApplyAsync(
-                    EmbeddingModelId,
-                    EmbeddingModelHash,
-                    new IdentityAutoAssignmentOptions(
-                        Enabled: true,
-                        HighScoreThreshold: 0.90,
-                        HighMarginThreshold: 0.25));
+                .ApplyAsync(EmbeddingModelId, EmbeddingModelHash, policy);
 
             Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), summary);
             Assert.Null(await ReadActiveAssignmentAsync(database, target));
@@ -190,14 +191,15 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             Assert.Equal(1.0, rank1.Score, 10);
             Assert.Null(rank1.ScoreMargin);
 
+            IdentitySuggestionPolicy policy = CreatePolicy(
+                enabled: true,
+                highScore: 0.90,
+                highMargin: 0,
+                mediumScore: 0.50);
+            Assert.Equal(IdentitySuggestionConfidenceGroups.Medium, policy.Classify(rank1.Score, rank1.ScoreMargin));
+
             IdentityAutoAssignmentSummary summary = await new SqliteIdentityAutoAssignmentService(database)
-                .ApplyAsync(
-                    EmbeddingModelId,
-                    EmbeddingModelHash,
-                    new IdentityAutoAssignmentOptions(
-                        Enabled: true,
-                        HighScoreThreshold: 0.90,
-                        HighMarginThreshold: 0));
+                .ApplyAsync(EmbeddingModelId, EmbeddingModelHash, policy);
 
             Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), summary);
             Assert.Null(await ReadActiveAssignmentAsync(database, target));
@@ -236,10 +238,7 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
                 .ApplyAsync(
                     EmbeddingModelId,
                     EmbeddingModelHash,
-                    new IdentityAutoAssignmentOptions(
-                        Enabled: true,
-                        HighScoreThreshold: 0.70,
-                        HighMarginThreshold: 0.10));
+                    CreatePolicy(enabled: true, highScore: 0.70, highMargin: 0.10, mediumScore: 0.50));
 
             Assert.Equal(new IdentityAutoAssignmentSummary(0, 0, 0), summary);
             ActiveAssignment assignment = Assert.IsType<ActiveAssignment>(
@@ -275,16 +274,17 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
 
             SqliteIdentityMatcher matcher = new(database);
             SqliteIdentityAutoAssignmentService service = new(database);
-            IdentityAutoAssignmentOptions options = new(
-                Enabled: true,
-                HighScoreThreshold: 0.50,
-                HighMarginThreshold: 0.50);
+            IdentitySuggestionPolicy policy = CreatePolicy(
+                enabled: true,
+                highScore: 0.50,
+                highMargin: 0.50,
+                mediumScore: 0.25);
 
             _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
             IdentityAutoAssignmentSummary firstPass = await service.ApplyAsync(
                 EmbeddingModelId,
                 EmbeddingModelHash,
-                options);
+                policy);
 
             Assert.Equal(new IdentityAutoAssignmentSummary(1, 1, 0), firstPass);
             Assert.NotNull(await ReadActiveAssignmentAsync(database, firstTarget));
@@ -293,13 +293,13 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             CatalogueReviewIdentitySuggestion secondTargetFirstSuggestion = Assert.Single(
                 await new SqliteReviewSuggestionRepository(database).GetSuggestionsAsync(secondTarget),
                 suggestion => suggestion.Rank == 1);
-            Assert.True(secondTargetFirstSuggestion.Score < options.HighScoreThreshold);
+            Assert.True(secondTargetFirstSuggestion.Score < policy.HighScoreThreshold);
 
             _ = await matcher.RegenerateAsync(EmbeddingModelId, EmbeddingModelHash);
             IdentityAutoAssignmentSummary secondPass = await service.ApplyAsync(
                 EmbeddingModelId,
                 EmbeddingModelHash,
-                options);
+                policy);
 
             Assert.Equal(new IdentityAutoAssignmentSummary(1, 1, 0), secondPass);
             ActiveAssignment propagated = Assert.IsType<ActiveAssignment>(
@@ -312,6 +312,21 @@ public sealed class SqliteIdentityAutoAssignmentServiceTests
             DeleteTemporaryDirectory(directory);
         }
     }
+
+    private static IdentitySuggestionPolicy CreatePolicy(
+        bool enabled,
+        double highScore,
+        double highMargin,
+        double mediumScore,
+        int version = 1) =>
+        new(
+            version,
+            enabled,
+            highScore,
+            highMargin,
+            mediumScore,
+            "test:policy",
+            new DateTimeOffset(2026, 8, 10, 11, 0, 0, TimeSpan.Zero));
 
     private static async Task<ActiveAssignment?> ReadActiveAssignmentAsync(
         SqliteCatalogueDatabase database,
