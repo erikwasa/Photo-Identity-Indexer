@@ -22,32 +22,30 @@ Model-specific embeddings and suggestions can coexist for the same canonical fac
 
 ## Canonical assignment actors
 
-The current implementation creates identity assignments through human review. ADR-0006 establishes the accepted next direction: WI-0043 will allow an explicitly enabled exact-model policy to create canonical High-confidence automatic assignments.
+Human review and the explicitly enabled identity-suggestion policy may create canonical assignments. Automatic assignments use actor `identity-matcher:auto` and the same canonical suggestion-acceptance path as a normal accepted suggestion.
 
-Both human and future automatic assignments use append-only canonical history. Automatic assignments must retain their model/score/policy provenance. Manual correction supersedes an earlier automatic assignment rather than deleting history.
+Both human and automatic assignments use append-only canonical history. Automatic assignments retain the exact model revision, rank-1 score, rank-1/rank-2 margin, policy version and thresholds that justified the decision. A later manual correction supersedes the earlier automatic assignment through a newer canonical review action rather than deleting history.
 
 ## Exemplars
 
-An active canonical assignment may provide positive exemplar evidence when the required exact-model embedding exists.
+An active canonical assignment may provide positive exemplar evidence when the required exact-model embedding exists, regardless of whether the active assignment was created by human review or the enabled automatic policy.
 
-Until WI-0043 is implemented, the active exemplars are human-assigned faces only. After WI-0043, eligible active automatic assignments may also become exemplars in later regeneration runs.
-
-Rejected faces, rejected face-person pairs, unreviewed faces and the planned Unknown review state are not positive exemplar evidence.
+Automatic assignments become eligible exemplars only on a later regeneration. Rejected faces, rejected face-person pairs, unreviewed faces and the planned Unknown review state are not positive exemplar evidence.
 
 ## Ranked suggestions and regeneration
 
-The current matcher regeneration:
+Matcher regeneration:
 
 1. loads embeddings for one exact model revision;
-2. builds person evidence from active eligible exemplars;
-3. scores eligible unreviewed targets;
-4. records ranked candidate people, score and margin evidence;
+2. builds person evidence from the current active eligible exemplars;
+3. scores eligible unreviewed targets from that fixed exemplar snapshot;
+4. records up to rank 1 and rank 2 candidate people, scores and rank-1/rank-2 margin evidence;
 5. preserves rejected face-person exclusions; and
-6. leaves canonical assignments/review history unchanged.
+6. after all targets have been scored, applies the current persisted policy to qualifying High rank-1 suggestions when automatic assignment is enabled.
 
-WI-0043 adds a policy phase after scoring. One regeneration must use a fixed exemplar snapshot: score all targets first, then apply qualifying High automatic assignments. Newly automatic exemplars cannot affect candidate scoring until a later regeneration.
+The fixed snapshot is deliberate: newly automatic assignments cannot affect candidate scoring until a later regeneration. A later manual reassignment becomes the latest active identity and therefore changes the exemplar identity used by later matching.
 
-WI-0045 later exposes regeneration through the normal browser workflow instead of requiring the CLI.
+The current CLI runs this workflow with `match regenerate`. WI-0045 later exposes regeneration through the normal browser workflow.
 
 ## Review states
 
@@ -62,9 +60,26 @@ A person-specific rejected suggestion remains durable negative evidence so the s
 
 ## Confidence groups and automatic policy
 
-WI-0043 introduces configurable High, Medium and Low score groups for one exact model policy. The High boundary is also the only group eligible for automatic canonical assignment when the toggle is enabled.
+The persisted identity-suggestion policy is versioned and editable from the local review application or through explicit CLI policy overrides. Automatic assignment is disabled by default.
 
-Threshold changes govern future decisions and do not retroactively undo assignments. Scores remain exact-model-specific.
+The default policy values are:
+
+- High score threshold: `0.70`;
+- High rank-1/rank-2 margin threshold: `0.10`; and
+- Medium score threshold: `0.50`.
+
+A rank-1 suggestion is **High** only when both conditions hold:
+
+1. rank-1 score is at or above the configured High score threshold; and
+2. the persisted rank-1/rank-2 score margin exists and is at or above the configured High margin threshold.
+
+A suggestion that meets the Medium score threshold but fails either High condition is **Medium**. Scores below the Medium threshold are **Low**. A missing rank-2 margin can therefore never qualify as High.
+
+Only High rank-1 suggestions are eligible for automatic canonical assignment, and only when the policy toggle is enabled. Threshold changes govern future classification and automatic decisions; they do not retroactively undo or rewrite historical assignments.
+
+The unified Faces queue shows the computed group and can filter High, Medium or Low suggestions and order the queue by confidence group with High first. Classification and automatic assignment use the same persisted policy so UI grouping cannot drift from the automation gate.
+
+Before automatic assignment is enabled for routine archive use, the score and margin thresholds must be tuned against a private reviewed sample as required by WI-0043.
 
 ## Model comparison boundary
 
@@ -82,7 +97,8 @@ The completed FP32-versus-INT8 comparison used the earlier YuNet detector popula
 
 - Canonical people and identity/review history survive model replacement.
 - Derived embeddings and suggestions are exact-model scoped and regenerable.
-- Automatic assignments, once implemented, are canonical decisions with explicit provenance rather than hidden derived labels.
+- Automatic assignments are canonical decisions with explicit model and policy provenance rather than hidden derived labels.
+- High confidence requires both an absolute rank-1 score gate and a rank-1/rank-2 gap gate.
 - Regeneration uses a fixed exemplar snapshot before automatic assignments are applied.
 - Manual correction supersedes an automatic assignment and changes later exemplar evidence.
 - Rejected face-person pairs remain excluded.
