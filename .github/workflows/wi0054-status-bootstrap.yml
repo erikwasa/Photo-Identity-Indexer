@@ -1,3 +1,4 @@
+# Temporary bootstrap for canonical delivery status; self-removes on success.
 name: WI-0054 status bootstrap
 
 on:
