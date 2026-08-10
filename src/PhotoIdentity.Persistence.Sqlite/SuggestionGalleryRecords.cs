@@ -7,10 +7,19 @@ public static class CatalogueSuggestionGallerySorts
 {
     public const string CreatedDescending = "created-desc";
     public const string SuggestedPerson = "suggested-person";
+    public const string ConfidenceGroup = "confidence-group";
     public const string ScoreMarginDescending = "margin-desc";
     public const string ScoreMarginAscending = "margin-asc";
     public const string ScoreDescending = "score-desc";
     public const string NoSuggestionFirst = "no-suggestion-first";
+}
+
+public static class CatalogueSuggestionConfidenceFilters
+{
+    public const string All = "all";
+    public const string High = IdentitySuggestionConfidenceGroups.High;
+    public const string Medium = IdentitySuggestionConfidenceGroups.Medium;
+    public const string Low = IdentitySuggestionConfidenceGroups.Low;
 }
 
 public sealed record CatalogueSuggestionGalleryTopSuggestion(
@@ -22,7 +31,8 @@ public sealed record CatalogueSuggestionGalleryTopSuggestion(
     double Score,
     double? ScoreMargin,
     string Status,
-    DateTimeOffset GeneratedAtUtc);
+    DateTimeOffset GeneratedAtUtc,
+    string ConfidenceGroup);
 
 public sealed record CatalogueSuggestionGalleryFace(
     FaceOccurrenceId Id,
