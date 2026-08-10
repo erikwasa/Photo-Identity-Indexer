@@ -46,7 +46,7 @@ Automated persistence/query tests plus browser verification on desktop and narro
 ## Completion notes
 
 - Files changed: favorite-person persistence, review/maintenance API contracts and endpoints, people maintenance controls, Face Details favorite control, face-card assignment labels, collection ordering, and integration coverage.
-- Trade-offs: while M17 work-item branches remain isolated, `person_favorites` is created idempotently by `SqliteFavoritePeopleRepository` rather than claiming schema migration version 11, which is already introduced independently by WI-0043. During M17 integration this table must be promoted into the next numbered central SQLite migration. Favorite consolidation currently follows the canonical person merge in the endpoint; integration should fold that small preference consolidation into the canonical merge transaction when the shared migration is introduced.
+- Integration resolved: after WI-0043 merged, WI-0047 schema version 12 promoted `person_favorites` into the central SQLite migration lifecycle and moved favorite OR-consolidation into the canonical person-merge transaction. The temporary branch-isolation trade-off is therefore closed before M17 review.
 - Merge policy: the surviving person is favorite when either the source or target person was favorite; rename never changes favorite state.
 - Deferred work: desktop and narrow/mobile browser verification is intentionally deferred to the milestone-wide M17 review. No matcher prior or scoring behavior is introduced.
-- Commands run: GitHub Actions Release build/test/documentation/review/Windows verification workflow for PR #117; exact successful run is recorded in delivery evidence after the final branch head completes.
+- Verification: PR #117 merged to `m17`; post-conflict GitHub Actions run `31435193480` passed Release build, full tests, documentation checks, review-app smoke, and Windows mixed-media verification.
