@@ -33,6 +33,8 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
 
             SqliteIdentitySuggestionPolicyRepository policies = new(database);
             IdentitySuggestionPolicy enabledPolicy = await policies.UpdateAsync(
+                EmbeddingModelId,
+                EmbeddingModelHash,
                 autoAssignEnabled: true,
                 highScoreThreshold: 0.75,
                 highMarginThreshold: 0.10,
@@ -54,6 +56,8 @@ public sealed class IdentityAutoAssignmentManualSupersessionTests
             Assert.Contains($"policy-version={enabledPolicy.Version}", automaticNote, StringComparison.Ordinal);
 
             IdentitySuggestionPolicy tightenedPolicy = await policies.UpdateAsync(
+                EmbeddingModelId,
+                EmbeddingModelHash,
                 autoAssignEnabled: false,
                 highScoreThreshold: 0.95,
                 highMarginThreshold: 0.50,
