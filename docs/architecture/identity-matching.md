@@ -18,11 +18,11 @@ The generic historical batch defaults still reference YuNet and must not be conf
 
 A matching or suggestion operation identifies the embedder by both model ID and exact SHA-256 hash. Embeddings, scores and thresholds from different revisions are not interchangeable.
 
-Model-specific embeddings and suggestions can coexist for the same canonical face occurrence without changing people or review history.
+Model-specific embeddings and suggestions can coexist for the same canonical face occurrence without changing people or review history. Each exact embedding-model revision has an independent confidence policy and policy-version stream.
 
 ## Canonical assignment actors
 
-Human review and the explicitly enabled identity-suggestion policy may create canonical assignments. Automatic assignments use actor `identity-matcher:auto` and the same canonical suggestion-acceptance path as a normal accepted suggestion.
+Human review and the explicitly enabled exact-model identity-suggestion policy may create canonical assignments. Automatic assignments use actor `identity-matcher:auto` and the same canonical suggestion-acceptance path as a normal accepted suggestion.
 
 Both human and automatic assignments use append-only canonical history. Automatic assignments retain the exact model revision, rank-1 score, rank-1/rank-2 margin, policy version and thresholds that justified the decision. A later manual correction supersedes the earlier automatic assignment through a newer canonical review action rather than deleting history.
 
@@ -41,7 +41,7 @@ Matcher regeneration:
 3. scores eligible unreviewed targets from that fixed exemplar snapshot;
 4. records up to rank 1 and rank 2 candidate people, scores and rank-1/rank-2 margin evidence;
 5. preserves rejected face-person exclusions; and
-6. after all targets have been scored, applies the current persisted policy to qualifying High rank-1 suggestions when automatic assignment is enabled.
+6. after all targets have been scored, applies that exact model revision's current persisted policy to qualifying High rank-1 suggestions when automatic assignment is enabled.
 
 The fixed snapshot is deliberate: newly automatic assignments cannot affect candidate scoring until a later regeneration. A later manual reassignment becomes the latest active identity and therefore changes the exemplar identity used by later matching.
 
@@ -60,9 +60,9 @@ A person-specific rejected suggestion remains durable negative evidence so the s
 
 ## Confidence groups and automatic policy
 
-The persisted identity-suggestion policy is versioned and editable from the local review application or through explicit CLI policy overrides. Automatic assignment is disabled by default.
+Each exact embedding-model revision has a persisted versioned identity-suggestion policy editable from the local review application or through explicit CLI policy overrides. A new exact-model policy starts with automatic assignment disabled.
 
-The default policy values are:
+The default values for a newly initialized exact-model policy are:
 
 - High score threshold: `0.70`;
 - High rank-1/rank-2 margin threshold: `0.10`; and
@@ -75,9 +75,9 @@ A rank-1 suggestion is **High** only when both conditions hold:
 
 A suggestion that meets the Medium score threshold but fails either High condition is **Medium**. Scores below the Medium threshold are **Low**. A missing rank-2 margin can therefore never qualify as High.
 
-Only High rank-1 suggestions are eligible for automatic canonical assignment, and only when the policy toggle is enabled. Threshold changes govern future classification and automatic decisions; they do not retroactively undo or rewrite historical assignments.
+Only High rank-1 suggestions are eligible for automatic canonical assignment, and only when that exact model revision's policy toggle is enabled. Threshold changes govern future classification and automatic decisions for that revision only; they do not retroactively undo historical assignments or alter another model revision's policy.
 
-The unified Faces queue shows the computed group and can filter High, Medium or Low suggestions and order the queue by confidence group with High first. Classification and automatic assignment use the same persisted policy so UI grouping cannot drift from the automation gate.
+The unified Faces queue shows the computed group and can filter High, Medium or Low suggestions and order the queue by confidence group with High first. Classification and automatic assignment load the same exact-model persisted policy so UI grouping cannot drift from the automation gate.
 
 Before automatic assignment is enabled for routine archive use, the score and margin thresholds must be tuned against a private reviewed sample as required by WI-0043.
 
@@ -97,12 +97,13 @@ The completed FP32-versus-INT8 comparison used the earlier YuNet detector popula
 
 - Canonical people and identity/review history survive model replacement.
 - Derived embeddings and suggestions are exact-model scoped and regenerable.
+- Each exact model revision has an independent confidence-policy version stream.
 - Automatic assignments are canonical decisions with explicit model and policy provenance rather than hidden derived labels.
 - High confidence requires both an absolute rank-1 score gate and a rank-1/rank-2 gap gate.
 - Regeneration uses a fixed exemplar snapshot before automatic assignments are applied.
 - Manual correction supersedes an automatic assignment and changes later exemplar evidence.
 - Rejected face-person pairs remain excluded.
 - Unknown and rejected faces do not become exemplars.
-- Scores from different model revisions are never silently mixed.
+- Scores and thresholds from different model revisions are never silently mixed.
 
 See [ADR-0002](../decisions/ADR-0002-model-independent-labels.md), [ADR-0006](../decisions/ADR-0006-canonical-auto-assignment.md), [Canonical data model](data-model.md) and [Model governance](../models/model-governance.md).
