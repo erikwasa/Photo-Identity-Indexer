@@ -26,35 +26,41 @@ Human review and the explicitly enabled exact-model identity-suggestion policy m
 
 Both human and automatic assignments use append-only canonical history. Automatic assignments retain the exact model revision, rank-1 score, rank-1/rank-2 margin, policy version and thresholds that justified the decision. A later manual correction supersedes the earlier automatic assignment through a newer canonical review action rather than deleting history.
 
+Unknown and false-detection decisions are also append-only canonical review actions, but they do not create person identity evidence. The latest unreversed face decision determines current review state. A later manual assignment may therefore supersede Unknown without deleting the earlier Unknown action; undoing that later assignment reveals the still-active earlier Unknown decision again.
+
 ## Exemplars
 
 An active canonical assignment may provide positive exemplar evidence when the required exact-model embedding exists, regardless of whether the active assignment was created by human review or the enabled automatic policy.
 
-Automatic assignments become eligible exemplars only on a later regeneration. Rejected faces, rejected face-person pairs, unreviewed faces and the planned Unknown review state are not positive exemplar evidence.
+Automatic assignments become eligible exemplars only on a later regeneration. Rejected faces, rejected face-person pairs, unreviewed faces and Unknown faces are not positive exemplar evidence. An older assignment hidden by a newer Unknown decision is not an exemplar while Unknown is the active state.
 
 ## Ranked suggestions and regeneration
 
-Matcher regeneration:
+Normal matcher regeneration:
 
 1. loads embeddings for one exact model revision;
 2. builds person evidence from the current active eligible exemplars;
-3. scores eligible unreviewed targets from that fixed exemplar snapshot;
+3. scores eligible **unreviewed** targets from that fixed exemplar snapshot;
 4. records up to rank 1 and rank 2 candidate people, scores and rank-1/rank-2 margin evidence;
 5. preserves rejected face-person exclusions; and
 6. after all targets have been scored, applies that exact model revision's current persisted policy to qualifying High rank-1 suggestions when automatic assignment is enabled.
 
+Unknown faces are excluded from normal regeneration targets. The persistence boundary also exposes an explicit `UnreviewedAndUnknown` target scope for future intentional rematching. That opt-in may regenerate advisory rankings for Unknown faces, but it does not change their stored Unknown review state. Automatic assignment separately requires no active assignment, Unknown or rejection, so an intentionally rematched Unknown face remains human-controlled until a manual review action supersedes or undoes Unknown.
+
 The fixed snapshot is deliberate: newly automatic assignments cannot affect candidate scoring until a later regeneration. A later manual reassignment becomes the latest active identity and therefore changes the exemplar identity used by later matching.
 
-The current CLI runs this workflow with `match regenerate`. WI-0045 later exposes regeneration through the normal browser workflow.
+The current CLI runs normal unreviewed-only regeneration with `match regenerate`. WI-0045 later exposes regeneration through the normal browser workflow. The explicit Unknown-inclusive scope is an internal future-safe boundary rather than an automatic rematch workflow.
 
 ## Review states
 
-Current states are Unreviewed, Assigned and Rejected. WI-0047 adds Unknown as a distinct real-person-but-unidentified state.
+Current states are Unreviewed, Assigned, Unknown and Rejected.
 
 - **Assigned** provides canonical person evidence.
-- **Unreviewed** is undecided and may have exact-model suggestions.
-- **Unknown** (planned) is a real face whose person is not known; it is not a person identity, exemplar or person-collection match.
+- **Unreviewed** is undecided and may participate in normal exact-model suggestion generation.
+- **Unknown** is a real face whose person is not known. It has no PersonId, is not a person identity, exemplar or person-collection match, and is excluded from normal matching by default.
 - **Rejected** represents a false/useless detection and provides no positive person evidence.
+
+Unknown is intentionally distinct from Rejected: marking a face Unknown says the detection is valid while the identity is unresolved. Both decisions are reversible. A later manual assignment can supersede Unknown while preserving audit history.
 
 A person-specific rejected suggestion remains durable negative evidence so the same face-person pair is not immediately proposed again under the governed rules.
 
@@ -103,7 +109,8 @@ The completed FP32-versus-INT8 comparison used the earlier YuNet detector popula
 - Regeneration uses a fixed exemplar snapshot before automatic assignments are applied.
 - Manual correction supersedes an automatic assignment and changes later exemplar evidence.
 - Rejected face-person pairs remain excluded.
-- Unknown and rejected faces do not become exemplars.
+- Unknown and rejected faces do not become exemplars or person-collection evidence.
+- Normal matcher regeneration excludes Unknown; explicit Unknown-inclusive rematching is advisory and never enables automatic assignment by itself.
 - Scores and thresholds from different model revisions are never silently mixed.
 
 See [ADR-0002](../decisions/ADR-0002-model-independent-labels.md), [ADR-0006](../decisions/ADR-0006-canonical-auto-assignment.md), [Canonical data model](data-model.md) and [Model governance](../models/model-governance.md).
