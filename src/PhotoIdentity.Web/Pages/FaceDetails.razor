@@ -53,7 +53,7 @@ else if (Details is not null)
         <div>
             <p class="eyebrow">Photo details</p>
             <h1>Face details</h1>
-            <p>Review model suggestions or explicitly assign any named person. Browser responses remain privacy-limited.</p>
+            <p>Assign a named person, mark a real face as an unknown person, or reject a false detection. Browser responses remain privacy-limited.</p>
         </div>
         <span class="state-badge large">@StateLabel</span>
     </section>
@@ -95,12 +95,40 @@ else if (Details is not null)
         <div class="notice success review-notice" role="status">@Message</div>
     }
 
+    <section class="audit-section">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Face decision</p>
+                <h2>Unknown person or false detection</h2>
+                <p class="suggestion-guidance">Unknown means this is a real face but the identity is not known. False detection means the detector did not find a real face. Both decisions are reversible and remain in the audit history.</p>
+            </div>
+        </div>
+
+        <div class="card-actions">
+            <button class="button secondary"
+                    disabled="@(ActionBusy || Details.Face.State == "unknown")"
+                    @onclick="MarkUnknownAsync">
+                Unknown person
+            </button>
+            <button class="button danger"
+                    disabled="@(ActionBusy || Details.Face.State == "rejected")"
+                    @onclick="RejectFaceAsync">
+                False detection
+            </button>
+            <button class="button secondary"
+                    disabled="@(ActionBusy || Details.Face.State == "unreviewed")"
+                    @onclick="UndoFaceDecisionAsync">
+                Undo latest face decision
+            </button>
+        </div>
+    </section>
+
     <section class="audit-section identity-assignment-section">
         <div class="section-heading">
             <div>
                 <p class="eyebrow">Explicit correction</p>
                 <h2>Assign any person</h2>
-                <p class="suggestion-guidance">Use this when the correct person is absent from the ranked suggestions. Favorites stay at the top and can be changed here without affecting identity evidence. A successful queue assignment advances to the next face.</p>
+                <p class="suggestion-guidance">Use this when the correct person is absent from the ranked suggestions or when an Unknown decision can now be resolved. Favorites stay at the top and can be changed here without affecting identity evidence. A successful queue assignment advances to the next face.</p>
             </div>
         </div>
 
@@ -154,7 +182,7 @@ else if (Details is not null)
             <div>
                 <p class="eyebrow">Advisory model output</p>
                 <h2>Ranked identity suggestions</h2>
-                <p class="suggestion-guidance">Scores never create a label. Accepting a suggestion remains an explicit human assignment.</p>
+                <p class="suggestion-guidance">Scores never create a label. Accepting or rejecting a person match requires the face itself to be unreviewed; undo an Unknown or false-detection decision first if you want to review suggestions.</p>
             </div>
             <span>@Suggestions.Count suggestion@(Suggestions.Count == 1 ? "" : "s")</span>
         </div>
@@ -313,7 +341,7 @@ else if (Details is not null)
     private string? ActionError { get; set; }
     private string? Message { get; set; }
 
-    private string NormalizedQueueState => QueueState is "unreviewed" or "assigned" or "rejected" or "all"
+    private string NormalizedQueueState => QueueState is "unreviewed" or "assigned" or "unknown" or "rejected" or "all"
         ? QueueState
         : "all";
     private string NormalizedSort => string.IsNullOrWhiteSpace(Sort) ? DefaultSort : Sort.Trim();
@@ -333,7 +361,8 @@ else if (Details is not null)
     private string StateLabel => Details?.Face.State switch
     {
         "assigned" => "Assigned",
-        "rejected" => "Rejected",
+        "unknown" => "Unknown person",
+        "rejected" => "False detection",
         _ => "Needs review",
     };
 
@@ -414,6 +443,54 @@ else if (Details is not null)
             Message = favorite
                 ? $"Added {person.DisplayName} to favorites."
                 : $"Removed {person.DisplayName} from favorites.";
+        }
+        catch (Exception exception)
+        {
+            ActionError = exception.Message;
+        }
+        finally
+        {
+            ActionBusy = false;
+        }
+    }
+
+    private async Task MarkUnknownAsync() =>
+        await RecordFaceDecisionAsync(
+            "unknown",
+            "Face marked as an unknown person.");
+
+    private async Task RejectFaceAsync() =>
+        await RecordFaceDecisionAsync(
+            "reject",
+            "False detection saved.");
+
+    private async Task UndoFaceDecisionAsync() =>
+        await RecordFaceDecisionAsync(
+            "undo",
+            "Latest face decision undone.");
+
+    private async Task RecordFaceDecisionAsync(string action, string successMessage)
+    {
+        bool shouldAdvance = Details?.Navigation is not null;
+        string? nextFaceId = Details?.Navigation?.NextFaceId;
+        ActionBusy = true;
+        ActionError = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/review/faces/{Uri.EscapeDataString(Id)}/{action}",
+                new ReviewFaceActionRequest(Actor));
+            await RequireSuccessAsync(response);
+
+            if (shouldAdvance)
+            {
+                NavigateAfterQueueMutation(nextFaceId);
+                return;
+            }
+
+            await RefreshAsync();
+            Message = successMessage;
         }
         catch (Exception exception)
         {
@@ -662,7 +739,8 @@ else if (Details is not null)
     private static string ActionLabel(ReviewActionResponse action) => action.Kind switch
     {
         "assign" when action.Person is not null => $"Assigned to {action.Person.DisplayName}",
-        "reject" => "Rejected face",
+        "unknown" => "Marked as unknown person",
+        "reject" => "Marked as false detection",
         "undo" when action.ReversesActionId is long id => $"Undid action #{id}",
         _ => action.Kind,
     };
