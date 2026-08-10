@@ -6,19 +6,30 @@ namespace PhotoIdentity.Persistence.Sqlite;
 
 public sealed record IdentityAutoAssignmentOptions(
     bool Enabled = false,
-    double HighConfidenceThreshold = 0.70)
+    double HighScoreThreshold = 0.70,
+    double HighMarginThreshold = 0.10)
 {
-    public const double DefaultHighConfidenceThreshold = 0.70;
+    public const double DefaultHighScoreThreshold = 0.70;
+    public const double DefaultHighMarginThreshold = 0.10;
 
     public void Validate()
     {
-        if (!double.IsFinite(HighConfidenceThreshold)
-            || HighConfidenceThreshold < 0
-            || HighConfidenceThreshold > 1)
+        if (!double.IsFinite(HighScoreThreshold)
+            || HighScoreThreshold < 0
+            || HighScoreThreshold > 1)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(HighConfidenceThreshold),
-                "The automatic-assignment confidence threshold must be between 0 and 1.");
+                nameof(HighScoreThreshold),
+                "The automatic-assignment High score threshold must be between 0 and 1.");
+        }
+
+        if (!double.IsFinite(HighMarginThreshold)
+            || HighMarginThreshold < 0
+            || HighMarginThreshold > 2)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(HighMarginThreshold),
+                "The automatic-assignment High rank-1/rank-2 margin threshold must be between 0 and 2.");
         }
     }
 }
@@ -30,8 +41,10 @@ public sealed record IdentityAutoAssignmentSummary(
 
 /// <summary>
 /// Promotes qualifying persisted rank-1 matcher suggestions through the same canonical
-/// suggestion-acceptance boundary used by manual review. The service is deliberately
-/// separate from ranking so one regeneration always scores from one fixed exemplar snapshot.
+/// suggestion-acceptance boundary used by manual review. A High candidate must satisfy
+/// both the absolute rank-1 score threshold and the configured rank-1/rank-2 score gap.
+/// The service is deliberately separate from ranking so one regeneration always scores
+/// from one fixed exemplar snapshot.
 /// </summary>
 public sealed class SqliteIdentityAutoAssignmentService
 {
@@ -67,7 +80,8 @@ public sealed class SqliteIdentityAutoAssignmentService
         IReadOnlyList<AutoAssignmentCandidate> candidates = await ReadCandidatesAsync(
             modelId,
             modelHash,
-            options.HighConfidenceThreshold,
+            options.HighScoreThreshold,
+            options.HighMarginThreshold,
             cancellationToken);
 
         SqliteReviewSuggestionRepository reviewSuggestions = new(_database);
@@ -77,7 +91,7 @@ public sealed class SqliteIdentityAutoAssignmentService
         {
             DateTimeOffset decidedAtUtc = _timeProvider.GetUtcNow().ToUniversalTime();
             string note = FormattableString.Invariant(
-                $"Automatic assignment from persisted rank-1 identity suggestion; model-id={modelId}; model-hash={modelHash}; score={candidate.Score:R}; high-confidence-threshold={options.HighConfidenceThreshold:R}.");
+                $"Automatic assignment from persisted High rank-1 identity suggestion; model-id={modelId}; model-hash={modelHash}; score={candidate.Score:R}; rank1-rank2-margin={candidate.ScoreMargin:R}; high-score-threshold={options.HighScoreThreshold:R}; high-margin-threshold={options.HighMarginThreshold:R}.");
 
             try
             {
@@ -107,7 +121,8 @@ public sealed class SqliteIdentityAutoAssignmentService
     private async Task<IReadOnlyList<AutoAssignmentCandidate>> ReadCandidatesAsync(
         ModelId modelId,
         Sha256Digest modelHash,
-        double threshold,
+        double scoreThreshold,
+        double marginThreshold,
         CancellationToken cancellationToken)
     {
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
@@ -116,7 +131,8 @@ public sealed class SqliteIdentityAutoAssignmentService
             SELECT
                 suggestion.id,
                 ranking.face_occurrence_id,
-                suggestion.score
+                suggestion.score,
+                ranking.score_margin
             FROM identity_suggestion_rankings AS ranking
             INNER JOIN identity_suggestions AS suggestion
                 ON suggestion.id = ranking.suggestion_id
@@ -124,7 +140,9 @@ public sealed class SqliteIdentityAutoAssignmentService
               AND ranking.model_hash = $model_hash
               AND ranking.rank = 1
               AND suggestion.status = 'pending'
-              AND suggestion.score >= $threshold
+              AND suggestion.score >= $score_threshold
+              AND ranking.score_margin IS NOT NULL
+              AND ranking.score_margin >= $margin_threshold
               AND NOT EXISTS (
                   SELECT 1
                   FROM review_actions AS action
@@ -135,7 +153,8 @@ public sealed class SqliteIdentityAutoAssignmentService
             """;
         command.Parameters.AddWithValue("$model_id", modelId.ToString());
         command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
-        command.Parameters.AddWithValue("$threshold", threshold);
+        command.Parameters.AddWithValue("$score_threshold", scoreThreshold);
+        command.Parameters.AddWithValue("$margin_threshold", marginThreshold);
 
         List<AutoAssignmentCandidate> candidates = [];
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -144,7 +163,8 @@ public sealed class SqliteIdentityAutoAssignmentService
             candidates.Add(new AutoAssignmentCandidate(
                 reader.GetInt64(0),
                 FaceOccurrenceId.From(Guid.Parse(reader.GetString(1))),
-                reader.GetDouble(2)));
+                reader.GetDouble(2),
+                reader.GetDouble(3)));
         }
 
         return candidates;
@@ -159,5 +179,6 @@ public sealed class SqliteIdentityAutoAssignmentService
     private sealed record AutoAssignmentCandidate(
         long SuggestionId,
         FaceOccurrenceId FaceOccurrenceId,
-        double Score);
+        double Score,
+        double ScoreMargin);
 }
