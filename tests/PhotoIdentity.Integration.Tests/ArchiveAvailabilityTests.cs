@@ -56,7 +56,9 @@ public sealed class ArchiveAvailabilityTests
             Assert.Equal(1, status.CurrentImages);
             Assert.Equal(0, status.LocalImages);
             Assert.Equal(1, status.OnlineOnlyImages);
-            Assert.Equal(0, status.PendingImages);
+            // Pending is an analysis dimension, independent from current OneDrive availability.
+            // The legacy local-only scheduler above must still refuse to schedule/open this item.
+            Assert.Equal(1, status.PendingImages);
             CatalogueArchiveItemPage unavailable = await statusRepository.GetItemsAsync(
                 catalogueSource.Id,
                 "1970",
@@ -68,6 +70,22 @@ public sealed class ArchiveAvailabilityTests
             Assert.Equal("1970/01/photo.jpg", item.RelativePath);
             Assert.Equal("online-only", item.Availability);
             Assert.Equal("unavailable", item.AnalysisState);
+
+            CatalogueArchiveItemPage orthogonalPending = await new SqliteArchiveItemFilterRepository(database)
+                .GetItemsAsync(
+                    catalogueSource.Id,
+                    "1970",
+                    profileHash,
+                    availability: "online-only",
+                    verification: "verified",
+                    analysis: "pending",
+                    offset: 0,
+                    limit: 50);
+            CatalogueArchiveItemStatus pendingItem = Assert.Single(orthogonalPending.Items);
+            Assert.Equal("1970/01/photo.jpg", pendingItem.RelativePath);
+            Assert.Equal("online-only", pendingItem.Availability);
+            Assert.Equal("verified", pendingItem.SourceVerificationState);
+            Assert.Equal("pending", pendingItem.AnalysisState);
 
             source.Availability = AssetAvailability.Local;
             ArchiveSourceCatalogueScanSummary hydrated = await scanner.ScanAsync(

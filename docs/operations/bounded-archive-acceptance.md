@@ -1,6 +1,8 @@
 # Bounded archive acceptance
 
-This procedure is the human acceptance gate for WI-0042 after Slices 1–4 are merged. It validates review proxies, explicit originals, bounded hydration, source re-verification and end-to-end archive advancement together.
+This procedure is the human acceptance gate for WI-0042 after Slices 1–5 are merged. It validates review proxies, explicit originals, bounded hydration, source re-verification and end-to-end unattended archive advancement together.
+
+The first Slices 1–4 acceptance attempt was intentionally paused after the maintainer found the Slice 5 blockers documented in `bounded-archive-slice5.md`. Do not resume or record the combined gate as passed until those corrections are merged and re-verified.
 
 Do **not** record private source paths, filenames, pixels or identity data in Git. Retain only pass/fail outcomes and aggregate/path-free measurements.
 
@@ -110,7 +112,9 @@ After restart, verify durable ownership and completion state are preserved. Infe
 
 ## 7. Full archive advancement
 
-After the focused checks pass, synchronize the intended permanent archive coverage and use **Advance archive** repeatedly. The operation is intentionally incremental: when OneDrive is still downloading a required source, the UI reports that state and a later advance continues from durable state.
+After the focused checks pass, add or retain the intended permanent archive coverage and use **Advance archive once**. The server synchronizes included coverage first and continues unattended through source verification, bounded hydration waits, analysis, durable proxy generation and managed release. The UI may be refreshed or closed without requiring per-file transition clicks; restart must resume durable running intent.
+
+Verify **Pause archive** stops scheduling further advancement without discarding completed durable work, and that starting advancement again resumes from the stored catalogue state.
 
 Review aggregate status until there is no remaining source verification, pending/failed analysis or intended proxy work for the selected scope. Confirm ordinary collection browsing remains proxy-backed throughout.
 

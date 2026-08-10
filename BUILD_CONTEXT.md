@@ -24,7 +24,9 @@ See `docs/product/success-criteria.md` and `docs/delivery/local-first-plan.md` f
 
 Merged implementation includes deterministic versioned review proxies, proxy-backed collection browsing, explicit original hydrate/status/view/release, managed hydration ownership, free-space/byte/concurrency policy, LRU release of Photo-Identity-owned content, source-verification state and bounded first-time online-only source verification.
 
-PR #111 merged the source re-verification slice. The combined acceptance is documented in `docs/operations/bounded-archive-acceptance.md`; do not infer that the real-machine gate passed merely from automated coverage.
+PR #111 merged the source re-verification slice. The first combined Windows/OneDrive acceptance attempt was paused on 2026-08-10 after the maintainer found three acceptance blockers: archive advancement required repeated per-transition clicks, Collections opened the fixed thumbnail instead of a proxy-first viewer and had no original controls, and analysed online-only revisions disappeared from the Archive analysed filter.
+
+WI-0042 Slice 5 is active on `agent/WI-0042-slice5-unattended-archive` / draft PR #115. It adds durable one-click unattended advancement, proxy-first viewing with explicit original controls and orthogonal archive status. The combined acceptance remains pending and is documented in `docs/operations/bounded-archive-acceptance.md` plus `docs/operations/bounded-archive-slice5.md`.
 
 **WI-0041 — Add incremental permanent archive ingestion** remains blocked on WI-0042 acceptance.
 
@@ -64,7 +66,7 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 
 ## Next concrete sequence
 
-1. Complete automated review of WI-0053 Slice 1 / PR #114 and run private representative HEIC verification.
+1. Complete WI-0042 Slice 5 / PR #115 and resume the paused combined Windows/OneDrive acceptance.
 2. Complete the combined WI-0042 human acceptance and deliberately accept the production proxy/hydration policy values.
 3. Unblock and complete WI-0041 permanent incremental ingestion.
 4. Confirm the version-1 success criteria on the real Windows/OneDrive environment, including a privacy-safe archive media inventory; if no RAW is present, record that fact rather than inventing RAW implementation evidence.

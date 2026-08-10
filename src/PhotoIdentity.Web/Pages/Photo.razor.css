@@ -1,0 +1,26 @@
+.photo-viewer-frame {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    overflow: hidden;
+    border-radius: 1rem;
+    background: #1f2222;
+}
+
+.photo-viewer-image {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    max-height: min(72vh, 64rem);
+    object-fit: contain;
+}
+
+@media (max-width: 600px) {
+    .photo-viewer-frame {
+        min-height: 14rem;
+        padding: 0.5rem;
+    }
+}

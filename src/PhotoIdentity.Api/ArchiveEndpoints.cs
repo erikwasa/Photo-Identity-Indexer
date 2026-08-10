@@ -76,6 +76,8 @@ public static class ArchiveEndpoints
         group.MapGet("/items", GetItemsAsync);
         group.MapPost("/include", IncludeAsync);
         group.MapPost("/sync", SyncAsync);
+        group.MapPost("/advance/start", StartAdvancementAsync);
+        group.MapPost("/advance/pause", PauseAdvancementAsync);
         group.MapPost("/analysis/step", AnalysisStepAsync);
         return endpoints;
     }
@@ -128,6 +130,7 @@ public static class ArchiveEndpoints
                 page.Items
                     .Select(item => new ArchiveItemStatusResponse(
                         item.RelativePath,
+                        item.RevisionId?.ToString(),
                         item.Availability,
                         item.SourceVerificationState,
                         item.AnalysisState,
@@ -236,6 +239,52 @@ public static class ArchiveEndpoints
         }
     }
 
+    private static async Task<IResult> StartAdvancementAsync(
+        SqliteCatalogueDatabase database,
+        ArchiveOperatorConfiguration operatorConfiguration,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            ArchiveCoverageConfiguration configured = await new SqliteArchiveCoverageRepository(database)
+                .GetAsync(cancellationToken)
+                ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
+            await new SqliteArchiveAdvancementRepository(database).RequestRunAsync(
+                configured.Source.Id,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
+            return Results.Ok(await BuildStatusAsync(database, operatorConfiguration, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            return BadRequest(exception);
+        }
+    }
+
+    private static async Task<IResult> PauseAdvancementAsync(
+        SqliteCatalogueDatabase database,
+        ArchiveOperatorConfiguration operatorConfiguration,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            ArchiveCoverageConfiguration configured = await new SqliteArchiveCoverageRepository(database)
+                .GetAsync(cancellationToken)
+                ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
+            await new SqliteArchiveAdvancementRepository(database).PauseAsync(
+                configured.Source.Id,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
+            return Results.Ok(await BuildStatusAsync(database, operatorConfiguration, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            return BadRequest(exception);
+        }
+    }
+
     private static async Task<IResult> AnalysisStepAsync(
         SqliteCatalogueDatabase database,
         ArchiveOperatorConfiguration operatorConfiguration,
@@ -279,6 +328,7 @@ public static class ArchiveEndpoints
                 ArchiveAnalysisConfiguration.EmbedderModelId,
                 empty,
                 [],
+                null,
                 null);
         }
 
@@ -332,6 +382,16 @@ public static class ArchiveEndpoints
             latestRun = latest is null ? null : ToResponse(latest);
         }
 
+        ArchiveAdvancementState? advancement = await new SqliteArchiveAdvancementRepository(database)
+            .GetAsync(configured.Source.Id, cancellationToken);
+        ArchiveAdvancementStatusResponse? advancementResponse = advancement is null
+            ? null
+            : new ArchiveAdvancementStatusResponse(
+                advancement.RuntimeState,
+                advancement.IsRequested,
+                advancement.Message,
+                advancement.UpdatedAtUtc);
+
         string rootName = new DirectoryInfo(configured.Source.RootLocator).Name;
         return new ArchiveStatusResponse(
             true,
@@ -345,7 +405,8 @@ public static class ArchiveEndpoints
             ArchiveAnalysisConfiguration.EmbedderModelId,
             ToResponse(total),
             folders,
-            latestRun);
+            latestRun,
+            advancementResponse);
     }
 
     private static async Task<Sha256Digest?> ResolveProfileHashAsync(

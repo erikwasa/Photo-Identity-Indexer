@@ -23,6 +23,7 @@ public sealed record CatalogueArchiveFolderStatus(
 
 public sealed record CatalogueArchiveItemStatus(
     string RelativePath,
+    AssetRevisionId? RevisionId,
     string Availability,
     string SourceVerificationState,
     string AnalysisState,
@@ -131,14 +132,12 @@ public sealed class SqliteArchiveStatusRepository
                               AND analysis.asset_revision_id IS NOT NULL THEN 1 ELSE 0 END),
                 SUM(CASE WHEN current.deleted_at_utc IS NULL
                               AND current.verification_state = 'verified'
-                              AND current.availability = 'local'
                               AND current.revision_id IS NOT NULL
                               AND analysis.asset_revision_id IS NULL
                               AND COALESCE(latest_job.status, '') <> 'failed'
                          THEN 1 ELSE 0 END),
                 SUM(CASE WHEN current.deleted_at_utc IS NULL
                               AND current.verification_state = 'verified'
-                              AND current.availability = 'local'
                               AND current.revision_id IS NOT NULL
                               AND analysis.asset_revision_id IS NULL
                               AND latest_job.status = 'failed'
@@ -256,15 +255,16 @@ public sealed class SqliteArchiveStatusRepository
             classified AS (
                 SELECT
                     source_key,
+                    revision_id,
                     availability,
                     verification_state,
                     CASE
                         WHEN deleted_at_utc IS NOT NULL THEN 'missing'
+                        WHEN analysed_revision_id IS NOT NULL THEN 'analysed'
                         WHEN verification_state = 'needs-source-verification' THEN 'needs-source-verification'
                         WHEN verification_state = 'unverified' THEN 'unverified'
-                        WHEN availability <> 'local' THEN 'unavailable'
-                        WHEN analysed_revision_id IS NOT NULL THEN 'analysed'
                         WHEN latest_job_status = 'failed' THEN 'failed'
+                        WHEN availability <> 'local' THEN 'unavailable'
                         ELSE 'pending'
                     END AS analysis_state,
                     latest_job_error
@@ -272,6 +272,7 @@ public sealed class SqliteArchiveStatusRepository
             )
             SELECT
                 source_key,
+                revision_id,
                 availability,
                 verification_state,
                 analysis_state,
@@ -297,15 +298,16 @@ public sealed class SqliteArchiveStatusRepository
         {
             if (items.Count == 0)
             {
-                total = reader.GetInt32(5);
+                total = reader.GetInt32(6);
             }
 
             items.Add(new CatalogueArchiveItemStatus(
                 reader.GetString(0),
-                reader.GetString(1),
+                reader.IsDBNull(1) ? null : AssetRevisionId.From(Guid.Parse(reader.GetString(1))),
                 reader.GetString(2),
                 reader.GetString(3),
-                reader.IsDBNull(4) ? null : reader.GetString(4)));
+                reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5)));
         }
 
         return new CatalogueArchiveItemPage(offset, limit, total, items);

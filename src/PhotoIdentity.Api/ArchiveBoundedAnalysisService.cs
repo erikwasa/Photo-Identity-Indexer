@@ -200,10 +200,16 @@ public sealed class ArchiveBoundedAnalysisService
                     return new ArchiveBoundedAnalysisAdvanceResult(false);
                 }
 
-                _ = await coordinator.ResumeAsync(
+                ArchiveAnalysisResumeResult resumed = await coordinator.ResumeAsync(
                     latest.RunId,
                     new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: 1),
                     cancellationToken);
+                if (resumed.ProcessingSummary.FailedJobs > 0)
+                {
+                    throw new InvalidOperationException(
+                        "Archive analysis failed for one or more images. Review the Archive failed filter before retrying.");
+                }
+
                 _ = await TryAdvancePostAnalysisAsync(
                     coverage,
                     analysisProfileHash,
@@ -247,6 +253,12 @@ public sealed class ArchiveBoundedAnalysisService
             analysisConfiguration,
             new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: 1),
             cancellationToken);
+        if (started.ProcessingSummary?.FailedJobs > 0)
+        {
+            throw new InvalidOperationException(
+                "Archive analysis failed for one or more images. Review the Archive failed filter before retrying.");
+        }
+
         _ = await TryAdvancePostAnalysisAsync(
             coverage,
             analysisProfileHash,

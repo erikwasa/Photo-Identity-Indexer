@@ -66,6 +66,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteArchiveSourceVerificationStateRepository>();
         builder.Services.AddSingleton<SqliteArchiveAvailabilityRepository>();
         builder.Services.AddSingleton<SqliteArchiveStorageRepository>();
+        builder.Services.AddSingleton<SqliteArchiveAdvancementRepository>();
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton<DetectorRolloutCropFileResolver>();
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();
@@ -78,6 +79,7 @@ public partial class Program
         builder.Services.AddSingleton<IArchiveStorageProbe, DriveArchiveStorageProbe>();
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddHostedService<ArchiveAdvancementHostedService>();
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
             detectorEvaluationRoot,
             serviceProvider.GetRequiredService<TimeProvider>()));
@@ -126,10 +128,12 @@ public partial class Program
         app.MapBulkReviewEndpoints();
         app.MapBulkSuggestionReviewEndpoints();
         app.MapCollectionEndpoints();
+        app.MapCollectionProxyEndpoints();
         app.MapDetectorEvaluationEndpoints();
         app.MapDetectorEvaluationComparisonEndpoints();
         app.MapDetectorRolloutEndpoints();
         app.MapArchiveEndpoints();
+        app.MapArchiveItemFilterEndpoints();
         app.MapArchiveStorageEndpoints();
         app.MapFallbackToFile("index.html");
 
