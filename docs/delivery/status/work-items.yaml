@@ -722,7 +722,7 @@ work_items:
   blocker_notes: []
   evidence:
   - type: human_verification
-    value: Private same-corpus FP32-versus-INT8 comparison and manual suggestion review completed locally on 2026-08-01. Twenty representative faces were correct under both exact revisions with no material practical difference; retain the FP32 baseline. The detailed record remains private.
+    value: Private same-corpus FP32-versus-INT8 comparison and manual suggestion review completed locally on Windows on 2026-08-01. Twenty representative faces were correct under both exact revisions with no material practical difference; retain the FP32 baseline. The detailed record remains private.
 - id: WI-0031
   title: Rewrite operator and architecture documentation
   milestone: M15
@@ -1056,14 +1056,22 @@ work_items:
 - id: WI-0043
   title: Add configurable confidence groups and canonical auto-assignment
   milestone: M17
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0043-confidence-auto-assignment.md
+  started_at: 2026-08-10
+  last_updated_at: 2026-08-10
+  branch: wi-0043
   blockers:
   - WI-0016
   - WI-0033
-  blocker_notes: []
-  evidence: []
+  blocker_notes:
+  - Private reviewed-sample threshold tuning remains required before completion and routine auto-assignment.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/116
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31429588957
 - id: WI-0044
   title: Add favorite people
   milestone: M17
