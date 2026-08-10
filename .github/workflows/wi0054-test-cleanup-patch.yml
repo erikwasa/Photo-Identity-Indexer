@@ -1,0 +1,55 @@
+name: WI-0054 test cleanup patch
+
+on:
+  push:
+    branches:
+      - agent/WI-0054-archive-ui-polish
+    paths:
+      - .github/workflows/wi0054-test-cleanup-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/WI-0054-archive-ui-polish
+          fetch-depth: 0
+      - name: Clear SQLite pools before temp cleanup
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tests/PhotoIdentity.Integration.Tests/CollectionViewerPreviewApplicationTests.cs')
+          text = path.read_text(encoding='utf-8')
+          old = '''    private static void DeleteTemporaryDirectory(string directory)
+    {
+        if (Directory.Exists(directory))
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }'''
+          new = '''    private static void DeleteTemporaryDirectory(string directory)
+    {
+        SqliteConnection.ClearAllPools();
+        if (Directory.Exists(directory))
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }'''
+          if old not in text:
+              raise SystemExit('Expected cleanup method was not found.')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Commit patch and remove workflow
+        shell: bash
+        run: |
+          git rm .github/workflows/wi0054-test-cleanup-patch.yml
+          git config user.name "Erik Wahlström"
+          git config user.email "54457926+erikwasa@users.noreply.github.com"
+          git add tests/PhotoIdentity.Integration.Tests/CollectionViewerPreviewApplicationTests.cs
+          git commit -m "Fix WI-0054 test cleanup"
+          git push origin HEAD:agent/WI-0054-archive-ui-polish
