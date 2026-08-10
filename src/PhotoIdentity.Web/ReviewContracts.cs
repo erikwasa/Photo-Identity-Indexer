@@ -15,6 +15,8 @@ public sealed record ReviewTopSuggestionResponse(
     string? ConfidenceGroup = null);
 
 public sealed record IdentitySuggestionPolicyResponse(
+    string ModelId,
+    string ModelHash,
     int Version,
     bool AutoAssignEnabled,
     double HighScoreThreshold,
