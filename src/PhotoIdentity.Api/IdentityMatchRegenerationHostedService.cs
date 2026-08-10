@@ -16,6 +16,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
     private readonly SqliteIdentityMatchRegenerationScorer _scorer;
     private readonly SqliteIdentitySuggestionPolicyRepository _policies;
     private readonly SqliteIdentityAutoAssignmentService _autoAssignment;
+    private readonly SqliteIdentityMatchEvidenceVersionReader _evidence;
     private readonly TimeProvider _timeProvider;
 
     public IdentityMatchRegenerationHostedService(
@@ -23,12 +24,14 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         SqliteIdentityMatchRegenerationScorer scorer,
         SqliteIdentitySuggestionPolicyRepository policies,
         SqliteIdentityAutoAssignmentService autoAssignment,
+        SqliteIdentityMatchEvidenceVersionReader evidence,
         TimeProvider timeProvider)
     {
         _runs = runs;
         _scorer = scorer;
         _policies = policies;
         _autoAssignment = autoAssignment;
+        _evidence = evidence;
         _timeProvider = timeProvider;
     }
 
@@ -142,6 +145,25 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 run.ModelHash,
                 policy,
                 cancellationToken);
+
+            IdentityMatchEvidenceVersion currentEvidence = await _evidence.ReadAsync(
+                run.ModelId,
+                run.ModelHash,
+                cancellationToken);
+            IdentityMatchEvidenceVersion expectedEvidence =
+                SqliteIdentityMatchEvidenceVersionReader.ExpectedAfterAutomaticAssignments(
+                    run.EvidenceVersion,
+                    auto.AssignedCount);
+            if (currentEvidence != expectedEvidence)
+            {
+                await _runs.MarkFailedAsync(
+                    run.Id,
+                    "Identity evidence changed while automatic assignments were being finalized. The generated suggestions are stale; start a new regeneration.",
+                    _timeProvider.GetUtcNow(),
+                    cancellationToken);
+                return true;
+            }
+
             await _runs.CompleteRunAsync(
                 run.Id,
                 auto.AssignedCount,
