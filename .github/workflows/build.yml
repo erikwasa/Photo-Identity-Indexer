@@ -224,5 +224,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: package-verification-diagnostics
-          path: .artifacts/package-verification
+          path: |
+            .artifacts/package-verification/localappdata/PhotoIdentity/launcher-logs
+            .artifacts/package-verification/packages/PhotoIdentity-win-x64/package-manifest.json
           retention-days: 1
