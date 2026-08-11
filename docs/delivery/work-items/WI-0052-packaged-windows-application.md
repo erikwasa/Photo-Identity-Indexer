@@ -35,11 +35,11 @@ WI-0051 removes startup friction but still assumes a prepared publish output. A 
 
 ## Acceptance criteria
 
-- [ ] A repeatable build produces a Windows operator package with a clear executable entry point.
-- [ ] Normal use does not require running dotnet publish or setting shell environment variables manually.
-- [ ] Application upgrades preserve catalogue/configuration/private derived data outside the package directory.
-- [ ] Duplicate-instance and startup-health behavior remains predictable.
-- [ ] Package/runtime trade-offs and update procedure are documented and verified on Windows.
+- [x] A repeatable build produces a Windows operator package with a clear executable entry point.
+- [x] Normal use does not require running dotnet publish or setting shell environment variables manually.
+- [x] Application upgrades preserve catalogue/configuration/private derived data outside the package directory.
+- [x] Duplicate-instance and startup-health behavior remains predictable.
+- [x] Package/runtime trade-offs and update procedure are documented and verified on Windows.
 
 ## Verification requirements
 
@@ -48,6 +48,22 @@ Automated packaging smoke verification where possible plus human install/copy/st
 ## Completion notes
 
 - Files changed:
+  - `Package-PhotoIdentity.ps1` builds the repeatable self-contained `win-x64` folder/ZIP package.
+  - `packaging/windows/PhotoIdentity.cmd` is the normal packaged entry point and pins only the package code location.
+  - `packaging/windows/PhotoIdentity.launcher.example.json` demonstrates durable settings without a package-specific `publishPath`.
+  - `packaging/windows/README.txt` documents start, durable-data and side-by-side replacement behavior inside the package.
+  - `Start-PhotoIdentity.ps1` accepts an explicit package publish-path override while retaining WI-0051 health/duplicate-instance semantics and private local configuration.
+  - `verify-package.ps1` builds/extracts/starts/restarts/replaces a disposable package and verifies external catalogue/configuration preservation.
+  - `.github/workflows/build.yml` runs package verification on an isolated Windows runner and uploads the produced ZIP as a short-lived artifact.
+  - `docs/operations/windows-package.md` records the package/runtime decision and operator upgrade procedure.
 - Trade-offs:
+  - `win-x64` self-contained deployment is selected. The ZIP is larger and bundled .NET runtime updates require a rebuilt package, but the operator does not need a separately installed .NET runtime.
+  - A transparent ZIP/folder package is preferred over MSI/MSIX for M18. It supports side-by-side replacement without introducing installer state or moving private data into an installation directory.
+  - The package entry point remains a Windows command file backed by the reviewed PowerShell launcher rather than duplicating startup/health behavior in a second launcher implementation.
 - Deferred work:
-- Commands run:
+  - MSI/MSIX, code signing, auto-update and cross-platform desktop packaging remain outside M18.
+  - Final human M18 verification still needs a real Windows Explorer extract/double-click/side-by-side replacement pass against the maintained non-destructive catalogue configuration.
+- Commands run by CI/package verification:
+  - `./Package-PhotoIdentity.ps1 -Configuration Release`
+  - `./verify-package.ps1 -Configuration Release -Port 5083`
+  - existing build/test/docs/review/launcher gates remain unchanged.
