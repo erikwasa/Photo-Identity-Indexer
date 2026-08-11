@@ -64,6 +64,9 @@ staging/
 *.sqlite
 *.sqlite3
 
+# Private operator bootstrap configuration
+PhotoIdentity.launcher.json
+
 # Model binaries (manifests and download scripts remain tracked)
 models/**/*.onnx
 models/**/*.pt
