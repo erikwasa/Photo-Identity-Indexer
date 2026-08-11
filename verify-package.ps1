@@ -202,8 +202,17 @@ try {
     Write-Host "Durable data root: $configurationDirectory"
 }
 finally {
-    if ($startedProcessIds.Count -ne 0) {
-        Stop-PackageServerProcesses -ProcessIds $startedProcessIds
+    $cleanupProcessIds = @($startedProcessIds)
+    try {
+        $cleanupProcessIds += @(Get-PackageServerProcesses | ForEach-Object { [int]$_.ProcessId })
+    }
+    catch {
+        Write-Warning "Could not enumerate package verification processes during cleanup: $($_.Exception.Message)"
+    }
+
+    $cleanupProcessIds = @($cleanupProcessIds | Sort-Object -Unique)
+    if ($cleanupProcessIds.Count -ne 0) {
+        Stop-PackageServerProcesses -ProcessIds $cleanupProcessIds
     }
 
     $env:LOCALAPPDATA = $previousLocalAppData
