@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -7,6 +8,11 @@ namespace PhotoIdentity.Api;
 
 public static class ReviewEndpoints
 {
+    private const int GalleryImageSize = 360;
+    private const int DetailsImageSize = 960;
+    private const int MinimumImageSize = 96;
+    private const int MaximumImageSize = 1600;
+
     public static IEndpointRouteBuilder MapReviewEndpoints(this IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/review");
@@ -126,7 +132,7 @@ public static class ReviewEndpoints
                 sort,
                 cancellationToken);
             return Results.Ok(new ReviewFaceDetailsResponse(
-                ToResponse(face),
+                ToResponse(face, DetailsImageSize),
                 face.MediaType,
                 face.PhotoWidth,
                 face.PhotoHeight,
@@ -151,15 +157,41 @@ public static class ReviewEndpoints
         string id,
         SqliteReviewRepository repository,
         ReviewCropFileResolver cropFileResolver,
-        CancellationToken cancellationToken)
+        SqliteCatalogueDatabase database,
+        CollectionReviewProxyFileResolver proxyFileResolver,
+        int size = GalleryImageSize,
+        CancellationToken cancellationToken = default)
     {
         if (!TryFaceOccurrenceId(id, out FaceOccurrenceId faceOccurrenceId))
         {
             return BadRequest("The face occurrence identifier is invalid.");
         }
 
+        if (size is < MinimumImageSize or > MaximumImageSize)
+        {
+            return BadRequest($"Review image size must be between {MinimumImageSize} and {MaximumImageSize} pixels.");
+        }
+
         CatalogueReviewFace? face = await repository.GetFaceAsync(faceOccurrenceId, cancellationToken);
-        if (face?.CropStoragePath is not string storagePath)
+        if (face is null)
+        {
+            return Results.NotFound();
+        }
+
+        ReviewFacePreviewResolver previewResolver = new(
+            database,
+            proxyFileResolver,
+            new OpenCvReviewFaceRenderer());
+        EncodedReviewFace? preview = await previewResolver.RenderAsync(
+            faceOccurrenceId,
+            size,
+            cancellationToken);
+        if (preview is not null)
+        {
+            return Results.File(preview.Content, preview.ContentType);
+        }
+
+        if (face.CropStoragePath is not string storagePath)
         {
             return Results.NotFound();
         }
@@ -339,9 +371,13 @@ public static class ReviewEndpoints
         }
     }
 
-    private static ReviewFaceResponse ToResponse(CatalogueReviewFace face) => new(
+    private static ReviewFaceResponse ToResponse(CatalogueReviewFace face) => ToResponse(face, imageSize: null);
+
+    private static ReviewFaceResponse ToResponse(CatalogueReviewFace face, int? imageSize) => new(
         face.Id.ToString(),
-        $"/api/review/faces/{face.Id}/image",
+        imageSize is int requestedSize
+            ? $"/api/review/faces/{face.Id}/image?size={requestedSize}"
+            : $"/api/review/faces/{face.Id}/image",
         face.PhotoName,
         face.Ordinal,
         face.Confidence,
