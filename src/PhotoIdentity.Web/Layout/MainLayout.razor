@@ -2,29 +2,49 @@
 
 <div class="app-shell">
     <header class="topbar">
-        <a class="brand" href="/" aria-label="Photo Identity review gallery">
+        <a class="brand" href="/" aria-label="Photo Identity review workspace">
             <span class="brand-mark">PI</span>
             <span>
                 <strong>Photo Identity</strong>
-                <small>Local review</small>
+                <small>Review &amp; library</small>
             </span>
         </a>
-        <nav class="topbar-actions" aria-label="Review navigation">
-            <a class="topbar-link" href="/">Faces</a>
-            <a class="topbar-link" href="/match-regeneration">Regenerate matches</a>
-            <a class="topbar-link" href="/suggestion-policy">Suggestion policy</a>
-            <a class="topbar-link" href="/archive">Archive</a>
-            <a class="topbar-link" href="/settings">Settings</a>
-            <a class="topbar-link" href="/detector-evaluation">Detector evaluation</a>
-            <a class="topbar-link" href="/detector-comparisons">Detector comparisons</a>
-            <a class="topbar-link" href="/detector-rollout">Detector rollout</a>
-            <a class="topbar-link" href="/collections">Collections</a>
-            <a class="topbar-link" href="/audit">Audit</a>
-            <a class="topbar-link" href="/progress">Progress</a>
-            <a class="topbar-link" href="/people">People</a>
+
+        <nav class="primary-nav" aria-label="Primary navigation">
+            <a class="primary-link" href="/">Review</a>
+            <a class="primary-link" href="/collections">Library</a>
+            <a class="primary-link" href="/settings">Settings</a>
+
+            <details class="advanced-menu">
+                <summary class="primary-link">Advanced</summary>
+                <div class="advanced-menu-panel">
+                    <div class="advanced-menu-section">
+                        <strong>Identity &amp; operations</strong>
+                        <a href="/people">People</a>
+                        <a href="/audit">Audit</a>
+                        <a href="/progress">Progress</a>
+                        <a href="/suggestion-policy">Suggestion policy</a>
+                    </div>
+                    <div class="advanced-menu-section">
+                        <strong>Detector engineering</strong>
+                        <a href="/detector-evaluation">Detector evaluation</a>
+                        <a href="/detector-comparisons">Detector comparisons</a>
+                        <a href="/detector-rollout">Detector rollout</a>
+                    </div>
+                </div>
+            </details>
+
             <span class="privacy-pill"><span aria-hidden="true">●</span> Local catalogue</span>
         </nav>
     </header>
+
+    <nav class="review-workflow" aria-label="Review workflow">
+        <span>Review workflow</span>
+        <a href="/archive">Archive</a>
+        <a href="/">Faces</a>
+        <a href="/match-regeneration">Regenerate matches</a>
+        <a href="/progress">Progress</a>
+    </nav>
 
     <main class="content">
         @Body

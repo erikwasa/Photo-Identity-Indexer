@@ -35,12 +35,12 @@ Detector evaluation, comparison, rollout, audit and diagnostic pages were valuab
 
 ## Acceptance criteria
 
-- [ ] Primary navigation clearly emphasizes Review and Library plus a Settings/advanced entry point.
-- [ ] The normal new-image loop can be completed without visiting engineering pages.
-- [ ] Collection browsing remains directly reachable as Library.
-- [ ] Detector/model engineering, audit, progress and advanced person maintenance remain accessible outside the primary navigation.
-- [ ] Existing useful URLs are preserved or redirected.
-- [ ] Desktop and narrow/mobile navigation is usable without crowding.
+- [x] Primary navigation clearly emphasizes Review and Library plus a Settings/advanced entry point.
+- [x] The normal new-image loop can be completed without visiting engineering pages.
+- [x] Collection browsing remains directly reachable as Library.
+- [x] Detector/model engineering, audit, progress and advanced person maintenance remain accessible outside the primary navigation.
+- [x] Existing useful URLs are preserved or redirected.
+- [x] Desktop and narrow/mobile navigation is usable without crowding.
 
 ## Verification requirements
 
@@ -49,6 +49,11 @@ Human workflow verification on Windows and the trusted mobile-browser path, plus
 ## Completion notes
 
 - Files changed:
+  - `src/PhotoIdentity.Web/Layout/MainLayout.razor` reduces the always-visible navigation to Review, Library, Settings and Advanced while retaining all existing route targets.
+  - `src/PhotoIdentity.Web/Layout/MainLayout.razor.css` adds responsive primary navigation, an accessible no-script Advanced menu and a horizontally scrollable narrow-screen review workflow strip.
 - Trade-offs:
-- Deferred work:
-- Commands run:
+  - Existing route paths remain unchanged instead of introducing redirects solely for naming; `/` is presented as Review and `/collections` as Library.
+  - Archive, Faces, match regeneration and Progress stay visible as a secondary Review workflow because they are normal operating steps rather than engineering tools.
+  - Progress is also retained in Advanced so maintenance/diagnostic navigation remains complete without occupying the primary navigation.
+- Deferred work: no capabilities were removed; further consolidation inside individual Review/Library pages can be considered after milestone-wide human workflow verification.
+- Commands run: repository execution is unavailable in the current agent environment; validation is delegated to the repository GitHub Actions gate before review.
