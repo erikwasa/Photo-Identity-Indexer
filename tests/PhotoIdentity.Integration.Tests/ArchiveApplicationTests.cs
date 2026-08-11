@@ -100,6 +100,64 @@ public sealed class ArchiveApplicationTests
         }
     }
 
+    [Fact]
+    public async Task Archive_coverage_can_be_replaced_without_changing_source_or_deleting_catalogue_assets()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string archiveRoot = Path.Combine(directory, "Kamerabilder");
+            string january = Path.Combine(archiveRoot, "1970", "01");
+            string february = Path.Combine(archiveRoot, "1970", "02");
+            Directory.CreateDirectory(january);
+            Directory.CreateDirectory(february);
+            await File.WriteAllBytesAsync(Path.Combine(january, "one.jpg"), [1, 2, 3]);
+            await File.WriteAllBytesAsync(Path.Combine(february, "two.jpg"), [4, 5, 6]);
+
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            await using ArchiveApiFactory factory = new(
+                databasePath,
+                FindRepositoryRoot(),
+                Path.Combine(directory, "analysis-output"));
+            using HttpClient client = factory.CreateClient();
+
+            using HttpResponseMessage configure = await client.PostAsJsonAsync(
+                "/api/archive/include",
+                new ArchiveIncludeRequest(archiveRoot, "1970"));
+            configure.EnsureSuccessStatusCode();
+            using HttpResponseMessage initialSync = await client.PostAsync("/api/archive/sync", null);
+            initialSync.EnsureSuccessStatusCode();
+
+            using HttpResponseMessage replace = await client.PutAsJsonAsync(
+                "/api/archive/coverage",
+                new ArchiveCoverageUpdateRequest(["1970/02"]));
+            replace.EnsureSuccessStatusCode();
+            string replaceJson = await replace.Content.ReadAsStringAsync();
+            Assert.DoesNotContain(archiveRoot, replaceJson, StringComparison.OrdinalIgnoreCase);
+            ArchiveStatusResponse narrowed = Assert.IsType<ArchiveStatusResponse>(
+                await replace.Content.ReadFromJsonAsync<ArchiveStatusResponse>());
+            Assert.Equal("Kamerabilder", narrowed.RootName);
+            Assert.Equal(["1970/02"], narrowed.IncludedFolders);
+
+            ArchiveItemPageResponse retainedJanuary = Assert.IsType<ArchiveItemPageResponse>(
+                await client.GetFromJsonAsync<ArchiveItemPageResponse>(
+                    "/api/archive/items?folder=1970/01&state=all&offset=0&limit=50"));
+            ArchiveItemStatusResponse retainedItem = Assert.Single(retainedJanuary.Items);
+            Assert.Equal("1970/01/one.jpg", retainedItem.RelativePath);
+
+            ArchiveStatusResponse normalized = Assert.IsType<ArchiveStatusResponse>(
+                await (await client.PutAsJsonAsync(
+                    "/api/archive/coverage",
+                    new ArchiveCoverageUpdateRequest(["1970/01", "1970"])))
+                    .Content.ReadFromJsonAsync<ArchiveStatusResponse>());
+            Assert.Equal(["1970"], normalized.IncludedFolders);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
     private static string FindRepositoryRoot()
     {
         DirectoryInfo? directory = new(AppContext.BaseDirectory);

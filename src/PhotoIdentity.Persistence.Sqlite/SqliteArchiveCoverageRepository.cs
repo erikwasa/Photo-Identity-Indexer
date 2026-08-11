@@ -80,15 +80,66 @@ public sealed class SqliteArchiveCoverageRepository
         IReadOnlyList<string> normalized = ArchiveCoverage.NormalizeIncludedFolders(
             current.Append(normalizedFolder));
 
+        await WriteIncludedFoldersAsync(
+            connection,
+            transaction,
+            configured.Id,
+            normalized,
+            configuredAt,
+            cancellationToken);
+
+        transaction.Commit();
+        return new ArchiveCoverageConfiguration(configured, normalized);
+    }
+
+    /// <summary>
+    /// Replaces only the root-relative coverage list for the already configured permanent source.
+    /// Source identity and catalogue assets are preserved; this operation only changes which folders
+    /// future archive synchronization and processing runs consider included.
+    /// </summary>
+    public async Task<ArchiveCoverageConfiguration> ReplaceIncludedFoldersAsync(
+        IEnumerable<string> relativeFolders,
+        DateTimeOffset configuredAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(relativeFolders);
+        IReadOnlyList<string> normalized = ArchiveCoverage.NormalizeIncludedFolders(relativeFolders);
+        DateTimeOffset configuredAt = configuredAtUtc.ToUniversalTime();
+
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        CatalogueSource configured = await ReadConfiguredSourceAsync(connection, transaction, cancellationToken)
+            ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
+
+        await WriteIncludedFoldersAsync(
+            connection,
+            transaction,
+            configured.Id,
+            normalized,
+            configuredAt,
+            cancellationToken);
+
+        transaction.Commit();
+        return new ArchiveCoverageConfiguration(configured, normalized);
+    }
+
+    private static async Task WriteIncludedFoldersAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        SourceId sourceId,
+        IReadOnlyList<string> includedFolders,
+        DateTimeOffset configuredAtUtc,
+        CancellationToken cancellationToken)
+    {
         using (SqliteCommand delete = connection.CreateCommand())
         {
             delete.Transaction = transaction;
             delete.CommandText = "DELETE FROM archive_included_folders WHERE source_id = $source_id;";
-            delete.Parameters.AddWithValue("$source_id", configured.Id.ToString());
+            delete.Parameters.AddWithValue("$source_id", sourceId.ToString());
             await delete.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        foreach (string folder in normalized)
+        foreach (string folder in includedFolders)
         {
             using SqliteCommand insert = connection.CreateCommand();
             insert.Transaction = transaction;
@@ -96,14 +147,11 @@ public sealed class SqliteArchiveCoverageRepository
                 INSERT INTO archive_included_folders (source_id, relative_path, included_at_utc)
                 VALUES ($source_id, $relative_path, $included_at_utc);
                 """;
-            insert.Parameters.AddWithValue("$source_id", configured.Id.ToString());
+            insert.Parameters.AddWithValue("$source_id", sourceId.ToString());
             insert.Parameters.AddWithValue("$relative_path", folder);
-            insert.Parameters.AddWithValue("$included_at_utc", Format(configuredAt));
+            insert.Parameters.AddWithValue("$included_at_utc", Format(configuredAtUtc));
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
-
-        transaction.Commit();
-        return new ArchiveCoverageConfiguration(configured, normalized);
     }
 
     private static async Task<CatalogueSource?> ReadConfiguredSourceAsync(

@@ -19,12 +19,23 @@ See `docs/product/success-criteria.md` and `docs/delivery/local-first-plan.md` f
 - **M17 — Identity review automation**: `completed` and human-verified on 2026-08-11. All four M17 work items are merged to `main` and accepted on Windows laptop and Pixel.
 - **M12 — Full archive processing**: `proposed` under the repository status rules. Its archive-readiness work (WI-0041, WI-0042, WI-0053 and WI-0054) is completed and human-verified; the later full-coverage WI-0023 remains separate and is not yet ready.
 - **M09 — Azure VM pilot without identities**: `ready` and optional; Azure is not required for version 1.
-- **M18 — Operator application experience**: `ready` in the canonical `main` delivery registry.
+- **M18 — Operator application experience**: `ready` in the canonical `main` delivery registry. WI-0046, WI-0048, WI-0051 and WI-0052 are implemented and merged into the `m18` integration branch; draft PR #129 is the milestone integration and local-verification boundary.
 - **M19 — Photo metadata and semantic collections**: `ready` in the canonical `main` delivery registry.
 
 ## Canonical active work
 
-The `main` delivery registry currently has no work items in `in_progress`, `in_review` or `blocked` state after completion of M17 and WI-0054.
+The `main` delivery registry currently has no work items in `in_progress`, `in_review` or `blocked` state after completion of M17 and WI-0054. M18 implementation remains intentionally outside canonical completion status until the integrated local verification pass is accepted.
+
+## M18 operator application integration candidate
+
+All four M18 implementation work items are merged into `m18` and have automated evidence:
+
+- **WI-0046** simplifies the application shell around Review, Library and Settings while keeping engineering and maintenance tools available through Advanced/review-workflow navigation.
+- **WI-0048** consolidates archive coverage and matching/suggestion policy into `/settings`, including persisted archive-coverage replacement that preserves source identity and existing assets.
+- **WI-0051** provides a double-clickable Windows launcher with loopback-only hosting, `/health` readiness, duplicate-instance prevention, persisted local bootstrap configuration and actionable startup errors.
+- **WI-0052** provides a repeatable self-contained `win-x64` operator ZIP with `PhotoIdentity.cmd`; replaceable application code stays inside the package while catalogue, configuration, analysis/proxy data and logs remain external. Automated package verification passed first start, repeated-start reuse and side-by-side replacement against the same durable configuration/catalogue boundary.
+
+The observed self-contained CI package size is approximately 272.6 MB extracted / 116.1 MB ZIP. Draft PR #129 targets `main` and must remain unmerged until the integrated Windows verification is complete.
 
 ## Completed M17 identity review automation
 
@@ -44,7 +55,7 @@ Two non-blocking presentation issues were observed during M17 verification and m
 - on laptop, the `Unknown person`, `Assign` and `False detection` buttons do not fit comfortably inside a face card;
 - on Pixel, the persistent menu consumes roughly half the screen and remains fixed while scrolling, which is unacceptable for normal mobile use.
 
-These observations do not reopen any M17 acceptance criterion.
+The M18 narrow-layout verification should confirm whether the shell/navigation change resolves the Pixel menu observation. The face-card button fit remains a separate presentation follow-up if still visible. These observations do not reopen any M17 acceptance criterion.
 
 ## Completed WI-0054 archive polish
 
@@ -85,10 +96,11 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 
 ## Next concrete sequence
 
-1. Apply the two minor Faces responsive-layout fixes directly without creating work items.
-2. Confirm the version-1 product success criteria on the real Windows/OneDrive environment.
-3. Continue permanent-catalogue archive coverage incrementally when the remaining M12 full-coverage prerequisites are satisfied; do not create a replacement production database.
-4. Continue the planned operator-experience and library-intelligence milestones from their canonical ready states; Azure remains optional.
+1. Run the integrated M18 human verification pass on Windows from the synchronized `m18` / draft PR #129 candidate: extract/start from Explorer, verify Review/Library/Settings on desktop and narrow layout, confirm launcher duplicate/startup behavior, perform a non-destructive side-by-side package replacement, and verify the maintained catalogue/configuration persists.
+2. If M18 verification passes, update WI-0046, WI-0048, WI-0051, WI-0052 and M18 with human verification evidence, regenerate delivery status, and mark PR #129 ready for merge. If verification finds a defect, fix it on `m18` and repeat only the affected acceptance checks plus the integration gate.
+3. Apply any remaining minor Faces presentation follow-ups directly without reopening M17.
+4. Confirm the version-1 product success criteria on the real Windows/OneDrive environment.
+5. Continue permanent-catalogue archive coverage incrementally when the remaining M12 full-coverage prerequisites are satisfied; do not create a replacement production database. Continue M19 from its canonical ready state when prioritized; Azure remains optional.
 
 ## Completed gates
 
@@ -108,16 +120,22 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 - `docs/product/success-criteria.md`
 - `docs/delivery/local-first-plan.md`
 - `docs/delivery/milestones/M17-review-automation.md`
+- `docs/delivery/milestones/M18-application-experience.md`
 - `docs/delivery/work-items/WI-0043-confidence-auto-assignment.md`
 - `docs/delivery/work-items/WI-0044-favorite-people.md`
 - `docs/delivery/work-items/WI-0045-web-match-regeneration.md`
 - `docs/delivery/work-items/WI-0047-unknown-review-state.md`
 - `docs/delivery/work-items/WI-0054-archive-ui-polish.md`
+- `docs/delivery/work-items/WI-0046-simplified-application-shell.md`
+- `docs/delivery/work-items/WI-0048-configuration-page.md`
+- `docs/delivery/work-items/WI-0051-one-click-windows-launcher.md`
+- `docs/delivery/work-items/WI-0052-packaged-windows-application.md`
 - `docs/delivery/work-items/WI-0042-bounded-archive-storage.md`
 - `docs/delivery/work-items/WI-0041-incremental-archive-ingestion.md`
 - `docs/delivery/work-items/WI-0053-heic-raw-support.md`
 - `docs/operations/index.md`
 - `docs/operations/local-operator-guide.md`
+- `docs/operations/windows-package.md`
 - `docs/operations/bounded-archive-acceptance.md`
 - `docs/delivery/status/work-items.yaml`
 
@@ -128,6 +146,9 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 ./test.ps1
 ./verify-local.ps1 -InstallModels
 ./verify-review.ps1 -Mode Smoke -Configuration Release
+./verify-launcher.ps1 -Configuration Release
+./Package-PhotoIdentity.ps1 -Configuration Release
+./verify-package.ps1 -Configuration Release
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```

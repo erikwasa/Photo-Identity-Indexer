@@ -1,0 +1,319 @@
+[CmdletBinding()]
+param(
+    [string]$ConfigurationPath,
+    [string]$PublishPathOverride,
+    [switch]$NoBrowser,
+    [ValidateRange(1, 300)]
+    [int]$StartupTimeoutSeconds = 45
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+$SupportedSettings = @(
+    "PhotoIdentity__DatabasePath",
+    "PhotoIdentity__ArchiveAnalysisOutputRoot",
+    "PhotoIdentity__ReviewProxyRoot",
+    "PhotoIdentity__ReviewProxyProfileId",
+    "PhotoIdentity__ReviewProxyMaximumLongEdge",
+    "PhotoIdentity__ReviewProxyJpegQuality",
+    "PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes",
+    "PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes",
+    "PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations",
+    "PhotoIdentity__RepositoryRoot",
+    "PhotoIdentity__ModelDirectory"
+)
+
+function Resolve-LauncherConfigurationPath {
+    if (-not [string]::IsNullOrWhiteSpace($ConfigurationPath)) {
+        $candidate = [Environment]::ExpandEnvironmentVariables($ConfigurationPath)
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "Launcher configuration does not exist: $candidate"
+        }
+
+        return (Resolve-Path -LiteralPath $candidate).Path
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:PHOTOIDENTITY_LAUNCHER_CONFIG)) {
+        $candidate = [Environment]::ExpandEnvironmentVariables($env:PHOTOIDENTITY_LAUNCHER_CONFIG)
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "PHOTOIDENTITY_LAUNCHER_CONFIG points to a missing file: $candidate"
+        }
+
+        return (Resolve-Path -LiteralPath $candidate).Path
+    }
+
+    $adjacent = Join-Path $PSScriptRoot "PhotoIdentity.launcher.json"
+    if (Test-Path -LiteralPath $adjacent -PathType Leaf) {
+        return (Resolve-Path -LiteralPath $adjacent).Path
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $local = Join-Path $env:LOCALAPPDATA "PhotoIdentity\launcher.json"
+        if (Test-Path -LiteralPath $local -PathType Leaf) {
+            return (Resolve-Path -LiteralPath $local).Path
+        }
+    }
+
+    return $null
+}
+
+function Resolve-ConfiguredPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Value,
+        [string]$BaseDirectory
+    )
+
+    $expanded = [Environment]::ExpandEnvironmentVariables($Value.Trim())
+    if ([string]::IsNullOrWhiteSpace($expanded)) {
+        throw "Configured path may not be empty."
+    }
+
+    if ([IO.Path]::IsPathRooted($expanded)) {
+        return [IO.Path]::GetFullPath($expanded)
+    }
+
+    if ([string]::IsNullOrWhiteSpace($BaseDirectory)) {
+        return [IO.Path]::GetFullPath((Join-Path $PSScriptRoot $expanded))
+    }
+
+    return [IO.Path]::GetFullPath((Join-Path $BaseDirectory $expanded))
+}
+
+function Read-LauncherConfiguration {
+    $configurationFile = Resolve-LauncherConfigurationPath
+    $localApplicationRoot = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        Join-Path $PSScriptRoot ".photoidentity"
+    }
+    else {
+        Join-Path $env:LOCALAPPDATA "PhotoIdentity"
+    }
+
+    $publishPath = Join-Path $localApplicationRoot "app"
+    $url = "http://127.0.0.1:5080"
+    $settings = @{}
+    $configurationDirectory = $null
+
+    if ($null -ne $configurationFile) {
+        $configurationDirectory = Split-Path -Parent $configurationFile
+        $raw = Get-Content -LiteralPath $configurationFile -Raw
+        try {
+            $parsed = $raw | ConvertFrom-Json
+        }
+        catch {
+            throw "Launcher configuration is not valid JSON: $configurationFile. $($_.Exception.Message)"
+        }
+
+        if ($null -ne $parsed.PSObject.Properties["publishPath"] -and
+            -not [string]::IsNullOrWhiteSpace([string]$parsed.publishPath)) {
+            $publishPath = Resolve-ConfiguredPath -Value ([string]$parsed.publishPath) -BaseDirectory $configurationDirectory
+        }
+
+        if ($null -ne $parsed.PSObject.Properties["url"] -and
+            -not [string]::IsNullOrWhiteSpace([string]$parsed.url)) {
+            $url = ([string]$parsed.url).Trim()
+        }
+
+        if ($null -ne $parsed.PSObject.Properties["settings"] -and $null -ne $parsed.settings) {
+            foreach ($property in $parsed.settings.PSObject.Properties) {
+                if ($SupportedSettings -notcontains $property.Name) {
+                    throw "Unsupported launcher setting '$($property.Name)'. Only documented PhotoIdentity settings may be supplied."
+                }
+
+                if ($null -eq $property.Value) {
+                    continue
+                }
+
+                $settings[$property.Name] = [Environment]::ExpandEnvironmentVariables(([string]$property.Value).Trim())
+            }
+        }
+    }
+    else {
+        $publishPath = [IO.Path]::GetFullPath($publishPath)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($PublishPathOverride)) {
+        $publishPath = Resolve-ConfiguredPath -Value $PublishPathOverride -BaseDirectory $PSScriptRoot
+    }
+
+    try {
+        $baseUri = [Uri]$url
+    }
+    catch {
+        throw "Launcher URL is invalid: $url"
+    }
+
+    if (-not $baseUri.IsAbsoluteUri -or $baseUri.Scheme -ne "http" -or -not $baseUri.IsLoopback) {
+        throw "Launcher URL must be an absolute loopback HTTP URL such as http://127.0.0.1:5080."
+    }
+
+    if (-not [string]::IsNullOrEmpty($baseUri.Query) -or -not [string]::IsNullOrEmpty($baseUri.Fragment)) {
+        throw "Launcher URL may not contain a query string or fragment."
+    }
+
+    return [pscustomobject]@{
+        ConfigurationPath = $configurationFile
+        PublishPath = [IO.Path]::GetFullPath($publishPath)
+        BaseUri = $baseUri
+        Settings = $settings
+        LocalApplicationRoot = [IO.Path]::GetFullPath($localApplicationRoot)
+    }
+}
+
+function Test-PhotoIdentityHealth {
+    param([Parameter(Mandatory = $true)][Uri]$BaseUri)
+
+    $healthUri = New-Object Uri($BaseUri, "/health")
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri $healthUri.AbsoluteUri -TimeoutSec 2
+        if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) {
+            return $false
+        }
+
+        $payload = $response.Content | ConvertFrom-Json
+        return $null -ne $payload -and [string]$payload.status -eq "ok"
+    }
+    catch {
+        return $false
+    }
+}
+
+function Test-TcpPortOpen {
+    param([Parameter(Mandatory = $true)][Uri]$BaseUri)
+
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $task = $client.ConnectAsync($BaseUri.Host, $BaseUri.Port)
+        if (-not $task.Wait(600)) {
+            return $false
+        }
+
+        return $client.Connected
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
+function Open-PhotoIdentityBrowser {
+    param([Parameter(Mandatory = $true)][Uri]$BaseUri)
+
+    if ($NoBrowser) {
+        return
+    }
+
+    Start-Process $BaseUri.AbsoluteUri | Out-Null
+}
+
+function Start-PhotoIdentityServer {
+    param([Parameter(Mandatory = $true)]$Configuration)
+
+    if (-not (Test-Path -LiteralPath $Configuration.PublishPath -PathType Container)) {
+        throw "Published Photo Identity application was not found at '$($Configuration.PublishPath)'. Publish src\PhotoIdentity.Api\PhotoIdentity.Api.csproj there or create PhotoIdentity.launcher.json from PhotoIdentity.launcher.example.json with the correct publishPath."
+    }
+
+    $executable = Join-Path $Configuration.PublishPath "PhotoIdentity.Api.exe"
+    $assembly = Join-Path $Configuration.PublishPath "PhotoIdentity.Api.dll"
+    $filePath = $null
+    $argumentList = $null
+
+    if (Test-Path -LiteralPath $executable -PathType Leaf) {
+        $filePath = $executable
+        $argumentList = "--urls `"$($Configuration.BaseUri.AbsoluteUri)`""
+    }
+    elseif (Test-Path -LiteralPath $assembly -PathType Leaf) {
+        $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
+        if ($null -eq $dotnet) {
+            throw "PhotoIdentity.Api.dll exists, but the .NET runtime was not found on PATH. Install the required .NET runtime or use the packaged Windows application."
+        }
+
+        $filePath = $dotnet.Source
+        $argumentList = "`"$assembly`" --urls `"$($Configuration.BaseUri.AbsoluteUri)`""
+    }
+    else {
+        throw "Publish output '$($Configuration.PublishPath)' does not contain PhotoIdentity.Api.exe or PhotoIdentity.Api.dll. Republish the API project before launching."
+    }
+
+    $logDirectory = Join-Path $Configuration.LocalApplicationRoot "launcher-logs"
+    New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+    $stdoutLog = Join-Path $logDirectory "api.stdout.log"
+    $stderrLog = Join-Path $logDirectory "api.stderr.log"
+
+    $previousValues = @{}
+    foreach ($name in $Configuration.Settings.Keys) {
+        $previousValues[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+        [Environment]::SetEnvironmentVariable($name, $Configuration.Settings[$name], "Process")
+    }
+
+    try {
+        return Start-Process `
+            -FilePath $filePath `
+            -ArgumentList $argumentList `
+            -WorkingDirectory $Configuration.PublishPath `
+            -WindowStyle Hidden `
+            -RedirectStandardOutput $stdoutLog `
+            -RedirectStandardError $stderrLog `
+            -PassThru
+    }
+    finally {
+        foreach ($name in $Configuration.Settings.Keys) {
+            [Environment]::SetEnvironmentVariable($name, $previousValues[$name], "Process")
+        }
+    }
+}
+
+try {
+    $configuration = Read-LauncherConfiguration
+
+    if (Test-PhotoIdentityHealth -BaseUri $configuration.BaseUri) {
+        Write-Host "Photo Identity is already running at $($configuration.BaseUri.AbsoluteUri)"
+        Open-PhotoIdentityBrowser -BaseUri $configuration.BaseUri
+        exit 0
+    }
+
+    if (Test-TcpPortOpen -BaseUri $configuration.BaseUri) {
+        throw "Port $($configuration.BaseUri.Port) is already in use, but Photo Identity did not answer its /health endpoint. Stop the conflicting process or change the loopback URL in the launcher configuration."
+    }
+
+    Write-Host "Starting Photo Identity from $($configuration.PublishPath)"
+    if ($null -ne $configuration.ConfigurationPath) {
+        Write-Host "Using launcher configuration $($configuration.ConfigurationPath)"
+    }
+    else {
+        Write-Host "No launcher configuration file was found; using local defaults."
+    }
+
+    $process = Start-PhotoIdentityServer -Configuration $configuration
+    $deadline = [DateTime]::UtcNow.AddSeconds($StartupTimeoutSeconds)
+
+    while ([DateTime]::UtcNow -lt $deadline) {
+        if ($process.HasExited) {
+            $logDirectory = Join-Path $configuration.LocalApplicationRoot "launcher-logs"
+            throw "Photo Identity exited during startup with code $($process.ExitCode). Review '$logDirectory\api.stderr.log' for details."
+        }
+
+        if (Test-PhotoIdentityHealth -BaseUri $configuration.BaseUri) {
+            Write-Host "Photo Identity is ready at $($configuration.BaseUri.AbsoluteUri)"
+            Open-PhotoIdentityBrowser -BaseUri $configuration.BaseUri
+            exit 0
+        }
+
+        Start-Sleep -Milliseconds 350
+    }
+
+    if (-not $process.HasExited) {
+        Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    }
+
+    $logDirectory = Join-Path $configuration.LocalApplicationRoot "launcher-logs"
+    throw "Photo Identity did not become healthy within $StartupTimeoutSeconds seconds. The attempted process was stopped. Review '$logDirectory\api.stderr.log' for details."
+}
+catch {
+    Write-Host "Photo Identity launcher error:" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    exit 1
+}

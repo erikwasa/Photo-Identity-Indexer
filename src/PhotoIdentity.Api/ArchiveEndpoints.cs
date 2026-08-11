@@ -75,6 +75,7 @@ public static class ArchiveEndpoints
         group.MapGet("/status", GetStatusAsync);
         group.MapGet("/items", GetItemsAsync);
         group.MapPost("/include", IncludeAsync);
+        group.MapPut("/coverage", ReplaceCoverageAsync);
         group.MapPost("/sync", SyncAsync);
         group.MapPost("/advance/start", StartAdvancementAsync);
         group.MapPost("/advance/pause", PauseAdvancementAsync);
@@ -188,6 +189,30 @@ public static class ArchiveEndpoints
             _ = await coverageRepository.ConfigureAndIncludeAsync(
                 source,
                 request.RelativeFolder,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
+            return Results.Ok(await BuildStatusAsync(database, operatorConfiguration, cancellationToken));
+        }
+        catch (Exception exception)
+        {
+            return BadRequest(exception);
+        }
+    }
+
+    private static async Task<IResult> ReplaceCoverageAsync(
+        ArchiveCoverageUpdateRequest request,
+        SqliteCatalogueDatabase database,
+        ArchiveOperatorConfiguration operatorConfiguration,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            ArgumentNullException.ThrowIfNull(request.IncludedFolders);
+            SqliteArchiveCoverageRepository coverageRepository = new(database);
+            _ = await coverageRepository.ReplaceIncludedFoldersAsync(
+                request.IncludedFolders,
                 timeProvider.GetUtcNow(),
                 cancellationToken);
             return Results.Ok(await BuildStatusAsync(database, operatorConfiguration, cancellationToken));

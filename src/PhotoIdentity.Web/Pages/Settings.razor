@@ -1,0 +1,441 @@
+@page "/settings"
+@inject HttpClient Http
+
+<PageTitle>Settings · Photo Identity</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Operator settings</p>
+        <h1>Settings</h1>
+        <p>Manage permanent archive coverage and the confidence policy used for future identity matching runs.</p>
+    </div>
+    <button class="button secondary" disabled="@Busy" @onclick="RefreshAsync">Refresh</button>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="notice success" role="status">@Message</div>
+}
+
+@if (Loading)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading settings…</p>
+    </section>
+}
+else
+{
+    <section class="review-filter-panel" aria-labelledby="archive-settings-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Permanent archive</p>
+                <h2 id="archive-settings-heading">Archive coverage</h2>
+            </div>
+            @if (Archive is { Configured: true })
+            {
+                <span class="model-summary">Source: @Archive.RootName</span>
+            }
+        </div>
+
+        @if (Archive is not { Configured: true })
+        {
+            <p>Configure the permanent source once. The browser sends the path during setup, but API responses expose only the source folder name and root-relative coverage.</p>
+            <form @onsubmit="ConfigureArchiveAsync" @onsubmit:preventDefault>
+                <div class="review-filter-grid">
+                    <div>
+                        <label class="field-label" for="settings-archive-root">Permanent archive root</label>
+                        <input id="settings-archive-root"
+                               @bind="ArchiveRootPath"
+                               disabled="@Busy"
+                               placeholder="C:\Users\…\OneDrive\Bilder\Kamerabilder" />
+                        <p>Once configured, this source identity is preserved by later coverage changes.</p>
+                    </div>
+                    <div>
+                        <label class="field-label" for="settings-initial-folder">First included folder</label>
+                        <input id="settings-initial-folder"
+                               @bind="InitialArchiveFolder"
+                               disabled="@Busy"
+                               placeholder="1970/01" />
+                        <p>Use a root-relative folder. Enter <code>.</code> to include the complete archive root.</p>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button type="submit"
+                            class="button primary"
+                            disabled="@(Busy || string.IsNullOrWhiteSpace(ArchiveRootPath) || string.IsNullOrWhiteSpace(InitialArchiveFolder))">
+                        Configure archive
+                    </button>
+                </div>
+            </form>
+        }
+        else
+        {
+            <form @onsubmit="SaveCoverageAsync" @onsubmit:preventDefault>
+                <label class="field-label" for="settings-coverage">Included folders</label>
+                <textarea id="settings-coverage"
+                          rows="7"
+                          @bind="CoverageFoldersText"
+                          disabled="@Busy"></textarea>
+                <p>One root-relative folder per line. Parent folders subsume children, so <code>1970</code> replaces separate <code>1970/01</code>, <code>1970/02</code>, and similar entries. Enter <code>.</code> for the archive root.</p>
+                <div class="notice warning">
+                    Changing coverage does not delete catalogue assets. It changes which folders future synchronization, verification and processing runs include.
+                </div>
+                <div class="card-actions">
+                    <button type="submit" class="button primary" disabled="@Busy">Save archive coverage</button>
+                    <a class="button secondary" href="/archive">Open archive progress</a>
+                </div>
+            </form>
+        }
+    </section>
+
+    <section class="review-filter-panel" aria-labelledby="matching-settings-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Identity matching</p>
+                <h2 id="matching-settings-heading">Suggestion confidence policy</h2>
+            </div>
+        </div>
+
+        @if (PolicyOptions.ModelRevisions.Count == 0)
+        {
+            <div class="empty-state compact">
+                <p>No exact suggestion-model revisions are available yet. Generate identity suggestions before configuring model-specific confidence boundaries.</p>
+            </div>
+        }
+        else
+        {
+            <label class="field-label" for="settings-model">Exact model revision</label>
+            <select id="settings-model"
+                    @bind="SelectedModelIndex"
+                    @bind:after="ChangePolicyModelAsync"
+                    disabled="@Busy">
+                @for (int index = 0; index < PolicyOptions.ModelRevisions.Count; index++)
+                {
+                    ReviewModelRevisionFilterResponse model = PolicyOptions.ModelRevisions[index];
+                    <option value="@index">@ModelLabel(model)</option>
+                }
+            </select>
+
+            @if (LoadingPolicy)
+            {
+                <div class="empty-state compact" aria-live="polite">
+                    <div class="spinner" aria-hidden="true"></div>
+                    <p>Loading confidence policy…</p>
+                </div>
+            }
+            else if (Policy is IdentitySuggestionPolicyResponse policy)
+            {
+                <form @onsubmit="SavePolicyAsync" @onsubmit:preventDefault>
+                    <div class="review-filter-grid">
+                        <div>
+                            <label class="field-label" for="settings-high-score">High minimum score</label>
+                            <input id="settings-high-score"
+                                   type="number"
+                                   min="0"
+                                   max="1"
+                                   step="0.01"
+                                   @bind="HighScoreThreshold"
+                                   disabled="@Busy" />
+                            <p>Rank 1 must meet this score and the High rank gap below.</p>
+                        </div>
+                        <div>
+                            <label class="field-label" for="settings-high-margin">High minimum rank gap</label>
+                            <input id="settings-high-margin"
+                                   type="number"
+                                   min="0"
+                                   max="2"
+                                   step="0.01"
+                                   @bind="HighMarginThreshold"
+                                   disabled="@Busy" />
+                            <p>High requires rank 1 minus rank 2 to meet this margin.</p>
+                        </div>
+                        <div>
+                            <label class="field-label" for="settings-medium-score">Medium minimum score</label>
+                            <input id="settings-medium-score"
+                                   type="number"
+                                   min="0"
+                                   max="1"
+                                   step="0.01"
+                                   @bind="MediumScoreThreshold"
+                                   disabled="@Busy" />
+                            <p>Scores below this boundary are Low.</p>
+                        </div>
+                    </div>
+
+                    <label class="field-label" for="settings-auto-assign">
+                        <input id="settings-auto-assign"
+                               type="checkbox"
+                               @bind="AutoAssignEnabled"
+                               disabled="@Busy" />
+                        Automatically assign qualifying High suggestions after a future regeneration
+                    </label>
+
+                    <div class="notice warning">
+                        Policy changes affect future suggestion regeneration and automatic assignment. They do not retroactively rewrite existing canonical assignments.
+                    </div>
+
+                    <div class="card-actions">
+                        <button type="submit" class="button primary" disabled="@Busy">Save matching policy</button>
+                        <a class="button secondary" href="/match-regeneration">Regenerate matches</a>
+                    </div>
+
+                    <p class="field-help">Policy version @policy.Version · updated by @policy.UpdatedBy · @policy.ModelId · @HashPrefix(policy.ModelHash)</p>
+                </form>
+            }
+        }
+    </section>
+}
+
+@code {
+    private const string PolicyActor = "local-reviewer";
+
+    private ArchiveStatusResponse? Archive { get; set; }
+    private ReviewFilterOptionsResponse PolicyOptions { get; set; } = new([], []);
+    private IdentitySuggestionPolicyResponse? Policy { get; set; }
+    private string ArchiveRootPath { get; set; } = string.Empty;
+    private string InitialArchiveFolder { get; set; } = string.Empty;
+    private string CoverageFoldersText { get; set; } = string.Empty;
+    private string SelectedModelIndex { get; set; } = "0";
+    private bool AutoAssignEnabled { get; set; }
+    private double HighScoreThreshold { get; set; }
+    private double HighMarginThreshold { get; set; }
+    private double MediumScoreThreshold { get; set; }
+    private bool Loading { get; set; } = true;
+    private bool LoadingPolicy { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    private ReviewModelRevisionFilterResponse? SelectedModel =>
+        int.TryParse(SelectedModelIndex, out int index) &&
+        index >= 0 && index < PolicyOptions.ModelRevisions.Count
+            ? PolicyOptions.ModelRevisions[index]
+            : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        Busy = true;
+        Message = null;
+        try
+        {
+            await LoadAllAsync();
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task LoadAllAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Archive = await Http.GetFromJsonAsync<ArchiveStatusResponse>("api/archive/status");
+            CopyCoverageFromArchive();
+
+            PolicyOptions = await Http.GetFromJsonAsync<ReviewFilterOptionsResponse>("api/review/filters")
+                ?? new ReviewFilterOptionsResponse([], []);
+            if (PolicyOptions.ModelRevisions.Count > 0)
+            {
+                if (!int.TryParse(SelectedModelIndex, out int selectedIndex) ||
+                    selectedIndex < 0 || selectedIndex >= PolicyOptions.ModelRevisions.Count)
+                {
+                    SelectedModelIndex = "0";
+                }
+
+                await LoadPolicyAsync();
+            }
+            else
+            {
+                Policy = null;
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task ConfigureArchiveAsync()
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/archive/include",
+                new ArchiveIncludeRequest(ArchiveRootPath, InitialArchiveFolder));
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Archive = await response.Content.ReadFromJsonAsync<ArchiveStatusResponse>();
+            CopyCoverageFromArchive();
+            ArchiveRootPath = string.Empty;
+            InitialArchiveFolder = string.Empty;
+            Message = "Permanent archive source and initial coverage saved.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task SaveCoverageAsync()
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            string[] folders = CoverageFoldersText
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                "api/archive/coverage",
+                new ArchiveCoverageUpdateRequest(folders));
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Archive = await response.Content.ReadFromJsonAsync<ArchiveStatusResponse>();
+            CopyCoverageFromArchive();
+            Message = "Archive coverage saved. Existing catalogue assets were preserved.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ChangePolicyModelAsync()
+    {
+        Message = null;
+        Error = null;
+        Policy = null;
+        await LoadPolicyAsync();
+    }
+
+    private async Task LoadPolicyAsync()
+    {
+        ReviewModelRevisionFilterResponse model = SelectedModel
+            ?? throw new InvalidOperationException("An exact suggestion model revision is required.");
+
+        LoadingPolicy = true;
+        try
+        {
+            Policy = await Http.GetFromJsonAsync<IdentitySuggestionPolicyResponse>(PolicyUrl(model));
+            if (Policy is null)
+            {
+                Error = "The suggestion policy response was empty.";
+                return;
+            }
+
+            CopyFromPolicy(Policy);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            LoadingPolicy = false;
+        }
+    }
+
+    private async Task SavePolicyAsync()
+    {
+        ReviewModelRevisionFilterResponse model = SelectedModel
+            ?? throw new InvalidOperationException("An exact suggestion model revision is required.");
+
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            UpdateIdentitySuggestionPolicyRequest request = new(
+                AutoAssignEnabled,
+                HighScoreThreshold,
+                HighMarginThreshold,
+                MediumScoreThreshold,
+                PolicyActor);
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(PolicyUrl(model), request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Policy = await response.Content.ReadFromJsonAsync<IdentitySuggestionPolicyResponse>();
+            if (Policy is null)
+            {
+                Error = "The saved suggestion policy response was empty.";
+                return;
+            }
+
+            CopyFromPolicy(Policy);
+            Message = $"Matching policy version {Policy.Version} saved for {Policy.ModelId} · {HashPrefix(Policy.ModelHash)}.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void CopyCoverageFromArchive()
+    {
+        CoverageFoldersText = Archive is { Configured: true }
+            ? string.Join(Environment.NewLine, Archive.IncludedFolders.Select(folder => string.IsNullOrEmpty(folder) ? "." : folder))
+            : string.Empty;
+    }
+
+    private void CopyFromPolicy(IdentitySuggestionPolicyResponse policy)
+    {
+        AutoAssignEnabled = policy.AutoAssignEnabled;
+        HighScoreThreshold = policy.HighScoreThreshold;
+        HighMarginThreshold = policy.HighMarginThreshold;
+        MediumScoreThreshold = policy.MediumScoreThreshold;
+    }
+
+    private static string PolicyUrl(ReviewModelRevisionFilterResponse model) =>
+        $"api/review/suggestion-policy?modelId={Uri.EscapeDataString(model.ModelId)}" +
+        $"&modelHash={Uri.EscapeDataString(model.ModelHash)}";
+
+    private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
+        $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+
+    private static string HashPrefix(string hash) =>
+        hash[..Math.Min(12, hash.Length)];
+}
