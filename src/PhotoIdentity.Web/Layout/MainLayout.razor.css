@@ -166,16 +166,14 @@
         width: 100%;
         flex-wrap: nowrap;
         justify-content: flex-start;
-        gap: 0.25rem;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-        scrollbar-width: thin;
+        gap: 0.15rem;
     }
 
     .primary-link {
         min-height: 40px;
         flex: 0 0 auto;
-        padding: 0.45rem 0.65rem;
+        padding: 0.45rem 0.55rem;
+        font-size: 0.92rem;
     }
 
     .privacy-pill {
