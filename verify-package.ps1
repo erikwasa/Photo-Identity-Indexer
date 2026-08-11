@@ -130,7 +130,7 @@ try {
     $databasePath = Join-Path $configurationDirectory "catalogue.db"
     $analysisPath = Join-Path $configurationDirectory "archive-analysis"
     $reviewProxyPath = Join-Path $configurationDirectory "review-proxies"
-    $configuration = [ordered]@{
+    $launcherConfiguration = [ordered]@{
         url = $url
         settings = [ordered]@{
             PhotoIdentity__DatabasePath = $databasePath
@@ -138,7 +138,7 @@ try {
             PhotoIdentity__ReviewProxyRoot = $reviewProxyPath
         }
     }
-    $configuration | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $configurationPath -Encoding UTF8
+    $launcherConfiguration | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $configurationPath -Encoding UTF8
     $configurationHash = (Get-FileHash -LiteralPath $configurationPath -Algorithm SHA256).Hash
 
     $preexisting = @(Get-PackageServerProcesses)
