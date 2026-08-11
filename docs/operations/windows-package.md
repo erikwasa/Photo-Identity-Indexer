@@ -1,0 +1,118 @@
+# Windows operator package
+
+This runbook defines the M18 Windows package boundary for normal Photo Identity use. The package is a replaceable code bundle; the catalogue, launcher configuration, analysis output, review proxies, logs and other private derived data stay outside the package directory.
+
+## Supported package
+
+The supported operator package is currently:
+
+- runtime identifier: `win-x64`;
+- deployment mode: **self-contained**;
+- UI/runtime shape: the existing local ASP.NET Core host plus Blazor WebAssembly application;
+- operator entry point: `PhotoIdentity.cmd`;
+- local listener: loopback HTTP only, normally `http://127.0.0.1:5080`.
+
+Self-contained deployment is intentional. It makes the ZIP larger and requires rebuilding/replacing the package when the bundled .NET runtime must be updated, but normal use does not depend on a separately installed .NET runtime or on an operator running `dotnet publish`.
+
+MSI/MSIX packaging is not required for this milestone. A ZIP/folder package keeps the installation boundary transparent, supports side-by-side replacement, and avoids introducing installer state while there is only one supported Windows architecture.
+
+## Build a package
+
+From the repository root:
+
+```powershell
+./Package-PhotoIdentity.ps1 -Configuration Release
+```
+
+The default outputs are:
+
+```text
+.artifacts\packages\PhotoIdentity-win-x64\
+.artifacts\packages\PhotoIdentity-win-x64.zip
+```
+
+The packager:
+
+1. publishes `src/PhotoIdentity.Api` self-contained for `win-x64`;
+2. places application binaries under `app`;
+3. adds `PhotoIdentity.cmd`, `Start-PhotoIdentity.ps1`, `README.txt`, a safe launcher-configuration example and `package-manifest.json`;
+4. rejects an accidental real `PhotoIdentity.launcher.json` or SQLite database in the package; and
+5. creates the ZIP and prints compressed/uncompressed package size.
+
+The CI `package-verification` job runs the same package path on Windows and uploads the resulting ZIP as a short-lived workflow artifact.
+
+## Install and start
+
+Extract the complete ZIP to a local folder, for example:
+
+```text
+C:\Apps\PhotoIdentity-<version>
+```
+
+Then double-click:
+
+```text
+PhotoIdentity.cmd
+```
+
+`PhotoIdentity.cmd` pins the executable code location to the package's own `app` directory, then delegates startup-health, duplicate-instance and browser behavior to the WI-0051 launcher. This code-path override is deliberately separate from persistent operator settings.
+
+## Durable data and settings
+
+By default, Photo Identity uses:
+
+```text
+%LOCALAPPDATA%\PhotoIdentity
+```
+
+for local durable application state such as the default catalogue, archive analysis output and launcher logs. Private installations may configure other local non-OneDrive paths where the existing operating policy requires them.
+
+Optional launcher configuration belongs at:
+
+```text
+%LOCALAPPDATA%\PhotoIdentity\launcher.json
+```
+
+Copy the package's `PhotoIdentity.launcher.example.json` there when configuration is required. For packaged use, normally **do not set `publishPath`**. `PhotoIdentity.cmd` always runs the `app` directory beside the package launcher, while URL and whitelisted `PhotoIdentity__...` settings remain durable outside the package.
+
+Do not place any of these inside the extracted package directory:
+
+- the canonical SQLite catalogue;
+- archive-analysis output;
+- review proxies;
+- private photos or crops;
+- real launcher configuration; or
+- backups.
+
+## Upgrade or replace the package
+
+Use side-by-side replacement rather than overwriting a running application folder:
+
+1. extract the new ZIP to a new local folder beside the current package;
+2. stop the currently running `PhotoIdentity.Api.exe` process;
+3. start `PhotoIdentity.cmd` from the new folder;
+4. confirm the existing catalogue, settings and expected Review/Library state are present; and
+5. delete the old package folder only after the new package is verified.
+
+No catalogue migration or private-data copy is part of a normal package replacement because durable state is outside both package folders. Normal database schema migration remains the application's existing startup responsibility and must continue to follow the SQLite backup/restore policy for risky maintenance.
+
+## Verification
+
+Automated package verification is:
+
+```powershell
+./verify-package.ps1 -Configuration Release
+```
+
+It uses disposable local application data and a dedicated loopback port. The verification:
+
+- builds the self-contained `win-x64` ZIP;
+- extracts and starts package v1 through `PhotoIdentity.cmd`;
+- waits for `/health` and verifies a repeated launch reuses the same process;
+- confirms the catalogue is created outside the package directory;
+- stops v1;
+- extracts the same package into a second install directory;
+- starts v2 against the same external configuration/catalogue; and
+- proves the external configuration and a preservation marker survive the replacement.
+
+M18 completion still requires a human Windows pass: extract/copy the package, double-click `PhotoIdentity.cmd`, inspect Review/Library/Settings on desktop and narrow layout, and perform one non-destructive side-by-side replacement using the maintained catalogue configuration.

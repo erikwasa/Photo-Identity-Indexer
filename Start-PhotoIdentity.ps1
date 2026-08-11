@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$ConfigurationPath,
+    [string]$PublishPathOverride,
     [switch]$NoBrowser,
     [ValidateRange(1, 300)]
     [int]$StartupTimeoutSeconds = 45
@@ -132,6 +133,10 @@ function Read-LauncherConfiguration {
         $publishPath = [IO.Path]::GetFullPath($publishPath)
     }
 
+    if (-not [string]::IsNullOrWhiteSpace($PublishPathOverride)) {
+        $publishPath = Resolve-ConfiguredPath -Value $PublishPathOverride -BaseDirectory $PSScriptRoot
+    }
+
     try {
         $baseUri = [Uri]$url
     }
@@ -223,7 +228,7 @@ function Start-PhotoIdentityServer {
     elseif (Test-Path -LiteralPath $assembly -PathType Leaf) {
         $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
         if ($null -eq $dotnet) {
-            throw "PhotoIdentity.Api.dll exists, but the .NET runtime was not found on PATH. Install the required .NET runtime or use the future packaged application from WI-0052."
+            throw "PhotoIdentity.Api.dll exists, but the .NET runtime was not found on PATH. Install the required .NET runtime or use the packaged Windows application."
         }
 
         $filePath = $dotnet.Source

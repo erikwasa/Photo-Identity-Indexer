@@ -1,0 +1,8 @@
+{
+  "url": "http://127.0.0.1:5080",
+  "settings": {
+    "PhotoIdentity__DatabasePath": "%LOCALAPPDATA%\\PhotoIdentity\\catalogue.db",
+    "PhotoIdentity__ArchiveAnalysisOutputRoot": "%LOCALAPPDATA%\\PhotoIdentity\\archive-analysis",
+    "PhotoIdentity__ReviewProxyRoot": "%LOCALAPPDATA%\\PhotoIdentity\\review-proxies"
+  }
+}
