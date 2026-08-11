@@ -140,30 +140,77 @@
 }
 
 @media (max-width: 680px) {
+    .topbar {
+        position: static;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.55rem;
+        padding: max(0.65rem, env(safe-area-inset-top)) 0.75rem 0.65rem;
+    }
+
+    .brand {
+        align-self: flex-start;
+    }
+
+    .brand small {
+        display: none;
+    }
+
+    .brand-mark {
+        width: 2.35rem;
+        height: 2.35rem;
+        border-radius: 0.72rem;
+    }
+
     .primary-nav {
         width: 100%;
+        flex-wrap: nowrap;
         justify-content: flex-start;
+        gap: 0.25rem;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: thin;
     }
 
     .primary-link {
-        padding-inline: 0.65rem;
+        min-height: 40px;
+        flex: 0 0 auto;
+        padding: 0.45rem 0.65rem;
+    }
+
+    .privacy-pill {
+        display: none;
     }
 
     .advanced-menu {
-        position: static;
+        position: relative;
+        flex: 0 0 auto;
     }
 
     .advanced-menu-panel {
         position: absolute;
-        left: 1rem;
-        right: 1rem;
-        top: auto;
+        top: calc(100% + 0.4rem);
+        left: auto;
+        right: 0;
+        width: min(19rem, calc(100vw - 1.5rem));
         min-width: 0;
+        max-height: min(60vh, 28rem);
         grid-template-columns: 1fr;
-        margin-top: 0.45rem;
+        margin-top: 0;
+        overflow-y: auto;
     }
 
     .review-workflow {
-        padding-inline: 1rem;
+        gap: 0.2rem;
+        padding: 0.35rem 0.75rem;
+    }
+
+    .review-workflow > span {
+        display: none;
+    }
+
+    .review-workflow a {
+        min-height: 36px;
+        padding: 0.35rem 0.55rem;
     }
 }
