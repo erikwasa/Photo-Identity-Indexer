@@ -33,11 +33,11 @@ The canonical people list will become increasingly long. Alphabetical selection 
 
 ## Acceptance criteria
 
-- [ ] A person can be marked and unmarked as favorite.
-- [ ] Favorite state persists across application restarts and person rename.
-- [ ] Favorites appear first in all normal person selectors with stable alphabetical ordering inside each group.
-- [ ] Favorite state does not affect matcher evidence or scores.
-- [ ] Person merge has defined, tested favorite-state behavior.
+- [x] A person can be marked and unmarked as favorite.
+- [x] Favorite state persists across application restarts and person rename.
+- [x] Favorites appear first in all normal person selectors with stable alphabetical ordering inside each group.
+- [x] Favorite state does not affect matcher evidence or scores.
+- [x] Person merge has defined, tested favorite-state behavior.
 
 ## Verification requirements
 
@@ -45,7 +45,8 @@ Automated persistence/query tests plus browser verification on desktop and narro
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: favorite-person persistence, review/maintenance API contracts and endpoints, people maintenance controls, Face Details favorite control, face-card assignment labels, collection ordering, and integration coverage.
+- Integration resolved: after WI-0043 merged, WI-0047 schema version 12 promoted `person_favorites` into the central SQLite migration lifecycle and moved favorite OR-consolidation into the canonical person-merge transaction. The temporary branch-isolation trade-off is therefore closed before M17 review.
+- Merge policy: the surviving person is favorite when either the source or target person was favorite; rename never changes favorite state.
+- Deferred work: desktop and narrow/mobile browser verification is intentionally deferred to the milestone-wide M17 review. No matcher prior or scoring behavior is introduced.
+- Verification: PR #117 merged to `m17`; post-conflict GitHub Actions run `31435193480` passed Release build, full tests, documentation checks, review-app smoke, and Windows mixed-media verification.

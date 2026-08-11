@@ -21,7 +21,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M12 | Full archive processing | in_progress |
 | M13 | Ongoing local synchronisation | proposed |
 | M14 | Collection-ready API | completed |
-| M17 | Identity review automation | ready |
+| M17 | Identity review automation | in_progress |
 | M18 | Operator application experience | ready |
 | M19 | Photo metadata and semantic collections | ready |
 

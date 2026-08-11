@@ -7,36 +7,13 @@ using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
-public enum IdentityMatchTargetScope
-{
-    UnreviewedOnly,
-    UnreviewedAndUnknown,
-}
-
-public sealed record IdentityMatchSummary(
-    int TargetCount,
-    int SuggestedTargetCount,
-    int SuggestionCount);
-
-public sealed record CatalogueRankedIdentitySuggestion(
-    long SuggestionId,
-    FaceOccurrenceId FaceOccurrenceId,
-    PersonId SuggestedPersonId,
-    ModelId ModelId,
-    Sha256Digest ModelHash,
-    int Rank,
-    double Score,
-    double? ScoreMargin,
-    string Status,
-    DateTimeOffset GeneratedAtUtc);
-
 /// <summary>
-/// Regenerates exact cosine-similarity suggestions from current canonical exemplars.
-/// Normal regeneration targets only unreviewed faces. An explicit target scope may include
-/// Unknown faces for intentional future rematching without changing their stored review state.
-/// Suggestions never write canonical labels, and reviewed suggestion states are preserved.
+/// Scores one snapshotted regeneration target per transaction. The durable run controller
+/// guarantees that canonical identity evidence remains unchanged across the whole run.
+/// Keeping each target transaction short allows review reads and UI polling to continue while
+/// a large regeneration is in progress.
 /// </summary>
-public sealed class SqliteIdentityMatcher
+public sealed class SqliteIdentityMatchRegenerationScorer
 {
     private const string PendingStatus = "pending";
     private const string RejectedStatus = "rejected";
@@ -44,7 +21,7 @@ public sealed class SqliteIdentityMatcher
     private readonly SqliteCatalogueDatabase _database;
     private readonly TimeProvider _timeProvider;
 
-    public SqliteIdentityMatcher(
+    public SqliteIdentityMatchRegenerationScorer(
         SqliteCatalogueDatabase database,
         TimeProvider? timeProvider = null)
     {
@@ -53,33 +30,36 @@ public sealed class SqliteIdentityMatcher
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    public Task<IdentityMatchSummary> RegenerateAsync(
+    public async Task<int> ScoreTargetAsync(
         ModelId modelId,
         Sha256Digest modelHash,
-        CancellationToken cancellationToken = default) =>
-        RegenerateAsync(
-            modelId,
-            modelHash,
-            IdentityMatchTargetScope.UnreviewedOnly,
-            cancellationToken);
-
-    public async Task<IdentityMatchSummary> RegenerateAsync(
-        ModelId modelId,
-        Sha256Digest modelHash,
-        IdentityMatchTargetScope targetScope,
+        FaceOccurrenceId faceOccurrenceId,
         CancellationToken cancellationToken = default)
     {
-        if (targetScope is not (
-            IdentityMatchTargetScope.UnreviewedOnly or
-            IdentityMatchTargetScope.UnreviewedAndUnknown))
-        {
-            throw new ArgumentOutOfRangeException(nameof(targetScope));
-        }
-
         await _database.InitializeAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
         await EnsureRankingSchemaAsync(connection, transaction, cancellationToken);
+
+        StoredEmbedding? target = await ReadEligibleTargetAsync(
+            connection,
+            transaction,
+            modelId,
+            modelHash,
+            faceOccurrenceId,
+            cancellationToken);
+        if (target is null)
+        {
+            await ClearTargetRankingsAsync(
+                connection,
+                transaction,
+                faceOccurrenceId,
+                modelId,
+                modelHash,
+                cancellationToken);
+            transaction.Commit();
+            return 0;
+        }
 
         IReadOnlyList<Exemplar> exemplars = await ReadExemplarsAsync(
             connection,
@@ -87,57 +67,41 @@ public sealed class SqliteIdentityMatcher
             modelId,
             modelHash,
             cancellationToken);
-        IReadOnlyList<StoredEmbedding> targets = await ReadTargetsAsync(
-            connection,
-            transaction,
-            modelId,
-            modelHash,
-            targetScope,
-            cancellationToken);
         HashSet<RejectedPair> rejectedPairs = await ReadRejectedPairsAsync(
             connection,
             transaction,
             cancellationToken);
+        Candidate[] candidates = ScoreCandidates(target, exemplars, rejectedPairs)
+            .OrderByDescending(candidate => candidate.Score)
+            .ThenBy(candidate => candidate.PersonId.ToString(), StringComparer.Ordinal)
+            .Take(2)
+            .ToArray();
 
-        await ClearRankingsAsync(connection, transaction, modelId, modelHash, cancellationToken);
-
-        DateTimeOffset generatedAtUtc = _timeProvider.GetUtcNow().ToUniversalTime();
-        int suggestedTargetCount = 0;
-        int suggestionCount = 0;
-
-        foreach (StoredEmbedding target in targets)
-        {
-            Candidate[] candidates = ScoreCandidates(target, exemplars, rejectedPairs)
-                .OrderByDescending(candidate => candidate.Score)
-                .ThenBy(candidate => candidate.PersonId.ToString(), StringComparer.Ordinal)
-                .Take(2)
-                .ToArray();
-
-            if (candidates.Length > 0)
-            {
-                suggestedTargetCount++;
-                suggestionCount += candidates.Length;
-            }
-
-            await ReplaceRankingsAsync(
-                connection,
-                transaction,
-                target.FaceOccurrenceId,
-                modelId,
-                modelHash,
-                candidates,
-                generatedAtUtc,
-                cancellationToken);
-        }
+        await ClearTargetRankingsAsync(
+            connection,
+            transaction,
+            faceOccurrenceId,
+            modelId,
+            modelHash,
+            cancellationToken);
+        await ReplaceSuggestionsAndRankingsAsync(
+            connection,
+            transaction,
+            faceOccurrenceId,
+            modelId,
+            modelHash,
+            candidates,
+            _timeProvider.GetUtcNow(),
+            cancellationToken);
 
         transaction.Commit();
-        return new IdentityMatchSummary(targets.Count, suggestedTargetCount, suggestionCount);
+        return candidates.Length;
     }
 
-    public async Task<IReadOnlyList<CatalogueRankedIdentitySuggestion>> GetRankedSuggestionsAsync(
-        FaceOccurrenceId faceOccurrenceId,
+    public async Task RemoveObsoleteRankingsAsync(
         ModelId modelId,
         Sha256Digest modelHash,
+        Guid runId,
         CancellationToken cancellationToken = default)
     {
         await _database.InitializeAsync(cancellationToken);
@@ -145,97 +109,122 @@ public sealed class SqliteIdentityMatcher
         using SqliteTransaction transaction = connection.BeginTransaction();
         await EnsureRankingSchemaAsync(connection, transaction, cancellationToken);
 
+        using (SqliteCommand deleteRankings = connection.CreateCommand())
+        {
+            deleteRankings.Transaction = transaction;
+            deleteRankings.CommandText = """
+                DELETE FROM identity_suggestion_rankings
+                WHERE model_id = $model_id
+                  AND model_hash = $model_hash
+                  AND face_occurrence_id NOT IN (
+                      SELECT face_occurrence_id
+                      FROM identity_match_regeneration_targets
+                      WHERE run_id = $run_id);
+                """;
+            deleteRankings.Parameters.AddWithValue("$model_id", modelId.ToString());
+            deleteRankings.Parameters.AddWithValue("$model_hash", modelHash.ToString());
+            deleteRankings.Parameters.AddWithValue("$run_id", runId.ToString("D"));
+            await deleteRankings.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        // Pending derived suggestions that no longer participate in the current ranking are safe to
+        // delete. Accepted/rejected suggestion history remains durable and is never removed here.
+        using (SqliteCommand deleteSuggestions = connection.CreateCommand())
+        {
+            deleteSuggestions.Transaction = transaction;
+            deleteSuggestions.CommandText = """
+                DELETE FROM identity_suggestions
+                WHERE model_id = $model_id
+                  AND model_hash = $model_hash
+                  AND status = $pending_status
+                  AND id NOT IN (
+                      SELECT suggestion_id
+                      FROM identity_suggestion_rankings
+                      WHERE model_id = $model_id
+                        AND model_hash = $model_hash);
+                """;
+            deleteSuggestions.Parameters.AddWithValue("$model_id", modelId.ToString());
+            deleteSuggestions.Parameters.AddWithValue("$model_hash", modelHash.ToString());
+            deleteSuggestions.Parameters.AddWithValue("$pending_status", PendingStatus);
+            await deleteSuggestions.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        transaction.Commit();
+    }
+
+    private static async Task<StoredEmbedding?> ReadEligibleTargetAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        ModelId modelId,
+        Sha256Digest modelHash,
+        FaceOccurrenceId faceOccurrenceId,
+        CancellationToken cancellationToken)
+    {
         using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
+            WITH latest_review AS (
+                SELECT
+                    face_occurrence_id,
+                    action_kind,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY face_occurrence_id
+                        ORDER BY id DESC) AS row_number
+                FROM review_actions
+                WHERE action_kind IN ('assign', 'unknown', 'reject')
+                  AND reversed_at_utc IS NULL
+            ),
+            matching_embeddings AS (
+                SELECT
+                    crop.face_occurrence_id,
+                    embedding.dimensions,
+                    embedding.l2_norm,
+                    embedding.vector_blob,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY crop.face_occurrence_id
+                        ORDER BY embedding.created_at_utc DESC, embedding.id DESC) AS row_number
+                FROM face_crops AS crop
+                INNER JOIN embeddings AS embedding
+                    ON embedding.face_crop_id = crop.id
+                WHERE crop.face_occurrence_id = $face_occurrence_id
+                  AND embedding.model_id = $model_id
+                  AND embedding.model_hash = $model_hash
+            )
             SELECT
-                suggestion.id,
-                suggestion.face_occurrence_id,
-                suggestion.suggested_person_id,
-                suggestion.model_id,
-                suggestion.model_hash,
-                ranking.rank,
-                suggestion.score,
-                ranking.score_margin,
-                suggestion.status,
-                ranking.generated_at_utc
-            FROM identity_suggestion_rankings AS ranking
-            INNER JOIN identity_suggestions AS suggestion
-                ON suggestion.id = ranking.suggestion_id
-            WHERE ranking.face_occurrence_id = $face_occurrence_id
-              AND ranking.model_id = $model_id
-              AND ranking.model_hash = $model_hash
-            ORDER BY ranking.rank;
+                matching.face_occurrence_id,
+                matching.dimensions,
+                matching.l2_norm,
+                matching.vector_blob
+            FROM matching_embeddings AS matching
+            WHERE matching.row_number = 1
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM latest_review AS review
+                  WHERE review.face_occurrence_id = matching.face_occurrence_id
+                    AND review.row_number = 1)
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM person_labels AS label
+                  WHERE label.face_occurrence_id = matching.face_occurrence_id
+                    AND label.label_kind = 'confirmed'
+                    AND NOT EXISTS (
+                        SELECT 1
+                        FROM review_actions AS action
+                        WHERE action.face_occurrence_id = label.face_occurrence_id));
             """;
         command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
         command.Parameters.AddWithValue("$model_id", modelId.ToString());
         command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
 
-        List<CatalogueRankedIdentitySuggestion> suggestions = [];
-        await using (SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
         {
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                suggestions.Add(new CatalogueRankedIdentitySuggestion(
-                    reader.GetInt64(0),
-                    FaceOccurrenceId.From(Guid.Parse(reader.GetString(1))),
-                    PersonId.From(Guid.Parse(reader.GetString(2))),
-                    new ModelId(reader.GetString(3)),
-                    new Sha256Digest(reader.GetString(4)),
-                    reader.GetInt32(5),
-                    reader.GetDouble(6),
-                    reader.IsDBNull(7) ? null : reader.GetDouble(7),
-                    reader.GetString(8),
-                    ParseTimestamp(reader.GetString(9))));
-            }
+            return null;
         }
 
-        transaction.Commit();
-        return suggestions;
-    }
-
-    private static async Task EnsureRankingSchemaAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        CancellationToken cancellationToken)
-    {
-        using SqliteCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            CREATE TABLE IF NOT EXISTS identity_suggestion_rankings (
-                face_occurrence_id TEXT NOT NULL,
-                model_id TEXT NOT NULL,
-                model_hash TEXT NOT NULL,
-                rank INTEGER NOT NULL CHECK (rank IN (1, 2)),
-                suggestion_id INTEGER NOT NULL,
-                score_margin REAL NULL CHECK (score_margin IS NULL OR score_margin >= 0),
-                generated_at_utc TEXT NOT NULL,
-                PRIMARY KEY (face_occurrence_id, model_id, model_hash, rank),
-                UNIQUE (suggestion_id),
-                FOREIGN KEY (face_occurrence_id) REFERENCES face_occurrences (id) ON DELETE CASCADE,
-                FOREIGN KEY (suggestion_id) REFERENCES identity_suggestions (id) ON DELETE CASCADE
-            );
-            """;
-        await command.ExecuteNonQueryAsync(cancellationToken);
-    }
-
-    private static async Task ClearRankingsAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        ModelId modelId,
-        Sha256Digest modelHash,
-        CancellationToken cancellationToken)
-    {
-        using SqliteCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            DELETE FROM identity_suggestion_rankings
-            WHERE model_id = $model_id
-              AND model_hash = $model_hash;
-            """;
-        command.Parameters.AddWithValue("$model_id", modelId.ToString());
-        command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        return new StoredEmbedding(
+            FaceOccurrenceId.From(Guid.Parse(reader.GetString(0))),
+            ReadVector(reader, 1, 2, 3));
     }
 
     private static async Task<IReadOnlyList<Exemplar>> ReadExemplarsAsync(
@@ -321,89 +310,6 @@ public sealed class SqliteIdentityMatcher
         return exemplars;
     }
 
-    private static async Task<IReadOnlyList<StoredEmbedding>> ReadTargetsAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        ModelId modelId,
-        Sha256Digest modelHash,
-        IdentityMatchTargetScope targetScope,
-        CancellationToken cancellationToken)
-    {
-        using SqliteCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            WITH latest_review AS (
-                SELECT
-                    face_occurrence_id,
-                    action_kind,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY face_occurrence_id
-                        ORDER BY id DESC) AS row_number
-                FROM review_actions
-                WHERE action_kind IN ('assign', 'unknown', 'reject')
-                  AND reversed_at_utc IS NULL
-            ),
-            legacy_confirmed AS (
-                SELECT DISTINCT label.face_occurrence_id
-                FROM person_labels AS label
-                WHERE label.label_kind = 'confirmed'
-                  AND NOT EXISTS (
-                      SELECT 1
-                      FROM review_actions AS action
-                      WHERE action.face_occurrence_id = label.face_occurrence_id)
-            ),
-            matching_embeddings AS (
-                SELECT
-                    crop.face_occurrence_id,
-                    embedding.dimensions,
-                    embedding.l2_norm,
-                    embedding.vector_blob,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY crop.face_occurrence_id
-                        ORDER BY embedding.created_at_utc DESC, embedding.id DESC) AS row_number
-                FROM face_crops AS crop
-                INNER JOIN embeddings AS embedding
-                    ON embedding.face_crop_id = crop.id
-                WHERE embedding.model_id = $model_id
-                  AND embedding.model_hash = $model_hash
-            )
-            SELECT
-                matching.face_occurrence_id,
-                matching.dimensions,
-                matching.l2_norm,
-                matching.vector_blob
-            FROM matching_embeddings AS matching
-            WHERE matching.row_number = 1
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM latest_review AS review
-                  WHERE review.face_occurrence_id = matching.face_occurrence_id
-                    AND review.row_number = 1
-                    AND ($include_unknown = 0 OR review.action_kind <> 'unknown'))
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM legacy_confirmed AS confirmed
-                  WHERE confirmed.face_occurrence_id = matching.face_occurrence_id)
-            ORDER BY matching.face_occurrence_id;
-            """;
-        command.Parameters.AddWithValue("$model_id", modelId.ToString());
-        command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
-        command.Parameters.AddWithValue(
-            "$include_unknown",
-            targetScope == IdentityMatchTargetScope.UnreviewedAndUnknown ? 1 : 0);
-
-        List<StoredEmbedding> targets = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            targets.Add(new StoredEmbedding(
-                FaceOccurrenceId.From(Guid.Parse(reader.GetString(0))),
-                ReadVector(reader, 1, 2, 3)));
-        }
-
-        return targets;
-    }
-
     private static async Task<HashSet<RejectedPair>> ReadRejectedPairsAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -469,7 +375,27 @@ public sealed class SqliteIdentityMatcher
         return bestByPerson.Select(pair => new Candidate(pair.Key, pair.Value));
     }
 
-    private static async Task ReplaceRankingsAsync(
+    private static async Task ClearTargetRankingsAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        FaceOccurrenceId faceOccurrenceId,
+        ModelId modelId,
+        Sha256Digest modelHash,
+        CancellationToken cancellationToken)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            DELETE FROM identity_suggestion_rankings
+            WHERE face_occurrence_id = $face_occurrence_id
+              AND model_id = $model_id
+              AND model_hash = $model_hash;
+            """;
+        AddVersionParameters(command, faceOccurrenceId, modelId, modelHash);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task ReplaceSuggestionsAndRankingsAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
         FaceOccurrenceId faceOccurrenceId,
@@ -606,15 +532,29 @@ public sealed class SqliteIdentityMatcher
         return Convert.ToInt64(value, CultureInfo.InvariantCulture);
     }
 
-    private static void AddVersionParameters(
-        SqliteCommand command,
-        FaceOccurrenceId faceOccurrenceId,
-        ModelId modelId,
-        Sha256Digest modelHash)
+    private static async Task EnsureRankingSchemaAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        CancellationToken cancellationToken)
     {
-        command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
-        command.Parameters.AddWithValue("$model_id", modelId.ToString());
-        command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            CREATE TABLE IF NOT EXISTS identity_suggestion_rankings (
+                face_occurrence_id TEXT NOT NULL,
+                model_id TEXT NOT NULL,
+                model_hash TEXT NOT NULL,
+                rank INTEGER NOT NULL CHECK (rank IN (1, 2)),
+                suggestion_id INTEGER NOT NULL,
+                score_margin REAL NULL CHECK (score_margin IS NULL OR score_margin >= 0),
+                generated_at_utc TEXT NOT NULL,
+                PRIMARY KEY (face_occurrence_id, model_id, model_hash, rank),
+                UNIQUE (suggestion_id),
+                FOREIGN KEY (face_occurrence_id) REFERENCES face_occurrences (id) ON DELETE CASCADE,
+                FOREIGN KEY (suggestion_id) REFERENCES identity_suggestions (id) ON DELETE CASCADE
+            );
+            """;
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static EmbeddingVector ReadVector(
@@ -649,11 +589,19 @@ public sealed class SqliteIdentityMatcher
         return vector;
     }
 
+    private static void AddVersionParameters(
+        SqliteCommand command,
+        FaceOccurrenceId faceOccurrenceId,
+        ModelId modelId,
+        Sha256Digest modelHash)
+    {
+        command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
+        command.Parameters.AddWithValue("$model_id", modelId.ToString());
+        command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
+    }
+
     private static string Format(DateTimeOffset value) =>
         value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-
-    private static DateTimeOffset ParseTimestamp(string value) =>
-        DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToUniversalTime();
 
     private sealed record StoredEmbedding(FaceOccurrenceId FaceOccurrenceId, EmbeddingVector Vector);
     private sealed record Exemplar(PersonId PersonId, FaceOccurrenceId FaceOccurrenceId, EmbeddingVector Vector);

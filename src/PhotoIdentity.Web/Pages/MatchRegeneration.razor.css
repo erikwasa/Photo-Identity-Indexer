@@ -1,0 +1,123 @@
+.regeneration-hero {
+    margin-bottom: 1rem;
+}
+
+.regeneration-model-row {
+    display: grid;
+    grid-template-columns: minmax(18rem, 1fr) auto;
+    align-items: end;
+    gap: 1rem;
+}
+
+.regeneration-model-row select {
+    width: 100%;
+}
+
+.regeneration-status {
+    margin-top: 1rem;
+    padding: 1.25rem;
+    border: 1px solid var(--border, #d8d8d8);
+    border-radius: 1rem;
+    background: var(--surface, #fff);
+}
+
+.regeneration-status-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.regeneration-status-heading h2,
+.regeneration-status-heading p {
+    margin-top: 0;
+}
+
+.state-pill {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: .35rem .7rem;
+    font-weight: 700;
+    white-space: nowrap;
+    background: #ececec;
+}
+
+.state-pill.active {
+    background: #e7f0ff;
+}
+
+.state-pill.stale {
+    background: #fff1d6;
+}
+
+.state-pill.current {
+    background: #e2f5e8;
+}
+
+.regeneration-progress {
+    margin: 1.25rem 0;
+}
+
+.progress-track {
+    height: .65rem;
+    overflow: hidden;
+    margin-bottom: .45rem;
+    border-radius: 999px;
+    background: #e9e9e9;
+}
+
+.progress-track span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: currentColor;
+    transition: width .2s ease;
+}
+
+.regeneration-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .75rem;
+    margin: 1rem 0;
+}
+
+.regeneration-metrics div {
+    padding: .8rem;
+    border-radius: .75rem;
+    background: rgba(127, 127, 127, .08);
+}
+
+.regeneration-metrics dt {
+    font-size: .8rem;
+    opacity: .75;
+}
+
+.regeneration-metrics dd {
+    margin: .25rem 0 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.regeneration-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin-top: 1rem;
+}
+
+.regeneration-note {
+    margin-bottom: 0;
+    opacity: .8;
+}
+
+@media (max-width: 700px) {
+    .regeneration-model-row,
+    .regeneration-metrics {
+        grid-template-columns: 1fr;
+    }
+
+    .regeneration-status-heading {
+        flex-direction: column;
+    }
+}

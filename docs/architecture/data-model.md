@@ -36,35 +36,59 @@ Baseline and candidate embeddings coexist. Embeddings from different revisions m
 
 ## People and assignment history
 
-A **person** has a stable internal ID and human-maintained display name. People are shared across all model revisions.
+A **person** has a stable internal ID and human-maintained display name. People are shared across all model revisions. A favorite flag is a local selection preference associated with a Person; it is stored independently from identity evidence and never changes matcher scores or exemplar eligibility.
 
-Canonical identity decisions are append-only actions. The current runtime records human assignment, rejection, undo and person-maintenance operations such as rename or merge. ADR-0006 adds an accepted future action source: WI-0043 may create an automatic canonical assignment when an explicitly enabled exact-model High-confidence policy qualifies.
+Canonical face review decisions are append-only actions. Human assignment, Unknown, false-detection rejection and undo actions remain canonical review history. Person-maintenance operations such as rename or merge have their own append-only maintenance history. An explicitly enabled identity-suggestion policy may also promote a qualifying High rank-1 suggestion into a canonical assignment through the same governed acceptance boundary.
 
-Automatic assignments must record the actor/source plus exact model, score and policy evidence. A later manual reassignment supersedes the earlier active assignment through history rather than erasing it.
+An **Unknown** face decision represents a real detected face whose identity is currently unknown. It has no PersonId and never creates a synthetic Person. Unknown is distinct from false-detection rejection, which says the detection itself should not be treated as a real face for identity review.
 
-Current state is derived from active history. An active assignment is canonical identity data regardless of whether its allowed actor was human or an enabled governed automatic policy. A rejection preserves negative evidence. Merged people resolve to a surviving canonical person without rewriting model provenance or historical assignment evidence.
+Automatic assignments record the automatic actor plus exact model revision, rank-1 score, rank-1/rank-2 margin, policy version and thresholds. A later manual reassignment supersedes the earlier active assignment through history rather than erasing it.
 
-## Exemplars and suggestions
+Current face state is derived from the newest unreversed assignment, Unknown or rejection action. An active assignment is canonical identity data regardless of whether its allowed actor was human or the enabled governed automatic policy. An active Unknown decision hides any older assignment from current identity evidence without deleting that assignment. A later manual assignment can supersede Unknown; undoing that assignment reveals the earlier still-active Unknown action. Merged people resolve to a surviving canonical person without rewriting model provenance or historical assignment evidence.
 
-An **exemplar** is an actively assigned face eligible to provide positive identity evidence for one exact embedding revision.
+## Exemplars, suggestions and confidence policy
 
-Until WI-0043 is implemented, exemplars come from human assignments only. After WI-0043, qualifying active automatic assignments may also become exemplars in later regeneration runs. A regeneration uses a fixed exemplar snapshot so assignments created during that run do not feed back into its own scoring.
+An **exemplar** is an actively assigned face eligible to provide positive identity evidence for one exact embedding revision. Human and automatic assignments can both become exemplars, but an automatic assignment created after one regeneration's scoring phase cannot enter that same regeneration's exemplar snapshot. It becomes eligible on a later run.
+
+Unknown and rejected faces are not exemplars. An older assignment hidden by a newer active Unknown or rejection decision is likewise not active exemplar evidence.
 
 An **identity suggestion** is derived model-scoped evidence. It identifies:
 
 - the target face occurrence;
 - the suggested person;
 - the exact embedding model ID and hash;
-- score, margin and ranking evidence; and
+- score, rank and rank-1/rank-2 margin evidence; and
 - lifecycle state such as pending or superseded by later regeneration/review.
 
-A suggestion is not canonical merely because it exists. Only an explicit human action or the implemented/enabled automatic-assignment policy may create canonical assignment history. Rejected face-person pairs remain excluded under the governed matching rules.
+Each exact embedding-model revision has its own **identity suggestion policy** and monotonic policy-version stream. This keeps score calibration isolated when multiple model revisions coexist. Each exact-model policy persists:
 
-The planned Unknown review state represents a real but currently unidentified person without creating a synthetic Person row. Unknown faces are not exemplars or person-collection evidence until later assigned.
+- whether automatic assignment is enabled;
+- the minimum High rank-1 score;
+- the minimum High rank-1/rank-2 score gap;
+- the Medium score floor; and
+- who changed the policy and when.
 
-## Processing runs and jobs
+High classification requires both the High score and High margin conditions. A missing or insufficient rank-2 margin cannot be High. Suggestions that meet the Medium score floor but not both High conditions are Medium; lower scores are Low.
+
+A suggestion is not canonical merely because it exists. Only an explicit human action or the enabled exact-model automatic-assignment policy may create canonical assignment history. Changing one model revision's policy changes future classification and promotion decisions for that exact revision only; it does not rewrite historical assignments or alter another model revision's thresholds. Rejected face-person pairs remain excluded under the governed matching rules.
+
+Normal regeneration targets Unreviewed faces. Unknown faces are excluded by default, but an explicit future-safe matcher scope may intentionally regenerate advisory suggestions for Unknown without changing their canonical Unknown state. Automatic assignment still excludes any face with active Unknown state, so such rematching requires a later human action to change canonical identity.
+
+## Processing and regeneration runs
 
 A **processing run** persists source scope, output location, selected model IDs and operational policy. Its jobs and attempts record pending, running, completed and failed work so an interrupted run can resume without changing models or duplicating canonical revision identity.
+
+A browser-triggered **identity match regeneration run** is separate operational state for derived suggestion work. It is scoped to one exact embedding-model revision and persists:
+
+- the exact model ID/hash and captured suggestion-policy version;
+- an identity-evidence version built from canonical review/suggestion decisions, person merges and exact-model embeddings;
+- the snapshotted eligible target face IDs and deterministic target order;
+- pending/running/completed/error target state; and
+- processed-target, suggested-target, suggestion, automatic-assignment and error counters plus timestamps/error text.
+
+Only one active browser regeneration is allowed for an exact model revision. A running target remains durable so it can be reclaimed after an application restart. If identity evidence changes before finalization, the run becomes stale and a new run must be started from the current catalogue state. A policy-version change also prevents finalization under different automatic-assignment thresholds.
+
+Regeneration run/target records are operational state rather than canonical identity evidence. The suggestions and rankings they generate remain derived and replaceable; any enabled automatic assignment is promoted separately through canonical review history only after the complete fixed-snapshot scoring phase.
 
 Run state is canonical operational data. Individual model outputs remain derived.
 
@@ -84,11 +108,13 @@ Evaluation exports are neutral private manifests derived from a reviewed catalog
 - deterministic split policy and seed; and
 - gallery, validation and held-out test membership.
 
-Evaluation reports are derived and reproducible. Validation may select thresholds; held-out test data only reports final performance.
+Evaluation reports are derived and reproducible. Validation may select thresholds; held-out test data only reports final performance. Only active assignments are person identity evidence; Unknown and rejected faces are not exported as assigned identities.
 
 ## Collection data
 
 Collection queries read canonical people/assignment state plus optional exact-model suggestion evidence. They return opaque asset/revision identifiers, media metadata and matched-person evidence.
+
+Unknown faces are excluded from person collections, including from optional suggestion-backed collection matches while Unknown is active.
 
 The collection browser uses versioned review proxies where configured. Neutral manifests expose opaque HTTP resource URLs rather than local source roots, source keys, filenames or crop paths.
 
@@ -105,10 +131,11 @@ Validated import matches known revision IDs, verifies checksums and provenance, 
 | Canonical or governed | Derived and regenerable |
 |---|---|
 | Source, asset and revision identity | Detector observations |
-| People | Crops, thumbnails and review proxies |
-| Assignments and rejections | Embeddings |
+| People and favorite-selection preferences | Crops, thumbnails and review proxies |
+| Assignments, Unknown decisions and false-detection rejections | Embeddings |
 | Append-only assignment/review history | Suggestions and rankings |
-| Processing-run/job state | Evaluation manifests and reports |
+| Exact-model identity-suggestion policies and versions | Confidence classification under the current exact-model policy |
+| Processing/regeneration run and job-control state | Evaluation manifests and reports |
 | Bundle import/provenance records | Portable processing outputs |
 
 Derived data is still biometric or private and must be protected accordingly.
@@ -117,6 +144,6 @@ Derived data is still biometric or private and must be protected accordingly.
 
 Every derived result must be traceable to the immutable source revision, exact model ID and hash, material preprocessing/alignment contract and processing run or import that produced it.
 
-Every automatic canonical assignment, once WI-0043 is implemented, must additionally retain the exact matching policy and evidence that promoted it from derived suggestion evidence into canonical history.
+Every automatic canonical assignment must additionally retain the exact model revision, score and rank-gap evidence plus the policy version and thresholds that promoted it from derived suggestion evidence into canonical history.
 
 See the [Glossary](../glossary.md), [Recognition and identity matching](identity-matching.md), [ADR-0006](../decisions/ADR-0006-canonical-auto-assignment.md), [ADR-0007](../decisions/ADR-0007-permanent-archive-bounded-storage.md) and [SQLite persistence operations](../operations/sqlite-persistence.md).

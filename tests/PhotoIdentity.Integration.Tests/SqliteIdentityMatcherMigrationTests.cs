@@ -61,6 +61,21 @@ public sealed class SqliteIdentityMatcherMigrationTests
                         status TEXT NOT NULL,
                         created_at_utc TEXT NOT NULL,
                         UNIQUE (face_occurrence_id, suggested_person_id, model_id, model_hash));
+                    CREATE TABLE review_actions (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        face_occurrence_id TEXT NOT NULL,
+                        action_kind TEXT NOT NULL CHECK (action_kind IN ('assign', 'reject', 'undo')),
+                        person_id TEXT NULL,
+                        person_label_id INTEGER NULL,
+                        actor TEXT NOT NULL,
+                        note TEXT NULL,
+                        created_at_utc TEXT NOT NULL,
+                        reversed_at_utc TEXT NULL,
+                        reverses_action_id INTEGER NULL,
+                        CHECK (
+                            (action_kind = 'assign' AND person_id IS NOT NULL AND person_label_id IS NOT NULL AND reverses_action_id IS NULL)
+                            OR (action_kind = 'reject' AND person_id IS NULL AND person_label_id IS NULL AND reverses_action_id IS NULL)
+                            OR (action_kind = 'undo' AND reverses_action_id IS NOT NULL)));
                     INSERT INTO schema_migrations (version, applied_at_utc)
                         VALUES (1, $now), (2, $now), (3, $now), (4, $now);
                     INSERT INTO people (id, display_name, created_at_utc, merged_into_person_id)

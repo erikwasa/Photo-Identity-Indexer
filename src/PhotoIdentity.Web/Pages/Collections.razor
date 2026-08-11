@@ -97,7 +97,7 @@ else
                                        checked="@SelectedPersonIds.Contains(person.Id)"
                                        disabled="@LoadingResults"
                                        @onchange="eventArgs => SetPersonSelection(person.Id, eventArgs)" />
-                                <span>@person.DisplayName</span>
+                                <span>@PersonLabel(person)</span>
                             </label>
                         }
                     }
@@ -115,7 +115,7 @@ else
                             disabled="@LoadingResults"
                             aria-label="@RemovePersonLabel(person)"
                             @onclick="() => RemovePerson(person.Id)">
-                        <span>@person.DisplayName</span>
+                        <span>@PersonLabel(person)</span>
                         <span aria-hidden="true">×</span>
                     </button>
                 }
@@ -333,12 +333,16 @@ else
         .Where(person =>
             string.IsNullOrWhiteSpace(PersonSearch) ||
             person.DisplayName.Contains(PersonSearch.Trim(), StringComparison.OrdinalIgnoreCase))
-        .OrderBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+        .OrderByDescending(person => person.IsFavorite)
+        .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+        .ThenBy(person => person.Id, StringComparer.Ordinal)
         .ToArray();
 
     private IReadOnlyList<ReviewPersonResponse> SelectedPeople => People
         .Where(person => SelectedPersonIds.Contains(person.Id))
-        .OrderBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+        .OrderByDescending(person => person.IsFavorite)
+        .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+        .ThenBy(person => person.Id, StringComparer.Ordinal)
         .ToArray();
 
     private string PersonSelectionSummary => SelectedPersonIds.Count switch
@@ -581,6 +585,9 @@ else
 
     private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
         $"{model.ModelId} · {model.ModelHash[..Math.Min(12, model.ModelHash.Length)]}";
+
+    private static string PersonLabel(ReviewPersonResponse person) =>
+        person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
 
     private static string EvidenceSummary(CollectionPersonMatchResponse match)
     {

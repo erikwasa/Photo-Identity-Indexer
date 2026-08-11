@@ -7,7 +7,7 @@ using PhotoIdentity.Core.Identifiers;
 namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
-/// Previews and commits bounded bulk assignment or face rejection operations.
+/// Previews and commits bounded bulk assignment, Unknown or face rejection operations.
 /// A commit must present the exact token produced by a preview of the same eligible face set.
 /// </summary>
 public sealed class SqliteBulkReviewRepository
@@ -176,9 +176,12 @@ public sealed class SqliteBulkReviewRepository
         {
             case CatalogueBulkReviewActionKinds.Assign when personId is null:
                 throw new ArgumentException("A person is required for a bulk assignment.", nameof(personId));
+            case CatalogueBulkReviewActionKinds.Unknown when personId is not null:
+                throw new ArgumentException("A bulk Unknown decision cannot include a person.", nameof(personId));
             case CatalogueBulkReviewActionKinds.Reject when personId is not null:
                 throw new ArgumentException("A bulk face rejection cannot include a person.", nameof(personId));
             case CatalogueBulkReviewActionKinds.Assign:
+            case CatalogueBulkReviewActionKinds.Unknown:
             case CatalogueBulkReviewActionKinds.Reject:
                 return normalized;
             default:
@@ -225,7 +228,7 @@ public sealed class SqliteBulkReviewRepository
                     SELECT 1
                     FROM review_actions
                     WHERE review_actions.face_occurrence_id = face_occurrences.id
-                      AND review_actions.action_kind IN ('assign', 'reject')
+                      AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
                       AND review_actions.reversed_at_utc IS NULL)
                 THEN 0 ELSE 1 END AS is_eligible
             FROM face_occurrences

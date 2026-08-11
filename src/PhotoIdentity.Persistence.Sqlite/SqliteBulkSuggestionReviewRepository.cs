@@ -196,7 +196,7 @@ public sealed class SqliteBulkSuggestionReviewRepository
                     SELECT 1
                     FROM review_actions
                     WHERE review_actions.face_occurrence_id = suggestion.face_occurrence_id
-                      AND review_actions.action_kind IN ('assign', 'reject')
+                      AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
                       AND review_actions.reversed_at_utc IS NULL)
                 THEN 0 ELSE 1 END AS face_is_unreviewed,
                 person.merged_into_person_id

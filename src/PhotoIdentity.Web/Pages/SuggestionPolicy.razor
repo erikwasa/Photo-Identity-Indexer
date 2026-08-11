@@ -1,0 +1,285 @@
+@page "/suggestion-policy"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Suggestion policy · Photo Identity</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Identity matching</p>
+        <h1>Suggestion confidence policy</h1>
+        <p>Configure one exact model revision at a time. High requires both the rank-1 score and the gap over rank 2.</p>
+    </div>
+</section>
+
+@if (LoadingOptions)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading suggestion models…</p>
+    </section>
+}
+else if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+else if (Options.ModelRevisions.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No suggestion model revisions</h2>
+        <p>Generate identity suggestions before editing a model-specific confidence policy.</p>
+    </section>
+}
+else
+{
+    <section class="review-filter-panel" aria-labelledby="policy-model-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Exact model scope</p>
+                <h2 id="policy-model-heading">Suggestion model</h2>
+            </div>
+        </div>
+
+        <label class="field-label" for="policy-model">Model revision</label>
+        <select id="policy-model"
+                @bind="SelectedModelIndex"
+                @bind:after="ChangeModelAsync"
+                disabled="@(LoadingPolicy || Saving)">
+            @for (int index = 0; index < Options.ModelRevisions.Count; index++)
+            {
+                ReviewModelRevisionFilterResponse model = Options.ModelRevisions[index];
+                <option value="@index">@ModelLabel(model)</option>
+            }
+        </select>
+    </section>
+
+    @if (LoadingPolicy)
+    {
+        <section class="empty-state" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <p>Loading exact-model suggestion policy…</p>
+        </section>
+    }
+    else if (Policy is IdentitySuggestionPolicyResponse policy)
+    {
+        @if (!string.IsNullOrWhiteSpace(Message))
+        {
+            <div class="notice success" role="status">@Message</div>
+        }
+
+        <section class="review-filter-panel" aria-labelledby="policy-heading">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Policy version @policy.Version</p>
+                    <h2 id="policy-heading">Confidence boundaries</h2>
+                </div>
+                <span class="model-summary">@policy.ModelId · @HashPrefix(policy.ModelHash) · updated by @policy.UpdatedBy</span>
+            </div>
+
+            <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <div class="review-filter-grid">
+                    <div>
+                        <label class="field-label" for="high-score">High minimum rank-1 score</label>
+                        <input id="high-score"
+                               type="number"
+                               min="0"
+                               max="1"
+                               step="0.01"
+                               @bind="HighScoreThreshold"
+                               disabled="@Saving" />
+                        <p>Rank 1 must meet or exceed this absolute score.</p>
+                    </div>
+
+                    <div>
+                        <label class="field-label" for="high-margin">High minimum rank-1/rank-2 gap</label>
+                        <input id="high-margin"
+                               type="number"
+                               min="0"
+                               max="2"
+                               step="0.01"
+                               @bind="HighMarginThreshold"
+                               disabled="@Saving" />
+                        <p>A missing or smaller rank-2 gap is never High.</p>
+                    </div>
+
+                    <div>
+                        <label class="field-label" for="medium-score">Medium minimum rank-1 score</label>
+                        <input id="medium-score"
+                               type="number"
+                               min="0"
+                               max="1"
+                               step="0.01"
+                               @bind="MediumScoreThreshold"
+                               disabled="@Saving" />
+                        <p>Suggestions below this score are Low. Strong but ambiguous suggestions fall back to Medium.</p>
+                    </div>
+                </div>
+
+                <label class="field-label" for="auto-assign">
+                    <input id="auto-assign"
+                           type="checkbox"
+                           @bind="AutoAssignEnabled"
+                           disabled="@Saving" />
+                    Automatically assign High suggestions after regeneration for this exact model revision
+                </label>
+
+                <div class="card-actions">
+                    <button type="submit" class="button primary" disabled="@Saving">
+                        @(Saving ? "Saving…" : "Save policy")
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <section class="review-filter-panel" aria-labelledby="policy-rule-heading">
+            <p class="eyebrow">Classification rule</p>
+            <h2 id="policy-rule-heading">How High is decided</h2>
+            <p><strong>High</strong>: rank-1 score ≥ @HighScoreThreshold.ToString("0.###") and rank-1 minus rank-2 score ≥ @HighMarginThreshold.ToString("0.###").</p>
+            <p><strong>Medium</strong>: not High, but rank-1 score ≥ @MediumScoreThreshold.ToString("0.###").</p>
+            <p><strong>Low</strong>: rank-1 score below @MediumScoreThreshold.ToString("0.###").</p>
+            <p>These boundaries apply only to <strong>@policy.ModelId · @HashPrefix(policy.ModelHash)</strong>. Other model revisions keep independent policy versions and thresholds.</p>
+        </section>
+    }
+}
+
+@code {
+    private const string Actor = "local-reviewer";
+
+    private ReviewFilterOptionsResponse Options { get; set; } = new([], []);
+    private IdentitySuggestionPolicyResponse? Policy { get; set; }
+    private string SelectedModelIndex { get; set; } = "0";
+    private bool AutoAssignEnabled { get; set; }
+    private double HighScoreThreshold { get; set; }
+    private double HighMarginThreshold { get; set; }
+    private double MediumScoreThreshold { get; set; }
+    private bool LoadingOptions { get; set; } = true;
+    private bool LoadingPolicy { get; set; }
+    private bool Saving { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    private ReviewModelRevisionFilterResponse? SelectedModel =>
+        int.TryParse(SelectedModelIndex, out int index) &&
+        index >= 0 && index < Options.ModelRevisions.Count
+            ? Options.ModelRevisions[index]
+            : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Options = await Http.GetFromJsonAsync<ReviewFilterOptionsResponse>("api/review/filters")
+                ?? new ReviewFilterOptionsResponse([], []);
+            if (Options.ModelRevisions.Count > 0)
+            {
+                SelectedModelIndex = "0";
+                await LoadPolicyAsync();
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            LoadingOptions = false;
+        }
+    }
+
+    private async Task ChangeModelAsync()
+    {
+        Policy = null;
+        Message = null;
+        Error = null;
+        await LoadPolicyAsync();
+    }
+
+    private async Task LoadPolicyAsync()
+    {
+        ReviewModelRevisionFilterResponse model = SelectedModel
+            ?? throw new InvalidOperationException("An exact suggestion model revision is required.");
+
+        LoadingPolicy = true;
+        Error = null;
+        try
+        {
+            Policy = await Http.GetFromJsonAsync<IdentitySuggestionPolicyResponse>(PolicyUrl(model));
+            if (Policy is null)
+            {
+                Error = "The suggestion policy response was empty.";
+                return;
+            }
+
+            CopyFromPolicy(Policy);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            LoadingPolicy = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        ReviewModelRevisionFilterResponse model = SelectedModel
+            ?? throw new InvalidOperationException("An exact suggestion model revision is required.");
+
+        Saving = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            UpdateIdentitySuggestionPolicyRequest request = new(
+                AutoAssignEnabled,
+                HighScoreThreshold,
+                HighMarginThreshold,
+                MediumScoreThreshold,
+                Actor);
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(PolicyUrl(model), request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Policy = await response.Content.ReadFromJsonAsync<IdentitySuggestionPolicyResponse>();
+            if (Policy is null)
+            {
+                Error = "The saved suggestion policy response was empty.";
+                return;
+            }
+
+            CopyFromPolicy(Policy);
+            Message = $"Suggestion policy version {Policy.Version} saved for {Policy.ModelId} · {HashPrefix(Policy.ModelHash)}.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Saving = false;
+        }
+    }
+
+    private static string PolicyUrl(ReviewModelRevisionFilterResponse model) =>
+        $"api/review/suggestion-policy?modelId={Uri.EscapeDataString(model.ModelId)}" +
+        $"&modelHash={Uri.EscapeDataString(model.ModelHash)}";
+
+    private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
+        $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+
+    private static string HashPrefix(string hash) =>
+        hash[..Math.Min(12, hash.Length)];
+
+    private void CopyFromPolicy(IdentitySuggestionPolicyResponse policy)
+    {
+        AutoAssignEnabled = policy.AutoAssignEnabled;
+        HighScoreThreshold = policy.HighScoreThreshold;
+        HighMarginThreshold = policy.HighMarginThreshold;
+        MediumScoreThreshold = policy.MediumScoreThreshold;
+    }
+}

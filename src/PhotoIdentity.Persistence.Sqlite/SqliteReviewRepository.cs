@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
 /// Provides review-oriented queries and append-only, reversible human actions.
-/// Current face state is derived from the newest unreversed assignment or rejection.
+/// Current face state is derived from the newest unreversed assignment, Unknown decision or rejection.
 /// </summary>
 public sealed class SqliteReviewRepository
 {
@@ -19,7 +19,7 @@ public sealed class SqliteReviewRepository
                     PARTITION BY face_occurrence_id
                     ORDER BY id DESC) AS row_number
             FROM review_actions
-            WHERE action_kind IN ('assign', 'reject')
+            WHERE action_kind IN ('assign', 'unknown', 'reject')
               AND reversed_at_utc IS NULL
         ),
         latest_crop AS (
@@ -96,6 +96,7 @@ public sealed class SqliteReviewRepository
         {
             CatalogueReviewStates.Unreviewed => "latest_action.id IS NULL",
             CatalogueReviewStates.Assigned => "latest_action.action_kind = 'assign'",
+            CatalogueReviewStates.Unknown => "latest_action.action_kind = 'unknown'",
             CatalogueReviewStates.Rejected => "latest_action.action_kind = 'reject'",
             "all" => "1 = 1",
             _ => throw new ArgumentException($"Unsupported review state '{state}'.", nameof(state)),
@@ -292,46 +293,33 @@ public sealed class SqliteReviewRepository
             ReversesActionId: null);
     }
 
-    public async Task<CatalogueReviewAction> RejectAsync(
+    public Task<CatalogueReviewAction> MarkUnknownAsync(
         FaceOccurrenceId faceOccurrenceId,
         string actor,
         DateTimeOffset createdAtUtc,
         string? note = null,
-        CancellationToken cancellationToken = default)
-    {
-        string normalizedActor = Required(actor, nameof(actor));
-        string? normalizedNote = Optional(note);
-
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteTransaction transaction = connection.BeginTransaction();
-        await RequireOccurrenceAsync(connection, transaction, faceOccurrenceId, cancellationToken);
-        long actionId = await InsertActionAsync(
-            connection,
-            transaction,
+        CancellationToken cancellationToken = default) =>
+        RecordPersonlessDecisionAsync(
             faceOccurrenceId,
-            CatalogueReviewActionKinds.Reject,
-            personId: null,
-            personLabelId: null,
-            normalizedActor,
-            normalizedNote,
+            CatalogueReviewActionKinds.Unknown,
+            actor,
             createdAtUtc,
-            reversesActionId: null,
+            note,
             cancellationToken);
-        transaction.Commit();
 
-        return new CatalogueReviewAction(
-            actionId,
+    public Task<CatalogueReviewAction> RejectAsync(
+        FaceOccurrenceId faceOccurrenceId,
+        string actor,
+        DateTimeOffset createdAtUtc,
+        string? note = null,
+        CancellationToken cancellationToken = default) =>
+        RecordPersonlessDecisionAsync(
             faceOccurrenceId,
             CatalogueReviewActionKinds.Reject,
-            PersonId: null,
-            PersonDisplayName: null,
-            PersonLabelId: null,
-            normalizedActor,
-            normalizedNote,
-            createdAtUtc.ToUniversalTime(),
-            ReversedAtUtc: null,
-            ReversesActionId: null);
-    }
+            actor,
+            createdAtUtc,
+            note,
+            cancellationToken);
 
     public async Task<CatalogueReviewAction?> UndoLatestAsync(
         FaceOccurrenceId faceOccurrenceId,
@@ -455,6 +443,48 @@ public sealed class SqliteReviewRepository
         return actions;
     }
 
+    private async Task<CatalogueReviewAction> RecordPersonlessDecisionAsync(
+        FaceOccurrenceId faceOccurrenceId,
+        string kind,
+        string actor,
+        DateTimeOffset createdAtUtc,
+        string? note,
+        CancellationToken cancellationToken)
+    {
+        string normalizedActor = Required(actor, nameof(actor));
+        string? normalizedNote = Optional(note);
+
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        await RequireOccurrenceAsync(connection, transaction, faceOccurrenceId, cancellationToken);
+        long actionId = await InsertActionAsync(
+            connection,
+            transaction,
+            faceOccurrenceId,
+            kind,
+            personId: null,
+            personLabelId: null,
+            normalizedActor,
+            normalizedNote,
+            createdAtUtc,
+            reversesActionId: null,
+            cancellationToken);
+        transaction.Commit();
+
+        return new CatalogueReviewAction(
+            actionId,
+            faceOccurrenceId,
+            kind,
+            PersonId: null,
+            PersonDisplayName: null,
+            PersonLabelId: null,
+            normalizedActor,
+            normalizedNote,
+            createdAtUtc.ToUniversalTime(),
+            ReversedAtUtc: null,
+            ReversesActionId: null);
+    }
+
     private static async Task RequireOccurrenceAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -565,7 +595,7 @@ public sealed class SqliteReviewRepository
             FROM review_actions
             LEFT JOIN people ON people.id = review_actions.person_id
             WHERE review_actions.face_occurrence_id = $face_occurrence_id
-              AND review_actions.action_kind IN ('assign', 'reject')
+              AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
               AND review_actions.reversed_at_utc IS NULL
             ORDER BY review_actions.id DESC
             LIMIT 1;
@@ -591,6 +621,7 @@ public sealed class SqliteReviewRepository
         string state = actionKind switch
         {
             CatalogueReviewActionKinds.Assign => CatalogueReviewStates.Assigned,
+            CatalogueReviewActionKinds.Unknown => CatalogueReviewStates.Unknown,
             CatalogueReviewActionKinds.Reject => CatalogueReviewStates.Rejected,
             _ => CatalogueReviewStates.Unreviewed,
         };

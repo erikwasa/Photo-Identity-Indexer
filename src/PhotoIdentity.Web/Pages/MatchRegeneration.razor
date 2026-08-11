@@ -1,0 +1,399 @@
+@page "/match-regeneration"
+@using System.Net.Http.Json
+@implements IAsyncDisposable
+@inject HttpClient Http
+
+<PageTitle>Regenerate matches · Photo Identity</PageTitle>
+
+<section class="hero regeneration-hero">
+    <div>
+        <p class="eyebrow">Identity suggestions</p>
+        <h1>Regenerate matches</h1>
+        <p>Rebuild ranked suggestions from the current canonical identity evidence without leaving the local application. Work continues in the background and exposes durable progress.</p>
+    </div>
+</section>
+
+<section class="review-filter-panel" aria-labelledby="regeneration-model-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Exact model revision</p>
+            <h2 id="regeneration-model-heading">Suggestion model</h2>
+        </div>
+        @if (SelectedModel is RegenerationModelResponse selected)
+        {
+            <span class="model-summary">@selected.ModelId · @HashPrefix(selected.ModelHash)</span>
+        }
+    </div>
+
+    <div class="regeneration-model-row">
+        <div>
+            <label class="field-label" for="regeneration-model">Model revision</label>
+            <select id="regeneration-model"
+                    @bind="SelectedModelIndex"
+                    @bind:after="ChangeModelAsync"
+                    disabled="@(Loading || Models.Count == 0)">
+                @for (int index = 0; index < Models.Count; index++)
+                {
+                    RegenerationModelResponse model = Models[index];
+                    <option value="@index">@ModelLabel(model)</option>
+                }
+            </select>
+        </div>
+        <button class="button secondary"
+                disabled="@(Loading || SelectedModel is null)"
+                @onclick="LoadStateAsync">
+            Refresh state
+        </button>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="notice success" role="status">@Message</div>
+}
+
+@if (Loading && State is null)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading regeneration state…</p>
+    </section>
+}
+else if (SelectedModel is null)
+{
+    <section class="empty-state">
+        <h2>No embedding model is available</h2>
+        <p>Process faces with an embedding model before generating identity suggestions.</p>
+    </section>
+}
+else if (State is MatchRegenerationStateResponse state)
+{
+    <section class="regeneration-status" aria-live="polite">
+        <div class="regeneration-status-heading">
+            <div>
+                <p class="eyebrow">Regeneration state</p>
+                <h2>@StatusHeading(state)</h2>
+                <p>@StatusDescription(state)</p>
+            </div>
+            <span class="state-pill @StateClass(state)">@StateLabel(state)</span>
+        </div>
+
+        @if (state.IsActive || state.TargetCount > 0)
+        {
+            <div class="regeneration-progress" aria-label="Regeneration progress">
+                <div class="progress-track" aria-hidden="true">
+                    <span style="width: @ProgressPercent(state)%"></span>
+                </div>
+                <strong>@state.ProcessedTargetCount / @state.TargetCount targets processed</strong>
+            </div>
+        }
+
+        <dl class="regeneration-metrics">
+            <div>
+                <dt>Targets</dt>
+                <dd>@state.TargetCount</dd>
+            </div>
+            <div>
+                <dt>Suggested targets</dt>
+                <dd>@state.SuggestedTargetCount</dd>
+            </div>
+            <div>
+                <dt>Ranked suggestions</dt>
+                <dd>@state.SuggestionCount</dd>
+            </div>
+            <div>
+                <dt>Auto assignments</dt>
+                <dd>@state.AutomaticallyAssignedCount</dd>
+            </div>
+            <div>
+                <dt>Errors</dt>
+                <dd>@state.ErrorCount</dd>
+            </div>
+            <div>
+                <dt>Policy version</dt>
+                <dd>@state.PolicyVersion</dd>
+            </div>
+        </dl>
+
+        @if (!string.IsNullOrWhiteSpace(state.Error))
+        {
+            <div class="notice error" role="alert">@state.Error</div>
+        }
+
+        <div class="regeneration-actions">
+            <button class="button primary"
+                    disabled="@(Starting || state.IsActive)"
+                    @onclick="StartAsync">
+                @(state.IsStale ? "Regenerate suggestions" : state.Status == "not-run" ? "Generate suggestions" : "Regenerate again")
+            </button>
+            <a class="button secondary" href="@FacesUrl">Open refreshed Faces queue</a>
+        </div>
+
+        @if (state.IsActive)
+        {
+            <p class="regeneration-note">You can continue using the application while this runs. An identity-affecting review change makes the run stale instead of silently changing its scoring evidence.</p>
+        }
+        else if (state.CompletedAtUtc is DateTimeOffset completed)
+        {
+            <p class="regeneration-note">Last finished @completed.ToLocalTime().ToString("g").</p>
+        }
+    </section>
+}
+
+@code {
+    private const string Actor = "review-ui:match-regeneration";
+    private static readonly TimeSpan PollDelay = TimeSpan.FromSeconds(1);
+
+    private IReadOnlyList<RegenerationModelResponse> Models { get; set; } = [];
+    private string SelectedModelIndex { get; set; } = "";
+    private MatchRegenerationStateResponse? State { get; set; }
+    private bool Loading { get; set; }
+    private bool Starting { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+    private CancellationTokenSource? PollCancellation { get; set; }
+
+    private RegenerationModelResponse? SelectedModel =>
+        int.TryParse(SelectedModelIndex, out int modelIndex) &&
+        modelIndex >= 0 && modelIndex < Models.Count
+            ? Models[modelIndex]
+            : null;
+
+    private string FacesUrl => SelectedModel is RegenerationModelResponse model
+        ? $"/?state=unreviewed&sort=confidence-group&confidenceGroup=all&modelId={Uri.EscapeDataString(model.ModelId)}&modelHash={Uri.EscapeDataString(model.ModelHash)}"
+        : "/";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Loading = true;
+        try
+        {
+            Models = await Http.GetFromJsonAsync<RegenerationModelResponse[]>("api/review/match-regeneration/models")
+                ?? [];
+            SelectedModelIndex = Models.Count > 0 ? "0" : "";
+            await LoadStateAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = $"Regeneration state could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task ChangeModelAsync()
+    {
+        StopPolling();
+        State = null;
+        Message = null;
+        Error = null;
+        await LoadStateAsync();
+    }
+
+    private async Task LoadStateAsync()
+    {
+        if (SelectedModel is not RegenerationModelResponse model)
+        {
+            State = null;
+            return;
+        }
+
+        Error = null;
+        try
+        {
+            MatchRegenerationStateResponse? state = await Http.GetFromJsonAsync<MatchRegenerationStateResponse>(
+                BuildApiUrl(model));
+            State = state ?? throw new InvalidOperationException("The regeneration state response was empty.");
+            if (State.IsActive)
+            {
+                EnsurePolling();
+            }
+            else
+            {
+                StopPolling();
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+    }
+
+    private async Task StartAsync()
+    {
+        if (Starting || SelectedModel is not RegenerationModelResponse model)
+        {
+            return;
+        }
+
+        Starting = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                BuildApiUrl(model),
+                new { actor = Actor });
+            await RequireSuccessAsync(response);
+            State = await response.Content.ReadFromJsonAsync<MatchRegenerationStateResponse>()
+                ?? throw new InvalidOperationException("The regeneration start response was empty.");
+            Message = $"Regeneration queued for {model.ModelId}.";
+            EnsurePolling();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Starting = false;
+        }
+    }
+
+    private void EnsurePolling()
+    {
+        if (PollCancellation is not null)
+        {
+            return;
+        }
+
+        PollCancellation = new CancellationTokenSource();
+        _ = PollAsync(PollCancellation.Token);
+    }
+
+    private async Task PollAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(PollDelay, cancellationToken);
+                await InvokeAsync(async () =>
+                {
+                    await LoadStateAsync();
+                    StateHasChanged();
+                });
+
+                if (State?.IsActive != true)
+                {
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private void StopPolling()
+    {
+        CancellationTokenSource? cancellation = PollCancellation;
+        PollCancellation = null;
+        if (cancellation is null)
+        {
+            return;
+        }
+
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        StopPolling();
+        return ValueTask.CompletedTask;
+    }
+
+    private static string BuildApiUrl(RegenerationModelResponse model) =>
+        $"api/review/match-regeneration?modelId={Uri.EscapeDataString(model.ModelId)}&modelHash={Uri.EscapeDataString(model.ModelHash)}";
+
+    private static string StatusHeading(MatchRegenerationStateResponse state) => state.Status switch
+    {
+        "pending" => "Regeneration queued",
+        "running" => "Regeneration in progress",
+        "completed" when !state.IsStale => "Suggestions are current",
+        "stale" => "Suggestions need regeneration",
+        "failed" => "Regeneration stopped",
+        "not-run" => "No tracked regeneration yet",
+        _ when state.IsStale => "Suggestions need regeneration",
+        _ => "Regeneration state",
+    };
+
+    private static string StatusDescription(MatchRegenerationStateResponse state)
+    {
+        if (state.IsActive)
+        {
+            return "Suggestions are being scored in short durable steps. Progress survives an application restart.";
+        }
+
+        if (state.IsStale)
+        {
+            return "Canonical identity evidence or the exact-model policy changed after the last completed run.";
+        }
+
+        return "The latest tracked regeneration completed against the current identity evidence and policy.";
+    }
+
+    private static string StateLabel(MatchRegenerationStateResponse state) => state.IsActive
+        ? state.Status == "pending" ? "Queued" : "Running"
+        : state.IsStale ? "Stale" : "Current";
+
+    private static string StateClass(MatchRegenerationStateResponse state) => state.IsActive
+        ? "active"
+        : state.IsStale ? "stale" : "current";
+
+    private static double ProgressPercent(MatchRegenerationStateResponse state) =>
+        state.TargetCount <= 0
+            ? (state.IsActive ? 0 : 100)
+            : Math.Clamp(100.0 * state.ProcessedTargetCount / state.TargetCount, 0, 100);
+
+    private static string ModelLabel(RegenerationModelResponse model) =>
+        $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+
+    private static string HashPrefix(string hash) => hash[..Math.Min(12, hash.Length)];
+
+    private static async Task RequireSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string detail = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(detail)
+                ? $"The regeneration request failed with status {(int)response.StatusCode}."
+                : detail);
+    }
+
+    private sealed record RegenerationModelResponse(
+        string ModelId,
+        string ModelHash,
+        int FaceCount);
+
+    private sealed record MatchRegenerationStateResponse(
+        Guid? RunId,
+        string ModelId,
+        string ModelHash,
+        int PolicyVersion,
+        string Status,
+        bool IsActive,
+        bool IsStale,
+        int TargetCount,
+        int ProcessedTargetCount,
+        int SuggestedTargetCount,
+        int SuggestionCount,
+        int AutomaticallyAssignedCount,
+        int ErrorCount,
+        DateTimeOffset? RequestedAtUtc,
+        DateTimeOffset? StartedAtUtc,
+        DateTimeOffset? CompletedAtUtc,
+        DateTimeOffset? UpdatedAtUtc,
+        string? Error);
+}

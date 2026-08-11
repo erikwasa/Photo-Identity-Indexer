@@ -211,6 +211,13 @@ public sealed class SqlitePersonMaintenanceRepository
             sourcePersonId,
             targetPersonId,
             cancellationToken);
+        await ConsolidateFavoritesAsync(
+            connection,
+            transaction,
+            sourcePersonId,
+            targetPersonId,
+            createdAtUtc,
+            cancellationToken);
 
         using (SqliteCommand merge = connection.CreateCommand())
         {
@@ -414,6 +421,35 @@ public sealed class SqlitePersonMaintenanceRepository
                 await combine.ExecuteNonQueryAsync(cancellationToken);
             }
         }
+    }
+
+    private static async Task ConsolidateFavoritesAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        PersonId sourcePersonId,
+        PersonId targetPersonId,
+        DateTimeOffset changedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO person_favorites (person_id, favorited_at_utc)
+            SELECT $target_person_id, $favorited_at_utc
+            WHERE EXISTS (
+                SELECT 1
+                FROM person_favorites
+                WHERE person_id IN ($source_person_id, $target_person_id))
+            ON CONFLICT(person_id) DO UPDATE SET
+                favorited_at_utc = excluded.favorited_at_utc;
+
+            DELETE FROM person_favorites
+            WHERE person_id = $source_person_id;
+            """;
+        command.Parameters.AddWithValue("$source_person_id", sourcePersonId.ToString());
+        command.Parameters.AddWithValue("$target_person_id", targetPersonId.ToString());
+        command.Parameters.AddWithValue("$favorited_at_utc", Format(changedAtUtc));
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<string> RequireActivePersonAsync(

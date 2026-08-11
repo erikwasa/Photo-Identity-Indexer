@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 10;
+    public const int CurrentSchemaVersion = 12;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -486,6 +486,93 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 10;
         """;
 
+    private const string VersionElevenMigration = """
+        CREATE TABLE identity_suggestion_policies (
+            model_id TEXT NOT NULL,
+            model_hash TEXT NOT NULL,
+            policy_version INTEGER NOT NULL CHECK (policy_version >= 1),
+            auto_assign_enabled INTEGER NOT NULL CHECK (auto_assign_enabled IN (0, 1)),
+            high_score_threshold REAL NOT NULL CHECK (high_score_threshold >= 0 AND high_score_threshold <= 1),
+            high_margin_threshold REAL NOT NULL CHECK (high_margin_threshold >= 0 AND high_margin_threshold <= 2),
+            medium_score_threshold REAL NOT NULL CHECK (medium_score_threshold >= 0 AND medium_score_threshold <= 1),
+            updated_by TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            PRIMARY KEY (model_id, model_hash),
+            CHECK (medium_score_threshold <= high_score_threshold)
+        );
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (11, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 11;
+        """;
+
+    private const string VersionTwelveMigration = """
+        CREATE TABLE review_actions_v12 (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            face_occurrence_id TEXT NOT NULL,
+            action_kind TEXT NOT NULL CHECK (action_kind IN ('assign', 'unknown', 'reject', 'undo')),
+            person_id TEXT NULL,
+            person_label_id INTEGER NULL,
+            actor TEXT NOT NULL,
+            note TEXT NULL,
+            created_at_utc TEXT NOT NULL,
+            reversed_at_utc TEXT NULL,
+            reverses_action_id INTEGER NULL,
+            FOREIGN KEY (face_occurrence_id) REFERENCES face_occurrences (id) ON DELETE CASCADE,
+            FOREIGN KEY (person_id) REFERENCES people (id) ON DELETE RESTRICT,
+            FOREIGN KEY (person_label_id) REFERENCES person_labels (id) ON DELETE RESTRICT,
+            FOREIGN KEY (reverses_action_id) REFERENCES review_actions_v12 (id) ON DELETE RESTRICT,
+            CHECK (
+                (action_kind = 'assign' AND person_id IS NOT NULL AND person_label_id IS NOT NULL AND reverses_action_id IS NULL)
+                OR (action_kind IN ('unknown', 'reject') AND person_id IS NULL AND person_label_id IS NULL AND reverses_action_id IS NULL)
+                OR (action_kind = 'undo' AND reverses_action_id IS NOT NULL)
+            )
+        );
+
+        INSERT INTO review_actions_v12 (
+            id,
+            face_occurrence_id,
+            action_kind,
+            person_id,
+            person_label_id,
+            actor,
+            note,
+            created_at_utc,
+            reversed_at_utc,
+            reverses_action_id)
+        SELECT
+            id,
+            face_occurrence_id,
+            action_kind,
+            person_id,
+            person_label_id,
+            actor,
+            note,
+            created_at_utc,
+            reversed_at_utc,
+            reverses_action_id
+        FROM review_actions
+        ORDER BY id;
+
+        DROP TABLE review_actions;
+        ALTER TABLE review_actions_v12 RENAME TO review_actions;
+
+        CREATE INDEX ix_review_actions_face_history
+            ON review_actions (face_occurrence_id, id DESC);
+        CREATE INDEX ix_review_actions_face_active
+            ON review_actions (face_occurrence_id, action_kind, reversed_at_utc, id DESC);
+
+        CREATE TABLE IF NOT EXISTS person_favorites (
+            person_id TEXT NOT NULL PRIMARY KEY,
+            favorited_at_utc TEXT NOT NULL,
+            FOREIGN KEY (person_id) REFERENCES people (id) ON DELETE CASCADE
+        );
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (12, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 12;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -579,6 +666,21 @@ public sealed class SqliteCatalogueDatabase
         if (version < 10)
         {
             await ApplyMigrationAsync(connection, VersionTenMigration, cancellationToken);
+            version = 10;
+        }
+
+        if (version < 11)
+        {
+            await ApplyMigrationAsync(connection, VersionElevenMigration, cancellationToken);
+            version = 11;
+        }
+
+        if (version < 12)
+        {
+            await ApplyMigrationWithForeignKeysDisabledAsync(
+                connection,
+                VersionTwelveMigration,
+                cancellationToken);
         }
     }
 
@@ -622,5 +724,48 @@ public sealed class SqliteCatalogueDatabase
         command.CommandText = sql;
         await command.ExecuteNonQueryAsync(cancellationToken);
         transaction.Commit();
+    }
+
+    private static async Task ApplyMigrationWithForeignKeysDisabledAsync(
+        SqliteConnection connection,
+        string sql,
+        CancellationToken cancellationToken)
+    {
+        using (SqliteCommand disable = connection.CreateCommand())
+        {
+            disable.CommandText = "PRAGMA foreign_keys = OFF;";
+            await disable.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        try
+        {
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            using (SqliteCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = sql;
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            using (SqliteCommand check = connection.CreateCommand())
+            {
+                check.Transaction = transaction;
+                check.CommandText = "PRAGMA foreign_key_check;";
+                await using SqliteDataReader reader = await check.ExecuteReaderAsync(cancellationToken);
+                if (await reader.ReadAsync(cancellationToken))
+                {
+                    throw new InvalidOperationException(
+                        $"Schema migration created a foreign-key violation in table '{reader.GetString(0)}'.");
+                }
+            }
+
+            transaction.Commit();
+        }
+        finally
+        {
+            using SqliteCommand enable = connection.CreateCommand();
+            enable.CommandText = "PRAGMA foreign_keys = ON;";
+            await enable.ExecuteNonQueryAsync(cancellationToken);
+        }
     }
 }

@@ -22,7 +22,13 @@
         @if (Face.TopSuggestion is ReviewTopSuggestionResponse suggestion)
         {
             <section class="top-suggestion" aria-label="Top identity suggestion">
-                <p class="eyebrow">Top suggestion</p>
+                <div class="face-heading">
+                    <p class="eyebrow">Top suggestion</p>
+                    @if (!string.IsNullOrWhiteSpace(suggestion.ConfidenceGroup))
+                    {
+                        <span class="state-badge">@ConfidenceGroupLabel(suggestion.ConfidenceGroup)</span>
+                    }
+                </div>
                 <strong>@suggestion.Person.DisplayName</strong>
                 <p>Score @suggestion.Score.ToString("F4") · Margin @MarginLabel(suggestion.ScoreMargin)</p>
                 @if (CanAcceptTopSuggestion)
@@ -53,7 +59,7 @@
             <option value="">Choose a person</option>
             @foreach (ReviewPersonResponse person in People)
             {
-                <option value="@person.Id">@person.DisplayName</option>
+                <option value="@person.Id">@PersonLabel(person)</option>
             }
         </select>
 
@@ -61,8 +67,11 @@
             <button class="button primary" disabled="@(string.IsNullOrWhiteSpace(SelectedPersonId) || Busy)" @onclick="AssignAsync">
                 Assign
             </button>
-            <button class="button danger" disabled="@Busy" @onclick="RejectAsync">
-                Reject
+            <button class="button secondary" disabled="@(Face.State == "unknown" || Busy)" @onclick="MarkUnknownAsync">
+                Unknown person
+            </button>
+            <button class="button danger" disabled="@(Face.State == "rejected" || Busy)" @onclick="RejectAsync">
+                False detection
             </button>
             <button class="button secondary" disabled="@(Face.State == "unreviewed" || Busy)" @onclick="UndoAsync">
                 Undo
@@ -99,6 +108,9 @@
     public EventCallback<(string FaceId, string PersonId)> AssignRequested { get; set; }
 
     [Parameter]
+    public EventCallback<string> UnknownRequested { get; set; }
+
+    [Parameter]
     public EventCallback<string> RejectRequested { get; set; }
 
     [Parameter]
@@ -118,7 +130,8 @@
     private string StateLabel => Face.State switch
     {
         "assigned" => "Assigned",
-        "rejected" => "Rejected",
+        "unknown" => "Unknown person",
+        "rejected" => "False detection",
         _ => "Needs review",
     };
 
@@ -176,6 +189,19 @@
         }
     }
 
+    private async Task MarkUnknownAsync()
+    {
+        Busy = true;
+        try
+        {
+            await UnknownRequested.InvokeAsync(Face.Id);
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
     private async Task RejectAsync()
     {
         Busy = true;
@@ -201,6 +227,17 @@
             Busy = false;
         }
     }
+
+    private static string PersonLabel(ReviewPersonResponse person) =>
+        person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
+
+    private static string ConfidenceGroupLabel(string value) => value.ToLowerInvariant() switch
+    {
+        "high" => "High",
+        "medium" => "Medium",
+        "low" => "Low",
+        _ => value,
+    };
 
     private static string MarginLabel(double? margin) => margin is double value
         ? value.ToString("F4")
