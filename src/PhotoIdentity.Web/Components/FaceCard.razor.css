@@ -1,6 +1,7 @@
 .face-card {
     position: relative;
     min-width: 0;
+    container-type: inline-size;
 }
 
 .face-card.bulk-selected {
@@ -68,6 +69,19 @@
     width: 100%;
 }
 
+.card-actions {
+    grid-template-columns: 1fr;
+}
+
+.card-actions .button {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 0.7rem;
+    line-height: 1.2;
+    text-align: center;
+    white-space: normal;
+}
+
 .visually-hidden {
     position: absolute;
     width: 1px;
@@ -80,12 +94,14 @@
     border: 0;
 }
 
+@container (min-width: 19rem) {
+    .card-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 600px) {
     .face-card-body {
         padding: 0.75rem;
-    }
-
-    .card-actions {
-        grid-template-columns: 1fr;
     }
 }
