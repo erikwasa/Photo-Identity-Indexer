@@ -5,6 +5,6 @@ set "PHOTOIDENTITY_EXIT_CODE=%ERRORLEVEL%"
 if not "%PHOTOIDENTITY_EXIT_CODE%"=="0" (
     echo.
     echo Photo Identity could not start. Review the launcher message above.
-    pause
+    if not "%PHOTOIDENTITY_NONINTERACTIVE%"=="1" pause
 )
 exit /b %PHOTOIDENTITY_EXIT_CODE%
