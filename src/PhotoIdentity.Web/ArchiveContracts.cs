@@ -84,6 +84,9 @@ public sealed record ArchiveIncludeRequest(
     string? RootPath,
     string RelativeFolder);
 
+public sealed record ArchiveCoverageUpdateRequest(
+    IReadOnlyList<string> IncludedFolders);
+
 public sealed record ArchiveSyncResponse(
     int SupportedFiles,
     int LocalFiles,
