@@ -28,8 +28,8 @@ None.
 ## Recently completed
 
 - [**WI-0054 — Polish archive viewing, progress and availability**](../work-items/WI-0054-archive-ui-polish.md) — `completed`; owner: `ai-agent`
+- [**WI-0053 — Add HEIC and archive RAW image support**](../work-items/WI-0053-heic-raw-support.md) — `completed`; owner: `ai-agent`
 - [**WI-0047 — Add Unknown as a face review state**](../work-items/WI-0047-unknown-review-state.md) — `completed`; owner: `ai-agent`
-- [**WI-0045 — Regenerate identity matches from the web application**](../work-items/WI-0045-web-match-regeneration.md) — `completed`; owner: `ai-agent`
 
 ## Next ready work
 
