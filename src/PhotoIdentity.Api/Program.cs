@@ -48,6 +48,11 @@ public partial class Program
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
         builder.Services.AddSingleton<SqliteSuggestionGalleryRepository>();
         builder.Services.AddSingleton<SqliteIdentitySuggestionPolicyRepository>();
+        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationModelRepository>();
+        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationRepository>();
+        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationScorer>();
+        builder.Services.AddSingleton<SqliteIdentityMatchEvidenceVersionReader>();
+        builder.Services.AddSingleton<SqliteIdentityAutoAssignmentService>();
         builder.Services.AddSingleton<SqlitePersonAuditRepository>();
         builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();
@@ -82,6 +87,7 @@ public partial class Program
         builder.Services.AddSingleton<OpenCvReviewProxyRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddHostedService<ArchiveAdvancementHostedService>();
+        builder.Services.AddHostedService<IdentityMatchRegenerationHostedService>();
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
             detectorEvaluationRoot,
             serviceProvider.GetRequiredService<TimeProvider>()));
@@ -126,6 +132,7 @@ public partial class Program
         app.MapReviewSuggestionEndpoints();
         app.MapSuggestionGalleryEndpoints();
         app.MapIdentitySuggestionPolicyEndpoints();
+        app.MapIdentityMatchRegenerationEndpoints();
         app.MapPersonAuditEndpoints();
         app.MapPersonMaintenanceEndpoints();
         app.MapBulkReviewEndpoints();

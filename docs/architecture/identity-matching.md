@@ -49,7 +49,15 @@ Unknown faces are excluded from normal regeneration targets. The persistence bou
 
 The fixed snapshot is deliberate: newly automatic assignments cannot affect candidate scoring until a later regeneration. A later manual reassignment becomes the latest active identity and therefore changes the exemplar identity used by later matching.
 
-The current CLI runs normal unreviewed-only regeneration with `match regenerate`. WI-0045 later exposes regeneration through the normal browser workflow. The explicit Unknown-inclusive scope is an internal future-safe boundary rather than an automatic rematch workflow.
+The CLI remains a valid diagnostic path through `match regenerate`. The browser workflow uses a separate durable run controller rather than spawning the CLI or holding one HTTP request/SQLite transaction open for the whole catalogue. Starting a web regeneration snapshots the exact-model policy version, an identity-evidence version and the current eligible target face IDs. A background worker then scores one target in a short transaction, records durable progress and can reclaim an interrupted running target after application restart.
+
+The web run exposes target, processed-target, suggested-target, suggestion, automatic-assignment and error counts. One active run is allowed per exact model revision. A second request for the same revision is rejected until the first is no longer active.
+
+Canonical review decisions, suggestion decisions, person merges or new exact-model embeddings change the run's identity-evidence version. If any of those changes while a run is active, the worker stops the run as stale instead of silently changing exemplar evidence halfway through scoring. A policy-version change likewise prevents finalization under different thresholds. After the final target, the worker revalidates evidence and policy, removes obsolete rankings, then applies automatic assignment once for the complete fixed-snapshot result. This preserves the same-run non-cascade invariant: automatic assignments cannot become exemplars until a later regeneration.
+
+The `Regenerate matches` web workspace selects an exact model revision, shows current/stale/queued/running/completed state and durable progress, and links back to the confidence-group Faces queue after completion. Review reads remain available while scoring proceeds because regeneration uses short per-target transactions.
+
+The explicit Unknown-inclusive scope is an internal future-safe boundary rather than an automatic rematch workflow.
 
 ## Review states
 
@@ -107,6 +115,8 @@ The completed FP32-versus-INT8 comparison used the earlier YuNet detector popula
 - Automatic assignments are canonical decisions with explicit model and policy provenance rather than hidden derived labels.
 - High confidence requires both an absolute rank-1 score gate and a rank-1/rank-2 gap gate.
 - Regeneration uses a fixed exemplar snapshot before automatic assignments are applied.
+- Browser-triggered regeneration is durable, restart-safe and does not depend on one long HTTP request or transaction.
+- An active browser regeneration becomes stale if identity evidence changes before finalization.
 - Manual correction supersedes an automatic assignment and changes later exemplar evidence.
 - Rejected face-person pairs remain excluded.
 - Unknown and rejected faces do not become exemplars or person-collection evidence.
