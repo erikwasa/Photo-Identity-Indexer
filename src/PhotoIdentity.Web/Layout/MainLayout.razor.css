@@ -1,32 +1,134 @@
-.topbar-actions {
+.primary-nav {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 0.65rem;
+    gap: 0.55rem;
 }
 
-.topbar-link {
+.primary-link {
     min-height: 44px;
     display: inline-flex;
     align-items: center;
-    padding: 0.55rem 0.75rem;
+    padding: 0.55rem 0.8rem;
     color: #e8f0ec;
     border-radius: 0.7rem;
     font-weight: 700;
     text-decoration: none;
 }
 
-.topbar-link:hover,
-.topbar-link:focus-visible {
+.primary-link:hover,
+.primary-link:focus-visible,
+.advanced-menu[open] > summary {
     background: rgba(255, 255, 255, 0.1);
 }
 
-@media (max-width: 680px) {
+.advanced-menu {
+    position: relative;
+}
+
+.advanced-menu > summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.advanced-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.advanced-menu > summary::after {
+    content: "▾";
+    margin-left: 0.45rem;
+    font-size: 0.8em;
+}
+
+.advanced-menu[open] > summary::after {
+    content: "▴";
+}
+
+.advanced-menu-panel {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 0.55rem);
+    right: 0;
+    min-width: 19rem;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    padding: 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 0.85rem;
+    background: #17231e;
+    box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.28);
+}
+
+.advanced-menu-section {
+    display: grid;
+    gap: 0.3rem;
+}
+
+.advanced-menu-section strong {
+    padding: 0.35rem 0.5rem;
+    color: #a9b9b0;
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.advanced-menu-section a {
+    display: block;
+    padding: 0.5rem;
+    color: #e8f0ec;
+    border-radius: 0.55rem;
+    text-decoration: none;
+}
+
+.advanced-menu-section a:hover,
+.advanced-menu-section a:focus-visible {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.review-workflow {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.55rem clamp(1rem, 3vw, 2.5rem);
+    border-bottom: 1px solid rgba(31, 51, 42, 0.12);
+    background: rgba(245, 248, 246, 0.92);
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+.review-workflow > span {
+    margin-right: 0.35rem;
+    color: #5f7067;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.review-workflow a {
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.65rem;
+    color: #263f34;
+    border-radius: 0.6rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.review-workflow a:hover,
+.review-workflow a:focus-visible {
+    background: rgba(42, 91, 68, 0.09);
+}
+
+@media (max-width: 860px) {
     .topbar {
         align-items: flex-start;
     }
 
-    .topbar-actions {
+    .primary-nav {
         flex-wrap: wrap;
         gap: 0.35rem;
     }
@@ -34,5 +136,34 @@
     .privacy-pill {
         width: 100%;
         justify-content: center;
+    }
+}
+
+@media (max-width: 680px) {
+    .primary-nav {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .primary-link {
+        padding-inline: 0.65rem;
+    }
+
+    .advanced-menu {
+        position: static;
+    }
+
+    .advanced-menu-panel {
+        position: absolute;
+        left: 1rem;
+        right: 1rem;
+        top: auto;
+        min-width: 0;
+        grid-template-columns: 1fr;
+        margin-top: 0.45rem;
+    }
+
+    .review-workflow {
+        padding-inline: 1rem;
     }
 }
