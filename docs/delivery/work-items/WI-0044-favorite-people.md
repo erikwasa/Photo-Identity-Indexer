@@ -41,12 +41,13 @@ The canonical people list will become increasingly long. Alphabetical selection 
 
 ## Verification requirements
 
-Automated persistence/query tests plus browser verification on desktop and narrow/mobile layouts.
+Automated persistence/query tests plus browser verification on desktop and narrow/mobile layouts. Human desktop and Pixel verification completed on 2026-08-11 as part of the milestone-wide M17 review.
 
 ## Completion notes
 
 - Files changed: favorite-person persistence, review/maintenance API contracts and endpoints, people maintenance controls, Face Details favorite control, face-card assignment labels, collection ordering, and integration coverage.
 - Integration resolved: after WI-0043 merged, WI-0047 schema version 12 promoted `person_favorites` into the central SQLite migration lifecycle and moved favorite OR-consolidation into the canonical person-merge transaction. The temporary branch-isolation trade-off is therefore closed before M17 review.
 - Merge policy: the surviving person is favorite when either the source or target person was favorite; rename never changes favorite state.
-- Deferred work: desktop and narrow/mobile browser verification is intentionally deferred to the milestone-wide M17 review. No matcher prior or scoring behavior is introduced.
-- Verification: PR #117 merged to `m17`; post-conflict GitHub Actions run `31435193480` passed Release build, full tests, documentation checks, review-app smoke, and Windows mixed-media verification.
+- Matcher behavior: favorites remain a UI preference only and do not alter matcher evidence or scores.
+- Verification: PR #117 merged to `m17`; post-conflict GitHub Actions run `31435193480` passed Release build, full tests, documentation checks, review-app smoke, and Windows mixed-media verification. The maintainer then accepted favorite persistence, ordering and controls during the milestone-wide Windows laptop and Pixel verification on 2026-08-11.
+- Deferred work: none required for WI-0044 completion. The remaining Faces layout comments are minor UI follow-ups and do not change favorite behavior.
