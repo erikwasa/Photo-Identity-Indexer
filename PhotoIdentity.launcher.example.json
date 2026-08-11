@@ -1,0 +1,9 @@
+{
+  "publishPath": "C:\\PhotoIdentity\\app",
+  "url": "http://127.0.0.1:5080",
+  "settings": {
+    "PhotoIdentity__DatabasePath": "C:\\PhotoIdentity\\catalogue.db",
+    "PhotoIdentity__ArchiveAnalysisOutputRoot": "C:\\PhotoIdentity\\analysis",
+    "PhotoIdentity__ReviewProxyRoot": "C:\\PhotoIdentity\\review-proxies"
+  }
+}

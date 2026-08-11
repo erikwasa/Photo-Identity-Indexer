@@ -75,7 +75,11 @@ $env:PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations = "<accepted-c
 
 Do not invent production values. Use the values accepted through [bounded archive acceptance](bounded-archive-acceptance.md). See [review-proxy serving and bounded originals](review-proxy-serving.md) for exact semantics.
 
+For routine launcher use, store the same accepted values in the private launcher bootstrap instead of setting them manually before every start. Copy `PhotoIdentity.launcher.example.json` to either `PhotoIdentity.launcher.json` beside the launcher or `%LOCALAPPDATA%\PhotoIdentity\launcher.json`, then add only the accepted settings required by the installation. The real `PhotoIdentity.launcher.json` is ignored by Git and must remain private.
+
 ## 4. Publish and run the local browser application
+
+Publish the existing hosted API/Blazor application as before:
 
 ```powershell
 Remove-Item $publish -Recurse -Force -ErrorAction SilentlyContinue
@@ -84,14 +88,37 @@ dotnet publish `
   .\src\PhotoIdentity.Api\PhotoIdentity.Api.csproj `
   --configuration Release `
   --output $publish
+```
 
+For the example `C:\PhotoIdentity\app` layout, copy `PhotoIdentity.launcher.example.json` to `PhotoIdentity.launcher.json` beside `Start-PhotoIdentity.cmd` and keep its `publishPath`, database, analysis and proxy paths aligned with the accepted local installation. Add the accepted proxy-profile and hydration-policy settings from section 3 when those features are enabled.
+
+Then start Photo Identity by double-clicking:
+
+```text
+Start-PhotoIdentity.cmd
+```
+
+The launcher:
+
+- accepts only a loopback HTTP URL such as `http://127.0.0.1:5080`;
+- opens the browser only after `/health` reports the application ready;
+- reuses an already healthy Photo Identity instance instead of starting a duplicate;
+- refuses to start when the configured port is occupied by something that is not the Photo Identity health endpoint;
+- loads only the documented `PhotoIdentity__...` bootstrap settings from the private JSON file; and
+- writes startup stdout/stderr logs under `%LOCALAPPDATA%\PhotoIdentity\launcher-logs` when troubleshooting is needed.
+
+If no launcher configuration exists, the launcher uses the application defaults and expects publish output at `%LOCALAPPDATA%\PhotoIdentity\app`.
+
+The command-line startup remains available for development and diagnostics:
+
+```powershell
 Push-Location $publish
 dotnet .\PhotoIdentity.Api.dll --urls "http://127.0.0.1:5080"
 ```
 
-Open `http://localhost:5080` on Windows.
+Open `http://localhost:5080` on Windows when starting manually.
 
-A one-click launcher and packaged Windows application are planned under WI-0051/WI-0052. Until they are implemented, publishing and starting the hosted API/Blazor process remains the supported path.
+WI-0051 deliberately remains a launcher around the existing framework-dependent publish. Installer/self-contained application packaging belongs to WI-0052.
 
 ## 5. Configure permanent archive coverage
 

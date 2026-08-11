@@ -17,18 +17,19 @@ See `docs/product/success-criteria.md` and `docs/delivery/local-first-plan.md` f
 ## Current milestones
 
 - **M12 — Full archive processing**: `in_progress`. The version-1 archive-readiness work-item gates are complete, while M12 continues through later full-coverage completion.
-- **M17 — Identity review automation**: `in_progress`. WI-0043, WI-0044 and WI-0047 are merged into `m17` and in review; WI-0045 is the remaining implementation item. Draft PR #122 is the `m17` to `main` integration and milestone-verification boundary.
+- **M17 — Identity review automation**: `in_progress`. Integrated review automation remains under milestone-wide human verification.
+- **M18 — Operator application experience**: implementation is progressing on the isolated `m18` integration branch while M17 verification continues. WI-0048 and WI-0046 are merged into `m18`; WI-0051 is the active implementation item and WI-0052 follows it.
 - **M09 — Azure VM pilot without identities**: `ready` and optional; Azure is not required for version 1.
 
 ## Active work
+
+**WI-0051 — Add a one-click Windows launcher** is the active M18 work item on `agent/WI-0051-windows-launcher`, based on the merged WI-0046 `m18` head. It wraps the existing framework-dependent published API/Blazor application rather than introducing a new runtime. The intended operator path is a double-clickable `.cmd` entry point backed by a reviewable PowerShell launcher, private local bootstrap configuration, loopback-only hosting, `/health` readiness, duplicate-instance prevention and actionable startup errors. A dedicated Windows CI verification publishes to disposable output, launches twice and asserts one healthy server process remains. Human Windows Explorer verification against a clean publish remains required before completion.
 
 **WI-0054 — Polish archive viewing, progress and availability** is `in_review`. Its implementation was merged in PR #118 after the maintainer completed real Windows/OneDrive verification of WI-0042 and WI-0041 on 2026-08-10; human verification of the three follow-up cases remains the completion step.
 
 The focused follow-up fixes three post-acceptance usability inconsistencies: local verified pending revisions need a safe viewer fallback before their durable proxy exists; latest-run progress must be distinguished from cumulative archive analysis; and explicit original status/hydration observations must reconcile the persisted Archive availability state. The accepted WI-0042 managed-release and bounded-storage policy remains unchanged.
 
-**M17 integrated review automation** is now under milestone-wide verification. WI-0043 provides exact-model configurable confidence groups and optional canonical High-confidence auto-assignment using both rank-1 score and rank-1/rank-2 gap; automatic assignment remains disabled by default pending representative private-sample threshold tuning. WI-0044 adds favorite people without changing matcher evidence, and WI-0047 adds the reversible Unknown review state without creating synthetic identities. Desktop and narrow/mobile integrated UI verification remains before these items are completed.
-
-**WI-0045 — Regenerate identity matches from the web application** is the remaining M17 implementation item. It should be built on the latest `m17` integration state while the milestone-wide human verification of the already merged review features proceeds.
+**M17 integrated review automation** remains under milestone-wide verification. WI-0043 provides exact-model configurable confidence groups and optional canonical High-confidence auto-assignment using both rank-1 score and rank-1/rank-2 gap; automatic assignment remains disabled by default pending representative private-sample threshold tuning. WI-0044 adds favorite people without changing matcher evidence, and WI-0047 adds the reversible Unknown review state without creating synthetic identities. Desktop and narrow/mobile integrated UI verification remains before these items are completed.
 
 **WI-0053 — Add HEIC and archive RAW image support** is `completed` and human-verified as of 2026-08-11. HEIC/HEIF is supported through the production image contract and review-proxy path, privacy-safe archive inventory/reporting is in place, representative private HEIC files were successfully decoded with correct visual output and unchanged originals, and the current archive has no known RAW variants. A future newly observed RAW format reopens only that format-specific decoder/verification requirement rather than invalidating the current completion evidence.
 
@@ -54,9 +55,9 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 
 ## Next concrete sequence
 
-1. Continue milestone-wide M17 verification of confidence grouping/auto-assignment safety, favorite people and Unknown behavior on desktop and narrow/mobile review surfaces.
-2. Implement WI-0045 on the latest `m17` integration branch and merge it into M17 once automated verification is green.
-3. Complete M17 human verification, update the four M17 work items to their verified states, then make draft PR #122 ready for final merge to `main`.
+1. Complete WI-0051 automated validation, merge it into `m18`, then verify the one-click launcher from Windows Explorer against a clean published output.
+2. Proceed to WI-0052 packaged/self-contained Windows application work after WI-0051 is accepted, continuing to keep M18 outside `main` until the milestone integration boundary is ready.
+3. Continue milestone-wide M17 verification of confidence grouping/auto-assignment safety, favorite people, Unknown behavior and web regeneration on desktop and narrow/mobile review surfaces.
 4. Complete human verification of WI-0054 archive viewer/progress/availability polish for the three reported post-acceptance cases.
 5. Confirm the version-1 success criteria on the real Windows/OneDrive environment and continue permanent-catalogue archive coverage incrementally; do not create a replacement production database.
 
@@ -76,10 +77,14 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 - `docs/product/success-criteria.md`
 - `docs/delivery/local-first-plan.md`
 - `docs/delivery/milestones/M17-review-automation.md`
+- `docs/delivery/milestones/M18-application-experience.md`
 - `docs/delivery/work-items/WI-0043-confidence-auto-assignment.md`
 - `docs/delivery/work-items/WI-0044-favorite-people.md`
 - `docs/delivery/work-items/WI-0045-web-match-regeneration.md`
-- `docs/delivery/work-items/WI-0047-unknown-review-state.md`
+- `docs/delivery/work-items/WI-0046-simplified-application-shell.md`
+- `docs/delivery/work-items/WI-0048-configuration-page.md`
+- `docs/delivery/work-items/WI-0051-one-click-windows-launcher.md`
+- `docs/delivery/work-items/WI-0052-packaged-windows-application.md`
 - `docs/delivery/work-items/WI-0042-bounded-archive-storage.md`
 - `docs/delivery/work-items/WI-0041-incremental-archive-ingestion.md`
 - `docs/delivery/work-items/WI-0053-heic-raw-support.md`
@@ -95,6 +100,7 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 ./test.ps1
 ./verify-local.ps1 -InstallModels
 ./verify-review.ps1 -Mode Smoke -Configuration Release
+./verify-launcher.ps1 -Configuration Release
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
