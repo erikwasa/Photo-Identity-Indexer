@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.Persistence.Sqlite;
