@@ -72,7 +72,8 @@ After PR #118 was merged, a 20-image mixed local/online-only acceptance run expo
 
 - Files changed across WI-0054: viewer/original-access API and web pages, Archive progress UI, source-verification and bounded-analysis orchestration, integration tests and operator/delivery docs.
 - Trade-offs: transient fallback rendering performs an exact SHA-256 verification/read when no durable proxy exists; this is intentionally preferred to implicit hydration or serving unverified bytes. Active advancement uses several truthful stage counters instead of a fabricated all-pipeline percentage.
-- Deferred work: parallel unattended archive advancement remains outside this work item.
+- Deferred work: parallel unattended archive advancement remains outside this work item. No WI-0054 acceptance blocker remains.
 - Validation: GitHub Actions build run 802 (`31436697991`) passed Release build, the full automated test suite, living/generated documentation checks, hosted review smoke, Windows mixed-media verification and report assertions for the original WI-0054 product changes.
-- Corrective validation: GitHub Actions build run 821 (`31440775067`) passed the same full repository gate on corrective product head `0ac2c22d34542f30b174fdecf9b71c5a333c76fd`, including regression coverage for first-time verification and true revision identity change.
+- Corrective validation: GitHub Actions build run 822 (`31441519751`) passed the same full repository gate on corrective head `7d511a9ac5234528139650fb8b2a06d0f0a34c7f`, including regression coverage for first-time verification and true revision identity change.
+- Human verification: the maintainer completed post-merge WI-0054 verification on the real Windows/OneDrive archive on 2026-08-11 and accepted the viewer fallback, progress stability and availability behavior after the corrective follow-up.
 - Commands run: repository CI plus `PhotoIdentity.Docs validate/generate --check` before review.

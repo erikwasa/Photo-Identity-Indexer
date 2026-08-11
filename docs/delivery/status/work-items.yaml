@@ -1066,17 +1066,19 @@ work_items:
 - id: WI-0043
   title: Add configurable confidence groups and canonical auto-assignment
   milestone: M17
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0043-confidence-auto-assignment.md
   started_at: 2026-08-10
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
   last_updated_at: 2026-08-11
   branch: wi-0043
   blockers:
   - WI-0016
   - WI-0033
-  blocker_notes:
-  - Private reviewed-sample threshold tuning and milestone-wide UI verification remain required before completion and routine auto-assignment; automatic assignment remains disabled by default.
+  blocker_notes: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/116
@@ -1084,19 +1086,23 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31430785546
   - type: merge_commit
     value: b275103baca69a8ca947b88607ff8ae517804944
+  - type: human_verification
+    value: Maintainer completed milestone-wide M17 verification on Windows laptop and Pixel on 2026-08-11 and accepted configurable confidence grouping, conservative score-plus-margin High classification, threshold tuning, automatic-assignment behavior and manual correction/audit behavior; only minor non-blocking Faces layout comments remained.
 - id: WI-0044
   title: Add favorite people
   milestone: M17
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0044-favorite-people.md
   started_at: 2026-08-10
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
   last_updated_at: 2026-08-11
   branch: wi-0044
   blockers:
   - WI-0015
-  blocker_notes:
-  - Milestone-wide desktop and narrow/mobile verification remains before completion.
+  blocker_notes: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/117
@@ -1104,17 +1110,33 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31435193480
   - type: merge_commit
     value: fe6fd4696a8eaa90d274db322f27a49ac72d3b22
+  - type: human_verification
+    value: Maintainer completed milestone-wide M17 desktop and Pixel verification on 2026-08-11 and accepted favorite persistence, ordering and controls; favorites remained a UI preference and did not affect matching.
 - id: WI-0045
   title: Regenerate identity matches from the web application
   milestone: M17
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0045-web-match-regeneration.md
+  started_at: 2026-08-11
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
+  last_updated_at: 2026-08-11
+  branch: wi-0045
   blockers:
   - WI-0016
   - WI-0043
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/123
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31444575754
+  - type: merge_commit
+    value: 6cd010c7568b295c981ee19ff84f28307a05d10f
+  - type: human_verification
+    value: Maintainer completed milestone-wide M17 local verification on 2026-08-11 and accepted browser-triggered exact-model regeneration, durable progress/current-stale feedback and normal review usage during regeneration.
 - id: WI-0046
   title: Simplify the application around Review and Library
   milestone: M18
@@ -1130,17 +1152,19 @@ work_items:
 - id: WI-0047
   title: Add Unknown as a face review state
   milestone: M17
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0047-unknown-review-state.md
   started_at: 2026-08-10
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
   last_updated_at: 2026-08-11
   branch: wi-0047
   blockers:
   - WI-0015
   - WI-0016
-  blocker_notes:
-  - Milestone-wide desktop and narrow/mobile verification remains before completion.
+  blocker_notes: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/119
@@ -1148,6 +1172,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31439710560
   - type: merge_commit
     value: b44f3798ac511bf6addc804e2fb5b641c8d7790c
+  - type: human_verification
+    value: Maintainer completed milestone-wide M17 desktop and Pixel verification on 2026-08-11 and accepted Unknown as distinct from false detection, reversible and supersedable by later assignment with preserved history.
 - id: WI-0048
   title: Add an operator configuration page
   milestone: M18
@@ -1230,14 +1256,31 @@ work_items:
 - id: WI-0054
   title: Polish archive viewing, progress and availability
   milestone: M12
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0054-archive-ui-polish.md
   started_at: 2026-08-10
-  last_updated_at: 2026-08-10
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
+  last_updated_at: 2026-08-11
   branch: agent/WI-0054-archive-ui-polish
   blockers:
   - WI-0041
   - WI-0042
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/118
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31437508867
+  - type: merge_commit
+    value: 187c1da86cdf03345b6a08bcdb3c40a90f51b2b6
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/121
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31441519751
+  - type: merge_commit
+    value: cee18b822fa3ad9f7a8a0899c4cbdb6e1faf8b2d
+  - type: human_verification
+    value: Maintainer completed post-merge WI-0054 verification on the real Windows/OneDrive archive on 2026-08-11 and accepted archive viewer fallback, progress stability and availability behavior after the corrective follow-up; no blocking issues remained.

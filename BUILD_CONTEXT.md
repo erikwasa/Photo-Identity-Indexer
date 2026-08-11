@@ -10,30 +10,69 @@ The version-1 archive-readiness gates are:
 2. WI-0041 — stable permanent archive identity and incremental no-repeat ingestion after WI-0042 is accepted; and
 3. WI-0053 — HEIC/HEIF plus every RAW variant required by the real archive, with explicit unsupported state for any deliberate exception.
 
-All three archive-readiness work-item gates are now human-verified. The remaining version-1 step is to confirm the product success criteria on the real Windows/OneDrive environment after the active archive-UI follow-up is accepted.
+All three archive-readiness work-item gates are human-verified. WI-0054, the post-acceptance archive viewer/progress/availability polish discovered during real Windows/OneDrive verification, is also human-verified. The remaining version-1 step is the final real-environment product-success confirmation.
 
 See `docs/product/success-criteria.md` and `docs/delivery/local-first-plan.md` for the durable product/delivery definition.
 
 ## Current milestones
 
-- **M12 — Full archive processing**: `in_progress`. The version-1 archive-readiness work-item gates are complete, while M12 continues through later full-coverage completion.
-- **M17 — Identity review automation**: `in_progress`. Integrated review automation remains under milestone-wide human verification.
-- **M18 — Operator application experience**: implementation is progressing on the isolated `m18` integration branch while M17 verification continues. WI-0048, WI-0046 and WI-0051 are merged into `m18`; WI-0052 is the final implementation item before an integrated M18 human verification pass.
+- **M17 — Identity review automation**: `completed` and human-verified on 2026-08-11. All four M17 work items are merged to `main` and accepted on Windows laptop and Pixel.
+- **M12 — Full archive processing**: `proposed` under the repository status rules. Its archive-readiness work (WI-0041, WI-0042, WI-0053 and WI-0054) is completed and human-verified; the later full-coverage WI-0023 remains separate and is not yet ready.
 - **M09 — Azure VM pilot without identities**: `ready` and optional; Azure is not required for version 1.
+- **M18 — Operator application experience**: `ready` in the canonical `main` delivery registry. WI-0046, WI-0048, WI-0051 and WI-0052 are implemented and merged into the `m18` integration branch; draft PR #129 is the milestone integration and local-verification boundary.
+- **M19 — Photo metadata and semantic collections**: `ready` in the canonical `main` delivery registry.
 
-## Active work
+## Canonical active work
 
-**WI-0052 — Package Photo Identity as a Windows application** is the active M18 work item on `agent/WI-0052-windows-package`, based on the merged WI-0051 `m18` head. It turns the launcher/publish workflow into a repeatable self-contained `win-x64` operator ZIP. The package contains only replaceable code and a one-file `PhotoIdentity.cmd` entry point; private configuration and durable catalogue/analysis/proxy state remain outside the package, normally below `%LOCALAPPDATA%\PhotoIdentity` or the accepted installation-specific local paths. Automated package verification builds the ZIP, starts it twice, verifies one healthy server, then performs a side-by-side replacement while preserving the same external catalogue/configuration boundary.
+The `main` delivery registry currently has no work items in `in_progress`, `in_review` or `blocked` state after completion of M17 and WI-0054. M18 implementation remains intentionally outside canonical completion status until the integrated local verification pass is accepted.
 
-**WI-0051 — Add a one-click Windows launcher** is merged into `m18` and automated Windows verification passed. The launcher provides loopback-only hosting, `/health` readiness, duplicate-instance prevention, private local bootstrap configuration and actionable startup errors. Its remaining acceptance activity is included in the planned integrated M18 Windows Explorer verification rather than being performed separately before WI-0052.
+## M18 operator application integration candidate
 
-**WI-0054 — Polish archive viewing, progress and availability** is `in_review`. Its implementation was merged in PR #118 after the maintainer completed real Windows/OneDrive verification of WI-0042 and WI-0041 on 2026-08-10; human verification of the three follow-up cases remains the completion step.
+All four M18 implementation work items are merged into `m18` and have automated evidence:
 
-The focused follow-up fixes three post-acceptance usability inconsistencies: local verified pending revisions need a safe viewer fallback before their durable proxy exists; latest-run progress must be distinguished from cumulative archive analysis; and explicit original status/hydration observations must reconcile the persisted Archive availability state. The accepted WI-0042 managed-release and bounded-storage policy remains unchanged.
+- **WI-0046** simplifies the application shell around Review, Library and Settings while keeping engineering and maintenance tools available through Advanced/review-workflow navigation.
+- **WI-0048** consolidates archive coverage and matching/suggestion policy into `/settings`, including persisted archive-coverage replacement that preserves source identity and existing assets.
+- **WI-0051** provides a double-clickable Windows launcher with loopback-only hosting, `/health` readiness, duplicate-instance prevention, persisted local bootstrap configuration and actionable startup errors.
+- **WI-0052** provides a repeatable self-contained `win-x64` operator ZIP with `PhotoIdentity.cmd`; replaceable application code stays inside the package while catalogue, configuration, analysis/proxy data and logs remain external. Automated package verification passed first start, repeated-start reuse and side-by-side replacement against the same durable configuration/catalogue boundary.
 
-**M17 integrated review automation** remains under milestone-wide verification. WI-0043 provides exact-model configurable confidence groups and optional canonical High-confidence auto-assignment using both rank-1 score and rank-1/rank-2 gap; automatic assignment remains disabled by default pending representative private-sample threshold tuning. WI-0044 adds favorite people without changing matcher evidence, and WI-0047 adds the reversible Unknown review state without creating synthetic identities. Desktop and narrow/mobile integrated UI verification remains before these items are completed.
+The observed self-contained CI package size is approximately 272.6 MB extracted / 116.1 MB ZIP. Draft PR #129 targets `main` and must remain unmerged until the integrated Windows verification is complete.
 
-**WI-0053 — Add HEIC and archive RAW image support** is `completed` and human-verified as of 2026-08-11. HEIC/HEIF is supported through the production image contract and review-proxy path, privacy-safe archive inventory/reporting is in place, representative private HEIC files were successfully decoded with correct visual output and unchanged originals, and the current archive has no known RAW variants. A future newly observed RAW format reopens only that format-specific decoder/verification requirement rather than invalidating the current completion evidence.
+## Completed M17 identity review automation
+
+M17 is complete after integrated automated verification and milestone-wide human review on 2026-08-11.
+
+- **WI-0043** provides exact-model configurable High/Medium/Low confidence groups and optional canonical High-confidence automatic assignment. High requires both the configured rank-1 score and rank-1/rank-2 margin. Automatic decisions are auditable, use one fixed exemplar snapshot per regeneration, and can be superseded by manual correction.
+- **WI-0044** adds favorite people with stable favorite-first ordering across normal selectors and maintenance surfaces without changing matcher evidence or scores.
+- **WI-0045** moves exact-model suggestion regeneration into the browser with durable progress, restart recovery, duplicate-run exclusion and stale-evidence protection while retaining the CLI path for diagnostics/automation.
+- **WI-0047** adds Unknown as a reversible real-face review state distinct from false detection, excludes Unknown from normal identity evidence/collections, and preserves history when a later assignment supersedes it.
+
+The maintainer accepted the integrated M17 workflow on Windows laptop and Pixel, including confidence grouping and threshold tuning, optional automatic assignment and audit/correction behavior, favorite ordering and controls, Unknown/false-detection distinction and later assignment, and browser regeneration with progress/stale-state feedback.
+
+## Minor Faces UI follow-ups
+
+Two non-blocking presentation issues were observed during M17 verification and may be fixed directly without creating work items:
+
+- on laptop, the `Unknown person`, `Assign` and `False detection` buttons do not fit comfortably inside a face card;
+- on Pixel, the persistent menu consumes roughly half the screen and remains fixed while scrolling, which is unacceptable for normal mobile use.
+
+The M18 narrow-layout verification should confirm whether the shell/navigation change resolves the Pixel menu observation. The face-card button fit remains a separate presentation follow-up if still visible. These observations do not reopen any M17 acceptance criterion.
+
+## Completed WI-0054 archive polish
+
+WI-0054 is `completed` and human-verified as of 2026-08-11. The accepted behavior includes:
+
+- safe review-sized fallback viewing from already-local, exact-revision-verified originals when no durable proxy exists;
+- no implicit hydration when normal viewing encounters an online-only original without a proxy;
+- clear no-preview UI instead of broken images;
+- stable operator-facing Archive advancement stage counters rather than replaceable internal batch progress;
+- persisted reconciliation of live OneDrive availability observed during explicit original status/hydrate/release operations; and
+- stale queued/running revision cancellation only when immutable identity for that same asset actually changes.
+
+The accepted WI-0042 managed-release and bounded-storage policy remains unchanged.
+
+## WI-0053 archive formats
+
+WI-0053 is `completed` and human-verified as of 2026-08-11. HEIC/HEIF is supported through the production image contract and review-proxy path, privacy-safe archive inventory/reporting is in place, representative private HEIC files were successfully decoded with correct visual output and unchanged originals, and the current archive has no known RAW variants. A future newly observed RAW format reopens only that format-specific decoder/verification requirement rather than invalidating the current completion evidence.
 
 ## Selected permanent archive analysis profile
 
@@ -49,22 +88,24 @@ The generic historical `batch` defaults still use YuNet and must not be mistaken
 
 The previous FP32-versus-INT8 embedding comparison used the earlier YuNet face population. If production model selection is reaffirmed after the detector change, evaluate the exact models on the selected CenterFace population before treating the old comparison as definitive for the permanent archive.
 
-## Accepted future direction
+## Accepted identity-automation direction
 
-ADR-0006 supersedes the earlier mandatory-human-confirmation rule and is implemented by WI-0043. Suggestion policy is scoped to an exact embedding-model revision, High confidence requires both absolute rank-1 score and a configurable rank-1/rank-2 gap, and optional automatic assignments use the canonical acceptance boundary with audit provenance. Automatic assignments can become exemplars only on later regeneration runs and can be superseded by manual reassignment. The feature remains disabled by default until the maintainer accepts tuned thresholds on a representative private reviewed sample.
+ADR-0006 supersedes the earlier mandatory-human-confirmation rule and is implemented and human-verified by M17. Suggestion policy is scoped to an exact embedding-model revision, High confidence requires both absolute rank-1 score and a configurable rank-1/rank-2 gap, and optional automatic assignments use the canonical acceptance boundary with audit provenance. Automatic assignments can become exemplars only on later regeneration runs and can be superseded by manual reassignment. Automatic assignment remains an explicit user-controlled setting and is disabled by default.
 
 ADR-0007 records the stable archive root plus bounded local materialization architecture.
 
 ## Next concrete sequence
 
-1. Complete WI-0052 automated package validation and merge it into `m18`.
-2. Run one integrated M18 human verification pass on Windows: extract/start the package from Explorer, verify Review/Library/Settings on desktop and narrow layout, confirm launcher duplicate/startup behavior, perform a non-destructive side-by-side package replacement, and verify the maintained catalogue/configuration persists.
-3. Continue milestone-wide M17 verification of confidence grouping/auto-assignment safety, favorite people, Unknown behavior and web regeneration on desktop and narrow/mobile review surfaces.
-4. Complete human verification of WI-0054 archive viewer/progress/availability polish for the three reported post-acceptance cases.
-5. Confirm the version-1 success criteria on the real Windows/OneDrive environment and continue permanent-catalogue archive coverage incrementally; do not create a replacement production database.
+1. Run the integrated M18 human verification pass on Windows from the synchronized `m18` / draft PR #129 candidate: extract/start from Explorer, verify Review/Library/Settings on desktop and narrow layout, confirm launcher duplicate/startup behavior, perform a non-destructive side-by-side package replacement, and verify the maintained catalogue/configuration persists.
+2. If M18 verification passes, update WI-0046, WI-0048, WI-0051, WI-0052 and M18 with human verification evidence, regenerate delivery status, and mark PR #129 ready for merge. If verification finds a defect, fix it on `m18` and repeat only the affected acceptance checks plus the integration gate.
+3. Apply any remaining minor Faces presentation follow-ups directly without reopening M17.
+4. Confirm the version-1 product success criteria on the real Windows/OneDrive environment.
+5. Continue permanent-catalogue archive coverage incrementally when the remaining M12 full-coverage prerequisites are satisfied; do not create a replacement production database. Continue M19 from its canonical ready state when prioritized; Azure remains optional.
 
 ## Completed gates
 
+- M17 identity review automation is merged to `main` and human-verified on Windows laptop and Pixel.
+- WI-0054 archive viewer/progress/availability polish is human-verified on the real Windows/OneDrive archive.
 - WI-0042 bounded archive hydration, source re-verification, durable review proxies and managed-release behavior are human-verified on the real Windows/OneDrive archive.
 - WI-0041 stable permanent archive identity, overlapping coverage, incremental rescan and no-repeat processing are human-verified on the real Windows/OneDrive archive.
 - WI-0053 HEIC/HEIF support, explicit RAW visibility policy and private HEIC verification are human-verified; no RAW variants are currently known in the maintained archive.
@@ -83,6 +124,8 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 - `docs/delivery/work-items/WI-0043-confidence-auto-assignment.md`
 - `docs/delivery/work-items/WI-0044-favorite-people.md`
 - `docs/delivery/work-items/WI-0045-web-match-regeneration.md`
+- `docs/delivery/work-items/WI-0047-unknown-review-state.md`
+- `docs/delivery/work-items/WI-0054-archive-ui-polish.md`
 - `docs/delivery/work-items/WI-0046-simplified-application-shell.md`
 - `docs/delivery/work-items/WI-0048-configuration-page.md`
 - `docs/delivery/work-items/WI-0051-one-click-windows-launcher.md`

@@ -26,17 +26,26 @@ The automatic policy remains user-controlled and disabled by default. Threshold 
 
 ## Verification status
 
-As of 2026-08-11, WI-0043, WI-0044 and WI-0047 are merged into the `m17` integration branch and are in review. Automated build, regression, documentation, review-smoke and Windows verification gates are green for their final work-item heads.
+M17 completed human verification on 2026-08-11 after all four work items were merged and the integrated milestone was merged to `main` through PR #122.
 
-Milestone-wide human verification remains for the integrated desktop and narrow/mobile review flows. WI-0043 additionally requires representative private-sample tuning of the High score, rank-1/rank-2 gap and Medium thresholds before routine automatic assignment is enabled; automatic assignment remains disabled by default while that tuning is performed.
+The maintainer reviewed the integrated workflow on a Windows laptop and Pixel, including High/Medium/Low confidence behavior and threshold tuning, optional automatic assignment and audit/correction behavior, favorite-person ordering and controls, Unknown versus false-detection behavior and later assignment, and browser-triggered regeneration with progress/stale-state feedback. The automated work-item and integrated repository gates were already green before the human pass.
 
-WI-0045 is the remaining implementation item. The draft `m17` to `main` milestone PR is the integration and verification boundary; it stays draft until WI-0045 is merged and the milestone-wide verification is complete.
+All four M17 work items are therefore `completed` and human-verified.
+
+## Minor post-verification UI follow-ups
+
+Two non-blocking Faces-page layout observations remain and do not require separate work items:
+
+- on the laptop layout, the `Unknown person`, `Assign` and `False detection` buttons do not fit comfortably inside the face card;
+- on Pixel, the persistent menu consumes roughly half of the screen and remains fixed while the page scrolls, which is unacceptable for normal mobile use.
+
+These are presentation fixes only and do not reopen any M17 acceptance criterion.
 
 ## Exit criteria
 
-- Suggestion groups and automatic-assignment policy are persisted and adjustable.
-- Automatic assignments have explicit model, score and policy provenance.
-- Manual correction cleanly supersedes an automatic identity and changes future exemplar evidence.
-- Suggestion regeneration is available through the normal web workflow.
-- Unknown is a distinct auditable review state that is excluded from identity evidence and person collections.
-- Favorite people are consistently prioritized without influencing model scores.
+- [x] Suggestion groups and automatic-assignment policy are persisted and adjustable.
+- [x] Automatic assignments have explicit model, score and policy provenance.
+- [x] Manual correction cleanly supersedes an automatic identity and changes future exemplar evidence.
+- [x] Suggestion regeneration is available through the normal web workflow.
+- [x] Unknown is a distinct auditable review state that is excluded from identity evidence and person collections.
+- [x] Favorite people are consistently prioritized without influencing model scores.

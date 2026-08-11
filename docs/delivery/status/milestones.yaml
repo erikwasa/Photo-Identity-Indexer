@@ -109,7 +109,7 @@ milestones:
   - WI-0022
 - id: M12
   title: Full archive processing
-  status: in_progress
+  status: proposed
   document: ../milestones/M12-full-archive.md
   work_items:
   - WI-0041
@@ -131,7 +131,7 @@ milestones:
   - WI-0025
 - id: M17
   title: Identity review automation
-  status: in_progress
+  status: completed
   document: ../milestones/M17-review-automation.md
   work_items:
   - WI-0043
