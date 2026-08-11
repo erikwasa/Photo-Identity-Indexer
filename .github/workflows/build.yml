@@ -84,18 +84,6 @@ jobs:
             .artifacts/review-verification/api.stderr.log
           retention-days: 1
 
-      - name: Run Windows launcher verification
-        shell: powershell
-        run: ./verify-launcher.ps1 -Configuration Release -Port 5082
-
-      - name: Upload launcher verification diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: launcher-verification-diagnostics
-          path: .artifacts/launcher-verification
-          retention-days: 1
-
       - name: Prepare Windows PowerShell verification fixtures
         shell: pwsh
         run: |
@@ -177,4 +165,16 @@ jobs:
         with:
           name: local-verification-diagnostics
           path: .artifacts/local-verification/verification-report.json
+          retention-days: 1
+
+      - name: Run Windows launcher verification
+        shell: powershell
+        run: ./verify-launcher.ps1 -Configuration Release -Port 5082
+
+      - name: Upload launcher verification diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launcher-verification-diagnostics
+          path: .artifacts/launcher-verification
           retention-days: 1
