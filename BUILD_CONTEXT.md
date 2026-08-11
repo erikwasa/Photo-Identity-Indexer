@@ -18,12 +18,14 @@ See `docs/product/success-criteria.md` and `docs/delivery/local-first-plan.md` f
 
 - **M12 — Full archive processing**: `in_progress`. The version-1 archive-readiness work-item gates are complete, while M12 continues through later full-coverage completion.
 - **M17 — Identity review automation**: `in_progress`. Integrated review automation remains under milestone-wide human verification.
-- **M18 — Operator application experience**: implementation is progressing on the isolated `m18` integration branch while M17 verification continues. WI-0048 and WI-0046 are merged into `m18`; WI-0051 is the active implementation item and WI-0052 follows it.
+- **M18 — Operator application experience**: implementation is progressing on the isolated `m18` integration branch while M17 verification continues. WI-0048, WI-0046 and WI-0051 are merged into `m18`; WI-0052 is the final implementation item before an integrated M18 human verification pass.
 - **M09 — Azure VM pilot without identities**: `ready` and optional; Azure is not required for version 1.
 
 ## Active work
 
-**WI-0051 — Add a one-click Windows launcher** is the active M18 work item on `agent/WI-0051-windows-launcher`, based on the merged WI-0046 `m18` head. It wraps the existing framework-dependent published API/Blazor application rather than introducing a new runtime. The intended operator path is a double-clickable `.cmd` entry point backed by a reviewable PowerShell launcher, private local bootstrap configuration, loopback-only hosting, `/health` readiness, duplicate-instance prevention and actionable startup errors. A dedicated Windows CI verification publishes to disposable output, launches twice and asserts one healthy server process remains. Human Windows Explorer verification against a clean publish remains required before completion.
+**WI-0052 — Package Photo Identity as a Windows application** is the active M18 work item on `agent/WI-0052-windows-package`, based on the merged WI-0051 `m18` head. It turns the launcher/publish workflow into a repeatable self-contained `win-x64` operator ZIP. The package contains only replaceable code and a one-file `PhotoIdentity.cmd` entry point; private configuration and durable catalogue/analysis/proxy state remain outside the package, normally below `%LOCALAPPDATA%\PhotoIdentity` or the accepted installation-specific local paths. Automated package verification builds the ZIP, starts it twice, verifies one healthy server, then performs a side-by-side replacement while preserving the same external catalogue/configuration boundary.
+
+**WI-0051 — Add a one-click Windows launcher** is merged into `m18` and automated Windows verification passed. The launcher provides loopback-only hosting, `/health` readiness, duplicate-instance prevention, private local bootstrap configuration and actionable startup errors. Its remaining acceptance activity is included in the planned integrated M18 Windows Explorer verification rather than being performed separately before WI-0052.
 
 **WI-0054 — Polish archive viewing, progress and availability** is `in_review`. Its implementation was merged in PR #118 after the maintainer completed real Windows/OneDrive verification of WI-0042 and WI-0041 on 2026-08-10; human verification of the three follow-up cases remains the completion step.
 
@@ -55,8 +57,8 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 
 ## Next concrete sequence
 
-1. Complete WI-0051 automated validation, merge it into `m18`, then verify the one-click launcher from Windows Explorer against a clean published output.
-2. Proceed to WI-0052 packaged/self-contained Windows application work after WI-0051 is accepted, continuing to keep M18 outside `main` until the milestone integration boundary is ready.
+1. Complete WI-0052 automated package validation and merge it into `m18`.
+2. Run one integrated M18 human verification pass on Windows: extract/start the package from Explorer, verify Review/Library/Settings on desktop and narrow layout, confirm launcher duplicate/startup behavior, perform a non-destructive side-by-side package replacement, and verify the maintained catalogue/configuration persists.
 3. Continue milestone-wide M17 verification of confidence grouping/auto-assignment safety, favorite people, Unknown behavior and web regeneration on desktop and narrow/mobile review surfaces.
 4. Complete human verification of WI-0054 archive viewer/progress/availability polish for the three reported post-acceptance cases.
 5. Confirm the version-1 success criteria on the real Windows/OneDrive environment and continue permanent-catalogue archive coverage incrementally; do not create a replacement production database.
@@ -90,6 +92,7 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 - `docs/delivery/work-items/WI-0053-heic-raw-support.md`
 - `docs/operations/index.md`
 - `docs/operations/local-operator-guide.md`
+- `docs/operations/windows-package.md`
 - `docs/operations/bounded-archive-acceptance.md`
 - `docs/delivery/status/work-items.yaml`
 
@@ -101,6 +104,8 @@ ADR-0007 records the stable archive root plus bounded local materialization arch
 ./verify-local.ps1 -InstallModels
 ./verify-review.ps1 -Mode Smoke -Configuration Release
 ./verify-launcher.ps1 -Configuration Release
+./Package-PhotoIdentity.ps1 -Configuration Release
+./verify-package.ps1 -Configuration Release
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
