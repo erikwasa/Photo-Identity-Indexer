@@ -12,6 +12,8 @@ public sealed record ArchiveSourceVerificationAdvanceResult(
     bool WaitingForLocalContent,
     bool VerificationCompleted,
     AssetRevisionId? RevisionId,
+    AssetRevisionId? PreviousRevisionId,
+    bool RevisionChanged,
     bool NewRevision,
     bool ManagedHydrationTransferred);
 
@@ -63,7 +65,8 @@ public sealed class ArchiveSourceVerificationService
         ArchiveSourceObservation? source = await _observations.GetNextPendingAsync(sourceId, cancellationToken);
         if (source is null)
         {
-            return new ArchiveSourceVerificationAdvanceResult(false, false, false, null, false, false);
+            return new ArchiveSourceVerificationAdvanceResult(
+                false, false, false, null, null, false, false, false);
         }
 
         string path = ResolvePath(source);
@@ -169,11 +172,16 @@ public sealed class ArchiveSourceVerificationService
             persisted.RevisionId,
             _timeProvider.GetUtcNow(),
             cancellationToken);
+        AssetRevisionId? previousRevisionId = source.VerifiedRevisionId;
+        bool revisionChanged = previousRevisionId is AssetRevisionId previous &&
+            previous != persisted.RevisionId;
         return new ArchiveSourceVerificationAdvanceResult(
             true,
             false,
             true,
             persisted.RevisionId,
+            previousRevisionId,
+            revisionChanged,
             persisted.NewRevision,
             transferred);
     }
@@ -232,7 +240,7 @@ public sealed class ArchiveSourceVerificationService
     }
 
     private static ArchiveSourceVerificationAdvanceResult Waiting() =>
-        new(true, true, false, null, false, false);
+        new(true, true, false, null, null, false, false, false);
 
     private sealed record VerifiedSourceContent(
         long SizeBytes,

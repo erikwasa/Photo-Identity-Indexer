@@ -137,20 +137,34 @@ public sealed class ArchiveBoundedAnalysisService
             return new ArchiveBoundedAnalysisAdvanceResult(false);
         }
 
-        if (verification is { VerificationCompleted: true, NewRevision: true } && latest is not null)
+        if (verification is
+            {
+                VerificationCompleted: true,
+                RevisionChanged: true,
+                PreviousRevisionId: AssetRevisionId previousRevisionId,
+            } &&
+            latest is not null)
         {
             ProcessingRunSummary durable = await processingRepository.GetRunSummaryAsync(
                 latest.RunId,
                 cancellationToken);
             if (!durable.IsTerminal)
             {
-                _ = await processingRepository.RequestCancellationAsync(
+                IReadOnlyList<CatalogueProcessingJob> jobs = await processingRepository.GetJobsAsync(
                     latest.RunId,
-                    _timeProvider.GetUtcNow(),
                     cancellationToken);
+                bool staleRevisionIsStillActive = jobs.Any(job =>
+                    job.AssetRevisionId == previousRevisionId &&
+                    job.Status is ProcessingJobStatus.Queued or ProcessingJobStatus.Running);
+                if (staleRevisionIsStillActive)
+                {
+                    _ = await processingRepository.RequestCancellationAsync(
+                        latest.RunId,
+                        _timeProvider.GetUtcNow(),
+                        cancellationToken);
+                    latest = null;
+                }
             }
-
-            latest = null;
         }
 
         // Finish durable proxy/release work before starting more inference. If this fails, the
