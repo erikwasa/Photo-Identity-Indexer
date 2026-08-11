@@ -123,5 +123,15 @@ try {
 finally {
     foreach ($processId in $startedProcessIds) {
         Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue
+        Wait-Process -Id $processId -Timeout 10 -ErrorAction SilentlyContinue
+    }
+
+    $remaining = @(Get-LauncherServerProcesses)
+    if ($remaining.Count -ne 0) {
+        Write-Warning "Launcher verification cleanup still sees Photo Identity process IDs: $($remaining.ProcessId -join ', ')."
+        foreach ($remainingProcess in $remaining) {
+            Stop-Process -Id ([int]$remainingProcess.ProcessId) -Force -ErrorAction SilentlyContinue
+            Wait-Process -Id ([int]$remainingProcess.ProcessId) -Timeout 10 -ErrorAction SilentlyContinue
+        }
     }
 }
