@@ -5,7 +5,9 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
+using OpenCvSharp;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
@@ -141,6 +143,61 @@ public sealed class ReviewApplicationTests
                 StringComparison.OrdinalIgnoreCase);
             byte[] imageBytes = await imageResponse.Content.ReadAsByteArrayAsync();
             Assert.Equal(seeded.CropBytes, imageBytes);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Review_api_renders_proxy_backed_face_previews_without_upscaling()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            string proxyRoot = Path.Combine(directory, "review-proxies");
+            Directory.CreateDirectory(proxyRoot);
+
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            SeededReviewFace seeded = await SeedReviewFaceAsync(database, directory);
+            const string profileId = "review-test-1600-q90";
+            await SeedReviewProxyAsync(database, seeded.RevisionId, proxyRoot, profileId);
+
+            await using ReviewApiFactory factory = new(databasePath, proxyRoot, profileId);
+            using HttpClient client = factory.CreateClient();
+
+            using HttpResponseMessage galleryImageResponse = await client.GetAsync(
+                $"/api/review/faces/{seeded.Id}/image?size=360");
+            galleryImageResponse.EnsureSuccessStatusCode();
+            Assert.Equal("image/jpeg", galleryImageResponse.Content.Headers.ContentType?.MediaType);
+            byte[] galleryBytes = await galleryImageResponse.Content.ReadAsByteArrayAsync();
+            Assert.NotEqual(seeded.CropBytes, galleryBytes);
+            using Mat galleryImage = Cv2.ImDecode(galleryBytes, ImreadModes.Color);
+            Assert.False(galleryImage.Empty());
+            Assert.Equal(360, galleryImage.Cols);
+            Assert.Equal(360, galleryImage.Rows);
+
+            using HttpResponseMessage detailsResponse = await client.GetAsync($"/api/review/faces/{seeded.Id}");
+            detailsResponse.EnsureSuccessStatusCode();
+            ReviewFaceDetailsResponse details = Assert.IsType<ReviewFaceDetailsResponse>(
+                await detailsResponse.Content.ReadFromJsonAsync<ReviewFaceDetailsResponse>());
+            Assert.True(details.Face.ImageUrl.EndsWith("?size=960", StringComparison.Ordinal));
+            Assert.DoesNotContain(proxyRoot, details.Face.ImageUrl, StringComparison.OrdinalIgnoreCase);
+
+            using HttpResponseMessage detailsImageResponse = await client.GetAsync(details.Face.ImageUrl);
+            detailsImageResponse.EnsureSuccessStatusCode();
+            byte[] detailsBytes = await detailsImageResponse.Content.ReadAsByteArrayAsync();
+            using Mat detailsImage = Cv2.ImDecode(detailsBytes, ImreadModes.Color);
+            Assert.False(detailsImage.Empty());
+            Assert.Equal(800, detailsImage.Cols);
+            Assert.Equal(800, detailsImage.Rows);
+
+            using HttpResponseMessage invalidSizeResponse = await client.GetAsync(
+                $"/api/review/faces/{seeded.Id}/image?size=40");
+            Assert.Equal(HttpStatusCode.BadRequest, invalidSizeResponse.StatusCode);
         }
         finally
         {
@@ -302,7 +359,7 @@ public sealed class ReviewApplicationTests
                 'test-detector',
                 $model_hash,
                 0.97,
-                '{"x":10,"y":10,"width":80,"height":80}',
+                '[0.25,0.20,0.40,0.60]',
                 '[]',
                 $created_at_utc);
 
@@ -334,7 +391,51 @@ public sealed class ReviewApplicationTests
         command.Parameters.AddWithValue("$crop_path", storedCropPath);
         await command.ExecuteNonQueryAsync();
 
-        return new SeededReviewFace(occurrenceId, sourceRoot, cropPath, cropBytes);
+        return new SeededReviewFace(
+            occurrenceId,
+            persistedRevision.Id,
+            sourceRoot,
+            cropPath,
+            cropBytes);
+    }
+
+    private static async Task SeedReviewProxyAsync(
+        SqliteCatalogueDatabase database,
+        AssetRevisionId revisionId,
+        string proxyRoot,
+        string profileId)
+    {
+        DateTimeOffset now = new(2026, 7, 26, 7, 55, 0, TimeSpan.Zero);
+        ReviewProxyProfile profile = new(profileId, 1600, 90);
+        SqliteArchiveReviewProxyRepository repository = new(database);
+        await repository.RegisterProfileAsync(profile, now);
+
+        byte[] proxyBytes;
+        using (Mat image = new(new Size(1200, 800), MatType.CV_8UC3, new Scalar(40, 60, 80)))
+        {
+            Cv2.Rectangle(image, new Rect(300, 160, 480, 480), new Scalar(210, 220, 230), thickness: -1);
+            Cv2.ImEncode(
+                ".jpg",
+                image,
+                out proxyBytes,
+                new ImageEncodingParam(ImwriteFlags.JpegQuality, 90));
+        }
+
+        string relativePath = $"{profileId}/{revisionId}.jpg";
+        string physicalPath = Path.Combine(proxyRoot, relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(physicalPath)!);
+        await File.WriteAllBytesAsync(physicalPath, proxyBytes);
+        string proxyHash = Convert.ToHexString(SHA256.HashData(proxyBytes)).ToLowerInvariant();
+
+        await repository.RecordCompletionAsync(new ArchiveReviewProxyRecord(
+            revisionId,
+            profileId,
+            proxyBytes.LongLength,
+            new Sha256Digest(proxyHash),
+            1200,
+            800,
+            now,
+            relativePath));
     }
 
     private static string CreateTemporaryDirectory()
@@ -357,6 +458,7 @@ public sealed class ReviewApplicationTests
 
     private sealed record SeededReviewFace(
         FaceOccurrenceId Id,
+        AssetRevisionId RevisionId,
         string SourceRoot,
         string CropPath,
         byte[] CropBytes);
@@ -364,15 +466,31 @@ public sealed class ReviewApplicationTests
     private sealed class ReviewApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
     {
         private readonly string _databasePath;
+        private readonly string? _reviewProxyRoot;
+        private readonly string? _reviewProxyProfileId;
 
-        public ReviewApiFactory(string databasePath)
+        public ReviewApiFactory(
+            string databasePath,
+            string? reviewProxyRoot = null,
+            string? reviewProxyProfileId = null)
         {
             _databasePath = databasePath;
+            _reviewProxyRoot = reviewProxyRoot;
+            _reviewProxyProfileId = reviewProxyProfileId;
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            if (!string.IsNullOrWhiteSpace(_reviewProxyRoot))
+            {
+                builder.UseSetting("PhotoIdentity:ReviewProxyRoot", _reviewProxyRoot);
+            }
+
+            if (!string.IsNullOrWhiteSpace(_reviewProxyProfileId))
+            {
+                builder.UseSetting("PhotoIdentity:ReviewProxyProfileId", _reviewProxyProfileId);
+            }
         }
     }
 }
