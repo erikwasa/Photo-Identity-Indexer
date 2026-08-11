@@ -132,7 +132,7 @@ public static class ReviewEndpoints
                 sort,
                 cancellationToken);
             return Results.Ok(new ReviewFaceDetailsResponse(
-                ToResponse(face, DetailsImageSize),
+                ToResponseWithImageSize(face, DetailsImageSize),
                 face.MediaType,
                 face.PhotoWidth,
                 face.PhotoHeight,
@@ -371,9 +371,10 @@ public static class ReviewEndpoints
         }
     }
 
-    private static ReviewFaceResponse ToResponse(CatalogueReviewFace face) => ToResponse(face, imageSize: null);
+    private static ReviewFaceResponse ToResponse(CatalogueReviewFace face) =>
+        ToResponseWithImageSize(face, imageSize: null);
 
-    private static ReviewFaceResponse ToResponse(CatalogueReviewFace face, int? imageSize) => new(
+    private static ReviewFaceResponse ToResponseWithImageSize(CatalogueReviewFace face, int? imageSize) => new(
         face.Id.ToString(),
         imageSize is int requestedSize
             ? $"/api/review/faces/{face.Id}/image?size={requestedSize}"
