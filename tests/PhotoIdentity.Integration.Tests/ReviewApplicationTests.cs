@@ -184,7 +184,7 @@ public sealed class ReviewApplicationTests
             detailsResponse.EnsureSuccessStatusCode();
             ReviewFaceDetailsResponse details = Assert.IsType<ReviewFaceDetailsResponse>(
                 await detailsResponse.Content.ReadFromJsonAsync<ReviewFaceDetailsResponse>());
-            Assert.True(details.Face.ImageUrl.EndsWith("?size=960", StringComparison.Ordinal));
+            Assert.EndsWith("?size=960", details.Face.ImageUrl);
             Assert.DoesNotContain(proxyRoot, details.Face.ImageUrl, StringComparison.OrdinalIgnoreCase);
 
             using HttpResponseMessage detailsImageResponse = await client.GetAsync(details.Face.ImageUrl);
