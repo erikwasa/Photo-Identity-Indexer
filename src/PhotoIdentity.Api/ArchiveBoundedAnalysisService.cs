@@ -129,6 +129,35 @@ public sealed class ArchiveBoundedAnalysisService
             analysisProfileHash,
             cancellationToken);
 
+        if (latest is not null)
+        {
+            ProcessingRunSummary durable = await processingRepository.GetRunSummaryAsync(
+                latest.RunId,
+                cancellationToken);
+            if (!durable.IsTerminal)
+            {
+                CatalogueProcessingRun savedRun = await processingRepository.GetRunAsync(
+                    latest.RunId,
+                    cancellationToken)
+                    ?? throw new InvalidOperationException(
+                        $"Archive analysis run {latest.RunId} disappeared while checking its runtime configuration.");
+                LocalBatchConfiguration savedConfiguration = LocalBatchConfiguration.FromJson(savedRun.ConfigurationJson);
+                if (!AnalysisRuntimePathsEqual(savedConfiguration, batchConfiguration))
+                {
+                    // Repository/model directories belong to the replaceable application package, not
+                    // to durable archive identity. An unfinished run from an older side-by-side package
+                    // must not make the new package reach back into the old installation. Cancelling the
+                    // stale run is safe because successful revision/profile completions are recorded
+                    // independently and StartAsync schedules only the still-pending revisions.
+                    _ = await processingRepository.RequestCancellationAsync(
+                        latest.RunId,
+                        _timeProvider.GetUtcNow(),
+                        cancellationToken);
+                    latest = null;
+                }
+            }
+        }
+
         ArchiveSourceVerificationAdvanceResult verification = await _sourceVerification.AdvanceAsync(
             coverage.Source.Id,
             cancellationToken);
@@ -474,6 +503,20 @@ public sealed class ArchiveBoundedAnalysisService
             availability,
             _timeProvider.GetUtcNow(),
             cancellationToken);
+    }
+
+    private static bool AnalysisRuntimePathsEqual(
+        LocalBatchConfiguration savedConfiguration,
+        LocalBatchConfiguration currentConfiguration) =>
+        PathsEqual(savedConfiguration.RepositoryRoot, currentConfiguration.RepositoryRoot) &&
+        PathsEqual(savedConfiguration.ModelDirectory, currentConfiguration.ModelDirectory);
+
+    private static bool PathsEqual(string left, string right)
+    {
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), comparison);
     }
 
     private static string ResolveSourcePath(string rootLocator, string sourceKey)

@@ -68,9 +68,25 @@ Automated regression tests are required for resource/configuration resolution an
 
 Verification must preserve the maintained archive and originals: do not force mass re-analysis or uncontrolled hydration as part of the test.
 
+### 2026-08-13 packaged-upgrade finding
+
+Human Windows verification after PR #135 confirmed that `PhotoIdentity.Api.exe` was running from the new `C:\PhotoIdentity\v1.3\app` package while **Advance archive** still attempted to open CenterFace from `C:\PhotoIdentity\v1.2\app\models\files\centerface.onnx`.
+
+The cause is an unfinished archive processing run whose durable `ConfigurationJson` contains the absolute repository/model paths from the package that created the run. The bounded Archive path selects the latest non-terminal run for the same governed analysis profile and resumes it, so the new process can inadvertently reuse replaceable paths from the previous package. This is distinct from the PR #135 model-packaging fix: v1.3 contains the governed model files, but the old run never asks v1.3 for them.
+
+Corrective behavior: when bounded Archive advancement encounters a non-terminal run for the same analysis profile whose saved package runtime paths differ from the current package paths, it cancels that stale run and starts current-package work for only the still-pending revisions. Exact revision/profile completions remain durable and are not re-analyzed merely because the package directory changed.
+
 ## Completion notes
 
 - Files changed:
+  - PR #133 packaged governed model manifests and made packaged runtime profile resolution independent of a checkout.
+  - PR #134 restored safe local revision-verified Library preview fallback.
+  - PR #135 packaged governed CenterFace/SFace model files and surfaced storage telemetry/selected launcher policy.
+  - Current corrective slice prevents unfinished archive runs from retaining previous-package repository/model paths across a side-by-side upgrade.
 - Trade-offs:
+  - Replaceable package paths are not treated as durable resume identity. A stale non-terminal run is cancelled rather than mutated in place; already-recorded revision/profile completions are reused and only pending revisions are eligible for a new run.
 - Deferred work:
+  - Final human packaged verification of Faces, Archive, Library and Settings, including remaining low-resolution legacy face cases.
+  - Operator-friendly stop/version-identification behavior for upgrades should be handled separately unless it is required to complete the current packaged verification.
 - Commands run:
+  - Automated validation is delegated to the branch CI because the active agent environment has no local repository checkout.
