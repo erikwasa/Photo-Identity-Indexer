@@ -59,8 +59,8 @@ public static class PhotoTagEndpoints
             });
 
         endpoints.MapDelete(
-            "/api/collections/photos/{revisionId}/tags/{tagName}",
-            async (string revisionId, string tagName, SqlitePhotoTagRepository repository, CancellationToken cancellationToken) =>
+            "/api/collections/photos/{revisionId}/tags",
+            async (string revisionId, string name, SqlitePhotoTagRepository repository, CancellationToken cancellationToken) =>
             {
                 if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
                 {
@@ -71,7 +71,7 @@ public static class PhotoTagEndpoints
                 {
                     IReadOnlyList<CatalogueManualPhotoTag> tags = await repository.RemoveManualTagAsync(
                         parsedRevisionId,
-                        tagName,
+                        name,
                         LocalMaintainerActor,
                         cancellationToken);
                     return Results.Ok(ToResponse(tags));
