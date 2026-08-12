@@ -2,7 +2,7 @@
 
 This is the authoritative local operating path for Photo Identity Indexer on Windows. It distinguishes the current permanent-archive workflow from retained pilot/evaluation tooling.
 
-Check [current delivery status](../delivery/status/current.md) before treating a planned feature as available. In particular, version 1 is not declared archive-ready until the permanent-ingestion, bounded-storage and archive-format gates are complete.
+Check the short [`BUILD_CONTEXT.md`](../../BUILD_CONTEXT.md) handoff and the canonical [work-item registry](../delivery/status/work-items.yaml) before treating a planned feature as available. Formal lifecycle status and completion evidence live in the registry; the build context identifies the current development or verification boundary.
 
 ## Trust and privacy boundary
 
