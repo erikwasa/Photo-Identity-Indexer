@@ -28,7 +28,7 @@ Manual assignments and model-produced evidence must remain distinguishable. Re-r
 - Expose API contracts for listing, adding and removing tags on a photo revision.
 - Add manual tag controls to the existing `/photo/{RevisionId}` viewer.
 - Reuse existing canonical tags when the same spelling is entered with different casing or surrounding whitespace.
-- Leave a documented persistence/API extension point for model-produced tag evidence with exact model revision and score provenance.
+- Establish a clean boundary where future automatic evidence can reference the same canonical vocabulary without sharing or mutating manual assignment history.
 - Keep original photos read-only and do not require image hydration merely to edit tag metadata.
 
 ## Initial semantics
@@ -36,12 +36,14 @@ Manual assignments and model-produced evidence must remain distinguishable. Re-r
 - Tags are flat, free-form labels in this item. Hierarchies, synonyms and automatic place-name expansion are deferred.
 - Canonical identity is normalized independently of display casing. The first accepted display spelling is retained until a separate rename capability is intentionally added.
 - Manual tags are authoritative human assertions, not confidence-scored model evidence.
-- Automatic tag evidence will be stored separately from manual assignment history and can later contribute to effective/filterable tags under an explicit policy.
+- Automatic tag evidence will remain separate from manual assignment history and can later contribute to effective/filterable tags only under an explicit policy.
+- The automatic-evidence persistence schema is deliberately deferred to WI-0049. Model identity plus a scalar score is not sufficient provenance for all candidate approaches because preprocessing, prompts, vocabulary/tokenization or other pipeline inputs may affect the output.
 
 ## Out of scope
 
 - Automatic image tagging inference or model installation.
 - Selecting a production image-tagging model.
+- Freezing the production automatic-evidence schema before WI-0049 establishes the complete reproducible inference-pipeline provenance and output shape.
 - Smart-collection tag predicates; WI-0050 consumes this production representation.
 - Hierarchical taxonomies, aliases/synonyms, tag merging or bulk tag maintenance.
 - Writing EXIF/IPTC/XMP metadata back into original files.
@@ -53,7 +55,7 @@ Manual assignments and model-produced evidence must remain distinguishable. Re-r
 - [ ] Tag identity is case-insensitive and ignores surrounding/repeated whitespace while preserving a stable display name.
 - [ ] Manual add/remove history is auditable and tied to the exact asset revision.
 - [ ] Tag metadata operations do not modify or implicitly hydrate the original photo.
-- [ ] Persistence and API contracts leave model evidence provenance separate from manual assignments.
+- [ ] Persistence and API contracts leave a clear boundary for future model evidence without conflating it with manual assignments.
 - [ ] Automated tests cover normalization, idempotent add, remove/re-add, revision validation and migration behavior.
 
 ## Verification requirements
@@ -70,5 +72,5 @@ Automated persistence/API tests plus maintainer verification in the local photo 
 
 - Files changed:
 - Trade-offs:
-- Deferred work: automatic evidence generation; tag hierarchies/synonyms; bulk tag maintenance
+- Deferred work: automatic evidence generation/schema; tag hierarchies/synonyms; bulk tag maintenance
 - Commands run:
