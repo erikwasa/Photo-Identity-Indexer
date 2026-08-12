@@ -7,7 +7,7 @@
     <div>
         <p class="eyebrow">Operator settings</p>
         <h1>Settings</h1>
-        <p>Manage permanent archive coverage and the confidence policy used for future identity matching runs.</p>
+        <p>Manage permanent archive coverage, inspect bounded archive storage policy, and configure the confidence policy used for future identity matching runs.</p>
     </div>
     <button class="button secondary" disabled="@Busy" @onclick="RefreshAsync">Refresh</button>
 </section>
@@ -90,6 +90,68 @@ else
                     <a class="button secondary" href="/archive">Open archive progress</a>
                 </div>
             </form>
+        }
+    </section>
+
+    <section class="review-filter-panel" aria-labelledby="archive-storage-settings-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Bounded storage</p>
+                <h2 id="archive-storage-settings-heading">Archive hydration policy</h2>
+            </div>
+            @if (ArchiveStorage is not null)
+            {
+                <span class="model-summary">Managed hydration: @(ArchiveStorage.PolicyConfigured ? "enabled" : "disabled")</span>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(StorageError))
+        {
+            <div class="notice error" role="alert">Archive storage status could not be loaded: @StorageError</div>
+        }
+        else if (ArchiveStorage is null)
+        {
+            <div class="empty-state compact">
+                <p>No archive storage status is available.</p>
+            </div>
+        }
+        else
+        {
+            <div class="review-filter-grid">
+                <div>
+                    <span class="field-label">Minimum free-space reserve</span>
+                    <strong>@FormatByteSetting(ArchiveStorage.MinimumFreeSpaceReserveBytes)</strong>
+                    <p><code>PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes</code></p>
+                </div>
+                <div>
+                    <span class="field-label">Maximum Photo Identity-managed hydration</span>
+                    <strong>@FormatByteSetting(ArchiveStorage.MaximumManagedHydrationBytes)</strong>
+                    <p><code>PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes</code></p>
+                </div>
+                <div>
+                    <span class="field-label">Maximum concurrent operations</span>
+                    <strong>@FormatCountSetting(ArchiveStorage.MaximumConcurrentOperations)</strong>
+                    <p><code>PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations</code></p>
+                </div>
+            </div>
+
+            @if (ArchiveStorage.PolicyConfigured)
+            {
+                <div class="notice success">
+                    Managed archive hydration is enabled with all three required limits configured.
+                </div>
+            }
+            else
+            {
+                <div class="notice warning">
+                    @(ArchiveStorage.PolicyMessage ?? "Managed archive hydration is disabled because the complete bounded-storage policy is not configured.")
+                </div>
+            }
+
+            <p class="field-help">
+                These are startup configuration values and are read-only while Photo Identity is running. For the packaged Windows application, edit
+                <code>%LOCALAPPDATA%\PhotoIdentity\launcher.json</code> and restart Photo Identity for changes to take effect. Use accepted storage-policy values rather than inventing production limits.
+            </p>
         }
     </section>
 
@@ -195,6 +257,7 @@ else
     private const string PolicyActor = "local-reviewer";
 
     private ArchiveStatusResponse? Archive { get; set; }
+    private ArchiveStorageStatusResponse? ArchiveStorage { get; set; }
     private ReviewFilterOptionsResponse PolicyOptions { get; set; } = new([], []);
     private IdentitySuggestionPolicyResponse? Policy { get; set; }
     private string ArchiveRootPath { get; set; } = string.Empty;
@@ -209,6 +272,7 @@ else
     private bool LoadingPolicy { get; set; }
     private bool Busy { get; set; }
     private string? Error { get; set; }
+    private string? StorageError { get; set; }
     private string? Message { get; set; }
 
     private ReviewModelRevisionFilterResponse? SelectedModel =>
@@ -240,10 +304,21 @@ else
     {
         Loading = true;
         Error = null;
+        StorageError = null;
         try
         {
             Archive = await Http.GetFromJsonAsync<ArchiveStatusResponse>("api/archive/status");
             CopyCoverageFromArchive();
+
+            ArchiveStorage = null;
+            try
+            {
+                ArchiveStorage = await Http.GetFromJsonAsync<ArchiveStorageStatusResponse>("api/archive/storage");
+            }
+            catch (Exception exception)
+            {
+                StorageError = exception.Message;
+            }
 
             PolicyOptions = await Http.GetFromJsonAsync<ReviewFilterOptionsResponse>("api/review/filters")
                 ?? new ReviewFilterOptionsResponse([], []);
@@ -435,6 +510,29 @@ else
 
     private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
         $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+
+    private static string FormatByteSetting(long? value)
+    {
+        if (value is null)
+        {
+            return "Not configured";
+        }
+
+        string[] units = ["bytes", "KiB", "MiB", "GiB", "TiB"];
+        double scaled = value.Value;
+        int unit = 0;
+        while (Math.Abs(scaled) >= 1024d && unit < units.Length - 1)
+        {
+            scaled /= 1024d;
+            unit++;
+        }
+
+        string human = unit == 0 ? $"{value.Value} bytes" : $"{scaled:0.##} {units[unit]}";
+        return $"{human} ({value.Value} bytes exact)";
+    }
+
+    private static string FormatCountSetting(int? value) =>
+        value is null ? "Not configured" : $"{value.Value} operation{(value.Value == 1 ? "" : "s")}";
 
     private static string HashPrefix(string hash) =>
         hash[..Math.Min(12, hash.Length)];

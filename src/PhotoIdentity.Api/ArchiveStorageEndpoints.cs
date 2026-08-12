@@ -12,6 +12,7 @@ public static class ArchiveStorageEndpoints
 
     private static async Task<IResult> GetStorageAsync(
         ArchiveHydrationCapacityService capacity,
+        ArchiveHydrationPolicyConfiguration configuration,
         CancellationToken cancellationToken)
     {
         try
@@ -21,9 +22,9 @@ public static class ArchiveStorageEndpoints
                 value.ArchiveConfigured,
                 value.PolicyConfigured,
                 value.PolicyMessage,
-                value.MinimumFreeSpaceReserveBytes,
-                value.MaximumManagedHydrationBytes,
-                value.MaximumConcurrentOperations,
+                configuration.MinimumFreeSpaceReserveBytes,
+                configuration.MaximumManagedHydrationBytes,
+                configuration.MaximumConcurrentOperations,
                 value.LogicalSourceBytes,
                 value.AvailableFreeBytes,
                 value.ManagedHydratedBytes,
