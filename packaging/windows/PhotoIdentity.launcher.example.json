@@ -3,6 +3,9 @@
   "settings": {
     "PhotoIdentity__DatabasePath": "%LOCALAPPDATA%\\PhotoIdentity\\catalogue.db",
     "PhotoIdentity__ArchiveAnalysisOutputRoot": "%LOCALAPPDATA%\\PhotoIdentity\\archive-analysis",
-    "PhotoIdentity__ReviewProxyRoot": "%LOCALAPPDATA%\\PhotoIdentity\\review-proxies"
+    "PhotoIdentity__ReviewProxyRoot": "%LOCALAPPDATA%\\PhotoIdentity\\review-proxies",
+    "PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes": "",
+    "PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes": "",
+    "PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations": ""
   }
 }
