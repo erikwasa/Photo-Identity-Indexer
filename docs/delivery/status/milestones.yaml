@@ -150,8 +150,9 @@ milestones:
   - WI-0055
 - id: M19
   title: Photo metadata and semantic collections
-  status: ready
+  status: in_progress
   document: ../milestones/M19-library-intelligence.md
   work_items:
+  - WI-0056
   - WI-0049
   - WI-0050
