@@ -17,6 +17,7 @@ Normal use of Photo Identity is centered on two clear activities — reviewing n
 - [WI-0048](../work-items/WI-0048-configuration-page.md) — consolidate archive coverage and matching policy into a settings page
 - [WI-0051](../work-items/WI-0051-one-click-windows-launcher.md) — provide a double-clickable Windows launcher for the existing published application
 - [WI-0052](../work-items/WI-0052-packaged-windows-application.md) — package the application so routine use no longer depends on manual publish or environment-variable setup
+- [WI-0055](../work-items/WI-0055-packaged-runtime-regressions.md) — restore packaged review/archive behavior and expose bounded-hydration policy
 
 ## Scope boundary
 
