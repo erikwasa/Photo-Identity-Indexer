@@ -75,10 +75,19 @@ function Assert-Healthy {
     }
 }
 
-function Assert-PackagedArchiveProfileReady {
+function Initialize-ArchiveFixture {
     param([Parameter(Mandatory = $true)][string]$SourceRoot)
 
     New-Item -ItemType Directory -Path $SourceRoot -Force | Out-Null
+    [IO.File]::WriteAllBytes(
+        (Join-Path $SourceRoot "package-analysis.jpg"),
+        [Convert]::FromBase64String(
+            "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAIBAQEBAQIBAQECAgICAgQDAgICAgUEBAMEBgUGBgYFBgYGBwkIBgcJBwYGCAsICQoKCgoKBggLDAsKDAkKCgr/2wBDAQICAgICAgUDAwUKBwYHCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgr/wAARCAAKABQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD8V6KKK8M9gKKKKAP/2Q=="))
+}
+
+function Assert-PackagedArchiveProfileReady {
+    param([Parameter(Mandatory = $true)][string]$SourceRoot)
+
     $request = [ordered]@{
         rootPath = $SourceRoot
         relativeFolder = "."
@@ -99,6 +108,43 @@ function Assert-PackagedArchiveProfileReady {
     }
 }
 
+function Assert-PackagedArchiveAnalysis {
+    $sync = Invoke-RestMethod -Method Post -Uri "$url/api/archive/sync" -TimeoutSec 30
+    if ([int]$sync.supportedFiles -lt 1) {
+        throw "Packaged archive verification did not discover its local image fixture."
+    }
+
+    $step = Invoke-RestMethod -Method Post -Uri "$url/api/archive/analysis/step" -TimeoutSec 60
+    if (-not [bool]$step.status.analysisReady) {
+        throw "Packaged archive analysis became unavailable: $($step.status.analysisMessage)"
+    }
+    if ([int]$step.status.totals.failedImages -ne 0) {
+        throw "Packaged archive analysis recorded a failed image."
+    }
+    if ([int]$step.status.totals.analysedImages -lt 1) {
+        throw "Packaged archive analysis did not complete the local image fixture."
+    }
+}
+
+function Assert-PackagedStoragePolicy {
+    $storage = Invoke-RestMethod -Method Get -Uri "$url/api/archive/storage" -TimeoutSec 10
+    if (-not [bool]$storage.policyConfigured) {
+        throw "Packaged hydration policy was not configured. Message: $($storage.policyMessage)"
+    }
+    if ([long]$storage.minimumFreeSpaceReserveBytes -ne 21474836480L) {
+        throw "Packaged minimum free-space reserve did not match the launcher policy."
+    }
+    if ([long]$storage.maximumManagedHydrationBytes -ne 10737418240L) {
+        throw "Packaged managed-hydration budget did not match the launcher policy."
+    }
+    if ([int]$storage.maximumConcurrentOperations -ne 2) {
+        throw "Packaged hydration concurrency did not match the launcher policy."
+    }
+    if ($null -eq $storage.availableFreeBytes) {
+        throw "Packaged storage status did not expose available free space."
+    }
+}
+
 if (-not (Test-Path -LiteralPath $packageScript -PathType Leaf)) {
     throw "Package script was not found: $packageScript"
 }
@@ -106,6 +152,7 @@ if (-not (Test-Path -LiteralPath $packageScript -PathType Leaf)) {
 Remove-Item -LiteralPath $artifactRoot -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $localAppData -Force | Out-Null
+Initialize-ArchiveFixture -SourceRoot $archiveRoot
 
 $previousLocalAppData = $env:LOCALAPPDATA
 $previousNonInteractive = $env:PHOTOIDENTITY_NONINTERACTIVE
@@ -137,6 +184,9 @@ try {
     if ([string]$manifest.analysisManifestDirectory -ne "app/models/manifests") {
         throw "Package manifest does not identify the packaged archive-analysis manifests."
     }
+    if ([string]$manifest.analysisModelDirectory -ne "app/models/files") {
+        throw "Package manifest does not identify the packaged archive-analysis model files."
+    }
 
     if (-not (Test-Path -LiteralPath (Join-Path $installV1 "app\PhotoIdentity.Api.exe") -PathType Leaf)) {
         throw "Package does not contain the self-contained PhotoIdentity.Api.exe host."
@@ -145,8 +195,22 @@ try {
     foreach ($relativeManifest in @(
         "app\models\manifests\centerface-2019-fp32.json",
         "app\models\manifests\sface-2021dec-fp32.json")) {
-        if (-not (Test-Path -LiteralPath (Join-Path $installV1 $relativeManifest) -PathType Leaf)) {
+        $packagedManifestPath = Join-Path $installV1 $relativeManifest
+        if (-not (Test-Path -LiteralPath $packagedManifestPath -PathType Leaf)) {
             throw "Package is missing required archive-analysis manifest: $relativeManifest"
+        }
+
+        $modelManifest = Get-Content -LiteralPath $packagedManifestPath -Raw | ConvertFrom-Json
+        $packagedModelPath = Join-Path $installV1 ("app\models\files\" + [string]$modelManifest.fileName)
+        if (-not (Test-Path -LiteralPath $packagedModelPath -PathType Leaf)) {
+            throw "Package is missing governed model file for $($modelManifest.modelId): $($modelManifest.fileName)"
+        }
+        if ((Get-Item -LiteralPath $packagedModelPath).Length -ne [long]$modelManifest.sizeBytes) {
+            throw "Packaged model size did not match the governed manifest for $($modelManifest.modelId)."
+        }
+        $actualHash = (Get-FileHash -LiteralPath $packagedModelPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualHash -ne ([string]$modelManifest.sha256).ToLowerInvariant()) {
+            throw "Packaged model SHA-256 did not match the governed manifest for $($modelManifest.modelId)."
         }
     }
 
@@ -163,6 +227,11 @@ try {
         if ($exampleSettingNames -notcontains $requiredSetting) {
             throw "Package launcher configuration example is missing bounded-storage setting: $requiredSetting"
         }
+    }
+    if ([string]$launcherExample.settings.PhotoIdentity__ReviewProxyProfileId -ne "jpeg-1600-q78" -or
+        [string]$launcherExample.settings.PhotoIdentity__ReviewProxyMaximumLongEdge -ne "1600" -or
+        [string]$launcherExample.settings.PhotoIdentity__ReviewProxyJpegQuality -ne "78") {
+        throw "Package launcher example does not contain the selected review-proxy profile settings."
     }
 
     $embeddedPrivateFiles = @(Get-ChildItem -LiteralPath $installV1 -Recurse -File | Where-Object {
@@ -187,6 +256,12 @@ try {
             PhotoIdentity__DatabasePath = $databasePath
             PhotoIdentity__ArchiveAnalysisOutputRoot = $analysisPath
             PhotoIdentity__ReviewProxyRoot = $reviewProxyPath
+            PhotoIdentity__ReviewProxyProfileId = "jpeg-1600-q78"
+            PhotoIdentity__ReviewProxyMaximumLongEdge = "1600"
+            PhotoIdentity__ReviewProxyJpegQuality = "78"
+            PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes = "21474836480"
+            PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes = "10737418240"
+            PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations = "2"
         }
     }
     $launcherConfiguration | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $configurationPath -Encoding UTF8
@@ -200,6 +275,8 @@ try {
     Invoke-PackageEntryPoint -InstallRoot $installV1
     Assert-Healthy
     Assert-PackagedArchiveProfileReady -SourceRoot $archiveRoot
+    Assert-PackagedStoragePolicy
+    Assert-PackagedArchiveAnalysis
 
     $firstProcesses = @(Get-PackageServerProcesses)
     if ($firstProcesses.Count -ne 1) {

@@ -4,11 +4,11 @@
     "PhotoIdentity__DatabasePath": "%LOCALAPPDATA%\\PhotoIdentity\\catalogue.db",
     "PhotoIdentity__ArchiveAnalysisOutputRoot": "%LOCALAPPDATA%\\PhotoIdentity\\archive-analysis",
     "PhotoIdentity__ReviewProxyRoot": "%LOCALAPPDATA%\\PhotoIdentity\\review-proxies",
-    "PhotoIdentity__ReviewProxyProfileId": "",
-    "PhotoIdentity__ReviewProxyMaximumLongEdge": "",
-    "PhotoIdentity__ReviewProxyJpegQuality": "",
-    "PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes": "",
-    "PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes": "",
-    "PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations": ""
+    "PhotoIdentity__ReviewProxyProfileId": "jpeg-1600-q78",
+    "PhotoIdentity__ReviewProxyMaximumLongEdge": "1600",
+    "PhotoIdentity__ReviewProxyJpegQuality": "78",
+    "PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes": "21474836480",
+    "PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes": "10737418240",
+    "PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations": "2"
   }
 }
