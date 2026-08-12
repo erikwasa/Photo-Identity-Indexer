@@ -6,43 +6,37 @@ Formal work-item lifecycle status and evidence live in `docs/delivery/status/wor
 
 ## Current focus
 
-**WI-0055 — Fix packaged review, archive and storage-policy regressions** is the current verification boundary.
+**WI-0056 — Add canonical photo tags and manual tagging** is the current implementation boundary for M19.
 
-The packaged-runtime implementation has been merged to `main` through PRs #133, #134 and #135. The merged work covers package-local model manifests and governed model weights, the Library local-original preview fallback, review-proxy launcher settings, bounded-hydration launcher settings, and Settings storage telemetry.
+Slice 1 establishes the production tag contract before automatic tagging is selected: canonical case-insensitive tag identity, revision-bound append-only manual add/remove history, a separate model-evidence table, revision-scoped API endpoints and integration coverage. Manual assignments and future model evidence are intentionally separate so rerunning a model cannot overwrite maintainer intent.
 
-Formal completion still requires the human Windows verification defined by WI-0055. A merged implementation is not completion evidence by itself.
+M19 sequencing is now WI-0056 → WI-0049 for automatic visible-content experimentation, while WI-0050 can consume canonical manual tags independently of whether an automatic model is selected.
 
 ## Next concrete step
 
-Run WI-0055 verification from the packaged Windows application against the maintained durable configuration without forcing mass re-analysis or uncontrolled hydration:
+Validate the Slice 1 branch through CI, then implement Slice 2 on the same WI-0056 branch:
 
-1. Confirm Face Gallery and Face Details prefer a materially higher-resolution human-review image when the configured durable proxy/profile is available, rather than scaling the 112x112 recognition crop.
-2. Confirm existing permanent-archive Analyzed/Pending/Failed counts are meaningful and unchanged completed analysis remains reusable.
-3. Confirm **Advance archive** works without a source checkout and backfills missing durable proxies where appropriate.
-4. Confirm Library preview behavior is coherent for both already-local revision-verified originals and online-only originals, with no implicit hydration from normal browsing.
-5. Confirm Settings reports the configured hydration policy, current free space, managed hydration usage/budget and selected review-proxy profile.
-
-If verification passes, record human evidence and complete WI-0055 through the normal delivery-status workflow. If a defect remains, keep the fix scoped to WI-0055 and repeat only the affected verification checks plus the packaged-runtime gate.
+1. Add manual tag controls to `/photo/{RevisionId}` using the new tag API without requiring original hydration.
+2. Show current manual tags clearly and support add/remove with useful validation feedback.
+3. Add end-to-end application coverage for the photo-viewer workflow.
+4. Run the normal repository/documentation validation before moving WI-0056 to review.
 
 ## Relevant files
 
-- `docs/delivery/work-items/WI-0055-packaged-runtime-regressions.md`
-- `docs/delivery/status/work-items.yaml`
-- `docs/product/success-criteria.md`
-- `docs/operations/local-operator-guide.md`
-- `docs/operations/windows-package.md`
-- `docs/operations/bounded-archive-acceptance.md`
+- `docs/delivery/work-items/WI-0056-manual-photo-tags.md`
+- `docs/delivery/milestones/M19-library-intelligence.md`
+- `docs/delivery/work-items/WI-0049-visible-content-tagging-experiment.md`
+- `docs/delivery/work-items/WI-0050-exif-smart-collections.md`
+- `src/PhotoIdentity.Core/Tags/PhotoTagName.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoTagRepository.cs`
+- `src/PhotoIdentity.Api/PhotoTagEndpoints.cs`
+- `src/PhotoIdentity.Web/Pages/Photo.razor`
 
 ## Repository validation
 
 ```powershell
 ./build.ps1
 ./test.ps1
-./verify-local.ps1 -InstallModels
-./verify-review.ps1 -Mode Smoke -Configuration Release
-./verify-launcher.ps1 -Configuration Release
-./Package-PhotoIdentity.ps1 -Configuration Release
-./verify-package.ps1 -Configuration Release
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
