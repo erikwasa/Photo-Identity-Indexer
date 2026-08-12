@@ -2,10 +2,12 @@
 
 ## Read before changing the repository
 
-1. Read `BUILD_CONTEXT.md`.
+1. Read `BUILD_CONTEXT.md` for the current handoff only.
 2. Read the active work-item file.
 3. Read only the linked ADRs and module documents needed for that item.
-4. Check dependencies and status in `docs/delivery/status/work-items.yaml`.
+4. Check dependencies and formal lifecycle status in `docs/delivery/status/work-items.yaml`.
+
+`BUILD_CONTEXT.md` should stay short and current. Do not turn it into a project history or repeat completion details that already live in work-item documents, ADRs, milestone documents or the canonical registries.
 
 ## Architecture constraints
 
@@ -14,7 +16,7 @@
 - Core/domain code must not expose EF Core, OpenCV, ONNX Runtime, Azure SDK or Microsoft Graph types.
 - Personal OneDrive is accessed through the Windows sync client, not Microsoft Graph.
 - Azure is disposable optional compute. It receives portable bundles and has no OneDrive credentials, managed identity or service principal.
-- Canonical people and identity assignments are model-independent and auditable. The current runtime uses human review; ADR-0006 permits opt-in canonical automatic assignments with exact-model/policy provenance once WI-0043 is implemented.
+- Canonical people and identity assignments are model-independent and auditable. ADR-0006 permits opt-in canonical automatic assignments with exact-model/policy provenance.
 - Original photos are read-only and must not be modified.
 - The permanent archive uses one stable source identity with bounded local materialization; see ADR-0007.
 
@@ -33,7 +35,9 @@ Never commit personal photos, face crops, embeddings, biometric datasets, model 
 
 ## Status workflow
 
-The YAML registries are canonical. Use `PhotoIdentity.Docs` instead of hand-editing status when the required command is available.
+The YAML registries are canonical machine/audit records. `docs/delivery/status/work-items.yaml` intentionally retains completed work because dependency calculation, milestone status and completion evidence rely on that history; it is not intended to be the normal human current-status page.
+
+Use `PhotoIdentity.Docs` instead of hand-editing status when the required command is available.
 
 ```powershell
 dotnet run --project tools/PhotoIdentity.Docs -- validate
@@ -61,6 +65,6 @@ Before work, mark the item `in_progress`. After implementation, add evidence and
 - Database changes include migrations.
 - Idempotency has been considered.
 - The affected documentation is updated.
-- `BUILD_CONTEXT.md` reflects the next concrete step.
+- `BUILD_CONTEXT.md` reflects only the next concrete step and essential continuation pointers.
 - Evidence is recorded in `work-items.yaml`.
 - `PhotoIdentity.Docs validate` and `generate --check` pass.

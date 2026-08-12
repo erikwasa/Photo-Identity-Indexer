@@ -6,22 +6,21 @@ The Windows computer is the trusted control plane. It owns the SQLite catalogue,
 
 ## Start here
 
-Follow the [local operator guide](docs/operations/local-operator-guide.md) to install the pinned models, process a representative photo set, review identities, regenerate suggestions, evaluate model revisions, browse collections, back up the catalogue and clean up temporary artefacts.
+Follow the [local operator guide](docs/operations/local-operator-guide.md) for the normal packaged/local operating workflow.
 
 Use these references when you need more detail:
 
 - [Documentation index](docs/index.md)
+- [Build context](BUILD_CONTEXT.md) for the immediate development/verification handoff
 - [Architecture overview](docs/architecture/overview.md)
 - [Local evaluation and multi-model workflow](docs/operations/local-evaluation.md)
 - [SQLite backup, restore and concurrency policy](docs/operations/sqlite-persistence.md)
 - [Security and privacy](docs/architecture/security-and-privacy.md)
-- [Current delivery status](docs/delivery/status/current.md)
+- [Delivery roadmap](docs/delivery/roadmap.md)
 
-## Current status
+## Development status
 
-The complete local workflow has been exercised against a private 450–550-image catalogue on Windows and a Pixel over a trusted private network. This includes resumable processing, human review, exact-model suggestions, deterministic evaluation, multi-model coexistence, backup and restore, responsive collection browsing, and a neutral path-free collection manifest.
-
-M15 is now rewriting and independently validating the operator and architecture documentation. Azure work remains optional and deferred until the clean-setup documentation validation is complete and access is available.
+`BUILD_CONTEXT.md` contains only the current focus and next concrete step. Formal work-item lifecycle status, dependencies and completion evidence are maintained in [`docs/delivery/status/work-items.yaml`](docs/delivery/status/work-items.yaml).
 
 ## Prerequisites
 
@@ -50,15 +49,15 @@ Expected success signals are a Release build, passing automated tests, verified 
 The accepted workflow is:
 
 1. stage a local or OneDrive-synchronised source outside the repository;
-2. process immutable photo revisions with the pinned YuNet detector and SFace embedder;
+2. process immutable photo revisions with the governed detector and SFace embedder;
 3. review faces and maintain people through the local browser application;
 4. regenerate ranked suggestions for one exact embedding-model revision;
 5. export and evaluate deterministic reviewed-catalogue splits;
 6. optionally process the same revisions with another pinned model revision;
-7. browse any-person or all-person collections and request a neutral manifest; and
+7. browse collections and request neutral manifests; and
 8. stop writers before backing up the SQLite catalogue and referenced artefacts.
 
-The [local operator guide](docs/operations/local-operator-guide.md) is the authoritative command sequence. Other documents explain individual subsystems rather than duplicating that sequence.
+The [local operator guide](docs/operations/local-operator-guide.md) is the authoritative normal operating path. Other documents explain individual subsystems rather than duplicating that sequence.
 
 ## Privacy boundary
 

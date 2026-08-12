@@ -87,7 +87,6 @@ public sealed class DocumentationValidatorTests : IDisposable
             _root,
             Path.Combine(_root, "docs", "delivery", "status", "work-items.yaml"),
             Path.Combine(_root, "docs", "delivery", "status", "milestones.yaml"),
-            Path.Combine(_root, "docs", "delivery", "status", "current.md"),
             Path.Combine(_root, "docs", "delivery", "roadmap.md"));
 
     private static WorkItemRegistry Registry(params WorkItem[] items) =>

@@ -3,14 +3,15 @@
 ## Start here
 
 - [README and project orientation](../README.md)
+- [Build context](../BUILD_CONTEXT.md) — current development/verification handoff only
 - [Local operator guide](operations/local-operator-guide.md)
 - [Operations documentation map](operations/index.md)
 - [Architecture overview](architecture/overview.md)
 - [Glossary](glossary.md)
-- [Current delivery status](delivery/status/current.md)
-- [Build context](../BUILD_CONTEXT.md)
 
 The local operator guide is the authoritative normal operating path. Specialized operations documents are classified in the operations index so completed experiment runbooks are not mistaken for current product instructions.
+
+Formal delivery lifecycle status is kept in the canonical YAML registries. They are machine/audit records rather than the normal human current-status view; use `BUILD_CONTEXT.md` for the immediate continuation point.
 
 ## Operations
 
@@ -64,8 +65,8 @@ Azure is not required for version 1 or the accepted local permanent-catalogue wo
 - [Roadmap](delivery/roadmap.md)
 - [Milestones](delivery/milestones/)
 - [Work items](delivery/work-items/)
-- [Canonical work-item status](delivery/status/work-items.yaml)
-- [Canonical milestone status](delivery/status/milestones.yaml)
+- [Canonical work-item registry](delivery/status/work-items.yaml)
+- [Canonical milestone registry](delivery/status/milestones.yaml)
 - [Risks](delivery/risks.md)
 - [Templates](delivery/templates/)
 

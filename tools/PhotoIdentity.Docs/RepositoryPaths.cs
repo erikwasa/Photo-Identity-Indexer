@@ -4,7 +4,6 @@ public sealed record RepositoryPaths(
     string Root,
     string WorkItemsRegistry,
     string MilestonesRegistry,
-    string CurrentStatus,
     string Roadmap)
 {
     public string StatusDirectory => Path.GetDirectoryName(WorkItemsRegistry)!;
@@ -29,7 +28,6 @@ public sealed record RepositoryPaths(
                     current,
                     workItems,
                     milestones,
-                    Path.Combine(current, "docs", "delivery", "status", "current.md"),
                     Path.Combine(current, "docs", "delivery", "roadmap.md"));
             }
 

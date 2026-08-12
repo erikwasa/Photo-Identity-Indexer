@@ -15,4 +15,6 @@ dotnet run --project tools/PhotoIdentity.Docs -- review WI-0005
 dotnet run --project tools/PhotoIdentity.Docs -- complete WI-0005 --evidence-type workflow --evidence-value URL --verified-by human
 ```
 
-The YAML registries remain canonical. Mutating commands validate the repository before and after writing, update milestone statuses, and regenerate the human-readable views.
+The YAML registries remain canonical. Mutating commands validate the repository before and after writing, update milestone statuses, and regenerate the roadmap.
+
+`work-items.yaml` deliberately keeps completed entries because blockers, milestone calculation and completion evidence depend on that history. It is a machine/audit registry, not a human current-status document. The immediate continuation point belongs in the short root `BUILD_CONTEXT.md` handoff.
