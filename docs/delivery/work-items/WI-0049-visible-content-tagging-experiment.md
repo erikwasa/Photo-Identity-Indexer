@@ -28,9 +28,11 @@ Manual assignments are the human-owned source of truth. Automatic output is mode
 - Use controlled-vocabulary image/text similarity as the first integration baseline because it maps directly onto canonical tags and can fit the existing ONNX/C# runtime shape.
 - Compare a purpose-built image tagger when feasible if it offers materially better object/scene/activity coverage at acceptable runtime and packaging cost.
 - Treat generative captioning as optional comparative evidence rather than a required production path.
+- Compare inference from the existing durable review proxy with inference from the original on the same representative sample. Prefer the proxy path if semantic usefulness is materially preserved because it avoids unnecessary archive hydration; otherwise record the bounded-hydration requirement explicitly.
 - Measure practical precision/usefulness, missed concepts, confusing concepts, runtime and storage footprint.
 - Record model provenance, licence/redistribution constraints and hardware/runtime requirements.
-- Prototype model-produced tag evidence separately from manual assignment history, including exact model revision and score/confidence provenance.
+- Define automatic-evidence provenance at the complete inference-pipeline level. For controlled-vocabulary scoring this includes at least exact model revision, image preprocessing, tokenizer/text preprocessing, prompt templates and vocabulary/version; model hash plus a scalar score alone is insufficient for reproducibility.
+- Prototype model-produced tag evidence separately from manual assignment history only after the experiment has established the evidence shape that needs to be persisted.
 - Produce a recommendation: reject automatic tagging, continue experimenting, or select an approach for a later production implementation.
 
 ## Candidate families to investigate
@@ -45,6 +47,7 @@ Candidate names are an experiment starting point, not a production-model decisio
 
 - Requiring a production automatic tagging model to ship from this work item.
 - Replacing or mutating manual tag assignments.
+- Freezing a production automatic-evidence schema before the experiment establishes the required pipeline provenance and output shape.
 - Building the final smart-collection UI.
 - Uploading the private archive to a third-party vision API.
 - Generating tag descriptions through an external LLM using private photo content.
@@ -54,9 +57,10 @@ Candidate names are an experiment starting point, not a production-model decisio
 - [ ] A bounded representative tag experiment can be reproduced locally.
 - [ ] The experiment includes object/scene and activity-style concepts relevant to the intended library use.
 - [ ] At least one controlled-vocabulary approach is measured against the canonical tag representation.
+- [ ] Review-proxy versus original-image inference is measured on the same sample and the chosen production-input recommendation is recorded.
 - [ ] Quality, runtime and storage findings are recorded without committing private photo content or private tag labels.
 - [ ] Candidate model provenance/licensing, packaging and redistribution constraints are documented.
-- [ ] Prototype automatic evidence cannot overwrite manual assignments and records exact model/score provenance.
+- [ ] Any prototype automatic evidence cannot overwrite manual assignments and records enough exact pipeline provenance to reproduce its scores/outputs.
 - [ ] A clear production recommendation and next implementation boundary are recorded.
 
 ## Verification requirements
