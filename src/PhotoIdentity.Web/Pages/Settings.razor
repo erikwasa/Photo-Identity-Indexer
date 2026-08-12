@@ -135,6 +135,40 @@ else
                 </div>
             </div>
 
+            <h3>Current storage use</h3>
+            <div class="review-filter-grid">
+                <div>
+                    <span class="field-label">Disk free now</span>
+                    <strong>@FormatByteSetting(ArchiveStorage.AvailableFreeBytes)</strong>
+                    <p>Current available free space on the volume containing the configured archive.</p>
+                </div>
+                <div>
+                    <span class="field-label">Photo Identity-managed hydration used</span>
+                    <strong>@FormatByteSetting(ArchiveStorage.ManagedReservedBytes)</strong>
+                    <p>@ArchiveStorage.ActiveManagedOriginals managed item(s) · @ArchiveStorage.HydrationsInProgress hydration(s) currently downloading.</p>
+                </div>
+                <div>
+                    <span class="field-label">Managed budget remaining</span>
+                    <strong>@FormatByteSetting(RemainingManagedBudget(ArchiveStorage))</strong>
+                    <p>Maximum managed hydration minus bytes still reserved by Photo Identity.</p>
+                </div>
+                <div>
+                    <span class="field-label">Managed local / downloading / releasing</span>
+                    <strong>@FormatByteSetting(ArchiveStorage.ManagedHydratedBytes)</strong>
+                    <p>@FormatByteSetting(ArchiveStorage.ManagedDownloadingBytes) downloading · @FormatByteSetting(ArchiveStorage.ManagedReleasingBytes) releasing.</p>
+                </div>
+                <div>
+                    <span class="field-label">Durable review proxies</span>
+                    <strong>@FormatByteSetting(ArchiveStorage.ReviewProxyBytes)</strong>
+                    <p>Selected profile: @(string.IsNullOrWhiteSpace(ArchiveStorage.ReviewProxyProfileId) ? "not configured" : ArchiveStorage.ReviewProxyProfileId)</p>
+                </div>
+                <div>
+                    <span class="field-label">Logical archive source size</span>
+                    <strong>@FormatByteSetting(ArchiveStorage.LogicalSourceBytes)</strong>
+                    <p>Aggregate logical bytes in current archive coverage; this is not the amount that must remain local.</p>
+                </div>
+            </div>
+
             @if (ArchiveStorage.PolicyConfigured)
             {
                 <div class="notice success">
@@ -150,7 +184,7 @@ else
 
             <p class="field-help">
                 These are startup configuration values and are read-only while Photo Identity is running. For the packaged Windows application, edit
-                <code>%LOCALAPPDATA%\PhotoIdentity\launcher.json</code> and restart Photo Identity for changes to take effect. Use accepted storage-policy values rather than inventing production limits.
+                <code>%LOCALAPPDATA%\PhotoIdentity\launcher.json</code> and restart Photo Identity for changes to take effect. Refresh this page to update current disk and managed-storage observations.
             </p>
         }
     </section>
@@ -511,11 +545,16 @@ else
     private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
         $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
 
+    private static long? RemainingManagedBudget(ArchiveStorageStatusResponse storage) =>
+        storage.MaximumManagedHydrationBytes is long maximum
+            ? Math.Max(0L, maximum - storage.ManagedReservedBytes)
+            : null;
+
     private static string FormatByteSetting(long? value)
     {
         if (value is null)
         {
-            return "Not configured";
+            return "Not available";
         }
 
         string[] units = ["bytes", "KiB", "MiB", "GiB", "TiB"];
