@@ -30,15 +30,15 @@ public readonly record struct PhotoTagName
 
         foreach (char character in compatibilityNormalized.Trim())
         {
-            if (char.IsControl(character))
-            {
-                throw new ArgumentException("Photo tags cannot contain control characters.", nameof(value));
-            }
-
             if (char.IsWhiteSpace(character))
             {
                 pendingSpace = display.Length > 0;
                 continue;
+            }
+
+            if (char.IsControl(character))
+            {
+                throw new ArgumentException("Photo tags cannot contain control characters.", nameof(value));
             }
 
             if (pendingSpace)
