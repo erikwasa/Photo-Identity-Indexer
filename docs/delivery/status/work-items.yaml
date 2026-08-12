@@ -1192,7 +1192,7 @@ work_items:
   owner: unassigned
   document: ../work-items/WI-0049-visible-content-tagging-experiment.md
   blockers:
-  - WI-0042
+  - WI-0056
   blocker_notes: []
   evidence: []
 - id: WI-0050
@@ -1205,6 +1205,7 @@ work_items:
   - WI-0025
   - WI-0041
   - WI-0042
+  - WI-0056
   blocker_notes: []
   evidence: []
 - id: WI-0051
@@ -1295,5 +1296,18 @@ work_items:
   - WI-0048
   - WI-0052
   - WI-0054
+  blocker_notes: []
+  evidence: []
+- id: WI-0056
+  title: Add canonical photo tags and manual tagging
+  milestone: M19
+  status: in_progress
+  owner: ai-agent
+  document: ../work-items/WI-0056-manual-photo-tags.md
+  started_at: 2026-08-13
+  last_updated_at: 2026-08-13
+  branch: agent/WI-0056-manual-photo-tags
+  blockers:
+  - WI-0042
   blocker_notes: []
   evidence: []
