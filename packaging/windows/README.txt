@@ -21,6 +21,13 @@ Optional launcher configuration is read from:
 
 Copy PhotoIdentity.launcher.example.json there if you need non-default settings. For the packaged application, normally leave publishPath unset; PhotoIdentity.cmd always starts the app directory shipped beside it.
 
+The example launcher file includes the three bounded archive-hydration keys with blank values. Blank or missing values keep Photo Identity-managed hydration disabled. Replace them only with storage-policy values that have been deliberately accepted for this computer:
+  PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes
+  PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes
+  PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations
+
+The Settings page shows the effective values and whether managed hydration is enabled. These values are startup configuration; edit launcher.json and restart Photo Identity to apply changes.
+
 UPGRADE / REPLACEMENT
 ---------------------
 1. Extract the new package to a new folder beside the old package.
