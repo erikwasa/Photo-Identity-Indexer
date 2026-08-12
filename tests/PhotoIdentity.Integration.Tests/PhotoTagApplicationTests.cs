@@ -35,14 +35,14 @@ public sealed class PhotoTagApplicationTests
             await using PhotoTagApiFactory factory = new(databasePath);
             using HttpClient client = factory.CreateClient();
 
-            PhotoTagResponse[] firstAdd = await PostTagAsync(client, revisionId, "  Beach   Day ");
+            PhotoTagResponse[] firstAdd = await PostTagAsync(client, revisionId, "  Beach/Day  ");
             Assert.Single(firstAdd);
-            Assert.Equal("Beach Day", firstAdd[0].Name);
+            Assert.Equal("Beach/Day", firstAdd[0].Name);
             Assert.Equal("manual", firstAdd[0].Source);
 
-            PhotoTagResponse[] secondAdd = await PostTagAsync(client, revisionId, "beach day");
+            PhotoTagResponse[] secondAdd = await PostTagAsync(client, revisionId, "beach/day");
             Assert.Single(secondAdd);
-            Assert.Equal("Beach Day", secondAdd[0].Name);
+            Assert.Equal("Beach/Day", secondAdd[0].Name);
 
             SqliteCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
@@ -53,13 +53,13 @@ public sealed class PhotoTagApplicationTests
             }
 
             using HttpResponseMessage remove = await client.DeleteAsync(
-                $"/api/collections/photos/{revisionId}/tags/{Uri.EscapeDataString("BEACH DAY")}");
+                $"/api/collections/photos/{revisionId}/tags?name={Uri.EscapeDataString("BEACH/DAY")}");
             remove.EnsureSuccessStatusCode();
             PhotoTagResponse[] afterRemove =
                 await remove.Content.ReadFromJsonAsync<PhotoTagResponse[]>() ?? [];
             Assert.Empty(afterRemove);
 
-            PhotoTagResponse[] afterReAdd = await PostTagAsync(client, revisionId, "Beach Day");
+            PhotoTagResponse[] afterReAdd = await PostTagAsync(client, revisionId, "Beach/Day");
             Assert.Single(afterReAdd);
 
             await using (SqliteConnection connection = await database.OpenConnectionAsync())
