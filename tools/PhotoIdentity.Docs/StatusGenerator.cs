@@ -26,20 +26,16 @@ public sealed class StatusGenerator
             milestone.Status = WorkItemRules.CalculateMilestoneStatus(milestone, itemMap);
         }
 
-        string current = BuildCurrent(workItems, milestones, itemMap);
         string roadmap = BuildRoadmap(milestones);
 
         if (checkOnly)
         {
-            bool matches = CheckFile(paths.CurrentStatus, current, output) &
-                           CheckFile(paths.Roadmap, roadmap, output);
-            return matches;
+            return CheckFile(paths.Roadmap, roadmap, output);
         }
 
         _store.SaveMilestones(paths, milestones);
-        RegistryStore.WriteAtomically(paths.CurrentStatus, current);
         RegistryStore.WriteAtomically(paths.Roadmap, roadmap);
-        output.WriteLine("Generated milestone statuses, current.md and roadmap.md.");
+        output.WriteLine("Generated milestone statuses and roadmap.md.");
         return true;
     }
 
@@ -56,68 +52,6 @@ public sealed class StatusGenerator
 
         output.WriteLine($"Generated file is stale: {path}");
         return false;
-    }
-
-    private static string BuildCurrent(
-        WorkItemRegistry registry,
-        MilestoneRegistry milestones,
-        IReadOnlyDictionary<string, WorkItem> itemMap)
-    {
-        List<WorkItem> active = registry.WorkItems
-            .Where(item => item.Status is "in_progress" or "in_review" or "blocked")
-            .OrderBy(item => item.Id, StringComparer.Ordinal)
-            .ToList();
-
-        List<WorkItem> completed = registry.WorkItems
-            .Where(item => item.Status == "completed")
-            .OrderByDescending(item => item.CompletedAt, StringComparer.Ordinal)
-            .ThenByDescending(item => item.Id, StringComparer.Ordinal)
-            .Take(3)
-            .ToList();
-
-        List<WorkItem> ready = registry.WorkItems
-            .Where(item => WorkItemRules.IsReady(item, itemMap))
-            .OrderBy(item => item.Id, StringComparer.Ordinal)
-            .Take(5)
-            .ToList();
-
-        StringBuilder builder = new();
-        builder.AppendLine("# Current delivery status");
-        builder.AppendLine();
-        builder.AppendLine("Generated from `work-items.yaml` and `milestones.yaml`. Do not edit manually.");
-        builder.AppendLine();
-        builder.AppendLine("## Milestones");
-        builder.AppendLine();
-        foreach (Milestone milestone in milestones.Milestones.Where(value => value.Status != "proposed"))
-        {
-            builder.AppendLine($"- **{milestone.Id} — {milestone.Title}**: `{milestone.Status}`");
-        }
-
-        AppendWorkItems("Active work", active);
-        AppendWorkItems("Recently completed", completed);
-        AppendWorkItems("Next ready work", ready);
-
-        return builder.ToString().Replace("\r\n", "\n", StringComparison.Ordinal);
-
-        void AppendWorkItems(string heading, IReadOnlyCollection<WorkItem> items)
-        {
-            builder.AppendLine();
-            builder.AppendLine($"## {heading}");
-            builder.AppendLine();
-
-            if (items.Count == 0)
-            {
-                builder.AppendLine("None.");
-                return;
-            }
-
-            foreach (WorkItem item in items)
-            {
-                string document = Path.GetFileName(item.Document);
-                builder.AppendLine(
-                    $"- [**{item.Id} — {item.Title}**](../work-items/{document}) — `{item.Status}`; owner: `{item.Owner}`");
-            }
-        }
     }
 
     private static string BuildRoadmap(MilestoneRegistry milestones)
