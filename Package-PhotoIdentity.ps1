@@ -47,8 +47,13 @@ $launcherScript = Join-Path $repositoryRoot "Start-PhotoIdentity.ps1"
 $packageEntryPoint = Join-Path $repositoryRoot "packaging\windows\PhotoIdentity.cmd"
 $packageReadme = Join-Path $repositoryRoot "packaging\windows\README.txt"
 $packageConfigurationExample = Join-Path $repositoryRoot "packaging\windows\PhotoIdentity.launcher.example.json"
+$requiredModelManifests = @(
+    (Join-Path $repositoryRoot "models\manifests\centerface-2019-fp32.json"),
+    (Join-Path $repositoryRoot "models\manifests\sface-2021dec-fp32.json")
+)
 
-foreach ($requiredPath in @($apiProject, $launcherScript, $packageEntryPoint, $packageReadme, $packageConfigurationExample)) {
+$requiredPaths = @($apiProject, $launcherScript, $packageEntryPoint, $packageReadme, $packageConfigurationExample) + $requiredModelManifests
+foreach ($requiredPath in $requiredPaths) {
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
         throw "Required packaging input was not found: $requiredPath"
     }
@@ -79,6 +84,14 @@ if (-not (Test-Path -LiteralPath $publishedExecutable -PathType Leaf)) {
     throw "Self-contained publish did not produce PhotoIdentity.Api.exe."
 }
 
+# Archive profile identity is derived from the governed checked-in manifests. Keep those manifests
+# with replaceable application code so packaged status/reconciliation does not depend on a source checkout.
+$packagedManifestRoot = Join-Path $appRoot "models\manifests"
+New-Item -ItemType Directory -Path $packagedManifestRoot -Force | Out-Null
+foreach ($manifestPath in $requiredModelManifests) {
+    Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $packagedManifestRoot (Split-Path -Leaf $manifestPath)) -Force
+}
+
 Copy-Item -LiteralPath $launcherScript -Destination (Join-Path $packageRoot "Start-PhotoIdentity.ps1") -Force
 Copy-Item -LiteralPath $packageEntryPoint -Destination (Join-Path $packageRoot "PhotoIdentity.cmd") -Force
 Copy-Item -LiteralPath $packageReadme -Destination (Join-Path $packageRoot "README.txt") -Force
@@ -91,6 +104,7 @@ $manifest = [ordered]@{
     deploymentMode = "self-contained"
     entryPoint = "PhotoIdentity.cmd"
     applicationExecutable = "app/PhotoIdentity.Api.exe"
+    analysisManifestDirectory = "app/models/manifests"
     durableApplicationData = "%LOCALAPPDATA%/PhotoIdentity"
 }
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $packageRoot "package-manifest.json") -Encoding UTF8
