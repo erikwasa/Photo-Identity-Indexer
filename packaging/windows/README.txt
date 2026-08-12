@@ -21,12 +21,20 @@ Optional launcher configuration is read from:
 
 Copy PhotoIdentity.launcher.example.json there if you need non-default settings. For the packaged application, normally leave publishPath unset; PhotoIdentity.cmd always starts the app directory shipped beside it.
 
-The example launcher file includes the three bounded archive-hydration keys with blank values. Blank or missing values keep Photo Identity-managed hydration disabled. Replace them only with storage-policy values that have been deliberately accepted for this computer:
+High-resolution human review and automatic durable proxy generation require the review-proxy root plus the exact registered proxy profile settings:
+  PhotoIdentity__ReviewProxyRoot
+  PhotoIdentity__ReviewProxyProfileId
+  PhotoIdentity__ReviewProxyMaximumLongEdge
+  PhotoIdentity__ReviewProxyJpegQuality
+
+The launcher example leaves the profile-specific values blank instead of guessing them. If ReviewProxyRoot is set but ReviewProxyProfileId is missing, existing durable proxies are not selected for normal serving and face review can fall back to the legacy recognition crop. Use the exact profile id and encoder settings already accepted/registered for the durable catalogue.
+
+The example launcher file also includes the three bounded archive-hydration keys with blank values. Blank or missing values keep Photo Identity-managed hydration disabled. Replace them only with storage-policy values that have been deliberately accepted for this computer:
   PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes
   PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes
   PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations
 
-The Settings page shows the effective values and whether managed hydration is enabled. These values are startup configuration; edit launcher.json and restart Photo Identity to apply changes.
+The Settings page shows the effective hydration values and whether managed hydration is enabled. These values are startup configuration; edit launcher.json and restart Photo Identity to apply changes.
 
 UPGRADE / REPLACEMENT
 ---------------------
