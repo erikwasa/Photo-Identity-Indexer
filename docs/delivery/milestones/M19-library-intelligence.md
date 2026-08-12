@@ -19,13 +19,13 @@ The catalogue can organize photos using information beyond face identity: photog
 
 ## Tag architecture
 
-Manual tagging is the production baseline rather than a fallback for automatic tagging. Canonical tag identity and human assignment history are established before the model experiment. Model-produced evidence remains separate and carries exact model/score provenance so rerunning or replacing a model cannot overwrite a maintainer assignment.
+Manual tagging is the production baseline rather than a fallback for automatic tagging. Canonical tag identity and human assignment history are established before the model experiment. Model-produced evidence remains separate so rerunning or replacing a model cannot overwrite a maintainer assignment. Its eventual persistence must identify the complete reproducible inference pipeline, not only a model hash and scalar score.
 
-Automatic tagging remains evidence-driven: WI-0049 measures candidate approaches before any model becomes a production dependency. WI-0050 consumes canonical tags regardless of whether automatic tag evidence has been selected by then.
+Automatic tagging remains evidence-driven: WI-0049 measures candidate approaches before any model or automatic-evidence schema becomes a production dependency. WI-0050 consumes canonical manual tags regardless of whether automatic tag evidence has been selected by then.
 
 ## Initial automatic-tagging investigation boundary
 
-The first experiment should use a controlled-vocabulary image/text similarity approach as the integration baseline because it maps directly onto canonical tags and fits the existing local ONNX/C# architecture. A purpose-built image tagger may be compared when its runtime and packaging cost are acceptable. Generative captioning is optional evidence, not a prerequisite for M19.
+The first experiment should use a controlled-vocabulary image/text similarity approach as the integration baseline because it maps directly onto canonical tags and fits the existing local ONNX/C# architecture. A purpose-built image tagger may be compared when its runtime and packaging cost are acceptable. Generative captioning is optional evidence, not a prerequisite for M19. The experiment also compares the existing durable review proxy with original-image inference before accepting any requirement to hydrate originals for semantic tagging.
 
 ## Exit criteria
 
@@ -34,4 +34,4 @@ The first experiment should use a controlled-vocabulary image/text similarity ap
 - A maintainer can add and remove canonical tags without modifying original photos.
 - Manual tag assignments and automatic tag evidence have distinct provenance and cannot silently overwrite each other.
 - Smart collections can be saved and reevaluated as catalogue contents change and can include canonical tag predicates.
-- The tagging experiment produces evidence about usefulness, runtime, storage and model-governance implications before a production automatic model is selected.
+- The tagging experiment produces evidence about usefulness, runtime, storage, input-image requirements and model-governance implications before a production automatic model is selected.
