@@ -1284,3 +1284,16 @@ work_items:
     value: cee18b822fa3ad9f7a8a0899c4cbdb6e1faf8b2d
   - type: human_verification
     value: Maintainer completed post-merge WI-0054 verification on the real Windows/OneDrive archive on 2026-08-11 and accepted archive viewer fallback, progress stability and availability behavior after the corrective follow-up; no blocking issues remained.
+- id: WI-0055
+  title: Fix packaged review, archive and storage-policy regressions
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0055-packaged-runtime-regressions.md
+  blockers:
+  - WI-0042
+  - WI-0048
+  - WI-0052
+  - WI-0054
+  blocker_notes: []
+  evidence: []
