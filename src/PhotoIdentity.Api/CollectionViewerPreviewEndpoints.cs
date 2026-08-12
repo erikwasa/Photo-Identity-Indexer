@@ -6,6 +6,14 @@ namespace PhotoIdentity.Api;
 
 public static class CollectionViewerPreviewEndpoints
 {
+    // The viewer fallback is transient and is never registered as a durable proxy profile.
+    // These settings preserve the review-sized rendering used by WI-0054 while allowing an
+    // already-local verified original to be viewed even when durable proxy generation is not configured.
+    private static readonly ReviewProxyProfile TransientViewerProfile = new(
+        "viewer-preview-transient-v1",
+        maximumLongEdge: 1600,
+        jpegQuality: 78);
+
     public static IEndpointRouteBuilder MapCollectionViewerPreviewEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/collections/photos/{revisionId}/viewer-preview", GetViewerPreviewAsync);
@@ -32,14 +40,6 @@ public static class CollectionViewerPreviewEndpoints
             return Results.File(proxy.Path, proxy.ContentType, enableRangeProcessing: true);
         }
 
-        if (!proxyConfiguration.TryResolve(out _, out ReviewProxyProfile? profile, out string? configurationMessage) ||
-            profile is null)
-        {
-            return Results.Problem(
-                configurationMessage ?? "Review-preview rendering is not configured.",
-                statusCode: StatusCodes.Status503ServiceUnavailable);
-        }
-
         VerifiedCollectionOriginal? original = await originalAccess.OpenVerifiedAsync(
             parsedRevisionId,
             cancellationToken);
@@ -51,10 +51,16 @@ public static class CollectionViewerPreviewEndpoints
             });
         }
 
+        ReviewProxyProfile renderProfile =
+            proxyConfiguration.TryResolve(out _, out ReviewProxyProfile? configuredProfile, out _) &&
+            configuredProfile is not null
+                ? configuredProfile
+                : TransientViewerProfile;
+
         await using FileStream stream = original.Stream;
         using MemoryStream source = new();
         await stream.CopyToAsync(source, cancellationToken);
-        EncodedReviewProxy preview = renderer.Render(source.ToArray(), profile, cancellationToken);
+        EncodedReviewProxy preview = renderer.Render(source.ToArray(), renderProfile, cancellationToken);
         return Results.File(preview.Content, preview.ContentType);
     }
 }

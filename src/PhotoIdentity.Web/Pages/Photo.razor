@@ -22,8 +22,16 @@
     @if (PreviewUnavailable)
     {
         <div class="empty-state compact">
-            <p>No review preview is currently available. A durable proxy has not been generated yet and the authoritative original is not already local and revision-verified.</p>
-            <p>Normal viewing will not download an online-only original. Use <strong>Load original</strong> below only when you explicitly want full-resolution access, or let archive processing generate the durable proxy.</p>
+            @if (Original?.State == "ready")
+            {
+                <p>The authoritative original is local and revision-verified, but the review preview could not be rendered.</p>
+                <p>Normal viewing did not request hydration. Refresh the page to retry, or let archive processing generate the durable proxy.</p>
+            }
+            else
+            {
+                <p>No review preview is currently available. A durable proxy has not been generated yet and the authoritative original is not already local and revision-verified.</p>
+                <p>Normal viewing will not download an online-only original. Use <strong>Load original</strong> below only when you explicitly want full-resolution access, or let archive processing generate the durable proxy.</p>
+            }
         </div>
     }
     else
