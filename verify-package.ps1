@@ -15,6 +15,7 @@ $packageOutputRoot = Join-Path $artifactRoot "packages"
 $installV1 = Join-Path $artifactRoot "install-v1"
 $installV2 = Join-Path $artifactRoot "install-v2"
 $localAppData = Join-Path $artifactRoot "localappdata"
+$archiveRoot = Join-Path $artifactRoot "archive-source"
 $packageScript = Join-Path $repositoryRoot "Package-PhotoIdentity.ps1"
 $packageZip = Join-Path $packageOutputRoot "PhotoIdentity-win-x64.zip"
 $url = "http://127.0.0.1:$Port"
@@ -74,6 +75,30 @@ function Assert-Healthy {
     }
 }
 
+function Assert-PackagedArchiveProfileReady {
+    param([Parameter(Mandatory = $true)][string]$SourceRoot)
+
+    New-Item -ItemType Directory -Path $SourceRoot -Force | Out-Null
+    $request = [ordered]@{
+        rootPath = $SourceRoot
+        relativeFolder = "."
+    } | ConvertTo-Json
+
+    $status = Invoke-RestMethod `
+        -Method Post `
+        -Uri "$url/api/archive/include" `
+        -ContentType "application/json" `
+        -Body $request `
+        -TimeoutSec 10
+
+    if (-not [bool]$status.analysisReady) {
+        throw "Packaged archive profile did not resolve without a source-checkout RepositoryRoot. Message: $($status.analysisMessage)"
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$status.profileHash)) {
+        throw "Packaged archive profile resolved without a profile hash."
+    }
+}
+
 if (-not (Test-Path -LiteralPath $packageScript -PathType Leaf)) {
     throw "Package script was not found: $packageScript"
 }
@@ -109,9 +134,35 @@ try {
     if ([string]$manifest.runtimeIdentifier -ne "win-x64" -or [string]$manifest.deploymentMode -ne "self-contained") {
         throw "Package manifest does not describe the expected self-contained win-x64 deployment."
     }
+    if ([string]$manifest.analysisManifestDirectory -ne "app/models/manifests") {
+        throw "Package manifest does not identify the packaged archive-analysis manifests."
+    }
 
     if (-not (Test-Path -LiteralPath (Join-Path $installV1 "app\PhotoIdentity.Api.exe") -PathType Leaf)) {
         throw "Package does not contain the self-contained PhotoIdentity.Api.exe host."
+    }
+
+    foreach ($relativeManifest in @(
+        "app\models\manifests\centerface-2019-fp32.json",
+        "app\models\manifests\sface-2021dec-fp32.json")) {
+        if (-not (Test-Path -LiteralPath (Join-Path $installV1 $relativeManifest) -PathType Leaf)) {
+            throw "Package is missing required archive-analysis manifest: $relativeManifest"
+        }
+    }
+
+    $launcherExamplePath = Join-Path $installV1 "PhotoIdentity.launcher.example.json"
+    if (-not (Test-Path -LiteralPath $launcherExamplePath -PathType Leaf)) {
+        throw "Package launcher configuration example is missing."
+    }
+    $launcherExample = Get-Content -LiteralPath $launcherExamplePath -Raw | ConvertFrom-Json
+    $exampleSettingNames = @($launcherExample.settings.PSObject.Properties.Name)
+    foreach ($requiredSetting in @(
+        "PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes",
+        "PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes",
+        "PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations")) {
+        if ($exampleSettingNames -notcontains $requiredSetting) {
+            throw "Package launcher configuration example is missing bounded-storage setting: $requiredSetting"
+        }
     }
 
     $embeddedPrivateFiles = @(Get-ChildItem -LiteralPath $installV1 -Recurse -File | Where-Object {
@@ -148,6 +199,7 @@ try {
 
     Invoke-PackageEntryPoint -InstallRoot $installV1
     Assert-Healthy
+    Assert-PackagedArchiveProfileReady -SourceRoot $archiveRoot
 
     $firstProcesses = @(Get-PackageServerProcesses)
     if ($firstProcesses.Count -ne 1) {
