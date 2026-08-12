@@ -147,6 +147,7 @@ milestones:
   - WI-0048
   - WI-0051
   - WI-0052
+  - WI-0055
 - id: M19
   title: Photo metadata and semantic collections
   status: ready
