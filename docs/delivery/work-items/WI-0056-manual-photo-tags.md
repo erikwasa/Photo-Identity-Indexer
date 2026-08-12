@@ -5,7 +5,7 @@ milestone: M19
 status_source: ../status/work-items.yaml
 depends_on: [WI-0042]
 related_adrs: []
-affected_modules: [PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Api, PhotoIdentity.Web]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Api, PhotoIdentity.Web]
 ---
 
 # WI-0056: Add canonical photo tags and manual tagging
