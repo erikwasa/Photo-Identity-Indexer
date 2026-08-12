@@ -600,22 +600,6 @@ public sealed class SqliteCatalogueDatabase
         CREATE INDEX ix_photo_tag_actions_tag_history
             ON photo_tag_actions (tag_id, asset_revision_id, id DESC);
 
-        CREATE TABLE photo_tag_model_evidence (
-            asset_revision_id TEXT NOT NULL,
-            tag_id INTEGER NOT NULL,
-            model_id TEXT NOT NULL,
-            model_hash TEXT NOT NULL,
-            score REAL NOT NULL,
-            score_kind TEXT NOT NULL,
-            observed_at_utc TEXT NOT NULL,
-            PRIMARY KEY (asset_revision_id, tag_id, model_id, model_hash),
-            FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
-            FOREIGN KEY (tag_id) REFERENCES photo_tags (id) ON DELETE RESTRICT
-        );
-
-        CREATE INDEX ix_photo_tag_model_evidence_tag_model
-            ON photo_tag_model_evidence (tag_id, model_id, model_hash);
-
         INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
             VALUES (13, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
         PRAGMA user_version = 13;
