@@ -47,12 +47,24 @@ $launcherScript = Join-Path $repositoryRoot "Start-PhotoIdentity.ps1"
 $packageEntryPoint = Join-Path $repositoryRoot "packaging\windows\PhotoIdentity.cmd"
 $packageReadme = Join-Path $repositoryRoot "packaging\windows\README.txt"
 $packageConfigurationExample = Join-Path $repositoryRoot "packaging\windows\PhotoIdentity.launcher.example.json"
+$modelInstaller = Join-Path $repositoryRoot "models\install-models.ps1"
+$requiredModelIds = @(
+    "centerface-2019-fp32",
+    "sface-2021dec-fp32"
+)
 $requiredModelManifests = @(
     (Join-Path $repositoryRoot "models\manifests\centerface-2019-fp32.json"),
     (Join-Path $repositoryRoot "models\manifests\sface-2021dec-fp32.json")
 )
 
-$requiredPaths = @($apiProject, $launcherScript, $packageEntryPoint, $packageReadme, $packageConfigurationExample) + $requiredModelManifests
+$requiredPaths = @(
+    $apiProject,
+    $launcherScript,
+    $packageEntryPoint,
+    $packageReadme,
+    $packageConfigurationExample,
+    $modelInstaller
+) + $requiredModelManifests
 foreach ($requiredPath in $requiredPaths) {
     if (-not (Test-Path -LiteralPath $requiredPath -PathType Leaf)) {
         throw "Required packaging input was not found: $requiredPath"
@@ -92,6 +104,20 @@ foreach ($manifestPath in $requiredModelManifests) {
     Copy-Item -LiteralPath $manifestPath -Destination (Join-Path $packagedManifestRoot (Split-Path -Leaf $manifestPath)) -Force
 }
 
+# Archive analysis also needs the exact governed model weights. Install them into replaceable package
+# application code using the same manifest/SHA-256 verifier as a developer checkout, so runtime archive
+# advancement never depends on a separate repository models\files directory.
+$packagedModelRoot = Join-Path $appRoot "models\files"
+New-Item -ItemType Directory -Path $packagedModelRoot -Force | Out-Null
+Write-Host "Installing governed archive-analysis models into the Windows package..."
+& $modelInstaller `
+    -Id $requiredModelIds `
+    -ModelDirectory $packagedModelRoot `
+    -Configuration $Configuration
+if ($LASTEXITCODE -ne 0) {
+    throw "Governed model installation for the Windows package failed with exit code $LASTEXITCODE."
+}
+
 Copy-Item -LiteralPath $launcherScript -Destination (Join-Path $packageRoot "Start-PhotoIdentity.ps1") -Force
 Copy-Item -LiteralPath $packageEntryPoint -Destination (Join-Path $packageRoot "PhotoIdentity.cmd") -Force
 Copy-Item -LiteralPath $packageReadme -Destination (Join-Path $packageRoot "README.txt") -Force
@@ -105,6 +131,7 @@ $manifest = [ordered]@{
     entryPoint = "PhotoIdentity.cmd"
     applicationExecutable = "app/PhotoIdentity.Api.exe"
     analysisManifestDirectory = "app/models/manifests"
+    analysisModelDirectory = "app/models/files"
     durableApplicationData = "%LOCALAPPDATA%/PhotoIdentity"
 }
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $packageRoot "package-manifest.json") -Encoding UTF8
