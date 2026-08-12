@@ -50,7 +50,40 @@ public sealed class CollectionViewerPreviewApplicationTests
     }
 
     [Fact]
-    public async Task Online_only_original_without_proxy_is_not_hydrated_by_viewer_get()
+    public async Task Local_verified_original_without_proxy_profile_is_rendered_without_hydration()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            AssetRevisionId revisionId = await CreateRevisionAsync(databasePath, directory, PngBytes);
+            FakeFilesOnDemandPlatform platform = new(
+                new OneDriveFilesOnDemandState(AssetAvailability.Local, false, false));
+
+            await using ViewerApiFactory factory = new(
+                databasePath,
+                directory,
+                platform,
+                configureProxyProfile: false);
+            using HttpClient client = factory.CreateClient();
+
+            using HttpResponseMessage response = await client.GetAsync(
+                $"/api/collections/photos/{revisionId}/viewer-preview");
+
+            response.EnsureSuccessStatusCode();
+            Assert.Equal("image/jpeg", response.Content.Headers.ContentType?.MediaType);
+            Assert.NotEmpty(await response.Content.ReadAsByteArrayAsync());
+            Assert.Equal(0, platform.HydrationRequests);
+            Assert.Equal("local", await ReadAvailabilityAsync(databasePath, revisionId));
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Online_only_original_without_proxy_profile_is_not_hydrated_by_viewer_get()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -60,7 +93,11 @@ public sealed class CollectionViewerPreviewApplicationTests
             FakeFilesOnDemandPlatform platform = new(
                 new OneDriveFilesOnDemandState(AssetAvailability.OnlineOnly, false, true));
 
-            await using ViewerApiFactory factory = new(databasePath, directory, platform);
+            await using ViewerApiFactory factory = new(
+                databasePath,
+                directory,
+                platform,
+                configureProxyProfile: false);
             using HttpClient client = factory.CreateClient();
 
             using HttpResponseMessage response = await client.GetAsync(
@@ -198,24 +235,31 @@ public sealed class CollectionViewerPreviewApplicationTests
         private readonly string _databasePath;
         private readonly string _root;
         private readonly FakeFilesOnDemandPlatform _platform;
+        private readonly bool _configureProxyProfile;
 
         public ViewerApiFactory(
             string databasePath,
             string root,
-            FakeFilesOnDemandPlatform platform)
+            FakeFilesOnDemandPlatform platform,
+            bool configureProxyProfile = true)
         {
             _databasePath = databasePath;
             _root = root;
             _platform = platform;
+            _configureProxyProfile = configureProxyProfile;
         }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
             builder.UseSetting("PhotoIdentity:ReviewProxyRoot", Path.Combine(_root, "proxies"));
-            builder.UseSetting("PhotoIdentity:ReviewProxyProfileId", "test-preview");
-            builder.UseSetting("PhotoIdentity:ReviewProxyMaximumLongEdge", "1600");
-            builder.UseSetting("PhotoIdentity:ReviewProxyJpegQuality", "78");
+            if (_configureProxyProfile)
+            {
+                builder.UseSetting("PhotoIdentity:ReviewProxyProfileId", "test-preview");
+                builder.UseSetting("PhotoIdentity:ReviewProxyMaximumLongEdge", "1600");
+                builder.UseSetting("PhotoIdentity:ReviewProxyJpegQuality", "78");
+            }
+
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IOneDriveFilesOnDemandPlatform>();
