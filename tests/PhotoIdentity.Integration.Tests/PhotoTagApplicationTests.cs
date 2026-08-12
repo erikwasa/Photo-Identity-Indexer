@@ -80,7 +80,7 @@ public sealed class PhotoTagApplicationTests
     }
 
     [Fact]
-    public async Task Removing_manual_assignment_does_not_remove_model_evidence_extension_rows()
+    public async Task Removing_manual_assignment_retains_canonical_vocabulary_entry()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -88,32 +88,58 @@ public sealed class PhotoTagApplicationTests
             string databasePath = Path.Combine(directory, "catalogue.db");
             AssetRevisionId revisionId = await CreateRevisionAsync(databasePath, directory);
             SqliteCatalogueDatabase database = new(databasePath);
-            await database.InitializeAsync();
             SqlitePhotoTagRepository repository = new(database, TimeProvider.System);
 
             await repository.AddManualTagAsync(revisionId, "volleyball", "test-maintainer");
-
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
-            {
-                using SqliteCommand insertEvidence = connection.CreateCommand();
-                insertEvidence.CommandText = """
-                    INSERT INTO photo_tag_model_evidence (
-                        asset_revision_id, tag_id, model_id, model_hash, score, score_kind, observed_at_utc)
-                    SELECT $revision_id, id, 'candidate-model', $model_hash, 0.82, 'cosine', $observed_at_utc
-                    FROM photo_tags
-                    WHERE normalized_name = 'volleyball';
-                    """;
-                insertEvidence.Parameters.AddWithValue("$revision_id", revisionId.ToString());
-                insertEvidence.Parameters.AddWithValue("$model_hash", new string('b', 64));
-                insertEvidence.Parameters.AddWithValue("$observed_at_utc", DateTimeOffset.UtcNow.ToString("O"));
-                await insertEvidence.ExecuteNonQueryAsync();
-            }
-
             await repository.RemoveManualTagAsync(revisionId, "Volleyball", "test-maintainer");
+
             Assert.Empty(await repository.GetManualTagsAsync(revisionId));
 
             await using SqliteConnection verify = await database.OpenConnectionAsync();
-            Assert.Equal(1, await ReadCountAsync(verify, "SELECT COUNT(*) FROM photo_tag_model_evidence;"));
+            Assert.Equal(1, await ReadCountAsync(verify, "SELECT COUNT(*) FROM photo_tags;"));
+            Assert.Equal(2, await ReadCountAsync(verify, "SELECT COUNT(*) FROM photo_tag_actions;"));
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Schema_version_thirteen_migrates_a_version_twelve_catalogue_to_manual_tag_tables()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+
+            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            {
+                using SqliteCommand rewind = connection.CreateCommand();
+                rewind.CommandText = """
+                    DROP TABLE photo_tag_actions;
+                    DROP TABLE photo_tags;
+                    DELETE FROM schema_migrations WHERE version = 13;
+                    PRAGMA user_version = 12;
+                    """;
+                await rewind.ExecuteNonQueryAsync();
+            }
+
+            await database.InitializeAsync();
+
+            await using SqliteConnection verify = await database.OpenConnectionAsync();
+            Assert.Equal(13, await ReadCountAsync(verify, "PRAGMA user_version;"));
+            Assert.Equal(1, await ReadCountAsync(
+                verify,
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = 13;"));
+            Assert.Equal(1, await ReadCountAsync(
+                verify,
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'photo_tags';"));
+            Assert.Equal(1, await ReadCountAsync(
+                verify,
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'photo_tag_actions';"));
         }
         finally
         {
