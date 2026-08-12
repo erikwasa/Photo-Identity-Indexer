@@ -8,7 +8,7 @@ Formal work-item lifecycle status and evidence live in `docs/delivery/status/wor
 
 **WI-0056 — Add canonical photo tags and manual tagging** is the current implementation boundary for M19.
 
-Slice 1 establishes the production tag contract before automatic tagging is selected: canonical case-insensitive tag identity, revision-bound append-only manual add/remove history, a separate model-evidence table, revision-scoped API endpoints and integration coverage. Manual assignments and future model evidence are intentionally separate so rerunning a model cannot overwrite maintainer intent.
+Slice 1 establishes the production tag contract before automatic tagging is selected: canonical case-insensitive tag identity, revision-bound append-only manual add/remove history, revision-scoped API endpoints and integration coverage. Manual persistence intentionally contains no model scores or confidence fields; WI-0049 must first establish the complete automatic inference-pipeline provenance and output shape before any automatic-evidence schema is frozen.
 
 M19 sequencing is now WI-0056 → WI-0049 for automatic visible-content experimentation, while WI-0050 can consume canonical manual tags independently of whether an automatic model is selected.
 
