@@ -8,6 +8,8 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Tags;
 using PhotoIdentity.Persistence.Sqlite;
+using WebPhotoTagMutationRequest = PhotoIdentity.Web.Contracts.PhotoTagMutationRequest;
+using WebPhotoTagResponse = PhotoIdentity.Web.Contracts.PhotoTagResponse;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -35,12 +37,12 @@ public sealed class PhotoTagApplicationTests
             await using PhotoTagApiFactory factory = new(databasePath);
             using HttpClient client = factory.CreateClient();
 
-            PhotoTagResponse[] firstAdd = await PostTagAsync(client, revisionId, "  Beach/Day  ");
+            WebPhotoTagResponse[] firstAdd = await PostTagAsync(client, revisionId, "  Beach/Day  ");
             Assert.Single(firstAdd);
             Assert.Equal("Beach/Day", firstAdd[0].Name);
             Assert.Equal("manual", firstAdd[0].Source);
 
-            PhotoTagResponse[] secondAdd = await PostTagAsync(client, revisionId, "beach/day");
+            WebPhotoTagResponse[] secondAdd = await PostTagAsync(client, revisionId, "beach/day");
             Assert.Single(secondAdd);
             Assert.Equal("Beach/Day", secondAdd[0].Name);
 
@@ -55,11 +57,11 @@ public sealed class PhotoTagApplicationTests
             using HttpResponseMessage remove = await client.DeleteAsync(
                 $"/api/collections/photos/{revisionId}/tags?name={Uri.EscapeDataString("BEACH/DAY")}");
             remove.EnsureSuccessStatusCode();
-            PhotoTagResponse[] afterRemove =
-                await remove.Content.ReadFromJsonAsync<PhotoTagResponse[]>() ?? [];
+            WebPhotoTagResponse[] afterRemove =
+                await remove.Content.ReadFromJsonAsync<WebPhotoTagResponse[]>() ?? [];
             Assert.Empty(afterRemove);
 
-            PhotoTagResponse[] afterReAdd = await PostTagAsync(client, revisionId, "Beach/Day");
+            WebPhotoTagResponse[] afterReAdd = await PostTagAsync(client, revisionId, "Beach/Day");
             Assert.Single(afterReAdd);
 
             await using (SqliteConnection connection = await database.OpenConnectionAsync())
@@ -72,6 +74,43 @@ public sealed class PhotoTagApplicationTests
             using HttpResponseMessage missingResponse = await client.GetAsync(
                 $"/api/collections/photos/{missing}/tags");
             Assert.Equal(HttpStatusCode.NotFound, missingResponse.StatusCode);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Hosted_photo_route_and_web_tag_contract_are_available_for_the_same_revision()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            AssetRevisionId revisionId = await CreateRevisionAsync(databasePath, directory);
+
+            await using PhotoTagApiFactory factory = new(databasePath);
+            using HttpClient client = factory.CreateClient();
+
+            using HttpResponseMessage page = await client.GetAsync($"/photo/{revisionId}");
+            page.EnsureSuccessStatusCode();
+            string html = await page.Content.ReadAsStringAsync();
+            Assert.Contains("blazor.webassembly.js", html, StringComparison.OrdinalIgnoreCase);
+
+            WebPhotoTagResponse[] added = await PostTagAsync(client, revisionId, "Family archive");
+            Assert.Single(added);
+            Assert.Equal("Family archive", added[0].Name);
+
+            WebPhotoTagResponse[] reloaded = await client.GetFromJsonAsync<WebPhotoTagResponse[]>(
+                $"/api/collections/photos/{revisionId}/tags") ?? [];
+            Assert.Single(reloaded);
+            Assert.Equal(added[0], reloaded[0]);
+
+            using HttpResponseMessage removed = await client.DeleteAsync(
+                $"/api/collections/photos/{revisionId}/tags?name={Uri.EscapeDataString("family archive")}");
+            removed.EnsureSuccessStatusCode();
+            Assert.Empty(await removed.Content.ReadFromJsonAsync<WebPhotoTagResponse[]>() ?? []);
         }
         finally
         {
@@ -147,16 +186,16 @@ public sealed class PhotoTagApplicationTests
         }
     }
 
-    private static async Task<PhotoTagResponse[]> PostTagAsync(
+    private static async Task<WebPhotoTagResponse[]> PostTagAsync(
         HttpClient client,
         AssetRevisionId revisionId,
         string name)
     {
         using HttpResponseMessage response = await client.PostAsJsonAsync(
             $"/api/collections/photos/{revisionId}/tags",
-            new PhotoTagMutationRequest(name));
+            new WebPhotoTagMutationRequest(name));
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<PhotoTagResponse[]>() ?? [];
+        return await response.Content.ReadFromJsonAsync<WebPhotoTagResponse[]>() ?? [];
     }
 
     private static async Task<AssetRevisionId> CreateRevisionAsync(string databasePath, string sourceRoot)
