@@ -87,18 +87,8 @@ work_items:
   - WI-0043
   blocker_notes: []
   evidence: []
-- id: WI-0049
-  title: Experiment with visible-content image tagging
-  milestone: M19
-  status: proposed
-  owner: unassigned
-  document: ../work-items/WI-0049-visible-content-tagging-experiment.md
-  blockers:
-  - WI-0056
-  blocker_notes: []
-  evidence: []
 - id: WI-0050
-  title: Add EXIF metadata and smart collections
+  title: Add photo metadata and persistent smart collections
   milestone: M19
   status: proposed
   owner: unassigned
@@ -145,14 +135,14 @@ work_items:
   blocker_notes: []
   evidence: []
 - id: WI-0056
-  title: Add canonical photo tags and manual tagging
+  title: Add Immich-compatible hierarchical manual photo tags
   milestone: M19
-  status: in_review
+  status: in_progress
   owner: ai-agent
   document: ../work-items/WI-0056-manual-photo-tags.md
   started_at: 2026-08-13
   last_updated_at: 2026-08-14
-  branch: agent/WI-0056-manual-photo-tags
+  branch: agent/WI-0056-immich-tag-hierarchy
   blockers:
   - WI-0042
   blocker_notes: []
