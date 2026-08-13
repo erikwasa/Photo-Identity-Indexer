@@ -45,6 +45,73 @@
         </div>
     }
 
+    <section class="metadata-card photo-tag-panel" aria-labelledby="photo-tags-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Photo metadata</p>
+                <h2 id="photo-tags-heading">Tags</h2>
+            </div>
+            @if (!LoadingTags)
+            {
+                <span>@TagCountLabel</span>
+            }
+        </div>
+
+        @if (LoadingTags)
+        {
+            <div class="empty-state compact"><p>Loading tags…</p></div>
+        }
+        else
+        {
+            @if (Tags.Count == 0)
+            {
+                <p class="photo-tag-empty">No manual tags have been added to this photo.</p>
+            }
+            else
+            {
+                <div class="photo-tag-list" aria-label="Manual photo tags">
+                    @foreach (PhotoTagResponse tag in Tags)
+                    {
+                        <button type="button"
+                                class="photo-tag-chip"
+                                disabled="@TagBusy"
+                                title="Remove @tag.Name"
+                                aria-label="Remove tag @tag.Name"
+                                @onclick="() => RemoveTagAsync(tag.Name)">
+                            <span>@tag.Name</span>
+                            <span aria-hidden="true">×</span>
+                        </button>
+                    }
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(TagError))
+            {
+                <div class="notice error photo-tag-notice" role="alert">@TagError</div>
+            }
+
+            <label class="field-label photo-tag-label" for="photo-tag-input">Add a manual tag</label>
+            <div class="inline-field photo-tag-entry">
+                <input id="photo-tag-input"
+                       type="text"
+                       maxlength="80"
+                       autocomplete="off"
+                       placeholder="e.g. beach day"
+                       disabled="@TagBusy"
+                       @bind="TagInput"
+                       @bind:event="oninput"
+                       @onkeydown="HandleTagKeyDown" />
+                <button type="button"
+                        class="button primary"
+                        disabled="@(TagBusy || string.IsNullOrWhiteSpace(TagInput))"
+                        @onclick="AddTagAsync">
+                    @(TagBusy ? "Saving…" : "Add tag")
+                </button>
+            </div>
+            <p class="photo-tag-help">Tags are saved to this exact photo revision. Editing tags does not download or modify the original image.</p>
+        }
+    </section>
+
     <div class="section-heading">
         <div>
             <p class="eyebrow">Authoritative original</p>
@@ -105,21 +172,29 @@
     public string RevisionId { get; set; } = string.Empty;
 
     private CollectionOriginalAccessResponse? Original { get; set; }
+    private IReadOnlyList<PhotoTagResponse> Tags { get; set; } = [];
     private bool LoadingStatus { get; set; }
+    private bool LoadingTags { get; set; }
     private bool Busy { get; set; }
+    private bool TagBusy { get; set; }
     private bool PreviewUnavailable { get; set; }
+    private string TagInput { get; set; } = string.Empty;
     private string? Error { get; set; }
+    private string? TagError { get; set; }
     private CancellationTokenSource? PollCancellation { get; set; }
 
     private string PreviewUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/viewer-preview";
     private string OriginalUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original";
     private string StatusUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original/status";
+    private string TagsUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/tags";
+    private string TagCountLabel => Tags.Count == 1 ? "1 manual tag" : $"{Tags.Count} manual tags";
 
     protected override async Task OnParametersSetAsync()
     {
         StopPolling();
         PreviewUnavailable = false;
-        await LoadStatusAsync();
+        TagInput = string.Empty;
+        await Task.WhenAll(LoadStatusAsync(), LoadTagsAsync());
         StartPollingIfNeeded();
     }
 
@@ -144,6 +219,114 @@
         {
             LoadingStatus = false;
         }
+    }
+
+    private async Task LoadTagsAsync()
+    {
+        LoadingTags = true;
+        TagError = null;
+        try
+        {
+            Tags = await Http.GetFromJsonAsync<PhotoTagResponse[]>(TagsUrl) ?? [];
+        }
+        catch (Exception exception)
+        {
+            Tags = [];
+            TagError = $"Tags could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            LoadingTags = false;
+        }
+    }
+
+    private async Task AddTagAsync()
+    {
+        if (TagBusy || string.IsNullOrWhiteSpace(TagInput))
+        {
+            return;
+        }
+
+        string requestedName = TagInput;
+        TagBusy = true;
+        TagError = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                TagsUrl,
+                new PhotoTagMutationRequest(requestedName));
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(await ReadTagErrorAsync(response, "Tag could not be added."));
+            }
+
+            Tags = await response.Content.ReadFromJsonAsync<PhotoTagResponse[]>() ?? [];
+            TagInput = string.Empty;
+        }
+        catch (Exception exception)
+        {
+            TagError = exception.Message;
+        }
+        finally
+        {
+            TagBusy = false;
+        }
+    }
+
+    private async Task RemoveTagAsync(string name)
+    {
+        if (TagBusy)
+        {
+            return;
+        }
+
+        TagBusy = true;
+        TagError = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.DeleteAsync(
+                $"{TagsUrl}?name={Uri.EscapeDataString(name)}");
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(await ReadTagErrorAsync(response, "Tag could not be removed."));
+            }
+
+            Tags = await response.Content.ReadFromJsonAsync<PhotoTagResponse[]>() ?? [];
+        }
+        catch (Exception exception)
+        {
+            TagError = exception.Message;
+        }
+        finally
+        {
+            TagBusy = false;
+        }
+    }
+
+    private async Task HandleTagKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await AddTagAsync();
+        }
+    }
+
+    private static async Task<string> ReadTagErrorAsync(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            PhotoTagErrorResponse? error = await response.Content.ReadFromJsonAsync<PhotoTagErrorResponse>();
+            if (!string.IsNullOrWhiteSpace(error?.Error))
+            {
+                return error.Error;
+            }
+        }
+        catch
+        {
+            // Fall through to the HTTP status.
+        }
+
+        return $"{fallback} HTTP {(int)response.StatusCode}.";
     }
 
     private async Task HydrateAsync()

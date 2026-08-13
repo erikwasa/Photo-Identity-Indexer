@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 12;
+    public const int CurrentSchemaVersion = 13;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -573,6 +573,38 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 12;
         """;
 
+    private const string VersionThirteenMigration = """
+        CREATE TABLE photo_tags (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            normalized_name TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            created_by TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            CHECK (length(normalized_name) BETWEEN 1 AND 80),
+            CHECK (length(display_name) BETWEEN 1 AND 80)
+        );
+
+        CREATE TABLE photo_tag_actions (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            asset_revision_id TEXT NOT NULL,
+            tag_id INTEGER NOT NULL,
+            action_kind TEXT NOT NULL CHECK (action_kind IN ('add', 'remove')),
+            actor TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id) REFERENCES photo_tags (id) ON DELETE RESTRICT
+        );
+
+        CREATE INDEX ix_photo_tag_actions_revision_history
+            ON photo_tag_actions (asset_revision_id, tag_id, id DESC);
+        CREATE INDEX ix_photo_tag_actions_tag_history
+            ON photo_tag_actions (tag_id, asset_revision_id, id DESC);
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (13, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 13;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -681,6 +713,12 @@ public sealed class SqliteCatalogueDatabase
                 connection,
                 VersionTwelveMigration,
                 cancellationToken);
+            version = 12;
+        }
+
+        if (version < 13)
+        {
+            await ApplyMigrationAsync(connection, VersionThirteenMigration, cancellationToken);
         }
     }
 
