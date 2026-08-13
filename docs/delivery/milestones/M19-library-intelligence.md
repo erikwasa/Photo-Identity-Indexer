@@ -9,19 +9,21 @@ depends_on: [M12, M14]
 
 ## Outcome
 
-The catalogue can organize photos using information beyond face identity: photographic capture metadata, location, maintainer-owned photo tags and, when a viable local approach has been established, automatic visible-content tag evidence.
+The catalogue can organize photos using information beyond face identity: photographic capture metadata, location and automatic visible-content tags, with maintainer-owned manual tagging available as a fallback and correction path when automatic tagging is unavailable, misses a useful concept or produces an unusable result.
 
 ## Work items
 
-- [WI-0056](../work-items/WI-0056-manual-photo-tags.md) — establish the canonical photo-tag representation and manual tagging in the photo viewer
-- [WI-0049](../work-items/WI-0049-visible-content-tagging-experiment.md) — evaluate local automatic visible-content tagging against the canonical tag representation and record a production recommendation
+- [WI-0056](../work-items/WI-0056-manual-photo-tags.md) — establish the canonical photo-tag representation and the manual fallback/correction controls in the photo viewer
+- [WI-0049](../work-items/WI-0049-visible-content-tagging-experiment.md) — evaluate local automatic visible-content tagging against the canonical tag representation and select the primary production approach
 - [WI-0050](../work-items/WI-0050-exif-smart-collections.md) — ingest EXIF capture metadata and create reusable smart collections from metadata, people and canonical tags
 
 ## Tag architecture
 
-Manual tagging is the production baseline rather than a fallback for automatic tagging. Canonical tag identity and human assignment history are established before the model experiment. Model-produced evidence remains separate so rerunning or replacing a model cannot overwrite a maintainer assignment. Its eventual persistence must identify the complete reproducible inference pipeline, not only a model hash and scalar score.
+Automatic tagging is the intended primary tagging path for normal library use. Manual tagging is a fallback and correction mechanism, not the product baseline. WI-0056 is implemented first because automatic tagging still needs a stable canonical tag identity and a safe human recovery path before model selection; that implementation order does not imply that maintainers are expected to tag the archive manually.
 
-Automatic tagging remains evidence-driven: WI-0049 measures candidate approaches before any model or automatic-evidence schema becomes a production dependency. WI-0050 consumes canonical manual tags regardless of whether automatic tag evidence has been selected by then.
+Manual actions and model-produced evidence remain separate so rerunning or replacing a model cannot erase a maintainer intervention and a manual edit does not destroy reproducible model evidence. The production automatic-tag integration must define the effective-tag policy explicitly, including how an intentional manual correction or suppression for a specific tag takes precedence over conflicting automatic output.
+
+WI-0049 remains evidence-driven: it measures candidate approaches before a model or automatic-evidence schema becomes a production dependency. M19 does not treat manual-only tagging as the desired end state. If the first experiment cannot identify an acceptable automatic approach, it must record the blocker and the next bounded experiment rather than treating the manual fallback as completion of the automatic-tagging goal.
 
 ## Initial automatic-tagging investigation boundary
 
@@ -31,7 +33,8 @@ The first experiment should use a controlled-vocabulary image/text similarity ap
 
 - Capture time is stored as photographic local time when that is what the source metadata provides rather than being falsely normalized to UTC.
 - GPS metadata is retained when available without making location mandatory.
-- A maintainer can add and remove canonical tags without modifying original photos.
-- Manual tag assignments and automatic tag evidence have distinct provenance and cannot silently overwrite each other.
+- Automatic visible-content tagging has a selected production path, or M19 is explicitly blocked on a documented follow-up experiment rather than silently falling back to manual-only tagging.
+- A maintainer can add and remove canonical tags without modifying original photos when automatic tagging needs human fallback/correction.
+- Manual interventions and automatic tag evidence have distinct provenance and cannot silently overwrite each other.
 - Smart collections can be saved and reevaluated as catalogue contents change and can include canonical tag predicates.
 - The tagging experiment produces evidence about usefulness, runtime, storage, input-image requirements and model-governance implications before a production automatic model is selected.
