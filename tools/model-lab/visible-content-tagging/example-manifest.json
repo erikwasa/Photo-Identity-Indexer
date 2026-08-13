@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "samples": [
+    {
+      "id": "synthetic-sample-01",
+      "proxyPath": "C:/PhotoIdentity/private/visible-content-tagging/sample-01-proxy.jpg",
+      "originalPath": "C:/PhotoIdentity/private/visible-content-tagging/sample-01-original.jpg",
+      "expectedTags": [
+        "dog",
+        "outdoors"
+      ]
+    },
+    {
+      "id": "synthetic-sample-02",
+      "proxyPath": "C:/PhotoIdentity/private/visible-content-tagging/sample-02-proxy.jpg",
+      "expectedTags": [
+        "beach"
+      ]
+    }
+  ]
+}

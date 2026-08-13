@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "tags": [
+    {
+      "name": "beach",
+      "prompts": [
+        "a photo at a beach",
+        "a photo of a beach"
+      ]
+    },
+    {
+      "name": "dog"
+    },
+    {
+      "name": "outdoors"
+    },
+    {
+      "name": "playing volleyball",
+      "prompts": [
+        "a photo of people playing volleyball",
+        "a person playing volleyball"
+      ]
+    },
+    {
+      "name": "watching television",
+      "prompts": [
+        "a photo of people watching television",
+        "a person watching television"
+      ]
+    }
+  ]
+}
