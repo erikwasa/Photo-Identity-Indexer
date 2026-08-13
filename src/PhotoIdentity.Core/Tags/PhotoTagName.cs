@@ -78,12 +78,13 @@ public readonly record struct PhotoTagName
 
 /// <summary>
 /// Canonical hierarchical tag value using Immich-compatible slash-separated path semantics.
+/// The current SQLite schema bounds the persisted full value to 80 characters.
 /// </summary>
 public sealed record PhotoTagPath
 {
     public const char Separator = '/';
     public const int MaximumDepth = 32;
-    public const int MaximumValueLength = 512;
+    public const int MaximumValueLength = 80;
 
     private PhotoTagPath(PhotoTagName[] segments)
     {
