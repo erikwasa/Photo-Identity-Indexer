@@ -14,6 +14,7 @@ public sealed record CatalogueManualPhotoTag(
 /// <summary>
 /// Stores maintainer-owned photo tags independently from future model-produced tag evidence.
 /// Manual state is derived from append-only add/remove actions for one immutable asset revision.
+/// Canonical tag names are slash-separated hierarchical values compatible with Immich tag paths.
 /// </summary>
 public sealed class SqlitePhotoTagRepository
 {
@@ -43,7 +44,7 @@ public sealed class SqlitePhotoTagRepository
         string actor,
         CancellationToken cancellationToken = default)
     {
-        PhotoTagName tag = PhotoTagName.Parse(tagName);
+        PhotoTagPath tag = PhotoTagPath.Parse(tagName);
         string normalizedActor = NormalizeActor(actor);
         string now = _timeProvider.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
 
@@ -59,14 +60,14 @@ public sealed class SqlitePhotoTagRepository
                     normalized_name, display_name, created_by, created_at_utc)
                 VALUES ($normalized_name, $display_name, $actor, $created_at_utc);
                 """;
-            insertTag.Parameters.AddWithValue("$normalized_name", tag.NormalizedName);
-            insertTag.Parameters.AddWithValue("$display_name", tag.DisplayName);
+            insertTag.Parameters.AddWithValue("$normalized_name", tag.NormalizedValue);
+            insertTag.Parameters.AddWithValue("$display_name", tag.DisplayValue);
             insertTag.Parameters.AddWithValue("$actor", normalizedActor);
             insertTag.Parameters.AddWithValue("$created_at_utc", now);
             await insertTag.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        long tagId = await ReadTagIdAsync(connection, transaction, tag.NormalizedName, cancellationToken)
+        long tagId = await ReadTagIdAsync(connection, transaction, tag.NormalizedValue, cancellationToken)
             ?? throw new InvalidOperationException("The canonical photo tag could not be read after insertion.");
         string? latestAction = await ReadLatestActionAsync(
             connection,
@@ -98,7 +99,7 @@ public sealed class SqlitePhotoTagRepository
         string actor,
         CancellationToken cancellationToken = default)
     {
-        PhotoTagName tag = PhotoTagName.Parse(tagName);
+        PhotoTagPath tag = PhotoTagPath.Parse(tagName);
         string normalizedActor = NormalizeActor(actor);
         string now = _timeProvider.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
 
@@ -106,7 +107,7 @@ public sealed class SqlitePhotoTagRepository
         using SqliteTransaction transaction = connection.BeginTransaction();
         await EnsureRevisionExistsAsync(connection, transaction, revisionId, cancellationToken);
 
-        long? tagId = await ReadTagIdAsync(connection, transaction, tag.NormalizedName, cancellationToken);
+        long? tagId = await ReadTagIdAsync(connection, transaction, tag.NormalizedValue, cancellationToken);
         if (tagId is not null)
         {
             string? latestAction = await ReadLatestActionAsync(
