@@ -18,9 +18,99 @@
     object-fit: contain;
 }
 
+.photo-tag-panel {
+    margin: 0 0 1.5rem;
+}
+
+.photo-tag-empty,
+.photo-tag-help {
+    color: var(--muted);
+}
+
+.photo-tag-empty {
+    margin: 1rem 0 0;
+}
+
+.photo-tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.photo-tag-chip {
+    min-height: 36px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    max-width: 100%;
+    padding: 0.4rem 0.65rem;
+    color: #244944;
+    background: #e3f0eb;
+    border: 1px solid #9bc6bb;
+    border-radius: 999px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.photo-tag-chip span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.photo-tag-chip span:last-child {
+    font-size: 1.05rem;
+    line-height: 1;
+}
+
+.photo-tag-chip:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.photo-tag-notice {
+    margin-top: 1rem;
+}
+
+.photo-tag-label {
+    margin-top: 1rem;
+}
+
+.photo-tag-entry .button {
+    flex: 0 0 auto;
+    min-width: 7rem;
+}
+
+.photo-tag-help {
+    margin: 0.5rem 0 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+}
+
+.collection-inline-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 0.75rem;
+}
+
 @media (max-width: 600px) {
     .photo-viewer-frame {
         min-height: 14rem;
         padding: 0.5rem;
+    }
+
+    .photo-tag-entry,
+    .collection-inline-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .photo-tag-entry .button,
+    .collection-inline-actions .button {
+        width: 100%;
     }
 }
