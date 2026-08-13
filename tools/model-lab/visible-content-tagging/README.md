@@ -19,6 +19,8 @@ The first controlled-vocabulary baseline uses OpenCLIP with:
 
 The baseline deliberately does **not** use a softmax over the vocabulary as a multi-label confidence. Softmax forces labels to compete and makes the value depend on the exact vocabulary. The experiment retains independent cosine scores, then measures threshold behavior against human-labelled samples.
 
+Use `run_experiment.py` as the public entry point. It wraps the experiment core with two safety/canonicalization boundaries: tag labels receive NFKC compatibility normalization, collapsed whitespace, control-character rejection and UTF-16-length enforcement before lower-case identity; and Windows original-image inference refuses files marked offline or recall-on-data-access before any image bytes are opened.
+
 ## Privacy boundary
 
 Keep all real manifests, vocabulary files, model snapshots, detailed score reports and photos under an ignored local directory such as:
@@ -59,13 +61,15 @@ Each sample has:
 
 For the proxy-versus-original comparison, use the same sample IDs and labels; each manifest row refers to both representations of the same immutable photo revision.
 
-Do not hydrate online-only originals merely to fill the comparison. Select a representative subset whose originals are already local, or explicitly hydrate a bounded evaluation subset under the archive storage policy. The experiment must not turn normal semantic tagging into an implicit hydration path.
+Do not hydrate online-only originals merely to fill the comparison. Select a representative subset whose originals are already local, or explicitly hydrate a bounded evaluation subset under the archive storage policy. On Windows, `run_experiment.py` checks `st_file_attributes` before original-image decoding and refuses `FILE_ATTRIBUTE_OFFLINE` or `FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS`; this prevents the experiment from silently turning a placeholder read into OneDrive hydration. If a bounded original is wanted, hydrate it explicitly first and then rerun.
 
 ## Vocabulary
 
 Create `private/visible-content-tagging/vocabulary.json` from `example-vocabulary.json`.
 
-Tags are normalized with the same core semantics needed for canonical identity: repeated whitespace is collapsed and matching is case-insensitive. An entry may provide one or more explicit prompts. If prompts are omitted, the harness uses:
+The public runner mirrors the production `PhotoTagName` shape closely: NFKC normalization, repeated-whitespace collapse, control-character rejection, an 80 UTF-16-code-unit limit and lower-case canonical identity. Production C# remains the final authority for persisted canonical tags; this experiment normalization exists to prevent vocabulary/evaluation drift before production integration.
+
+An entry may provide one or more explicit prompts. If prompts are omitted, the harness uses:
 
 ```text
 a photo of {tag}
@@ -98,7 +102,7 @@ python -m pip install -r requirements.txt
 Prepare the pinned model below an ignored directory:
 
 ```powershell
-python experiment.py prepare-model `
+python run_experiment.py prepare-model `
   --model-dir ../../../private/visible-content-tagging/models/openclip-b32
 ```
 
@@ -107,7 +111,7 @@ The model snapshot is loaded later via OpenCLIP's local-directory loader. That p
 ## Run the paired experiment
 
 ```powershell
-python experiment.py run `
+python run_experiment.py run `
   --model-dir ../../../private/visible-content-tagging/models/openclip-b32 `
   --manifest ../../../private/visible-content-tagging/manifest.json `
   --vocabulary ../../../private/visible-content-tagging/vocabulary.json `
@@ -134,13 +138,13 @@ The preferred production input is the durable review proxy if it preserves usefu
 
 ## Test the harness without model downloads
 
-The score/metric tests use only the Python standard library and do not import OpenCLIP:
+The score/metric and safety tests use only the Python standard library and do not import OpenCLIP:
 
 ```powershell
-python test_experiment.py
+python -m unittest test_experiment.py test_run_experiment.py
 ```
 
-CI runs this lightweight test only. CI must never download the model or access private photos.
+CI runs these lightweight tests only. CI must never download the model or access private photos.
 
 ## What this slice does not decide
 
