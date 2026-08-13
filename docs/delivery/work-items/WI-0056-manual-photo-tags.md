@@ -64,13 +64,13 @@ Automated persistence/API tests plus maintainer verification in the local photo 
 
 ## Planned slices
 
-1. Persistence, migration and API contracts for canonical tags plus auditable manual assignments.
-2. Photo-viewer controls and end-to-end application tests.
-3. Documentation/verification polish and handoff to WI-0049 and WI-0050.
+1. **Implemented** — persistence, migration and API contracts for canonical tags plus auditable manual assignments.
+2. **Implemented** — photo-viewer controls plus hosted-route/Web-contract application coverage.
+3. **Current** — CI/documentation validation and maintainer verification before handoff to WI-0049 and WI-0050.
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work: automatic evidence generation/schema; tag hierarchies/synonyms; bulk tag maintenance
-- Commands run:
+- Files changed: canonical tag value object; SQLite schema v13 and tag repository; tag API endpoints; Web tag contracts; photo-viewer tag controls/styles; integration/application coverage; M19 sequencing and delivery documentation.
+- Trade-offs: tags remain flat and free-form; assignments are revision-bound; removal is an immediate audited action with re-add as the recovery path; automatic evidence storage is intentionally not frozen until WI-0049 establishes complete reproducible pipeline provenance.
+- Deferred work: automatic evidence generation/schema; tag hierarchies/synonyms; tag rename/merge; bulk tag maintenance; tag predicates in smart collections.
+- Commands run: GitHub Actions build/test/documentation/review/package/launcher verification through PR #138; maintainer photo-viewer verification remains required before completion.
