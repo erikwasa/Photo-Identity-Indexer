@@ -147,11 +147,11 @@ work_items:
 - id: WI-0056
   title: Add canonical photo tags and manual tagging
   milestone: M19
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0056-manual-photo-tags.md
   started_at: 2026-08-13
-  last_updated_at: 2026-08-13
+  last_updated_at: 2026-08-14
   branch: agent/WI-0056-manual-photo-tags
   blockers:
   - WI-0042
@@ -160,13 +160,22 @@ work_items:
 - id: WI-0057
   title: Split active and archived work-item registries
   milestone: M00
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0057-work-item-registry-archive.md
   started_at: 2026-08-13
-  last_updated_at: 2026-08-13
+  completed_at: 2026-08-14
+  verified_at: 2026-08-14
+  verified_by: automated
+  last_updated_at: 2026-08-14
   branch: agent/WI-0057-work-item-registry-archive
   blockers:
   - WI-0004
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/140
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31748239801
+  - type: merge_commit
+    value: 31487a9e431b004e91c5f65127f3cc5d213c9042
