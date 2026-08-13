@@ -1,6 +1,6 @@
 ---
 id: WI-0050
-title: Add EXIF metadata and smart collections
+title: Add photo metadata and persistent smart collections
 milestone: M19
 status_source: ../status/work-items.yaml
 depends_on: [WI-0025, WI-0041, WI-0042, WI-0056]
@@ -8,56 +8,56 @@ related_adrs: []
 affected_modules: [PhotoIdentity.Core, PhotoIdentity.Source.Local, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Api, PhotoIdentity.Web]
 ---
 
-# WI-0050: Add EXIF metadata and smart collections
+# WI-0050: Add photo metadata and persistent smart collections
 
 ## Objective
 
-Ingest photographic capture metadata and let the maintainer save reusable collections based on capture time, location, people and canonical photo tags.
+Persist photographic capture metadata and named smart-collection definitions that dynamically query the current catalogue by people, hierarchical tags, location and taken time.
 
-## Why
+Automatic visible-content tagging is on hold. Manual hierarchical tags from WI-0056 are the tag source for this work.
 
-The existing collection engine is identity-oriented and its stored observation timestamp describes catalogue ingestion rather than when the photo was taken. Library use needs photographic time/location semantics, canonical tag predicates and reusable queries. Automatic tagging is intended to supply the normal tag coverage; manual tags exist as fallback/correction when automation needs human intervention.
+## Filter contract
+
+- People: zero or more canonical people, with `all` or `any` matching.
+- Tags: zero or more canonical full tag values, with `all` or `any` matching.
+- Location: optional GPS criteria; coordinate bounds are sufficient initially and reverse geocoding is not required.
+- Taken time: optional inclusive photographic date bounds.
+- Populated dimensions combine with **AND** semantics.
+
+Date input should accept convenient forms including `2016`, `2020-2021` and `2025/05/01-2025/05/10`, then persist normalized explicit start/end dates.
+
+A saved smart collection stores its filter definition, not a copied list of asset IDs. Evaluating it later must include newly ingested photos that now match the same definition.
 
 ## In scope
 
-- Extract and persist EXIF DateTimeOriginal/capture time where available.
-- Treat timezone-less camera timestamps as local photographic wall-clock time rather than inventing UTC precision.
-- Preserve EXIF offset/timezone information separately when the source actually provides it.
-- Extract and persist GPS latitude/longitude when present.
-- Keep metadata associated with immutable asset revisions and source provenance.
-- Extend collection queries and UI to filter by capture date/time and geographic criteria.
-- Persist named smart-collection definitions that reevaluate against the current catalogue rather than copying a fixed list of asset IDs.
-- Combine metadata predicates with existing people predicates.
-- Include predicates over the canonical tag representation established by WI-0056 without hard-coding manual assignments as the primary tag source.
-- Define tag-query semantics around an explicit effective-tag policy: automatic output is the normal source once the production automatic pipeline exists, while explicit manual fallback/correction can take precedence for a conflicting tag without destroying model provenance.
-- Allow manual fallback tags to remain queryable when automatic tagging is unavailable for a particular photo or concept.
-- Define fallback behavior for photos with missing or malformed EXIF.
+- Persist EXIF capture time without inventing UTC for timezone-less camera timestamps; preserve a real source offset separately when present.
+- Persist GPS latitude/longitude when present.
+- Backfill metadata for existing revisions without changing canonical asset/revision identity.
+- Generalize collection queries so people are optional and can combine with tag, GPS and taken-time predicates.
+- Use photographic capture time rather than catalogue observation time for taken-time filters.
+- Persist smart-collection definitions in SQLite with create/list/get/update/delete and query operations.
+- Add UI to create, edit, reopen and evaluate saved collections.
+- Treat missing metadata as a non-match for a populated predicate.
 
 ## Out of scope
 
-- Geocoding coordinates into place names unless separately selected.
-- Treating catalogue observation time as a substitute for missing photographic capture time.
-- Treating manual-only tagging as the intended steady-state tag source for M19.
-- Writing metadata back to original photo files.
+Automatic tagging, reverse geocoding, sidecar/original metadata write-back, static copied membership lists and substituting catalogue observation time for missing capture time.
 
 ## Acceptance criteria
 
-- [ ] Capture timestamps preserve the source's local/offset semantics without false UTC conversion.
-- [ ] GPS metadata is available for collection filtering when present and optional when absent.
-- [ ] Existing assets can have metadata populated without changing canonical asset/revision identity.
-- [ ] Smart collections can be saved, reopened and reevaluated after new matching photos enter the catalogue.
-- [ ] Smart collections can combine people with capture-date/location predicates.
-- [ ] Smart collections can filter on canonical effective tags without assuming manual assignments are the normal source.
-- [ ] Manual fallback/correction tags remain usable when automatic tagging does not provide the needed tag.
-- [ ] Any automatic tag-evidence predicate or effective-tag rule has explicit provenance/threshold/override semantics rather than being conflated with manual intervention.
+- [ ] Capture time and GPS metadata are persisted with correct source semantics.
+- [ ] Saved smart collections can be created, reopened, edited and deleted.
+- [ ] A saved collection reevaluates against the current catalogue and includes newly matching photos automatically.
+- [ ] People, tags, location and taken time work independently and can all be combined in one collection.
+- [ ] People and tags each support explicit `all` and `any` matching.
+- [ ] The three documented date-input examples normalize to correct inclusive bounds.
+- [ ] Tag predicates use WI-0056 hierarchical full values.
+- [ ] Missing data never fabricates a match.
 
-## Verification requirements
+## Planned slices
 
-Automated metadata parsing/query tests using non-private fixtures plus human verification against representative real-camera EXIF, canonical tags and saved collection behavior.
-
-## Completion notes
-
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+1. Capture-time/GPS persistence and backfill.
+2. Combined collection-filter/query contract.
+3. Persisted smart-collection CRUD/query API.
+4. Saved-collection UI.
+5. Maintainer verification.
