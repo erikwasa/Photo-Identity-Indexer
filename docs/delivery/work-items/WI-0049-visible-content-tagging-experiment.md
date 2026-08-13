@@ -12,28 +12,29 @@ affected_modules: [PhotoIdentity.Core, PhotoIdentity.Imaging.OpenCv, PhotoIdenti
 
 ## Objective
 
-Evaluate practical local approaches for producing automatic visible-content tag evidence for whole photos, using the canonical tag representation established by WI-0056, and produce evidence for whether and how automatic tagging should become a production capability.
+Evaluate practical local approaches for producing automatic visible-content tags for whole photos, using the canonical tag representation established by WI-0056, and select the primary production direction for M19.
 
 ## Why
 
-Identity and manual tags alone are not enough for scalable discovery across a large archive. Automatic semantic evidence could enable richer browsing and collections, but model quality, vocabulary behavior, runtime, storage, privacy, packaging and redistribution implications should be measured before committing to an architecture.
+Automatic tagging is the intended normal path for scalable discovery across a large archive. Manual tagging exists as a fallback/correction mechanism when automation is unavailable, misses a useful concept or produces a result the maintainer needs to correct. The automatic approach therefore needs enough quality, repeatability and runtime practicality to carry the normal workload rather than depending on maintainers to label the archive by hand.
 
-Manual assignments are the human-owned source of truth. Automatic output is model evidence with exact provenance and must never overwrite a manual assignment.
+Model quality, vocabulary behavior, runtime, storage, privacy, packaging and redistribution implications should still be measured before committing to a production architecture. Explicit manual interventions must remain separate from model evidence and, in the eventual effective-tag policy, must be able to override a conflicting automatic result for the specific tag without destroying the underlying model evidence.
 
 ## In scope
 
 - Define a small representative private evaluation sample and useful canonical tag vocabulary/activity examples.
-- Reuse maintainer-assigned tags from WI-0056 as evaluation evidence where appropriate without committing private photo content or private labels.
+- Reuse maintainer-assigned fallback/correction tags from WI-0056 as evaluation evidence where appropriate without committing private photo content or private labels.
 - Evaluate one or more local image-semantic approaches without sending private photos to external services.
 - Use controlled-vocabulary image/text similarity as the first integration baseline because it maps directly onto canonical tags and can fit the existing ONNX/C# runtime shape.
 - Compare a purpose-built image tagger when feasible if it offers materially better object/scene/activity coverage at acceptable runtime and packaging cost.
 - Treat generative captioning as optional comparative evidence rather than a required production path.
 - Compare inference from the existing durable review proxy with inference from the original on the same representative sample. Prefer the proxy path if semantic usefulness is materially preserved because it avoids unnecessary archive hydration; otherwise record the bounded-hydration requirement explicitly.
-- Measure practical precision/usefulness, missed concepts, confusing concepts, runtime and storage footprint.
+- Measure practical precision/usefulness, missed concepts, confusing concepts, runtime and storage footprint with the goal of determining whether the approach can be the normal/default tagging path.
 - Record model provenance, licence/redistribution constraints and hardware/runtime requirements.
 - Define automatic-evidence provenance at the complete inference-pipeline level. For controlled-vocabulary scoring this includes at least exact model revision, image preprocessing, tokenizer/text preprocessing, prompt templates and vocabulary/version; model hash plus a scalar score alone is insufficient for reproducibility.
-- Prototype model-produced tag evidence separately from manual assignment history only after the experiment has established the evidence shape that needs to be persisted.
-- Produce a recommendation: reject automatic tagging, continue experimenting, or select an approach for a later production implementation.
+- Determine what effective-tag policy the production integration needs, including confidence/threshold behavior and how explicit manual additions or suppressions should override conflicting automatic output without deleting model evidence.
+- Prototype model-produced tag evidence separately from manual intervention history only after the experiment has established the evidence shape that needs to be persisted.
+- Produce a recommendation that selects the next production implementation boundary. If no candidate is acceptable, document the blocking deficiency and the next bounded experiment rather than treating manual-only tagging as the M19 target state.
 
 ## Candidate families to investigate
 
@@ -45,8 +46,9 @@ Candidate names are an experiment starting point, not a production-model decisio
 
 ## Out of scope
 
-- Requiring a production automatic tagging model to ship from this work item.
-- Replacing or mutating manual tag assignments.
+- Shipping the final production automatic-tagging pipeline directly from this experiment item unless the evidence and implementation boundary are small enough to be explicitly approved.
+- Replacing or mutating manual intervention history.
+- Treating manual fallback tagging as the normal library-tagging workflow.
 - Freezing a production automatic-evidence schema before the experiment establishes the required pipeline provenance and output shape.
 - Building the final smart-collection UI.
 - Uploading the private archive to a third-party vision API.
@@ -60,8 +62,9 @@ Candidate names are an experiment starting point, not a production-model decisio
 - [ ] Review-proxy versus original-image inference is measured on the same sample and the chosen production-input recommendation is recorded.
 - [ ] Quality, runtime and storage findings are recorded without committing private photo content or private tag labels.
 - [ ] Candidate model provenance/licensing, packaging and redistribution constraints are documented.
-- [ ] Any prototype automatic evidence cannot overwrite manual assignments and records enough exact pipeline provenance to reproduce its scores/outputs.
-- [ ] A clear production recommendation and next implementation boundary are recorded.
+- [ ] Any prototype automatic evidence cannot overwrite manual intervention history and records enough exact pipeline provenance to reproduce its scores/outputs.
+- [ ] The recommended effective-tag policy explains how explicit manual fallback/correction actions interact with automatic output.
+- [ ] A clear primary automatic-tagging production direction and next implementation boundary are recorded; if no candidate is acceptable, the blocking reason and next experiment are explicit.
 
 ## Verification requirements
 
