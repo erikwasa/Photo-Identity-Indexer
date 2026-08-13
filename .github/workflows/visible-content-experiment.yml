@@ -22,4 +22,5 @@ jobs:
           python-version: "3.12"
 
       - name: Run model-lab metric tests
-        run: python tools/model-lab/visible-content-tagging/test_experiment.py
+        working-directory: tools/model-lab/visible-content-tagging
+        run: python -m unittest test_experiment.py test_run_experiment.py
