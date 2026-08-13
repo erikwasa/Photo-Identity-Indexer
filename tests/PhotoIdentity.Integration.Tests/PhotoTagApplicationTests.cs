@@ -8,6 +8,7 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Tags;
 using PhotoIdentity.Persistence.Sqlite;
+using WebPhotoTagDefinitionResponse = PhotoIdentity.Web.Contracts.PhotoTagDefinitionResponse;
 using WebPhotoTagMutationRequest = PhotoIdentity.Web.Contracts.PhotoTagMutationRequest;
 using WebPhotoTagResponse = PhotoIdentity.Web.Contracts.PhotoTagResponse;
 using Xunit;
@@ -23,6 +24,20 @@ public sealed class PhotoTagApplicationTests
 
         Assert.Equal("Watching Television", tag.DisplayName);
         Assert.Equal("watching television", tag.NormalizedName);
+        Assert.Throws<ArgumentException>(() => PhotoTagName.Parse("Beach/Day"));
+    }
+
+    [Fact]
+    public void Canonical_tag_path_normalizes_each_hierarchy_segment()
+    {
+        PhotoTagPath tag = PhotoTagPath.Parse("  Places / Sweden  /  Stockholm ");
+
+        Assert.Equal("Places/Sweden/Stockholm", tag.DisplayValue);
+        Assert.Equal("places/sweden/stockholm", tag.NormalizedValue);
+        Assert.Equal("Stockholm", tag.Name.DisplayName);
+        Assert.Equal("Places/Sweden", tag.ParentDisplayValue);
+        Assert.Equal("places/sweden", tag.ParentNormalizedValue);
+        Assert.Throws<ArgumentException>(() => PhotoTagPath.Parse("Places//Stockholm"));
     }
 
     [Fact]
@@ -37,20 +52,35 @@ public sealed class PhotoTagApplicationTests
             await using PhotoTagApiFactory factory = new(databasePath);
             using HttpClient client = factory.CreateClient();
 
-            WebPhotoTagResponse[] firstAdd = await PostTagAsync(client, revisionId, "  Beach/Day  ");
+            WebPhotoTagResponse[] firstAdd = await PostTagAsync(client, revisionId, "  Beach / Day  ");
             Assert.Single(firstAdd);
             Assert.Equal("Beach/Day", firstAdd[0].Name);
+            Assert.Equal("Beach/Day", firstAdd[0].Value);
+            Assert.NotNull(firstAdd[0].ParentId);
+            Assert.Equal("Beach", firstAdd[0].ParentValue);
             Assert.Equal("manual", firstAdd[0].Source);
 
             WebPhotoTagResponse[] secondAdd = await PostTagAsync(client, revisionId, "beach/day");
             Assert.Single(secondAdd);
-            Assert.Equal("Beach/Day", secondAdd[0].Name);
+            Assert.Equal("Beach/Day", secondAdd[0].Value);
+
+            WebPhotoTagDefinitionResponse[] canonical =
+                await client.GetFromJsonAsync<WebPhotoTagDefinitionResponse[]>("/api/tags") ?? [];
+            Assert.Equal(2, canonical.Length);
+            WebPhotoTagDefinitionResponse root = Assert.Single(canonical, tag => tag.Value == "Beach");
+            WebPhotoTagDefinitionResponse leaf = Assert.Single(canonical, tag => tag.Value == "Beach/Day");
+            Assert.Equal("Beach", root.Name);
+            Assert.Null(root.ParentId);
+            Assert.Equal("Day", leaf.Name);
+            Assert.Equal(root.Id, leaf.ParentId);
+            Assert.Equal("Beach", leaf.ParentValue);
+            Assert.Null(leaf.Color);
 
             SqliteCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             await using (SqliteConnection connection = await database.OpenConnectionAsync())
             {
-                Assert.Equal(1, await ReadCountAsync(connection, "SELECT COUNT(*) FROM photo_tags;"));
+                Assert.Equal(2, await ReadCountAsync(connection, "SELECT COUNT(*) FROM photo_tags;"));
                 Assert.Equal(1, await ReadCountAsync(connection, "SELECT COUNT(*) FROM photo_tag_actions;"));
             }
 
@@ -66,7 +96,7 @@ public sealed class PhotoTagApplicationTests
 
             await using (SqliteConnection connection = await database.OpenConnectionAsync())
             {
-                Assert.Equal(1, await ReadCountAsync(connection, "SELECT COUNT(*) FROM photo_tags;"));
+                Assert.Equal(2, await ReadCountAsync(connection, "SELECT COUNT(*) FROM photo_tags;"));
                 Assert.Equal(3, await ReadCountAsync(connection, "SELECT COUNT(*) FROM photo_tag_actions;"));
             }
 
@@ -101,6 +131,7 @@ public sealed class PhotoTagApplicationTests
             WebPhotoTagResponse[] added = await PostTagAsync(client, revisionId, "Family archive");
             Assert.Single(added);
             Assert.Equal("Family archive", added[0].Name);
+            Assert.Equal("Family archive", added[0].Value);
 
             WebPhotoTagResponse[] reloaded = await client.GetFromJsonAsync<WebPhotoTagResponse[]>(
                 $"/api/collections/photos/{revisionId}/tags") ?? [];
@@ -189,11 +220,11 @@ public sealed class PhotoTagApplicationTests
     private static async Task<WebPhotoTagResponse[]> PostTagAsync(
         HttpClient client,
         AssetRevisionId revisionId,
-        string name)
+        string value)
     {
         using HttpResponseMessage response = await client.PostAsJsonAsync(
             $"/api/collections/photos/{revisionId}/tags",
-            new WebPhotoTagMutationRequest(name));
+            new WebPhotoTagMutationRequest(value));
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<WebPhotoTagResponse[]>() ?? [];
     }
