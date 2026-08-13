@@ -6,15 +6,30 @@ using PhotoIdentity.Core.Tags;
 namespace PhotoIdentity.Persistence.Sqlite;
 
 public sealed record CatalogueManualPhotoTag(
-    string NormalizedName,
-    string DisplayName,
+    long TagId,
+    string NormalizedValue,
+    string Value,
+    string Name,
+    long? ParentTagId,
+    string? ParentValue,
+    string? Color,
     string AssignedBy,
     DateTimeOffset AssignedAtUtc);
+
+public sealed record CataloguePhotoTagDefinition(
+    long TagId,
+    string NormalizedValue,
+    string Value,
+    string Name,
+    long? ParentTagId,
+    string? ParentValue,
+    string? Color);
 
 /// <summary>
 /// Stores maintainer-owned photo tags independently from future model-produced tag evidence.
 /// Manual state is derived from append-only add/remove actions for one immutable asset revision.
-/// Canonical tag names are slash-separated hierarchical values compatible with Immich tag paths.
+/// Canonical tag rows form an Immich-compatible slash-separated hierarchy while SQLite remains
+/// Photo Identity's source of truth.
 /// </summary>
 public sealed class SqlitePhotoTagRepository
 {
@@ -29,6 +44,17 @@ public sealed class SqlitePhotoTagRepository
         _timeProvider = timeProvider;
     }
 
+    public async Task<IReadOnlyList<CataloguePhotoTagDefinition>> GetCanonicalTagsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        IReadOnlyList<CanonicalTagRow> rows = await ReadCanonicalTagRowsAsync(connection, cancellationToken);
+        Dictionary<string, CanonicalTagRow> byNormalizedValue = rows.ToDictionary(
+            row => row.NormalizedValue,
+            StringComparer.Ordinal);
+        return rows.Select(row => ToDefinition(row, byNormalizedValue)).ToArray();
+    }
+
     public async Task<IReadOnlyList<CatalogueManualPhotoTag>> GetManualTagsAsync(
         AssetRevisionId revisionId,
         CancellationToken cancellationToken = default)
@@ -40,11 +66,11 @@ public sealed class SqlitePhotoTagRepository
 
     public async Task<IReadOnlyList<CatalogueManualPhotoTag>> AddManualTagAsync(
         AssetRevisionId revisionId,
-        string tagName,
+        string tagValue,
         string actor,
         CancellationToken cancellationToken = default)
     {
-        PhotoTagPath tag = PhotoTagPath.Parse(tagName);
+        PhotoTagPath requestedPath = PhotoTagPath.Parse(tagValue);
         string normalizedActor = NormalizeActor(actor);
         string now = _timeProvider.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
 
@@ -52,28 +78,18 @@ public sealed class SqlitePhotoTagRepository
         using SqliteTransaction transaction = connection.BeginTransaction();
         await EnsureRevisionExistsAsync(connection, transaction, revisionId, cancellationToken);
 
-        using (SqliteCommand insertTag = connection.CreateCommand())
-        {
-            insertTag.Transaction = transaction;
-            insertTag.CommandText = """
-                INSERT OR IGNORE INTO photo_tags (
-                    normalized_name, display_name, created_by, created_at_utc)
-                VALUES ($normalized_name, $display_name, $actor, $created_at_utc);
-                """;
-            insertTag.Parameters.AddWithValue("$normalized_name", tag.NormalizedValue);
-            insertTag.Parameters.AddWithValue("$display_name", tag.DisplayValue);
-            insertTag.Parameters.AddWithValue("$actor", normalizedActor);
-            insertTag.Parameters.AddWithValue("$created_at_utc", now);
-            await insertTag.ExecuteNonQueryAsync(cancellationToken);
-        }
-
-        long tagId = await ReadTagIdAsync(connection, transaction, tag.NormalizedValue, cancellationToken)
-            ?? throw new InvalidOperationException("The canonical photo tag could not be read after insertion.");
+        CanonicalTagRow finalTag = await EnsureCanonicalPathAsync(
+            connection,
+            transaction,
+            requestedPath,
+            normalizedActor,
+            now,
+            cancellationToken);
         string? latestAction = await ReadLatestActionAsync(
             connection,
             transaction,
             revisionId,
-            tagId,
+            finalTag.Id,
             cancellationToken);
 
         if (!string.Equals(latestAction, "add", StringComparison.Ordinal))
@@ -82,7 +98,7 @@ public sealed class SqlitePhotoTagRepository
                 connection,
                 transaction,
                 revisionId,
-                tagId,
+                finalTag.Id,
                 "add",
                 normalizedActor,
                 now,
@@ -95,11 +111,11 @@ public sealed class SqlitePhotoTagRepository
 
     public async Task<IReadOnlyList<CatalogueManualPhotoTag>> RemoveManualTagAsync(
         AssetRevisionId revisionId,
-        string tagName,
+        string tagValue,
         string actor,
         CancellationToken cancellationToken = default)
     {
-        PhotoTagPath tag = PhotoTagPath.Parse(tagName);
+        PhotoTagPath path = PhotoTagPath.Parse(tagValue);
         string normalizedActor = NormalizeActor(actor);
         string now = _timeProvider.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
 
@@ -107,14 +123,18 @@ public sealed class SqlitePhotoTagRepository
         using SqliteTransaction transaction = connection.BeginTransaction();
         await EnsureRevisionExistsAsync(connection, transaction, revisionId, cancellationToken);
 
-        long? tagId = await ReadTagIdAsync(connection, transaction, tag.NormalizedValue, cancellationToken);
-        if (tagId is not null)
+        CanonicalTagRow? tag = await ReadTagRowAsync(
+            connection,
+            transaction,
+            path.NormalizedValue,
+            cancellationToken);
+        if (tag is not null)
         {
             string? latestAction = await ReadLatestActionAsync(
                 connection,
                 transaction,
                 revisionId,
-                tagId.Value,
+                tag.Id,
                 cancellationToken);
             if (string.Equals(latestAction, "add", StringComparison.Ordinal))
             {
@@ -122,7 +142,7 @@ public sealed class SqlitePhotoTagRepository
                     connection,
                     transaction,
                     revisionId,
-                    tagId.Value,
+                    tag.Id,
                     "remove",
                     normalizedActor,
                     now,
@@ -134,11 +154,82 @@ public sealed class SqlitePhotoTagRepository
         return await ReadEffectiveTagsAsync(connection, revisionId, cancellationToken);
     }
 
+    private static async Task<CanonicalTagRow> EnsureCanonicalPathAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        PhotoTagPath requestedPath,
+        string actor,
+        string createdAtUtc,
+        CancellationToken cancellationToken)
+    {
+        CanonicalTagRow? existingFinal = await ReadTagRowAsync(
+            connection,
+            transaction,
+            requestedPath.NormalizedValue,
+            cancellationToken);
+        PhotoTagPath path = existingFinal is null
+            ? requestedPath
+            : PhotoTagPath.Parse(existingFinal.DisplayValue);
+
+        string? normalizedParent = null;
+        string? displayParent = null;
+        CanonicalTagRow? current = null;
+
+        foreach (PhotoTagName segment in path.Segments)
+        {
+            string normalizedValue = normalizedParent is null
+                ? segment.NormalizedName
+                : $"{normalizedParent}{PhotoTagPath.Separator}{segment.NormalizedName}";
+            current = await ReadTagRowAsync(
+                connection,
+                transaction,
+                normalizedValue,
+                cancellationToken);
+
+            if (current is null)
+            {
+                string displayValue = displayParent is null
+                    ? segment.DisplayName
+                    : $"{displayParent}{PhotoTagPath.Separator}{segment.DisplayName}";
+                using SqliteCommand insert = connection.CreateCommand();
+                insert.Transaction = transaction;
+                insert.CommandText = """
+                    INSERT INTO photo_tags (
+                        normalized_name, display_name, created_by, created_at_utc)
+                    VALUES ($normalized_name, $display_name, $actor, $created_at_utc);
+                    """;
+                insert.Parameters.AddWithValue("$normalized_name", normalizedValue);
+                insert.Parameters.AddWithValue("$display_name", displayValue);
+                insert.Parameters.AddWithValue("$actor", actor);
+                insert.Parameters.AddWithValue("$created_at_utc", createdAtUtc);
+                await insert.ExecuteNonQueryAsync(cancellationToken);
+                current = await ReadTagRowAsync(
+                    connection,
+                    transaction,
+                    normalizedValue,
+                    cancellationToken)
+                    ?? throw new InvalidOperationException("The canonical photo tag could not be read after insertion.");
+            }
+
+            normalizedParent = current.NormalizedValue;
+            displayParent = current.DisplayValue;
+        }
+
+        return current ?? throw new InvalidOperationException("The canonical photo tag path was empty.");
+    }
+
     private static async Task<IReadOnlyList<CatalogueManualPhotoTag>> ReadEffectiveTagsAsync(
         SqliteConnection connection,
         AssetRevisionId revisionId,
         CancellationToken cancellationToken)
     {
+        IReadOnlyList<CanonicalTagRow> canonicalRows = await ReadCanonicalTagRowsAsync(
+            connection,
+            cancellationToken);
+        Dictionary<string, CanonicalTagRow> byNormalizedValue = canonicalRows.ToDictionary(
+            row => row.NormalizedValue,
+            StringComparer.Ordinal);
+
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             WITH latest_actions AS (
@@ -151,6 +242,7 @@ public sealed class SqlitePhotoTagRepository
                 WHERE asset_revision_id = $revision_id
             )
             SELECT
+                photo_tags.id,
                 photo_tags.normalized_name,
                 photo_tags.display_name,
                 latest_actions.actor,
@@ -167,14 +259,82 @@ public sealed class SqlitePhotoTagRepository
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
+            long id = reader.GetInt64(0);
+            string normalizedValue = reader.GetString(1);
+            string displayValue = reader.GetString(2);
+            CanonicalTagRow? parent = Parent(normalizedValue, byNormalizedValue);
             tags.Add(new CatalogueManualPhotoTag(
-                reader.GetString(0),
-                reader.GetString(1),
-                reader.GetString(2),
-                DateTimeOffset.Parse(reader.GetString(3), CultureInfo.InvariantCulture)));
+                id,
+                normalizedValue,
+                displayValue,
+                LeafName(displayValue),
+                parent?.Id,
+                parent?.DisplayValue,
+                Color: null,
+                reader.GetString(3),
+                DateTimeOffset.Parse(reader.GetString(4), CultureInfo.InvariantCulture)));
         }
 
         return tags;
+    }
+
+    private static async Task<IReadOnlyList<CanonicalTagRow>> ReadCanonicalTagRowsAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT id, normalized_name, display_name
+            FROM photo_tags
+            ORDER BY display_name COLLATE NOCASE, normalized_name;
+            """;
+        List<CanonicalTagRow> rows = [];
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new CanonicalTagRow(
+                reader.GetInt64(0),
+                reader.GetString(1),
+                reader.GetString(2)));
+        }
+
+        return rows;
+    }
+
+    private static CataloguePhotoTagDefinition ToDefinition(
+        CanonicalTagRow row,
+        IReadOnlyDictionary<string, CanonicalTagRow> byNormalizedValue)
+    {
+        CanonicalTagRow? parent = Parent(row.NormalizedValue, byNormalizedValue);
+        return new CataloguePhotoTagDefinition(
+            row.Id,
+            row.NormalizedValue,
+            row.DisplayValue,
+            LeafName(row.DisplayValue),
+            parent?.Id,
+            parent?.DisplayValue,
+            Color: null);
+    }
+
+    private static CanonicalTagRow? Parent(
+        string normalizedValue,
+        IReadOnlyDictionary<string, CanonicalTagRow> byNormalizedValue)
+    {
+        int separator = normalizedValue.LastIndexOf(PhotoTagPath.Separator);
+        if (separator < 0)
+        {
+            return null;
+        }
+
+        return byNormalizedValue.TryGetValue(normalizedValue[..separator], out CanonicalTagRow? parent)
+            ? parent
+            : null;
+    }
+
+    private static string LeafName(string displayValue)
+    {
+        int separator = displayValue.LastIndexOf(PhotoTagPath.Separator);
+        return separator < 0 ? displayValue : displayValue[(separator + 1)..];
     }
 
     private static async Task EnsureRevisionExistsAsync(
@@ -194,18 +354,30 @@ public sealed class SqlitePhotoTagRepository
         }
     }
 
-    private static async Task<long?> ReadTagIdAsync(
+    private static async Task<CanonicalTagRow?> ReadTagRowAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
-        string normalizedName,
+        string normalizedValue,
         CancellationToken cancellationToken)
     {
         using SqliteCommand command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = "SELECT id FROM photo_tags WHERE normalized_name = $normalized_name;";
-        command.Parameters.AddWithValue("$normalized_name", normalizedName);
-        object? value = await command.ExecuteScalarAsync(cancellationToken);
-        return value is null or DBNull ? null : Convert.ToInt64(value, CultureInfo.InvariantCulture);
+        command.CommandText = """
+            SELECT id, normalized_name, display_name
+            FROM photo_tags
+            WHERE normalized_name = $normalized_name;
+            """;
+        command.Parameters.AddWithValue("$normalized_name", normalizedValue);
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new CanonicalTagRow(
+            reader.GetInt64(0),
+            reader.GetString(1),
+            reader.GetString(2));
     }
 
     private static async Task<string?> ReadLatestActionAsync(
@@ -265,4 +437,6 @@ public sealed class SqlitePhotoTagRepository
 
         return normalized;
     }
+
+    private sealed record CanonicalTagRow(long Id, string NormalizedValue, string DisplayValue);
 }
