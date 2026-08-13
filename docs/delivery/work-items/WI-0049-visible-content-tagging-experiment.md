@@ -36,6 +36,16 @@ Model quality, vocabulary behavior, runtime, storage, privacy, packaging and red
 - Prototype model-produced tag evidence separately from manual intervention history only after the experiment has established the evidence shape that needs to be persisted.
 - Produce a recommendation that selects the next production implementation boundary. If no candidate is acceptable, document the blocking deficiency and the next bounded experiment rather than treating manual-only tagging as the M19 target state.
 
+## Active first slice: controlled-vocabulary OpenCLIP baseline
+
+The first implemented experiment slice uses `open_clip_torch` 3.3.0 with `laion/CLIP-ViT-B-32-laion2B-s34B-b79K`. The model preparation command resolves pinned Hub revision `1a25a44` to its full immutable commit, downloads only the OpenCLIP configuration/tokenizer files and safetensors checkpoint, and records checkpoint/configuration SHA-256 hashes before local inference.
+
+The harness lives below `tools/model-lab/visible-content-tagging/` and deliberately keeps real manifests, vocabulary choices, model files and detailed reports out of Git. It records a path-free manifest digest, vocabulary/prompt digest, exact runtime package versions, independent normalized image/text cosine scores, proxy-threshold precision/recall/F1 sweeps, original-image metrics at the proxy-selected threshold, runtime and paired proxy/original agreement.
+
+A vocabulary softmax is not treated as a multi-label confidence because its values depend on which other vocabulary entries participate. The baseline instead retains independent cosine scores and uses threshold sweeps as experiment evidence. The current threshold-selection rule (proxy micro F1, then precision, then higher threshold) is an experiment rule only; it does not become production policy without held-out private validation.
+
+This slice does not hydrate originals automatically. The paired comparison should use already-local originals or an explicitly bounded evaluation subset under the existing archive storage policy.
+
 ## Candidate families to investigate
 
 - CLIP/OpenCLIP-style image/text similarity for a bounded canonical vocabulary and activity phrases.
@@ -70,9 +80,15 @@ Candidate names are an experiment starting point, not a production-model decisio
 
 Automated smoke tests for any prototype pipeline plus maintainer review of privacy-safe aggregate experiment results on private photos.
 
+## Planned slices
+
+1. **Current** — reproducible controlled-vocabulary OpenCLIP baseline, path-safe private manifest/vocabulary contracts, score/threshold metrics and proxy-versus-original comparison output.
+2. Run the first representative private sample and record privacy-safe aggregate findings plus operational input recommendation.
+3. If needed, compare the next bounded candidate (purpose-built tagger first; captioning only when justified), then select the production implementation boundary and effective-tag/manual-override policy.
+
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work: production automatic tag generation and collection integration unless explicitly selected as part of follow-on work
-- Commands run:
+- Files changed: first model-lab controlled-vocabulary experiment harness, synthetic manifest/vocabulary examples, model/runtime provenance capture and lightweight metric tests.
+- Trade-offs: Python is isolated to the model experiment because OpenCLIP is native there; no Python dependency is introduced into the production application. Independent cosine scores are retained rather than vocabulary softmax probabilities. Model files and private sample details remain local.
+- Deferred work: private experiment run and evidence; candidate comparison if required; production automatic evidence schema/generation; final threshold/effective-tag/manual-override policy; smart-collection integration.
+- Commands run: lightweight Python metric tests were exercised locally without model downloads; normal repository CI remains required for the branch.
