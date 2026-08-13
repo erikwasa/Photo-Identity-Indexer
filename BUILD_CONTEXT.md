@@ -6,42 +6,42 @@ Formal work-item lifecycle status and evidence live in `docs/delivery/status/wor
 
 ## Current focus
 
-**WI-0056 — Add canonical photo tags and manual tagging** is the current verification boundary for M19.
+**WI-0049 — Experiment with visible-content image tagging** is the active implementation boundary for M19.
 
-PR #138 implements the canonical tag representation and manual fallback/correction path end to end: canonical case-insensitive tag identity, revision-bound append-only add/remove history, revision-scoped API endpoints, Web contracts, photo-viewer controls and application/integration coverage. This manual capability is not the intended normal tagging workflow. Automatic visible-content tagging is the primary M19 path; WI-0056 is implemented first so the automatic pipeline has a stable canonical vocabulary and a safe human recovery mechanism.
+PR #138 / WI-0056 is merged and its full automated workflow passed. Human real-archive verification of the manual fallback/correction controls is intentionally deferred by the maintainer, so WI-0056 must remain `in_review` rather than being treated as completed. That deferred UI verification does not block the automatic-tagging experiment because the canonical tag/API boundary is merged.
 
-Manual persistence intentionally contains no model score/confidence schema. WI-0049 must establish the complete automatic inference-pipeline provenance, output shape, threshold/effective-tag policy and manual-override requirements before automatic evidence persistence is frozen.
+Automatic visible-content tagging is the intended normal/default M19 path. Manual tagging is only the fallback/correction mechanism. The first WI-0049 slice therefore establishes a reproducible controlled-vocabulary OpenCLIP experiment rather than extending manual tagging.
+
+The isolated harness below `tools/model-lab/visible-content-tagging/` pins OpenCLIP 3.3.0 and a specific LAION ViT-B/32 model revision, records resolved model/checkpoint/configuration provenance, keeps real manifests/vocabularies/model files/reports private, evaluates independent cosine scores over threshold sweeps and compares durable review proxies against the same photos' originals. It deliberately does not use vocabulary softmax as multi-label confidence and does not persist model evidence into the production catalogue yet.
 
 ## Next concrete step
 
-Complete CI and maintainer verification for WI-0056, then start WI-0049 as the primary automatic-tagging investigation:
+Run the first representative private experiment before selecting any production automatic-evidence schema:
 
-1. Open representative photos through `/photo/{RevisionId}` and confirm existing manual fallback tags load without changing original availability.
-2. Add a fallback/correction tag, reload the page and confirm it persists with stable display spelling; adding the same tag with different casing/whitespace must not create a duplicate.
-3. Remove and re-add a tag, including a representative free-form name containing `/`, and confirm the interaction remains clear on desktop and Pixel-sized layouts.
-4. On an online-only original, confirm manual tag add/remove does not request hydration and does not modify the source file.
-5. If verification passes, record evidence and complete WI-0056.
-6. Start WI-0049 with automatic tagging explicitly treated as the normal/default path. Compare review-proxy versus original input and determine the production model/evidence/threshold/override boundary. If the first candidates are unacceptable, record the blocker and next bounded experiment rather than treating manual-only tagging as the M19 target state.
+1. Create a private canonical vocabulary with a mix of object, scene/place, activity/event, absent and deliberately confusable concepts.
+2. Select a bounded representative sample with durable review proxies and human-labelled expected tags. Include paired originals that are already local, or use an explicitly bounded hydration subset; do not implicitly hydrate online-only originals for normal tagging.
+3. Prepare the pinned public model snapshot with `experiment.py prepare-model` and run the proxy/original comparison locally.
+4. Review privacy-safe aggregate precision/recall/F1, runtime and proxy/original agreement. Keep sample-level labels/scores private.
+5. If controlled-vocabulary quality is promising, define the held-out validation and effective-tag/manual-override policy needed for a production follow-on. If it is weak, compare the next bounded purpose-built tagger before considering captioning.
+6. Record the selected production direction or explicit blocker/next experiment. Manual-only tagging is not an acceptable automatic-tagging completion state.
 
 ## Relevant files
 
-- `docs/delivery/work-items/WI-0056-manual-photo-tags.md`
-- `docs/delivery/milestones/M19-library-intelligence.md`
 - `docs/delivery/work-items/WI-0049-visible-content-tagging-experiment.md`
-- `docs/delivery/work-items/WI-0050-exif-smart-collections.md`
-- `src/PhotoIdentity.Core/Tags/PhotoTagName.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoTagRepository.cs`
-- `src/PhotoIdentity.Api/PhotoTagEndpoints.cs`
-- `src/PhotoIdentity.Web/PhotoTagContracts.cs`
-- `src/PhotoIdentity.Web/Pages/Photo.razor`
-- `tests/PhotoIdentity.Integration.Tests/PhotoTagApplicationTests.cs`
+- `docs/delivery/milestones/M19-library-intelligence.md`
+- `tools/model-lab/visible-content-tagging/README.md`
+- `tools/model-lab/visible-content-tagging/experiment.py`
+- `tools/model-lab/visible-content-tagging/test_experiment.py`
+- `tools/model-lab/visible-content-tagging/example-manifest.json`
+- `tools/model-lab/visible-content-tagging/example-vocabulary.json`
+- `docs/delivery/work-items/WI-0056-manual-photo-tags.md`
 
 ## Repository validation
 
 ```powershell
 ./build.ps1
 ./test.ps1
+python tools/model-lab/visible-content-tagging/test_experiment.py
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
-./verify-review.ps1 -Mode Smoke -Configuration Release
 ```
