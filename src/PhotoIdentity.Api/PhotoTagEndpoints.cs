@@ -1,3 +1,4 @@
+using System.Globalization;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Persistence.Sqlite;
 
@@ -9,6 +10,15 @@ public static class PhotoTagEndpoints
 
     public static IEndpointRouteBuilder MapPhotoTagEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet(
+            "/api/tags",
+            async (SqlitePhotoTagRepository repository, CancellationToken cancellationToken) =>
+            {
+                IReadOnlyList<CataloguePhotoTagDefinition> tags =
+                    await repository.GetCanonicalTagsAsync(cancellationToken);
+                return Results.Ok(tags.Select(ToResponse).ToArray());
+            });
+
         endpoints.MapGet(
             "/api/collections/photos/{revisionId}/tags",
             async (string revisionId, SqlitePhotoTagRepository repository, CancellationToken cancellationToken) =>
@@ -43,7 +53,7 @@ public static class PhotoTagEndpoints
                 {
                     IReadOnlyList<CatalogueManualPhotoTag> tags = await repository.AddManualTagAsync(
                         parsedRevisionId,
-                        request.Name,
+                        request.Value,
                         LocalMaintainerActor,
                         cancellationToken);
                     return Results.Ok(ToResponse(tags));
@@ -60,7 +70,7 @@ public static class PhotoTagEndpoints
 
         endpoints.MapDelete(
             "/api/collections/photos/{revisionId}/tags",
-            async (string revisionId, string name, SqlitePhotoTagRepository repository, CancellationToken cancellationToken) =>
+            async (string revisionId, string value, SqlitePhotoTagRepository repository, CancellationToken cancellationToken) =>
             {
                 if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
                 {
@@ -71,7 +81,7 @@ public static class PhotoTagEndpoints
                 {
                     IReadOnlyList<CatalogueManualPhotoTag> tags = await repository.RemoveManualTagAsync(
                         parsedRevisionId,
-                        name,
+                        value,
                         LocalMaintainerActor,
                         cancellationToken);
                     return Results.Ok(ToResponse(tags));
@@ -91,11 +101,24 @@ public static class PhotoTagEndpoints
 
     private static PhotoTagResponse[] ToResponse(IReadOnlyList<CatalogueManualPhotoTag> tags) =>
         tags.Select(tag => new PhotoTagResponse(
-                tag.DisplayName,
+                tag.TagId.ToString(CultureInfo.InvariantCulture),
+                tag.Name,
+                tag.Value,
+                tag.ParentTagId?.ToString(CultureInfo.InvariantCulture),
+                tag.ParentValue,
+                tag.Color,
                 "manual",
                 tag.AssignedBy,
                 tag.AssignedAtUtc))
             .ToArray();
+
+    private static PhotoTagDefinitionResponse ToResponse(CataloguePhotoTagDefinition tag) => new(
+        tag.TagId.ToString(CultureInfo.InvariantCulture),
+        tag.Name,
+        tag.Value,
+        tag.ParentTagId?.ToString(CultureInfo.InvariantCulture),
+        tag.ParentValue,
+        tag.Color);
 
     private static bool TryParseRevisionId(string value, out AssetRevisionId revisionId)
     {
@@ -110,10 +133,23 @@ public static class PhotoTagEndpoints
     }
 }
 
-public sealed record PhotoTagMutationRequest(string Name);
+public sealed record PhotoTagMutationRequest(string Value);
+
+public sealed record PhotoTagDefinitionResponse(
+    string Id,
+    string Name,
+    string Value,
+    string? ParentId,
+    string? ParentValue,
+    string? Color);
 
 public sealed record PhotoTagResponse(
+    string Id,
     string Name,
+    string Value,
+    string? ParentId,
+    string? ParentValue,
+    string? Color,
     string Source,
     string AssignedBy,
     DateTimeOffset AssignedAtUtc);
