@@ -12,15 +12,15 @@ PR #138 / WI-0056 is merged and its full automated workflow passed. Human real-a
 
 Automatic visible-content tagging is the intended normal/default M19 path. Manual tagging is only the fallback/correction mechanism. The first WI-0049 slice therefore establishes a reproducible controlled-vocabulary OpenCLIP experiment rather than extending manual tagging.
 
-The isolated harness below `tools/model-lab/visible-content-tagging/` pins OpenCLIP 3.3.0 and a specific LAION ViT-B/32 model revision, records resolved model/checkpoint/configuration provenance, keeps real manifests/vocabularies/model files/reports private, evaluates independent cosine scores over threshold sweeps and compares durable review proxies against the same photos' originals. It deliberately does not use vocabulary softmax as multi-label confidence and does not persist model evidence into the production catalogue yet.
+The isolated harness below `tools/model-lab/visible-content-tagging/` pins OpenCLIP 3.3.0 and a specific LAION ViT-B/32 model revision, records resolved model/checkpoint/configuration provenance, keeps real manifests/vocabularies/model files/reports private, evaluates independent cosine scores over threshold sweeps and compares durable review proxies against the same photos' originals. `run_experiment.py` is the public entry point: it mirrors the production tag-normalization shape closely and refuses Windows originals marked offline or recall-on-data-access before opening image bytes. The slice deliberately does not use vocabulary softmax as multi-label confidence and does not persist model evidence into the production catalogue yet.
 
 ## Next concrete step
 
 Run the first representative private experiment before selecting any production automatic-evidence schema:
 
 1. Create a private canonical vocabulary with a mix of object, scene/place, activity/event, absent and deliberately confusable concepts.
-2. Select a bounded representative sample with durable review proxies and human-labelled expected tags. Include paired originals that are already local, or use an explicitly bounded hydration subset; do not implicitly hydrate online-only originals for normal tagging.
-3. Prepare the pinned public model snapshot with `experiment.py prepare-model` and run the proxy/original comparison locally.
+2. Select a bounded representative sample with durable review proxies and human-labelled expected tags. Include paired originals that are already local, or use an explicitly bounded hydration subset. The public runner rejects Windows offline/recall-on-data-access originals so comparison cannot silently hydrate a placeholder.
+3. Prepare the pinned public model snapshot with `run_experiment.py prepare-model` and run the proxy/original comparison locally.
 4. Review privacy-safe aggregate precision/recall/F1, runtime and proxy/original agreement. Keep sample-level labels/scores private.
 5. If controlled-vocabulary quality is promising, define the held-out validation and effective-tag/manual-override policy needed for a production follow-on. If it is weak, compare the next bounded purpose-built tagger before considering captioning.
 6. Record the selected production direction or explicit blocker/next experiment. Manual-only tagging is not an acceptable automatic-tagging completion state.
@@ -30,8 +30,10 @@ Run the first representative private experiment before selecting any production 
 - `docs/delivery/work-items/WI-0049-visible-content-tagging-experiment.md`
 - `docs/delivery/milestones/M19-library-intelligence.md`
 - `tools/model-lab/visible-content-tagging/README.md`
+- `tools/model-lab/visible-content-tagging/run_experiment.py`
 - `tools/model-lab/visible-content-tagging/experiment.py`
 - `tools/model-lab/visible-content-tagging/test_experiment.py`
+- `tools/model-lab/visible-content-tagging/test_run_experiment.py`
 - `tools/model-lab/visible-content-tagging/example-manifest.json`
 - `tools/model-lab/visible-content-tagging/example-vocabulary.json`
 - `docs/delivery/work-items/WI-0056-manual-photo-tags.md`
@@ -41,7 +43,9 @@ Run the first representative private experiment before selecting any production 
 ```powershell
 ./build.ps1
 ./test.ps1
-python tools/model-lab/visible-content-tagging/test_experiment.py
+cd tools/model-lab/visible-content-tagging
+python -m unittest test_experiment.py test_run_experiment.py
+cd ../../..
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
 ```
