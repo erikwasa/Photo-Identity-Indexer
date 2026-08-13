@@ -1,0 +1,25 @@
+name: visible-content-experiment
+
+on:
+  pull_request:
+    paths:
+      - "tools/model-lab/visible-content-tagging/**"
+      - ".github/workflows/visible-content-experiment.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  metric-tests:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run model-lab metric tests
+        run: python tools/model-lab/visible-content-tagging/test_experiment.py
