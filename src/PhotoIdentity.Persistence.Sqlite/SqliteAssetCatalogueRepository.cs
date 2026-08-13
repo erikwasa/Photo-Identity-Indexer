@@ -6,6 +6,14 @@ using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
+public sealed record PhotoMetadataBackfillCandidate(
+    AssetRevisionId RevisionId,
+    Sha256Digest ContentHash,
+    long SizeBytes,
+    string RootLocator,
+    string SourceKey,
+    string? MediaType);
+
 /// <summary>
 /// Stores source, asset and immutable revision records used by local catalogue scans.
 /// </summary>
@@ -146,6 +154,55 @@ public sealed class SqliteAssetCatalogueRepository
         command.Parameters.AddWithValue("$longitude", metadata.Longitude is null ? DBNull.Value : metadata.Longitude.Value);
         command.Parameters.AddWithValue("$extracted_at_utc", Format(extractedAtUtc));
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PhotoMetadataBackfillCandidate>> GetPhotoMetadataBackfillCandidatesAsync(
+        int limit = 250,
+        CancellationToken cancellationToken = default)
+    {
+        if (limit is < 1 or > 5000)
+        {
+            throw new ArgumentOutOfRangeException(nameof(limit), "Metadata backfill batch size must be between 1 and 5000.");
+        }
+
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await EnsurePhotoMetadataSchemaAsync(connection, cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT
+                asset_revisions.id,
+                asset_revisions.content_sha256,
+                asset_revisions.size_bytes,
+                sources.root_locator,
+                assets.source_key,
+                asset_revisions.media_type
+            FROM asset_revisions
+            INNER JOIN assets ON assets.id = asset_revisions.asset_id
+            INNER JOIN sources ON sources.id = assets.source_id
+            LEFT JOIN photo_capture_metadata
+                ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+            WHERE photo_capture_metadata.asset_revision_id IS NULL
+              AND assets.deleted_at_utc IS NULL
+              AND sources.kind = 'local-folder'
+            ORDER BY asset_revisions.observed_at_utc, asset_revisions.id
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", limit);
+
+        List<PhotoMetadataBackfillCandidate> candidates = [];
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            candidates.Add(new PhotoMetadataBackfillCandidate(
+                AssetRevisionId.From(Guid.Parse(reader.GetString(0))),
+                new Sha256Digest(reader.GetString(1)),
+                reader.GetInt64(2),
+                reader.GetString(3),
+                reader.GetString(4),
+                reader.IsDBNull(5) ? null : reader.GetString(5)));
+        }
+
+        return candidates;
     }
 
     private static async Task EnsurePhotoMetadataSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken)
