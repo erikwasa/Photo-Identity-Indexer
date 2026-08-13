@@ -7,8 +7,19 @@ public sealed record RepositoryPaths(
     string Roadmap)
 {
     public string StatusDirectory => Path.GetDirectoryName(WorkItemsRegistry)!;
+    public string WorkItemsArchiveDirectory => Path.Combine(StatusDirectory, "archive");
     public string WorkItemsDirectory => Path.GetFullPath(Path.Combine(StatusDirectory, "../work-items"));
     public string MilestonesDirectory => Path.GetFullPath(Path.Combine(StatusDirectory, "../milestones"));
+
+    public IReadOnlyList<string> ArchivedWorkItemRegistries =>
+        Directory.Exists(WorkItemsArchiveDirectory)
+            ? Directory.EnumerateFiles(
+                    WorkItemsArchiveDirectory,
+                    "work-items-*.yaml",
+                    SearchOption.TopDirectoryOnly)
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToList()
+            : [];
 
     public static RepositoryPaths Discover(string? startPath = null)
     {

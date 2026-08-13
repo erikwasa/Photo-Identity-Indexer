@@ -1,0 +1,1313 @@
+schema_version: 1
+allowed_statuses:
+- proposed
+- ready
+- in_progress
+- blocked
+- in_review
+- completed
+- cancelled
+work_items:
+- id: WI-0001
+  title: Establish living documentation
+  milestone: M00
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0001-living-documentation.md
+  started_at: 2026-07-24
+  completed_at: 2026-07-24
+  verified_at: 2026-07-24
+  verified_by: human
+  last_updated_at: 2026-07-24
+  branch: agent/living-documentation
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/1
+  - type: merge_commit
+    value: f342e76b94b5e643d353c852d55cd08907f159f7
+- id: WI-0002
+  title: Create solution skeleton
+  milestone: M00
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0002-solution-skeleton.md
+  started_at: 2026-07-24
+  completed_at: 2026-07-24
+  verified_at: 2026-07-24
+  verified_by: human
+  last_updated_at: 2026-07-24
+  branch: agent/WI-0002-solution-skeleton
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/2
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30129316996
+  - type: merge_commit
+    value: 0fedd16f131396ec05a175714736346f6cec23a8
+- id: WI-0003
+  title: Define core identifiers and contracts
+  milestone: M00
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0003-core-types.md
+  started_at: 2026-07-24
+  completed_at: 2026-07-25
+  verified_at: 2026-07-25
+  verified_by: human
+  last_updated_at: 2026-07-25
+  branch: agent/WI-0003-core-contracts
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/3
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30131013371
+  - type: merge_commit
+    value: 93d58f0de6afbcbcc32fc265a7c1ca79e0941ed6
+- id: WI-0004
+  title: Add documentation status tooling
+  milestone: M00
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0004-docs-tooling.md
+  started_at: 2026-07-25
+  completed_at: 2026-07-25
+  verified_at: 2026-07-25
+  verified_by: human
+  last_updated_at: 2026-07-25
+  branch: agent/living-documentation
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/4
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30132402177
+  - type: merge_commit
+    value: 46b4a549cd8ad23def2a321c0cdc55b1bb7611da
+- id: WI-0005
+  title: Add model installation and verification
+  milestone: M01
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0005-model-installation.md
+  started_at: 2026-07-25
+  completed_at: 2026-07-25
+  verified_at: 2026-07-25
+  verified_by: human
+  last_updated_at: 2026-07-25
+  branch: agent/WI-0005-model-installation
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/5
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30137525511
+  - type: merge_commit
+    value: 07fdaed57bcf0a3370beda42fc0fec62d331ab76
+- id: WI-0006
+  title: Implement image decoding
+  milestone: M01
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0006-image-decoder.md
+  started_at: 2026-07-25
+  completed_at: 2026-07-25
+  verified_at: 2026-07-25
+  verified_by: human
+  last_updated_at: 2026-07-25
+  branch: agent/WI-0006-image-decoding
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/6
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30150930457
+  - type: merge_commit
+    value: d85c098474e621769569f7110e34e164570c23c1
+- id: WI-0007
+  title: Implement YuNet detection
+  milestone: M01
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0007-yunet.md
+  started_at: 2026-07-25
+  completed_at: 2026-07-25
+  verified_at: 2026-07-25
+  verified_by: human
+  last_updated_at: 2026-07-25
+  branch: agent/WI-0007-yunet
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/12
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/13
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30164251213
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30166209245
+  - type: merge_commit
+    value: d48d02d8610f58211749e096a9114916112d9880
+  - type: merge_commit
+    value: 03c2d95a7e41d2932df45a31ed5c57071a35967d
+- id: WI-0008
+  title: Implement face crops and alignment
+  milestone: M01
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0008-alignment.md
+  started_at: 2026-07-25
+  completed_at: 2026-07-25
+  verified_at: 2026-07-25
+  verified_by: human
+  last_updated_at: 2026-07-25
+  branch: agent/WI-0008-face-alignment
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/14
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30167234799
+  - type: merge_commit
+    value: 65b6ffc28212c403b2f98df6bc8cdef70fa3d492
+- id: WI-0009
+  title: Implement SFace embeddings
+  milestone: M01
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0009-sface.md
+  started_at: 2026-07-25
+  completed_at: 2026-07-25
+  verified_at: 2026-07-25
+  verified_by: human
+  last_updated_at: 2026-07-25
+  branch: agent/WI-0009-sface-embeddings
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/15
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30168578069
+  - type: merge_commit
+    value: 19b36537368304f4b7c11bd330f6e6089338eca6
+- id: WI-0010
+  title: Build photoid inspect command
+  milestone: M01
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0010-inspect-command.md
+  started_at: 2026-07-25
+  completed_at: 2026-07-25
+  verified_at: 2026-07-25
+  verified_by: human
+  last_updated_at: 2026-07-25
+  branch: agent/WI-0010-inspect-command
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/16
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30169777119
+  - type: merge_commit
+    value: 4afa704dd6032cefcae598f544d3166c1107692e
+- id: WI-0011
+  title: Add SQLite persistence
+  milestone: M02
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0011-sqlite.md
+  started_at: 2026-07-25
+  completed_at: 2026-07-26
+  verified_at: 2026-07-26
+  verified_by: human
+  last_updated_at: 2026-07-26
+  branch: agent/WI-0011-operational-policy
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/17
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30173090694
+  - type: merge_commit
+    value: d1fa036ea256f8d5c9f8133ab184747908f0d64e
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/18
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30173892338
+  - type: merge_commit
+    value: 2de0194b0835a8c9b8d13f08b6fa5311e855f889
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/19
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30174420996
+  - type: merge_commit
+    value: 382011588f7055d783a0eae4d567f4bbc0adc0c9
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/20
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30176173088
+  - type: merge_commit
+    value: e4c2d1311a18b53b1492523789385b65edc9a7fc
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/21
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30176700097
+  - type: merge_commit
+    value: 9a3ca9f869b1ae1ae6c09fa4f49130bfd8a832c6
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/22
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30178418550
+  - type: merge_commit
+    value: 35814a403d7d53d38105daa0cc4c1a2c616fbacf
+- id: WI-0012
+  title: Add local folder scanning
+  milestone: M02
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0012-local-scanner.md
+  started_at: 2026-07-26
+  completed_at: 2026-07-26
+  verified_at: 2026-07-26
+  verified_by: human
+  last_updated_at: 2026-07-26
+  branch: agent/WI-0012-local-folder-scanning
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/23
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30179785787
+  - type: merge_commit
+    value: 5ac2b8263a7b0d82b7a3e23d9dfb676733cc702a
+- id: WI-0013
+  title: Add resumable batch processing
+  milestone: M02
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0013-resumable-processing.md
+  started_at: 2026-07-26
+  completed_at: 2026-07-26
+  verified_at: 2026-07-26
+  verified_by: human
+  last_updated_at: 2026-07-26
+  branch: agent/WI-0013-local-batch-inspection
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/24
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30181221035
+  - type: merge_commit
+    value: d87d1604fe1d958f8bcf5fb023f9dadd14786cb8
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/25
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30182282923
+  - type: merge_commit
+    value: b7527275168ebc351ba4066e7c00a589ea0d03b6
+- id: WI-0014
+  title: Add OneDrive availability and staging
+  milestone: M03
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0014-onedrive-staging.md
+  started_at: 2026-07-26
+  completed_at: 2026-07-26
+  verified_at: 2026-07-26
+  verified_by: human
+  last_updated_at: 2026-07-26
+  branch: agent/WI-0014-onedrive-staging
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/26
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30185278984
+  - type: merge_commit
+    value: b5d2a1ce24629df9fdb516eea12a69534fe257d5
+- id: WI-0015
+  title: Build minimal review application
+  milestone: M04
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0015-review-ui.md
+  started_at: 2026-07-26
+  completed_at: 2026-07-27
+  verified_at: 2026-07-27
+  verified_by: human
+  last_updated_at: 2026-07-27
+  branch: agent/WI-0015-device-verification
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/27
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30189387917
+  - type: merge_commit
+    value: 88f5c2c1b2dbccea9e99870405bbb9e280aa1d00
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/28
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30191749014
+  - type: merge_commit
+    value: 2dbb4de34df81ebfe2b326f0bc4fb48369d46b81
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/31
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30221154431
+  - type: merge_commit
+    value: 7b8e151d74dc1129470e0012ddef20bf609595f7
+- id: WI-0016
+  title: Add identity matcher
+  milestone: M05
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0016-matcher.md
+  started_at: 2026-07-27
+  completed_at: 2026-07-27
+  verified_at: 2026-07-27
+  verified_by: human
+  last_updated_at: 2026-07-27
+  branch: agent/WI-0016-identity-matcher
+  blockers:
+  - WI-0009
+  - WI-0015
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/33
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30225300153
+  - type: merge_commit
+    value: 50ca5ca422c8a7026120ff303de87b2a52755473
+- id: WI-0017
+  title: Add evaluation harness
+  milestone: M06
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0017-evaluation.md
+  started_at: 2026-07-27
+  completed_at: 2026-07-27
+  verified_at: 2026-07-27
+  verified_by: human
+  last_updated_at: 2026-07-27
+  branch: agent/WI-0017-evaluation-harness
+  blockers:
+  - WI-0016
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/34
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30254835059
+  - type: merge_commit
+    value: d0093e1a817dd81c905cc3edf908f35e8fe4b65f
+- id: WI-0018
+  title: Add portable bundles
+  milestone: M07
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0018-portable-bundles.md
+  started_at: 2026-07-26
+  completed_at: 2026-07-27
+  verified_at: 2026-07-27
+  verified_by: human
+  last_updated_at: 2026-07-27
+  branch: agent/WI-0018-production-portable-cli
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/29
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30201002371
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30201861843
+  - type: merge_commit
+    value: 8df838dd2764480baf8de87777c019dfdb23ed0e
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/30
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30209633129
+  - type: merge_commit
+    value: 16c5d8e9bca30ae4ee0e905e1b7d937f2d9ba6d7
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/32
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30223294058
+  - type: merge_commit
+    value: 64e640e08ff6ca0355e7b662d650901c0a360dbf
+- id: WI-0019
+  title: Add a second model adapter
+  milestone: M08
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0019-second-model.md
+  started_at: 2026-08-01
+  completed_at: 2026-08-01
+  verified_at: 2026-08-01
+  verified_by: human
+  last_updated_at: 2026-08-01
+  branch: agent/WI-0019-second-embedder
+  blockers:
+  - WI-0017
+  - WI-0018
+  - WI-0029
+  - WI-0033
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/52
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30671939930
+  - type: merge_commit
+    value: a22cce996cd629d778421b6328bedbd891b0e515
+  - type: human_verification
+    value: Pinned SFace INT8 installation, same-revision processing, exact-model coexistence, resume selection, baseline readability and unchanged human review data verified locally on Windows on 2026-08-01.
+- id: WI-0020
+  title: Run Azure VM pilot
+  milestone: M09
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0020-azure-pilot.md
+  blockers:
+  - WI-0018
+  - WI-0032
+  blocker_notes: []
+  evidence: []
+- id: WI-0021
+  title: Add Azure checkpointing
+  milestone: M10
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0021-azure-checkpointing.md
+  blockers:
+  - WI-0020
+  blocker_notes: []
+  evidence: []
+- id: WI-0022
+  title: Select production models
+  milestone: M11
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0022-model-selection.md
+  blockers:
+  - WI-0021
+  - WI-0030
+  blocker_notes: []
+  evidence: []
+- id: WI-0023
+  title: Process the full archive
+  milestone: M12
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0023-full-archive.md
+  blockers:
+  - WI-0022
+  - WI-0041
+  - WI-0042
+  - WI-0053
+  blocker_notes: []
+  evidence: []
+- id: WI-0024
+  title: Add ongoing local synchronisation
+  milestone: M13
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0024-ongoing-sync.md
+  blockers:
+  - WI-0014
+  - WI-0023
+  blocker_notes: []
+  evidence: []
+- id: WI-0025
+  title: Add collection-ready queries
+  milestone: M14
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0025-collection-api.md
+  started_at: 2026-08-01
+  completed_at: 2026-08-02
+  verified_at: 2026-08-02
+  verified_by: human
+  last_updated_at: 2026-08-02
+  branch: agent/WI-0025-neutral-manifest
+  blockers:
+  - WI-0015
+  - WI-0016
+  - WI-0029
+  - WI-0033
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/57
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/58
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/59
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/60
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/61
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/62
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/63
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30722490454
+  - type: merge_commit
+    value: e9c25b74f76402f8818983f35b43c82fbf373e83
+  - type: human_verification
+    value: Private-catalogue collection queries, Windows and Pixel UI, any/all semantics, fixed thumbnails, responsive layout, representative results and the neutral manifest were verified on 2026-08-02; detailed evidence remains outside Git.
+- id: WI-0026
+  title: Add local developer verification
+  milestone: M01
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0026-local-verification.md
+  started_at: 2026-07-25
+  completed_at: 2026-07-25
+  verified_at: 2026-07-25
+  verified_by: human
+  last_updated_at: 2026-07-25
+  branch: agent/WI-0026-local-verification
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/7
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/8
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/9
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/10
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/11
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30162808500
+  - type: merge_commit
+    value: c7002eca9ebeb8f00e2fcdb96bb6a0e31d252063
+- id: WI-0027
+  title: Complete the local review workflow
+  milestone: M06
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0027-review-workflow.md
+  started_at: 2026-07-27
+  completed_at: 2026-07-30
+  verified_at: 2026-07-30
+  verified_by: human
+  last_updated_at: 2026-07-30
+  branch: agent/WI-0027-review-smoke-coverage
+  blockers:
+  - WI-0015
+  - WI-0016
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/36
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30274139981
+  - type: merge_commit
+    value: c11a305e9a9110ace54da92fbfabe98fd3cd12d0
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/37
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30279981298
+  - type: merge_commit
+    value: 564b283ccdcdadf4f856bee92da062c14d9ac968
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/38
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30285389258
+  - type: merge_commit
+    value: 9295869227bdc68e9bd968907dfc507f8c619310
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/39
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30291001128
+  - type: merge_commit
+    value: 343616667e05d55754254789b790e21f38cfde37
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/40
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30292297233
+  - type: merge_commit
+    value: cc457af530bf4ac9f7ad25b5166658229568602f
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/43
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30306834009
+  - type: merge_commit
+    value: d1730135e196913c5f2dbeb8c56647bd4894b4d0
+  - type: human_verification
+    value: Windows and Pixel trusted-network review verification completed locally on 2026-07-30.
+- id: WI-0028
+  title: Export reviewed catalogues to model-lab
+  milestone: M06
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0028-catalogue-evaluation-export.md
+  started_at: 2026-07-27
+  completed_at: 2026-07-30
+  verified_at: 2026-07-30
+  verified_by: human
+  last_updated_at: 2026-07-30
+  branch: agent/WI-0028-catalogue-evaluation-export
+  blockers:
+  - WI-0013
+  - WI-0015
+  - WI-0017
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/41
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30295161772
+  - type: human_verification
+    value: Reproducible private-catalogue export and evaluation verified locally on Windows on 2026-07-30.
+- id: WI-0029
+  title: Run a 500-image local acceptance pilot
+  milestone: M06
+  status: completed
+  owner: human-maintainer
+  document: ../work-items/WI-0029-local-acceptance-pilot.md
+  started_at: 2026-07-30
+  completed_at: 2026-07-30
+  verified_at: 2026-07-30
+  verified_by: human
+  last_updated_at: 2026-07-30
+  branch: agent/WI-0029-completion-and-review-speed
+  blockers:
+  - WI-0027
+  - WI-0028
+  blocker_notes: []
+  evidence:
+  - type: human_verification
+    value: Private 450-550 image pilot completed locally on Windows and Pixel on 2026-07-30; only privacy-safe aggregate findings were retained.
+- id: WI-0030
+  title: Run a multi-model local comparison
+  milestone: M08
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0030-multi-model-comparison.md
+  started_at: 2026-08-01
+  completed_at: 2026-08-01
+  verified_at: 2026-08-01
+  verified_by: human
+  last_updated_at: 2026-08-01
+  branch: agent/WI-0030-completion
+  blockers:
+  - WI-0019
+  - WI-0029
+  blocker_notes: []
+  evidence:
+  - type: human_verification
+    value: Private same-corpus FP32-versus-INT8 comparison and manual suggestion review completed locally on 2026-08-01. Twenty representative faces were correct under both exact revisions with no material practical difference; retain the FP32 baseline. The detailed record remains private.
+- id: WI-0031
+  title: Rewrite operator and architecture documentation
+  milestone: M15
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0031-documentation-rewrite.md
+  started_at: 2026-08-02
+  completed_at: 2026-08-02
+  verified_at: 2026-08-02
+  verified_by: human
+  last_updated_at: 2026-08-02
+  branch: agent/general-housekeeping
+  blockers:
+  - WI-0025
+  - WI-0030
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/64
+  - type: merge_commit
+    value: b92065ba61ad7f088ea6df4625e81a828a782f06
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/65
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30735732007
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30735732012
+  - type: merge_commit
+    value: 6a8dcbee8154628abe408872efa4a2f27aa44c6d
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/66
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30737494080
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30737494071
+  - type: merge_commit
+    value: 2fa0f95d79a073cceb4ba0f1d6b188aec61c71f2
+  - type: human_verification
+    value: Maintainer reviewed and merged the complete documentation rewrite and final PowerShell housekeeping on 2026-08-02; independent clean-setup validation remains in WI-0032.
+- id: WI-0032
+  title: Validate documentation from a clean setup
+  milestone: M15
+  status: completed
+  owner: human-maintainer
+  document: ../work-items/WI-0032-documentation-validation.md
+  started_at: 2026-08-02
+  completed_at: 2026-08-08
+  verified_at: 2026-08-08
+  verified_by: human
+  last_updated_at: 2026-08-08
+  branch: agent/WI-0032-validation-prep
+  blockers:
+  - WI-0031
+  blocker_notes: []
+  evidence:
+  - type: human_verification
+    value: The maintainer confirmed on 2026-08-09 that WI-0032 clean-setup documentation validation and all remaining acceptance criteria are complete; detailed local validation notes remain outside Git.
+- id: WI-0033
+  title: Accelerate the human review workflow
+  milestone: M06
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0033-review-throughput.md
+  started_at: 2026-07-30
+  completed_at: 2026-08-01
+  verified_at: 2026-08-01
+  verified_by: human
+  last_updated_at: 2026-08-01
+  branch: agent/WI-0033-details-auto-advance
+  blockers:
+  - WI-0027
+  - WI-0029
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/50
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30640702799
+  - type: merge_commit
+    value: f677ce233934a8ffe54c1761a2fe488f46f7cc5c
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/51
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30664945020
+  - type: merge_commit
+    value: 6108de30fa69e87300bc5b6f0594f3a5d67049b0
+  - type: human_verification
+    value: Windows and Pixel corrective verification passed on 2026-08-01; privacy-safe aggregate review timing remains outside Git.
+- id: WI-0034
+  title: Measure baseline detector recall
+  milestone: M16
+  status: completed
+  owner: human-maintainer
+  document: ../work-items/WI-0034-detector-recall-baseline.md
+  started_at: 2026-08-03
+  completed_at: 2026-08-05
+  verified_at: 2026-08-05
+  verified_by: human
+  last_updated_at: 2026-08-05
+  blockers: []
+  blocker_notes: []
+  evidence:
+  - type: human_verification
+    value: The fixed private 100-photo YuNet confidence-0.9 baseline was fully reviewed and evaluated on Windows PowerShell 5.1 by 2026-08-05; it did not meet the predeclared M16 decision target, and detailed counts remain outside Git.
+- id: WI-0035
+  title: Tune YuNet confidence threshold
+  milestone: M16
+  status: completed
+  owner: human-maintainer
+  document: ../work-items/WI-0035-yunet-threshold-sweep.md
+  started_at: 2026-08-05
+  completed_at: 2026-08-06
+  verified_at: 2026-08-06
+  verified_by: human
+  last_updated_at: 2026-08-06
+  blockers:
+  - WI-0039
+  blocker_notes: []
+  evidence:
+  - type: human_verification
+    value: 'PR #74 completed reusable candidate-run matching and activated the fixed 0.8, 0.7, 0.6 and 0.5 YuNet threshold sweep.'
+  - type: human_verification
+    value: The maintainer completed isolated comparison runs for confidence 0.8, 0.7, 0.6 and 0.5 against the immutable confidence-0.9 ground truth by 2026-08-06. Every governed threshold from 0.9 through 0.5 failed the complete M16 gate; detailed metrics and category evidence remain private, and threshold tuning is insufficient.
+- id: WI-0036
+  title: Add multi-scale YuNet detection
+  milestone: M16
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0036-multiscale-yunet.md
+  started_at: 2026-08-06
+  completed_at: 2026-08-07
+  verified_at: 2026-08-07
+  verified_by: human
+  last_updated_at: 2026-08-07
+  branch: agent/WI-0036-multiscale-yunet
+  blockers:
+  - WI-0035
+  blocker_notes: []
+  evidence:
+  - type: human_verification
+    value: The completed confidence sweep established that threshold tuning alone is insufficient, activating governed multi-scale YuNet work on 2026-08-06.
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/82
+  - type: human_verification
+    value: The maintainer completed the governed multi-scale confidence-0.9 comparison on 2026-08-07. It failed the complete M16 gate but performed better than the single-pass confidence-0.9 baseline and single-pass confidence 0.8; detailed recall and category evidence remain private.
+  - type: human_verification
+    value: The explicitly approved multi-scale confidence-0.7 follow-up returned more than 100 false or duplicate detections, far above the maximum of 10. Confidence 0.6 was intentionally not run because lowering the threshold could not plausibly repair the disqualifying workload.
+- id: WI-0037
+  title: Evaluate another face detector
+  milestone: M16
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0037-detector-candidate.md
+  started_at: 2026-08-07
+  completed_at: 2026-08-07
+  verified_at: 2026-08-07
+  verified_by: human
+  last_updated_at: 2026-08-07
+  branch: agent/WI-0037-centerface-smoke-pass
+  blockers:
+  - WI-0036
+  blocker_notes: []
+  evidence:
+  - type: human_verification
+    value: Governed multi-scale YuNet candidates failed the complete M16 gate, activating alternative-detector evaluation on 2026-08-07.
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/84
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/86
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/88
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/89
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/90
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/91
+  - type: human_verification
+    value: The maintainer explicitly accepted the documented CenterFace pretrained-weight and training-data uncertainty for local evaluation on 2026-08-07; rollout engineering was separately instructed, and redistribution remains outside that acceptance.
+  - type: human_verification
+    value: The maintainer completed the unchanged governed CenterFace confidence-0.5 single-pass comparison against the fixed private 100-photo M16 sample and frozen ground truth on 2026-08-07 and reported that it passed the complete M16 gate; detailed metrics remain outside Git.
+- id: WI-0038
+  title: Roll out the selected detector pipeline
+  milestone: M16
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0038-detector-rollout.md
+  started_at: 2026-08-07
+  completed_at: 2026-08-08
+  verified_at: 2026-08-08
+  verified_by: human
+  last_updated_at: 2026-08-08
+  branch: agent/WI-0038-status-completion
+  blockers:
+  - WI-0037
+  blocker_notes: []
+  evidence:
+  - type: human_verification
+    value: CenterFace confidence 0.5 single-pass passed the complete M16 detector gate after the maintainer accepted the documented local-evaluation governance boundary; rollout engineering was separately instructed on 2026-08-07.
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/93
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/94
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31209699338
+  - type: merge_commit
+    value: 5fcaee5967b8bbe612ee6b73843fb26f5c9a3cd7
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/95
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31212074961
+  - type: merge_commit
+    value: f2ac13371e7c606a15153b6204ec967df8b70e38
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/96
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31216730491
+  - type: merge_commit
+    value: d709601783f4853589a92d1f75ecab08440ef516
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/97
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31224682650
+  - type: merge_commit
+    value: aad11770559d7a27dc328b4923f98abead3b274d
+  - type: human_verification
+    value: 'Disposable rollout run 5794d5c5-26fe-45f4-8a70-3132aae45891 completed 20 of 20 selected revisions with 77 applied candidates: 43 existing-occurrence mappings, 34 new occurrences, 0 ambiguous candidates and 1 retained unmatched existing occurrence.'
+  - type: human_verification
+    value: The maintainer inspected all 43 reviewed existing mappings and confirmed 43 correct physical-face mappings with 0 incorrect mappings. The 34 new occurrences had 0 person labels and 0 review actions; source and migrated pilot counts remained 69 people, 454 person labels, 467 review actions and 10 ranked-suggestion rows.
+  - type: human_verification
+    value: Replay/resume/apply verification kept face occurrences stable at 492 before and after with no reviewed decisions left to apply, the unmatched existing occurrence was retained, and restore-based rollback successfully recovered the original reviewed state on 2026-08-08.
+- id: WI-0039
+  title: Build detector evaluation workspace
+  milestone: M16
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0039-detector-evaluation-workspace.md
+  started_at: 2026-08-03
+  completed_at: 2026-08-05
+  verified_at: 2026-08-05
+  verified_by: automated
+  last_updated_at: 2026-08-05
+  branch: agent/WI-0039-comparison-slice
+  blockers:
+  - WI-0029
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/70
+  - type: merge_commit
+    value: 55b8fcbd2aeaf95c7f4a94885aba4077e2e86aba
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/71
+  - type: merge_commit
+    value: 1f9221be5999ac3a21041fd0bdfada309fe3f8da
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/72
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30802539255
+  - type: merge_commit
+    value: 9831e62372cecaf0b417ee314108e61f3667e5dc
+  - type: human_verification
+    value: Private confidence-0.9 manifest import, resumable authoring, full 100-photo review, source-pixel zoom and CSV export were verified locally on Windows PowerShell 5.1 by 2026-08-05; detailed evidence remains outside Git.
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/74
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31013795777
+  - type: merge_commit
+    value: 23790991b0abf4e6dea32fd33f312df3e37d6e50
+- id: WI-0040
+  title: Build a viewport-fitted detector comparison review workspace
+  milestone: M16
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0040-detector-comparison-review-workspace.md
+  started_at: 2026-08-05
+  completed_at: 2026-08-05
+  verified_at: 2026-08-05
+  verified_by: human
+  last_updated_at: 2026-08-05
+  branch: agent/WI-0040-viewport-review-workspace
+  blockers:
+  - WI-0039
+  blocker_notes: []
+  evidence:
+  - type: human_verification
+    value: During active detector-comparison review on 2026-08-05, the maintainer observed repeated page-level scrolling between overlays and decision fields because source-image aspect ratios produced inconsistent page heights; the viewport-fitted workspace was specified without private photo data.
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/79
+  - type: merge_commit
+    value: 6e1da45196ac6888d4bb464d4bfd3b780b768124
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/80
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31045597984
+  - type: merge_commit
+    value: 7a6ad053ef452413a41e2cd284094f26c5968ca4
+  - type: human_verification
+    value: The maintainer tested the merged WI-0040 viewport-fitted review workflow and cross-catalogue comparison-photo fix on 2026-08-05 and confirmed that it works as expected.
+- id: WI-0041
+  title: Add incremental permanent archive ingestion
+  milestone: M12
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0041-incremental-archive-ingestion.md
+  started_at: 2026-08-08
+  completed_at: 2026-08-10
+  verified_at: 2026-08-10
+  verified_by: human
+  last_updated_at: 2026-08-10
+  branch: agent/WI-0041-incremental-archive-ingestion
+  blockers:
+  - WI-0013
+  - WI-0014
+  - WI-0030
+  - WI-0037
+  - WI-0042
+  blocker_notes: []
+  evidence:
+  - type: human_verification
+    value: Maintainer verified incremental permanent archive ingestion on the real Windows/OneDrive archive on 2026-08-10, including overlapping parent/child coverage, no-repeat processing and discovery of new files in previously included folders.
+- id: WI-0042
+  title: Add bounded archive hydration and review proxies
+  milestone: M12
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0042-bounded-archive-storage.md
+  started_at: 2026-08-08
+  completed_at: 2026-08-10
+  verified_at: 2026-08-10
+  verified_by: human
+  last_updated_at: 2026-08-10
+  branch: agent/WI-0042-slice5-unattended-archive
+  blockers:
+  - WI-0014
+  - WI-0025
+  blocker_notes: []
+  evidence:
+  - type: human_verification
+    value: Maintainer verified the real Windows/OneDrive bounded archive workflow on 2026-08-10, including unattended advancement, proxy/original viewing, managed release, source re-verification and accepted storage-policy behavior.
+- id: WI-0043
+  title: Add configurable confidence groups and canonical auto-assignment
+  milestone: M17
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0043-confidence-auto-assignment.md
+  started_at: 2026-08-10
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
+  last_updated_at: 2026-08-11
+  branch: wi-0043
+  blockers:
+  - WI-0016
+  - WI-0033
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/116
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31430785546
+  - type: merge_commit
+    value: b275103baca69a8ca947b88607ff8ae517804944
+  - type: human_verification
+    value: Maintainer completed milestone-wide M17 verification on Windows laptop and Pixel on 2026-08-11 and accepted configurable confidence grouping, conservative score-plus-margin High classification, threshold tuning, automatic-assignment behavior and manual correction/audit behavior; only minor non-blocking Faces layout comments remained.
+- id: WI-0044
+  title: Add favorite people
+  milestone: M17
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0044-favorite-people.md
+  started_at: 2026-08-10
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
+  last_updated_at: 2026-08-11
+  branch: wi-0044
+  blockers:
+  - WI-0015
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/117
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31435193480
+  - type: merge_commit
+    value: fe6fd4696a8eaa90d274db322f27a49ac72d3b22
+  - type: human_verification
+    value: Maintainer completed milestone-wide M17 desktop and Pixel verification on 2026-08-11 and accepted favorite persistence, ordering and controls; favorites remained a UI preference and did not affect matching.
+- id: WI-0045
+  title: Regenerate identity matches from the web application
+  milestone: M17
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0045-web-match-regeneration.md
+  started_at: 2026-08-11
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
+  last_updated_at: 2026-08-11
+  branch: wi-0045
+  blockers:
+  - WI-0016
+  - WI-0043
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/123
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31444575754
+  - type: merge_commit
+    value: 6cd010c7568b295c981ee19ff84f28307a05d10f
+  - type: human_verification
+    value: Maintainer completed milestone-wide M17 local verification on 2026-08-11 and accepted browser-triggered exact-model regeneration, durable progress/current-stale feedback and normal review usage during regeneration.
+- id: WI-0046
+  title: Simplify the application around Review and Library
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0046-simplified-application-shell.md
+  blockers:
+  - WI-0025
+  - WI-0045
+  - WI-0048
+  blocker_notes: []
+  evidence: []
+- id: WI-0047
+  title: Add Unknown as a face review state
+  milestone: M17
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0047-unknown-review-state.md
+  started_at: 2026-08-10
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
+  last_updated_at: 2026-08-11
+  branch: wi-0047
+  blockers:
+  - WI-0015
+  - WI-0016
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/119
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31439710560
+  - type: merge_commit
+    value: b44f3798ac511bf6addc804e2fb5b641c8d7790c
+  - type: human_verification
+    value: Maintainer completed milestone-wide M17 desktop and Pixel verification on 2026-08-11 and accepted Unknown as distinct from false detection, reversible and supersedable by later assignment with preserved history.
+- id: WI-0048
+  title: Add an operator configuration page
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0048-configuration-page.md
+  blockers:
+  - WI-0041
+  - WI-0043
+  blocker_notes: []
+  evidence: []
+- id: WI-0049
+  title: Experiment with visible-content image tagging
+  milestone: M19
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0049-visible-content-tagging-experiment.md
+  blockers:
+  - WI-0056
+  blocker_notes: []
+  evidence: []
+- id: WI-0050
+  title: Add EXIF metadata and smart collections
+  milestone: M19
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0050-exif-smart-collections.md
+  blockers:
+  - WI-0025
+  - WI-0041
+  - WI-0042
+  - WI-0056
+  blocker_notes: []
+  evidence: []
+- id: WI-0051
+  title: Add a one-click Windows launcher
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0051-one-click-windows-launcher.md
+  blockers:
+  - WI-0041
+  blocker_notes: []
+  evidence: []
+- id: WI-0052
+  title: Package Photo Identity as a Windows application
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0052-packaged-windows-application.md
+  blockers:
+  - WI-0048
+  - WI-0051
+  blocker_notes: []
+  evidence: []
+- id: WI-0053
+  title: Add HEIC and archive RAW image support
+  milestone: M12
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0053-heic-raw-support.md
+  started_at: 2026-08-09
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
+  last_updated_at: 2026-08-11
+  branch: agent/WI-0053-heic-support
+  blockers:
+  - WI-0006
+  - WI-0012
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/114
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31337366611
+  - type: merge_commit
+    value: f0ae6bfef856b9055bb652b4d1290f353e4c62d1
+  - type: human_verification
+    value: Maintainer declared WI-0053 verified on 2026-08-11 after representative private HEIC files decoded successfully with correct visual output, expected orientation/dimensions, accepted runtime and peak working set, unchanged originals, governed archive analysis and durable proxy behavior; the maintained archive currently has no known RAW variants, so any future newly observed RAW format reopens format-specific verification rather than being silently skipped.
+- id: WI-0054
+  title: Polish archive viewing, progress and availability
+  milestone: M12
+  status: completed
+  owner: ai-agent
+  document: ../work-items/WI-0054-archive-ui-polish.md
+  started_at: 2026-08-10
+  completed_at: 2026-08-11
+  verified_at: 2026-08-11
+  verified_by: human
+  last_updated_at: 2026-08-11
+  branch: agent/WI-0054-archive-ui-polish
+  blockers:
+  - WI-0041
+  - WI-0042
+  blocker_notes: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/118
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31437508867
+  - type: merge_commit
+    value: 187c1da86cdf03345b6a08bcdb3c40a90f51b2b6
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/121
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31441519751
+  - type: merge_commit
+    value: cee18b822fa3ad9f7a8a0899c4cbdb6e1faf8b2d
+  - type: human_verification
+    value: Maintainer completed post-merge WI-0054 verification on the real Windows/OneDrive archive on 2026-08-11 and accepted archive viewer fallback, progress stability and availability behavior after the corrective follow-up; no blocking issues remained.
+- id: WI-0055
+  title: Fix packaged review, archive and storage-policy regressions
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0055-packaged-runtime-regressions.md
+  blockers:
+  - WI-0042
+  - WI-0048
+  - WI-0052
+  - WI-0054
+  blocker_notes: []
+  evidence: []
+- id: WI-0056
+  title: Add canonical photo tags and manual tagging
+  milestone: M19
+  status: in_progress
+  owner: ai-agent
+  document: ../work-items/WI-0056-manual-photo-tags.md
+  started_at: 2026-08-13
+  last_updated_at: 2026-08-13
+  branch: agent/WI-0056-manual-photo-tags
+  blockers:
+  - WI-0042
+  blocker_notes: []
+  evidence: []
