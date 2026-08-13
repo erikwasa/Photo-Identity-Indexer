@@ -5,7 +5,7 @@
 1. Read `BUILD_CONTEXT.md` for the current handoff only.
 2. Read the active work-item file.
 3. Read only the linked ADRs and module documents needed for that item.
-4. Check dependencies and formal lifecycle status in `docs/delivery/status/work-items.yaml`.
+4. Use `PhotoIdentity.Docs` for dependency and formal lifecycle status. `docs/delivery/status/work-items.yaml` contains current work; archived terminal history is resolved by the tool and should not be loaded routinely.
 
 `BUILD_CONTEXT.md` should stay short and current. Do not turn it into a project history or repeat completion details that already live in work-item documents, ADRs, milestone documents or the canonical registries.
 
@@ -35,9 +35,9 @@ Never commit personal photos, face crops, embeddings, biometric datasets, model 
 
 ## Status workflow
 
-The YAML registries are canonical machine/audit records. `docs/delivery/status/work-items.yaml` intentionally retains completed work because dependency calculation, milestone status and completion evidence rely on that history; it is not intended to be the normal human current-status page.
+The YAML registries are canonical machine/audit records. `docs/delivery/status/work-items.yaml` is the small writable registry for current work. Immutable files under `docs/delivery/status/archive/work-items-*.yaml` retain terminal history. `PhotoIdentity.Docs` combines the current registry with terminal archive entries for validation, blockers, milestone status and work selection.
 
-Use `PhotoIdentity.Docs` instead of hand-editing status when the required command is available.
+Do not load archive files during normal handoff work. Open archived history only when specific historical evidence is needed. Use `PhotoIdentity.Docs` instead of hand-editing status when the required command is available.
 
 ```powershell
 dotnet run --project tools/PhotoIdentity.Docs -- validate
@@ -66,5 +66,5 @@ Before work, mark the item `in_progress`. After implementation, add evidence and
 - Idempotency has been considered.
 - The affected documentation is updated.
 - `BUILD_CONTEXT.md` reflects only the next concrete step and essential continuation pointers.
-- Evidence is recorded in `work-items.yaml`.
+- Evidence is recorded through the work-item registry workflow.
 - `PhotoIdentity.Docs validate` and `generate --check` pass.
