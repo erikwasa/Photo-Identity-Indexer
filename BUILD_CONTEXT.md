@@ -6,35 +6,32 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0056 — Add canonical photo tags and manual tagging** is the current maintainer-verification boundary for M19.
+**WI-0056 — Add Immich-compatible hierarchical manual photo tags** is the current M19 implementation boundary.
 
-The implementation is merged through PR #138 and is now in review. It establishes canonical case-insensitive photo tags, revision-bound auditable manual add/remove history, revision-scoped API endpoints and photo-viewer fallback/correction controls. Manual tagging is a recovery path; automatic visible-content tagging remains the intended primary M19 workflow.
+Automatic visible-content tagging is on hold and WI-0049 is no longer part of the active M19 completion path. Manual tags remain supported and now use slash-separated hierarchical values, while SQLite remains the canonical store and original photos remain read-only.
 
-WI-0057 is complete. The former monolithic work-item registry is preserved under `docs/delivery/status/archive/`, while the small current registry remains the normal update surface. Automatic archive rotation is not planned at this time.
+M19 then proceeds to **WI-0050 — Add photo metadata and persistent smart collections**. Smart collections will persist filter definitions over people, hierarchical tags, GPS/location criteria and photographic taken-time, and will reevaluate against the current catalogue so newly matching photos appear automatically.
+
+WI-0057 is complete. Automatic work-item archive rotation is not planned at this time.
 
 ## Next concrete step
 
-Complete maintainer verification for WI-0056, then start WI-0049 as the primary automatic-tagging investigation:
-
-1. Open representative photos through `/photo/{RevisionId}` and confirm existing manual fallback tags load without changing original availability.
-2. Add a fallback/correction tag, reload the page and confirm it persists with stable display spelling; adding the same tag with different casing or whitespace must not create a duplicate.
-3. Remove and re-add a tag, including a representative free-form name containing `/`, and confirm the interaction remains clear on desktop and Pixel-sized layouts.
-4. On an online-only original, confirm manual tag add/remove does not request hydration and does not modify the source file.
-5. If verification passes, record human evidence and complete WI-0056.
-6. Start WI-0049 with automatic tagging explicitly treated as the normal/default path. Compare review-proxy versus original input and determine the production model, evidence, threshold and manual-override boundary.
+1. Finish WI-0056 hierarchy compatibility: validate root and nested tags, case/whitespace normalization, parent vocabulary, add/remove audit history and the canonical `/api/tags` contract.
+2. Run automated build/test/documentation gates.
+3. Perform maintainer verification in the photo viewer, including an online-only original to confirm tag edits do not hydrate or modify it.
+4. Complete WI-0056 and start WI-0050.
+5. Implement WI-0050 in bounded slices: capture-time/GPS persistence, combined query contract, saved smart-collection CRUD/query API, then UI.
 
 ## Relevant files
 
 - `docs/delivery/work-items/WI-0056-manual-photo-tags.md`
-- `docs/delivery/milestones/M19-library-intelligence.md`
-- `docs/delivery/work-items/WI-0049-visible-content-tagging-experiment.md`
 - `docs/delivery/work-items/WI-0050-exif-smart-collections.md`
+- `docs/delivery/milestones/M19-library-intelligence.md`
 - `docs/delivery/status/work-items.yaml`
 - `src/PhotoIdentity.Core/Tags/PhotoTagName.cs`
 - `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoTagRepository.cs`
 - `src/PhotoIdentity.Api/PhotoTagEndpoints.cs`
 - `src/PhotoIdentity.Web/PhotoTagContracts.cs`
-- `src/PhotoIdentity.Web/Pages/Photo.razor`
 - `tests/PhotoIdentity.Integration.Tests/PhotoTagApplicationTests.cs`
 
 ## Repository validation
