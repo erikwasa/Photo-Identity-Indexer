@@ -2,13 +2,14 @@ schema_version: 1
 milestones:
 - id: M00
   title: Repository and architecture
-  status: completed
+  status: in_progress
   document: ../milestones/M00-repository.md
   work_items:
   - WI-0001
   - WI-0002
   - WI-0003
   - WI-0004
+  - WI-0057
 - id: M01
   title: Single-image inference
   status: completed
