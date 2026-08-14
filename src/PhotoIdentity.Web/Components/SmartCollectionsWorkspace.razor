@@ -1,0 +1,267 @@
+<section class="smart-workspace" aria-labelledby="smart-collections-heading">
+    <div class="smart-workspace-heading">
+        <div>
+            <p class="eyebrow">Saved smart collections</p>
+            <h2 id="smart-collections-heading">People, tags, location and taken time</h2>
+            <p>Save a filter definition and reopen it later. Results are always evaluated against the current catalogue.</p>
+        </div>
+        <button type="button" class="button secondary" disabled="@Busy" @onclick="NewCollection">New collection</button>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="notice error" role="alert">@Error</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Notice))
+    {
+        <div class="notice" role="status">@Notice</div>
+    }
+
+    @if (Loading)
+    {
+        <div class="smart-loading" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <span>Loading smart collections…</span>
+        </div>
+    }
+    else
+    {
+        <div class="smart-layout">
+            <aside class="smart-saved-list" aria-label="Saved smart collections">
+                <div class="smart-subheading">
+                    <strong>Saved collections</strong>
+                    <span>@Definitions.Count</span>
+                </div>
+
+                @if (Definitions.Count == 0)
+                {
+                    <p class="smart-muted">No saved collections yet.</p>
+                }
+                else
+                {
+                    @foreach (SmartCollectionDefinitionResponse definition in Definitions)
+                    {
+                        <article class="smart-saved-card @(EditingId == definition.Id ? "selected" : "")">
+                            <button type="button"
+                                    class="smart-open-button"
+                                    disabled="@Busy"
+                                    @onclick="() => OpenSavedAsync(definition)">
+                                <strong>@definition.Name</strong>
+                                <span>@PeopleSummary(definition.Filter)</span>
+                                <span>@TagsSummary(definition.Filter)</span>
+                                <span>@DateSummary(definition.Filter)</span>
+                                <span>@LocationSummary(definition.Filter)</span>
+                            </button>
+                            <button type="button"
+                                    class="smart-delete-button"
+                                    disabled="@Busy"
+                                    @onclick="() => DeleteAsync(definition)">
+                                Delete
+                            </button>
+                        </article>
+                    }
+                }
+            </aside>
+
+            <div class="smart-editor">
+                <div class="smart-subheading">
+                    <strong>@EditorHeading</strong>
+                    @if (EditingId is not null)
+                    {
+                        <span>Saved definition</span>
+                    }
+                </div>
+
+                <label class="smart-field">
+                    <span class="field-label">Collection name</span>
+                    <input type="text"
+                           maxlength="120"
+                           placeholder="Example: Summer 2025 in Stockholm"
+                           @bind="Name"
+                           disabled="@Busy" />
+                </label>
+
+                <div class="smart-filter-grid">
+                    <fieldset class="smart-filter-card">
+                        <legend>People</legend>
+                        <label class="smart-inline-field">
+                            <span>Match</span>
+                            <select @bind="PeopleMatch" disabled="@Busy">
+                                <option value="all">All selected</option>
+                                <option value="any">Any selected</option>
+                            </select>
+                        </label>
+
+                        <div class="smart-option-list" role="group" aria-label="People filter">
+                            @if (OrderedPeople.Count == 0)
+                            {
+                                <span class="smart-muted">No people available.</span>
+                            }
+                            else
+                            {
+                                @foreach (ReviewPersonResponse person in OrderedPeople)
+                                {
+                                    <label class="smart-check-option">
+                                        <input type="checkbox"
+                                               checked="@SelectedPeople.Contains(person.Id)"
+                                               disabled="@Busy"
+                                               @onchange="args => TogglePerson(person.Id, args)" />
+                                        <span>@(person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName)</span>
+                                    </label>
+                                }
+                            }
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="smart-filter-card">
+                        <legend>Tags</legend>
+                        <label class="smart-inline-field">
+                            <span>Match</span>
+                            <select @bind="TagMatch" disabled="@Busy">
+                                <option value="all">All selected</option>
+                                <option value="any">Any selected</option>
+                            </select>
+                        </label>
+
+                        <div class="smart-option-list" role="group" aria-label="Tag filter">
+                            @if (OrderedTags.Count == 0)
+                            {
+                                <span class="smart-muted">No canonical tags yet.</span>
+                            }
+                            else
+                            {
+                                @foreach (PhotoTagDefinitionResponse tag in OrderedTags)
+                                {
+                                    <label class="smart-check-option">
+                                        <input type="checkbox"
+                                               checked="@SelectedTags.Contains(tag.Value)"
+                                               disabled="@Busy"
+                                               @onchange="args => ToggleTag(tag.Value, args)" />
+                                        <span>@tag.Value</span>
+                                    </label>
+                                }
+                            }
+                        </div>
+                    </fieldset>
+                </div>
+
+                <div class="smart-filter-grid smart-secondary-grid">
+                    <fieldset class="smart-filter-card">
+                        <legend>Taken time</legend>
+                        <label class="smart-field">
+                            <span class="field-label">Date expression</span>
+                            <input type="text"
+                                   placeholder="2016 · 2020-2021 · 2025/05/01-2025/05/10"
+                                   @bind="Taken"
+                                   disabled="@Busy" />
+                        </label>
+                        <small class="smart-help">Blank means any photographic capture date. Missing capture metadata will not match a populated date filter.</small>
+                    </fieldset>
+
+                    <fieldset class="smart-filter-card">
+                        <legend>Location</legend>
+                        <label class="smart-location-toggle">
+                            <input type="checkbox" @bind="UseLocation" disabled="@Busy" />
+                            <span>Limit to GPS rectangle</span>
+                        </label>
+
+                        <div class="smart-coordinate-grid">
+                            <label>
+                                <span>South</span>
+                                <input type="text" inputmode="decimal" @bind="South" disabled="@(!UseLocation || Busy)" />
+                            </label>
+                            <label>
+                                <span>West</span>
+                                <input type="text" inputmode="decimal" @bind="West" disabled="@(!UseLocation || Busy)" />
+                            </label>
+                            <label>
+                                <span>North</span>
+                                <input type="text" inputmode="decimal" @bind="North" disabled="@(!UseLocation || Busy)" />
+                            </label>
+                            <label>
+                                <span>East</span>
+                                <input type="text" inputmode="decimal" @bind="East" disabled="@(!UseLocation || Busy)" />
+                            </label>
+                        </div>
+                        <small class="smart-help">Coordinates are optional. Missing GPS metadata will not match a populated location filter.</small>
+                    </fieldset>
+                </div>
+
+                <div class="smart-actions">
+                    <button type="button" class="button primary" disabled="@Busy" @onclick="SaveAsync">
+                        @(Busy ? "Working…" : SaveLabel)
+                    </button>
+                    <button type="button" class="button secondary" disabled="@Busy" @onclick="PreviewAsync">
+                        Preview current filters
+                    </button>
+                    @if (EditingId is not null)
+                    {
+                        <button type="button" class="button secondary" disabled="@Busy" @onclick="() => QuerySavedAsync(0)">
+                            Re-evaluate saved definition
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (Results is SmartCollectionPageResponse resultPage)
+        {
+            <section class="smart-results" aria-labelledby="smart-results-heading">
+                <div class="smart-workspace-heading compact">
+                    <div>
+                        <p class="eyebrow">Current catalogue</p>
+                        <h3 id="smart-results-heading">@resultPage.Total photo@(resultPage.Total == 1 ? "" : "s")</h3>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(resultPage.CollectionName))
+                    {
+                        <span class="smart-result-label">@resultPage.CollectionName</span>
+                    }
+                </div>
+
+                @if (resultPage.Items.Length == 0)
+                {
+                    <div class="empty-state compact">
+                        <p>No photos currently match this definition.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="smart-photo-grid">
+                        @foreach (SmartCollectionPhotoResponse photo in resultPage.Items)
+                        {
+                            <article class="smart-photo-card">
+                                <a href="@($"/photo/{photo.RevisionId}")" aria-label="Open photo">
+                                    <img src="@photo.ThumbnailUrl" alt="Smart collection photo" loading="lazy" decoding="async" />
+                                </a>
+                                <div>
+                                    <strong>@PhotoDate(photo)</strong>
+                                    <span>@PhotoLocation(photo)</span>
+                                    @if (photo.Width is int width && photo.Height is int height)
+                                    {
+                                        <span>@width × @height</span>
+                                    }
+                                </div>
+                            </article>
+                        }
+                    </div>
+
+                    <nav class="pagination" aria-label="Smart collection pages">
+                        <button type="button"
+                                class="button secondary"
+                                disabled="@(Busy || resultPage.Offset == 0)"
+                                @onclick="PreviousPageAsync">
+                            Previous
+                        </button>
+                        <span>Showing @FirstResult–@LastResult</span>
+                        <button type="button"
+                                class="button secondary"
+                                disabled="@(Busy || resultPage.Offset + resultPage.Items.Length >= resultPage.Total)"
+                                @onclick="NextPageAsync">
+                            Next
+                        </button>
+                    </nav>
+                }
+            </section>
+        }
+    }
+</section>
