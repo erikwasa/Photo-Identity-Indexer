@@ -15,6 +15,7 @@ public sealed record PhotoMetadataBackfillReport(
 /// <summary>
 /// Reads capture metadata only from source files that are already local and still match the
 /// immutable revision fingerprint. The service never requests Files On-Demand hydration.
+/// Execution is explicit and bounded so metadata inspection cannot compete with viewer requests.
 /// </summary>
 public sealed class PhotoMetadataBackfillService
 {
@@ -164,68 +165,5 @@ public sealed class PhotoMetadataBackfillService
         }
 
         return resolved;
-    }
-}
-
-public sealed class PhotoMetadataBackfillHostedService : BackgroundService
-{
-    private const int BatchSize = 250;
-    private static readonly TimeSpan ScanDelay = TimeSpan.FromSeconds(1);
-    private static readonly TimeSpan RetryInterval = TimeSpan.FromMinutes(15);
-    private readonly PhotoMetadataBackfillService _service;
-    private readonly ILogger<PhotoMetadataBackfillHostedService> _logger;
-    private int _offset;
-
-    public PhotoMetadataBackfillHostedService(
-        PhotoMetadataBackfillService service,
-        ILogger<PhotoMetadataBackfillHostedService> logger)
-    {
-        _service = service;
-        _logger = logger;
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            TimeSpan delay = RetryInterval;
-            try
-            {
-                PhotoMetadataBackfillReport report = await _service.ExecuteBatchAsync(
-                    BatchSize,
-                    _offset,
-                    stoppingToken);
-
-                if (report.Persisted > 0)
-                {
-                    _offset = 0;
-                    delay = ScanDelay;
-                    _logger.LogInformation(
-                        "Photo metadata backfill persisted {Persisted} of {Candidates} candidates; {DeferredNonLocal} non-local revisions were left untouched.",
-                        report.Persisted,
-                        report.Candidates,
-                        report.DeferredNonLocal);
-                }
-                else if (report.Candidates > 0)
-                {
-                    _offset += report.Candidates;
-                    delay = ScanDelay;
-                }
-                else
-                {
-                    _offset = 0;
-                }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception exception)
-            {
-                _logger.LogWarning(exception, "Photo metadata backfill batch failed; it will be retried later.");
-            }
-
-            await Task.Delay(delay, stoppingToken);
-        }
     }
 }
