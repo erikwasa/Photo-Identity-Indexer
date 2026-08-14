@@ -96,7 +96,6 @@ public partial class Program
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddHostedService<ArchiveAdvancementHostedService>();
         builder.Services.AddHostedService<IdentityMatchRegenerationHostedService>();
-        builder.Services.AddHostedService<PhotoMetadataBackfillHostedService>();
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
             detectorEvaluationRoot,
             serviceProvider.GetRequiredService<TimeProvider>()));
@@ -117,6 +116,7 @@ public partial class Program
             if (context.Request.Path.StartsWithSegments("/api/review") ||
                 context.Request.Path.StartsWithSegments("/api/collections") ||
                 context.Request.Path.StartsWithSegments("/api/smart-collections") ||
+                context.Request.Path.StartsWithSegments("/api/photo-metadata") ||
                 context.Request.Path.StartsWithSegments("/api/detector-evaluation") ||
                 context.Request.Path.StartsWithSegments("/api/detector-rollout") ||
                 context.Request.Path.StartsWithSegments("/api/archive"))
@@ -149,6 +149,7 @@ public partial class Program
         app.MapBulkSuggestionReviewEndpoints();
         app.MapCollectionEndpoints();
         app.MapSmartCollectionEndpoints();
+        app.MapPhotoMetadataEndpoints();
         app.MapCollectionProxyEndpoints();
         app.MapCollectionViewerPreviewEndpoints();
         app.MapPhotoTagEndpoints();
