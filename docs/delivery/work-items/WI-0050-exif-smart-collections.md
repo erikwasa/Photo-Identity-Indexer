@@ -43,7 +43,7 @@ A saved smart collection stores its filter definition, not a copied list of asse
 
 ## Combined query contract
 
-The Slice 2 query contract is reusable by the persisted-definition API planned for Slice 3:
+The Slice 2 query contract is reused directly by saved definitions:
 
 - `people`: canonical person IDs plus `peopleMatch=all|any`;
 - `tags`: canonical hierarchical full values plus `tagMatch=all|any`;
@@ -52,6 +52,14 @@ The Slice 2 query contract is reusable by the persisted-definition API planned f
 - zero populated people is valid, so tag-only, location-only and taken-time-only collections are first-class;
 - populated dimensions combine with AND semantics;
 - missing capture metadata cannot satisfy location or taken-time predicates.
+
+## Saved-definition contract
+
+- A saved collection has a stable generated ID, canonical display name, normalized case-insensitive name identity and created/updated timestamps.
+- The stored payload is a versioned canonical filter definition. People IDs and hierarchical tag values are normalized and taken-date shorthand is persisted as explicit inclusive `from`/`to` dates.
+- No asset/revision membership rows are persisted.
+- Create, list, get, update and delete operate on the definition only.
+- Evaluating `/api/smart-collections/{id}/query` loads the saved filter and executes the same current-catalogue query implementation used by the transient Slice 2 endpoint.
 
 ## In scope
 
@@ -72,26 +80,27 @@ Automatic tagging, reverse geocoding, sidecar/original metadata write-back, stat
 
 - [x] Capture time and GPS metadata are persisted with correct source semantics.
 - [x] Existing revisions can be identified for bounded metadata backfill without changing their canonical identity.
-- [ ] Metadata inspection does not hydrate online-only originals.
+- [x] Metadata inspection does not hydrate online-only originals.
 - [ ] Saved smart collections can be created, reopened, edited and deleted.
 - [ ] A saved collection reevaluates against the current catalogue and includes newly matching photos automatically.
 - [ ] People, tags, location and taken time work independently and can all be combined in one collection.
-- [ ] People and tags each support explicit `all` and `any` matching.
-- [ ] The three documented date-input examples normalize to correct inclusive bounds.
-- [ ] Tag predicates use WI-0056 hierarchical full values.
-- [ ] Missing data never fabricates a match.
+- [x] People and tags each support explicit `all` and `any` matching.
+- [x] The three documented date-input examples normalize to correct inclusive bounds.
+- [x] Tag predicates use WI-0056 hierarchical full values.
+- [x] Missing data never fabricates a match.
 
 ## Implementation status
 
 - Slice 1 merged in PR #143 with successful workflow `31756173422`. It established capture-time/GPS parsing, revision-bound persistence and bounded backfill candidates.
-- Slice 2 is active on `agent/WI-0050-backfill-query-slice2`. It adds explicit local-only verified backfill execution plus the combined smart-collection filter/query contract.
-- Slice 3 will persist the normalized filter contract and expose saved smart-collection CRUD/query operations.
+- Slice 2 merged in PR #144 with successful workflow `31760294369`. It added explicit local-only verified metadata backfill plus the combined smart-collection filter/query contract.
+- Slice 3 is active on `agent/WI-0050-smart-collection-crud`. It persists canonical saved definitions and adds create/list/get/update/delete plus saved-query API operations.
+- Slice 4 will add the saved-collection UI.
 - Maintainer verification remains one integrated pass after all non-deferred M19 implementation is complete.
 
 ## Planned slices
 
 1. Capture-time/GPS persistence and bounded backfill foundation — merged in PR #143.
-2. Safe explicit metadata backfill execution plus combined collection-filter/query contract — current.
-3. Persisted smart-collection CRUD/query API.
+2. Safe explicit metadata backfill execution plus combined collection-filter/query contract — merged in PR #144.
+3. Persisted smart-collection CRUD/query API — current.
 4. Saved-collection UI.
 5. One maintainer verification pass for the complete non-deferred M19 scope.

@@ -10,17 +10,20 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 WI-0056 hierarchical manual tags are complete. Automatic visible-content tagging remains deferred and WI-0049 is not part of the active M19 completion path. SQLite remains canonical and originals remain read-only.
 
-PR #143 merged the WI-0050 capture-time/GPS foundation. The current Slice 2 adds safe local-only metadata backfill and a reusable smart-collection filter/query contract over canonical people, hierarchical tags, GPS bounds and photographic taken dates.
+PR #143 merged the capture-time/GPS foundation. PR #144 merged explicit local-only metadata backfill plus the reusable smart-collection query contract over people, hierarchical tags, GPS bounds and photographic taken dates.
 
-Maintainer verification is intentionally deferred until all non-deferred M19 implementation is complete so tags, capture metadata and saved smart collections can be reviewed together.
+The current Slice 3 persists named smart-collection definitions only. No static membership list is stored: saved evaluation loads the persisted filter and executes the same current-catalogue query implementation from Slice 2.
+
+Maintainer verification remains intentionally deferred until all non-deferred M19 implementation is complete so tags, capture metadata and saved smart collections can be reviewed together.
 
 ## Next concrete step
 
-1. Complete Slice 2 automated validation: online-only metadata backfill must not hydrate or read the original; local metadata reads must verify the immutable revision hash first.
-2. Validate the combined query contract: people and tags independently support `all|any`, zero people is valid, GPS/taken-time filters use capture metadata, and populated dimensions combine with AND semantics.
-3. Merge Slice 2 after build/test/docs/review/package gates pass.
-4. Start Slice 3: persist normalized smart-collection definitions in SQLite and add create/list/get/update/delete/query API operations.
-5. Follow with the saved-collection UI, then perform the single integrated M19 maintainer verification pass.
+1. Validate Slice 3 persistence: canonical names, versioned normalized filter JSON, duplicate-name conflict handling and CRUD round trips.
+2. Validate saved collection reevaluation: add a newly matching photo after save and confirm the saved query includes it without changing the definition.
+3. Validate create/list/get/update/delete and `/api/smart-collections/{id}/query` through the application API.
+4. Merge Slice 3 after build/test/docs/review/package/launcher gates pass.
+5. Start Slice 4: saved-collection UI for create, edit, reopen and evaluate.
+6. Perform the single integrated M19 maintainer verification pass after the UI slice.
 
 ## Relevant files
 
@@ -28,13 +31,12 @@ Maintainer verification is intentionally deferred until all non-deferred M19 imp
 - `docs/delivery/milestones/M19-library-intelligence.md`
 - `docs/delivery/status/work-items.yaml`
 - `src/PhotoIdentity.Core/Collections/SmartCollectionFilter.cs`
-- `src/PhotoIdentity.Core/Sources/PhotoCaptureMetadata.cs`
+- `src/PhotoIdentity.Core/Collections/SmartCollectionDefinition.cs`
 - `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionQueryRepository.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoMetadataBackfillRepository.cs`
-- `src/PhotoIdentity.Api/PhotoMetadataBackfillService.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionRepository.cs`
 - `src/PhotoIdentity.Api/SmartCollectionEndpoints.cs`
 - `tests/PhotoIdentity.Integration.Tests/SmartCollectionQueryRepositoryTests.cs`
-- `tests/PhotoIdentity.Integration.Tests/PhotoMetadataBackfillServiceTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/SmartCollectionPersistenceTests.cs`
 
 ## Repository validation
 
