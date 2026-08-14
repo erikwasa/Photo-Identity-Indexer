@@ -79,6 +79,44 @@ public sealed class SmartCollectionQueryRepositoryTests
     }
 
     [Fact]
+    public async Task Any_matching_accepts_one_requested_person_and_one_requested_tag()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            SqliteAssetCatalogueRepository catalogue = new(database);
+            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
+            SqliteSmartCollectionQueryRepository query = new(database);
+            PersonId alice = PersonId.New();
+            PersonId bob = PersonId.New();
+            CatalogueAssetRevision aliceTrip = await CreateRevisionAsync(catalogue, directory, "alice-trip.jpg", 'f');
+            CatalogueAssetRevision bobFamily = await CreateRevisionAsync(catalogue, directory, "bob-family.jpg", '1');
+
+            await AssignPersonAsync(database, aliceTrip.Id, alice, "Alice");
+            await AssignPersonAsync(database, bobFamily.Id, bob, "Bob");
+            await tags.AddManualTagAsync(aliceTrip.Id, "Trips/Italy", "test");
+            await tags.AddManualTagAsync(bobFamily.Id, "Family", "test");
+
+            SmartCollectionPhotoPage result = await query.QueryAsync(new SmartCollectionFilter(
+                people: [alice, bob],
+                peopleMatch: SmartCollectionMatchModes.Any,
+                tags: ["Trips/Italy", "Family"],
+                tagMatch: SmartCollectionMatchModes.Any));
+
+            Assert.Equal(2, result.Total);
+            AssetRevisionId[] revisionIds = result.Items.Select(item => item.RevisionId).ToArray();
+            Assert.Contains(aliceTrip.Id, revisionIds);
+            Assert.Contains(bobFamily.Id, revisionIds);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Empty_people_dimension_allows_tag_only_collection()
     {
         string directory = CreateTemporaryDirectory();
