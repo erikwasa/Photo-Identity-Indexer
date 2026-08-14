@@ -19,21 +19,25 @@ public sealed record PhotoMetadataBackfillReport(
 public sealed class PhotoMetadataBackfillService
 {
     private readonly SqliteAssetCatalogueRepository _catalogue;
+    private readonly SqlitePhotoMetadataBackfillRepository _backfill;
     private readonly IOneDriveFilesOnDemandPlatform _filesOnDemand;
     private readonly IPhotoMetadataReader _metadataReader;
     private readonly TimeProvider _timeProvider;
 
     public PhotoMetadataBackfillService(
         SqliteAssetCatalogueRepository catalogue,
+        SqlitePhotoMetadataBackfillRepository backfill,
         IOneDriveFilesOnDemandPlatform filesOnDemand,
         IPhotoMetadataReader metadataReader,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(catalogue);
+        ArgumentNullException.ThrowIfNull(backfill);
         ArgumentNullException.ThrowIfNull(filesOnDemand);
         ArgumentNullException.ThrowIfNull(metadataReader);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _catalogue = catalogue;
+        _backfill = backfill;
         _filesOnDemand = filesOnDemand;
         _metadataReader = metadataReader;
         _timeProvider = timeProvider;
@@ -41,10 +45,11 @@ public sealed class PhotoMetadataBackfillService
 
     public async Task<PhotoMetadataBackfillReport> ExecuteBatchAsync(
         int limit = 250,
+        int offset = 0,
         CancellationToken cancellationToken = default)
     {
         IReadOnlyList<PhotoMetadataBackfillCandidate> candidates =
-            await _catalogue.GetPhotoMetadataBackfillCandidatesAsync(limit, cancellationToken);
+            await _backfill.GetCandidatesAsync(limit, offset, cancellationToken);
 
         int persisted = 0;
         int deferredNonLocal = 0;
@@ -164,9 +169,12 @@ public sealed class PhotoMetadataBackfillService
 
 public sealed class PhotoMetadataBackfillHostedService : BackgroundService
 {
+    private const int BatchSize = 250;
+    private static readonly TimeSpan ScanDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan RetryInterval = TimeSpan.FromMinutes(15);
     private readonly PhotoMetadataBackfillService _service;
     private readonly ILogger<PhotoMetadataBackfillHostedService> _logger;
+    private int _offset;
 
     public PhotoMetadataBackfillHostedService(
         PhotoMetadataBackfillService service,
@@ -180,16 +188,32 @@ public sealed class PhotoMetadataBackfillHostedService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
+            TimeSpan delay = RetryInterval;
             try
             {
-                PhotoMetadataBackfillReport report = await _service.ExecuteBatchAsync(250, stoppingToken);
+                PhotoMetadataBackfillReport report = await _service.ExecuteBatchAsync(
+                    BatchSize,
+                    _offset,
+                    stoppingToken);
+
                 if (report.Persisted > 0)
                 {
+                    _offset = 0;
+                    delay = ScanDelay;
                     _logger.LogInformation(
                         "Photo metadata backfill persisted {Persisted} of {Candidates} candidates; {DeferredNonLocal} non-local revisions were left untouched.",
                         report.Persisted,
                         report.Candidates,
                         report.DeferredNonLocal);
+                }
+                else if (report.Candidates > 0)
+                {
+                    _offset += report.Candidates;
+                    delay = ScanDelay;
+                }
+                else
+                {
+                    _offset = 0;
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -201,7 +225,7 @@ public sealed class PhotoMetadataBackfillHostedService : BackgroundService
                 _logger.LogWarning(exception, "Photo metadata backfill batch failed; it will be retried later.");
             }
 
-            await Task.Delay(RetryInterval, stoppingToken);
+            await Task.Delay(delay, stoppingToken);
         }
     }
 }
