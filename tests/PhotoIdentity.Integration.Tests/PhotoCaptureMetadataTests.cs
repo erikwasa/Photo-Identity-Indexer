@@ -2,6 +2,7 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Source.Local;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -13,6 +14,15 @@ public sealed class PhotoCaptureMetadataTests
     {
         PhotoCaptureMetadata metadata = new(new DateTime(2025, 5, 10, 13, 45, 22, DateTimeKind.Local));
         Assert.Equal(DateTimeKind.Unspecified, metadata.TakenAtLocal!.Value.Kind);
+    }
+
+    [Fact]
+    public async Task Invalid_image_metadata_returns_empty_metadata()
+    {
+        using MemoryStream stream = new([1, 2, 3, 4]);
+        PhotoCaptureMetadata metadata = await new MetadataExtractorPhotoMetadataReader()
+            .ReadAsync(stream, "image/jpeg");
+        Assert.False(metadata.HasAnyValue);
     }
 
     [Fact]
