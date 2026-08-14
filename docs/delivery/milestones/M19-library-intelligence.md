@@ -39,6 +39,10 @@ The first production definition can combine all of these dimensions:
 
 Different dimensions combine with AND semantics. For example, a collection can mean "Alice AND Bob, tagged `Trips/Italy`, inside a geographic area, taken from 2025-05-01 through 2025-05-10". Date input should support convenient forms such as `2016`, `2020-2021` and `2025/05/01-2025/05/10`, normalized to explicit inclusive date bounds for persistence/querying.
 
+## Verification strategy
+
+Individual M19 implementation slices and work items may be closed from successful automated build, test and documentation evidence. Maintainer verification is performed once after all non-deferred M19 implementation is complete, so hierarchical tags, photographic metadata and saved smart collections can be exercised together as one coherent workflow.
+
 ## Exit criteria
 
 - Manual tags support hierarchical Immich-compatible tag values while remaining SQLite-backed and revision-audited.
@@ -48,3 +52,4 @@ Different dimensions combine with AND semantics. For example, a collection can m
 - A saved smart collection reevaluates against the current catalogue and automatically includes newly ingested matching photos.
 - Smart collections can combine people, hierarchical tags, location and taken-time criteria in one definition.
 - Missing EXIF/GPS/tag/person data fails the relevant predicate rather than inventing metadata.
+- The integrated non-deferred M19 workflow passes the final maintainer verification pass.

@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <PackageReference Include="MetadataExtractor" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
   </ItemGroup>
 </Project>

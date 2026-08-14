@@ -90,9 +90,12 @@ work_items:
 - id: WI-0050
   title: Add photo metadata and persistent smart collections
   milestone: M19
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0050-exif-smart-collections.md
+  started_at: 2026-08-14
+  last_updated_at: 2026-08-14
+  branch: agent/WI-0050-photo-metadata-slice1
   blockers:
   - WI-0025
   - WI-0041
@@ -137,16 +140,25 @@ work_items:
 - id: WI-0056
   title: Add Immich-compatible hierarchical manual photo tags
   milestone: M19
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0056-manual-photo-tags.md
   started_at: 2026-08-13
+  completed_at: 2026-08-14
+  verified_at: 2026-08-14
+  verified_by: automated
   last_updated_at: 2026-08-14
   branch: agent/WI-0056-immich-tag-hierarchy
   blockers:
   - WI-0042
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/142
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31752534536
+  - type: merge_commit
+    value: 3cd4d44af0f2a902fb54bbf40057c09c480f8f9a
 - id: WI-0057
   title: Split active and archived work-item registries
   milestone: M00
