@@ -1,7 +1,9 @@
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Source.Local;
 using PhotoIdentity.Source.OneDriveSync;
 
 namespace PhotoIdentity.Api;
@@ -58,6 +60,8 @@ public partial class Program
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();
         builder.Services.AddSingleton<SqliteBulkSuggestionReviewRepository>();
         builder.Services.AddSingleton<SqliteCollectionQueryRepository>();
+        builder.Services.AddSingleton<SqliteSmartCollectionQueryRepository>();
+        builder.Services.AddSingleton<SqliteAssetCatalogueRepository>();
         builder.Services.AddSingleton<SqlitePhotoTagRepository>();
         builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
@@ -83,12 +87,15 @@ public partial class Program
         builder.Services.AddSingleton<ArchiveSourceVerificationService>();
         builder.Services.AddSingleton<ArchiveBoundedAnalysisService>();
         builder.Services.AddSingleton<IOneDriveFilesOnDemandPlatform, WindowsOneDriveFilesOnDemandPlatform>();
+        builder.Services.AddSingleton<IPhotoMetadataReader, MetadataExtractorPhotoMetadataReader>();
+        builder.Services.AddSingleton<PhotoMetadataBackfillService>();
         builder.Services.AddSingleton<IArchiveStorageProbe, DriveArchiveStorageProbe>();
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
         builder.Services.AddSingleton<OpenCvReviewProxyRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddHostedService<ArchiveAdvancementHostedService>();
         builder.Services.AddHostedService<IdentityMatchRegenerationHostedService>();
+        builder.Services.AddHostedService<PhotoMetadataBackfillHostedService>();
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
             detectorEvaluationRoot,
             serviceProvider.GetRequiredService<TimeProvider>()));
@@ -108,6 +115,7 @@ public partial class Program
         {
             if (context.Request.Path.StartsWithSegments("/api/review") ||
                 context.Request.Path.StartsWithSegments("/api/collections") ||
+                context.Request.Path.StartsWithSegments("/api/smart-collections") ||
                 context.Request.Path.StartsWithSegments("/api/detector-evaluation") ||
                 context.Request.Path.StartsWithSegments("/api/detector-rollout") ||
                 context.Request.Path.StartsWithSegments("/api/archive"))
@@ -139,6 +147,7 @@ public partial class Program
         app.MapBulkReviewEndpoints();
         app.MapBulkSuggestionReviewEndpoints();
         app.MapCollectionEndpoints();
+        app.MapSmartCollectionEndpoints();
         app.MapCollectionProxyEndpoints();
         app.MapCollectionViewerPreviewEndpoints();
         app.MapPhotoTagEndpoints();
