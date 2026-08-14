@@ -152,7 +152,8 @@ public sealed class SmartCollectionQueryRepositoryTests
         DateTimeOffset now = new(2026, 8, 14, 0, 0, 0, TimeSpan.Zero);
         SourceId sourceId = SourceId.New();
         AssetId assetId = AssetId.New();
-        CatalogueSource source = new(sourceId, "local-folder", root, now);
+        string uniqueSourceRoot = Path.Combine(root, assetId.ToString());
+        CatalogueSource source = new(sourceId, "local-folder", uniqueSourceRoot, now);
         CatalogueAsset asset = new(assetId, sourceId, sourceKey, now);
         CatalogueAssetRevision revision = new(
             AssetRevisionId.New(),
