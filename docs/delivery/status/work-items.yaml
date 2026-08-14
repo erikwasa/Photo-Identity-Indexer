@@ -95,7 +95,7 @@ work_items:
   document: ../work-items/WI-0050-exif-smart-collections.md
   started_at: 2026-08-14
   last_updated_at: 2026-08-14
-  branch: agent/WI-0050-smart-collection-crud
+  branch: agent/WI-0050-smart-collection-ui
   blockers:
   - WI-0025
   - WI-0041
@@ -115,6 +115,12 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31760294369
   - type: merge_commit
     value: 43d76b20ca6700c42787b7d23489f3f3a559b43c
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/145
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31800391197
+  - type: merge_commit
+    value: 83f4a6ebc183860adfc28d5d625700011666ad14
 - id: WI-0051
   title: Add a one-click Windows launcher
   milestone: M18

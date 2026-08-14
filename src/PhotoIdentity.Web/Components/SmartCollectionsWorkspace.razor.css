@@ -1,0 +1,229 @@
+.smart-workspace {
+    display: grid;
+    gap: 1.25rem;
+    margin-bottom: 2rem;
+    padding: 1.25rem;
+    border: 1px solid var(--border, #d8dde6);
+    border-radius: 1rem;
+    background: var(--surface, #fff);
+}
+
+.smart-workspace-heading,
+.smart-subheading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.smart-workspace-heading h2,
+.smart-workspace-heading h3,
+.smart-workspace-heading p {
+    margin-top: 0;
+}
+
+.smart-workspace-heading.compact {
+    align-items: center;
+}
+
+.smart-layout {
+    display: grid;
+    grid-template-columns: minmax(15rem, 0.8fr) minmax(0, 2.2fr);
+    gap: 1rem;
+}
+
+.smart-saved-list,
+.smart-editor,
+.smart-results {
+    display: grid;
+    gap: 1rem;
+}
+
+.smart-saved-list {
+    align-content: start;
+}
+
+.smart-subheading {
+    align-items: center;
+    color: var(--text-muted, #667085);
+}
+
+.smart-saved-card {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border, #d8dde6);
+    border-radius: 0.75rem;
+}
+
+.smart-saved-card.selected {
+    box-shadow: inset 0 0 0 2px currentColor;
+}
+
+.smart-open-button,
+.smart-delete-button {
+    font: inherit;
+}
+
+.smart-open-button {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.smart-open-button span,
+.smart-muted,
+.smart-help,
+.smart-photo-card span {
+    color: var(--text-muted, #667085);
+    font-size: 0.875rem;
+}
+
+.smart-delete-button {
+    justify-self: start;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--danger, #b42318);
+    cursor: pointer;
+}
+
+.smart-field,
+.smart-inline-field,
+.smart-coordinate-grid label,
+.smart-location-toggle {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.smart-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.smart-filter-card {
+    display: grid;
+    gap: 0.75rem;
+    min-width: 0;
+    margin: 0;
+    padding: 1rem;
+    border: 1px solid var(--border, #d8dde6);
+    border-radius: 0.75rem;
+}
+
+.smart-filter-card legend {
+    padding: 0 0.25rem;
+    font-weight: 700;
+}
+
+.smart-inline-field {
+    grid-template-columns: auto minmax(8rem, 1fr);
+    align-items: center;
+}
+
+.smart-option-list {
+    display: grid;
+    gap: 0.35rem;
+    max-height: 15rem;
+    overflow: auto;
+    padding-right: 0.25rem;
+}
+
+.smart-check-option,
+.smart-location-toggle {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+}
+
+.smart-check-option {
+    display: grid;
+    gap: 0.5rem;
+    padding: 0.35rem 0;
+}
+
+.smart-coordinate-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.smart-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.smart-loading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.smart-results {
+    padding-top: 1rem;
+    border-top: 1px solid var(--border, #d8dde6);
+}
+
+.smart-result-label {
+    color: var(--text-muted, #667085);
+}
+
+.smart-photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 1rem;
+}
+
+.smart-photo-card {
+    overflow: hidden;
+    border: 1px solid var(--border, #d8dde6);
+    border-radius: 0.75rem;
+    background: var(--surface, #fff);
+}
+
+.smart-photo-card a {
+    display: block;
+    aspect-ratio: 4 / 3;
+    background: #111;
+}
+
+.smart-photo-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.smart-photo-card > div {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.75rem;
+}
+
+@media (max-width: 900px) {
+    .smart-layout,
+    .smart-filter-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .smart-workspace {
+        padding: 0.9rem;
+    }
+
+    .smart-workspace-heading,
+    .smart-subheading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .smart-coordinate-grid {
+        grid-template-columns: 1fr;
+    }
+}

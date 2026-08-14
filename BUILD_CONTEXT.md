@@ -10,32 +10,33 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 WI-0056 hierarchical manual tags are complete. Automatic visible-content tagging remains deferred and WI-0049 is not part of the active M19 completion path. SQLite remains canonical and originals remain read-only.
 
-PR #143 merged the capture-time/GPS foundation. PR #144 merged explicit local-only metadata backfill plus the reusable smart-collection query contract over people, hierarchical tags, GPS bounds and photographic taken dates.
+PR #143 merged the capture-time/GPS foundation. PR #144 merged explicit local-only metadata backfill plus the reusable smart-collection query contract. PR #145 merged persistent saved definitions and CRUD/saved-query APIs.
 
-The current Slice 3 persists named smart-collection definitions only. No static membership list is stored: saved evaluation loads the persisted filter and executes the same current-catalogue query implementation from Slice 2.
+The current Slice 4 adds the saved-collection web workspace at `/smart-collections`. It uses canonical people and hierarchical tags, supports optional GPS bounds and taken-date shorthand, and keeps the existing `/collections` people/evidence workspace unchanged.
 
 Maintainer verification remains intentionally deferred until all non-deferred M19 implementation is complete so tags, capture metadata and saved smart collections can be reviewed together.
 
 ## Next concrete step
 
-1. Validate Slice 3 persistence: canonical names, versioned normalized filter JSON, duplicate-name conflict handling and CRUD round trips.
-2. Validate saved collection reevaluation: add a newly matching photo after save and confirm the saved query includes it without changing the definition.
-3. Validate create/list/get/update/delete and `/api/smart-collections/{id}/query` through the application API.
-4. Merge Slice 3 after build/test/docs/review/package/launcher gates pass.
-5. Start Slice 4: saved-collection UI for create, edit, reopen and evaluate.
-6. Perform the single integrated M19 maintainer verification pass after the UI slice.
+1. Validate the Slice 4 Razor workspace builds and the `/smart-collections` route is exposed from primary navigation.
+2. Validate create, reopen, edit, delete, preview and explicit saved-definition reevaluation against the merged Slice 3 APIs.
+3. Validate people/tag `all|any`, date shorthand, GPS bounds, result pagination and photo-detail links through the web workspace.
+4. Merge Slice 4 after build/test/docs/review/package/launcher gates pass.
+5. Perform the single integrated M19 maintainer verification pass.
+6. Record that human verification and complete WI-0050/M19 if no review defects remain.
 
 ## Relevant files
 
 - `docs/delivery/work-items/WI-0050-exif-smart-collections.md`
 - `docs/delivery/milestones/M19-library-intelligence.md`
 - `docs/delivery/status/work-items.yaml`
-- `src/PhotoIdentity.Core/Collections/SmartCollectionFilter.cs`
-- `src/PhotoIdentity.Core/Collections/SmartCollectionDefinition.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionQueryRepository.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionRepository.cs`
+- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor`
+- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor.cs`
+- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor.css`
+- `src/PhotoIdentity.Web/SmartCollectionContracts.cs`
+- `src/PhotoIdentity.Web/Layout/MainLayout.razor`
 - `src/PhotoIdentity.Api/SmartCollectionEndpoints.cs`
-- `tests/PhotoIdentity.Integration.Tests/SmartCollectionQueryRepositoryTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/SmartCollectionWebRouteTests.cs`
 - `tests/PhotoIdentity.Integration.Tests/SmartCollectionPersistenceTests.cs`
 
 ## Repository validation

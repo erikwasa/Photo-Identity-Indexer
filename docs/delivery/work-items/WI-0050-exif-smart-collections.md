@@ -61,6 +61,16 @@ The Slice 2 query contract is reused directly by saved definitions:
 - Create, list, get, update and delete operate on the definition only.
 - Evaluating `/api/smart-collections/{id}/query` loads the saved filter and executes the same current-catalogue query implementation used by the transient Slice 2 endpoint.
 
+## Saved-collection UI contract
+
+- `/smart-collections` is a dedicated local web workspace linked from primary navigation; the existing `/collections` people/evidence workspace remains unchanged.
+- The editor loads canonical people and WI-0056 tag vocabulary from the existing APIs.
+- People and tags expose explicit `all`/`any` selection modes.
+- Taken time accepts the documented shorthand; reopening a saved definition reconstructs an editable expression from the persisted explicit bounds.
+- Location can be enabled as an optional south/west/north/east GPS rectangle.
+- The current editor can be previewed without saving; saved definitions can be reopened, edited, deleted and explicitly reevaluated.
+- Result pages use the same current-catalogue smart query API and link each matching revision back to its photo detail route.
+
 ## In scope
 
 - Persist EXIF capture time without inventing UTC for timezone-less camera timestamps; preserve a real source offset separately when present.
@@ -81,9 +91,9 @@ Automatic tagging, reverse geocoding, sidecar/original metadata write-back, stat
 - [x] Capture time and GPS metadata are persisted with correct source semantics.
 - [x] Existing revisions can be identified for bounded metadata backfill without changing their canonical identity.
 - [x] Metadata inspection does not hydrate online-only originals.
-- [ ] Saved smart collections can be created, reopened, edited and deleted.
-- [ ] A saved collection reevaluates against the current catalogue and includes newly matching photos automatically.
-- [ ] People, tags, location and taken time work independently and can all be combined in one collection.
+- [ ] Saved smart collections can be created, reopened, edited and deleted through the web workspace.
+- [x] A saved collection reevaluates against the current catalogue and includes newly matching photos automatically.
+- [x] People, tags, location and taken time work independently and can all be combined in one collection.
 - [x] People and tags each support explicit `all` and `any` matching.
 - [x] The three documented date-input examples normalize to correct inclusive bounds.
 - [x] Tag predicates use WI-0056 hierarchical full values.
@@ -93,14 +103,14 @@ Automatic tagging, reverse geocoding, sidecar/original metadata write-back, stat
 
 - Slice 1 merged in PR #143 with successful workflow `31756173422`. It established capture-time/GPS parsing, revision-bound persistence and bounded backfill candidates.
 - Slice 2 merged in PR #144 with successful workflow `31760294369`. It added explicit local-only verified metadata backfill plus the combined smart-collection filter/query contract.
-- Slice 3 is active on `agent/WI-0050-smart-collection-crud`. It persists canonical saved definitions and adds create/list/get/update/delete plus saved-query API operations.
-- Slice 4 will add the saved-collection UI.
+- Slice 3 merged in PR #145 with successful workflow `31800391197`. It persisted canonical saved definitions and added create/list/get/update/delete plus saved-query API operations.
+- Slice 4 is active on `agent/WI-0050-smart-collection-ui`. It adds the `/smart-collections` saved-definition workspace without changing the legacy `/collections` flow.
 - Maintainer verification remains one integrated pass after all non-deferred M19 implementation is complete.
 
 ## Planned slices
 
 1. Capture-time/GPS persistence and bounded backfill foundation — merged in PR #143.
 2. Safe explicit metadata backfill execution plus combined collection-filter/query contract — merged in PR #144.
-3. Persisted smart-collection CRUD/query API — current.
-4. Saved-collection UI.
+3. Persisted smart-collection CRUD/query API — merged in PR #145.
+4. Saved-collection UI — current.
 5. One maintainer verification pass for the complete non-deferred M19 scope.
