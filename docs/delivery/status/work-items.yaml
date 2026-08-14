@@ -199,3 +199,35 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31748239801
   - type: merge_commit
     value: 31487a9e431b004e91c5f65127f3cc5d213c9042
+- id: WI-0058
+  title: Improve Face Details image quality
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0058-face-details-image-quality.md
+  blockers:
+  - WI-0033
+  - WI-0042
+  blocker_notes: []
+  evidence: []
+- id: WI-0059
+  title: Open the full photo from face review
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0059-full-photo-from-face-review.md
+  blockers:
+  - WI-0025
+  - WI-0033
+  blocker_notes: []
+  evidence: []
+- id: WI-0060
+  title: Streamline bulk face review
+  milestone: M18
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0060-streamline-bulk-face-review.md
+  blockers:
+  - WI-0033
+  blocker_notes: []
+  evidence: []
