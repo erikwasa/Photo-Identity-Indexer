@@ -90,14 +90,14 @@ public sealed class SmartCollectionQueryRepositoryTests
             SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
             SqliteSmartCollectionQueryRepository query = new(database);
             CatalogueAssetRevision tagged = await CreateRevisionAsync(catalogue, directory, "tagged.jpg", 'd');
-            CatalogueAssetRevision untagged = await CreateRevisionAsync(catalogue, directory, "untagged.jpg", 'e');
+            _ = await CreateRevisionAsync(catalogue, directory, "untagged.jpg", 'e');
             await tags.AddManualTagAsync(tagged.Id, "Places/Sweden/Stockholm", "test");
 
             SmartCollectionPhotoPage result = await query.QueryAsync(
                 new SmartCollectionFilter(tags: ["places/sweden/stockholm"]));
 
             Assert.Equal(tagged.Id, Assert.Single(result.Items).RevisionId);
-            Assert.DoesNotContain(result.Items, item => item.RevisionId == untagged.Id);
+            Assert.Equal(1, result.Total);
         }
         finally
         {
@@ -148,12 +148,22 @@ public sealed class SmartCollectionQueryRepositoryTests
             await person.ExecuteNonQueryAsync();
         }
 
+        long ordinal;
+        using (SqliteCommand nextOrdinal = connection.CreateCommand())
+        {
+            nextOrdinal.Transaction = transaction;
+            nextOrdinal.CommandText = "SELECT COALESCE(MAX(ordinal), -1) + 1 FROM face_occurrences WHERE asset_revision_id = $revision;";
+            nextOrdinal.Parameters.AddWithValue("$revision", revisionId.ToString());
+            ordinal = (long)(await nextOrdinal.ExecuteScalarAsync() ?? 0L);
+        }
+
         using (SqliteCommand face = connection.CreateCommand())
         {
             face.Transaction = transaction;
-            face.CommandText = "INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc) VALUES ($id, $revision, 0, $now);";
+            face.CommandText = "INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc) VALUES ($id, $revision, $ordinal, $now);";
             face.Parameters.AddWithValue("$id", faceId.ToString());
             face.Parameters.AddWithValue("$revision", revisionId.ToString());
+            face.Parameters.AddWithValue("$ordinal", ordinal);
             face.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
             await face.ExecuteNonQueryAsync();
         }
