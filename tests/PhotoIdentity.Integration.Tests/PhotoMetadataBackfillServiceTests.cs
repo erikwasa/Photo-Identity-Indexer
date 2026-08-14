@@ -124,7 +124,10 @@ public sealed class PhotoMetadataBackfillServiceTests
         string sourceKey,
         byte[] content)
     {
-        string path = Path.Combine(root, sourceKey);
+        string sourceRoot = Path.Combine(root, Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(sourceRoot);
+        string itemKey = Path.GetFileName(sourceKey);
+        string path = Path.Combine(sourceRoot, itemKey);
         await File.WriteAllBytesAsync(path, content);
         string hash = Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant();
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -138,8 +141,8 @@ public sealed class PhotoMetadataBackfillServiceTests
             now,
             "image/jpeg");
         await repository.SaveRevisionAsync(
-            new CatalogueSource(sourceId, "local-folder", root, now),
-            new CatalogueAsset(assetId, sourceId, sourceKey, now),
+            new CatalogueSource(sourceId, "local-folder", sourceRoot, now),
+            new CatalogueAsset(assetId, sourceId, itemKey, now),
             revision);
         return revision.Id;
     }
