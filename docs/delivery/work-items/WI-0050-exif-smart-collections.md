@@ -28,6 +28,16 @@ Date input should accept convenient forms including `2016`, `2020-2021` and `202
 
 A saved smart collection stores its filter definition, not a copied list of asset IDs. Evaluating it later must include newly ingested photos that now match the same definition.
 
+## Capture-metadata contract
+
+- `DateTimeOriginal` is stored as photographic wall-clock time. A timezone-less camera timestamp is not converted to UTC.
+- A real EXIF original-time offset is stored separately when present.
+- GPS latitude/longitude are optional but atomic: both coordinates are stored together or neither is stored.
+- Capture metadata is revision-bound and does not replace catalogue `observed_at_utc`.
+- A persisted empty metadata record means the revision was inspected and had no usable capture-time/GPS values. No record means it is still eligible for backfill.
+- Backfill candidates retain the expected immutable revision content hash so metadata is not attached to the wrong revision if the source file has changed.
+- Inspecting metadata must not request OneDrive hydration or write to the source image.
+
 ## In scope
 
 - Persist EXIF capture time without inventing UTC for timezone-less camera timestamps; preserve a real source offset separately when present.
@@ -46,6 +56,8 @@ Automatic tagging, reverse geocoding, sidecar/original metadata write-back, stat
 ## Acceptance criteria
 
 - [ ] Capture time and GPS metadata are persisted with correct source semantics.
+- [ ] Existing revisions can be identified for bounded metadata backfill without changing their canonical identity.
+- [ ] Metadata inspection does not hydrate online-only originals.
 - [ ] Saved smart collections can be created, reopened, edited and deleted.
 - [ ] A saved collection reevaluates against the current catalogue and includes newly matching photos automatically.
 - [ ] People, tags, location and taken time work independently and can all be combined in one collection.
@@ -56,8 +68,8 @@ Automatic tagging, reverse geocoding, sidecar/original metadata write-back, stat
 
 ## Planned slices
 
-1. Capture-time/GPS persistence and backfill.
+1. Capture-time/GPS persistence and bounded backfill foundation.
 2. Combined collection-filter/query contract.
 3. Persisted smart-collection CRUD/query API.
 4. Saved-collection UI.
-5. Maintainer verification.
+5. One maintainer verification pass for the complete non-deferred M19 scope.
