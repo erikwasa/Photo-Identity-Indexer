@@ -79,10 +79,7 @@ public static class SmartCollectionEndpoints
                 },
             });
         }
-        catch (Exception exception) when (
-            exception is ArgumentException or
-            FormatException or
-            ArgumentOutOfRangeException)
+        catch (Exception exception) when (exception is ArgumentException or FormatException)
         {
             return Results.BadRequest(new { error = exception.Message });
         }
