@@ -37,7 +37,8 @@ A saved smart collection stores its filter definition, not a copied list of asse
 - A persisted empty metadata record means the revision was inspected and had no usable capture-time/GPS values. No record means it is still eligible for backfill.
 - Backfill candidates retain the expected immutable revision content hash so metadata is not attached to the wrong revision if the source file has changed.
 - Metadata backfill checks Files On-Demand state before opening the source and only reads files already reported `Local`; it never requests hydration.
-- Deferred online-only candidates remain eligible for a later retry and are paged so they cannot starve later local candidates.
+- Backfill is explicitly triggered as a bounded `POST /api/photo-metadata/backfill` operation rather than an always-on background reader, so metadata inspection does not compete with viewer requests.
+- Deferred online-only candidates remain eligible for a later retry and the operation accepts paging so they cannot starve later local candidates.
 - Originals and sidecars remain read-only.
 
 ## Combined query contract
@@ -83,14 +84,14 @@ Automatic tagging, reverse geocoding, sidecar/original metadata write-back, stat
 ## Implementation status
 
 - Slice 1 merged in PR #143 with successful workflow `31756173422`. It established capture-time/GPS parsing, revision-bound persistence and bounded backfill candidates.
-- Slice 2 is active on `agent/WI-0050-backfill-query-slice2`. It adds local-only verified backfill execution plus the combined smart-collection filter/query contract.
+- Slice 2 is active on `agent/WI-0050-backfill-query-slice2`. It adds explicit local-only verified backfill execution plus the combined smart-collection filter/query contract.
 - Slice 3 will persist the normalized filter contract and expose saved smart-collection CRUD/query operations.
 - Maintainer verification remains one integrated pass after all non-deferred M19 implementation is complete.
 
 ## Planned slices
 
 1. Capture-time/GPS persistence and bounded backfill foundation — merged in PR #143.
-2. Safe metadata backfill execution plus combined collection-filter/query contract — current.
+2. Safe explicit metadata backfill execution plus combined collection-filter/query contract — current.
 3. Persisted smart-collection CRUD/query API.
 4. Saved-collection UI.
 5. One maintainer verification pass for the complete non-deferred M19 scope.
