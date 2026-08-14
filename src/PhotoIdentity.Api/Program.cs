@@ -62,6 +62,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteCollectionQueryRepository>();
         builder.Services.AddSingleton<SqliteSmartCollectionQueryRepository>();
         builder.Services.AddSingleton<SqliteAssetCatalogueRepository>();
+        builder.Services.AddSingleton<SqlitePhotoMetadataBackfillRepository>();
         builder.Services.AddSingleton<SqlitePhotoTagRepository>();
         builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
