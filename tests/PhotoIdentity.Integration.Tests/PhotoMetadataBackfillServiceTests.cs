@@ -23,7 +23,12 @@ public sealed class PhotoMetadataBackfillServiceTests
             await CreateRevisionForFileAsync(repository, directory, "photo.jpg", [1, 2, 3, 4]);
             FakeFilesOnDemandPlatform platform = new(AssetAvailability.OnlineOnly);
             FakeMetadataReader reader = new();
-            PhotoMetadataBackfillService service = new(repository, platform, reader, TimeProvider.System);
+            PhotoMetadataBackfillService service = new(
+                repository,
+                new SqlitePhotoMetadataBackfillRepository(database),
+                platform,
+                reader,
+                TimeProvider.System);
 
             PhotoMetadataBackfillReport report = await service.ExecuteBatchAsync();
 
@@ -58,7 +63,12 @@ public sealed class PhotoMetadataBackfillServiceTests
                 null,
                 59.3293,
                 18.0686));
-            PhotoMetadataBackfillService service = new(repository, platform, reader, TimeProvider.System);
+            PhotoMetadataBackfillService service = new(
+                repository,
+                new SqlitePhotoMetadataBackfillRepository(database),
+                platform,
+                reader,
+                TimeProvider.System);
 
             PhotoMetadataBackfillReport report = await service.ExecuteBatchAsync();
             PhotoCaptureMetadata? persisted = await repository.GetPhotoMetadataAsync(revisionId);
@@ -70,6 +80,32 @@ public sealed class PhotoMetadataBackfillServiceTests
             Assert.Equal(18.0686, persisted.Longitude);
             Assert.Equal(1, reader.ReadCount);
             Assert.Equal(0, platform.HydrationRequests);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Offset_can_move_past_deferred_candidate_without_marking_it_complete()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            SqliteAssetCatalogueRepository repository = new(database);
+            AssetRevisionId first = await CreateRevisionForFileAsync(repository, directory, "first.jpg", [1]);
+            AssetRevisionId second = await CreateRevisionForFileAsync(repository, directory, "second.jpg", [2]);
+            SqlitePhotoMetadataBackfillRepository backfill = new(database);
+
+            IReadOnlyList<PhotoMetadataBackfillCandidate> firstPage = await backfill.GetCandidatesAsync(1, 0);
+            IReadOnlyList<PhotoMetadataBackfillCandidate> secondPage = await backfill.GetCandidatesAsync(1, 1);
+
+            Assert.Equal(first, Assert.Single(firstPage).RevisionId);
+            Assert.Equal(second, Assert.Single(secondPage).RevisionId);
+            Assert.Null(await repository.GetPhotoMetadataAsync(first));
         }
         finally
         {
