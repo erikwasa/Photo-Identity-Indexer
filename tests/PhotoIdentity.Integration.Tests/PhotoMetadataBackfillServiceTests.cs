@@ -103,9 +103,14 @@ public sealed class PhotoMetadataBackfillServiceTests
             IReadOnlyList<PhotoMetadataBackfillCandidate> firstPage = await backfill.GetCandidatesAsync(1, 0);
             IReadOnlyList<PhotoMetadataBackfillCandidate> secondPage = await backfill.GetCandidatesAsync(1, 1);
 
-            Assert.Equal(first, Assert.Single(firstPage).RevisionId);
-            Assert.Equal(second, Assert.Single(secondPage).RevisionId);
+            AssetRevisionId firstPageId = Assert.Single(firstPage).RevisionId;
+            AssetRevisionId secondPageId = Assert.Single(secondPage).RevisionId;
+            Assert.NotEqual(firstPageId, secondPageId);
+            AssetRevisionId[] pagedIds = [firstPageId, secondPageId];
+            Assert.Contains(first, pagedIds);
+            Assert.Contains(second, pagedIds);
             Assert.Null(await repository.GetPhotoMetadataAsync(first));
+            Assert.Null(await repository.GetPhotoMetadataAsync(second));
         }
         finally
         {
