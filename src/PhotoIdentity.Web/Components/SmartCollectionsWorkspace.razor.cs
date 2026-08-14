@@ -212,7 +212,7 @@ public partial class SmartCollectionsWorkspace
         Busy = true;
         try
         {
-            await QueryTransientCoreAsync(request);
+            await QueryTransientCoreAsync(request!);
         }
         finally
         {
@@ -290,7 +290,7 @@ public partial class SmartCollectionsWorkspace
 
             if (ActiveResultMode == ResultMode.Transient && TryBuildQueryRequest(offset, out SmartCollectionQueryRequest? request))
             {
-                await QueryTransientCoreAsync(request);
+                await QueryTransientCoreAsync(request!);
             }
         }
         finally
