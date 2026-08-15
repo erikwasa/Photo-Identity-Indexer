@@ -135,6 +135,7 @@ public sealed record ReviewIdentitySuggestionResponse(
 
 public sealed record ReviewFaceDetailsResponse(
     ReviewFaceResponse Face,
+    string AssetRevisionId,
     string MediaType,
     int? PhotoWidth,
     int? PhotoHeight,
