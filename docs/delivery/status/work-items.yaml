@@ -202,32 +202,47 @@ work_items:
 - id: WI-0058
   title: Improve Face Details image quality
   milestone: M18
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0058-face-details-image-quality.md
+  started_at: 2026-08-15
+  last_updated_at: 2026-08-15
+  branch: agent/m18-face-review-ux
   blockers:
   - WI-0033
   - WI-0042
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/147
 - id: WI-0059
   title: Open the full photo from face review
   milestone: M18
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0059-full-photo-from-face-review.md
+  started_at: 2026-08-15
+  last_updated_at: 2026-08-15
+  branch: agent/m18-face-review-ux
   blockers:
   - WI-0025
   - WI-0033
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/147
 - id: WI-0060
   title: Streamline bulk face review
   milestone: M18
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0060-streamline-bulk-face-review.md
+  started_at: 2026-08-15
+  last_updated_at: 2026-08-15
+  branch: agent/m18-face-review-ux
   blockers:
   - WI-0033
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/147
