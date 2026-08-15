@@ -94,6 +94,7 @@ public static class ReviewEndpoints
         string id,
         SqliteReviewRepository repository,
         SqliteReviewFilterRepository filterRepository,
+        SqliteCatalogueDatabase database,
         string state = "all",
         string? processingRunId = null,
         string? modelId = null,
@@ -118,6 +119,13 @@ public static class ReviewEndpoints
             return Results.NotFound();
         }
 
+        AssetRevisionId? revisionId = await new ReviewFaceRevisionResolver(database)
+            .ResolveAsync(faceOccurrenceId, cancellationToken);
+        if (revisionId is null)
+        {
+            return Results.NotFound();
+        }
+
         try
         {
             IReadOnlyList<CatalogueReviewAction> actions = await repository.GetActionsAsync(
@@ -133,6 +141,7 @@ public static class ReviewEndpoints
                 cancellationToken);
             return Results.Ok(new ReviewFaceDetailsResponse(
                 ToResponseWithImageSize(face, DetailsImageSize),
+                revisionId.Value.ToString(),
                 face.MediaType,
                 face.PhotoWidth,
                 face.PhotoHeight,
@@ -159,6 +168,7 @@ public static class ReviewEndpoints
         ReviewCropFileResolver cropFileResolver,
         SqliteCatalogueDatabase database,
         CollectionReviewProxyFileResolver proxyFileResolver,
+        CollectionOriginalAccessService originalAccessService,
         int size = GalleryImageSize,
         CancellationToken cancellationToken = default)
     {
@@ -181,11 +191,13 @@ public static class ReviewEndpoints
         ReviewFacePreviewResolver previewResolver = new(
             database,
             proxyFileResolver,
+            originalAccessService,
             new OpenCvReviewFaceRenderer());
         EncodedReviewFace? preview = await previewResolver.RenderAsync(
             faceOccurrenceId,
             size,
-            cancellationToken);
+            preferVerifiedOriginal: size > GalleryImageSize,
+            cancellationToken: cancellationToken);
         if (preview is not null)
         {
             return Results.File(preview.Content, preview.ContentType);
