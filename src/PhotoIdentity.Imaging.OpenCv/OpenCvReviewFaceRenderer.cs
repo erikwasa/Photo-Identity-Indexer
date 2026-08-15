@@ -10,7 +10,7 @@ public sealed record EncodedReviewFace(
     int Height);
 
 /// <summary>
-/// Renders a face-centered JPEG from an already privacy-safe review proxy.
+/// Renders a face-centered JPEG from a review-safe image source.
 /// The face receives surrounding context for human review and pixels are never upscaled.
 /// </summary>
 public sealed class OpenCvReviewFaceRenderer
@@ -41,6 +41,40 @@ public sealed class OpenCvReviewFaceRenderer
             return null;
         }
 
+        return Render(sourceBytes, boundingBox, maximumEdge, cancellationToken);
+    }
+
+    public async Task<EncodedReviewFace?> RenderAsync(
+        Stream source,
+        NormalizedBoundingBox boundingBox,
+        int maximumEdge,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumEdge);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            using MemoryStream buffer = new();
+            await source.CopyToAsync(buffer, cancellationToken);
+            return Render(buffer.ToArray(), boundingBox, maximumEdge, cancellationToken);
+        }
+        catch (Exception exception) when (
+            exception is IOException or
+            UnauthorizedAccessException or
+            ObjectDisposedException)
+        {
+            return null;
+        }
+    }
+
+    private static EncodedReviewFace? Render(
+        byte[] sourceBytes,
+        NormalizedBoundingBox boundingBox,
+        int maximumEdge,
+        CancellationToken cancellationToken)
+    {
         try
         {
             using Mat source = Cv2.ImDecode(sourceBytes, ImreadModes.Color);
