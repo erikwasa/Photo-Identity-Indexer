@@ -1,0 +1,964 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Review faces · Photo Identity</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Human review queue</p>
+        <h1>Review detected faces</h1>
+        <p>Filter, sort, assign, mark a real face as an unknown person, reject false detections, undo, or accept ranked suggestions from one continuous local queue.</p>
+    </div>
+
+    <form class="person-creator" @onsubmit="CreatePersonAsync" @onsubmit:preventDefault>
+        <label class="field-label" for="new-person">Create person</label>
+        <div class="inline-field">
+            <input id="new-person"
+                   placeholder="Display name"
+                   maxlength="200"
+                   autocomplete="off"
+                   @bind="NewPersonName"
+                   @bind:event="oninput" />
+            <button type="submit"
+                    class="button primary"
+                    disabled="@(string.IsNullOrWhiteSpace(NewPersonName) || CreatingPerson)">
+                Add
+            </button>
+        </div>
+    </form>
+</section>
+
+<nav class="filter-tabs" aria-label="Review state">
+    @foreach ((string Value, string Label) filter in StateFilters)
+    {
+        <button class="filter-tab @(State == filter.Value ? "active" : "")"
+                disabled="@Loading"
+                @onclick="() => ChangeStateAsync(filter.Value)">
+            @filter.Label
+        </button>
+    }
+</nav>
+
+<section class="review-filter-panel" aria-labelledby="review-filter-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Queue controls</p>
+            <h2 id="review-filter-heading">Filter and order</h2>
+        </div>
+        @if (SelectedModel is ReviewModelRevisionFilterResponse activeModel)
+        {
+            <span class="model-summary">@activeModel.ModelId · @HashPrefix(activeModel.ModelHash)</span>
+        }
+    </div>
+
+    <div class="review-filter-grid">
+        <div>
+            <label class="field-label" for="review-run">Processing run</label>
+            <select id="review-run"
+                    @bind="SelectedRunIndex"
+                    @bind:after="ApplyRunAsync"
+                    disabled="@(Loading || Options.ProcessingRuns.Count == 0)">
+                <option value="">All processing runs</option>
+                @for (int index = 0; index < Options.ProcessingRuns.Count; index++)
+                {
+                    ReviewProcessingRunFilterResponse run = Options.ProcessingRuns[index];
+                    <option value="@index">@RunLabel(run)</option>
+                }
+            </select>
+        </div>
+
+        <div>
+            <label class="field-label" for="review-model">Suggestion model</label>
+            <select id="review-model"
+                    @bind="SelectedModelIndex"
+                    @bind:after="ApplyModelAsync"
+                    disabled="@(Loading || Options.ModelRevisions.Count == 0)">
+                <option value="">No suggestion context</option>
+                @for (int index = 0; index < Options.ModelRevisions.Count; index++)
+                {
+                    ReviewModelRevisionFilterResponse model = Options.ModelRevisions[index];
+                    <option value="@index">@ModelLabel(model)</option>
+                }
+            </select>
+        </div>
+
+        <div>
+            <label class="field-label" for="review-confidence-group">Confidence group</label>
+            <select id="review-confidence-group"
+                    @bind="ConfidenceGroup"
+                    @bind:after="ApplyFiltersAsync"
+                    disabled="@(Loading || SelectedModel is null)">
+                @foreach ((string Value, string Label) option in ConfidenceFilters)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </select>
+        </div>
+
+        <div>
+            <label class="field-label" for="review-sort">Order</label>
+            <select id="review-sort"
+                    @bind="Sort"
+                    @bind:after="ApplyFiltersAsync"
+                    disabled="@Loading">
+                @foreach ((string Value, string Label, bool RequiresModel) option in SortOptions)
+                {
+                    <option value="@option.Value" disabled="@(option.RequiresModel && SelectedModel is null)">
+                        @option.Label
+                    </option>
+                }
+            </select>
+        </div>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="notice success" role="status">@Message</div>
+}
+
+@if (Faces.Count > 0)
+{
+    <section class="bulk-review-panel" aria-labelledby="bulk-review-heading">
+        <div class="bulk-review-heading">
+            <div>
+                <p class="eyebrow">Optional batch action</p>
+                <h2 id="bulk-review-heading">Review selected faces</h2>
+                <p>Select an anchor face and Shift-select another loaded face for an inclusive range, then toggle individual exceptions. Bulk actions are revalidated immediately before they commit.</p>
+            </div>
+            <div class="bulk-selection-actions">
+                <button class="button secondary"
+                        disabled="@(BulkBusy || LoadedUnreviewedCount == 0)"
+                        @onclick="SelectLoaded">
+                    Select loaded
+                </button>
+                <button class="button secondary"
+                        disabled="@(BulkBusy || SelectedCount == 0)"
+                        @onclick="ClearSelection">
+                    Clear
+                </button>
+            </div>
+        </div>
+    </section>
+}
+
+@if (Loading && Faces.Count == 0)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading the review queue…</p>
+    </section>
+}
+else if (Faces.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No faces in this view</h2>
+        <p>Choose another review state, run, model, or process additional photos.</p>
+    </section>
+}
+else
+{
+    <div class="gallery-summary" role="status">
+        <span>@Total face@(Total == 1 ? "" : "s")</span>
+        <span>@Faces.Count loaded</span>
+    </div>
+
+    <section class="face-grid" aria-label="Face review cards">
+        @foreach (ReviewFaceResponse face in Faces)
+        {
+            <FaceCard @key="face.Id"
+                      Face="face"
+                      People="People"
+                      DetailsUrl="@BuildDetailsUrl(face.Id)"
+                      Selectable="@(face.State == "unreviewed")"
+                      Selected="@SelectedFaceIds.Contains(face.Id)"
+                      SelectionDisabled="@BulkBusy"
+                      SelectionChanged="SetFaceSelection"
+                      AcceptSuggestionRequested="AcceptSuggestionAsync"
+                      AssignRequested="AssignAsync"
+                      UnknownRequested="MarkUnknownAsync"
+                      RejectRequested="RejectAsync"
+                      UndoRequested="UndoAsync" />
+        }
+    </section>
+
+    @if (LoadingMore)
+    {
+        <div class="infinite-loading" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <span>Loading more faces…</span>
+        </div>
+    }
+    else if (HasMore)
+    {
+        <InfiniteScrollTrigger @key="ScrollGeneration"
+                               Enabled="true"
+                               Busy="false"
+                               LoadMore="LoadMoreAsync" />
+    }
+    else
+    {
+        <p class="end-of-queue">End of this queue.</p>
+    }
+}
+
+@if (SelectedCount > 0)
+{
+    <section class="bulk-action-bar" aria-label="Bulk review actions">
+        <div class="bulk-action-summary">
+            <strong>@SelectedCount selected</strong>
+            <span>Shift-click selects a loaded range.</span>
+        </div>
+
+        <div>
+            <label class="field-label" for="bulk-person">Assign to</label>
+            <select id="bulk-person" @bind="BulkPersonId" disabled="@(BulkBusy || People.Count == 0)">
+                <option value="">Choose a person</option>
+                @foreach (ReviewPersonResponse person in People)
+                {
+                    <option value="@person.Id">@PersonLabel(person)</option>
+                }
+            </select>
+        </div>
+
+        <div>
+            <label class="field-label" for="bulk-note">Audit note</label>
+            <input id="bulk-note"
+                   maxlength="1000"
+                   placeholder="Optional note"
+                   @bind="BulkNote"
+                   @bind:event="oninput"
+                   disabled="@BulkBusy" />
+        </div>
+
+        @if (CanAcceptSelectedSuggestions && SharedSuggestedPerson is ReviewPersonResponse suggestedPerson)
+        {
+            <button class="button primary"
+                    disabled="@BulkBusy"
+                    @onclick="() => ExecuteBulkAsync(AcceptSuggestionsAction)">
+                Accept @suggestedPerson.DisplayName
+            </button>
+        }
+
+        <button class="button primary"
+                disabled="@(BulkBusy || string.IsNullOrWhiteSpace(BulkPersonId))"
+                @onclick="() => ExecuteBulkAsync("assign")">
+            Assign
+        </button>
+        <button class="button secondary"
+                disabled="@BulkBusy"
+                @onclick="() => ExecuteBulkAsync("unknown")">
+            Unknown
+        </button>
+        <button class="button danger"
+                disabled="@BulkBusy"
+                @onclick="() => ExecuteBulkAsync("reject")">
+            False detection
+        </button>
+        <button class="button secondary"
+                disabled="@BulkBusy"
+                @onclick="ClearSelection">
+            Clear
+        </button>
+    </section>
+    <div class="bulk-action-spacer" aria-hidden="true"></div>
+}
+
+@code {
+    private const int PageSize = 40;
+    private const int MaximumInitialLoad = 200;
+    private const string Actor = "local-reviewer";
+    private const string CreatedSort = "created-desc";
+    private const string DefaultSuggestionSort = "suggested-person";
+    private const string AcceptSuggestionsAction = "accept-suggestions";
+    private const string AllConfidenceGroups = "all";
+
+    private static readonly (string Value, string Label)[] StateFilters =
+    [
+        ("unreviewed", "Needs review"),
+        ("assigned", "Assigned"),
+        ("unknown", "Unknown"),
+        ("rejected", "False detections"),
+        ("all", "All"),
+    ];
+
+    private static readonly (string Value, string Label)[] ConfidenceFilters =
+    [
+        (AllConfidenceGroups, "All confidence groups"),
+        ("high", "High"),
+        ("medium", "Medium"),
+        ("low", "Low"),
+    ];
+
+    private static readonly (string Value, string Label, bool RequiresModel)[] SortOptions =
+    [
+        (CreatedSort, "Newest first", false),
+        ("suggested-person", "Suggested person", true),
+        ("confidence-group", "Confidence group (High first)", true),
+        ("margin-desc", "Easiest suggestions", true),
+        ("margin-asc", "Most ambiguous suggestions", true),
+        ("score-desc", "Highest suggestion score", true),
+        ("no-suggestion-first", "No suggestion first", true),
+    ];
+
+    [Parameter] public string? QueryState { get; set; }
+    [Parameter] public string? QuerySort { get; set; }
+    [Parameter] public string? QueryProcessingRunId { get; set; }
+    [Parameter] public string? QueryModelId { get; set; }
+    [Parameter] public string? QueryModelHash { get; set; }
+    [Parameter] public string? QueryConfidenceGroup { get; set; }
+    [Parameter] public int QueryLoaded { get; set; }
+
+    private ReviewFilterOptionsResponse Options { get; set; } = new([], []);
+    private List<ReviewFaceResponse> Faces { get; } = [];
+    private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+    private HashSet<string> SelectedFaceIds { get; } = new(StringComparer.Ordinal);
+    private string State { get; set; } = "unreviewed";
+    private string Sort { get; set; } = DefaultSuggestionSort;
+    private string ConfidenceGroup { get; set; } = AllConfidenceGroups;
+    private string SelectedRunIndex { get; set; } = "";
+    private string SelectedModelIndex { get; set; } = "";
+    private string NewPersonName { get; set; } = "";
+    private string BulkPersonId { get; set; } = "";
+    private string BulkNote { get; set; } = "";
+    private string? SelectionAnchorFaceId { get; set; }
+    private int Total { get; set; }
+    private int ScrollGeneration { get; set; }
+    private bool Loading { get; set; }
+    private bool LoadingMore { get; set; }
+    private bool CreatingPerson { get; set; }
+    private bool BulkBusy { get; set; }
+    private bool OptionsLoaded { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    private ReviewProcessingRunFilterResponse? SelectedRun =>
+        int.TryParse(SelectedRunIndex, out int runIndex) &&
+        runIndex >= 0 && runIndex < Options.ProcessingRuns.Count
+            ? Options.ProcessingRuns[runIndex]
+            : null;
+
+    private ReviewModelRevisionFilterResponse? SelectedModel =>
+        int.TryParse(SelectedModelIndex, out int modelIndex) &&
+        modelIndex >= 0 && modelIndex < Options.ModelRevisions.Count
+            ? Options.ModelRevisions[modelIndex]
+            : null;
+
+    private IReadOnlyList<ReviewFaceResponse> SelectedFaces =>
+        Faces.Where(face => SelectedFaceIds.Contains(face.Id)).ToArray();
+
+    private ReviewPersonResponse? SharedSuggestedPerson
+    {
+        get
+        {
+            IReadOnlyList<ReviewFaceResponse> selected = SelectedFaces;
+            if (selected.Count == 0 || selected.Any(face => face.TopSuggestion is null))
+            {
+                return null;
+            }
+
+            ReviewPersonResponse[] people = selected
+                .Select(face => face.TopSuggestion!.Person)
+                .GroupBy(person => person.Id, StringComparer.Ordinal)
+                .Select(group => group.First())
+                .ToArray();
+            return people.Length == 1 ? people[0] : null;
+        }
+    }
+
+    private bool CanAcceptSelectedSuggestions =>
+        SelectedModel is not null &&
+        SharedSuggestedPerson is not null &&
+        SelectedFaces.All(face => face.TopSuggestion?.Status == "pending");
+
+    private int SelectedCount => SelectedFaceIds.Count;
+    private int LoadedUnreviewedCount => Faces.Count(face => face.State == "unreviewed");
+    private bool HasMore => Faces.Count < Total;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!OptionsLoaded)
+        {
+            await LoadOptionsAsync();
+            await LoadPeopleAsync();
+            OptionsLoaded = true;
+        }
+
+        ResolveQuerySelections();
+        int initialTarget = Math.Clamp(QueryLoaded <= 0 ? PageSize : QueryLoaded, PageSize, MaximumInitialLoad);
+        await LoadFacesAsync(reset: true, targetCount: initialTarget);
+    }
+
+    private async Task LoadOptionsAsync()
+    {
+        try
+        {
+            Options = await Http.GetFromJsonAsync<ReviewFilterOptionsResponse>("api/review/filters")
+                ?? new ReviewFilterOptionsResponse([], []);
+        }
+        catch (Exception exception)
+        {
+            Error = $"Review filter options could not be loaded: {exception.Message}";
+        }
+    }
+
+    private async Task LoadPeopleAsync()
+    {
+        People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+        if (People.All(person => person.Id != BulkPersonId))
+        {
+            BulkPersonId = People.FirstOrDefault()?.Id ?? "";
+        }
+    }
+
+    private void ResolveQuerySelections()
+    {
+        State = StateFilters.Any(filter => filter.Value == QueryState)
+            ? QueryState!
+            : "unreviewed";
+
+        int runIndex = Options.ProcessingRuns
+            .Select((run, index) => (run, index))
+            .Where(item => item.run.Id == QueryProcessingRunId)
+            .Select(item => item.index)
+            .DefaultIfEmpty(-1)
+            .First();
+        SelectedRunIndex = runIndex >= 0 ? runIndex.ToString() : "";
+
+        int modelIndex = Options.ModelRevisions
+            .Select((model, index) => (model, index))
+            .Where(item => item.model.ModelId == QueryModelId && item.model.ModelHash == QueryModelHash)
+            .Select(item => item.index)
+            .DefaultIfEmpty(-1)
+            .First();
+        if (modelIndex < 0 && Options.ModelRevisions.Count > 0 &&
+            string.IsNullOrWhiteSpace(QueryModelId) && string.IsNullOrWhiteSpace(QueryModelHash))
+        {
+            modelIndex = 0;
+        }
+        SelectedModelIndex = modelIndex >= 0 ? modelIndex.ToString() : "";
+
+        ConfidenceGroup = SelectedModel is not null &&
+                          ConfidenceFilters.Any(option => option.Value == QueryConfidenceGroup)
+            ? QueryConfidenceGroup!
+            : AllConfidenceGroups;
+
+        string fallbackSort = SelectedModel is null ? CreatedSort : DefaultSuggestionSort;
+        Sort = SortOptions.Any(option => option.Value == QuerySort && (!option.RequiresModel || SelectedModel is not null))
+            ? QuerySort!
+            : fallbackSort;
+    }
+
+    private async Task LoadFacesAsync(bool reset, int targetCount = PageSize)
+    {
+        if (reset)
+        {
+            Loading = true;
+            Faces.Clear();
+            Total = 0;
+            ResetBulkSelection();
+        }
+        else
+        {
+            if (LoadingMore || !HasMore)
+            {
+                return;
+            }
+            LoadingMore = true;
+        }
+
+        Error = null;
+        try
+        {
+            do
+            {
+                int remaining = Math.Max(PageSize, targetCount - Faces.Count);
+                int limit = Math.Min(MaximumInitialLoad, remaining);
+                ReviewFacePageResponse? page = await Http.GetFromJsonAsync<ReviewFacePageResponse>(
+                    BuildFacesApiUrl(Faces.Count, limit));
+                if (page is null)
+                {
+                    throw new InvalidOperationException("The review queue response was empty.");
+                }
+
+                Total = page.Total;
+                HashSet<string> existingIds = Faces.Select(face => face.Id).ToHashSet(StringComparer.Ordinal);
+                Faces.AddRange(page.Items.Where(face => existingIds.Add(face.Id)));
+                ScrollGeneration++;
+
+                if (Faces.Count >= targetCount || Faces.Count >= Total || page.Items.Count == 0)
+                {
+                    break;
+                }
+            }
+            while (true);
+        }
+        catch (Exception exception)
+        {
+            Error = $"The review queue could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+            LoadingMore = false;
+        }
+    }
+
+    private string BuildFacesApiUrl(int offset, int limit)
+    {
+        List<string> query =
+        [
+            $"state={Uri.EscapeDataString(State)}",
+            $"offset={offset}",
+            $"limit={limit}",
+            $"sort={Uri.EscapeDataString(Sort)}",
+        ];
+        if (SelectedRun is ReviewProcessingRunFilterResponse run)
+        {
+            query.Add($"processingRunId={Uri.EscapeDataString(run.Id)}");
+        }
+        if (SelectedModel is ReviewModelRevisionFilterResponse model)
+        {
+            query.Add($"modelId={Uri.EscapeDataString(model.ModelId)}");
+            query.Add($"modelHash={Uri.EscapeDataString(model.ModelHash)}");
+            query.Add($"confidenceGroup={Uri.EscapeDataString(ConfidenceGroup)}");
+            return $"api/review/suggestion-faces?{string.Join("&", query)}";
+        }
+
+        return $"api/review/faces?{string.Join("&", query)}";
+    }
+
+    private Task LoadMoreAsync() => LoadFacesAsync(reset: false, targetCount: Faces.Count + PageSize);
+
+    private async Task ReloadLoadedAsync()
+    {
+        int target = Math.Max(PageSize, Faces.Count);
+        await LoadFacesAsync(reset: true, targetCount: target);
+    }
+
+    private async Task ChangeStateAsync(string state)
+    {
+        State = state;
+        await ApplyFiltersAsync();
+    }
+
+    private Task ApplyRunAsync() => ApplyFiltersAsync();
+
+    private async Task ApplyModelAsync()
+    {
+        if (SelectedModel is null)
+        {
+            Sort = CreatedSort;
+            ConfidenceGroup = AllConfidenceGroups;
+        }
+        else if (Sort == CreatedSort)
+        {
+            Sort = DefaultSuggestionSort;
+        }
+
+        await ApplyFiltersAsync();
+    }
+
+    private async Task ApplyFiltersAsync()
+    {
+        Message = null;
+        await LoadFacesAsync(reset: true);
+    }
+
+    private async Task CreatePersonAsync()
+    {
+        if (CreatingPerson || string.IsNullOrWhiteSpace(NewPersonName))
+        {
+            return;
+        }
+
+        CreatingPerson = true;
+        Error = null;
+        Message = null;
+        string createdName = NewPersonName.Trim();
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/review/people",
+                new CreatePersonRequest(createdName));
+            await RequireSuccessAsync(response);
+            ReviewPersonResponse? created = await response.Content.ReadFromJsonAsync<ReviewPersonResponse>();
+            NewPersonName = "";
+            await LoadPeopleAsync();
+            if (created is not null)
+            {
+                BulkPersonId = created.Id;
+            }
+            Message = $"Created {createdName}.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            CreatingPerson = false;
+        }
+    }
+
+    private string BuildDetailsUrl(string faceId)
+    {
+        List<string> scope = BuildQueueScope(includeLoaded: false);
+        if (SelectedModel is not null)
+        {
+            scope.Add("suggestionQueue=true");
+        }
+
+        string returnUrl = $"/?{string.Join("&", BuildQueueScope(includeLoaded: true))}";
+        scope.Add($"returnUrl={Uri.EscapeDataString(returnUrl)}");
+        return $"/faces/{Uri.EscapeDataString(faceId)}?{string.Join("&", scope)}";
+    }
+
+    private List<string> BuildQueueScope(bool includeLoaded)
+    {
+        List<string> query =
+        [
+            $"state={Uri.EscapeDataString(State)}",
+            $"sort={Uri.EscapeDataString(Sort)}",
+        ];
+        if (SelectedRun is ReviewProcessingRunFilterResponse run)
+        {
+            query.Add($"processingRunId={Uri.EscapeDataString(run.Id)}");
+        }
+        if (SelectedModel is ReviewModelRevisionFilterResponse model)
+        {
+            query.Add($"modelId={Uri.EscapeDataString(model.ModelId)}");
+            query.Add($"modelHash={Uri.EscapeDataString(model.ModelHash)}");
+            query.Add($"confidenceGroup={Uri.EscapeDataString(ConfidenceGroup)}");
+        }
+        if (includeLoaded)
+        {
+            query.Add($"loaded={Math.Clamp(Math.Max(PageSize, Faces.Count), PageSize, MaximumInitialLoad)}");
+        }
+        return query;
+    }
+
+    private void SetFaceSelection((string FaceId, bool Selected, bool Range) change)
+    {
+        if (BulkBusy)
+        {
+            return;
+        }
+
+        if (change.Range && !string.IsNullOrWhiteSpace(SelectionAnchorFaceId))
+        {
+            IReadOnlyList<string> range = ReviewSelectionRange.Resolve(
+                Faces,
+                SelectionAnchorFaceId!,
+                change.FaceId);
+            foreach (string faceId in range)
+            {
+                if (change.Selected)
+                {
+                    SelectedFaceIds.Add(faceId);
+                }
+                else
+                {
+                    SelectedFaceIds.Remove(faceId);
+                }
+            }
+        }
+        else if (change.Selected)
+        {
+            SelectedFaceIds.Add(change.FaceId);
+        }
+        else
+        {
+            SelectedFaceIds.Remove(change.FaceId);
+        }
+
+        SelectionAnchorFaceId = change.FaceId;
+        Message = null;
+    }
+
+    private void SelectLoaded()
+    {
+        foreach (ReviewFaceResponse face in Faces.Where(face => face.State == "unreviewed"))
+        {
+            SelectedFaceIds.Add(face.Id);
+        }
+        SelectionAnchorFaceId = null;
+        Message = null;
+    }
+
+    private void ClearSelection()
+    {
+        ResetBulkSelection();
+        Message = null;
+    }
+
+    private void ResetBulkSelection()
+    {
+        SelectedFaceIds.Clear();
+        SelectionAnchorFaceId = null;
+    }
+
+    private async Task ExecuteBulkAsync(string action)
+    {
+        if (BulkBusy || SelectedCount == 0)
+        {
+            return;
+        }
+
+        string[] faceIds = SelectedFaceIds.OrderBy(value => value, StringComparer.Ordinal).ToArray();
+        int desiredLoaded = Faces.Count;
+        BulkBusy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            if (action == AcceptSuggestionsAction)
+            {
+                await ExecuteSuggestionBulkAsync(faceIds, desiredLoaded);
+                return;
+            }
+
+            if (action == "assign" && string.IsNullOrWhiteSpace(BulkPersonId))
+            {
+                throw new InvalidOperationException("Choose a person before assigning selected faces.");
+            }
+
+            BulkReviewPreviewRequest previewRequest = new(
+                faceIds,
+                action,
+                action == "assign" ? BulkPersonId : null);
+            using HttpResponseMessage previewResponse = await Http.PostAsJsonAsync(
+                "api/review/bulk/preview",
+                previewRequest);
+            await RequireSuccessAsync(previewResponse);
+            BulkReviewPreviewResponse preview = await previewResponse.Content.ReadFromJsonAsync<BulkReviewPreviewResponse>()
+                ?? throw new InvalidOperationException("The bulk preview response was empty.");
+            RequireExactPreview(preview.AffectedCount, preview.SkippedCount, faceIds.Length);
+
+            BulkReviewCommitRequest commitRequest = new(
+                faceIds,
+                action,
+                action == "assign" ? BulkPersonId : null,
+                preview.AffectedCount,
+                preview.PreviewToken,
+                Confirm: true,
+                Actor,
+                EmptyToNull(BulkNote));
+            using HttpResponseMessage commitResponse = await Http.PostAsJsonAsync(
+                "api/review/bulk/commit",
+                commitRequest);
+            await RequireSuccessAsync(commitResponse);
+            BulkReviewCommitResponse result = await commitResponse.Content.ReadFromJsonAsync<BulkReviewCommitResponse>()
+                ?? throw new InvalidOperationException("The bulk commit response was empty.");
+
+            ReviewPersonResponse? assignedPerson = action == "assign"
+                ? result.Person ?? People.FirstOrDefault(person => person.Id == BulkPersonId)
+                : null;
+            ApplyCommittedFaces(faceIds, action, assignedPerson);
+            BulkNote = "";
+            Message = action switch
+            {
+                "reject" => $"Marked {result.AffectedCount} face{(result.AffectedCount == 1 ? "" : "s")} as false detections.",
+                "unknown" => $"Marked {result.AffectedCount} face{(result.AffectedCount == 1 ? "" : "s")} as Unknown.",
+                _ => $"Assigned {result.AffectedCount} face{(result.AffectedCount == 1 ? "" : "s")} to {assignedPerson?.DisplayName}.",
+            };
+            await BackfillAfterBulkAsync(desiredLoaded);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            BulkBusy = false;
+        }
+    }
+
+    private async Task ExecuteSuggestionBulkAsync(string[] faceIds, int desiredLoaded)
+    {
+        ReviewModelRevisionFilterResponse model = SelectedModel
+            ?? throw new InvalidOperationException("A suggestion model is required.");
+        ReviewPersonResponse person = SharedSuggestedPerson
+            ?? throw new InvalidOperationException("Select faces whose pending top suggestion is the same person.");
+        if (!CanAcceptSelectedSuggestions)
+        {
+            throw new InvalidOperationException("Every selected face must have a pending top suggestion for the same person.");
+        }
+
+        long[] suggestionIds = SelectedFaces
+            .Select(face => face.TopSuggestion!.Id)
+            .OrderBy(id => id)
+            .ToArray();
+        using HttpResponseMessage previewResponse = await Http.PostAsJsonAsync(
+            "api/review/bulk-suggestions/preview",
+            new BulkSuggestionPreviewRequest(suggestionIds, model.ModelId, model.ModelHash));
+        await RequireSuccessAsync(previewResponse);
+        BulkSuggestionPreviewResponse preview = await previewResponse.Content.ReadFromJsonAsync<BulkSuggestionPreviewResponse>()
+            ?? throw new InvalidOperationException("The suggestion preview response was empty.");
+        RequireExactPreview(preview.AffectedCount, preview.SkippedCount, faceIds.Length);
+
+        using HttpResponseMessage commitResponse = await Http.PostAsJsonAsync(
+            "api/review/bulk-suggestions/commit",
+            new BulkSuggestionCommitRequest(
+                suggestionIds,
+                model.ModelId,
+                model.ModelHash,
+                preview.AffectedCount,
+                preview.PreviewToken,
+                Confirm: true,
+                Actor,
+                EmptyToNull(BulkNote)));
+        await RequireSuccessAsync(commitResponse);
+        BulkSuggestionCommitResponse result = await commitResponse.Content.ReadFromJsonAsync<BulkSuggestionCommitResponse>()
+            ?? throw new InvalidOperationException("The suggestion commit response was empty.");
+
+        ApplyCommittedFaces(faceIds, "assign", result.Person ?? person);
+        BulkNote = "";
+        Message = $"Accepted {result.AffectedCount} suggestion{(result.AffectedCount == 1 ? "" : "s")} for {result.Person.DisplayName}.";
+        await BackfillAfterBulkAsync(desiredLoaded);
+    }
+
+    private static void RequireExactPreview(int affectedCount, int skippedCount, int selectedCount)
+    {
+        if (skippedCount != 0 || affectedCount != selectedCount)
+        {
+            throw new InvalidOperationException(
+                "The selected faces changed before the bulk action could be committed. Review the current selection and try again.");
+        }
+    }
+
+    private void ApplyCommittedFaces(
+        IReadOnlyCollection<string> faceIds,
+        string action,
+        ReviewPersonResponse? person)
+    {
+        HashSet<string> affected = faceIds.ToHashSet(StringComparer.Ordinal);
+        if (State == "unreviewed")
+        {
+            int removed = Faces.RemoveAll(face => affected.Contains(face.Id));
+            Total = Math.Max(0, Total - removed);
+        }
+        else
+        {
+            for (int index = 0; index < Faces.Count; index++)
+            {
+                ReviewFaceResponse face = Faces[index];
+                if (!affected.Contains(face.Id))
+                {
+                    continue;
+                }
+
+                Faces[index] = action switch
+                {
+                    "assign" => face with { State = "assigned", Person = person },
+                    "unknown" => face with { State = "unknown", Person = null },
+                    "reject" => face with { State = "rejected", Person = null },
+                    _ => face,
+                };
+            }
+        }
+
+        ResetBulkSelection();
+        ScrollGeneration++;
+    }
+
+    private async Task BackfillAfterBulkAsync(int desiredLoaded)
+    {
+        if (State != "unreviewed" || !HasMore || Faces.Count >= desiredLoaded)
+        {
+            return;
+        }
+
+        await LoadFacesAsync(reset: false, targetCount: Math.Min(desiredLoaded, MaximumInitialLoad));
+    }
+
+    private async Task AcceptSuggestionAsync((string FaceId, long SuggestionId) request)
+    {
+        await ApplyActionAsync(
+            $"api/review/faces/{Uri.EscapeDataString(request.FaceId)}/suggestions/{request.SuggestionId}/accept",
+            new ReviewSuggestionActionRequest(Actor),
+            "Suggestion accepted.");
+    }
+
+    private async Task AssignAsync((string FaceId, string PersonId) request)
+    {
+        await ApplyActionAsync(
+            $"api/review/faces/{Uri.EscapeDataString(request.FaceId)}/assign",
+            new AssignFaceRequest(request.PersonId, Actor),
+            "Face assignment saved.");
+    }
+
+    private async Task MarkUnknownAsync(string faceId)
+    {
+        await ApplyActionAsync(
+            $"api/review/faces/{Uri.EscapeDataString(faceId)}/unknown",
+            new ReviewFaceActionRequest(Actor),
+            "Face marked as an unknown person.");
+    }
+
+    private async Task RejectAsync(string faceId)
+    {
+        await ApplyActionAsync(
+            $"api/review/faces/{Uri.EscapeDataString(faceId)}/reject",
+            new ReviewFaceActionRequest(Actor),
+            "False detection saved.");
+    }
+
+    private async Task UndoAsync(string faceId)
+    {
+        await ApplyActionAsync(
+            $"api/review/faces/{Uri.EscapeDataString(faceId)}/undo",
+            new ReviewFaceActionRequest(Actor),
+            "Latest review action undone.");
+    }
+
+    private async Task ApplyActionAsync<TRequest>(string url, TRequest request, string successMessage)
+    {
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(url, request);
+            await RequireSuccessAsync(response);
+            Message = successMessage;
+            await ReloadLoadedAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+    }
+
+    private static string PersonLabel(ReviewPersonResponse person) =>
+        person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
+
+    private static string? EmptyToNull(string value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string RunLabel(ReviewProcessingRunFilterResponse run) =>
+        $"{run.StartedAtUtc.ToLocalTime():g} · {run.Status} · {run.FaceCount} face{(run.FaceCount == 1 ? "" : "s")}";
+
+    private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
+        $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+
+    private static string HashPrefix(string hash) =>
+        hash[..Math.Min(12, hash.Length)];
+
+    private static async Task RequireSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string detail = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(detail)
+                ? $"The review action failed with status {(int)response.StatusCode}."
+                : detail);
+    }
+}
