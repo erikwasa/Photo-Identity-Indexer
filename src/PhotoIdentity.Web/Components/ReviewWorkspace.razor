@@ -239,24 +239,24 @@ else
         {
             <button class="button primary"
                     disabled="@BulkBusy"
-                    @onclick="() => ExecuteBulkAsync(AcceptSuggestionsAction)">
+                    @onclick="ExecuteAcceptSuggestionsBulkAsync">
                 Accept @suggestedPerson.DisplayName
             </button>
         }
 
         <button class="button primary"
                 disabled="@(BulkBusy || string.IsNullOrWhiteSpace(BulkPersonId))"
-                @onclick="() => ExecuteBulkAsync("assign")">
+                @onclick="ExecuteAssignBulkAsync">
             Assign
         </button>
         <button class="button secondary"
                 disabled="@BulkBusy"
-                @onclick="() => ExecuteBulkAsync("unknown")">
+                @onclick="ExecuteUnknownBulkAsync">
             Unknown
         </button>
         <button class="button danger"
                 disabled="@BulkBusy"
-                @onclick="() => ExecuteBulkAsync("reject")">
+                @onclick="ExecuteRejectBulkAsync">
             False detection
         </button>
         <button class="button secondary"
@@ -275,6 +275,9 @@ else
     private const string CreatedSort = "created-desc";
     private const string DefaultSuggestionSort = "suggested-person";
     private const string AcceptSuggestionsAction = "accept-suggestions";
+    private const string AssignAction = "assign";
+    private const string UnknownAction = "unknown";
+    private const string RejectAction = "reject";
     private const string AllConfidenceGroups = "all";
 
     private static readonly (string Value, string Label)[] StateFilters =
@@ -702,6 +705,11 @@ else
         SelectionAnchorFaceId = null;
     }
 
+    private Task ExecuteAcceptSuggestionsBulkAsync() => ExecuteBulkAsync(AcceptSuggestionsAction);
+    private Task ExecuteAssignBulkAsync() => ExecuteBulkAsync(AssignAction);
+    private Task ExecuteUnknownBulkAsync() => ExecuteBulkAsync(UnknownAction);
+    private Task ExecuteRejectBulkAsync() => ExecuteBulkAsync(RejectAction);
+
     private async Task ExecuteBulkAsync(string action)
     {
         if (BulkBusy || SelectedCount == 0)
@@ -722,7 +730,7 @@ else
                 return;
             }
 
-            if (action == "assign" && string.IsNullOrWhiteSpace(BulkPersonId))
+            if (action == AssignAction && string.IsNullOrWhiteSpace(BulkPersonId))
             {
                 throw new InvalidOperationException("Choose a person before assigning selected faces.");
             }
@@ -730,7 +738,7 @@ else
             BulkReviewPreviewRequest previewRequest = new(
                 faceIds,
                 action,
-                action == "assign" ? BulkPersonId : null);
+                action == AssignAction ? BulkPersonId : null);
             using HttpResponseMessage previewResponse = await Http.PostAsJsonAsync(
                 "api/review/bulk/preview",
                 previewRequest);
@@ -742,7 +750,7 @@ else
             BulkReviewCommitRequest commitRequest = new(
                 faceIds,
                 action,
-                action == "assign" ? BulkPersonId : null,
+                action == AssignAction ? BulkPersonId : null,
                 preview.AffectedCount,
                 preview.PreviewToken,
                 Confirm: true,
@@ -755,15 +763,15 @@ else
             BulkReviewCommitResponse result = await commitResponse.Content.ReadFromJsonAsync<BulkReviewCommitResponse>()
                 ?? throw new InvalidOperationException("The bulk commit response was empty.");
 
-            ReviewPersonResponse? assignedPerson = action == "assign"
+            ReviewPersonResponse? assignedPerson = action == AssignAction
                 ? result.Person ?? People.FirstOrDefault(person => person.Id == BulkPersonId)
                 : null;
             ApplyCommittedFaces(faceIds, action, assignedPerson);
             BulkNote = "";
             Message = action switch
             {
-                "reject" => $"Marked {result.AffectedCount} face{(result.AffectedCount == 1 ? "" : "s")} as false detections.",
-                "unknown" => $"Marked {result.AffectedCount} face{(result.AffectedCount == 1 ? "" : "s")} as Unknown.",
+                RejectAction => $"Marked {result.AffectedCount} face{(result.AffectedCount == 1 ? "" : "s")} as false detections.",
+                UnknownAction => $"Marked {result.AffectedCount} face{(result.AffectedCount == 1 ? "" : "s")} as Unknown.",
                 _ => $"Assigned {result.AffectedCount} face{(result.AffectedCount == 1 ? "" : "s")} to {assignedPerson?.DisplayName}.",
             };
             await BackfillAfterBulkAsync(desiredLoaded);
@@ -782,7 +790,7 @@ else
     {
         ReviewModelRevisionFilterResponse model = SelectedModel
             ?? throw new InvalidOperationException("A suggestion model is required.");
-        ReviewPersonResponse person = SharedSuggestedPerson
+        _ = SharedSuggestedPerson
             ?? throw new InvalidOperationException("Select faces whose pending top suggestion is the same person.");
         if (!CanAcceptSelectedSuggestions)
         {
@@ -816,7 +824,7 @@ else
         BulkSuggestionCommitResponse result = await commitResponse.Content.ReadFromJsonAsync<BulkSuggestionCommitResponse>()
             ?? throw new InvalidOperationException("The suggestion commit response was empty.");
 
-        ApplyCommittedFaces(faceIds, "assign", result.Person ?? person);
+        ApplyCommittedFaces(faceIds, AssignAction, result.Person);
         BulkNote = "";
         Message = $"Accepted {result.AffectedCount} suggestion{(result.AffectedCount == 1 ? "" : "s")} for {result.Person.DisplayName}.";
         await BackfillAfterBulkAsync(desiredLoaded);
@@ -854,9 +862,9 @@ else
 
                 Faces[index] = action switch
                 {
-                    "assign" => face with { State = "assigned", Person = person },
-                    "unknown" => face with { State = "unknown", Person = null },
-                    "reject" => face with { State = "rejected", Person = null },
+                    AssignAction => face with { State = "assigned", Person = person },
+                    UnknownAction => face with { State = "unknown", Person = null },
+                    RejectAction => face with { State = "rejected", Person = null },
                     _ => face,
                 };
             }
