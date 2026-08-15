@@ -43,6 +43,24 @@
     min-width: 0;
 }
 
+.details-image-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.details-image {
+    flex: 1 1 auto;
+}
+
+.details-image-toolbar {
+    display: flex;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    padding: 0.75rem;
+    background: rgba(255, 253, 248, 0.96);
+    border-top: 1px solid var(--line);
+}
+
 .timeline li {
     grid-template-columns: 1.25rem minmax(0, 1fr);
 }
@@ -149,6 +167,12 @@
 @media (max-width: 760px) {
     .identity-assignment-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 680px) {
+    .details-image-toolbar .button {
+        width: 100%;
     }
 }
 

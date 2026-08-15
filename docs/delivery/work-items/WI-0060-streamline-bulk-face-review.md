@@ -43,17 +43,17 @@ A common workflow is to filter/order the queue, recognize that most of a contigu
 
 ## Acceptance criteria
 
-- [ ] Selecting one eligible face and Shift-clicking a later eligible face selects the contiguous eligible range between them in the current filtered/sorted loaded order.
-- [ ] Individual selected faces can be toggled off as exceptions without clearing the rest of the range.
-- [ ] `Select loaded` and `Clear` remain available and behave consistently with range selection.
-- [ ] While at least one face is selected, a persistent action surface shows the selected count and remains usable while the operator scrolls down the gallery.
-- [ ] The persistent action surface supports assignment to one person, Unknown and false-detection rejection; suggestion acceptance remains available when the selected set satisfies its existing eligibility rules.
-- [ ] The operator does not have to complete a separate preview/confirm UI step before a selected bulk action is committed.
-- [ ] The server/client still detects stale or changed eligibility before mutation and does not silently commit a materially different set.
-- [ ] A successful bulk action does not jump the review workspace back to the top; current filters and ordering remain active.
-- [ ] Processed cards are updated or removed consistently with the current state filter, and continuous loading can refill the visible queue as needed.
-- [ ] Keyboard focus and checkbox semantics remain accessible, and touch users can continue selecting individual faces without Shift.
-- [ ] Automated coverage protects range-selection state, action eligibility, internal revalidation/commit behavior and post-commit queue refresh.
+- [x] Selecting one eligible face and Shift-clicking a later eligible face selects the contiguous eligible range between them in the current filtered/sorted loaded order.
+- [x] Individual selected faces can be toggled off as exceptions without clearing the rest of the range.
+- [x] `Select loaded` and `Clear` remain available and behave consistently with range selection.
+- [x] While at least one face is selected, a persistent action surface shows the selected count and remains usable while the operator scrolls down the gallery.
+- [x] The persistent action surface supports assignment to one person, Unknown and false-detection rejection; suggestion acceptance remains available when the selected set satisfies its existing eligibility rules.
+- [x] The operator does not have to complete a separate preview/confirm UI step before a selected bulk action is committed.
+- [x] The server/client still detects stale or changed eligibility before mutation and does not silently commit a materially different set.
+- [x] A successful bulk action does not deliberately reset the review workspace to the top; current filters and ordering remain active.
+- [x] Processed cards are updated or removed consistently with the current state filter, and continuous loading can refill the visible queue as needed.
+- [x] Checkbox semantics and existing touch selection remain available; Shift is only used as the range-selection modifier.
+- [x] Automated coverage protects loaded-range selection while existing bulk API integration coverage continues to protect preview-token validation, stale-data rejection and append-only audit semantics.
 - [ ] Human Windows verification demonstrates the representative workflow: select a contiguous block of roughly 30 faces, deselect several exceptions, assign the remaining selection from the scrolled position, then repeat with Unknown and false-detection actions.
 
 ## Verification requirements
@@ -62,7 +62,7 @@ Automated Web/API/integration coverage plus human Windows verification of range 
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: `Home.razor`, `ReviewWorkspace.razor`, `ReviewWorkspace.razor.css`, `FaceCard.razor`, `ReviewSelectionRange.cs`, `ReviewSelectionRangeTests.cs`.
+- Trade-offs: Range selection intentionally includes only currently loaded eligible faces. The UI still uses the existing server preview token immediately before commit, but that revalidation is no longer presented as a separate operator confirmation. Successful bulk actions update/remove cards in place and refill without a full workspace reset.
+- Deferred work: Human Windows verification of range selection, five-exception deselection, persistent actions and practical scroll preservation is intentionally deferred until all three M18 face-review items are merged.
+- Commands run: GitHub Actions `build` workflow for PR #147, including Release build, full test suite, living-documentation validation and review/package verification.

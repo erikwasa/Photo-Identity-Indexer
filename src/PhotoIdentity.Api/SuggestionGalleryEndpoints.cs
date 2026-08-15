@@ -7,6 +7,8 @@ namespace PhotoIdentity.Api;
 
 public static class SuggestionGalleryEndpoints
 {
+    private const int DetailsImageSize = 960;
+
     public static IEndpointRouteBuilder MapSuggestionGalleryEndpoints(this IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/review/suggestion-faces");
@@ -61,6 +63,7 @@ public static class SuggestionGalleryEndpoints
         string id,
         SqliteReviewRepository reviewRepository,
         SqliteSuggestionGalleryRepository suggestionRepository,
+        SqliteCatalogueDatabase database,
         string? modelId,
         string? modelHash,
         string state = CatalogueReviewStates.Unreviewed,
@@ -82,6 +85,13 @@ public static class SuggestionGalleryEndpoints
             return Results.NotFound();
         }
 
+        AssetRevisionId? revisionId = await new ReviewFaceRevisionResolver(database)
+            .ResolveAsync(faceOccurrenceId, cancellationToken);
+        if (revisionId is null)
+        {
+            return Results.NotFound();
+        }
+
         try
         {
             IReadOnlyList<CatalogueReviewAction> actions = await reviewRepository.GetActionsAsync(
@@ -97,7 +107,8 @@ public static class SuggestionGalleryEndpoints
                 confidenceGroup,
                 cancellationToken);
             return Results.Ok(new ReviewFaceDetailsResponse(
-                ToResponse(face),
+                ToDetailsResponse(face),
+                revisionId.Value.ToString(),
                 face.MediaType,
                 face.PhotoWidth,
                 face.PhotoHeight,
@@ -129,9 +140,9 @@ public static class SuggestionGalleryEndpoints
         face.CreatedAtUtc,
         face.TopSuggestion is null ? null : ToResponse(face.TopSuggestion));
 
-    private static ReviewFaceResponse ToResponse(CatalogueReviewFace face) => new(
+    private static ReviewFaceResponse ToDetailsResponse(CatalogueReviewFace face) => new(
         face.Id.ToString(),
-        $"/api/review/faces/{face.Id}/image",
+        $"/api/review/faces/{face.Id}/image?size={DetailsImageSize}",
         face.PhotoName,
         face.Ordinal,
         face.Confidence,

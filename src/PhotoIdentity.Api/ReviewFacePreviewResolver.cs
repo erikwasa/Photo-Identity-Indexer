@@ -8,37 +8,63 @@ using PhotoIdentity.Persistence.Sqlite;
 namespace PhotoIdentity.Api;
 
 /// <summary>
-/// Resolves a face occurrence to the durable review proxy for its immutable asset revision,
-/// then renders a higher-resolution face-centered preview without exposing source paths.
+/// Resolves a face occurrence to review-safe source pixels without exposing source paths.
+/// Face Details can prefer an already-local, revision-verified original; ordinary gallery
+/// rendering remains proxy-backed. Online-only originals are never hydrated implicitly.
 /// </summary>
 public sealed class ReviewFacePreviewResolver
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly CollectionReviewProxyFileResolver _proxyFileResolver;
+    private readonly CollectionOriginalAccessService _originalAccessService;
     private readonly OpenCvReviewFaceRenderer _renderer;
 
     public ReviewFacePreviewResolver(
         SqliteCatalogueDatabase database,
         CollectionReviewProxyFileResolver proxyFileResolver,
+        CollectionOriginalAccessService originalAccessService,
         OpenCvReviewFaceRenderer renderer)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(proxyFileResolver);
+        ArgumentNullException.ThrowIfNull(originalAccessService);
         ArgumentNullException.ThrowIfNull(renderer);
         _database = database;
         _proxyFileResolver = proxyFileResolver;
+        _originalAccessService = originalAccessService;
         _renderer = renderer;
     }
 
     public async Task<EncodedReviewFace?> RenderAsync(
         FaceOccurrenceId faceOccurrenceId,
         int maximumEdge,
+        bool preferVerifiedOriginal = false,
         CancellationToken cancellationToken = default)
     {
         ReviewFaceGeometry? geometry = await GetGeometryAsync(faceOccurrenceId, cancellationToken);
         if (geometry is null)
         {
             return null;
+        }
+
+        if (preferVerifiedOriginal)
+        {
+            VerifiedCollectionOriginal? original = await _originalAccessService.OpenVerifiedAsync(
+                geometry.AssetRevisionId,
+                cancellationToken);
+            if (original is not null)
+            {
+                await using FileStream stream = original.Stream;
+                EncodedReviewFace? renderedOriginal = await _renderer.RenderAsync(
+                    stream,
+                    geometry.BoundingBox,
+                    maximumEdge,
+                    cancellationToken);
+                if (renderedOriginal is not null)
+                {
+                    return renderedOriginal;
+                }
+            }
         }
 
         CollectionPhotoFile? proxy = await _proxyFileResolver.ResolveAsync(

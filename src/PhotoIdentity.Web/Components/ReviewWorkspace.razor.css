@@ -1,0 +1,178 @@
+.review-filter-panel,
+.bulk-review-panel {
+    min-width: 0;
+    margin: 0 0 1.2rem;
+    padding: clamp(1rem, 2vw, 1.35rem);
+    background: rgba(255, 253, 248, 0.94);
+    border: 1px solid var(--line);
+    border-radius: 1.2rem;
+    box-shadow: var(--shadow);
+}
+
+.review-filter-panel h2,
+.bulk-review-heading h2 {
+    margin: 0.15rem 0 0.35rem;
+    font-size: clamp(1.35rem, 3vw, 2rem);
+}
+
+.review-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.8rem;
+    margin-top: 1rem;
+}
+
+.model-summary {
+    max-width: 100%;
+    color: var(--muted);
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+}
+
+.bulk-review-heading {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.bulk-review-heading > div {
+    min-width: 0;
+}
+
+.bulk-review-heading p:not(.eyebrow) {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.bulk-selection-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.bulk-action-bar {
+    position: fixed;
+    left: 50%;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    z-index: 40;
+    transform: translateX(-50%);
+    display: grid;
+    width: min(92rem, calc(100% - 2rem));
+    grid-template-columns: auto minmax(12rem, 0.9fr) minmax(14rem, 1.1fr) repeat(5, auto);
+    align-items: end;
+    gap: 0.65rem;
+    padding: 0.8rem;
+    background: rgba(255, 253, 248, 0.98);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: 0 20px 55px rgba(23, 38, 41, 0.24);
+    backdrop-filter: blur(18px);
+}
+
+.bulk-action-bar > * {
+    min-width: 0;
+}
+
+.bulk-action-summary {
+    align-self: center;
+    min-width: 9rem;
+}
+
+.bulk-action-summary strong,
+.bulk-action-summary span {
+    display: block;
+}
+
+.bulk-action-summary span {
+    margin-top: 0.15rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+
+.bulk-action-bar .button {
+    white-space: nowrap;
+}
+
+.bulk-action-spacer {
+    height: 7.5rem;
+}
+
+.infinite-loading {
+    display: flex;
+    min-height: 5rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: var(--muted);
+}
+
+.infinite-loading .spinner {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.end-of-queue {
+    margin: 1.5rem 0 0;
+    color: var(--muted);
+    text-align: center;
+}
+
+@media (max-width: 1180px) {
+    .bulk-action-bar {
+        grid-template-columns: minmax(8rem, auto) minmax(12rem, 1fr) minmax(14rem, 1.3fr) repeat(3, auto);
+    }
+}
+
+@media (max-width: 960px) {
+    .review-filter-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .bulk-action-bar {
+        max-height: min(70vh, 32rem);
+        grid-template-columns: 1fr 1fr;
+        overflow-y: auto;
+    }
+
+    .bulk-action-summary,
+    .bulk-action-bar > div:nth-child(2),
+    .bulk-action-bar > div:nth-child(3) {
+        grid-column: 1 / -1;
+    }
+
+    .bulk-action-bar .button {
+        width: 100%;
+        white-space: normal;
+    }
+
+    .bulk-action-spacer {
+        height: 12rem;
+    }
+}
+
+@media (max-width: 680px) {
+    .review-filter-panel .section-heading,
+    .bulk-review-heading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .review-filter-grid,
+    .bulk-action-bar {
+        grid-template-columns: 1fr;
+    }
+
+    .bulk-selection-actions,
+    .bulk-selection-actions .button {
+        width: 100%;
+    }
+
+    .bulk-action-summary,
+    .bulk-action-bar > div:nth-child(2),
+    .bulk-action-bar > div:nth-child(3) {
+        grid-column: auto;
+    }
+}

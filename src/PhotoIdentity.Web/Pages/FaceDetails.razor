@@ -61,6 +61,14 @@ else if (Details is not null)
     <div class="details-grid">
         <section class="details-image-panel">
             <img class="details-image" src="@Details.Face.ImageUrl" alt="Detected face" />
+            <div class="details-image-toolbar">
+                <a class="button secondary"
+                   href="@FullPhotoUrl"
+                   target="_blank"
+                   rel="noopener noreferrer">
+                    View full photo ↗
+                </a>
+            </div>
         </section>
 
         <section class="metadata-card">
@@ -355,6 +363,9 @@ else if (Details is not null)
     private bool CanReviewSuggestions =>
         !ActionBusy && string.Equals(Details?.Face.State, "unreviewed", StringComparison.Ordinal);
     private string SafeReturnUrl => IsSafeRelativeUrl(ReturnUrl) ? ReturnUrl! : "/";
+    private string FullPhotoUrl => Details is null
+        ? "/"
+        : $"/photo/{Uri.EscapeDataString(Details.AssetRevisionId)}";
     private ReviewPersonResponse? SelectedPerson =>
         People.FirstOrDefault(person => person.Id == SelectedPersonId);
 

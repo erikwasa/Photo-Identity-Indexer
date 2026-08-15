@@ -1,11 +1,13 @@
+@using Microsoft.AspNetCore.Components.Web
+
 <article class="face-card state-@Face.State @(Selected ? "bulk-selected" : "")">
     @if (Selectable)
     {
         <label class="face-selector" aria-label="Select face for bulk review">
             <input type="checkbox"
                    checked="@Selected"
-                   disabled="@Busy"
-                   @onchange="OnSelectionChangedAsync" />
+                   disabled="@(Busy || SelectionDisabled)"
+                   @onclick="OnSelectionClickedAsync" />
             <span class="visually-hidden">Select face</span>
         </label>
     }
@@ -99,7 +101,10 @@
     public bool Selected { get; set; }
 
     [Parameter]
-    public EventCallback<(string FaceId, bool Selected)> SelectionChanged { get; set; }
+    public bool SelectionDisabled { get; set; }
+
+    [Parameter]
+    public EventCallback<(string FaceId, bool Selected, bool Range)> SelectionChanged { get; set; }
 
     [Parameter]
     public EventCallback<(string FaceId, long SuggestionId)> AcceptSuggestionRequested { get; set; }
@@ -147,10 +152,10 @@
         }
     }
 
-    private Task OnSelectionChangedAsync(ChangeEventArgs args)
+    private Task OnSelectionClickedAsync(MouseEventArgs args)
     {
-        bool selected = args.Value is bool value && value;
-        return SelectionChanged.InvokeAsync((Face.Id, selected));
+        bool nextSelected = !Selected;
+        return SelectionChanged.InvokeAsync((Face.Id, nextSelected, args.ShiftKey));
     }
 
     private async Task AcceptTopSuggestionAsync()
