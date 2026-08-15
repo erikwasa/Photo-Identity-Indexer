@@ -37,13 +37,13 @@ The review API requests a larger image for Face Details than for the gallery, bu
 
 ## Acceptance criteria
 
-- [ ] Face Gallery continues to use a card-appropriate face preview and does not incur the cost of the Face Details rendering path.
-- [ ] Face Details can return a face-centered preview up to approximately 960 px on its longest edge when the selected source contains enough real pixels.
-- [ ] The renderer never enlarges a smaller source crop solely to satisfy the requested dimensions.
-- [ ] A face whose higher-resolution source is unavailable still renders through the existing safe fallback rather than failing the details page.
-- [ ] Opening Face Details does not request hydration of an online-only original.
-- [ ] Browser-facing contracts expose only privacy-safe image URLs/metadata and never local source or derivative paths.
-- [ ] Automated tests distinguish gallery-size rendering, higher-resolution detail rendering, fallback behavior and no-upscale behavior.
+- [x] Face Gallery continues to use a card-appropriate face preview and does not incur the cost of the Face Details rendering path.
+- [x] Face Details can return a face-centered preview up to approximately 960 px on its longest edge when the selected source contains enough real pixels.
+- [x] The renderer never enlarges a smaller source crop solely to satisfy the requested dimensions.
+- [x] A face whose higher-resolution source is unavailable still renders through the existing safe fallback rather than failing the details page.
+- [x] Opening Face Details does not request hydration of an online-only original.
+- [x] Browser-facing contracts expose only privacy-safe image URLs/metadata and never local source or derivative paths.
+- [x] Automated tests distinguish gallery-size rendering, higher-resolution detail rendering, fallback behavior and no-upscale behavior.
 - [ ] Human verification on Windows confirms that representative Face Details images are visibly sharper than their gallery counterparts when higher-resolution source pixels exist and do not appear artificially enlarged when they do not.
 
 ## Verification requirements
@@ -52,7 +52,7 @@ Automated API/rendering tests plus human Windows verification with representativ
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: `OpenCvReviewFaceRenderer.cs`, `ReviewFacePreviewResolver.cs`, `ReviewEndpoints.cs`, `SuggestionGalleryEndpoints.cs`, `ReviewFaceDetailImageApplicationTests.cs`.
+- Trade-offs: Face Details prefers an already-local revision-verified original only for detail-sized requests. Gallery requests stay review-proxy backed. If a verified original is unavailable or online-only, the renderer falls back to the durable review proxy and still refuses to upscale a smaller crop.
+- Deferred work: Human Windows image-quality verification is intentionally deferred until WI-0058, WI-0059 and WI-0060 are all merged and ready to verify together.
+- Commands run: GitHub Actions `build` workflow for PR #147, including Release build, full test suite, living-documentation validation and review/package verification.
