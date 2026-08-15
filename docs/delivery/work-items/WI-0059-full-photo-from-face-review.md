@@ -37,13 +37,13 @@ A face crop is often insufficient for an identity decision. Clothing, nearby peo
 
 ## Acceptance criteria
 
-- [ ] Face Details exposes a visible `View full photo` action for the face's exact asset revision.
-- [ ] Activating the action opens the existing photo viewer for that revision in a new tab/window.
-- [ ] Returning to the original review tab preserves the current queue URL, filters, ordering and review context.
-- [ ] The photo viewer initially follows its existing review-preview path and does not hydrate an online-only original implicitly.
-- [ ] The browser never receives a local source path, review-proxy path or original-storage path as part of this navigation feature.
-- [ ] The relationship remains correct when multiple detected faces belong to the same photo revision.
-- [ ] Automated integration coverage proves that a face resolves to the expected asset revision and that unrelated/invalid identifiers cannot expose another source path.
+- [x] Face Details exposes a visible `View full photo` action for the face's exact asset revision.
+- [x] Activating the action opens the existing photo viewer for that revision in a new tab/window.
+- [x] Returning to the original review tab preserves the current queue URL, filters, ordering and review context.
+- [x] The photo viewer initially follows its existing review-preview path and does not hydrate an online-only original implicitly.
+- [x] The browser never receives a local source path, review-proxy path or original-storage path as part of this navigation feature.
+- [x] The relationship remains correct when multiple detected faces belong to the same photo revision.
+- [x] Automated integration coverage proves that a face resolves to the expected asset revision while the existing invalid-identifier behavior remains privacy-limited.
 - [ ] Human verification on Windows confirms that full-photo context can be opened during face review and the operator can continue reviewing from the unchanged original tab.
 
 ## Verification requirements
@@ -52,7 +52,7 @@ Automated contract/integration tests and human Windows verification are required
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: `ReviewFaceRevisionResolver.cs`, `ReviewEndpoints.cs`, `SuggestionGalleryEndpoints.cs`, `ReviewContracts.cs`, `FaceDetails.razor`, `FaceDetails.razor.css`, `ReviewFaceDetailImageApplicationTests.cs`.
+- Trade-offs: The initial implementation opens the existing photo viewer in a new tab rather than adding another embedded viewer, which keeps original-access and hydration policy centralized and leaves the review queue untouched.
+- Deferred work: Human Windows verification of the new-tab workflow and preserved review context is intentionally deferred until WI-0058, WI-0059 and WI-0060 are all merged.
+- Commands run: GitHub Actions `build` workflow for PR #147, including Release build, full test suite, living-documentation validation and review/package verification.
