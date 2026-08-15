@@ -41,6 +41,7 @@ public sealed record CatalogueReviewAction(
 
 public sealed record CatalogueReviewFace(
     FaceOccurrenceId Id,
+    AssetRevisionId RevisionId,
     int Ordinal,
     DateTimeOffset CreatedAtUtc,
     string PhotoName,
