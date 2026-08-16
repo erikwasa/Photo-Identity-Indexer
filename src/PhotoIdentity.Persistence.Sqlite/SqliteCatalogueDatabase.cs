@@ -712,7 +712,8 @@ public sealed class SqliteCatalogueDatabase
             asset_revision_id TEXT NOT NULL,
             tag_id INTEGER NULL,
             action_kind TEXT NOT NULL CHECK (action_kind IN ('set', 'clear')),
-            source_kind TEXT NOT NULL CHECK (source_kind IN ('manual', 'legacy-migration', 'automatic')),
+            source_kind TEXT NOT NULL CHECK (source_kind IN ('manual', 'automatic', 'migration')),
+            provider TEXT NULL,
             actor TEXT NOT NULL,
             created_at_utc TEXT NOT NULL,
             FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
@@ -734,10 +735,7 @@ public sealed class SqliteCatalogueDatabase
             resolved_by TEXT NULL,
             resolution_note TEXT NULL,
             FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
-            CHECK (length(candidate_values) > 0),
-            CHECK (
-                (resolved_at_utc IS NULL AND resolved_by IS NULL)
-                OR (resolved_at_utc IS NOT NULL AND resolved_by IS NOT NULL))
+            CHECK (length(candidate_values) > 0)
         );
         CREATE INDEX IF NOT EXISTS ix_photo_place_migration_conflicts_open
             ON photo_place_migration_conflicts (resolved_at_utc, detected_at_utc, asset_revision_id);
