@@ -5,54 +5,68 @@ milestone: M18
 status_source: ../status/work-items.yaml
 depends_on: [WI-0033, WI-0042]
 related_adrs: []
-affected_modules: [PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Imaging.OpenCv, PhotoIdentity.Integration.Tests]
+affected_modules: [PhotoIdentity.Api, PhotoIdentity.Worker, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Imaging.OpenCv, PhotoIdentity.Integration.Tests]
 ---
 
 # WI-0058: Improve Face Details image quality
 
 ## Objective
 
-Make the face crop shown on Face Details materially sharper than the gallery card image when the underlying photo contains enough source pixels, without artificial upscaling or weakening the application's local-first privacy and hydration boundaries.
+Make Face Details materially sharper than the gallery card when the original photo contains enough real face pixels, while making both Face Gallery and Face Details independent of whether the authoritative full-resolution photo is currently local or online-only.
 
 ## Why
 
-The review API requests a larger image for Face Details than for the gallery, but both views ultimately render from the same review-proxy source. The face renderer intentionally never upscales, so a face-with-context crop that contains only roughly 200–300 source pixels stays at that intrinsic size even when Face Details asks for a larger result. The details layout then displays that small image in a much larger panel, making it visibly pixelated.
+The first WI-0058 implementation attempted to render Face Details from an already-local, revision-verified original at request time and otherwise fell back to the whole-photo review proxy. Windows manual verification on 2026-08-16 showed that this still produced the same roughly proxy-resolution face image as Face Gallery in a representative local-original case. More importantly, tying review quality to the current hydration state of the original is the wrong long-term boundary.
+
+Face review needs a durable local artifact. The full-resolution original should be required only while analysis/backfill creates that artifact; routine review should never need to probe, hydrate or reopen the original.
 
 ## In scope
 
-- Keep the gallery image path optimized for card-sized review.
-- Add a higher-resolution rendering path for Face Details that can use genuinely higher-resolution source pixels when available.
-- Prefer a privacy-safe durable derivative suitable for detail review; an already-local, revision-verified original may be used as a source when appropriate.
-- Preserve the existing face-centered crop and surrounding review context unless a better detail-specific crop policy is justified by tests.
-- Keep the no-upscale behavior: increasing requested dimensions must not fabricate detail from a smaller crop.
-- Fall back gracefully to the existing review crop when no higher-resolution source is available.
-- Add automated coverage for source selection, size behavior and privacy/hydration boundaries.
+- Generate one durable contextual face-review derivative per detected face from the full-resolution authoritative original while that original is available for archive work.
+- Use the existing face-centered context policy (`2.2x` the detected face extent), JPEG quality 90 and a maximum long edge of 960 px.
+- Never upscale a crop that contains fewer than 960 real source pixels on its longest edge.
+- Store the derivative permanently under the configured review-derivative root, separately from the small aligned recognition crop.
+- Serve Face Details directly from the stored derivative when its intrinsic dimensions are within the 960 px request.
+- Serve Face Gallery by downscaling the same stored derivative to the card request size (currently 360 px) at response time; do not persist a second gallery-size copy unless later performance evidence justifies it.
+- Keep the durable whole-photo review proxy as a temporary compatibility fallback while existing faces are waiting for derivative backfill.
+- Backfill already-analyzed current revisions by reusing their persisted face observations/bounding boxes. Backfill may hydrate an online-only original under the existing bounded hydration policy, generate all missing face derivatives for that revision, then release only app-managed hydration.
+- Include missing face-review derivatives in archive advancement work so requested archive processing does not report complete while relevant analyzed faces are still waiting for backfill.
+- Decode the original through the application's supported image decoder so JPEG, PNG, HEIC and HEIF use the same supported source-format boundary.
+- Add automated coverage for durable generation, gallery downscaling, high-resolution details and review behavior after the original becomes online-only.
 
 ## Out of scope
 
-- Automatically hydrating an online-only OneDrive original merely because Face Details was opened.
-- Exposing source paths, derivative paths or other private filesystem details to the browser.
-- Replacing the gallery with full-resolution images.
+- Persisting a separate 360 px gallery derivative before performance measurements show it is needed.
+- Automatically hydrating an original because a user opened Face Gallery or Face Details.
+- Exposing authoritative source paths or durable derivative paths to the browser.
+- Re-running face detection, alignment or embedding solely to backfill review derivatives.
 - General image enhancement, super-resolution or AI-based reconstruction.
 
 ## Acceptance criteria
 
-- [x] Face Gallery continues to use a card-appropriate face preview and does not incur the cost of the Face Details rendering path.
-- [x] Face Details can return a face-centered preview up to approximately 960 px on its longest edge when the selected source contains enough real pixels.
-- [x] The renderer never enlarges a smaller source crop solely to satisfy the requested dimensions.
-- [x] A face whose higher-resolution source is unavailable still renders through the existing safe fallback rather than failing the details page.
-- [x] Opening Face Details does not request hydration of an online-only original.
-- [x] Browser-facing contracts expose only privacy-safe image URLs/metadata and never local source or derivative paths.
-- [x] Automated tests distinguish gallery-size rendering, higher-resolution detail rendering, fallback behavior and no-upscale behavior.
-- [ ] Human verification on Windows confirms that representative Face Details images are visibly sharper than their gallery counterparts when higher-resolution source pixels exist and do not appear artificially enlarged when they do not.
+- [ ] A durable contextual face-review JPEG is generated from full-resolution source pixels for each detected face, with a maximum long edge of 960 px and no upscaling.
+- [ ] The durable face-review derivative is separate from the aligned recognition crop and remains available after the authoritative original becomes online-only.
+- [ ] Face Details uses the durable derivative and can return up to approximately 960 px on its longest edge when the original face/context region contains enough real pixels.
+- [ ] Face Gallery uses the same durable derivative as its quality source and returns a card-sized response without requiring a second permanently stored gallery image.
+- [ ] Opening Face Gallery or Face Details never probes or hydrates the authoritative original.
+- [ ] Already-analyzed faces can be backfilled from persisted observations without rerunning detector or embedder inference.
+- [ ] Archive advancement keeps derivative backfill pending until relevant current analyzed faces have durable review derivatives and respects the existing managed hydration/release boundary.
+- [ ] JPEG, PNG, HEIC and HEIF originals use the application's supported decoder when the durable face derivative is generated.
+- [ ] Browser-facing contracts continue to expose only privacy-safe image URLs/metadata and never source or derivative filesystem paths.
+- [ ] Automated tests prove that a face derivative generated while the original is local remains the high-resolution Face Details source after the original state changes to online-only.
+- [ ] Human verification on Windows confirms that representative Face Details images are visibly sharper than their gallery counterparts and remain unchanged when the original is online-only.
 
 ## Verification requirements
 
-Automated API/rendering tests plus human Windows verification with representative small-face and large-face examples are required.
+Automated renderer/persistence/API coverage plus Windows verification with representative large-face, small-face and online-only-after-backfill examples are required. Manual verification should explicitly confirm that making an original online-only after backfill does not reduce Face Gallery or Face Details quality.
+
+## Implementation history
+
+- PR #147 introduced a request-time original-preference path. Manual verification on 2026-08-16 failed the image-quality criterion and exposed the unwanted runtime dependency on original hydration state.
+- The replacement design stores one permanent `<=960 px` face-review derivative generated from the full-resolution original and uses it as the sole high-quality source for both review surfaces.
+- Existing analyzed faces are backfilled from their persisted bounding boxes; face inference is not repeated.
 
 ## Completion notes
 
-- Files changed: `OpenCvReviewFaceRenderer.cs`, `ReviewFacePreviewResolver.cs`, `ReviewEndpoints.cs`, `SuggestionGalleryEndpoints.cs`, `ReviewFaceDetailImageApplicationTests.cs`.
-- Trade-offs: Face Details prefers an already-local revision-verified original only for detail-sized requests. Gallery requests stay review-proxy backed. If a verified original is unavailable or online-only, the renderer falls back to the durable review proxy and still refuses to upscale a smaller crop.
-- Deferred work: Human Windows image-quality verification is intentionally deferred until WI-0058, WI-0059 and WI-0060 are all merged and ready to verify together.
-- Commands run: GitHub Actions `build` workflow for PR #147, including Release build, full test suite, living-documentation validation and review/package verification.
+- WI-0058 remains open while the durable derivative implementation and backfill are completed and reverified on Windows.
+- WI-0059 and WI-0060 passed the same 2026-08-16 Windows verification session independently of this image-quality failure.
