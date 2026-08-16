@@ -13,21 +13,31 @@ public sealed record ReviewProxyServingConfiguration(
 }
 
 /// <summary>
-/// Resolves durable review-proxy metadata to a verified path under the configured derivative root.
-/// It never falls back to or opens the authoritative source original.
+/// Resolves durable review derivative metadata to verified paths under the configured derivative
+/// root. It never falls back to or opens the authoritative source original.
 /// </summary>
 public sealed class CollectionReviewProxyFileResolver
 {
     private readonly SqliteArchiveReviewProxyRepository _repository;
+    private readonly SqliteCatalogueDatabase? _database;
     private readonly ReviewProxyServingConfiguration _configuration;
 
     public CollectionReviewProxyFileResolver(
         SqliteArchiveReviewProxyRepository repository,
         ReviewProxyServingConfiguration configuration)
+        : this(repository, database: null, configuration)
+    {
+    }
+
+    public CollectionReviewProxyFileResolver(
+        SqliteArchiveReviewProxyRepository repository,
+        SqliteCatalogueDatabase? database,
+        ReviewProxyServingConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(configuration);
         _repository = repository;
+        _database = database;
         _configuration = configuration;
     }
 
@@ -49,12 +59,36 @@ public sealed class CollectionReviewProxyFileResolver
             return null;
         }
 
+        string? path = ResolveStoredPath(proxy.RelativePath, proxy.EncodedByteLength);
+        return path is null ? null : new CollectionPhotoFile(path, "image/jpeg");
+    }
+
+    public Task<FaceReviewDerivativeFile?> ResolveFaceReviewAsync(
+        FaceOccurrenceId faceOccurrenceId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_database is null)
+        {
+            return Task.FromResult<FaceReviewDerivativeFile?>(null);
+        }
+
+        return new FaceReviewDerivativeFileResolver(_database, _configuration)
+            .ResolveAsync(faceOccurrenceId, cancellationToken);
+    }
+
+    private string? ResolveStoredPath(string relativePath, long encodedByteLength)
+    {
+        if (string.IsNullOrWhiteSpace(_configuration.RootPath))
+        {
+            return null;
+        }
+
         string root;
         string path;
         try
         {
             root = Path.GetFullPath(_configuration.RootPath!);
-            string platformPath = proxy.RelativePath
+            string platformPath = relativePath
                 .Replace('/', Path.DirectorySeparatorChar)
                 .Replace('\\', Path.DirectorySeparatorChar);
             path = Path.GetFullPath(Path.Combine(root, platformPath));
@@ -82,7 +116,7 @@ public sealed class CollectionReviewProxyFileResolver
         {
             FileInfo file = new(path);
             if (!file.Exists ||
-                file.Length != proxy.EncodedByteLength ||
+                file.Length != encodedByteLength ||
                 (file.Attributes & FileAttributes.ReparsePoint) != 0)
             {
                 return null;
@@ -96,6 +130,6 @@ public sealed class CollectionReviewProxyFileResolver
             return null;
         }
 
-        return new CollectionPhotoFile(path, "image/jpeg");
+        return path;
     }
 }
