@@ -91,7 +91,7 @@ Automatic tagging, reverse geocoding, sidecar/original metadata write-back, stat
 - [x] Capture time and GPS metadata are persisted with correct source semantics.
 - [x] Existing revisions can be identified for bounded metadata backfill without changing their canonical identity.
 - [x] Metadata inspection does not hydrate online-only originals.
-- [ ] Saved smart collections can be created, reopened, edited and deleted through the web workspace.
+- [x] Saved smart collections can be created, reopened, edited and deleted through the web workspace.
 - [x] A saved collection reevaluates against the current catalogue and includes newly matching photos automatically.
 - [x] People, tags, location and taken time work independently and can all be combined in one collection.
 - [x] People and tags each support explicit `all` and `any` matching.
@@ -104,13 +104,14 @@ Automatic tagging, reverse geocoding, sidecar/original metadata write-back, stat
 - Slice 1 merged in PR #143 with successful workflow `31756173422`. It established capture-time/GPS parsing, revision-bound persistence and bounded backfill candidates.
 - Slice 2 merged in PR #144 with successful workflow `31760294369`. It added explicit local-only verified metadata backfill plus the combined smart-collection filter/query contract.
 - Slice 3 merged in PR #145 with successful workflow `31800391197`. It persisted canonical saved definitions and added create/list/get/update/delete plus saved-query API operations.
-- Slice 4 is active on `agent/WI-0050-smart-collection-ui`. It adds the `/smart-collections` saved-definition workspace without changing the legacy `/collections` flow.
-- Maintainer verification remains one integrated pass after all non-deferred M19 implementation is complete.
+- Slice 4 merged in PR #146 with successful workflow `31802548161`. It added the `/smart-collections` saved-definition workspace without changing the legacy `/collections` flow.
+- The maintainer completed the integrated M19 baseline verification on 2026-08-16 and reported that M19 and the work-item functions behaved as expected.
+- WI-0050 is complete. Later M19 additions are tracked separately in WI-0061 through WI-0064 so the verified baseline contract remains stable and auditable.
 
-## Planned slices
+## Completed slices
 
-1. Capture-time/GPS persistence and bounded backfill foundation — merged in PR #143.
-2. Safe explicit metadata backfill execution plus combined collection-filter/query contract — merged in PR #144.
-3. Persisted smart-collection CRUD/query API — merged in PR #145.
-4. Saved-collection UI — current.
-5. One maintainer verification pass for the complete non-deferred M19 scope.
+1. Capture-time/GPS persistence and bounded backfill foundation — PR #143.
+2. Safe explicit metadata backfill execution plus combined collection-filter/query contract — PR #144.
+3. Persisted smart-collection CRUD/query API — PR #145.
+4. Saved-collection UI — PR #146.
+5. Integrated maintainer verification — completed 2026-08-16.
