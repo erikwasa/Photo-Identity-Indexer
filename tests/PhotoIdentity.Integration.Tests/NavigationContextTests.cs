@@ -27,15 +27,50 @@ public sealed class NavigationContextTests
     }
 
     [Fact]
+    public void Transient_state_round_trip_preserves_editor_filters()
+    {
+        SmartCollectionTransientNavigationState state = new(
+            "saved-1",
+            "Current preview",
+            ["person-2", "person-1"],
+            "any",
+            ["Family", "Travel"],
+            "all",
+            "2025/05/01-2025/05/10",
+            true,
+            "59.0",
+            "17.0",
+            "60.0",
+            "18.0");
+
+        string json = SmartCollectionNavigation.SerializeTransientState(state);
+        SmartCollectionTransientNavigationState? restored = SmartCollectionNavigation.DeserializeTransientState(json);
+
+        Assert.NotNull(restored);
+        Assert.Equal(state.EditingId, restored.EditingId);
+        Assert.Equal(state.Name, restored.Name);
+        Assert.Equal(state.People, restored.People);
+        Assert.Equal(state.PeopleMatch, restored.PeopleMatch);
+        Assert.Equal(state.Tags, restored.Tags);
+        Assert.Equal(state.TagMatch, restored.TagMatch);
+        Assert.Equal(state.Taken, restored.Taken);
+        Assert.Equal(state.UseLocation, restored.UseLocation);
+        Assert.Equal(state.South, restored.South);
+        Assert.Equal(state.West, restored.West);
+        Assert.Equal(state.North, restored.North);
+        Assert.Equal(state.East, restored.East);
+    }
+
+    [Fact]
     public void Photo_url_escapes_the_entire_nested_return_url()
     {
         string returnUrl = "/smart-collections?mode=saved&collection=collection-1&offset=40";
 
         string url = SmartCollectionNavigation.BuildPhotoUrl("revision-1", returnUrl);
 
-        Assert.StartsWith("/photo/revision-1?returnUrl=", url, StringComparison.Ordinal);
-        Assert.Contains("%2Fsmart-collections%3Fmode%3Dsaved%26collection%3Dcollection-1%26offset%3D40", url, StringComparison.Ordinal);
-        Assert.DoesNotContain("&offset=40", url, StringComparison.Ordinal);
+        Assert.StartsWith("/photo/revision-1?returnUrl=", url);
+        Assert.Contains("%2Fsmart-collections%3Fmode%3Dsaved%26collection%3Dcollection-1%26offset%3D40", url);
+        Assert.DoesNotContain("&offset=40", url);
     }
 
     [Theory]
