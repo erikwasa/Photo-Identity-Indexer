@@ -13,6 +13,7 @@ using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using PhotoIdentity.Web.Contracts;
+using PhotoIdentity.Worker;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -20,12 +21,20 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class ReviewFaceDetailImageApplicationTests
 {
     [Fact]
-    public async Task Face_details_prefers_verified_local_original_and_exposes_containing_revision()
+    public async Task Face_details_uses_durable_full_resolution_face_derivative()
     {
         string directory = CreateTemporaryDirectory();
         try
         {
             SeededFace seeded = await SeedAsync(directory);
+            SqliteCatalogueDatabase database = new(seeded.DatabasePath);
+            _ = await new ArchiveFaceReviewDerivativeWriter(database).GenerateAsync(
+                seeded.RevisionId,
+                seeded.SourcePath,
+                seeded.SourceRoot,
+                seeded.ProxyRoot,
+                new DateTimeOffset(2026, 8, 16, 18, 0, 0, TimeSpan.Zero));
+
             FakeFilesOnDemandPlatform platform = new(
                 new OneDriveFilesOnDemandState(AssetAvailability.Local, false, false));
 
@@ -68,12 +77,20 @@ public sealed class ReviewFaceDetailImageApplicationTests
     }
 
     [Fact]
-    public async Task Face_details_does_not_hydrate_online_only_original_and_falls_back_to_review_proxy()
+    public async Task Face_details_remains_high_resolution_after_original_becomes_online_only()
     {
         string directory = CreateTemporaryDirectory();
         try
         {
             SeededFace seeded = await SeedAsync(directory);
+            SqliteCatalogueDatabase database = new(seeded.DatabasePath);
+            _ = await new ArchiveFaceReviewDerivativeWriter(database).GenerateAsync(
+                seeded.RevisionId,
+                seeded.SourcePath,
+                seeded.SourceRoot,
+                seeded.ProxyRoot,
+                new DateTimeOffset(2026, 8, 16, 18, 0, 0, TimeSpan.Zero));
+
             FakeFilesOnDemandPlatform platform = new(
                 new OneDriveFilesOnDemandState(AssetAvailability.OnlineOnly, false, true));
 
@@ -93,8 +110,8 @@ public sealed class ReviewFaceDetailImageApplicationTests
                 await detailsImageResponse.Content.ReadAsByteArrayAsync(),
                 ImreadModes.Color);
 
-            Assert.Equal(800, detailsImage.Cols);
-            Assert.Equal(800, detailsImage.Rows);
+            Assert.Equal(960, detailsImage.Cols);
+            Assert.Equal(960, detailsImage.Rows);
             Assert.Equal(0, platform.HydrationRequests);
         }
         finally
@@ -206,6 +223,8 @@ public sealed class ReviewFaceDetailImageApplicationTests
 
         return new SeededFace(
             databasePath,
+            sourceRoot,
+            sourcePath,
             proxyRoot,
             profileId,
             faceId,
@@ -232,6 +251,8 @@ public sealed class ReviewFaceDetailImageApplicationTests
 
     private sealed record SeededFace(
         string DatabasePath,
+        string SourceRoot,
+        string SourcePath,
         string ProxyRoot,
         string ProfileId,
         FaceOccurrenceId FaceId,
