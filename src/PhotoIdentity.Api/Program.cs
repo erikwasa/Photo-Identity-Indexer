@@ -75,6 +75,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteAssetCatalogueRepository>();
         builder.Services.AddSingleton<SqlitePhotoMetadataBackfillRepository>();
         builder.Services.AddSingleton<SqlitePhotoTagRepository>();
+        builder.Services.AddSingleton<SqlitePhotoPlaceRepository>();
         builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
         builder.Services.AddSingleton<SqliteProcessingRepository>();
@@ -118,7 +119,9 @@ public partial class Program
             serviceProvider.GetRequiredService<TimeProvider>()));
 
         WebApplication app = builder.Build();
-        await app.Services.GetRequiredService<SqliteCatalogueDatabase>().InitializeAsync();
+        SqliteCatalogueDatabase catalogueDatabase = app.Services.GetRequiredService<SqliteCatalogueDatabase>();
+        await catalogueDatabase.InitializeAsync();
+        await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(catalogueDatabase);
 
         app.UseBlazorFrameworkFiles();
         app.UseStaticFiles();
@@ -128,6 +131,7 @@ public partial class Program
                 context.Request.Path.StartsWithSegments("/api/collections") ||
                 context.Request.Path.StartsWithSegments("/api/smart-collections") ||
                 context.Request.Path.StartsWithSegments("/api/photo-metadata") ||
+                context.Request.Path.StartsWithSegments("/api/places") ||
                 context.Request.Path.StartsWithSegments("/api/detector-evaluation") ||
                 context.Request.Path.StartsWithSegments("/api/detector-rollout") ||
                 context.Request.Path.StartsWithSegments("/api/archive"))
@@ -165,6 +169,7 @@ public partial class Program
         app.MapCollectionProxyEndpoints();
         app.MapCollectionViewerPreviewEndpoints();
         app.MapPhotoTagEndpoints();
+        app.MapPhotoPlaceEndpoints();
         app.MapDetectorEvaluationEndpoints();
         app.MapDetectorEvaluationComparisonEndpoints();
         app.MapDetectorRolloutEndpoints();
