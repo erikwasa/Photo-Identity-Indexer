@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Web.Components;
@@ -9,9 +11,29 @@ namespace PhotoIdentity.Web.Components;
 public partial class SmartCollectionsWorkspace
 {
     private const int PageSize = 40;
+    private static readonly JsonSerializerOptions NavigationJsonOptions = new(JsonSerializerDefaults.Web);
 
     [Inject]
     public HttpClient Http { get; set; } = default!;
+
+    [Inject]
+    public IJSRuntime JS { get; set; } = default!;
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "mode")]
+    public string? NavigationMode { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "collection")]
+    public string? NavigationCollectionId { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "offset")]
+    public int? NavigationOffset { get; set; }
+
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "preview")]
+    public string? NavigationPreviewKey { get; set; }
 
     private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
     private IReadOnlyList<PhotoTagDefinitionResponse> Tags { get; set; } = [];
@@ -20,6 +42,7 @@ public partial class SmartCollectionsWorkspace
     private HashSet<string> SelectedTags { get; } = new(StringComparer.OrdinalIgnoreCase);
     private SmartCollectionPageResponse? Results { get; set; }
     private string? EditingId { get; set; }
+    private string? TransientPreviewKey { get; set; }
     private string Name { get; set; } = "";
     private string PeopleMatch { get; set; } = "all";
     private string TagMatch { get; set; } = "all";
@@ -50,6 +73,14 @@ public partial class SmartCollectionsWorkspace
     private string SaveLabel => EditingId is null ? "Save collection" : "Save changes";
     private int FirstResult => Results is null || Results.Items.Length == 0 ? 0 : Results.Offset + 1;
     private int LastResult => Results is null ? 0 : Results.Offset + Results.Items.Length;
+    private string CurrentWorkspaceReturnUrl => ActiveResultMode switch
+    {
+        ResultMode.Saved when EditingId is not null && Results is not null =>
+            SmartCollectionNavigation.BuildSavedWorkspaceUrl(EditingId, Results.Offset),
+        ResultMode.Transient when TransientPreviewKey is not null && Results is not null =>
+            SmartCollectionNavigation.BuildTransientWorkspaceUrl(TransientPreviewKey, Results.Offset),
+        _ => "/smart-collections",
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -64,6 +95,7 @@ public partial class SmartCollectionsWorkspace
             People = await peopleTask ?? [];
             Tags = await tagTask ?? [];
             Definitions = await definitionTask ?? [];
+            await RestoreNavigationStateAsync();
         }
         catch (Exception exception)
         {
@@ -75,9 +107,16 @@ public partial class SmartCollectionsWorkspace
         }
     }
 
-    private void NewCollection()
+    private async Task NewCollection()
+    {
+        ResetEditor();
+        await ReplaceWorkspaceUrlAsync("/smart-collections");
+    }
+
+    private void ResetEditor()
     {
         EditingId = null;
+        TransientPreviewKey = null;
         Name = "";
         SelectedPeople.Clear();
         SelectedTags.Clear();
@@ -101,6 +140,7 @@ public partial class SmartCollectionsWorkspace
     private void ApplyDefinition(SmartCollectionDefinitionResponse definition)
     {
         EditingId = definition.Id;
+        TransientPreviewKey = null;
         Name = definition.Name;
         SelectedPeople.Clear();
         foreach (string person in definition.Filter.People)
@@ -130,6 +170,36 @@ public partial class SmartCollectionsWorkspace
             South = West = North = East = "";
         }
 
+        Results = null;
+        ActiveResultMode = ResultMode.None;
+        Error = null;
+        Notice = null;
+    }
+
+    private void ApplyTransientNavigationState(SmartCollectionTransientNavigationState state)
+    {
+        EditingId = state.EditingId;
+        Name = state.Name;
+        SelectedPeople.Clear();
+        foreach (string person in state.People)
+        {
+            SelectedPeople.Add(person);
+        }
+
+        SelectedTags.Clear();
+        foreach (string tag in state.Tags)
+        {
+            SelectedTags.Add(tag);
+        }
+
+        PeopleMatch = state.PeopleMatch;
+        TagMatch = state.TagMatch;
+        Taken = state.Taken;
+        UseLocation = state.UseLocation;
+        South = state.South;
+        West = state.West;
+        North = state.North;
+        East = state.East;
         Results = null;
         ActiveResultMode = ResultMode.None;
         Error = null;
@@ -189,6 +259,10 @@ public partial class SmartCollectionsWorkspace
             await RefreshDefinitionsAsync();
             Notice = "Smart collection saved.";
             await QuerySavedCoreAsync(0);
+            if (ActiveResultMode == ResultMode.Saved && Results is not null)
+            {
+                await ReplaceSavedWorkspaceUrlAsync();
+            }
         }
         catch (Exception exception)
         {
@@ -213,6 +287,10 @@ public partial class SmartCollectionsWorkspace
         try
         {
             await QueryTransientCoreAsync(request!);
+            if (ActiveResultMode == ResultMode.Transient && Results is not null)
+            {
+                await PersistTransientNavigationAsync();
+            }
         }
         finally
         {
@@ -236,8 +314,9 @@ public partial class SmartCollectionsWorkspace
 
             if (string.Equals(EditingId, definition.Id, StringComparison.Ordinal))
             {
-                NewCollection();
+                ResetEditor();
                 Notice = "Smart collection deleted.";
+                await ReplaceWorkspaceUrlAsync("/smart-collections");
             }
             else
             {
@@ -285,12 +364,21 @@ public partial class SmartCollectionsWorkspace
             if (ActiveResultMode == ResultMode.Saved && EditingId is not null)
             {
                 await QuerySavedCoreAsync(offset);
+                if (ActiveResultMode == ResultMode.Saved && Results is not null)
+                {
+                    await ReplaceSavedWorkspaceUrlAsync();
+                }
+
                 return;
             }
 
             if (ActiveResultMode == ResultMode.Transient && TryBuildQueryRequest(offset, out SmartCollectionQueryRequest? request))
             {
                 await QueryTransientCoreAsync(request!);
+                if (ActiveResultMode == ResultMode.Transient && Results is not null)
+                {
+                    await PersistTransientNavigationAsync();
+                }
             }
         }
         finally
@@ -305,6 +393,10 @@ public partial class SmartCollectionsWorkspace
         try
         {
             await QuerySavedCoreAsync(offset);
+            if (ActiveResultMode == ResultMode.Saved && Results is not null)
+            {
+                await ReplaceSavedWorkspaceUrlAsync();
+            }
         }
         finally
         {
@@ -323,7 +415,7 @@ public partial class SmartCollectionsWorkspace
         try
         {
             using HttpResponseMessage response = await Http.GetAsync(
-                $"api/smart-collections/{EditingId}/query?offset={offset}&limit={PageSize}");
+                $"api/smart-collections/{EditingId}/query?offset={Math.Max(0, offset)}&limit={PageSize}");
             if (!response.IsSuccessStatusCode)
             {
                 Error = await ReadErrorAsync(response, "The saved collection could not be evaluated.");
@@ -361,6 +453,130 @@ public partial class SmartCollectionsWorkspace
             Error = $"The smart collection preview could not be evaluated: {exception.Message}";
         }
     }
+
+    private async Task RestoreNavigationStateAsync()
+    {
+        int offset = Math.Max(0, NavigationOffset ?? 0);
+        if (string.Equals(NavigationMode, "saved", StringComparison.OrdinalIgnoreCase) &&
+            !string.IsNullOrWhiteSpace(NavigationCollectionId))
+        {
+            SmartCollectionDefinitionResponse? definition = Definitions.FirstOrDefault(
+                candidate => string.Equals(candidate.Id, NavigationCollectionId, StringComparison.Ordinal));
+            if (definition is null)
+            {
+                Notice = "The saved Smart Collection referenced by this browser history entry no longer exists.";
+                return;
+            }
+
+            ApplyDefinition(definition);
+            await QuerySavedCoreAsync(offset);
+            return;
+        }
+
+        if (!string.Equals(NavigationMode, "transient", StringComparison.OrdinalIgnoreCase) ||
+            !IsValidPreviewKey(NavigationPreviewKey))
+        {
+            return;
+        }
+
+        try
+        {
+            string previewKey = NavigationPreviewKey!;
+            string storageKey = SmartCollectionNavigation.PreviewStorageKey(previewKey);
+            string? json = await JS.InvokeAsync<string?>("sessionStorage.getItem", storageKey);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                Notice = "This unsaved Smart Collection preview is no longer available in this browser tab.";
+                return;
+            }
+
+            SmartCollectionTransientNavigationState? state =
+                JsonSerializer.Deserialize<SmartCollectionTransientNavigationState>(json, NavigationJsonOptions);
+            if (state is null)
+            {
+                Notice = "This unsaved Smart Collection preview could not be restored.";
+                return;
+            }
+
+            ApplyTransientNavigationState(state);
+            TransientPreviewKey = previewKey;
+            if (TryBuildQueryRequest(offset, out SmartCollectionQueryRequest? request))
+            {
+                await QueryTransientCoreAsync(request!);
+            }
+        }
+        catch (Exception exception) when (exception is JSException or JsonException)
+        {
+            Notice = $"This unsaved Smart Collection preview could not be restored: {exception.Message}";
+        }
+    }
+
+    private async Task PersistTransientNavigationAsync()
+    {
+        if (Results is null)
+        {
+            return;
+        }
+
+        TransientPreviewKey ??= Guid.NewGuid().ToString("N");
+        SmartCollectionTransientNavigationState state = new(
+            EditingId,
+            Name,
+            SelectedPeople.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
+            PeopleMatch,
+            SelectedTags.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
+            TagMatch,
+            Taken,
+            UseLocation,
+            South,
+            West,
+            North,
+            East);
+
+        try
+        {
+            string json = JsonSerializer.Serialize(state, NavigationJsonOptions);
+            await JS.InvokeVoidAsync(
+                "sessionStorage.setItem",
+                SmartCollectionNavigation.PreviewStorageKey(TransientPreviewKey),
+                json);
+            await ReplaceWorkspaceUrlAsync(
+                SmartCollectionNavigation.BuildTransientWorkspaceUrl(TransientPreviewKey, Results.Offset));
+        }
+        catch (JSException exception)
+        {
+            Notice = $"The current preview is available, but its browser-tab return state could not be saved: {exception.Message}";
+        }
+    }
+
+    private async Task ReplaceSavedWorkspaceUrlAsync()
+    {
+        if (EditingId is null || Results is null)
+        {
+            return;
+        }
+
+        await ReplaceWorkspaceUrlAsync(
+            SmartCollectionNavigation.BuildSavedWorkspaceUrl(EditingId, Results.Offset));
+    }
+
+    private async Task ReplaceWorkspaceUrlAsync(string relativeUrl)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("history.replaceState", (object?)null, "", relativeUrl);
+        }
+        catch (JSException exception)
+        {
+            Notice = $"Browser history state could not be updated: {exception.Message}";
+        }
+    }
+
+    private string PhotoHref(SmartCollectionPhotoResponse photo) =>
+        SmartCollectionNavigation.BuildPhotoUrl(photo.RevisionId, CurrentWorkspaceReturnUrl);
+
+    private static bool IsValidPreviewKey(string? value) =>
+        value is not null && value.Length == 32 && Guid.TryParseExact(value, "N", out _);
 
     private bool TryBuildDefinitionRequest(out SmartCollectionDefinitionRequest? request)
     {
@@ -402,7 +618,7 @@ public partial class SmartCollectionsWorkspace
             TagMatch,
             location,
             string.IsNullOrWhiteSpace(Taken) ? null : Taken.Trim(),
-            offset,
+            Math.Max(0, offset),
             PageSize);
         return true;
     }
