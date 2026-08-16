@@ -49,6 +49,52 @@
         </div>
     }
 
+    <section class="metadata-card photo-details-panel" aria-labelledby="photo-details-heading">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Photo metadata</p>
+                <h2 id="photo-details-heading">Details</h2>
+            </div>
+            @if (!LoadingDetails && Details is not null)
+            {
+                <span>@PeopleCountLabel</span>
+            }
+        </div>
+
+        @if (LoadingDetails)
+        {
+            <div class="empty-state compact"><p>Loading photo details…</p></div>
+        }
+        else if (Details is not null)
+        {
+            <dl class="profile-details photo-detail-values">
+                <div><dt>File name</dt><dd>@Details.FileName</dd></div>
+            </dl>
+
+            <div class="photo-people-section">
+                <h3>People</h3>
+                @if (Details.People.Count == 0)
+                {
+                    <p class="photo-detail-empty">No confirmed people are currently known to be in this photo.</p>
+                }
+                else
+                {
+                    <div class="photo-person-list" aria-label="Confirmed people in this photo">
+                        @foreach (PhotoDetailsPersonResponse person in Details.People)
+                        {
+                            <span class="photo-person-chip" title="@ConfirmedFaceLabel(person.ConfirmedFaceCount)">@person.DisplayName</span>
+                        }
+                    </div>
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(DetailsError))
+        {
+            <div class="notice error photo-details-notice" role="alert">@DetailsError</div>
+        }
+    </section>
+
     <section class="metadata-card photo-tag-panel" aria-labelledby="photo-tags-heading">
         <div class="section-heading">
             <div>
@@ -167,14 +213,17 @@
     public string RevisionId { get; set; } = string.Empty;
 
     private CollectionOriginalAccessResponse? Original { get; set; }
+    private PhotoDetailsResponse? Details { get; set; }
     private IReadOnlyList<PhotoTagResponse> Tags { get; set; } = [];
     private bool LoadingStatus { get; set; }
+    private bool LoadingDetails { get; set; }
     private bool LoadingTags { get; set; }
     private bool Busy { get; set; }
     private bool TagBusy { get; set; }
     private bool PreviewUnavailable { get; set; }
     private string TagInput { get; set; } = string.Empty;
     private string? Error { get; set; }
+    private string? DetailsError { get; set; }
     private string? TagError { get; set; }
     private CancellationTokenSource? PollCancellation { get; set; }
 
@@ -182,15 +231,18 @@
     private string OriginalUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original";
     private string ViewerUrl => Original?.CanView == true ? OriginalUrl : PreviewUrl;
     private string StatusUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original/status";
+    private string DetailsUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/details";
     private string TagsUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/tags";
     private string TagCountLabel => Tags.Count == 1 ? "1 manual tag" : $"{Tags.Count} manual tags";
+    private string PeopleCountLabel => Details?.People.Count == 1 ? "1 confirmed person" : $"{Details?.People.Count ?? 0} confirmed people";
 
     protected override async Task OnParametersSetAsync()
     {
         StopPolling();
         PreviewUnavailable = false;
         TagInput = string.Empty;
-        await Task.WhenAll(LoadStatusAsync(), LoadTagsAsync());
+        Details = null;
+        await Task.WhenAll(LoadStatusAsync(), LoadDetailsAsync(), LoadTagsAsync());
         StartPollingIfNeeded();
     }
 
@@ -215,6 +267,25 @@
         finally
         {
             LoadingStatus = false;
+        }
+    }
+
+    private async Task LoadDetailsAsync()
+    {
+        LoadingDetails = true;
+        DetailsError = null;
+        try
+        {
+            Details = await Http.GetFromJsonAsync<PhotoDetailsResponse>(DetailsUrl);
+        }
+        catch (Exception exception)
+        {
+            Details = null;
+            DetailsError = $"Photo details could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            LoadingDetails = false;
         }
     }
 
@@ -436,6 +507,9 @@
     {
         PollCancellation?.Cancel();
     }
+
+    private static string ConfirmedFaceLabel(int count) =>
+        count == 1 ? "1 confirmed face" : $"{count} confirmed faces";
 
     private static string OriginalManagedByLabel(CollectionOriginalAccessResponse original) =>
         original.ManagedHydration

@@ -69,6 +69,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();
         builder.Services.AddSingleton<SqliteBulkSuggestionReviewRepository>();
         builder.Services.AddSingleton<SqliteCollectionQueryRepository>();
+        builder.Services.AddSingleton<SqlitePhotoDetailsRepository>();
         builder.Services.AddSingleton<SqliteSmartCollectionQueryRepository>();
         builder.Services.AddSingleton<SqliteSmartCollectionRepository>();
         builder.Services.AddSingleton<SqliteAssetCatalogueRepository>();
@@ -158,6 +159,7 @@ public partial class Program
         app.MapBulkReviewEndpoints();
         app.MapBulkSuggestionReviewEndpoints();
         app.MapCollectionEndpoints();
+        app.MapPhotoDetailsEndpoints();
         app.MapSmartCollectionEndpoints();
         app.MapPhotoMetadataEndpoints();
         app.MapCollectionProxyEndpoints();

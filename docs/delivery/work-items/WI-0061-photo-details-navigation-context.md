@@ -46,6 +46,12 @@ The current viewer also prefers the durable review proxy even when the revision-
 2. **Photo detail metadata** — expose original file name plus consolidated confirmed people without leaking private source paths.
 3. **Navigation restoration** — preserve saved/transient Smart Collection state and replace the fixed Back destination with validated return context.
 
+## Implementation history
+
+- Slice 1 merged through PR #150 (`f93c486ce87f382c6c109b856995b55a601ce92e`). It implemented original-first Photo Details viewing, proxy fallback without implicit hydration, in-place transition after explicit hydration, and the simplified original-state UI.
+- Slice 2 is implemented on `agent/WI-0061-photo-details-metadata`. It adds a catalogue-only details query/API, exposes only the source-key basename, returns only active confirmed person assignments, excludes pending suggestions, and reserves a `ManualPresence` field in the response for WI-0062 without creating face-independent evidence yet.
+- Slice 2 integration coverage deliberately points the catalogue at an original source directory that does not exist locally; the details API must still return filename and confirmed people, proving the metadata path does not open or hydrate the original.
+
 ## Recommended state model
 
 - Saved Smart Collections should be reconstructable from a URL containing the saved collection identifier plus paging/result context.
@@ -59,6 +65,7 @@ The current viewer also prefers the durable review proxy even when the revision-
 - Exposing full source paths, source roots or private directory structure to the browser.
 - Changing the durable smart-collection definition model beyond what is required to restore navigation state.
 - Changing collection/gallery thumbnail policy; original-first behavior in this work item is specific to the Photo Details viewer.
+- Changing the durable face-review derivative introduced separately by WI-0058/PR #151.
 
 ## Acceptance criteria
 
