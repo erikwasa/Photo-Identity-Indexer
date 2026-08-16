@@ -1,14 +1,16 @@
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Places;
 using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
 public sealed record SmartCollectionLocationRequest(
-    double South,
-    double West,
-    double North,
-    double East);
+    double? South = null,
+    double? West = null,
+    double? North = null,
+    double? East = null,
+    string? Place = null);
 
 public sealed record SmartCollectionQueryRequest(
     string[]? People = null,
@@ -275,13 +277,7 @@ public static class SmartCollectionEndpoints
             .Distinct()
             .ToArray();
 
-        SmartCollectionGeoBounds? parsedLocation = location is null
-            ? null
-            : new SmartCollectionGeoBounds(
-                location.South,
-                location.West,
-                location.North,
-                location.East);
+        SmartCollectionGeoBounds? parsedLocation = ParseBounds(location);
         SmartCollectionDateRange? parsedTaken = string.IsNullOrWhiteSpace(taken)
             ? null
             : SmartCollectionDateRange.Parse(taken);
@@ -292,7 +288,35 @@ public static class SmartCollectionEndpoints
             tags,
             tagMatch,
             parsedLocation,
-            parsedTaken);
+            parsedTaken,
+            location?.Place);
+    }
+
+    private static SmartCollectionGeoBounds? ParseBounds(SmartCollectionLocationRequest? location)
+    {
+        if (location is null)
+        {
+            return null;
+        }
+
+        bool any = location.South.HasValue || location.West.HasValue ||
+            location.North.HasValue || location.East.HasValue;
+        bool all = location.South.HasValue && location.West.HasValue &&
+            location.North.HasValue && location.East.HasValue;
+        if (any && !all)
+        {
+            throw new ArgumentException(
+                "Location GPS bounds require south, west, north and east together.",
+                nameof(location));
+        }
+
+        return all
+            ? new SmartCollectionGeoBounds(
+                location.South!.Value,
+                location.West!.Value,
+                location.North!.Value,
+                location.East!.Value)
+            : null;
     }
 
     private static SmartCollectionDefinitionResponse ToDefinitionResponse(
@@ -331,13 +355,16 @@ public static class SmartCollectionEndpoints
         filter.PeopleMatch,
         filter.Tags.ToArray(),
         filter.TagMatch,
-        filter.Location is null
+        filter.Location is null && filter.LocationPlace is null
             ? null
             : new SmartCollectionLocationRequest(
-                filter.Location.South,
-                filter.Location.West,
-                filter.Location.North,
-                filter.Location.East),
+                filter.Location?.South,
+                filter.Location?.West,
+                filter.Location?.North,
+                filter.Location?.East,
+                filter.LocationPlace is null
+                    ? null
+                    : PhotoPlacePath.Parse(filter.LocationPlace).DisplayValue),
         filter.Taken is null
             ? null
             : new SmartCollectionDateRangeResponse(
