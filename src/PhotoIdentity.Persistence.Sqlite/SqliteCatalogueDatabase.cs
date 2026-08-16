@@ -673,39 +673,6 @@ public sealed class SqliteCatalogueDatabase
             ON photo_person_actions (asset_revision_id, person_id, id DESC);
         CREATE INDEX IF NOT EXISTS ix_photo_person_actions_person_history
             ON photo_person_actions (person_id, asset_revision_id, id DESC);
-        CREATE TRIGGER IF NOT EXISTS trg_photo_person_actions_transfer_merge
-        AFTER UPDATE OF merged_into_person_id ON people
-        WHEN OLD.merged_into_person_id IS NULL
-         AND NEW.merged_into_person_id IS NOT NULL
-        BEGIN
-            INSERT INTO photo_person_actions (
-                asset_revision_id, person_id, action_kind, actor, created_at_utc)
-            SELECT
-                source_action.asset_revision_id,
-                NEW.merged_into_person_id,
-                'add',
-                'person-merge',
-                strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-            FROM photo_person_actions AS source_action
-            WHERE source_action.person_id = NEW.id
-              AND source_action.action_kind = 'add'
-              AND source_action.id = (
-                  SELECT MAX(source_latest.id)
-                  FROM photo_person_actions AS source_latest
-                  WHERE source_latest.asset_revision_id = source_action.asset_revision_id
-                    AND source_latest.person_id = NEW.id)
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM photo_person_actions AS target_action
-                  WHERE target_action.asset_revision_id = source_action.asset_revision_id
-                    AND target_action.person_id = NEW.merged_into_person_id
-                    AND target_action.action_kind = 'add'
-                    AND target_action.id = (
-                        SELECT MAX(target_latest.id)
-                        FROM photo_person_actions AS target_latest
-                        WHERE target_latest.asset_revision_id = source_action.asset_revision_id
-                          AND target_latest.person_id = NEW.merged_into_person_id));
-        END;
 
         CREATE TABLE IF NOT EXISTS photo_place_actions (
             id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
