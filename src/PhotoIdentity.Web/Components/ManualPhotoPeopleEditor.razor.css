@@ -1,0 +1,87 @@
+.photo-people-section {
+    margin-top: 1rem;
+}
+
+.photo-people-section h3 {
+    margin-bottom: 0.65rem;
+}
+
+.manual-person-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-bottom: 1rem;
+}
+
+.manual-person-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    padding: 0.35rem 0.55rem 0.35rem 0.7rem;
+    background: var(--surface-raised);
+}
+
+.manual-person-chip small {
+    color: var(--text-muted);
+}
+
+.manual-person-chip button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+    padding: 0.1rem 0.2rem;
+}
+
+.manual-person-chip button:disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+
+.manual-person-label {
+    display: block;
+    margin-top: 0.9rem;
+}
+
+.manual-person-search {
+    width: min(100%, 34rem);
+    margin-top: 0.35rem;
+}
+
+.manual-person-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.55rem;
+}
+
+.manual-person-options button {
+    border: 1px solid var(--border-color);
+    border-radius: 0.6rem;
+    background: var(--surface-raised);
+    color: inherit;
+    padding: 0.45rem 0.7rem;
+    cursor: pointer;
+}
+
+.manual-person-options button:hover:not(:disabled) {
+    border-color: currentColor;
+}
+
+.manual-person-options span,
+.manual-person-help {
+    color: var(--text-muted);
+}
+
+.manual-person-help {
+    margin-top: 0.65rem;
+    margin-bottom: 0;
+}
+
+.manual-person-notice {
+    margin-top: 0.7rem;
+}
