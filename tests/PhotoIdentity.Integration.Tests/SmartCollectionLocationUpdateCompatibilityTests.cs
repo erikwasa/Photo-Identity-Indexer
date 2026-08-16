@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
