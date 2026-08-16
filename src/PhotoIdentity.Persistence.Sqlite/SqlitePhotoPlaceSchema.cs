@@ -5,9 +5,9 @@ using PhotoIdentity.Core.Places;
 namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
-/// Compatibility-safe schema guard for first-class Places. The formal catalogue schema-version
-/// bump is intentionally paired with the Smart Collection filter-v2 table rebuild in WI-0063
-/// Slice 2 so existing v1 saved definitions stay readable throughout Slice 1.
+/// Compatibility-safe schema guard and legacy-assignment migrator for first-class Places.
+/// Catalogue schema v14 formalizes these structures, while the guard remains idempotent for
+/// direct repository use and normalizes any pre-release v14 preview shape before data access.
 /// </summary>
 public static class SqlitePhotoPlaceSchema
 {
@@ -62,6 +62,11 @@ public static class SqlitePhotoPlaceSchema
                 );
                 """;
             await schema.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        if (!await HasColumnAsync(connection, "photo_place_actions", "provider", cancellationToken))
+        {
+            await NormalizePreviewSchemaAsync(connection, cancellationToken);
         }
 
         List<LegacyPlaceAssignment> legacy = [];
@@ -171,6 +176,80 @@ public static class SqlitePhotoPlaceSchema
             conflict.Parameters.AddWithValue("$detected_at_utc", UtcNow());
             await conflict.ExecuteNonQueryAsync(cancellationToken);
         }
+    }
+
+    private static async Task<bool> HasColumnAsync(
+        SqliteConnection connection,
+        string table,
+        string column,
+        CancellationToken cancellationToken)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA table_info({table});";
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static async Task NormalizePreviewSchemaAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            CREATE TABLE photo_place_actions_normalized (
+                id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                asset_revision_id TEXT NOT NULL,
+                tag_id INTEGER NULL,
+                action_kind TEXT NOT NULL CHECK (action_kind IN ('set', 'clear')),
+                source_kind TEXT NOT NULL CHECK (source_kind IN ('manual', 'automatic', 'migration')),
+                provider TEXT NULL,
+                actor TEXT NOT NULL,
+                created_at_utc TEXT NOT NULL,
+                FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                FOREIGN KEY (tag_id) REFERENCES photo_tags (id) ON DELETE RESTRICT,
+                CHECK (
+                    (action_kind = 'set' AND tag_id IS NOT NULL)
+                    OR (action_kind = 'clear' AND tag_id IS NULL)
+                )
+            );
+
+            INSERT INTO photo_place_actions_normalized (
+                id, asset_revision_id, tag_id, action_kind, source_kind,
+                provider, actor, created_at_utc)
+            SELECT
+                id,
+                asset_revision_id,
+                tag_id,
+                action_kind,
+                CASE source_kind
+                    WHEN 'legacy-migration' THEN 'migration'
+                    ELSE source_kind
+                END,
+                NULL,
+                actor,
+                created_at_utc
+            FROM photo_place_actions
+            ORDER BY id;
+
+            DROP TABLE photo_place_actions;
+            ALTER TABLE photo_place_actions_normalized RENAME TO photo_place_actions;
+            CREATE INDEX ix_photo_place_actions_revision_history
+                ON photo_place_actions (asset_revision_id, id DESC);
+            CREATE INDEX ix_photo_place_actions_tag_history
+                ON photo_place_actions (tag_id, asset_revision_id, id DESC);
+            """;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        transaction.Commit();
     }
 
     private static async Task<bool> HasPlaceHistoryAsync(
