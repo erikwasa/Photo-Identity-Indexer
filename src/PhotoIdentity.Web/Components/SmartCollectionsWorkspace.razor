@@ -234,7 +234,7 @@
                         @foreach (SmartCollectionPhotoResponse photo in resultPage.Items)
                         {
                             <article class="smart-photo-card">
-                                <a href="@($"/photo/{photo.RevisionId}")" aria-label="Open photo">
+                                <a href="@PhotoHref(photo)" aria-label="Open photo">
                                     <img src="@photo.ThumbnailUrl" alt="Smart collection photo" loading="lazy" decoding="async" />
                                 </a>
                                 <div>

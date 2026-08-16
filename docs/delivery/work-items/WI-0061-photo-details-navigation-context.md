@@ -16,9 +16,9 @@ Make Photo Details show the privacy-safe catalogue information needed to underst
 
 ## Context
 
-The current Photo Details route is revision-oriented and loads original availability plus manual tags. It does not expose the original file name or a consolidated list of confirmed people. Its return control is hard-coded to `/collections`, and the Smart Collections editor keeps its active selection, filters, result mode and paging only in component memory.
+The original Photo Details route was revision-oriented and loaded original availability plus manual tags. It did not expose the original file name or a consolidated list of confirmed people. Its return control was hard-coded to `/collections`, and the Smart Collections editor kept its active selection, filters, result mode and paging only in component memory.
 
-The current viewer also prefers the durable review proxy even when the revision-verified authoritative original is already local, and the explicit `Open original` control navigates the browser away from the current Photo Details view. Original availability is presented twice: once beside the section heading and again as a `State` row, while Photo Identity managed hydration and OneDrive/user pinning are shown as separate rows.
+The original viewer also preferred the durable review proxy even when the revision-verified authoritative original was already local, and the explicit `Open original` control navigated the browser away from the current Photo Details view. Original availability was presented twice, while Photo Identity managed hydration and OneDrive/user pinning were shown as separate rows.
 
 ## In scope
 
@@ -49,14 +49,17 @@ The current viewer also prefers the durable review proxy even when the revision-
 ## Implementation history
 
 - Slice 1 merged through PR #150 (`f93c486ce87f382c6c109b856995b55a601ce92e`). It implemented original-first Photo Details viewing, proxy fallback without implicit hydration, in-place transition after explicit hydration, and the simplified original-state UI.
-- Slice 2 is implemented on `agent/WI-0061-photo-details-metadata`. It adds a catalogue-only details query/API, exposes only the source-key basename, returns only active confirmed person assignments, excludes pending suggestions, and reserves a `ManualPresence` field in the response for WI-0062 without creating face-independent evidence yet.
-- Slice 2 integration coverage deliberately points the catalogue at an original source directory that does not exist locally; the details API must still return filename and confirmed people, proving the metadata path does not open or hydrate the original.
+- Slice 2 merged through PR #152 (`c46880596f2f2a42e4868873878c6e70fef7def4`). It added a catalogue-only details query/API, exposes only the source-key basename, returns only active confirmed person assignments, excludes pending suggestions, and reserves a `ManualPresence` field in the response for WI-0062 without creating face-independent evidence yet.
+- Slice 2 integration coverage deliberately points the catalogue at an original source directory that does not exist locally; the details API still returns filename and confirmed people, proving the metadata path does not open or hydrate the original.
+- Slice 3 is implemented on `agent/WI-0061-smart-navigation`. Saved Smart Collections encode the saved definition identifier and result offset in the URL. Unsaved previews store their editor/filter state in tab-scoped `sessionStorage` under a generated GUID key while the URL carries only that key and result offset.
+- Slice 3 result links pass the current Smart Collections URL as one escaped `returnUrl` parameter. Photo Details accepts only rooted local application routes, rejects protocol-relative/backslash/control-character inputs, labels Smart Collections return context explicitly, and falls back to `/collections` when context is invalid or absent.
 
-## Recommended state model
+## State model
 
-- Saved Smart Collections should be reconstructable from a URL containing the saved collection identifier plus paging/result context.
-- Transient unsaved previews may use tab-scoped browser session storage referenced by navigation context so large filter payloads do not need to be embedded in URLs.
-- Browser history should contain enough information for normal Back navigation to restore the previous Smart Collections workspace rather than instantiate a blank editor.
+- Saved Smart Collections are reconstructable from a URL containing the saved collection identifier plus paging/result context.
+- Transient unsaved previews use tab-scoped browser session storage referenced by a generated navigation key so filter payloads and person/tag selections are not embedded in URLs.
+- Browser history is updated with `replaceState` after a saved query, transient preview or page change. Opening a photo therefore leaves a reconstructable Smart Collections entry immediately behind it in browser history.
+- Transient preview state is intentionally browser-tab local and may not survive closing the tab or clearing session storage; a missing state entry is surfaced without falling back to unrelated state.
 
 ## Out of scope
 
@@ -69,18 +72,18 @@ The current viewer also prefers the durable review proxy even when the revision-
 
 ## Acceptance criteria
 
-- [ ] Photo Details shows the original file name without exposing its directory or source root.
-- [ ] Photo Details shows canonical confirmed people known to be in the image and does not treat pending suggestions as confirmed people.
-- [ ] When a revision-verified original is already local, Photo Details displays that original rather than an existing review proxy.
-- [ ] When the original is online-only, normal Photo Details viewing can use an existing review proxy without requesting hydration.
-- [ ] After an explicit `Load original` completes, the original is displayed in the same Photo Details web view without a download or new-tab navigation.
-- [ ] Original state appears once as a badge and the UI shows one `Managed by: Photo Identity|OneDrive|No` value rather than separate management/pinning rows.
-- [ ] Opening a photo from a saved Smart Collection and returning with browser/mouse Back restores the same saved collection and result page.
-- [ ] Opening a photo from an unsaved Smart Collection preview and returning restores the applied preview filters and result context for that browser tab.
-- [ ] Photo Details shows a context-aware Back destination when a valid source workspace is supplied and safely falls back when it is not.
-- [ ] Return navigation cannot redirect outside the local Photo Identity application.
-- [ ] The new detail/navigation/viewer operations do not hydrate an online-only original implicitly.
-- [ ] Automated tests cover original-first/proxy-fallback viewer behavior, privacy-safe filename exposure, confirmed people, saved/transient navigation restoration and return-route validation.
+- [x] Photo Details shows the original file name without exposing its directory or source root.
+- [x] Photo Details shows canonical confirmed people known to be in the image and does not treat pending suggestions as confirmed people.
+- [x] When a revision-verified original is already local, Photo Details displays that original rather than an existing review proxy.
+- [x] When the original is online-only, normal Photo Details viewing can use an existing review proxy without requesting hydration.
+- [x] After an explicit `Load original` completes, the original is displayed in the same Photo Details web view without a download or new-tab navigation.
+- [x] Original state appears once as a badge and the UI shows one `Managed by: Photo Identity|OneDrive|No` value rather than separate management/pinning rows.
+- [ ] Opening a photo from a saved Smart Collection and returning with browser/mouse Back restores the same saved collection and result page. Implementation complete; local browser verification remains.
+- [ ] Opening a photo from an unsaved Smart Collection preview and returning restores the applied preview filters and result context for that browser tab. Implementation complete; local browser verification remains.
+- [x] Photo Details shows a context-aware Back destination when a valid source workspace is supplied and safely falls back when it is not.
+- [x] Return navigation cannot redirect outside the local Photo Identity application.
+- [x] The new detail/navigation/viewer operations do not hydrate an online-only original implicitly.
+- [x] Automated tests cover original-first/proxy-fallback viewer behavior, privacy-safe filename exposure, confirmed people, saved/transient navigation state contracts and return-route validation.
 
 ## Verification requirements
 

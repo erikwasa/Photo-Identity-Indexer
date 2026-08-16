@@ -6,35 +6,34 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0061 — Enrich Photo Details and preserve navigation context** remains the active M19 work item.
+**WI-0061 — Enrich Photo Details and preserve navigation context** is in its final implementation slice for M19.
 
-Slice 1 merged through PR #150. Main also includes the separate PR #151 durable face-review derivative work; WI-0061 must not change that face-review storage/rendering path.
+Slices 1 and 2 merged through PR #150 and PR #152. Main also includes the separate PR #151 durable face-review derivative work and PR #153 integration-host stabilization; WI-0061 does not change the face-review derivative path.
 
-The active Slice 2 adds privacy-safe Photo Details metadata:
+Slice 3 now adds navigation restoration:
 
-- expose the original file name as the source-key basename only, never the source root or relative directory;
-- show canonical people backed by active confirmed face assignments only;
-- exclude pending suggestions from the confirmed people list;
-- keep the details query catalogue-only so it never opens or hydrates an original;
-- reserve `ManualPresence` in the person response so WI-0062 can add face-independent photo/person presence without another browser-contract revision.
+- saved Smart Collection URLs carry the saved definition identifier plus result offset and can reconstruct the workspace from catalogue state;
+- transient unsaved previews store editor/filter state only in tab-scoped `sessionStorage`, referenced by a generated preview key plus result offset in the URL;
+- Smart Collection photo links carry the current local workspace return URL into Photo Details;
+- Photo Details validates the supplied return URL as a rooted local application route, labels Smart Collection returns appropriately and falls back to `/collections` for invalid or absent context;
+- no navigation-state operation opens or hydrates an original image.
 
 ## Next concrete step
 
-1. Validate Slice 2 build, integration tests and living documentation in GitHub Actions.
-2. Merge Slice 2 after CI and maintainer review.
-3. Finish WI-0061 with Slice 3: saved/transient Smart Collection state restoration and validated context-aware Back navigation.
-4. After WI-0061 is complete, implement WI-0062 manual photo-level people. WI-0063 remains independently ready; WI-0064 follows WI-0063.
+1. Validate Slice 3 build, full tests, living documentation and review smoke in GitHub Actions.
+2. Merge the Slice 3 PR after CI and maintainer review.
+3. Perform the WI-0061 local browser pass: browser/mouse Back from both a saved Smart Collection result page and an unsaved preview, plus the context-aware Photo Details Back control and safe fallback behavior.
+4. After maintainer verification, mark WI-0061 completed and proceed with WI-0062 manual photo-level people. WI-0063 remains independently ready; WI-0064 follows WI-0063.
 
 ## Relevant files
 
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/work-items/WI-0061-photo-details-navigation-context.md`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoDetailsRepository.cs`
-- `src/PhotoIdentity.Api/PhotoDetailsEndpoints.cs`
-- `src/PhotoIdentity.Web/PhotoDetailsContracts.cs`
-- `src/PhotoIdentity.Web/Pages/Photo.razor`
-- `tests/PhotoIdentity.Integration.Tests/PhotoDetailsApplicationTests.cs`
+- `src/PhotoIdentity.Web/NavigationContext.cs`
 - `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor`
+- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor.cs`
+- `src/PhotoIdentity.Web/Pages/Photo.razor`
+- `tests/PhotoIdentity.Integration.Tests/NavigationContextTests.cs`
 
 ## Repository validation
 

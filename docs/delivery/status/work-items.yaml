@@ -268,12 +268,12 @@ work_items:
 - id: WI-0061
   title: Enrich Photo Details and preserve navigation context
   milestone: M19
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0061-photo-details-navigation-context.md
   started_at: 2026-08-16
   last_updated_at: 2026-08-16
-  branch: agent/WI-0061-photo-details-viewer
+  branch: agent/WI-0061-smart-navigation
   blockers:
   - WI-0025
   - WI-0050
@@ -281,6 +281,12 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/150
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/152
+  - type: merge_commit
+    value: c46880596f2f2a42e4868873878c6e70fef7def4
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/154
 - id: WI-0062
   title: Add manual photo-level people
   milestone: M19
