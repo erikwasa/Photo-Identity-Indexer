@@ -1,5 +1,7 @@
 using System.Globalization;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Places;
+using PhotoIdentity.Core.Tags;
 using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
@@ -7,6 +9,7 @@ namespace PhotoIdentity.Api;
 public static class PhotoTagEndpoints
 {
     private const string LocalMaintainerActor = "local-maintainer";
+    private const string ReservedPlacesError = "The Places hierarchy is reserved for first-class location data. Use the place editor instead of ordinary tags.";
 
     public static IEndpointRouteBuilder MapPhotoTagEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -16,7 +19,10 @@ public static class PhotoTagEndpoints
             {
                 IReadOnlyList<CataloguePhotoTagDefinition> tags =
                     await repository.GetCanonicalTagsAsync(cancellationToken);
-                return Results.Ok(tags.Select(ToResponse).ToArray());
+                return Results.Ok(tags
+                    .Where(tag => !PhotoPlacePath.IsReservedNormalizedTagValue(tag.NormalizedValue))
+                    .Select(ToResponse)
+                    .ToArray());
             });
 
         endpoints.MapGet(
@@ -32,7 +38,7 @@ public static class PhotoTagEndpoints
                 {
                     IReadOnlyList<CatalogueManualPhotoTag> tags =
                         await repository.GetManualTagsAsync(parsedRevisionId, cancellationToken);
-                    return Results.Ok(ToResponse(tags));
+                    return Results.Ok(ToResponse(NonPlaceTags(tags)));
                 }
                 catch (KeyNotFoundException exception)
                 {
@@ -49,6 +55,11 @@ public static class PhotoTagEndpoints
                     return Results.BadRequest(new PhotoTagErrorResponse("Invalid asset revision id."));
                 }
 
+                if (IsReservedPlaceValue(request.Value))
+                {
+                    return Results.BadRequest(new PhotoTagErrorResponse(ReservedPlacesError));
+                }
+
                 try
                 {
                     IReadOnlyList<CatalogueManualPhotoTag> tags = await repository.AddManualTagAsync(
@@ -56,7 +67,7 @@ public static class PhotoTagEndpoints
                         request.Value,
                         LocalMaintainerActor,
                         cancellationToken);
-                    return Results.Ok(ToResponse(tags));
+                    return Results.Ok(ToResponse(NonPlaceTags(tags)));
                 }
                 catch (KeyNotFoundException exception)
                 {
@@ -77,6 +88,11 @@ public static class PhotoTagEndpoints
                     return Results.BadRequest(new PhotoTagErrorResponse("Invalid asset revision id."));
                 }
 
+                if (IsReservedPlaceValue(name))
+                {
+                    return Results.BadRequest(new PhotoTagErrorResponse(ReservedPlacesError));
+                }
+
                 try
                 {
                     IReadOnlyList<CatalogueManualPhotoTag> tags = await repository.RemoveManualTagAsync(
@@ -84,7 +100,7 @@ public static class PhotoTagEndpoints
                         name,
                         LocalMaintainerActor,
                         cancellationToken);
-                    return Results.Ok(ToResponse(tags));
+                    return Results.Ok(ToResponse(NonPlaceTags(tags)));
                 }
                 catch (KeyNotFoundException exception)
                 {
@@ -97,6 +113,22 @@ public static class PhotoTagEndpoints
             });
 
         return endpoints;
+    }
+
+    private static IReadOnlyList<CatalogueManualPhotoTag> NonPlaceTags(
+        IReadOnlyList<CatalogueManualPhotoTag> tags) =>
+        tags.Where(tag => !PhotoPlacePath.IsReservedNormalizedTagValue(tag.NormalizedValue)).ToArray();
+
+    private static bool IsReservedPlaceValue(string value)
+    {
+        try
+        {
+            return PhotoPlacePath.IsReservedTagPath(PhotoTagPath.Parse(value));
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     private static PhotoTagResponse[] ToResponse(IReadOnlyList<CatalogueManualPhotoTag> tags) =>
