@@ -16,7 +16,7 @@ Reduce the interaction and scrolling cost of assigning, marking Unknown and reje
 
 ## Why
 
-The current continuous review gallery supports individual checkboxes plus `Select loaded`, but it has no range-selection model. Selecting most of the first several dozen faces therefore requires many individual clicks. Bulk controls live above the infinite-scroll gallery, so an operator who selects while scrolling must return to the top before acting. The visible preview-then-commit sequence also adds a second user confirmation even though selection plus the chosen bulk action already express explicit intent.
+The continuous review gallery previously supported individual checkboxes plus `Select loaded`, but no range-selection model. Selecting most of the first several dozen faces therefore required many individual clicks. Bulk controls also lived above the infinite-scroll gallery, forcing an operator who selected while scrolling to return to the top before acting, and the visible preview-then-commit sequence added a second confirmation even though selection plus the chosen bulk action already expressed explicit intent.
 
 A common workflow is to filter/order the queue, recognize that most of a contiguous group belongs to one person, select that range, remove a few exceptions, and commit the decision from the current scroll position.
 
@@ -28,8 +28,8 @@ A common workflow is to filter/order the queue, recognize that most of a contigu
 - Show a persistent sticky/fixed bulk-action bar whenever one or more eligible faces are selected.
 - Keep the selected count and bulk actions accessible from the operator's current scroll position.
 - Support bulk assignment to one named person, bulk Unknown and bulk false-detection rejection from the persistent action bar; preserve grouped top-suggestion acceptance where applicable.
-- Remove the user-visible preview/confirmation step. One explicit action from the selected state should perform the mutation.
-- Preserve stale-data protection internally. The client may perform preview/revalidation immediately before commit, or the API may offer an equivalent atomic validated commit, but a changed eligible set must not silently mutate a different set than the user selected.
+- Remove the user-visible preview/confirmation step. One explicit action from the selected state performs the mutation.
+- Preserve stale-data protection internally so a changed eligible set cannot silently mutate a different set than the operator selected.
 - Preserve filters, ordering and practical scroll position after successful bulk actions.
 - Prefer updating/removing affected visible cards in place and refilling the continuous queue rather than resetting the entire workspace to the top.
 - Maintain keyboard accessibility and existing touch behavior; Shift range selection is an enhancement for pointer/keyboard desktop use, not a replacement for normal checkbox selection.
@@ -54,7 +54,7 @@ A common workflow is to filter/order the queue, recognize that most of a contigu
 - [x] Processed cards are updated or removed consistently with the current state filter, and continuous loading can refill the visible queue as needed.
 - [x] Checkbox semantics and existing touch selection remain available; Shift is only used as the range-selection modifier.
 - [x] Automated coverage protects loaded-range selection while existing bulk API integration coverage continues to protect preview-token validation, stale-data rejection and append-only audit semantics.
-- [ ] Human Windows verification demonstrates the representative workflow: select a contiguous block of roughly 30 faces, deselect several exceptions, assign the remaining selection from the scrolled position, then repeat with Unknown and false-detection actions.
+- [x] Human Windows verification demonstrates the representative workflow: select a contiguous block of roughly 30 faces, deselect several exceptions, assign the remaining selection from the scrolled position, then repeat with Unknown and false-detection actions.
 
 ## Verification requirements
 
@@ -64,5 +64,5 @@ Automated Web/API/integration coverage plus human Windows verification of range 
 
 - Files changed: `Home.razor`, `ReviewWorkspace.razor`, `ReviewWorkspace.razor.css`, `FaceCard.razor`, `ReviewSelectionRange.cs`, `ReviewSelectionRangeTests.cs`.
 - Trade-offs: Range selection intentionally includes only currently loaded eligible faces. The UI still uses the existing server preview token immediately before commit, but that revalidation is no longer presented as a separate operator confirmation. Successful bulk actions update/remove cards in place and refill without a full workspace reset.
-- Deferred work: Human Windows verification of range selection, five-exception deselection, persistent actions and practical scroll preservation is intentionally deferred until all three M18 face-review items are merged.
-- Commands run: GitHub Actions `build` workflow for PR #147, including Release build, full test suite, living-documentation validation and review/package verification.
+- Automated verification: GitHub Actions `build` workflow for PR #147, including Release build, full test suite, living-documentation validation and review/package verification.
+- Manual verification: maintainer Windows verification passed on 2026-08-16, including the representative range-selection workflow, exception deselection, persistent bulk controls, Assign, Unknown and False detection actions, and practical scroll/context preservation.
