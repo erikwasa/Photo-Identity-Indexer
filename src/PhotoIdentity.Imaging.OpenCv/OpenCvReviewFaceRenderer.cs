@@ -1,5 +1,8 @@
+using System.Runtime.InteropServices;
 using OpenCvSharp;
 using PhotoIdentity.Core.Geometry;
+using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.Imaging.OpenCv;
 
@@ -10,13 +13,13 @@ public sealed record EncodedReviewFace(
     int Height);
 
 /// <summary>
-/// Renders a face-centered JPEG from a review-safe image source.
-/// The face receives surrounding context for human review and pixels are never upscaled.
+/// Renders face-centered JPEG review derivatives from decoded source pixels. The face receives
+/// surrounding context for human review and pixels are never upscaled.
 /// </summary>
 public sealed class OpenCvReviewFaceRenderer
 {
     public const double ContextScale = 2.2d;
-    private const int JpegQuality = 90;
+    public const int JpegQuality = 90;
 
     public async Task<EncodedReviewFace?> RenderAsync(
         string path,
@@ -69,20 +72,77 @@ public sealed class OpenCvReviewFaceRenderer
         }
     }
 
-    private static EncodedReviewFace? Render(
-        byte[] sourceBytes,
+    public EncodedReviewFace? Render(
+        ReadOnlySpan<byte> sourceBytes,
+        NormalizedBoundingBox boundingBox,
+        int maximumEdge,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<EncodedReviewFace?> rendered = RenderMany(
+            sourceBytes,
+            [boundingBox],
+            maximumEdge,
+            cancellationToken);
+        return rendered[0];
+    }
+
+    public IReadOnlyList<EncodedReviewFace?> RenderMany(
+        ReadOnlySpan<byte> sourceBytes,
+        IReadOnlyList<NormalizedBoundingBox> boundingBoxes,
+        int maximumEdge,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(boundingBoxes);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maximumEdge);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (sourceBytes.IsEmpty)
+        {
+            return Enumerable.Repeat<EncodedReviewFace?>(null, boundingBoxes.Count).ToArray();
+        }
+
+        try
+        {
+            ImageFrame image = OpenCvImageDecoder.DecodeEncoded(
+                sourceBytes,
+                new DecodeOptions(),
+                cancellationToken);
+            if (image.Format != PixelFormat.Bgr24 ||
+                image.Stride != checked(image.Size.Width * ImageFrame.BytesPerPixel(PixelFormat.Bgr24)))
+            {
+                return Enumerable.Repeat<EncodedReviewFace?>(null, boundingBoxes.Count).ToArray();
+            }
+
+            byte[] pixels = image.ToArray();
+            using Mat source = new(image.Size.Height, image.Size.Width, MatType.CV_8UC3);
+            Marshal.Copy(pixels, 0, source.Data, pixels.Length);
+
+            EncodedReviewFace?[] results = new EncodedReviewFace?[boundingBoxes.Count];
+            for (int index = 0; index < boundingBoxes.Count; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                results[index] = RenderDecoded(source, boundingBoxes[index], maximumEdge, cancellationToken);
+            }
+
+            return results;
+        }
+        catch (ImageDecodingException)
+        {
+            return Enumerable.Repeat<EncodedReviewFace?>(null, boundingBoxes.Count).ToArray();
+        }
+        catch (OpenCVException)
+        {
+            return Enumerable.Repeat<EncodedReviewFace?>(null, boundingBoxes.Count).ToArray();
+        }
+    }
+
+    private static EncodedReviewFace? RenderDecoded(
+        Mat source,
         NormalizedBoundingBox boundingBox,
         int maximumEdge,
         CancellationToken cancellationToken)
     {
         try
         {
-            using Mat source = Cv2.ImDecode(sourceBytes, ImreadModes.Color);
-            if (source.Empty())
-            {
-                return null;
-            }
-
             Rect crop = CalculateCrop(source.Cols, source.Rows, boundingBox);
             using Mat cropped = new(source, crop);
 
