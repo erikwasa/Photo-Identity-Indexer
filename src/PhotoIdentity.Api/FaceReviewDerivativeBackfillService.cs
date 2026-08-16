@@ -75,8 +75,10 @@ public sealed class FaceReviewDerivativeBackfillService
             case CollectionOriginalAccessService.ReleasingState:
                 return true;
             case CollectionOriginalAccessService.HashMismatchState:
-                throw new InvalidOperationException(
-                    "An analyzed archive original needs source verification before face review derivatives can be generated.");
+                // Source verification owns immutable-revision reconciliation. Leave this revision
+                // pending so bounded archive advancement can verify/reconcile it before backfill
+                // attempts to read source bytes.
+                return true;
             case CollectionOriginalAccessService.ReadyState:
                 break;
             default:
