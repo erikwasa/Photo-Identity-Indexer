@@ -164,14 +164,19 @@ public sealed record SmartCollectionFilter
         PhotoTagPath[] parsedTags = (tags ?? [])
             .Select(PhotoTagPath.Parse)
             .ToArray();
-        if (parsedTags.Any(PhotoPlacePath.IsReservedTagPath))
+        PhotoTagPath[] legacyPlaceTags = parsedTags
+            .Where(PhotoPlacePath.IsReservedTagPath)
+            .DistinctBy(path => path.NormalizedValue, StringComparer.Ordinal)
+            .ToArray();
+        if (legacyPlaceTags.Length > 1)
         {
             throw new ArgumentException(
-                $"The reserved '{PhotoPlacePath.RootDisplayName}' hierarchy belongs to the Location dimension, not Smart Collection tags.",
+                "A legacy Smart Collection cannot migrate more than one distinct Places tag into the single named-place Location criterion.",
                 nameof(tags));
         }
 
         Tags = parsedTags
+            .Where(path => !PhotoPlacePath.IsReservedTagPath(path))
             .Select(path => path.NormalizedValue)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
@@ -182,9 +187,22 @@ public sealed record SmartCollectionFilter
 
         TagMatch = SmartCollectionMatchModes.Normalize(tagMatch, nameof(tagMatch));
         Location = location;
-        LocationPlace = string.IsNullOrWhiteSpace(locationPlace)
+
+        string? explicitLocationPlace = string.IsNullOrWhiteSpace(locationPlace)
             ? null
             : PhotoPlacePath.Parse(locationPlace).CanonicalNormalizedValue;
+        string? legacyLocationPlace = legacyPlaceTags.Length == 0
+            ? null
+            : PhotoPlacePath.FromCanonicalTagPath(legacyPlaceTags[0]).CanonicalNormalizedValue;
+        if (explicitLocationPlace is not null && legacyLocationPlace is not null &&
+            !string.Equals(explicitLocationPlace, legacyLocationPlace, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "The legacy Places tag and named-place Location criterion refer to different canonical places.",
+                nameof(locationPlace));
+        }
+
+        LocationPlace = explicitLocationPlace ?? legacyLocationPlace;
         Taken = taken;
     }
 
