@@ -56,7 +56,7 @@ public static class PhotoReturnContext
 
         string value = candidate.Trim();
         if (value.Length > 2048 ||
-            !value.StartsWith('/', StringComparison.Ordinal) ||
+            !value.StartsWith("/", StringComparison.Ordinal) ||
             value.StartsWith("//", StringComparison.Ordinal) ||
             value.Contains('\\') ||
             value.Any(char.IsControl))
