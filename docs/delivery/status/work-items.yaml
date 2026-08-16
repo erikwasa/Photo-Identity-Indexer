@@ -321,7 +321,7 @@ work_items:
   document: ../work-items/WI-0063-first-class-places.md
   started_at: 2026-08-17
   last_updated_at: 2026-08-17
-  branch: agent/WI-0063-places-foundation
+  branch: agent/WI-0063-smart-location
   blockers:
   - WI-0050
   - WI-0056
@@ -329,6 +329,12 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/156
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31976609502
+  - type: merge_commit
+    value: 2c67f7ae653c441b6ce11e79e89d3f9c38d7aef2
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/157
 - id: WI-0064
   title: Add GeoNames reverse-geocoded Places enrichment
   milestone: M19
