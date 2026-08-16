@@ -106,10 +106,10 @@ public sealed class ManualPhotoPeopleApplicationTests
                 await client.GetFromJsonAsync<PhotoDetailsResponse>(
                     $"/api/collections/photos/{seeded.FirstRevisionId}/details"));
             Assert.Equal(2, details.People.Count);
-            PhotoDetailsPersonResponse ada = Assert.Single(details.People.Where(person => person.Id == seeded.AdaPersonId));
+            PhotoDetailsPersonResponse ada = Assert.Single(details.People, person => person.Id == seeded.AdaPersonId);
             Assert.Equal(1, ada.ConfirmedFaceCount);
             Assert.True(ada.ManualPresence);
-            PhotoDetailsPersonResponse bob = Assert.Single(details.People.Where(person => person.Id == seeded.BobPersonId));
+            PhotoDetailsPersonResponse bob = Assert.Single(details.People, person => person.Id == seeded.BobPersonId);
             Assert.Equal(0, bob.ConfirmedFaceCount);
             Assert.True(bob.ManualPresence);
 
