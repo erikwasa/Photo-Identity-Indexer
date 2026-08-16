@@ -18,6 +18,41 @@
     object-fit: contain;
 }
 
+.photo-original-state {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.8rem;
+    padding: 0.2rem 0.65rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.photo-original-state.ready {
+    background: #e3f0eb;
+    border-color: #9bc6bb;
+    color: #244944;
+}
+
+.photo-original-state.online-only {
+    background: #edf1f1;
+    color: #465554;
+}
+
+.photo-original-state.busy {
+    background: #fff3d7;
+    border-color: #d8bd79;
+    color: #6e5620;
+}
+
+.photo-original-state.attention {
+    background: #f9e6e4;
+    border-color: #d5aaa5;
+    color: #733b35;
+}
+
 .photo-tag-panel {
     margin: 0 0 1.5rem;
 }

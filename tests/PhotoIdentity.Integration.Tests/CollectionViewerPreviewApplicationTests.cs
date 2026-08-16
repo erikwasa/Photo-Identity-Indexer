@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
@@ -19,9 +20,10 @@ public sealed class CollectionViewerPreviewApplicationTests
 {
     private static readonly byte[] PngBytes = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAoAAAAICAIAAABPmPnhAAAAK0lEQVQIHXXBAQEAAADBMDqI+LBiSWBziT6X6HOJPpfoc4k+l+hziT6X6BtqPwoJ+/i3LAAAAABJRU5ErkJggg==");
+    private static readonly byte[] ProxyBytes = [0xff, 0xd8, 0xff, 0xd9];
 
     [Fact]
-    public async Task Local_verified_original_without_proxy_is_rendered_without_hydration()
+    public async Task Local_verified_original_without_proxy_is_served_directly_without_hydration()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -38,8 +40,8 @@ public sealed class CollectionViewerPreviewApplicationTests
                 $"/api/collections/photos/{revisionId}/viewer-preview");
 
             response.EnsureSuccessStatusCode();
-            Assert.Equal("image/jpeg", response.Content.Headers.ContentType?.MediaType);
-            Assert.NotEmpty(await response.Content.ReadAsByteArrayAsync());
+            Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(PngBytes, await response.Content.ReadAsByteArrayAsync());
             Assert.Equal(0, platform.HydrationRequests);
             Assert.Equal("local", await ReadAvailabilityAsync(databasePath, revisionId));
         }
@@ -50,7 +52,7 @@ public sealed class CollectionViewerPreviewApplicationTests
     }
 
     [Fact]
-    public async Task Local_verified_original_without_proxy_profile_is_rendered_without_hydration()
+    public async Task Local_verified_original_without_proxy_profile_is_served_directly_without_hydration()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -71,10 +73,69 @@ public sealed class CollectionViewerPreviewApplicationTests
                 $"/api/collections/photos/{revisionId}/viewer-preview");
 
             response.EnsureSuccessStatusCode();
-            Assert.Equal("image/jpeg", response.Content.Headers.ContentType?.MediaType);
-            Assert.NotEmpty(await response.Content.ReadAsByteArrayAsync());
+            Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(PngBytes, await response.Content.ReadAsByteArrayAsync());
             Assert.Equal(0, platform.HydrationRequests);
             Assert.Equal("local", await ReadAvailabilityAsync(databasePath, revisionId));
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Local_verified_original_wins_when_durable_proxy_also_exists()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            AssetRevisionId revisionId = await CreateRevisionAsync(databasePath, directory, PngBytes);
+            await CreateProxyAsync(databasePath, directory, revisionId, ProxyBytes);
+            FakeFilesOnDemandPlatform platform = new(
+                new OneDriveFilesOnDemandState(AssetAvailability.Local, false, false));
+
+            await using ViewerApiFactory factory = new(databasePath, directory, platform);
+            using HttpClient client = factory.CreateClient();
+
+            using HttpResponseMessage response = await client.GetAsync(
+                $"/api/collections/photos/{revisionId}/viewer-preview");
+
+            response.EnsureSuccessStatusCode();
+            Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(PngBytes, await response.Content.ReadAsByteArrayAsync());
+            Assert.Equal(0, platform.HydrationRequests);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Online_only_original_with_proxy_uses_proxy_without_hydration()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            AssetRevisionId revisionId = await CreateRevisionAsync(databasePath, directory, PngBytes);
+            await CreateProxyAsync(databasePath, directory, revisionId, ProxyBytes);
+            FakeFilesOnDemandPlatform platform = new(
+                new OneDriveFilesOnDemandState(AssetAvailability.OnlineOnly, false, true));
+
+            await using ViewerApiFactory factory = new(databasePath, directory, platform);
+            using HttpClient client = factory.CreateClient();
+
+            using HttpResponseMessage response = await client.GetAsync(
+                $"/api/collections/photos/{revisionId}/viewer-preview");
+
+            response.EnsureSuccessStatusCode();
+            Assert.Equal("image/jpeg", response.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(ProxyBytes, await response.Content.ReadAsByteArrayAsync());
+            Assert.Equal(0, platform.HydrationRequests);
+            Assert.Equal("online-only", await ReadAvailabilityAsync(databasePath, revisionId));
         }
         finally
         {
@@ -191,6 +252,37 @@ public sealed class CollectionViewerPreviewApplicationTests
             source,
             asset,
             revision)).Id;
+    }
+
+    private static async Task CreateProxyAsync(
+        string databasePath,
+        string root,
+        AssetRevisionId revisionId,
+        byte[] content)
+    {
+        SqliteCatalogueDatabase database = new(databasePath);
+        SqliteArchiveReviewProxyRepository repository = new(database);
+        ReviewProxyProfile profile = new("test-preview", maximumLongEdge: 1600, jpegQuality: 78);
+        DateTimeOffset now = new(2026, 8, 10, 20, 1, 0, TimeSpan.Zero);
+        await repository.RegisterProfileAsync(profile, now);
+
+        string relativePath = $"test-preview/{revisionId}.jpg";
+        string fullPath = Path.Combine(
+            root,
+            "proxies",
+            relativePath.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+        await File.WriteAllBytesAsync(fullPath, content);
+
+        await repository.RecordCompletionAsync(new ArchiveReviewProxyRecord(
+            revisionId,
+            profile.Id,
+            content.LongLength,
+            new Sha256Digest(Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant()),
+            1,
+            1,
+            now,
+            relativePath));
     }
 
     private static async Task<string?> ReadAvailabilityAsync(

@@ -7,8 +7,8 @@
 <section class="hero collection-hero">
     <div>
         <p class="eyebrow">Photo viewer</p>
-        <h1>Review preview</h1>
-        <p>Normal viewing prefers the durable review proxy. Before that proxy exists, an already-local revision-verified original may be rendered transiently without changing its OneDrive hydration state.</p>
+        <h1>Photo</h1>
+        <p>An already-local, revision-verified original is shown directly. If the original is online-only, the viewer uses the review proxy when available and never downloads the original implicitly.</p>
     </div>
     <a class="button secondary" href="/collections">Back to collections</a>
 </section>
@@ -19,17 +19,21 @@
 }
 
 <section class="collection-panel">
-    @if (PreviewUnavailable)
+    @if (LoadingStatus && Original is null)
+    {
+        <div class="empty-state compact"><p>Checking photo availability…</p></div>
+    }
+    else if (PreviewUnavailable)
     {
         <div class="empty-state compact">
             @if (Original?.State == "ready")
             {
-                <p>The authoritative original is local and revision-verified, but the review preview could not be rendered.</p>
-                <p>Normal viewing did not request hydration. Refresh the page to retry, or let archive processing generate the durable proxy.</p>
+                <p>The authoritative original is local and revision-verified, but it could not be displayed in the photo viewer.</p>
+                <p>Normal viewing did not request hydration. Refresh the page to retry.</p>
             }
             else
             {
-                <p>No review preview is currently available. A durable proxy has not been generated yet and the authoritative original is not already local and revision-verified.</p>
+                <p>No photo is currently available to display. A durable review proxy has not been generated yet and the authoritative original is not already local and revision-verified.</p>
                 <p>Normal viewing will not download an online-only original. Use <strong>Load original</strong> below only when you explicitly want full-resolution access, or let archive processing generate the durable proxy.</p>
             }
         </div>
@@ -38,8 +42,8 @@
     {
         <div class="photo-viewer-frame">
             <img class="photo-viewer-image"
-                 src="@PreviewUrl"
-                 alt="Review preview for the selected photo"
+                 src="@ViewerUrl"
+                 alt="Selected photo"
                  decoding="async"
                  @onerror="HandlePreviewError" />
         </div>
@@ -119,7 +123,7 @@
         </div>
         @if (Original is not null)
         {
-            <span>@OriginalStateLabel(Original.State)</span>
+            <span class="photo-original-state @OriginalStateClass(Original.State)">@OriginalStateLabel(Original.State)</span>
         }
     </div>
 
@@ -130,9 +134,7 @@
     else if (Original is not null)
     {
         <dl class="profile-details">
-            <div><dt>State</dt><dd>@OriginalStateLabel(Original.State)</dd></div>
-            <div><dt>Managed by Photo Identity</dt><dd>@(Original.ManagedHydration ? "Yes" : "No")</dd></div>
-            <div><dt>User/OneDrive pinned</dt><dd>@(Original.IsPinned ? "Yes" : "No")</dd></div>
+            <div><dt>Managed by</dt><dd>@OriginalManagedByLabel(Original)</dd></div>
         </dl>
 
         @if (!string.IsNullOrWhiteSpace(Original.Message))
@@ -146,13 +148,6 @@
                 <button type="button" class="button primary" disabled="@Busy" @onclick="HydrateAsync">
                     @(Busy ? "Requesting…" : "Load original")
                 </button>
-            }
-            @if (Original.CanView)
-            {
-                <a class="button primary"
-                   href="@OriginalUrl"
-                   target="_blank"
-                   rel="noopener noreferrer">Open original</a>
             }
             @if (Original.CanRelease)
             {
@@ -185,6 +180,7 @@
 
     private string PreviewUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/viewer-preview";
     private string OriginalUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original";
+    private string ViewerUrl => Original?.CanView == true ? OriginalUrl : PreviewUrl;
     private string StatusUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original/status";
     private string TagsUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/tags";
     private string TagCountLabel => Tags.Count == 1 ? "1 manual tag" : $"{Tags.Count} manual tags";
@@ -210,6 +206,7 @@
         try
         {
             Original = await Http.GetFromJsonAsync<CollectionOriginalAccessResponse>(StatusUrl);
+            PreviewUnavailable = false;
         }
         catch (Exception exception)
         {
@@ -439,6 +436,21 @@
     {
         PollCancellation?.Cancel();
     }
+
+    private static string OriginalManagedByLabel(CollectionOriginalAccessResponse original) =>
+        original.ManagedHydration
+            ? "Photo Identity"
+            : original.IsPinned
+                ? "OneDrive"
+                : "No";
+
+    private static string OriginalStateClass(string state) => state switch
+    {
+        "ready" => "ready",
+        "online-only" => "online-only",
+        "downloading" or "releasing" => "busy",
+        _ => "attention",
+    };
 
     private static string OriginalStateLabel(string state) => state switch
     {
