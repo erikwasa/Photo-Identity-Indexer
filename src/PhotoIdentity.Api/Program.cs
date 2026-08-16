@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.EventLog;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
@@ -13,6 +14,14 @@ public partial class Program
     public static async Task Main(string[] args)
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+        if (builder.Environment.IsDevelopment())
+        {
+            // WebApplicationFactory uses Development by default. Parallel integration-test hosts
+            // can otherwise share the Windows EventLog source lifetime and intermittently attempt
+            // to log through an EventLogInternal instance disposed by another completed host.
+            builder.Logging.AddFilter<EventLogLoggerProvider>(_ => false);
+        }
 
         string defaultApplicationRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
