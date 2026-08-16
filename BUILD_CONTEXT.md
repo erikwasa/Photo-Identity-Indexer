@@ -6,34 +6,38 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0061 — Enrich Photo Details and preserve navigation context** is in its final implementation slice for M19.
+**WI-0062 — Add manual photo-level people** is the active M19 implementation item.
 
-Slices 1 and 2 merged through PR #150 and PR #152. Main also includes the separate PR #151 durable face-review derivative work and PR #153 integration-host stabilization; WI-0061 does not change the face-review derivative path.
+WI-0061 implementation merged through PR #154. Its local browser verification is intentionally deferred and will be performed together with the remaining M19 work items in the consolidated maintainer pass.
 
-Slice 3 now adds navigation restoration:
+WI-0062 keeps photo-level manual presence separate from face evidence:
 
-- saved Smart Collection URLs carry the saved definition identifier plus result offset and can reconstruct the workspace from catalogue state;
-- transient unsaved previews store editor/filter state only in tab-scoped `sessionStorage`, referenced by a generated preview key plus result offset in the URL;
-- Smart Collection photo links carry the current local workspace return URL into Photo Details;
-- Photo Details validates the supplied return URL as a rooted local application route, labels Smart Collection returns appropriately and falls back to `/collections` for invalid or absent context;
-- no navigation-state operation opens or hydrates an original image.
+- append-only revision/person add/remove actions retain audit history;
+- Photo Details consolidates confirmed-face and manual-presence evidence without duplicate people;
+- manual add/remove does not create face occurrences, crops, embeddings, review actions or identity suggestions;
+- Smart Collections People filters query the union of confirmed faces and active manual presence with existing all/any semantics;
+- person merge transfers effective manual presence to the canonical target while preserving historical source-person actions;
+- all operations are catalogue-only and do not open or hydrate originals.
 
 ## Next concrete step
 
-1. Validate Slice 3 build, full tests, living documentation and review smoke in GitHub Actions.
-2. Merge the Slice 3 PR after CI and maintainer review.
-3. Perform the WI-0061 local browser pass: browser/mouse Back from both a saved Smart Collection result page and an unsaved preview, plus the context-aware Photo Details Back control and safe fallback behavior.
-4. After maintainer verification, mark WI-0061 completed and proceed with WI-0062 manual photo-level people. WI-0063 remains independently ready; WI-0064 follows WI-0063.
+1. Validate draft PR #155 build, integration tests, living documentation and review smoke in GitHub Actions.
+2. Merge WI-0062 after automated validation and code review; defer its local browser verification to the consolidated M19 pass.
+3. Continue with WI-0063 first-class Places.
+4. After WI-0063, implement WI-0064 GeoNames place enrichment.
+5. Perform the consolidated local M19 browser/operator verification, then close the remaining in-review work items and milestone as appropriate.
 
 ## Relevant files
 
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/work-items/WI-0061-photo-details-navigation-context.md`
-- `src/PhotoIdentity.Web/NavigationContext.cs`
-- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor`
-- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor.cs`
+- `docs/delivery/work-items/WI-0062-manual-photo-people.md`
+- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoPersonRepository.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoDetailsRepository.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionQueryRepository.cs`
+- `src/PhotoIdentity.Api/PhotoDetailsEndpoints.cs`
+- `src/PhotoIdentity.Web/Components/ManualPhotoPeopleEditor.razor`
 - `src/PhotoIdentity.Web/Pages/Photo.razor`
-- `tests/PhotoIdentity.Integration.Tests/NavigationContextTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/ManualPhotoPeopleApplicationTests.cs`
 
 ## Repository validation
 
