@@ -13,12 +13,7 @@ public sealed class SmartCollectionLocationUpdateCompatibilityTests
     [Fact]
     public async Task Update_without_place_preserves_existing_named_place_and_empty_place_clears_it()
     {
-        string directory = Path.Combine(
-            Path.GetTempPath(),
-            "PhotoIdentity.Integration.Tests",
-            Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(directory);
-
+        string directory = CreateTemporaryDirectory();
         try
         {
             string databasePath = Path.Combine(directory, "catalogue.db");
@@ -78,11 +73,60 @@ public sealed class SmartCollectionLocationUpdateCompatibilityTests
         }
         finally
         {
-            SqliteConnection.ClearAllPools();
-            if (Directory.Exists(directory))
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Schema_fourteen_directly_matches_the_places_guard_contract()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+
+            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            using SqliteCommand tableInfo = connection.CreateCommand();
+            tableInfo.CommandText = "PRAGMA table_info(photo_place_actions);";
+            bool hasProvider = false;
+            await using (SqliteDataReader reader = await tableInfo.ExecuteReaderAsync())
             {
-                Directory.Delete(directory, recursive: true);
+                while (await reader.ReadAsync())
+                {
+                    hasProvider |= string.Equals(reader.GetString(1), "provider", StringComparison.OrdinalIgnoreCase);
+                }
             }
+            Assert.True(hasProvider);
+
+            using SqliteCommand definition = connection.CreateCommand();
+            definition.CommandText = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'photo_place_actions';";
+            string sql = (string?)await definition.ExecuteScalarAsync() ?? string.Empty;
+            Assert.Contains("'migration'", sql, StringComparison.Ordinal);
+            Assert.DoesNotContain("'legacy-migration'", sql, StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    private static string CreateTemporaryDirectory()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "PhotoIdentity.Integration.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        return directory;
+    }
+
+    private static void DeleteTemporaryDirectory(string directory)
+    {
+        SqliteConnection.ClearAllPools();
+        if (Directory.Exists(directory))
+        {
+            Directory.Delete(directory, recursive: true);
         }
     }
 
