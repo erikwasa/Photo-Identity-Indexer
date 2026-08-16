@@ -6,48 +6,37 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-The original M19 baseline is verified and complete at the WI-0050/WI-0056 boundary. The maintainer completed the integrated local review on 2026-08-16 and reported that M19 and the implemented work-item functions behaved as expected.
+**WI-0061 — Enrich Photo Details and preserve navigation context** is the active M19 work item.
 
-M19 has now been extended with four follow-up work items. No follow-up implementation has started yet:
+The original M19 WI-0050/WI-0056 baseline was verified by the maintainer on 2026-08-16. M19 is now extended by WI-0061 through WI-0064. Automatic visible-content tagging remains deferred; SQLite stays canonical and originals remain read-only.
 
-- **WI-0061 — Enrich Photo Details and preserve navigation context**: original filename, consolidated confirmed people and return-state restoration from Smart Collections.
-- **WI-0062 — Add manual photo-level people**: revision-level person presence independent of face detection/identification, feeding Smart Collections but not face evidence.
-- **WI-0063 — Make Places a first-class location hierarchy**: reserve `Places/`, enforce one effective place, separate Places from generic tags and add hierarchical named-place filtering to Location.
-- **WI-0064 — Add GeoNames reverse-geocoded Places enrichment**: use the GeoNames web-service API from persisted GPS, with no downloaded GeoNames database extracts.
+WI-0061 is being delivered in three slices:
 
-Automatic visible-content tagging remains deferred and WI-0049 is not part of the active M19 completion path. SQLite remains canonical and originals remain read-only.
+1. Photo viewer/original-state cleanup.
+2. Photo detail metadata (original filename and confirmed people).
+3. Smart Collection navigation-state restoration and context-aware Back navigation.
 
-## Dependency shape
-
-Two work items are immediately ready and can proceed independently:
-
-1. WI-0061 (Photo Details/navigation context).
-2. WI-0063 (first-class Places hierarchy).
-
-WI-0062 depends on WI-0061 so its manual people controls can reuse the consolidated Photo Details contract. WI-0064 depends on WI-0063 so GeoNames writes into a settled single-place/location model rather than defining that model itself.
+The active Slice 1 changes Photo Details so an already-local, revision-verified original is displayed directly instead of a review proxy. Online-only originals continue to use a durable proxy when available without implicit hydration. After explicit hydration completes, the same Photo Details view switches to the original rather than downloading it or opening another tab. Original availability is shown once as a badge, with one `Managed by: Photo Identity|OneDrive|No` value.
 
 ## Next concrete step
 
-1. Merge the documentation/status change that registers WI-0061 through WI-0064 and closes the verified WI-0050 baseline.
-2. Choose either WI-0061 or WI-0063 as the first implementation track; they are intentionally parallel-ready.
-3. Implement WI-0062 after WI-0061 is merged.
-4. Implement WI-0064 after WI-0063 is merged, using the GeoNames HTTPS web-service API and private local username configuration.
-5. After all four follow-up work items are complete, perform one integrated M19 extension verification pass.
+1. Validate Slice 1 build/tests/docs and viewer integration tests.
+2. Merge Slice 1 after CI passes and maintainer review.
+3. Continue WI-0061 with privacy-safe original filename and consolidated confirmed-people detail data.
+4. Finish WI-0061 with saved/transient Smart Collection navigation restoration and validated context-aware Back navigation.
+5. Implement WI-0062 after WI-0061 is complete. WI-0063 remains independently ready; WI-0064 follows WI-0063.
 
 ## Relevant files
 
 - `docs/delivery/milestones/M19-library-intelligence.md`
 - `docs/delivery/status/milestones.yaml`
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/work-items/WI-0050-exif-smart-collections.md`
 - `docs/delivery/work-items/WI-0061-photo-details-navigation-context.md`
-- `docs/delivery/work-items/WI-0062-manual-photo-people.md`
-- `docs/delivery/work-items/WI-0063-first-class-places.md`
-- `docs/delivery/work-items/WI-0064-geonames-place-enrichment.md`
+- `src/PhotoIdentity.Api/CollectionViewerPreviewEndpoints.cs`
+- `src/PhotoIdentity.Api/CollectionEndpoints.cs`
 - `src/PhotoIdentity.Web/Pages/Photo.razor`
-- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionQueryRepository.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoTagRepository.cs`
+- `src/PhotoIdentity.Web/Pages/Photo.razor.css`
+- `tests/PhotoIdentity.Integration.Tests/CollectionViewerPreviewApplicationTests.cs`
 
 ## Repository validation
 
