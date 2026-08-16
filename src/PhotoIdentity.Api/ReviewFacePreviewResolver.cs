@@ -2,21 +2,22 @@ using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
 /// <summary>
-/// Resolves a face occurrence to review-safe source pixels without exposing source paths.
-/// Face Details can prefer an already-local, revision-verified original; ordinary gallery
-/// rendering remains proxy-backed. Online-only originals are never hydrated implicitly.
+/// Resolves a face occurrence to privacy-safe review pixels without exposing source paths.
+/// Durable face-review derivatives are preferred for both Gallery and Details; if a catalogue is
+/// still being backfilled, the durable whole-photo review proxy remains the safe fallback.
+/// Authoritative originals are never opened by this runtime review path.
 /// </summary>
 public sealed class ReviewFacePreviewResolver
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly CollectionReviewProxyFileResolver _proxyFileResolver;
-    private readonly CollectionOriginalAccessService _originalAccessService;
     private readonly OpenCvReviewFaceRenderer _renderer;
 
     public ReviewFacePreviewResolver(
@@ -31,7 +32,6 @@ public sealed class ReviewFacePreviewResolver
         ArgumentNullException.ThrowIfNull(renderer);
         _database = database;
         _proxyFileResolver = proxyFileResolver;
-        _originalAccessService = originalAccessService;
         _renderer = renderer;
     }
 
@@ -41,30 +41,26 @@ public sealed class ReviewFacePreviewResolver
         bool preferVerifiedOriginal = false,
         CancellationToken cancellationToken = default)
     {
+        _ = preferVerifiedOriginal;
+        FaceReviewDerivativeFile? durable = await _proxyFileResolver.ResolveFaceReviewAsync(
+            faceOccurrenceId,
+            cancellationToken);
+        if (durable is not null)
+        {
+            EncodedReviewFace? rendered = await RenderStoredDerivativeAsync(
+                durable,
+                maximumEdge,
+                cancellationToken);
+            if (rendered is not null)
+            {
+                return rendered;
+            }
+        }
+
         ReviewFaceGeometry? geometry = await GetGeometryAsync(faceOccurrenceId, cancellationToken);
         if (geometry is null)
         {
             return null;
-        }
-
-        if (preferVerifiedOriginal)
-        {
-            VerifiedCollectionOriginal? original = await _originalAccessService.OpenVerifiedAsync(
-                geometry.AssetRevisionId,
-                cancellationToken);
-            if (original is not null)
-            {
-                await using FileStream stream = original.Stream;
-                EncodedReviewFace? renderedOriginal = await _renderer.RenderAsync(
-                    stream,
-                    geometry.BoundingBox,
-                    maximumEdge,
-                    cancellationToken);
-                if (renderedOriginal is not null)
-                {
-                    return renderedOriginal;
-                }
-            }
         }
 
         CollectionPhotoFile? proxy = await _proxyFileResolver.ResolveAsync(
@@ -80,6 +76,53 @@ public sealed class ReviewFacePreviewResolver
             geometry.BoundingBox,
             maximumEdge,
             cancellationToken);
+    }
+
+    private static async Task<EncodedReviewFace?> RenderStoredDerivativeAsync(
+        FaceReviewDerivativeFile durable,
+        int maximumEdge,
+        CancellationToken cancellationToken)
+    {
+        if (maximumEdge >= Math.Max(durable.Width, durable.Height))
+        {
+            try
+            {
+                byte[] content = await File.ReadAllBytesAsync(durable.Path, cancellationToken);
+                return new EncodedReviewFace(
+                    content,
+                    "image/jpeg",
+                    durable.Width,
+                    durable.Height);
+            }
+            catch (Exception exception) when (
+                exception is IOException or
+                UnauthorizedAccessException or
+                System.Security.SecurityException)
+            {
+                return null;
+            }
+        }
+
+        ReviewProxyProfile responseProfile = new(
+            $"face-response-{maximumEdge}",
+            maximumEdge,
+            OpenCvReviewFaceRenderer.JpegQuality);
+        try
+        {
+            EncodedReviewProxy encoded = await new OpenCvReviewProxyRenderer().RenderAsync(
+                durable.Path,
+                responseProfile,
+                cancellationToken);
+            return new EncodedReviewFace(
+                encoded.Content,
+                encoded.ContentType,
+                encoded.Width,
+                encoded.Height);
+        }
+        catch (InvalidDataException)
+        {
+            return null;
+        }
     }
 
     private async Task<ReviewFaceGeometry?> GetGeometryAsync(
