@@ -15,7 +15,7 @@ public partial class Program
     {
         WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-        if (builder.Environment.IsDevelopment())
+        if (OperatingSystem.IsWindows() && builder.Environment.IsDevelopment())
         {
             // WebApplicationFactory uses Development by default. Parallel integration-test hosts
             // can otherwise share the Windows EventLog source lifetime and intermittently attempt
