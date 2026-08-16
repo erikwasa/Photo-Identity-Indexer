@@ -1,6 +1,7 @@
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Places;
+using PhotoIdentity.Core.Tags;
 using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
@@ -271,6 +272,8 @@ public static class SmartCollectionEndpoints
         SmartCollectionLocationRequest? location,
         string? taken)
     {
+        ValidateGenericTags(tags);
+
         PersonId[] parsedPeople = (people ?? [])
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(ParsePersonId)
@@ -290,6 +293,25 @@ public static class SmartCollectionEndpoints
             parsedLocation,
             parsedTaken,
             location?.Place);
+    }
+
+    private static void ValidateGenericTags(string[]? tags)
+    {
+        foreach (string value in tags ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            PhotoTagPath path = PhotoTagPath.Parse(value);
+            if (PhotoPlacePath.IsReservedTagPath(path))
+            {
+                throw new ArgumentException(
+                    $"The reserved '{PhotoPlacePath.RootDisplayName}' hierarchy belongs to Location, not Tags.",
+                    nameof(tags));
+            }
+        }
     }
 
     private static SmartCollectionGeoBounds? ParseBounds(SmartCollectionLocationRequest? location)
