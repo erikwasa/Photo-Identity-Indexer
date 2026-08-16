@@ -90,11 +90,14 @@ work_items:
 - id: WI-0050
   title: Add photo metadata and persistent smart collections
   milestone: M19
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0050-exif-smart-collections.md
   started_at: 2026-08-14
-  last_updated_at: 2026-08-14
+  completed_at: 2026-08-16
+  verified_at: 2026-08-16
+  verified_by: maintainer
+  last_updated_at: 2026-08-16
   branch: agent/WI-0050-smart-collection-ui
   blockers:
   - WI-0025
@@ -121,6 +124,12 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31800391197
   - type: merge_commit
     value: 83f4a6ebc183860adfc28d5d625700011666ad14
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/146
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31802548161
+  - type: merge_commit
+    value: a935c222d96c8769815618663a85ebd90404dd74
 - id: WI-0051
   title: Add a one-click Windows launcher
   milestone: M18
@@ -246,3 +255,47 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/147
+- id: WI-0061
+  title: Enrich Photo Details and preserve navigation context
+  milestone: M19
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0061-photo-details-navigation-context.md
+  blockers:
+  - WI-0025
+  - WI-0050
+  blocker_notes: []
+  evidence: []
+- id: WI-0062
+  title: Add manual photo-level people
+  milestone: M19
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0062-manual-photo-people.md
+  blockers:
+  - WI-0050
+  - WI-0061
+  blocker_notes: []
+  evidence: []
+- id: WI-0063
+  title: Make Places a first-class location hierarchy
+  milestone: M19
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0063-first-class-places.md
+  blockers:
+  - WI-0050
+  - WI-0056
+  blocker_notes: []
+  evidence: []
+- id: WI-0064
+  title: Add GeoNames reverse-geocoded Places enrichment
+  milestone: M19
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0064-geonames-place-enrichment.md
+  blockers:
+  - WI-0050
+  - WI-0063
+  blocker_notes: []
+  evidence: []
