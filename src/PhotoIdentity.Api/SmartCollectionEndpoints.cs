@@ -151,10 +151,19 @@ public static class SmartCollectionEndpoints
 
         try
         {
+            SmartCollectionDefinition? existing = await repository.GetAsync(collectionId, cancellationToken);
+            if (existing is null)
+            {
+                return Results.NotFound();
+            }
+
+            string? fallbackLocationPlace = request.Location?.Place is null
+                ? existing.Filter.LocationPlace
+                : null;
             SmartCollectionDefinition? definition = await repository.UpdateAsync(
                 collectionId,
                 request.Name,
-                ToFilter(request),
+                ToFilter(request, fallbackLocationPlace),
                 cancellationToken);
             return definition is null
                 ? Results.NotFound()
@@ -249,10 +258,13 @@ public static class SmartCollectionEndpoints
             request.Tags,
             request.TagMatch,
             request.Location,
-            request.Taken);
+            request.Taken,
+            fallbackLocationPlace: null);
     }
 
-    private static SmartCollectionFilter ToFilter(SmartCollectionDefinitionRequest request)
+    private static SmartCollectionFilter ToFilter(
+        SmartCollectionDefinitionRequest request,
+        string? fallbackLocationPlace = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         return ToFilter(
@@ -261,7 +273,8 @@ public static class SmartCollectionEndpoints
             request.Tags,
             request.TagMatch,
             request.Location,
-            request.Taken);
+            request.Taken,
+            fallbackLocationPlace);
     }
 
     private static SmartCollectionFilter ToFilter(
@@ -270,7 +283,8 @@ public static class SmartCollectionEndpoints
         string[]? tags,
         string? tagMatch,
         SmartCollectionLocationRequest? location,
-        string? taken)
+        string? taken,
+        string? fallbackLocationPlace)
     {
         ValidateGenericTags(tags);
 
@@ -284,6 +298,9 @@ public static class SmartCollectionEndpoints
         SmartCollectionDateRange? parsedTaken = string.IsNullOrWhiteSpace(taken)
             ? null
             : SmartCollectionDateRange.Parse(taken);
+        string? locationPlace = location?.Place is null
+            ? fallbackLocationPlace
+            : location.Place;
 
         return new SmartCollectionFilter(
             parsedPeople,
@@ -292,7 +309,7 @@ public static class SmartCollectionEndpoints
             tagMatch,
             parsedLocation,
             parsedTaken,
-            location?.Place);
+            locationPlace);
     }
 
     private static void ValidateGenericTags(string[]? tags)
