@@ -6,38 +6,38 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0062 — Add manual photo-level people** is the active M19 implementation item.
+**WI-0063 — Make Places a first-class location hierarchy** is the active M19 implementation item.
 
-WI-0061 implementation merged through PR #154. Its local browser verification is intentionally deferred and will be performed together with the remaining M19 work items in the consolidated maintainer pass.
+WI-0061 and WI-0062 implementation are merged. Their local browser verification is intentionally deferred and will be performed together with WI-0063/WI-0064 in the consolidated M19 maintainer pass.
 
-WI-0062 keeps photo-level manual presence separate from face evidence:
+Slice 1 is in draft PR #156 and establishes the first-class Places foundation:
 
-- append-only revision/person add/remove actions retain audit history;
-- Photo Details consolidates confirmed-face and manual-presence evidence without duplicate people;
-- manual add/remove does not create face occurrences, crops, embeddings, review actions or identity suggestions;
-- Smart Collections People filters query the union of confirmed faces and active manual presence with existing all/any semantics;
-- person merge transfers effective manual presence to the canonical target while preserving historical source-person actions;
-- all operations are catalogue-only and do not open or hydrate originals.
+- reserve `Places`/`Places/...` so ordinary tag routes reject and hide the namespace;
+- reuse canonical hierarchical `photo_tags` vocabulary while storing one effective revision-level place in append-only `photo_place_actions`;
+- expose dedicated place vocabulary/state/set/replace/clear APIs without the literal `Places/` prefix in normal values;
+- migrate coherent legacy Places chains to the deepest node while surfacing divergent paths in `photo_place_migration_conflicts`;
+- keep all place operations catalogue-only with no original access or hydration.
+
+The current `smart_collections` table hard-constrains filter schema version 1. The formal catalogue schema migration is therefore intentionally paired with the Smart Collection v2 table rebuild in Slice 2 rather than forcing two adjacent migrations.
 
 ## Next concrete step
 
-1. Validate draft PR #155 build, integration tests, living documentation and review smoke in GitHub Actions.
-2. Merge WI-0062 after automated validation and code review; defer its local browser verification to the consolidated M19 pass.
-3. Continue with WI-0063 first-class Places.
-4. After WI-0063, implement WI-0064 GeoNames place enrichment.
-5. Perform the consolidated local M19 browser/operator verification, then close the remaining in-review work items and milestone as appropriate.
+1. Validate draft PR #156 build, integration tests, living documentation, review smoke and Windows verification in GitHub Actions.
+2. Merge Slice 1 after automated validation and code review.
+3. Implement WI-0063 Slice 2: Smart Collection named-place Location contract, exact ancestor matching, Places exclusion from generic Smart tags, saved-filter v1→v2 migration and formal M19 schema migration.
+4. Implement Slice 3: Photo Details place editor and Smart Collection hierarchical place UI.
+5. Implement WI-0064 GeoNames enrichment, then perform the consolidated M19 browser/operator verification.
 
 ## Relevant files
 
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/work-items/WI-0062-manual-photo-people.md`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoPersonRepository.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoDetailsRepository.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionQueryRepository.cs`
-- `src/PhotoIdentity.Api/PhotoDetailsEndpoints.cs`
-- `src/PhotoIdentity.Web/Components/ManualPhotoPeopleEditor.razor`
-- `src/PhotoIdentity.Web/Pages/Photo.razor`
-- `tests/PhotoIdentity.Integration.Tests/ManualPhotoPeopleApplicationTests.cs`
+- `docs/delivery/work-items/WI-0063-first-class-places.md`
+- `src/PhotoIdentity.Core/Places/PhotoPlacePath.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoPlaceSchema.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoPlaceRepository.cs`
+- `src/PhotoIdentity.Api/PhotoPlaceEndpoints.cs`
+- `src/PhotoIdentity.Api/PhotoTagEndpoints.cs`
+- `tests/PhotoIdentity.Integration.Tests/PhotoPlaceFoundationApplicationTests.cs`
 
 ## Repository validation
 
