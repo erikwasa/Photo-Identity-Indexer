@@ -1,6 +1,7 @@
 namespace PhotoIdentity.Web;
 
 public sealed record SmartCollectionTransientNavigationState(
+    string? EditingId,
     string Name,
     string[] People,
     string PeopleMatch,
