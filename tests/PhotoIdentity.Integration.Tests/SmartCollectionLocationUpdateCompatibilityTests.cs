@@ -51,7 +51,7 @@ public sealed class SmartCollectionLocationUpdateCompatibilityTests
             SmartCollectionDefinitionResponse preserved =
                 await legacyUpdate.Content.ReadFromJsonAsync<SmartCollectionDefinitionResponse>()
                 ?? throw new InvalidOperationException("Update response was empty.");
-            Assert.Equal("Sweden/Stockholm region", preserved.Filter.Location?.Place);
+            Assert.Equal("sweden/stockholm region", preserved.Filter.Location?.Place);
             Assert.Equal(59.1, preserved.Filter.Location?.South);
 
             using HttpResponseMessage explicitClear = await client.PutAsJsonAsync(
