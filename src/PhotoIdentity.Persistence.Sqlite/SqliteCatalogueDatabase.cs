@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 13;
+    public const int CurrentSchemaVersion = 14;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -605,6 +605,148 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 13;
         """;
 
+    private const string VersionFourteenMigration = """
+        CREATE TABLE IF NOT EXISTS photo_capture_metadata (
+            asset_revision_id TEXT NOT NULL PRIMARY KEY,
+            taken_at_local TEXT NULL,
+            utc_offset_minutes INTEGER NULL CHECK (utc_offset_minutes IS NULL OR utc_offset_minutes BETWEEN -840 AND 840),
+            latitude REAL NULL CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
+            longitude REAL NULL CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180),
+            extracted_at_utc TEXT NOT NULL,
+            FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+            CHECK ((latitude IS NULL) = (longitude IS NULL)),
+            CHECK (utc_offset_minutes IS NULL OR taken_at_local IS NOT NULL)
+        );
+        CREATE INDEX IF NOT EXISTS ix_photo_capture_metadata_taken
+            ON photo_capture_metadata (taken_at_local, asset_revision_id);
+        CREATE INDEX IF NOT EXISTS ix_photo_capture_metadata_location
+            ON photo_capture_metadata (latitude, longitude, asset_revision_id);
+
+        CREATE TABLE IF NOT EXISTS smart_collections (
+            id TEXT NOT NULL PRIMARY KEY,
+            normalized_name TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            filter_schema_version INTEGER NOT NULL CHECK (filter_schema_version = 1),
+            filter_json TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            CHECK (length(normalized_name) BETWEEN 1 AND 120),
+            CHECK (length(display_name) BETWEEN 1 AND 120),
+            CHECK (length(filter_json) > 0)
+        );
+
+        CREATE TABLE smart_collections_v14 (
+            id TEXT NOT NULL PRIMARY KEY,
+            normalized_name TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            filter_schema_version INTEGER NOT NULL CHECK (filter_schema_version = 2),
+            filter_json TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            CHECK (length(normalized_name) BETWEEN 1 AND 120),
+            CHECK (length(display_name) BETWEEN 1 AND 120),
+            CHECK (length(filter_json) > 0)
+        );
+        INSERT INTO smart_collections_v14 (
+            id, normalized_name, display_name, filter_schema_version,
+            filter_json, created_at_utc, updated_at_utc)
+        SELECT
+            id, normalized_name, display_name, 2,
+            filter_json, created_at_utc, updated_at_utc
+        FROM smart_collections;
+        DROP TABLE smart_collections;
+        ALTER TABLE smart_collections_v14 RENAME TO smart_collections;
+        CREATE INDEX ix_smart_collections_name
+            ON smart_collections (normalized_name, id);
+
+        CREATE TABLE IF NOT EXISTS photo_person_actions (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            asset_revision_id TEXT NOT NULL,
+            person_id TEXT NOT NULL,
+            action_kind TEXT NOT NULL CHECK (action_kind IN ('add', 'remove')),
+            actor TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+            FOREIGN KEY (person_id) REFERENCES people (id) ON DELETE RESTRICT
+        );
+        CREATE INDEX IF NOT EXISTS ix_photo_person_actions_revision_history
+            ON photo_person_actions (asset_revision_id, person_id, id DESC);
+        CREATE INDEX IF NOT EXISTS ix_photo_person_actions_person_history
+            ON photo_person_actions (person_id, asset_revision_id, id DESC);
+        CREATE TRIGGER IF NOT EXISTS trg_photo_person_actions_transfer_merge
+        AFTER UPDATE OF merged_into_person_id ON people
+        WHEN OLD.merged_into_person_id IS NULL
+         AND NEW.merged_into_person_id IS NOT NULL
+        BEGIN
+            INSERT INTO photo_person_actions (
+                asset_revision_id, person_id, action_kind, actor, created_at_utc)
+            SELECT
+                source_action.asset_revision_id,
+                NEW.merged_into_person_id,
+                'add',
+                'person-merge',
+                strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            FROM photo_person_actions AS source_action
+            WHERE source_action.person_id = NEW.id
+              AND source_action.action_kind = 'add'
+              AND source_action.id = (
+                  SELECT MAX(source_latest.id)
+                  FROM photo_person_actions AS source_latest
+                  WHERE source_latest.asset_revision_id = source_action.asset_revision_id
+                    AND source_latest.person_id = NEW.id)
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM photo_person_actions AS target_action
+                  WHERE target_action.asset_revision_id = source_action.asset_revision_id
+                    AND target_action.person_id = NEW.merged_into_person_id
+                    AND target_action.action_kind = 'add'
+                    AND target_action.id = (
+                        SELECT MAX(target_latest.id)
+                        FROM photo_person_actions AS target_latest
+                        WHERE target_latest.asset_revision_id = source_action.asset_revision_id
+                          AND target_latest.person_id = NEW.merged_into_person_id));
+        END;
+
+        CREATE TABLE IF NOT EXISTS photo_place_actions (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            asset_revision_id TEXT NOT NULL,
+            tag_id INTEGER NULL,
+            action_kind TEXT NOT NULL CHECK (action_kind IN ('set', 'clear')),
+            source_kind TEXT NOT NULL CHECK (source_kind IN ('manual', 'legacy-migration', 'automatic')),
+            actor TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id) REFERENCES photo_tags (id) ON DELETE RESTRICT,
+            CHECK (
+                (action_kind = 'set' AND tag_id IS NOT NULL)
+                OR (action_kind = 'clear' AND tag_id IS NULL))
+        );
+        CREATE INDEX IF NOT EXISTS ix_photo_place_actions_revision_history
+            ON photo_place_actions (asset_revision_id, id DESC);
+        CREATE INDEX IF NOT EXISTS ix_photo_place_actions_tag_history
+            ON photo_place_actions (tag_id, asset_revision_id, id DESC);
+
+        CREATE TABLE IF NOT EXISTS photo_place_migration_conflicts (
+            asset_revision_id TEXT NOT NULL PRIMARY KEY,
+            candidate_values TEXT NOT NULL,
+            detected_at_utc TEXT NOT NULL,
+            resolved_at_utc TEXT NULL,
+            resolved_by TEXT NULL,
+            resolution_note TEXT NULL,
+            FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+            CHECK (length(candidate_values) > 0),
+            CHECK (
+                (resolved_at_utc IS NULL AND resolved_by IS NULL)
+                OR (resolved_at_utc IS NOT NULL AND resolved_by IS NOT NULL))
+        );
+        CREATE INDEX IF NOT EXISTS ix_photo_place_migration_conflicts_open
+            ON photo_place_migration_conflicts (resolved_at_utc, detected_at_utc, asset_revision_id);
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (14, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 14;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -719,6 +861,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 13)
         {
             await ApplyMigrationAsync(connection, VersionThirteenMigration, cancellationToken);
+            version = 13;
+        }
+
+        if (version < 14)
+        {
+            await ApplyMigrationAsync(connection, VersionFourteenMigration, cancellationToken);
         }
     }
 
