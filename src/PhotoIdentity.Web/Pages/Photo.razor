@@ -71,22 +71,9 @@
                 <div><dt>File name</dt><dd>@Details.FileName</dd></div>
             </dl>
 
-            <div class="photo-people-section">
-                <h3>People</h3>
-                @if (Details.People.Count == 0)
-                {
-                    <p class="photo-detail-empty">No confirmed people are currently known to be in this photo.</p>
-                }
-                else
-                {
-                    <div class="photo-person-list" aria-label="Confirmed people in this photo">
-                        @foreach (PhotoDetailsPersonResponse person in Details.People)
-                        {
-                            <span class="photo-person-chip" title="@ConfirmedFaceLabel(person.ConfirmedFaceCount)">@person.DisplayName</span>
-                        }
-                    </div>
-                }
-            </div>
+            <ManualPhotoPeopleEditor RevisionId="@RevisionId"
+                                     Details="@Details"
+                                     DetailsChanged="@((PhotoDetailsResponse details) => Details = details)" />
         }
 
         @if (!string.IsNullOrWhiteSpace(DetailsError))
@@ -242,7 +229,7 @@
     private string DetailsUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/details";
     private string TagsUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/tags";
     private string TagCountLabel => Tags.Count == 1 ? "1 manual tag" : $"{Tags.Count} manual tags";
-    private string PeopleCountLabel => Details?.People.Count == 1 ? "1 confirmed person" : $"{Details?.People.Count ?? 0} confirmed people";
+    private string PeopleCountLabel => Details?.People.Count == 1 ? "1 person" : $"{Details?.People.Count ?? 0} people";
 
     protected override async Task OnParametersSetAsync()
     {

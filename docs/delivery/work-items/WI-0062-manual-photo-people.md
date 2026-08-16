@@ -41,11 +41,23 @@ Manual photo-level presence must therefore not create or mutate:
 - Reject assignments to missing or already-merged people unless the canonical target is explicitly resolved.
 - Keep operations metadata-only and safe for online-only originals.
 
-## Recommended persistence model
+## Persistence model
 
-Introduce a dedicated photo-person action relation keyed by immutable asset revision plus canonical person, with `add`/`remove`, actor and timestamp. Effective presence is derived from the latest active action for each revision/person pair.
+`photo_person_actions` is a dedicated append-only relation keyed by immutable asset revision plus canonical person. Each row records `add`/`remove`, actor and timestamp; effective presence is the latest action for a revision/person pair.
+
+The table and indexes are created by an idempotent SQLite schema guard, following the existing catalogue pattern used by capture metadata. A merge trigger copies effective source-person presence to the active canonical target only when the target is not already effectively present. Historical source-person actions are retained unchanged, so merge transfer does not erase audit history or let source/target action timestamps accidentally cancel a valid assignment.
 
 This relation is intentionally separate from `person_labels` and `review_actions`, which remain tied to face occurrences.
+
+## Implementation
+
+- Draft PR #155 implements the work item on `agent/WI-0062-manual-photo-people`.
+- Photo Details mutation endpoints are catalogue-only and return the existing consolidated details response after each add/remove.
+- `SqlitePhotoDetailsRepository` unions active manual presence with confirmed face assignments and keeps `ConfirmedFaceCount` and `ManualPresence` independent.
+- The Photo Details People editor searches active canonical people, labels face/manual evidence explicitly, and only exposes removal for the manual evidence source.
+- `SqliteSmartCollectionQueryRepository` evaluates People filters against the union of confirmed face people and active manual photo people; existing `all`/`any` semantics are unchanged.
+- No legacy `/collections` face-evidence query is changed.
+- Integration tests use source roots that do not exist locally and verify zero writes to face/evidence tables during manual add/remove.
 
 ## Out of scope
 
@@ -57,16 +69,16 @@ This relation is intentionally separate from `person_labels` and `review_actions
 
 ## Acceptance criteria
 
-- [ ] A maintainer can add an active canonical person to a photo from Photo Details even when the photo has no detected faces.
-- [ ] A maintainer can remove that manual photo-level person assignment and the add/remove history remains auditable.
-- [ ] Manual photo-person assignment does not create or change any face occurrence, crop, embedding, face review action or identity suggestion.
-- [ ] Photo Details consolidates confirmed-face and manual-presence evidence without showing duplicate person rows.
-- [ ] Smart Collections People filters include manual photo-level presence and preserve existing `all`/`any` behavior.
-- [ ] The legacy face-evidence collection/review flows remain face-based and are not contaminated by photo-only presence.
-- [ ] Person merge consolidates photo-level assignments onto the canonical target safely.
-- [ ] Adding/removing manual people does not hydrate or modify an online-only original.
-- [ ] Automated tests cover no-face photos, combined face/manual evidence, add/remove audit history, Smart Collection filtering and merge behavior.
+- [x] A maintainer can add an active canonical person to a photo from Photo Details even when the photo has no detected faces. Implementation and automated API coverage complete; local browser verification is deferred to the consolidated M19 pass.
+- [x] A maintainer can remove that manual photo-level person assignment and the add/remove history remains auditable.
+- [x] Manual photo-person assignment does not create or change any face occurrence, crop, embedding, face review action or identity suggestion.
+- [x] Photo Details consolidates confirmed-face and manual-presence evidence without showing duplicate person rows.
+- [x] Smart Collections People filters include manual photo-level presence and preserve existing `all`/`any` behavior.
+- [x] The legacy face-evidence collection/review flows remain face-based and are not contaminated by photo-only presence.
+- [x] Person merge consolidates photo-level assignments onto the canonical target safely while preserving source history.
+- [x] Adding/removing manual people does not hydrate or modify an online-only original.
+- [x] Automated tests cover no-face photos, combined face/manual evidence, add/remove audit history, Smart Collection filtering and merge behavior.
 
 ## Verification requirements
 
-Automated persistence/API/query tests plus a local browser pass on a photo where a known person was not detected are required. The maintainer must confirm that the person becomes available to Smart Collections while Face Review remains unchanged.
+Automated persistence/API/query tests plus a local browser pass on a photo where a known person was not detected are required. Per the maintainer's M19 verification plan, the local browser pass is intentionally deferred until the remaining M19 work items are implemented. The consolidated pass must confirm that manual presence becomes available to Smart Collections while Face Review remains unchanged.

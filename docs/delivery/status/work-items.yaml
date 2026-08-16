@@ -277,7 +277,8 @@ work_items:
   blockers:
   - WI-0025
   - WI-0050
-  blocker_notes: []
+  blocker_notes:
+  - Local maintainer browser verification is intentionally deferred until the remaining M19 work items are implemented.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/150
@@ -287,17 +288,27 @@ work_items:
     value: c46880596f2f2a42e4868873878c6e70fef7def4
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/154
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31974027690
+  - type: merge_commit
+    value: 52dea2a531b0b4942c8c05d739cca1beb5aadd90
 - id: WI-0062
   title: Add manual photo-level people
   milestone: M19
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0062-manual-photo-people.md
+  started_at: 2026-08-16
+  last_updated_at: 2026-08-16
+  branch: agent/WI-0062-manual-photo-people
   blockers:
   - WI-0050
   - WI-0061
-  blocker_notes: []
-  evidence: []
+  blocker_notes:
+  - WI-0061 implementation is merged; its local verification is deferred to the consolidated M19 pass.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/155
 - id: WI-0063
   title: Make Places a first-class location hierarchy
   milestone: M19

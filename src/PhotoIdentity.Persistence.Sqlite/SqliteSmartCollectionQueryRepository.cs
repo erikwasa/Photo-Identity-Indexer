@@ -26,6 +26,7 @@ public sealed record SmartCollectionPhotoPage(
 /// <summary>
 /// Evaluates reusable smart-collection filters against current immutable revisions.
 /// Populated dimensions combine with AND semantics; people and tags independently support all/any.
+/// The people dimension is the union of confirmed face evidence and active manual photo-level presence.
 /// Missing capture metadata cannot satisfy location or taken-date predicates.
 /// </summary>
 public sealed class SqliteSmartCollectionQueryRepository
@@ -55,6 +56,32 @@ public sealed class SqliteSmartCollectionQueryRepository
             INNER JOIN people
                 ON people.id = latest_review_action.person_id
                AND people.merged_into_person_id IS NULL
+        ),
+        latest_photo_person_action AS (
+            SELECT
+                photo_person_actions.asset_revision_id,
+                photo_person_actions.person_id,
+                photo_person_actions.action_kind,
+                ROW_NUMBER() OVER (
+                    PARTITION BY photo_person_actions.asset_revision_id, photo_person_actions.person_id
+                    ORDER BY photo_person_actions.id DESC) AS row_number
+            FROM photo_person_actions
+        ),
+        active_manual_revision_people AS (
+            SELECT
+                latest_photo_person_action.asset_revision_id AS revision_id,
+                latest_photo_person_action.person_id
+            FROM latest_photo_person_action
+            INNER JOIN people
+                ON people.id = latest_photo_person_action.person_id
+               AND people.merged_into_person_id IS NULL
+            WHERE latest_photo_person_action.row_number = 1
+              AND latest_photo_person_action.action_kind = 'add'
+        ),
+        revision_people AS (
+            SELECT revision_id, person_id FROM confirmed_revision_people
+            UNION
+            SELECT revision_id, person_id FROM active_manual_revision_people
         ),
         latest_tag_action AS (
             SELECT
@@ -100,6 +127,7 @@ public sealed class SqliteSmartCollectionQueryRepository
 
         string where = BuildWhere(filter);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await SqlitePhotoPersonSchema.EnsureAsync(connection, transaction: null, cancellationToken);
         await EnsurePhotoMetadataSchemaAsync(connection, cancellationToken);
 
         int total;
@@ -182,7 +210,7 @@ public sealed class SqliteSmartCollectionQueryRepository
             predicates.Add($"""
                 AND asset_revisions.id IN (
                     SELECT revision_id
-                    FROM confirmed_revision_people
+                    FROM revision_people
                     WHERE person_id IN ({people})
                     GROUP BY revision_id
                     HAVING {having})
