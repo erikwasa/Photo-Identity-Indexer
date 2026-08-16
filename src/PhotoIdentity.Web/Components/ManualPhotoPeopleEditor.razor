@@ -1,0 +1,227 @@
+@inject HttpClient Http
+
+<div class="photo-people-section">
+    <h3>People</h3>
+
+    @if (Details is null)
+    {
+        <p class="photo-detail-empty">People are unavailable while photo details are loading.</p>
+    }
+    else
+    {
+        @if (Details.People.Count == 0)
+        {
+            <p class="photo-detail-empty">No confirmed or manually assigned people are currently known to be in this photo.</p>
+        }
+        else
+        {
+            <div class="manual-person-list" aria-label="People in this photo">
+                @foreach (PhotoDetailsPersonResponse person in Details.People)
+                {
+                    <span class="manual-person-chip" title="@EvidenceLabel(person)">
+                        <span>@person.DisplayName</span>
+                        <small>@EvidenceLabel(person)</small>
+                        @if (person.ManualPresence)
+                        {
+                            <button type="button"
+                                    disabled="@Busy"
+                                    title="Remove manual presence for @person.DisplayName"
+                                    aria-label="Remove manual presence for @person.DisplayName"
+                                    @onclick="() => RemoveAsync(person)">×</button>
+                        }
+                    </span>
+                }
+            </div>
+        }
+
+        <label class="field-label manual-person-label" for="manual-person-search">Add a person manually</label>
+        <input id="manual-person-search"
+               class="manual-person-search"
+               type="search"
+               autocomplete="off"
+               placeholder="Search canonical people"
+               disabled="@(Busy || LoadingPeople)"
+               @bind="Search"
+               @bind:event="oninput" />
+
+        @if (LoadingPeople)
+        {
+            <p class="manual-person-help">Loading canonical people…</p>
+        }
+        else if (!string.IsNullOrWhiteSpace(Search))
+        {
+            <div class="manual-person-options" role="list" aria-label="Matching canonical people">
+                @if (MatchingPeople.Count == 0)
+                {
+                    <span>No matching active people.</span>
+                }
+                else
+                {
+                    @foreach (ReviewPersonResponse person in MatchingPeople)
+                    {
+                        <button type="button"
+                                disabled="@Busy"
+                                @onclick="() => AddAsync(person)">
+                            @(person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName)
+                        </button>
+                    }
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <div class="notice error manual-person-notice" role="alert">@Error</div>
+        }
+
+        <p class="manual-person-help">Manual presence means only that the person is in this photo. It does not create a face, crop, embedding, review assignment or identity suggestion.</p>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string RevisionId { get; set; } = string.Empty;
+
+    [Parameter]
+    public PhotoDetailsResponse? Details { get; set; }
+
+    [Parameter]
+    public EventCallback<PhotoDetailsResponse> DetailsChanged { get; set; }
+
+    private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+    private string Search { get; set; } = string.Empty;
+    private bool LoadingPeople { get; set; } = true;
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+
+    private IReadOnlyList<ReviewPersonResponse> MatchingPeople => string.IsNullOrWhiteSpace(Search)
+        ? []
+        : People
+            .Where(person => person.DisplayName.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase))
+            .Where(person => Details?.People.Any(existing => existing.Id == person.Id && existing.ManualPresence) != true)
+            .OrderByDescending(person => person.IsFavorite)
+            .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(person => person.Id, StringComparer.Ordinal)
+            .Take(8)
+            .ToArray();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+        }
+        catch (Exception exception)
+        {
+            Error = $"Canonical people could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            LoadingPeople = false;
+        }
+    }
+
+    private async Task AddAsync(ReviewPersonResponse person)
+    {
+        if (Busy)
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/people",
+                new PhotoPersonMutationRequest(person.Id));
+            PhotoDetailsResponse updated = await ReadUpdatedDetailsAsync(response, "Person could not be added.");
+            Details = updated;
+            Search = string.Empty;
+            await DetailsChanged.InvokeAsync(updated);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RemoveAsync(PhotoDetailsPersonResponse person)
+    {
+        if (Busy || !person.ManualPresence)
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.DeleteAsync(
+                $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/people/{Uri.EscapeDataString(person.Id)}");
+            PhotoDetailsResponse updated = await ReadUpdatedDetailsAsync(response, "Manual person presence could not be removed.");
+            Details = updated;
+            await DetailsChanged.InvokeAsync(updated);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private static async Task<PhotoDetailsResponse> ReadUpdatedDetailsAsync(
+        HttpResponseMessage response,
+        string fallback)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<PhotoDetailsResponse>()
+                ?? throw new InvalidOperationException("The updated photo details response was empty.");
+        }
+
+        try
+        {
+            PhotoPersonErrorResponse? error = await response.Content.ReadFromJsonAsync<PhotoPersonErrorResponse>();
+            if (!string.IsNullOrWhiteSpace(error?.Error))
+            {
+                throw new InvalidOperationException(error.Error);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Preserve the request-level fallback when the response has no structured error body.
+        }
+
+        throw new InvalidOperationException($"{fallback} HTTP {(int)response.StatusCode}.");
+    }
+
+    private static string EvidenceLabel(PhotoDetailsPersonResponse person)
+    {
+        if (person.ConfirmedFaceCount > 0 && person.ManualPresence)
+        {
+            return $"{ConfirmedFaceLabel(person.ConfirmedFaceCount)} + manual";
+        }
+
+        if (person.ConfirmedFaceCount > 0)
+        {
+            return ConfirmedFaceLabel(person.ConfirmedFaceCount);
+        }
+
+        return "manual presence";
+    }
+
+    private static string ConfirmedFaceLabel(int count) =>
+        count == 1 ? "1 confirmed face" : $"{count} confirmed faces";
+}
