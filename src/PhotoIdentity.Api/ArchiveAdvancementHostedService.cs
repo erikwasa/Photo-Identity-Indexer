@@ -20,6 +20,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     private readonly SqliteArchiveSourceHydrationRepository _sourceHydrations;
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly ArchiveBoundedAnalysisService _boundedAnalysis;
+    private readonly FaceReviewDerivativeBackfillService _faceReviewBackfill;
     private readonly ArchiveOperatorConfiguration _operatorConfiguration;
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
     private readonly TimeProvider _timeProvider;
@@ -34,6 +35,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         SqliteArchiveSourceHydrationRepository sourceHydrations,
         ArchiveHydrationCapacityService capacity,
         ArchiveBoundedAnalysisService boundedAnalysis,
+        CollectionOriginalAccessService originals,
         ArchiveOperatorConfiguration operatorConfiguration,
         ReviewProxyGenerationConfiguration proxyConfiguration,
         TimeProvider timeProvider)
@@ -47,6 +49,12 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         _sourceHydrations = sourceHydrations;
         _capacity = capacity;
         _boundedAnalysis = boundedAnalysis;
+        _faceReviewBackfill = new FaceReviewDerivativeBackfillService(
+            database,
+            new SqliteLocalBatchRepository(database),
+            originals,
+            proxyConfiguration,
+            timeProvider);
         _operatorConfiguration = operatorConfiguration;
         _proxyConfiguration = proxyConfiguration;
         _timeProvider = timeProvider;
@@ -92,6 +100,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                         stoppingToken);
                 }
 
+                _ = await _faceReviewBackfill.AdvanceAsync(coverage, stoppingToken);
                 _ = await _boundedAnalysis.AdvanceAsync(_operatorConfiguration, stoppingToken);
                 ArchiveAdvancementWorkState work = await GetWorkStateAsync(coverage, stoppingToken);
                 if (!work.HasWork)
@@ -185,6 +194,9 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             profileHash,
             proxyProfile.Id,
             cancellationToken) is not null;
+        bool faceReviewPending = await _faceReviewBackfill.GetNextPendingAsync(
+            coverage,
+            cancellationToken) is not null;
         bool analysisPending = (await _analysis.GetPendingCurrentRevisionIdsAsync(
             coverage.Source.Id,
             profileHash,
@@ -205,7 +217,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         bool waiting = storage.HydrationsInProgress > 0 || storage.ManagedReleasingBytes > 0 || releasePending;
 
         return new ArchiveAdvancementWorkState(
-            sourcePending || proxyPending || analysisPending || activeRun || releasePending,
+            sourcePending || proxyPending || faceReviewPending || analysisPending || activeRun || releasePending,
             waiting);
     }
 
