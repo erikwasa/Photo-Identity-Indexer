@@ -268,7 +268,9 @@ work_items:
   - WI-0025
   - WI-0050
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/150
 - id: WI-0062
   title: Add manual photo-level people
   milestone: M19
