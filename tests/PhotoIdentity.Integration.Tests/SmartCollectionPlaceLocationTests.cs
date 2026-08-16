@@ -232,7 +232,7 @@ public sealed class SmartCollectionPlaceLocationTests
             SmartCollectionDefinitionResponse created =
                 await create.Content.ReadFromJsonAsync<SmartCollectionDefinitionResponse>()
                 ?? throw new InvalidOperationException();
-            Assert.Equal("Sweden/Stockholm region", created.Filter.Location?.Place);
+            Assert.Equal("sweden/stockholm region", created.Filter.Location?.Place);
             Assert.Equal(59, created.Filter.Location?.South);
 
             using HttpResponseMessage rejected = await client.PostAsJsonAsync(
