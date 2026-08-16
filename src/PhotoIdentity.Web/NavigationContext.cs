@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace PhotoIdentity.Web;
 
 public sealed record SmartCollectionTransientNavigationState(
@@ -18,6 +20,7 @@ public static class SmartCollectionNavigation
 {
     private const string WorkspaceRoot = "/smart-collections";
     private const string PreviewStoragePrefix = "photo-identity.smart-collections.preview.";
+    private static readonly JsonSerializerOptions NavigationJsonOptions = new(JsonSerializerDefaults.Web);
 
     public static string BuildSavedWorkspaceUrl(string collectionId, int offset)
     {
@@ -42,6 +45,18 @@ public static class SmartCollectionNavigation
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(previewKey);
         return $"{PreviewStoragePrefix}{previewKey}";
+    }
+
+    public static string SerializeTransientState(SmartCollectionTransientNavigationState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        return JsonSerializer.Serialize(state, NavigationJsonOptions);
+    }
+
+    public static SmartCollectionTransientNavigationState? DeserializeTransientState(string json)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(json);
+        return JsonSerializer.Deserialize<SmartCollectionTransientNavigationState>(json, NavigationJsonOptions);
     }
 }
 
