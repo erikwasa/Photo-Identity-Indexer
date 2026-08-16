@@ -6,37 +6,35 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0061 — Enrich Photo Details and preserve navigation context** is the active M19 work item.
+**WI-0061 — Enrich Photo Details and preserve navigation context** remains the active M19 work item.
 
-The original M19 WI-0050/WI-0056 baseline was verified by the maintainer on 2026-08-16. M19 is now extended by WI-0061 through WI-0064. Automatic visible-content tagging remains deferred; SQLite stays canonical and originals remain read-only.
+Slice 1 merged through PR #150. Main also includes the separate PR #151 durable face-review derivative work; WI-0061 must not change that face-review storage/rendering path.
 
-WI-0061 is being delivered in three slices:
+The active Slice 2 adds privacy-safe Photo Details metadata:
 
-1. Photo viewer/original-state cleanup.
-2. Photo detail metadata (original filename and confirmed people).
-3. Smart Collection navigation-state restoration and context-aware Back navigation.
-
-The active Slice 1 changes Photo Details so an already-local, revision-verified original is displayed directly instead of a review proxy. Online-only originals continue to use a durable proxy when available without implicit hydration. After explicit hydration completes, the same Photo Details view switches to the original rather than downloading it or opening another tab. Original availability is shown once as a badge, with one `Managed by: Photo Identity|OneDrive|No` value.
+- expose the original file name as the source-key basename only, never the source root or relative directory;
+- show canonical people backed by active confirmed face assignments only;
+- exclude pending suggestions from the confirmed people list;
+- keep the details query catalogue-only so it never opens or hydrates an original;
+- reserve `ManualPresence` in the person response so WI-0062 can add face-independent photo/person presence without another browser-contract revision.
 
 ## Next concrete step
 
-1. Validate Slice 1 build/tests/docs and viewer integration tests.
-2. Merge Slice 1 after CI passes and maintainer review.
-3. Continue WI-0061 with privacy-safe original filename and consolidated confirmed-people detail data.
-4. Finish WI-0061 with saved/transient Smart Collection navigation restoration and validated context-aware Back navigation.
-5. Implement WI-0062 after WI-0061 is complete. WI-0063 remains independently ready; WI-0064 follows WI-0063.
+1. Validate Slice 2 build, integration tests and living documentation in GitHub Actions.
+2. Merge Slice 2 after CI and maintainer review.
+3. Finish WI-0061 with Slice 3: saved/transient Smart Collection state restoration and validated context-aware Back navigation.
+4. After WI-0061 is complete, implement WI-0062 manual photo-level people. WI-0063 remains independently ready; WI-0064 follows WI-0063.
 
 ## Relevant files
 
-- `docs/delivery/milestones/M19-library-intelligence.md`
-- `docs/delivery/status/milestones.yaml`
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/work-items/WI-0061-photo-details-navigation-context.md`
-- `src/PhotoIdentity.Api/CollectionViewerPreviewEndpoints.cs`
-- `src/PhotoIdentity.Api/CollectionEndpoints.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoDetailsRepository.cs`
+- `src/PhotoIdentity.Api/PhotoDetailsEndpoints.cs`
+- `src/PhotoIdentity.Web/PhotoDetailsContracts.cs`
 - `src/PhotoIdentity.Web/Pages/Photo.razor`
-- `src/PhotoIdentity.Web/Pages/Photo.razor.css`
-- `tests/PhotoIdentity.Integration.Tests/CollectionViewerPreviewApplicationTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/PhotoDetailsApplicationTests.cs`
+- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor`
 
 ## Repository validation
 
