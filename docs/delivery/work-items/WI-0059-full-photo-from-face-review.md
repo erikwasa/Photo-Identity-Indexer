@@ -44,7 +44,7 @@ A face crop is often insufficient for an identity decision. Clothing, nearby peo
 - [x] The browser never receives a local source path, review-proxy path or original-storage path as part of this navigation feature.
 - [x] The relationship remains correct when multiple detected faces belong to the same photo revision.
 - [x] Automated integration coverage proves that a face resolves to the expected asset revision while the existing invalid-identifier behavior remains privacy-limited.
-- [ ] Human verification on Windows confirms that full-photo context can be opened during face review and the operator can continue reviewing from the unchanged original tab.
+- [x] Human verification on Windows confirms that full-photo context can be opened during face review and the operator can continue reviewing from the unchanged original tab.
 
 ## Verification requirements
 
@@ -53,6 +53,6 @@ Automated contract/integration tests and human Windows verification are required
 ## Completion notes
 
 - Files changed: `ReviewFaceRevisionResolver.cs`, `ReviewEndpoints.cs`, `SuggestionGalleryEndpoints.cs`, `ReviewContracts.cs`, `FaceDetails.razor`, `FaceDetails.razor.css`, `ReviewFaceDetailImageApplicationTests.cs`.
-- Trade-offs: The initial implementation opens the existing photo viewer in a new tab rather than adding another embedded viewer, which keeps original-access and hydration policy centralized and leaves the review queue untouched.
-- Deferred work: Human Windows verification of the new-tab workflow and preserved review context is intentionally deferred until WI-0058, WI-0059 and WI-0060 are all merged.
-- Commands run: GitHub Actions `build` workflow for PR #147, including Release build, full test suite, living-documentation validation and review/package verification.
+- Trade-offs: The implementation opens the existing photo viewer in a new tab rather than adding another embedded viewer, which keeps original-access and hydration policy centralized and leaves the review queue untouched.
+- Automated verification: GitHub Actions `build` workflow for PR #147, including Release build, full test suite, living-documentation validation and review/package verification.
+- Manual verification: maintainer Windows verification passed on 2026-08-16; the containing photo opened in a new tab and the originating review context remained usable and unchanged.
