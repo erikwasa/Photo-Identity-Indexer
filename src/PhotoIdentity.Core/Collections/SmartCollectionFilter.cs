@@ -1,5 +1,6 @@
 using System.Globalization;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Tags;
 
 namespace PhotoIdentity.Core.Collections;
@@ -149,7 +150,8 @@ public sealed record SmartCollectionFilter
         IEnumerable<string>? tags = null,
         string? tagMatch = null,
         SmartCollectionGeoBounds? location = null,
-        SmartCollectionDateRange? taken = null)
+        SmartCollectionDateRange? taken = null,
+        string? locationPlace = null)
     {
         People = (people ?? []).Distinct().ToArray();
         if (People.Count > 100)
@@ -159,8 +161,17 @@ public sealed record SmartCollectionFilter
 
         PeopleMatch = SmartCollectionMatchModes.Normalize(peopleMatch, nameof(peopleMatch));
 
-        Tags = (tags ?? [])
+        PhotoTagPath[] parsedTags = (tags ?? [])
             .Select(PhotoTagPath.Parse)
+            .ToArray();
+        if (parsedTags.Any(PhotoPlacePath.IsReservedTagPath))
+        {
+            throw new ArgumentException(
+                $"The reserved '{PhotoPlacePath.RootDisplayName}' hierarchy belongs to the Location dimension, not Smart Collection tags.",
+                nameof(tags));
+        }
+
+        Tags = parsedTags
             .Select(path => path.NormalizedValue)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
@@ -171,6 +182,9 @@ public sealed record SmartCollectionFilter
 
         TagMatch = SmartCollectionMatchModes.Normalize(tagMatch, nameof(tagMatch));
         Location = location;
+        LocationPlace = string.IsNullOrWhiteSpace(locationPlace)
+            ? null
+            : PhotoPlacePath.Parse(locationPlace).CanonicalNormalizedValue;
         Taken = taken;
     }
 
@@ -179,5 +193,6 @@ public sealed record SmartCollectionFilter
     public IReadOnlyList<string> Tags { get; }
     public string TagMatch { get; }
     public SmartCollectionGeoBounds? Location { get; }
+    public string? LocationPlace { get; }
     public SmartCollectionDateRange? Taken { get; }
 }
