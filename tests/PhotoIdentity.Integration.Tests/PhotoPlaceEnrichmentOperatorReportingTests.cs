@@ -149,6 +149,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
 
             string ordinaryTooLong = "Family/" + new string('x', PhotoTagPath.MaximumValueLength - "Family/".Length + 1);
             Assert.Throws<ArgumentException>(() => PhotoTagPath.Parse(ordinaryTooLong));
+            Assert.True(LongHierarchyGeocoder.Place.Length > PhotoTagPath.MaximumValueLength);
             Assert.True(LongHierarchyGeocoder.CanonicalPlace.Length > PhotoTagPath.MaximumValueLength);
             Assert.True(LongHierarchyGeocoder.CanonicalPlace.Length <= PhotoPlacePath.MaximumCanonicalValueLength);
 
@@ -290,7 +291,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
     private sealed class LongHierarchyGeocoder : IReverseGeocoder
     {
         public const string Place =
-            "Sweden/Västernorrland County/Sundsvall Municipality/Njurunda District/Sundsvall";
+            "Sweden/Västernorrland County/Sundsvall Municipality/Njurunda District/Sundsvall/Njurundabommen";
         public const string CanonicalPlace = "Places/" + Place;
 
         public string ProviderName => "geonames";
