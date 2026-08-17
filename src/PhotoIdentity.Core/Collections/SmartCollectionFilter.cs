@@ -164,6 +164,7 @@ public sealed record SmartCollectionFilter
         PhotoTagPath[] parsedTags = (tags ?? [])
             .Select(PhotoTagPath.Parse)
             .ToArray();
+        string normalizedTagMatch = SmartCollectionMatchModes.Normalize(tagMatch, nameof(tagMatch));
         PhotoTagPath[] legacyPlaceTags = parsedTags
             .Where(PhotoPlacePath.IsReservedTagPath)
             .DistinctBy(path => path.NormalizedValue, StringComparer.Ordinal)
@@ -175,8 +176,18 @@ public sealed record SmartCollectionFilter
                 nameof(tags));
         }
 
-        Tags = parsedTags
+        PhotoTagPath[] genericTags = parsedTags
             .Where(path => !PhotoPlacePath.IsReservedTagPath(path))
+            .ToArray();
+        if (legacyPlaceTags.Length == 1 && genericTags.Length > 0 &&
+            normalizedTagMatch == SmartCollectionMatchModes.Any)
+        {
+            throw new ArgumentException(
+                "A legacy Smart Collection using tagMatch 'any' cannot losslessly migrate a Places tag alongside generic tags because Location and Tags combine with AND semantics.",
+                nameof(tags));
+        }
+
+        Tags = genericTags
             .Select(path => path.NormalizedValue)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
@@ -185,7 +196,7 @@ public sealed record SmartCollectionFilter
             throw new ArgumentException("A smart collection can contain at most 100 tags.", nameof(tags));
         }
 
-        TagMatch = SmartCollectionMatchModes.Normalize(tagMatch, nameof(tagMatch));
+        TagMatch = normalizedTagMatch;
         Location = location;
 
         string? explicitLocationPlace = string.IsNullOrWhiteSpace(locationPlace)
