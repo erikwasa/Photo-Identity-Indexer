@@ -20,6 +20,10 @@ $SupportedSettings = @(
     "PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes",
     "PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes",
     "PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations",
+    "PhotoIdentity__GeoNames__Username",
+    "PhotoIdentity__GeoNames__BaseUrl",
+    "PhotoIdentity__GeoNames__Language",
+    "PhotoIdentity__GeoNames__MinimumRequestIntervalMilliseconds",
     "PhotoIdentity__RepositoryRoot",
     "PhotoIdentity__ModelDirectory"
 )
