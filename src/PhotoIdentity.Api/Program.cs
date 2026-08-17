@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.EventLog;
+using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
@@ -54,6 +55,11 @@ public partial class Program
             ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MinimumFreeSpaceReserveBytes"),
             ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MaximumManagedHydrationBytes"),
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:ArchiveHydration:MaximumConcurrentOperations")));
+        builder.Services.AddSingleton(new GeoNamesReverseGeocodingConfiguration(
+            builder.Configuration["PhotoIdentity:GeoNames:Username"],
+            builder.Configuration["PhotoIdentity:GeoNames:BaseUrl"],
+            builder.Configuration["PhotoIdentity:GeoNames:Language"],
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:MinimumRequestIntervalMilliseconds")));
         builder.Services.AddSingleton<SqliteReviewRepository>();
         builder.Services.AddSingleton<SqliteReviewFilterRepository>();
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
@@ -76,6 +82,8 @@ public partial class Program
         builder.Services.AddSingleton<SqlitePhotoMetadataBackfillRepository>();
         builder.Services.AddSingleton<SqlitePhotoTagRepository>();
         builder.Services.AddSingleton<SqlitePhotoPlaceRepository>();
+        builder.Services.AddSingleton<SqlitePhotoPlaceEnrichmentRepository>();
+        builder.Services.AddSingleton<SqliteAutomaticPhotoPlaceRepository>();
         builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
         builder.Services.AddSingleton<SqliteProcessingRepository>();
@@ -106,6 +114,9 @@ public partial class Program
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
         builder.Services.AddSingleton<OpenCvReviewProxyRenderer>();
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddHttpClient("GeoNames");
+        builder.Services.AddSingleton<IReverseGeocoder, GeoNamesReverseGeocoder>();
+        builder.Services.AddSingleton<PhotoPlaceEnrichmentService>();
         builder.Services.AddHostedService<ArchiveAdvancementHostedService>();
         builder.Services.AddHostedService<IdentityMatchRegenerationHostedService>();
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
@@ -122,6 +133,7 @@ public partial class Program
         SqliteCatalogueDatabase catalogueDatabase = app.Services.GetRequiredService<SqliteCatalogueDatabase>();
         await catalogueDatabase.InitializeAsync();
         await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(catalogueDatabase);
+        await SqlitePhotoPlaceEnrichmentSchema.EnsureAsync(catalogueDatabase);
 
         app.UseBlazorFrameworkFiles();
         app.UseStaticFiles();
@@ -132,6 +144,7 @@ public partial class Program
                 context.Request.Path.StartsWithSegments("/api/smart-collections") ||
                 context.Request.Path.StartsWithSegments("/api/photo-metadata") ||
                 context.Request.Path.StartsWithSegments("/api/places") ||
+                context.Request.Path.StartsWithSegments("/api/place-enrichment") ||
                 context.Request.Path.StartsWithSegments("/api/detector-evaluation") ||
                 context.Request.Path.StartsWithSegments("/api/detector-rollout") ||
                 context.Request.Path.StartsWithSegments("/api/archive"))
@@ -170,6 +183,7 @@ public partial class Program
         app.MapCollectionViewerPreviewEndpoints();
         app.MapPhotoTagEndpoints();
         app.MapPhotoPlaceEndpoints();
+        app.MapPhotoPlaceEnrichmentEndpoints();
         app.MapDetectorEvaluationEndpoints();
         app.MapDetectorEvaluationComparisonEndpoints();
         app.MapDetectorRolloutEndpoints();
