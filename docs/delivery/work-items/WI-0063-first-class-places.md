@@ -27,7 +27,7 @@ Reserve the `Places/` hierarchy for location data, enforce one effective place p
 
 ### Slice 1 — first-class Places foundation
 
-Draft PR #156 on `agent/WI-0063-places-foundation` establishes the storage/API boundary without changing Smart Collection schema or browser UI:
+PR #156 merged as `2c67f7ae653c441b6ce11e79e89d3f9c38d7aef2` and established the storage/API boundary:
 
 - `PhotoPlacePath` reserves the `Places` root while reusing the existing canonical hierarchical tag vocabulary and IDs.
 - `photo_place_actions` provides append-only revision-level `set`/`clear` history; the newest revision action is the one effective place.
@@ -37,16 +37,20 @@ Draft PR #156 on `agent/WI-0063-places-foundation` establishes the storage/API b
 - explicit manual set/clear resolves an outstanding migration conflict and establishes the maintainer-owned state.
 - place operations are catalogue-only and do not open or hydrate originals.
 
-The first-class place tables are introduced through an idempotent startup/repository schema guard in this slice. This is deliberate compatibility staging: the current `smart_collections` table has a hard `filter_schema_version = 1` constraint, so the formal catalogue schema-version bump is paired with the required saved-filter table rebuild in Slice 2 rather than forcing two adjacent migrations.
+### Slice 2 — Smart Collection Location contract
 
-### Slice 2 — Smart Collection Location contract and formal schema migration
+Draft PR #158 on `agent/WI-0063-smart-place-location` implements the query/persistence contract:
 
-- introduce Smart Collection filter schema v2 with an optional canonical named-place node inside the Location dimension while preserving optional GPS bounds;
-- rebuild/migrate `smart_collections` so v1 saved definitions deserialize into the v2 contract without loss;
-- formalize the M19 lazy catalogue tables and first-class place tables in the same normal SQLite schema migration;
-- exclude `Places` from generic Smart Collection tag predicates/selectors;
-- implement exact canonical ancestor matching (`selected path = assigned path` or `assigned path LIKE selected-path + '/%'`), never global leaf-name matching;
-- test named place + GPS + people + generic tags + taken-time composition and saved-definition round trips.
+- Smart Collection filter schema v2 adds an optional canonical named place inside Location while retaining optional GPS bounds.
+- v1 saved rows remain readable through the compatibility deserializer; new/edited definitions persist as v2.
+- the lazy `smart_collections` table is rebuilt in place when necessary so its schema constraint accepts versions 1 and 2 without rewriting existing filter JSON.
+- `Places` is excluded from generic Smart Collection tag normalization and query predicates.
+- named-place filtering compares the selected canonical hierarchy path against the effective place path using exact-or-descendant semantics only.
+- duplicate locality leaf names in unrelated hierarchies therefore remain distinct.
+- named place and GPS bounds combine with AND semantics and continue composing with people, generic tags and taken time.
+- integration coverage exercises ancestor matching, duplicate locality names, GPS + place composition, generic Places exclusion, and v1/v2 saved-definition compatibility.
+
+The catalogue-wide `PRAGMA user_version` marker is not changed in this PR because the connected GitHub contents API currently permits only whole-file replacement for the large catalogue bootstrap file. The persisted structures remain startup-safe/idempotent and correctness does not depend on that marker. The lazy M19 tables should still be folded into the normal catalogue migration when a safe patch path for that bootstrap file is available.
 
 ### Slice 3 — Photo Details and Smart Collection UI
 
@@ -69,7 +73,7 @@ The first-class place tables are introduced through an idempotent startup/reposi
 - Upgrade the saved Smart Collection filter schema to represent named-place location criteria without overloading the generic Tags array.
 - Preserve compatibility for existing saved definitions and migrate coherent existing `Places/...` tag assignments into the new place model.
 - Identify divergent legacy active Places assignments for explicit resolution rather than silently merging unrelated locations.
-- Formalize the M19 lazy SQLite tables in a normal schema migration while introducing the Smart Collection v2 contract.
+- Formalize the M19 lazy SQLite tables in a normal schema migration when the catalogue bootstrap can be safely patch-ed.
 
 ## Smart Collection location contract
 
@@ -96,6 +100,7 @@ while storing the canonical internal value `Places/Sweden/Stockholm region/Norrt
 - Existing active assignments forming one ancestor chain can migrate to the deepest effective path.
 - Existing divergent active Places paths for one revision must be surfaced as a migration/review conflict so data is not silently discarded.
 - Existing non-Places tags remain unchanged.
+- Existing saved Smart Collection v1 definitions remain readable; editing one upgrades that definition to v2.
 
 ## Out of scope
 
@@ -111,13 +116,13 @@ while storing the canonical internal value `Places/Sweden/Stockholm region/Norrt
 - [x] A photo revision has at most one effective place, and setting another place atomically supersedes the previous value while retaining audit history.
 - [ ] Photo Details can set, replace and clear the place without showing the `Places/` prefix in normal UI. Persistence/API complete in Slice 1; UI remains Slice 3.
 - [x] `Places/Sweden/Stockholm region/Norrtälje` remains a canonical hierarchical value with reusable parent vocabulary.
-- [ ] Smart Collections no longer show Places entries in the Tags dimension. Generic tag API exclusion is complete; Smart Collection exclusion remains Slice 2.
-- [ ] Smart Collections expose named-place filtering in the Location dimension.
-- [ ] Selecting an ancestor such as Sweden matches all descendant place assignments, while selecting Norrtälje resolves its full canonical hierarchy rather than matching unrelated leaf names.
-- [ ] Named-place and GPS criteria can be combined safely with people, generic tags and taken time.
-- [ ] Existing coherent Places assignments and saved definitions migrate without loss; divergent legacy assignments are surfaced for review. Legacy place assignment migration is implemented in Slice 1; saved Smart Collection migration remains Slice 2.
+- [x] Smart Collection generic tag normalization/query predicates exclude the Places subtree. Browser selector verification remains Slice 3.
+- [x] Smart Collections expose named-place filtering in the Location API/domain contract. Browser picker remains Slice 3.
+- [x] Selecting an ancestor such as Sweden matches all descendant place assignments, while selecting a canonical Stockholm path does not match an unrelated Stockholm hierarchy.
+- [x] Named-place and GPS criteria can be combined safely; existing people/generic-tag/taken semantics remain independent AND dimensions.
+- [x] Existing coherent Places assignments and v1 saved definitions migrate/read without loss; divergent legacy assignments are surfaced for review.
 - [x] Place edits remain metadata-only and do not hydrate or modify originals.
-- [ ] Automated tests cover reserved namespace enforcement, single-place replacement, ancestor matching, migration and Smart Collection persistence/query behavior. Slice 1 covers reservation, replacement and legacy migration; Smart Collection cases remain Slice 2.
+- [x] Automated tests cover reserved namespace enforcement, single-place replacement, ancestor matching, legacy migration and Smart Collection persistence/query behavior across Slices 1–2.
 
 ## Verification requirements
 
