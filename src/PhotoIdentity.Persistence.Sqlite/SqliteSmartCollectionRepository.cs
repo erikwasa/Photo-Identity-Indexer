@@ -14,22 +14,18 @@ public sealed class SmartCollectionNameConflictException : Exception
 }
 
 /// <summary>
-/// Persists normalized smart-collection filter definitions. Membership is never persisted;
-/// callers evaluate the stored filter against the current catalogue through
-/// <see cref="SqliteSmartCollectionQueryRepository"/>.
+/// Persists normalized smart-collection filter definitions. Schema v2 adds a canonical named
+/// place inside the Location dimension while retaining optional GPS bounds. Existing v1 rows are
+/// kept byte-for-byte and deserialized through the v1 compatibility contract until edited.
 /// </summary>
 public sealed class SqliteSmartCollectionRepository
 {
-    private const int FilterSchemaVersion = 1;
-
+    private const int FilterSchemaVersion = 2;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     private readonly SqliteCatalogueDatabase _database;
     private readonly TimeProvider _timeProvider;
 
-    public SqliteSmartCollectionRepository(
-        SqliteCatalogueDatabase database,
-        TimeProvider timeProvider)
+    public SqliteSmartCollectionRepository(SqliteCatalogueDatabase database, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(timeProvider);
@@ -37,123 +33,70 @@ public sealed class SqliteSmartCollectionRepository
         _timeProvider = timeProvider;
     }
 
-    public async Task<SmartCollectionDefinition> CreateAsync(
-        string name,
-        SmartCollectionFilter filter,
-        CancellationToken cancellationToken = default)
+    public async Task<SmartCollectionDefinition> CreateAsync(string name, SmartCollectionFilter filter, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(filter);
         SmartCollectionName canonicalName = SmartCollectionName.Parse(name);
         SmartCollectionFilter canonicalFilter = CanonicalizeFilter(filter);
         SmartCollectionId id = SmartCollectionId.New();
         DateTimeOffset now = _timeProvider.GetUtcNow();
-
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await EnsureSchemaAsync(connection, cancellationToken);
-
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO smart_collections (
-                id,
-                normalized_name,
-                display_name,
-                filter_schema_version,
-                filter_json,
-                created_at_utc,
-                updated_at_utc)
-            VALUES (
-                $id,
-                $normalized_name,
-                $display_name,
-                $filter_schema_version,
-                $filter_json,
-                $created_at_utc,
-                $updated_at_utc);
+                id, normalized_name, display_name, filter_schema_version, filter_json, created_at_utc, updated_at_utc)
+            VALUES ($id, $normalized_name, $display_name, $filter_schema_version, $filter_json, $created_at_utc, $updated_at_utc);
             """;
         AddDefinitionParameters(command, id, canonicalName, canonicalFilter, now, now);
-
-        try
-        {
-            await command.ExecuteNonQueryAsync(cancellationToken);
-        }
+        try { await command.ExecuteNonQueryAsync(cancellationToken); }
         catch (SqliteException exception) when (exception.SqliteErrorCode == 19)
-        {
-            throw new SmartCollectionNameConflictException(canonicalName.DisplayValue);
-        }
-
-        return new SmartCollectionDefinition(
-            id,
-            canonicalName.DisplayValue,
-            canonicalFilter,
-            now,
-            now);
+        { throw new SmartCollectionNameConflictException(canonicalName.DisplayValue); }
+        return new SmartCollectionDefinition(id, canonicalName.DisplayValue, canonicalFilter, now, now);
     }
 
-    public async Task<IReadOnlyList<SmartCollectionDefinition>> ListAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SmartCollectionDefinition>> ListAsync(CancellationToken cancellationToken = default)
     {
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await EnsureSchemaAsync(connection, cancellationToken);
-
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT id, display_name, filter_schema_version, filter_json, created_at_utc, updated_at_utc
-            FROM smart_collections
-            ORDER BY normalized_name, id;
+            FROM smart_collections ORDER BY normalized_name, id;
             """;
-
         List<SmartCollectionDefinition> definitions = [];
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            definitions.Add(ReadDefinition(reader));
-        }
-
+        while (await reader.ReadAsync(cancellationToken)) definitions.Add(ReadDefinition(reader));
         return definitions;
     }
 
-    public async Task<SmartCollectionDefinition?> GetAsync(
-        SmartCollectionId id,
-        CancellationToken cancellationToken = default)
+    public async Task<SmartCollectionDefinition?> GetAsync(SmartCollectionId id, CancellationToken cancellationToken = default)
     {
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await EnsureSchemaAsync(connection, cancellationToken);
-
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT id, display_name, filter_schema_version, filter_json, created_at_utc, updated_at_utc
-            FROM smart_collections
-            WHERE id = $id;
+            FROM smart_collections WHERE id = $id;
             """;
         command.Parameters.AddWithValue("$id", id.ToString());
-
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken)
-            ? ReadDefinition(reader)
-            : null;
+        return await reader.ReadAsync(cancellationToken) ? ReadDefinition(reader) : null;
     }
 
-    public async Task<SmartCollectionDefinition?> UpdateAsync(
-        SmartCollectionId id,
-        string name,
-        SmartCollectionFilter filter,
-        CancellationToken cancellationToken = default)
+    public async Task<SmartCollectionDefinition?> UpdateAsync(SmartCollectionId id, string name, SmartCollectionFilter filter, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(filter);
         SmartCollectionName canonicalName = SmartCollectionName.Parse(name);
         SmartCollectionFilter canonicalFilter = CanonicalizeFilter(filter);
         DateTimeOffset now = _timeProvider.GetUtcNow();
-
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await EnsureSchemaAsync(connection, cancellationToken);
-
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             UPDATE smart_collections
-            SET normalized_name = $normalized_name,
-                display_name = $display_name,
-                filter_schema_version = $filter_schema_version,
-                filter_json = $filter_json,
+            SET normalized_name = $normalized_name, display_name = $display_name,
+                filter_schema_version = $filter_schema_version, filter_json = $filter_json,
                 updated_at_utc = $updated_at_utc
             WHERE id = $id;
             """;
@@ -163,45 +106,24 @@ public sealed class SqliteSmartCollectionRepository
         command.Parameters.AddWithValue("$filter_schema_version", FilterSchemaVersion);
         command.Parameters.AddWithValue("$filter_json", SerializeFilter(canonicalFilter));
         command.Parameters.AddWithValue("$updated_at_utc", now.ToString("O", CultureInfo.InvariantCulture));
-
         int updated;
-        try
-        {
-            updated = await command.ExecuteNonQueryAsync(cancellationToken);
-        }
+        try { updated = await command.ExecuteNonQueryAsync(cancellationToken); }
         catch (SqliteException exception) when (exception.SqliteErrorCode == 19)
-        {
-            throw new SmartCollectionNameConflictException(canonicalName.DisplayValue);
-        }
-
-        if (updated == 0)
-        {
-            return null;
-        }
-
-        return await GetAsync(id, cancellationToken);
+        { throw new SmartCollectionNameConflictException(canonicalName.DisplayValue); }
+        return updated == 0 ? null : await GetAsync(id, cancellationToken);
     }
 
-    public async Task<bool> DeleteAsync(
-        SmartCollectionId id,
-        CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteAsync(SmartCollectionId id, CancellationToken cancellationToken = default)
     {
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await EnsureSchemaAsync(connection, cancellationToken);
-
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = "DELETE FROM smart_collections WHERE id = $id;";
         command.Parameters.AddWithValue("$id", id.ToString());
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 
-    private static void AddDefinitionParameters(
-        SqliteCommand command,
-        SmartCollectionId id,
-        SmartCollectionName name,
-        SmartCollectionFilter filter,
-        DateTimeOffset createdAtUtc,
-        DateTimeOffset updatedAtUtc)
+    private static void AddDefinitionParameters(SqliteCommand command, SmartCollectionId id, SmartCollectionName name, SmartCollectionFilter filter, DateTimeOffset createdAtUtc, DateTimeOffset updatedAtUtc)
     {
         command.Parameters.AddWithValue("$id", id.ToString());
         command.Parameters.AddWithValue("$normalized_name", name.NormalizedValue);
@@ -214,19 +136,16 @@ public sealed class SqliteSmartCollectionRepository
 
     private static SmartCollectionDefinition ReadDefinition(SqliteDataReader reader)
     {
-        int filterSchemaVersion = reader.GetInt32(2);
-        if (filterSchemaVersion != FilterSchemaVersion)
+        int version = reader.GetInt32(2);
+        SmartCollectionFilter filter = version switch
         {
-            throw new InvalidDataException(
-                $"Smart collection filter schema version {filterSchemaVersion} is not supported.");
-        }
-
+            1 => DeserializeFilterV1(reader.GetString(3)),
+            2 => DeserializeFilterV2(reader.GetString(3)),
+            _ => throw new InvalidDataException($"Smart collection filter schema version {version} is not supported."),
+        };
         return new SmartCollectionDefinition(
-            SmartCollectionId.From(Guid.Parse(reader.GetString(0))),
-            reader.GetString(1),
-            DeserializeFilter(reader.GetString(3)),
-            ParseTimestamp(reader.GetString(4)),
-            ParseTimestamp(reader.GetString(5)));
+            SmartCollectionId.From(Guid.Parse(reader.GetString(0))), reader.GetString(1), filter,
+            ParseTimestamp(reader.GetString(4)), ParseTimestamp(reader.GetString(5)));
     }
 
     private static SmartCollectionFilter CanonicalizeFilter(SmartCollectionFilter filter) => new(
@@ -239,109 +158,113 @@ public sealed class SqliteSmartCollectionRepository
 
     private static string SerializeFilter(SmartCollectionFilter filter)
     {
-        PersistedFilter payload = new(
-            filter.People.Select(person => person.ToString()).ToArray(),
-            filter.PeopleMatch,
-            filter.Tags.ToArray(),
-            filter.TagMatch,
-            filter.Location is null
-                ? null
-                : new PersistedLocation(
-                    filter.Location.South,
-                    filter.Location.West,
-                    filter.Location.North,
-                    filter.Location.East),
-            filter.Taken is null
-                ? null
-                : new PersistedTaken(
-                    filter.Taken.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    filter.Taken.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
+        PersistedFilterV2 payload = new(
+            filter.People.Select(person => person.ToString()).ToArray(), filter.PeopleMatch,
+            filter.Tags.ToArray(), filter.TagMatch,
+            filter.Location is null ? null : new PersistedLocationV2(
+                filter.Location.Place,
+                filter.Location.Bounds is null ? null : new PersistedBounds(
+                    filter.Location.Bounds.South, filter.Location.Bounds.West,
+                    filter.Location.Bounds.North, filter.Location.Bounds.East)),
+            filter.Taken is null ? null : new PersistedTaken(
+                filter.Taken.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                filter.Taken.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
         return JsonSerializer.Serialize(payload, JsonOptions);
     }
 
-    private static SmartCollectionFilter DeserializeFilter(string json)
+    private static SmartCollectionFilter DeserializeFilterV1(string json)
     {
-        PersistedFilter payload = JsonSerializer.Deserialize<PersistedFilter>(json, JsonOptions)
+        PersistedFilterV1 payload = JsonSerializer.Deserialize<PersistedFilterV1>(json, JsonOptions)
             ?? throw new InvalidDataException("Smart collection filter JSON is empty.");
-
         return new SmartCollectionFilter(
-            payload.People.Select(ParsePersonId),
-            payload.PeopleMatch,
-            payload.Tags,
-            payload.TagMatch,
-            payload.Location is null
-                ? null
-                : new SmartCollectionGeoBounds(
-                    payload.Location.South,
-                    payload.Location.West,
-                    payload.Location.North,
-                    payload.Location.East),
-            payload.Taken is null
-                ? null
-                : new SmartCollectionDateRange(
-                    ParseDate(payload.Taken.From),
-                    ParseDate(payload.Taken.To)));
+            payload.People.Select(ParsePersonId), payload.PeopleMatch, payload.Tags, payload.TagMatch,
+            payload.Location is null ? null : new SmartCollectionLocation(bounds: new SmartCollectionGeoBounds(
+                payload.Location.South, payload.Location.West, payload.Location.North, payload.Location.East)),
+            payload.Taken is null ? null : new SmartCollectionDateRange(ParseDate(payload.Taken.From), ParseDate(payload.Taken.To)));
+    }
+
+    private static SmartCollectionFilter DeserializeFilterV2(string json)
+    {
+        PersistedFilterV2 payload = JsonSerializer.Deserialize<PersistedFilterV2>(json, JsonOptions)
+            ?? throw new InvalidDataException("Smart collection filter JSON is empty.");
+        return new SmartCollectionFilter(
+            payload.People.Select(ParsePersonId), payload.PeopleMatch, payload.Tags, payload.TagMatch,
+            payload.Location is null ? null : new SmartCollectionLocation(
+                payload.Location.Place,
+                payload.Location.Bounds is null ? null : new SmartCollectionGeoBounds(
+                    payload.Location.Bounds.South, payload.Location.Bounds.West,
+                    payload.Location.Bounds.North, payload.Location.Bounds.East)),
+            payload.Taken is null ? null : new SmartCollectionDateRange(ParseDate(payload.Taken.From), ParseDate(payload.Taken.To)));
     }
 
     private static PhotoIdentity.Core.Identifiers.PersonId ParsePersonId(string value)
     {
         if (!Guid.TryParse(value, out Guid parsed) || parsed == Guid.Empty)
-        {
             throw new InvalidDataException($"Stored smart collection person identifier '{value}' is invalid.");
-        }
-
         return PhotoIdentity.Core.Identifiers.PersonId.From(parsed);
     }
 
-    private static DateOnly ParseDate(string value) => DateOnly.ParseExact(
-        value,
-        "yyyy-MM-dd",
-        CultureInfo.InvariantCulture,
-        DateTimeStyles.None);
+    private static DateOnly ParseDate(string value) => DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None);
+    private static DateTimeOffset ParseTimestamp(string value) => DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
 
-    private static DateTimeOffset ParseTimestamp(string value) => DateTimeOffset.Parse(
-        value,
-        CultureInfo.InvariantCulture,
-        DateTimeStyles.RoundtripKind);
-
-    private static async Task EnsureSchemaAsync(
-        SqliteConnection connection,
-        CancellationToken cancellationToken)
+    internal static async Task EnsureSchemaAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            CREATE TABLE IF NOT EXISTS smart_collections (
+        using (SqliteCommand create = connection.CreateCommand())
+        {
+            create.CommandText = """
+                CREATE TABLE IF NOT EXISTS smart_collections (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    normalized_name TEXT NOT NULL UNIQUE,
+                    display_name TEXT NOT NULL,
+                    filter_schema_version INTEGER NOT NULL CHECK (filter_schema_version IN (1, 2)),
+                    filter_json TEXT NOT NULL,
+                    created_at_utc TEXT NOT NULL,
+                    updated_at_utc TEXT NOT NULL,
+                    CHECK (length(normalized_name) BETWEEN 1 AND 120),
+                    CHECK (length(display_name) BETWEEN 1 AND 120),
+                    CHECK (length(filter_json) > 0));
+                CREATE INDEX IF NOT EXISTS ix_smart_collections_name ON smart_collections (normalized_name, id);
+                """;
+            await create.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        string? tableSql;
+        using (SqliteCommand inspect = connection.CreateCommand())
+        {
+            inspect.CommandText = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'smart_collections';";
+            tableSql = (string?)await inspect.ExecuteScalarAsync(cancellationToken);
+        }
+        if (tableSql is null || !tableSql.Contains("filter_schema_version = 1", StringComparison.OrdinalIgnoreCase)) return;
+
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        using SqliteCommand rebuild = connection.CreateCommand();
+        rebuild.Transaction = transaction;
+        rebuild.CommandText = """
+            CREATE TABLE smart_collections_v2 (
                 id TEXT NOT NULL PRIMARY KEY,
                 normalized_name TEXT NOT NULL UNIQUE,
                 display_name TEXT NOT NULL,
-                filter_schema_version INTEGER NOT NULL CHECK (filter_schema_version = 1),
+                filter_schema_version INTEGER NOT NULL CHECK (filter_schema_version IN (1, 2)),
                 filter_json TEXT NOT NULL,
                 created_at_utc TEXT NOT NULL,
                 updated_at_utc TEXT NOT NULL,
                 CHECK (length(normalized_name) BETWEEN 1 AND 120),
                 CHECK (length(display_name) BETWEEN 1 AND 120),
                 CHECK (length(filter_json) > 0));
-            CREATE INDEX IF NOT EXISTS ix_smart_collections_name
-                ON smart_collections (normalized_name, id);
+            INSERT INTO smart_collections_v2
+                SELECT id, normalized_name, display_name, filter_schema_version, filter_json, created_at_utc, updated_at_utc
+                FROM smart_collections;
+            DROP TABLE smart_collections;
+            ALTER TABLE smart_collections_v2 RENAME TO smart_collections;
+            CREATE INDEX ix_smart_collections_name ON smart_collections (normalized_name, id);
             """;
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        await rebuild.ExecuteNonQueryAsync(cancellationToken);
+        transaction.Commit();
     }
 
-    private sealed record PersistedFilter(
-        string[] People,
-        string PeopleMatch,
-        string[] Tags,
-        string TagMatch,
-        PersistedLocation? Location,
-        PersistedTaken? Taken);
-
-    private sealed record PersistedLocation(
-        double South,
-        double West,
-        double North,
-        double East);
-
-    private sealed record PersistedTaken(
-        string From,
-        string To);
+    private sealed record PersistedFilterV1(string[] People, string PeopleMatch, string[] Tags, string TagMatch, PersistedBounds? Location, PersistedTaken? Taken);
+    private sealed record PersistedFilterV2(string[] People, string PeopleMatch, string[] Tags, string TagMatch, PersistedLocationV2? Location, PersistedTaken? Taken);
+    private sealed record PersistedLocationV2(string? Place, PersistedBounds? Bounds);
+    private sealed record PersistedBounds(double South, double West, double North, double East);
+    private sealed record PersistedTaken(string From, string To);
 }
