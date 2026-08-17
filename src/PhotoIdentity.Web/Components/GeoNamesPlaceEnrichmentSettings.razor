@@ -1,0 +1,255 @@
+@inject HttpClient Http
+
+<section class="review-filter-panel" aria-labelledby="geonames-settings-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Location enrichment</p>
+            <h2 id="geonames-settings-heading">GeoNames place enrichment</h2>
+        </div>
+        @if (Status is not null)
+        {
+            <span class="model-summary">GeoNames: @(Status.Configured ? "enabled" : "disabled")</span>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="notice error" role="alert">@Error</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <div class="notice success" role="status">@Message</div>
+    }
+
+    @if (Loading)
+    {
+        <div class="empty-state compact" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <p>Loading GeoNames status…</p>
+        </div>
+    }
+    else if (Status is null)
+    {
+        <div class="empty-state compact">
+            <p>No GeoNames enrichment status is available.</p>
+        </div>
+    }
+    else
+    {
+        <div class="review-filter-grid">
+            <div>
+                <span class="field-label">Provider state</span>
+                <strong>@(Status.Configured ? "Configured" : "Disabled")</strong>
+                <p>The configured GeoNames username is kept server-side and is never returned by this status API.</p>
+            </div>
+            <div>
+                <span class="field-label">Service</span>
+                <strong>@Status.ServiceHost</strong>
+                <p>Requests use the configured secure GeoNames service contract.</p>
+            </div>
+            <div>
+                <span class="field-label">Place language</span>
+                <strong>@Status.Language</strong>
+                <p>GeoNames place names are requested using this startup setting.</p>
+            </div>
+            <div>
+                <span class="field-label">Minimum request interval</span>
+                <strong>@FormatInterval(Status.MinimumRequestIntervalMilliseconds)</strong>
+                <p>Photo Identity spaces provider requests by at least this configured interval.</p>
+            </div>
+        </div>
+
+        @if (!Status.Configured)
+        {
+            <div class="notice warning">
+                GeoNames enrichment is disabled. Configure <code>PhotoIdentity__GeoNames__Username</code> in the packaged application's
+                <code>%LOCALAPPDATA%\PhotoIdentity\launcher.json</code>, then restart Photo Identity. Optional startup settings are
+                <code>PhotoIdentity__GeoNames__BaseUrl</code>, <code>PhotoIdentity__GeoNames__Language</code>, and
+                <code>PhotoIdentity__GeoNames__MinimumRequestIntervalMilliseconds</code>.
+            </div>
+        }
+        else
+        {
+            <div class="notice warning">
+                <strong>External GPS disclosure:</strong> when you run enrichment, Photo Identity sends each selected photo's persisted latitude and longitude,
+                the configured GeoNames username, and the documented service parameters to GeoNames. It does not send photo bytes, filenames, source paths,
+                people, tags, or other catalogue metadata. The username remains server-side and is not shown here.
+            </div>
+
+            <div class="review-filter-grid">
+                <div>
+                    <label class="field-label" for="settings-geonames-batch-size">Maximum candidates this run</label>
+                    <input id="settings-geonames-batch-size"
+                           type="number"
+                           min="1"
+                           max="250"
+                           step="1"
+                           @bind="BatchSize"
+                           disabled="@Busy" />
+                    <p>Runs are bounded to 1–250 persisted-GPS candidates. Deferred or failed attempts remain eligible for a later run.</p>
+                </div>
+            </div>
+
+            <div class="card-actions">
+                <button type="button"
+                        class="button primary"
+                        disabled="@(Busy || !ValidBatchSize)"
+                        @onclick="RunEnrichmentAsync">
+                    @(Busy ? "Running…" : "Enrich GPS places")
+                </button>
+                <button type="button"
+                        class="button secondary"
+                        disabled="@(Busy || !ValidBatchSize)"
+                        @onclick="RefreshAutomaticPlacesAsync">
+                    Force refresh automatic places
+                </button>
+            </div>
+
+            <p class="field-help">
+                Normal runs reuse cached coordinate results and skip completed revisions. Force refresh bypasses the reverse-geocode cache for eligible automatic
+                results and can spend additional provider credits; manual places, explicit manual clears, and unresolved migration conflicts remain protected.
+            </p>
+        }
+
+        @if (LastReport is PhotoPlaceEnrichmentReportResponse report)
+        {
+            <h3>Latest batch result</h3>
+            <div class="review-filter-grid" aria-live="polite">
+                <div>
+                    <span class="field-label">Candidates</span>
+                    <strong>@report.Candidates</strong>
+                    <p>@report.ProviderRequests provider request(s) · @report.CachedResults cached result(s)</p>
+                </div>
+                <div>
+                    <span class="field-label">Assignments</span>
+                    <strong>@report.Assigned</strong>
+                    <p>@report.UnchangedAutomatic automatic result(s) already unchanged</p>
+                </div>
+                <div>
+                    <span class="field-label">Protected / conflicts</span>
+                    <strong>@report.SkippedManual / @report.SkippedConflict</strong>
+                    <p>Manual history and unresolved migration conflicts are never overwritten automatically.</p>
+                </div>
+                <div>
+                    <span class="field-label">Deferred / failed</span>
+                    <strong>@report.Deferred / @report.Failed</strong>
+                    <p>@(report.StoppedEarly ? "The provider asked this batch to stop early; retry later." : "The bounded batch reached a normal stopping point.")</p>
+                </div>
+            </div>
+        }
+
+        <p class="field-help">
+            Place data and reverse-geocoding service by <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">GeoNames</a>.
+            Provider-derived places remain normal first-class Photo Identity locations and can be corrected manually.
+        </p>
+    }
+</section>
+
+@code {
+    private PhotoPlaceEnrichmentStatusResponse? Status { get; set; }
+    private PhotoPlaceEnrichmentReportResponse? LastReport { get; set; }
+    private int BatchSize { get; set; } = 10;
+    private bool Loading { get; set; } = true;
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    private bool ValidBatchSize => BatchSize is >= 1 and <= 250;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatusAsync();
+    }
+
+    private async Task LoadStatusAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Status = await Http.GetFromJsonAsync<PhotoPlaceEnrichmentStatusResponse>("api/place-enrichment/status");
+            if (Status is null)
+            {
+                Error = "The GeoNames status response was empty.";
+            }
+        }
+        catch (Exception exception)
+        {
+            Status = null;
+            Error = $"GeoNames status could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private Task RunEnrichmentAsync() => ExecuteAsync(refresh: false);
+
+    private Task RefreshAutomaticPlacesAsync() => ExecuteAsync(refresh: true);
+
+    private async Task ExecuteAsync(bool refresh)
+    {
+        if (!ValidBatchSize)
+        {
+            Error = "GeoNames batch size must be between 1 and 250.";
+            return;
+        }
+
+        if (Status is not { Configured: true })
+        {
+            Error = "GeoNames enrichment is disabled until a private username is configured and Photo Identity is restarted.";
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            string url = $"api/place-enrichment/geonames?limit={BatchSize}&refresh={refresh.ToString().ToLowerInvariant()}";
+            using HttpResponseMessage response = await Http.PostAsync(url, content: null);
+            if (!response.IsSuccessStatusCode)
+            {
+                PhotoPlaceEnrichmentErrorResponse? apiError = null;
+                try
+                {
+                    apiError = await response.Content.ReadFromJsonAsync<PhotoPlaceEnrichmentErrorResponse>();
+                }
+                catch
+                {
+                    // Fall through to the status-code message when the response is not the API error contract.
+                }
+
+                Error = apiError?.Error ?? $"GeoNames enrichment failed with HTTP {(int)response.StatusCode}.";
+                return;
+            }
+
+            LastReport = await response.Content.ReadFromJsonAsync<PhotoPlaceEnrichmentReportResponse>();
+            if (LastReport is null)
+            {
+                Error = "The GeoNames enrichment response was empty.";
+                return;
+            }
+
+            Message = refresh
+                ? $"GeoNames refresh finished: {LastReport.Assigned} automatic place assignment(s), {LastReport.Deferred} deferred, {LastReport.Failed} failed."
+                : $"GeoNames enrichment finished: {LastReport.Assigned} place assignment(s), {LastReport.CachedResults} cached result(s), {LastReport.Deferred} deferred, {LastReport.Failed} failed.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private static string FormatInterval(int milliseconds) =>
+        milliseconds == 0
+            ? "No client delay configured"
+            : milliseconds % 1000 == 0
+                ? $"{milliseconds / 1000} second{(milliseconds == 1000 ? "" : "s")}"
+                : $"{milliseconds} ms";
+}
