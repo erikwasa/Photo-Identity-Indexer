@@ -32,7 +32,7 @@ public sealed record GeoNamesReverseGeocodingConfiguration
             throw new InvalidOperationException("GeoNames base URL must be an absolute HTTPS URL without credentials, query parameters or fragments.");
         }
 
-        BaseUri = requestedBaseUrl.EndsWith('/', StringComparison.Ordinal)
+        BaseUri = requestedBaseUrl.EndsWith("/", StringComparison.Ordinal)
             ? parsedBaseUri
             : new Uri(requestedBaseUrl + "/", UriKind.Absolute);
         Language = string.IsNullOrWhiteSpace(language) ? "local" : language.Trim();
@@ -58,9 +58,8 @@ public sealed record GeoNamesReverseGeocodingConfiguration
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(Username);
 
-    public string ContractKey => string.Create(
-        CultureInfo.InvariantCulture,
-        $"findNearbyPlaceName-v1|{BaseUri.GetLeftPart(UriPartial.Authority).ToLowerInvariant()}|lang={Language.ToLowerInvariant()}|localCountry=true|style=FULL|maxRows=1");
+    public string ContractKey =>
+        $"findNearbyPlaceName-v1|{BaseUri.GetLeftPart(UriPartial.Authority).ToLowerInvariant()}|lang={Language.ToLowerInvariant()}|localCountry=true|style=FULL|maxRows=1";
 }
 
 public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
