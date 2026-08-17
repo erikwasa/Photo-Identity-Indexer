@@ -44,17 +44,17 @@ Face review needs a durable local artifact. The full-resolution original should 
 
 ## Acceptance criteria
 
-- [ ] A durable contextual face-review JPEG is generated from full-resolution source pixels for each detected face, with a maximum long edge of 960 px and no upscaling.
-- [ ] The durable face-review derivative is separate from the aligned recognition crop and remains available after the authoritative original becomes online-only.
-- [ ] Face Details uses the durable derivative and can return up to approximately 960 px on its longest edge when the original face/context region contains enough real pixels.
-- [ ] Face Gallery uses the same durable derivative as its quality source and returns a card-sized response without requiring a second permanently stored gallery image.
-- [ ] Opening Face Gallery or Face Details never probes or hydrates the authoritative original.
-- [ ] Already-analyzed faces can be backfilled from persisted observations without rerunning detector or embedder inference.
-- [ ] Archive advancement keeps derivative backfill pending until relevant current analyzed faces have durable review derivatives and respects the existing managed hydration/release boundary.
-- [ ] JPEG, PNG, HEIC and HEIF originals use the application's supported decoder when the durable face derivative is generated.
-- [ ] Browser-facing contracts continue to expose only privacy-safe image URLs/metadata and never source or derivative filesystem paths.
-- [ ] Automated tests prove that a face derivative generated while the original is local remains the high-resolution Face Details source after the original state changes to online-only.
-- [ ] Human verification on Windows confirms that representative Face Details images are visibly sharper than their gallery counterparts and remain unchanged when the original is online-only.
+- [x] A durable contextual face-review JPEG is generated from full-resolution source pixels for each detected face, with a maximum long edge of 960 px and no upscaling.
+- [x] The durable face-review derivative is separate from the aligned recognition crop and remains available after the authoritative original becomes online-only.
+- [x] Face Details uses the durable derivative and can return up to approximately 960 px on its longest edge when the original face/context region contains enough real pixels.
+- [x] Face Gallery uses the same durable derivative as its quality source and returns a card-sized response without requiring a second permanently stored gallery image.
+- [x] Opening Face Gallery or Face Details never probes or hydrates the authoritative original.
+- [x] Already-analyzed faces can be backfilled from persisted observations without rerunning detector or embedder inference.
+- [x] Archive advancement keeps derivative backfill pending until relevant current analyzed faces have durable review derivatives and respects the existing managed hydration/release boundary.
+- [x] JPEG, PNG, HEIC and HEIF originals use the application's supported decoder when the durable face derivative is generated.
+- [x] Browser-facing contracts continue to expose only privacy-safe image URLs/metadata and never source or derivative filesystem paths.
+- [x] Automated tests prove that a face derivative generated while the original is local remains the high-resolution Face Details source after the original state changes to online-only.
+- [x] Human verification on Windows confirms that representative Face Details images are visibly sharper than their gallery counterparts and remain unchanged when the original is online-only.
 
 ## Verification requirements
 
@@ -63,10 +63,11 @@ Automated renderer/persistence/API coverage plus Windows verification with repre
 ## Implementation history
 
 - PR #147 introduced a request-time original-preference path. Manual verification on 2026-08-16 failed the image-quality criterion and exposed the unwanted runtime dependency on original hydration state.
-- The replacement design stores one permanent `<=960 px` face-review derivative generated from the full-resolution original and uses it as the sole high-quality source for both review surfaces.
+- PR #151 replaced that design with one permanent `<=960 px` face-review derivative generated from the full-resolution original and used as the sole high-quality source for both review surfaces.
 - Existing analyzed faces are backfilled from their persisted bounding boxes; face inference is not repeated.
 
 ## Completion notes
 
-- WI-0058 remains open while the durable derivative implementation and backfill are completed and reverified on Windows.
-- WI-0059 and WI-0060 passed the same 2026-08-16 Windows verification session independently of this image-quality failure.
+- The durable derivative implementation and backfill are merged through PR #151.
+- Maintainer Windows re-verification completed successfully on 2026-08-17; WI-0058 is accepted as complete.
+- WI-0059 and WI-0060 passed the earlier 2026-08-16 Windows verification session independently.
