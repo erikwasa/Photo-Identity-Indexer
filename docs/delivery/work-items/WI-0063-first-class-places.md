@@ -39,7 +39,7 @@ Merged PR #156 from `agent/WI-0063-places-foundation` establishes the storage/AP
 
 ### Slice 2 — Smart Collection Location contract and formal schema migration
 
-Draft PR #157 on `agent/WI-0063-smart-location` implements the non-UI Smart Collection semantics:
+Merged PR #157 from `agent/WI-0063-smart-location` implements the non-UI Smart Collection semantics:
 
 - Smart Collection filter schema v2 adds one optional canonical named place inside Location while preserving optional GPS bounds and coordinate-only request compatibility.
 - named places normalize to their full internal `places/...` path while API responses omit the literal `Places/` prefix.
@@ -52,10 +52,16 @@ Draft PR #157 on `agent/WI-0063-smart-location` implements the non-UI Smart Coll
 
 ### Slice 3 — Photo Details and Smart Collection UI
 
-- add a dedicated Photo Details place editor with set/replace/clear and migration-conflict presentation;
-- add hierarchical named-place selection to the Smart Collections Location editor while hiding the literal `Places/` prefix;
-- preserve saved/transient Smart Collection navigation state from WI-0061;
-- complete automated browser-contract coverage and defer the maintainer browser/operator pass to the consolidated M19 verification.
+Draft PR #159 on `agent/WI-0063-place-ui` implements the browser contract:
+
+- a reusable hierarchy picker reads the first-class `/api/places` vocabulary and presents indented parent/child nodes without the literal `Places/` prefix;
+- Photo Details shows the effective place/source, presents unresolved migration candidates, allows selection of existing vocabulary or entry of a new hierarchical path, and supports set/replace/clear through the Slice 1 metadata-only API;
+- Smart Collections expose the named-place hierarchy inside Location, independently of optional GPS bounds, while the generic Tags selector continues to use the Places-filtered `/api/tags` vocabulary;
+- clearing a named place from an existing saved definition sends an explicit clear rather than activating the Slice 2 legacy-editor fallback;
+- WI-0061 transient browser-tab state now carries the named-place selection while remaining compatible with older stored state that has no place property;
+- saved/transient result links continue to preserve the exact Smart Collection return context through Photo Details.
+
+Local browser/operator verification remains intentionally deferred to the consolidated M19 pass after WI-0064.
 
 ## In scope
 
@@ -82,7 +88,7 @@ The Location dimension may contain:
 
 If both a place and GPS bounds are populated, both predicates must match. Different top-level Smart Collection dimensions continue to combine with AND semantics.
 
-The UI should present a hierarchical place picker such as:
+The UI presents a hierarchical place picker such as:
 
 ```text
 Sweden
@@ -111,18 +117,18 @@ while storing the canonical internal value `Places/Sweden/Stockholm region/Norrt
 
 ## Acceptance criteria
 
-- [x] `Places` is reserved and cannot be assigned through the generic tag API as an ordinary tag. Browser editor verification remains for Slice 3/consolidated M19 review.
+- [x] `Places` is reserved and cannot be assigned through the generic tag API as an ordinary tag. The browser tag selector consumes the same filtered vocabulary; consolidated browser verification remains deferred.
 - [x] A photo revision has at most one effective place, and setting another place atomically supersedes the previous value while retaining audit history.
-- [ ] Photo Details can set, replace and clear the place without showing the `Places/` prefix in normal UI. Persistence/API complete in Slice 1; UI remains Slice 3.
+- [x] Photo Details can set, replace and clear the place without showing the `Places/` prefix in normal UI. Automated build/API coverage applies; maintainer browser verification remains deferred.
 - [x] `Places/Sweden/Stockholm region/Norrtälje` remains a canonical hierarchical value with reusable parent vocabulary.
-- [ ] Smart Collections no longer show Places entries in the Tags dimension. Backend predicates/API exclusion are complete in Slice 2; browser selector remains Slice 3.
-- [ ] Smart Collections expose named-place filtering in the Location dimension. Persistence/query/API complete in Slice 2; hierarchical browser selector remains Slice 3.
+- [x] Smart Collections no longer show Places entries in the Tags dimension because the browser selector consumes the reserved-subtree-filtered tag vocabulary.
+- [x] Smart Collections expose hierarchical named-place filtering in the Location dimension without displaying the reserved prefix.
 - [x] Selecting an ancestor such as Sweden matches all descendant place assignments, while selecting Norrtälje resolves its full canonical hierarchy rather than matching unrelated leaf names.
 - [x] Named-place and GPS criteria can be combined safely with people, generic tags and taken time.
-- [x] Existing coherent Places assignments and representable saved definitions migrate without loss; divergent or non-representable legacy cases are surfaced/rejected rather than silently changing semantics. Slice 1 covers photo-assignment migration/conflicts and Slice 2 covers saved-filter v1→v2 migration.
+- [x] Existing coherent Places assignments and representable saved definitions migrate without loss; divergent or non-representable legacy cases are surfaced/rejected rather than silently changing semantics.
 - [x] Place edits remain metadata-only and do not hydrate or modify originals.
-- [x] Automated tests cover reserved namespace enforcement, single-place replacement, ancestor matching, migration and Smart Collection persistence/query behavior. Browser/operator verification remains deferred.
+- [x] Automated tests cover reserved namespace enforcement, single-place replacement, ancestor matching, migration, Smart Collection persistence/query behavior and named-place navigation-state round trips. Browser/operator verification remains deferred.
 
 ## Verification requirements
 
-Automated migration/persistence/API/query tests plus local verification of place replacement, hierarchical filtering and the separation between Tags and Location are required. Per the maintainer's M19 plan, local browser/operator verification is intentionally deferred until WI-0063 and WI-0064 implementation are complete so M19 can be reviewed as one integrated workflow.
+Automated migration/persistence/API/query/browser-contract tests plus local verification of place replacement, hierarchical filtering and the separation between Tags and Location are required. Per the maintainer's M19 plan, local browser/operator verification is intentionally deferred until WI-0063 and WI-0064 implementation are complete so M19 can be reviewed as one integrated workflow.
