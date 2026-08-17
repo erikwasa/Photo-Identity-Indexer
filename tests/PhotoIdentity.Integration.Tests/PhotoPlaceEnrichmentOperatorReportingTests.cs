@@ -41,6 +41,11 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             Assert.Contains("enable Free Web Services", report.StopReasonMessage, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(privateUsername, report.StopReasonMessage, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("raw-provider-secret", report.StopReasonMessage, StringComparison.OrdinalIgnoreCase);
+            PhotoPlaceEnrichmentIssue issue = Assert.Single(report.Issues!);
+            Assert.Equal(revisionId.ToString(), issue.RevisionId);
+            Assert.Equal("failed", issue.Outcome);
+            Assert.Equal("10", issue.ProviderCode);
+            Assert.DoesNotContain(privateUsername, issue.Message, StringComparison.OrdinalIgnoreCase);
 
             await using SqliteConnection connection = await database.OpenConnectionAsync();
             using SqliteCommand command = connection.CreateCommand();
@@ -56,6 +61,66 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             Assert.Equal("failed", reader.GetString(0));
             Assert.Equal("10", reader.GetString(1));
             Assert.Contains(privateUsername, reader.GetString(2), StringComparison.Ordinal);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task No_result_is_reported_separately_and_does_not_spend_credits_again_on_normal_runs()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            AssetRevisionId revisionId = await CreateRevisionWithGpsAsync(database, directory);
+
+            IReverseGeocoder provider = new NoResultGeocoder();
+            TimeProvider clock = TimeProvider.System;
+            SqlitePhotoPlaceRepository places = new(database, clock);
+            PhotoPlaceEnrichmentService service = new(
+                provider,
+                new SqlitePhotoPlaceEnrichmentRepository(database, clock),
+                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+
+            PhotoPlaceEnrichmentReport first = await service.ExecuteBatchAsync(limit: 5);
+
+            Assert.Equal(1, first.Candidates);
+            Assert.Equal(1, first.ProviderRequests);
+            Assert.Equal(1, first.NoResult);
+            Assert.Equal(0, first.Failed);
+            Assert.False(first.StoppedEarly);
+            PhotoPlaceEnrichmentIssue issue = Assert.Single(first.Issues!);
+            Assert.Equal(revisionId.ToString(), issue.RevisionId);
+            Assert.Equal("no-result", issue.Outcome);
+            Assert.Equal("15", issue.ProviderCode);
+            Assert.Contains("no nearby populated place", issue.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("raw-provider-message", issue.Message, StringComparison.OrdinalIgnoreCase);
+
+            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            {
+                using SqliteCommand command = connection.CreateCommand();
+                command.CommandText = """
+                    SELECT status, last_error_code, completed_at_utc
+                    FROM photo_place_enrichment_attempts
+                    WHERE asset_revision_id = $revision_id
+                      AND provider = 'geonames';
+                    """;
+                command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
+                await using SqliteDataReader reader = await command.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal("skipped", reader.GetString(0));
+                Assert.Equal("15", reader.GetString(1));
+                Assert.False(reader.IsDBNull(2));
+            }
+
+            PhotoPlaceEnrichmentReport second = await service.ExecuteBatchAsync(limit: 5);
+            Assert.Equal(0, second.Candidates);
+            Assert.Equal(0, second.ProviderRequests);
         }
         finally
         {
@@ -135,6 +200,24 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
                 ErrorCode: "10",
                 ErrorMessage: $"raw-provider-secret: user account {username} is not enabled for free webservice",
                 StopBatch: true));
+        }
+    }
+
+    private sealed class NoResultGeocoder : IReverseGeocoder
+    {
+        public string ProviderName => "geonames";
+
+        public string ContractKey => "no-result-reporting-test-v1";
+
+        public Task<ReverseGeocodeResponse> ReverseGeocodeAsync(
+            ReverseGeocodeQuery query,
+            CancellationToken cancellationToken = default)
+        {
+            query.Validate();
+            return Task.FromResult(new ReverseGeocodeResponse(
+                ReverseGeocodeStatus.NoResult,
+                ErrorCode: "15",
+                ErrorMessage: "raw-provider-message: no result found"));
         }
     }
 }
