@@ -1,0 +1,94 @@
+@inject HttpClient Http
+
+<label class="place-picker-field">
+    <span class="field-label">@Label</span>
+    <select value="@CanonicalValue"
+            disabled="@(Disabled || Loading)"
+            @onchange="HandleChangedAsync">
+        <option value="">@EmptyLabel</option>
+        @foreach (PhotoPlaceDefinitionResponse place in OrderedPlaces)
+        {
+            <option value="@place.Value">@IndentedLabel(place)</option>
+        }
+    </select>
+</label>
+
+@if (Loading)
+{
+    <small class="place-picker-help">Loading place hierarchy…</small>
+}
+else if (!string.IsNullOrWhiteSpace(Error))
+{
+    <small class="place-picker-error" role="alert">@Error</small>
+}
+else if (OrderedPlaces.Count == 0)
+{
+    <small class="place-picker-help">No place vocabulary exists yet. A place can be created from Photo Details.</small>
+}
+else if (!string.IsNullOrWhiteSpace(Value))
+{
+    <small class="place-picker-help">Selected hierarchy: @DisplayPath</small>
+}
+
+@code {
+    [Parameter]
+    public string Label { get; set; } = "Named place";
+
+    [Parameter]
+    public string EmptyLabel { get; set; } = "Any named place";
+
+    [Parameter]
+    public string? Value { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValueChanged { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    private IReadOnlyList<PhotoPlaceDefinitionResponse> Places { get; set; } = [];
+    private bool Loading { get; set; } = true;
+    private string? Error { get; set; }
+
+    private IReadOnlyList<PhotoPlaceDefinitionResponse> OrderedPlaces => Places
+        .OrderBy(place => place.Value, StringComparer.OrdinalIgnoreCase)
+        .ThenBy(place => place.Id, StringComparer.Ordinal)
+        .ToArray();
+
+    private string CanonicalValue => ResolveDefinition(Value)?.Value ?? Value ?? string.Empty;
+    private string DisplayPath => ResolveDefinition(Value)?.Value ?? Value ?? string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Places = await Http.GetFromJsonAsync<PhotoPlaceDefinitionResponse[]>("api/places") ?? [];
+        }
+        catch (Exception exception)
+        {
+            Error = $"Places could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task HandleChangedAsync(ChangeEventArgs args)
+    {
+        string? selected = args.Value?.ToString();
+        await ValueChanged.InvokeAsync(string.IsNullOrWhiteSpace(selected) ? null : selected);
+    }
+
+    private PhotoPlaceDefinitionResponse? ResolveDefinition(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? null
+            : Places.FirstOrDefault(place => string.Equals(place.Value, value, StringComparison.OrdinalIgnoreCase));
+
+    private static string IndentedLabel(PhotoPlaceDefinitionResponse place)
+    {
+        int depth = place.Value.Count(character => character == '/');
+        string indent = string.Concat(Enumerable.Repeat("\u00a0\u00a0", depth));
+        return $"{indent}{place.Name}";
+    }
+}

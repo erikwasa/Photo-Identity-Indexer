@@ -14,7 +14,8 @@ public sealed record SmartCollectionTransientNavigationState(
     string South,
     string West,
     string North,
-    string East);
+    string East,
+    string? Place = null);
 
 public static class SmartCollectionNavigation
 {

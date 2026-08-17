@@ -1,0 +1,22 @@
+.place-picker-field {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.place-picker-field select {
+    width: 100%;
+}
+
+.place-picker-help,
+.place-picker-error {
+    display: block;
+    margin-top: 0.35rem;
+}
+
+.place-picker-help {
+    color: var(--muted);
+}
+
+.place-picker-error {
+    color: var(--danger, #b42318);
+}

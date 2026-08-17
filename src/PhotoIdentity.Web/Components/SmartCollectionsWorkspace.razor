@@ -164,9 +164,17 @@
 
                     <fieldset class="smart-filter-card">
                         <legend>Location</legend>
+
+                        <PlacePicker Label="Named place"
+                                     EmptyLabel="Any named place"
+                                     Value="@SelectedPlace"
+                                     ValueChanged="@((string? value) => SelectedPlace = value)"
+                                     Disabled="@Busy" />
+                        <small class="smart-help">Selecting a parent such as Sweden includes photos assigned anywhere below that place hierarchy.</small>
+
                         <label class="smart-location-toggle">
                             <input type="checkbox" @bind="UseLocation" disabled="@Busy" />
-                            <span>Limit to GPS rectangle</span>
+                            <span>Also limit to GPS rectangle</span>
                         </label>
 
                         <div class="smart-coordinate-grid">
@@ -187,7 +195,7 @@
                                 <input type="text" inputmode="decimal" @bind="East" disabled="@(!UseLocation || Busy)" />
                             </label>
                         </div>
-                        <small class="smart-help">Coordinates are optional. Missing GPS metadata will not match a populated location filter.</small>
+                        <small class="smart-help">Named place and GPS are independent. If both are populated, both must match. Missing GPS metadata will not match a populated GPS rectangle.</small>
                     </fieldset>
                 </div>
 

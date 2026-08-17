@@ -1,0 +1,214 @@
+@inject HttpClient Http
+
+<section class="photo-place-editor" aria-labelledby="photo-place-heading">
+    <div class="photo-place-heading">
+        <div>
+            <p class="eyebrow">Location</p>
+            <h3 id="photo-place-heading">Place</h3>
+        </div>
+        @if (State?.Place is not null)
+        {
+            <span class="photo-place-source">@SourceLabel(State.Place.Source)</span>
+        }
+    </div>
+
+    @if (Loading)
+    {
+        <div class="empty-state compact"><p>Loading place…</p></div>
+    }
+    else
+    {
+        @if (State?.MigrationConflict is PhotoPlaceMigrationConflictResponse conflict)
+        {
+            <div class="notice photo-place-conflict" role="status">
+                <strong>Legacy location needs review.</strong>
+                <p>More than one unrelated location path was active. Choose or enter the correct place below; saving it resolves this conflict.</p>
+                <ul>
+                    @foreach (string candidate in conflict.CandidateValues)
+                    {
+                        <li>@candidate</li>
+                    }
+                </ul>
+            </div>
+        }
+
+        @if (State?.Place is PhotoPlaceResponse current)
+        {
+            <p class="photo-place-current"><strong>Current:</strong> @current.Value</p>
+        }
+        else if (State?.MigrationConflict is null)
+        {
+            <p class="photo-place-empty">No place is assigned to this photo.</p>
+        }
+
+        <PlacePicker @key="State?.Place?.Id"
+                     Label="Choose existing place"
+                     EmptyLabel="No existing place selected"
+                     Value="@SelectedValue"
+                     ValueChanged="SetSelectedValue"
+                     Disabled="@Busy" />
+
+        <label class="photo-place-path-field">
+            <span class="field-label">Place path</span>
+            <input type="text"
+                   maxlength="80"
+                   autocomplete="off"
+                   placeholder="Sweden/Stockholm region/Norrtälje"
+                   disabled="@Busy"
+                   @bind="SelectedValue"
+                   @bind:event="oninput" />
+        </label>
+        <small class="photo-place-help">Enter the hierarchy starting with the country. A new path becomes reusable place vocabulary when you save it.</small>
+
+        <div class="photo-place-actions">
+            <button type="button"
+                    class="button primary"
+                    disabled="@(Busy || string.IsNullOrWhiteSpace(SelectedValue))"
+                    @onclick="SaveAsync">
+                @(Busy ? "Saving…" : State?.Place is null ? "Set place" : "Replace place")
+            </button>
+            <button type="button"
+                    class="button secondary"
+                    disabled="@(Busy || (State?.Place is null && State?.MigrationConflict is null))"
+                    @onclick="ClearAsync">
+                Clear place
+            </button>
+        </div>
+
+        <p class="photo-place-help">Place edits affect catalogue metadata for this photo revision only. They do not download or modify the original image.</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="notice error photo-place-notice" role="alert">@Error</div>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public string RevisionId { get; set; } = string.Empty;
+
+    private PhotoPlaceStateResponse? State { get; set; }
+    private string? SelectedValue { get; set; }
+    private bool Loading { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+
+    private string PlaceUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/place";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            State = await Http.GetFromJsonAsync<PhotoPlaceStateResponse>(PlaceUrl);
+            SelectedValue = State?.Place?.Value;
+        }
+        catch (Exception exception)
+        {
+            State = null;
+            SelectedValue = null;
+            Error = $"Place could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private Task SetSelectedValue(string? value)
+    {
+        SelectedValue = value;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (Busy || string.IsNullOrWhiteSpace(SelectedValue))
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                PlaceUrl,
+                new PhotoPlaceMutationRequest(SelectedValue.Trim()));
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(await ReadErrorAsync(response, "Place could not be saved."));
+            }
+
+            State = await response.Content.ReadFromJsonAsync<PhotoPlaceStateResponse>()
+                ?? throw new InvalidOperationException("The place response was empty.");
+            SelectedValue = State.Place?.Value;
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ClearAsync()
+    {
+        if (Busy)
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.DeleteAsync(PlaceUrl);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(await ReadErrorAsync(response, "Place could not be cleared."));
+            }
+
+            State = await response.Content.ReadFromJsonAsync<PhotoPlaceStateResponse>()
+                ?? throw new InvalidOperationException("The place response was empty.");
+            SelectedValue = null;
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private static async Task<string> ReadErrorAsync(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            PhotoPlaceErrorResponse? error = await response.Content.ReadFromJsonAsync<PhotoPlaceErrorResponse>();
+            if (!string.IsNullOrWhiteSpace(error?.Error))
+            {
+                return error.Error;
+            }
+        }
+        catch
+        {
+        }
+
+        return $"{fallback} HTTP {(int)response.StatusCode}.";
+    }
+
+    private static string SourceLabel(string source) => source switch
+    {
+        "manual" => "Manual",
+        "automatic" => "Automatic",
+        "migration" => "Migrated",
+        _ => source,
+    };
+}

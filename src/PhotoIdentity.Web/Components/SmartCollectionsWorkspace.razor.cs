@@ -47,6 +47,7 @@ public partial class SmartCollectionsWorkspace
     private string PeopleMatch { get; set; } = "all";
     private string TagMatch { get; set; } = "all";
     private string Taken { get; set; } = "";
+    private string? SelectedPlace { get; set; }
     private bool UseLocation { get; set; }
     private string South { get; set; } = "";
     private string West { get; set; } = "";
@@ -123,6 +124,7 @@ public partial class SmartCollectionsWorkspace
         PeopleMatch = "all";
         TagMatch = "all";
         Taken = "";
+        SelectedPlace = null;
         UseLocation = false;
         South = West = North = East = "";
         Results = null;
@@ -157,16 +159,22 @@ public partial class SmartCollectionsWorkspace
         PeopleMatch = definition.Filter.PeopleMatch;
         TagMatch = definition.Filter.TagMatch;
         Taken = ToEditableTaken(definition.Filter.Taken);
-        UseLocation = definition.Filter.Location is not null;
         if (definition.Filter.Location is SmartCollectionLocationRequest location)
         {
-            South = location.South.ToString(CultureInfo.InvariantCulture);
-            West = location.West.ToString(CultureInfo.InvariantCulture);
-            North = location.North.ToString(CultureInfo.InvariantCulture);
-            East = location.East.ToString(CultureInfo.InvariantCulture);
+            SelectedPlace = location.Place;
+            UseLocation = location.South.HasValue &&
+                location.West.HasValue &&
+                location.North.HasValue &&
+                location.East.HasValue;
+            South = location.South?.ToString(CultureInfo.InvariantCulture) ?? "";
+            West = location.West?.ToString(CultureInfo.InvariantCulture) ?? "";
+            North = location.North?.ToString(CultureInfo.InvariantCulture) ?? "";
+            East = location.East?.ToString(CultureInfo.InvariantCulture) ?? "";
         }
         else
         {
+            SelectedPlace = null;
+            UseLocation = false;
             South = West = North = East = "";
         }
 
@@ -195,6 +203,7 @@ public partial class SmartCollectionsWorkspace
         PeopleMatch = state.PeopleMatch;
         TagMatch = state.TagMatch;
         Taken = state.Taken;
+        SelectedPlace = state.Place;
         UseLocation = state.UseLocation;
         South = state.South;
         West = state.West;
@@ -531,7 +540,8 @@ public partial class SmartCollectionsWorkspace
             South,
             West,
             North,
-            East);
+            East,
+            SelectedPlace);
 
         try
         {
@@ -592,6 +602,11 @@ public partial class SmartCollectionsWorkspace
             return false;
         }
 
+        if (EditingId is not null && location is null)
+        {
+            location = new SmartCollectionLocationRequest(Place: string.Empty);
+        }
+
         request = new SmartCollectionDefinitionRequest(
             Name.Trim(),
             SelectedPeople.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
@@ -625,9 +640,15 @@ public partial class SmartCollectionsWorkspace
 
     private bool TryBuildLocation(out SmartCollectionLocationRequest? location)
     {
+        string? place = string.IsNullOrWhiteSpace(SelectedPlace) ? null : SelectedPlace.Trim();
         location = null;
         if (!UseLocation)
         {
+            if (place is not null)
+            {
+                location = new SmartCollectionLocationRequest(Place: place);
+            }
+
             return true;
         }
 
@@ -651,7 +672,12 @@ public partial class SmartCollectionsWorkspace
             return false;
         }
 
-        location = new SmartCollectionLocationRequest(south, west, north, east);
+        location = new SmartCollectionLocationRequest(
+            south,
+            west,
+            north,
+            east,
+            place ?? string.Empty);
         return true;
     }
 
@@ -693,9 +719,35 @@ public partial class SmartCollectionsWorkspace
         ? "Any taken date"
         : $"Taken {filter.Taken.From} to {filter.Taken.To}";
 
-    private static string LocationSummary(SmartCollectionFilterResponse filter) => filter.Location is null
-        ? "Any location"
-        : $"GPS {filter.Location.South:G6},{filter.Location.West:G6} to {filter.Location.North:G6},{filter.Location.East:G6}";
+    private static string LocationSummary(SmartCollectionFilterResponse filter)
+    {
+        if (filter.Location is null)
+        {
+            return "Any location";
+        }
+
+        string? place = string.IsNullOrWhiteSpace(filter.Location.Place)
+            ? null
+            : filter.Location.Place;
+        bool hasGps = filter.Location.South.HasValue &&
+            filter.Location.West.HasValue &&
+            filter.Location.North.HasValue &&
+            filter.Location.East.HasValue;
+
+        if (place is not null && hasGps)
+        {
+            return $"Place {place} · GPS {filter.Location.South!.Value:G6},{filter.Location.West!.Value:G6} to {filter.Location.North!.Value:G6},{filter.Location.East!.Value:G6}";
+        }
+
+        if (place is not null)
+        {
+            return $"Place {place}";
+        }
+
+        return hasGps
+            ? $"GPS {filter.Location.South!.Value:G6},{filter.Location.West!.Value:G6} to {filter.Location.North!.Value:G6},{filter.Location.East!.Value:G6}"
+            : "Any location";
+    }
 
     private static string ToEditableTaken(SmartCollectionDateRangeResponse? range)
     {

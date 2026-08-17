@@ -41,7 +41,8 @@ public sealed class NavigationContextTests
             "59.0",
             "17.0",
             "60.0",
-            "18.0");
+            "18.0",
+            "Sweden/Stockholm region/Norrtälje");
 
         string json = SmartCollectionNavigation.SerializeTransientState(state);
         SmartCollectionTransientNavigationState? restored = SmartCollectionNavigation.DeserializeTransientState(json);
@@ -59,6 +60,22 @@ public sealed class NavigationContextTests
         Assert.Equal(state.West, restored.West);
         Assert.Equal(state.North, restored.North);
         Assert.Equal(state.East, restored.East);
+        Assert.Equal(state.Place, restored.Place);
+    }
+
+    [Fact]
+    public void Legacy_transient_state_without_named_place_remains_readable()
+    {
+        const string json = """
+            {"editingId":null,"name":"Legacy preview","people":[],"peopleMatch":"all","tags":[],"tagMatch":"all","taken":"","useLocation":true,"south":"59","west":"17","north":"60","east":"19"}
+            """;
+
+        SmartCollectionTransientNavigationState? restored = SmartCollectionNavigation.DeserializeTransientState(json);
+
+        Assert.NotNull(restored);
+        Assert.Null(restored.Place);
+        Assert.True(restored.UseLocation);
+        Assert.Equal("59", restored.South);
     }
 
     [Fact]
