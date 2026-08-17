@@ -44,7 +44,7 @@ Store provider identifiers and provenance needed to explain or safely refresh an
 
 ### Slice 1 — provider, persistence and bounded enrichment foundation
 
-PR #160 on `agent/WI-0064-geonames-foundation` establishes the non-UI enrichment path:
+Merged PR #160 established the non-UI enrichment path:
 
 - a provider-neutral `IReverseGeocoder` boundary in Core isolates catalogue/location semantics from GeoNames HTTP handling;
 - `GeoNamesReverseGeocoder` uses the secure JSON service, rejects the public `demo` account and non-HTTPS base URLs, sends only coordinates plus documented provider parameters and the configured username, normalizes country/admin/locality values into `PhotoPlacePath`, and maps quota/transient provider states to clean deferral;
@@ -58,12 +58,17 @@ PR #160 on `agent/WI-0064-geonames-foundation` establishes the non-UI enrichment
 
 ### Slice 2 — operator workflow, attribution and final M19 verification handoff
 
-After Slice 1 is merged:
+Draft PR #161 on `agent/WI-0064-geonames-settings` adds the remaining operator-facing workflow:
 
-- add the Settings/operator surface for configured/disabled state, bounded execution, refresh and the latest batch result;
-- state clearly that GPS coordinates are sent to GeoNames when the maintainer invokes enrichment and do not expose the configured username in browser/API responses;
-- add GeoNames attribution where provider-derived enrichment is described to the operator;
-- finish browser-contract/operator coverage and run a small maintainer-configured live GeoNames sample as part of the consolidated M19 verification pass.
+- Settings reports configured/disabled provider state, service host, language and request pacing without returning the configured GeoNames username;
+- the maintainer can choose a bounded 1–250 candidate batch and explicitly run normal enrichment or force-refresh automatic places;
+- normal execution explains cache reuse/resumability, while force refresh states that it bypasses cached reverse-geocode results and can spend additional provider credits;
+- the operator sees the latest in-session candidates, provider requests, cache reuse, assignment, protected manual/conflict skip, deferred/failure and early-stop counts;
+- the Settings surface states that persisted latitude/longitude, the configured GeoNames username and documented service parameters leave the machine when enrichment is invoked, while photo bytes, filenames, source paths, people, tags and other catalogue metadata do not;
+- GeoNames attribution is presented directly with the provider-derived place workflow;
+- endpoint coverage verifies username redaction, disabled-provider refusal and the server-side batch bound without live provider calls.
+
+The final live-provider sample is intentionally not automated. After Slice 2 merges, a maintainer-configured small GeoNames sample and the deferred WI-0061/WI-0062/WI-0063 browser checks form the consolidated M19 verification pass.
 
 ## In scope
 
@@ -84,9 +89,9 @@ After Slice 1 is merged:
 
 ## Privacy and safety boundary
 
-Reverse geocoding sends latitude/longitude to GeoNames. It must therefore be disabled until explicitly configured and invoked, and operator documentation must state that GPS coordinates are sent to the external GeoNames service during enrichment.
+Reverse geocoding sends latitude/longitude to GeoNames. It is disabled until explicitly configured and invoked, and the Settings operator surface states that GPS coordinates are sent to the external GeoNames service during enrichment.
 
-The operation must not send photo bytes, filenames, people, tags, source paths or other catalogue information to GeoNames. The configured GeoNames username is provider authentication/configuration and is not returned by the Photo Identity status API.
+The operation does not send photo bytes, filenames, people, tags, source paths or other catalogue information to GeoNames. The configured GeoNames username is provider authentication/configuration and is not returned by the Photo Identity status API or displayed by the browser.
 
 ## Out of scope
 
@@ -109,8 +114,9 @@ The operation must not send photo bytes, filenames, people, tags, source paths o
 - [x] A later more-specific automatic result can replace an earlier automatic place while retaining provenance/audit history.
 - [x] Photos without GPS remain unassigned rather than receiving inferred or fabricated locations.
 - [x] Outbound requests contain coordinates/provider parameters only and do not disclose photo bytes, filenames, people, tags or private source paths.
-- [ ] GeoNames attribution and external-GPS privacy behavior are documented and presented for the operator. Documentation/UI remains Slice 2.
+- [x] GeoNames attribution and external-GPS privacy behavior are documented and presented for the operator.
 - [x] Automated tests use a fake/stub GeoNames HTTP boundary and cover normalization, caching, retries, rate-limit/error handling, manual precedence and no-hydration behavior.
+- [ ] A maintainer-configured live GeoNames sample and the consolidated M19 browser/operator pass are recorded as verification evidence.
 
 ## Verification requirements
 

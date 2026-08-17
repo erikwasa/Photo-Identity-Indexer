@@ -354,12 +354,16 @@ work_items:
   document: ../work-items/WI-0064-geonames-place-enrichment.md
   started_at: 2026-08-17
   last_updated_at: 2026-08-17
-  branch: agent/WI-0064-geonames-foundation
+  branch: agent/WI-0064-geonames-settings
   blockers:
   - WI-0050
   - WI-0063
   blocker_notes:
-  - Slice 1 provider, persistence and bounded enrichment foundation is under automated review; operator UI and live-provider verification remain Slice 2.
+  - Slice 1 provider, persistence and bounded enrichment foundation is merged through PR #160; Slice 2 operator workflow is in draft PR #161. The maintainer live-provider sample and consolidated M19 browser verification remain after Slice 2 merges.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/160
+  - type: merge_commit
+    value: 56313e91e9344fc825df3772f95c8a449d442aad
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/161
