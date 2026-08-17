@@ -16,6 +16,10 @@
     {
         <div class="notice error" role="alert">@Error</div>
     }
+    @if (!string.IsNullOrWhiteSpace(Warning))
+    {
+        <div class="notice warning" role="status">@Warning</div>
+    }
     @if (!string.IsNullOrWhiteSpace(Message))
     {
         <div class="notice success" role="status">@Message</div>
@@ -133,9 +137,25 @@
                 <div>
                     <span class="field-label">Deferred / failed</span>
                     <strong>@report.Deferred / @report.Failed</strong>
-                    <p>@(report.StoppedEarly ? "The provider asked this batch to stop early; retry later." : "The bounded batch reached a normal stopping point.")</p>
+                    <p>@(report.StoppedEarly ? "The batch stopped after the provider response shown below." : "The bounded batch reached a normal stopping point.")</p>
                 </div>
             </div>
+
+            @if (!string.IsNullOrWhiteSpace(report.StopReasonMessage))
+            {
+                <div class="notice @(report.Failed > 0 ? "error" : "warning")" role="status">
+                    <strong>Provider result@(string.IsNullOrWhiteSpace(report.StopReasonCode) ? string.Empty : $" ({report.StopReasonCode})")</strong>
+                    <p>@report.StopReasonMessage</p>
+                    @if (string.Equals(report.StopReasonCode, "10", StringComparison.Ordinal))
+                    {
+                        <p>
+                            GeoNames requires confirmed accounts to enable free web-service access separately.
+                            <a href="https://www.geonames.org/manageaccount" target="_blank" rel="noopener noreferrer">Open the GeoNames account page</a>,
+                            enable <strong>Free Web Services</strong>, then retry this batch.
+                        </p>
+                    }
+                </div>
+            }
         }
 
         <p class="field-help">
@@ -152,6 +172,7 @@
     private bool Loading { get; set; } = true;
     private bool Busy { get; set; }
     private string? Error { get; set; }
+    private string? Warning { get; set; }
     private string? Message { get; set; }
 
     private bool ValidBatchSize => BatchSize is >= 1 and <= 250;
@@ -204,6 +225,7 @@
 
         Busy = true;
         Error = null;
+        Warning = null;
         Message = null;
         try
         {
@@ -232,9 +254,20 @@
                 return;
             }
 
-            Message = refresh
-                ? $"GeoNames refresh finished: {LastReport.Assigned} automatic place assignment(s), {LastReport.Deferred} deferred, {LastReport.Failed} failed."
-                : $"GeoNames enrichment finished: {LastReport.Assigned} place assignment(s), {LastReport.CachedResults} cached result(s), {LastReport.Deferred} deferred, {LastReport.Failed} failed.";
+            if (LastReport.Failed > 0)
+            {
+                Error = $"GeoNames enrichment stopped with {LastReport.Failed} failed provider request(s). See Latest batch result for the reason.";
+            }
+            else if (LastReport.Deferred > 0)
+            {
+                Warning = $"GeoNames enrichment paused with {LastReport.Deferred} deferred request(s). See Latest batch result before retrying.";
+            }
+            else
+            {
+                Message = refresh
+                    ? $"GeoNames refresh finished: {LastReport.Assigned} automatic place assignment(s)."
+                    : $"GeoNames enrichment finished: {LastReport.Assigned} place assignment(s), {LastReport.CachedResults} cached result(s).";
+            }
         }
         catch (Exception exception)
         {
