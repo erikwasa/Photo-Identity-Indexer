@@ -62,8 +62,8 @@ Automated packaging smoke verification where possible plus human install/copy/st
   - The package entry point remains a Windows command file backed by the reviewed PowerShell launcher rather than duplicating startup/health behavior in a second launcher implementation.
 - Deferred work:
   - MSI/MSIX, code signing, auto-update and cross-platform desktop packaging remain outside M18.
-  - Final human M18 verification still needs a real Windows Explorer extract/double-click/side-by-side replacement pass against the maintained non-destructive catalogue configuration.
 - Commands run by CI/package verification:
   - `./Package-PhotoIdentity.ps1 -Configuration Release`
   - `./verify-package.ps1 -Configuration Release -Port 5083`
   - existing build/test/docs/review/launcher gates remain unchanged.
+- Maintainer Windows install/copy/start/upgrade verification completed on 2026-08-17; WI-0052 is accepted as complete.
