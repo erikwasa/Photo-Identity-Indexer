@@ -40,6 +40,8 @@ The hierarchy is conceptually country -> available administrative subdivision(s)
 
 Store provider identifiers and provenance needed to explain or safely refresh an automatically derived place, but use Photo Identity's canonical place path as the Smart Collection query value.
 
+Provider-derived administrative hierarchies can legitimately exceed the ordinary 80-character manual-tag path limit. First-class `Places/...` values therefore use a separate 500-character canonical hierarchy capacity while ordinary non-Places tag input remains capped at 80 characters.
+
 ## Implementation slices
 
 ### Slice 1 — provider, persistence and bounded enrichment foundation
@@ -58,7 +60,7 @@ Merged PR #160 established the non-UI enrichment path:
 
 ### Slice 2 — operator workflow, attribution and final M19 verification handoff
 
-Draft PR #161 on `agent/WI-0064-geonames-settings` adds the remaining operator-facing workflow:
+Merged PR #161 added the operator-facing workflow:
 
 - Settings reports configured/disabled provider state, service host, language and request pacing without returning the configured GeoNames username;
 - the maintainer can choose a bounded 1–250 candidate batch and explicitly run normal enrichment or force-refresh automatic places;
@@ -68,7 +70,18 @@ Draft PR #161 on `agent/WI-0064-geonames-settings` adds the remaining operator-f
 - GeoNames attribution is presented directly with the provider-derived place workflow;
 - endpoint coverage verifies username redaction, disabled-provider refusal and the server-side batch bound without live provider calls.
 
-The final live-provider sample is intentionally not automated. After Slice 2 merges, a maintainer-configured small GeoNames sample and the deferred WI-0061/WI-0062/WI-0063 browser checks form the consolidated M19 verification pass.
+### Live-provider corrective slice
+
+Maintainer verification on 2026-08-17 exposed three operator/runtime issues that are corrected in PR #165:
+
+- the first live request failed because the GeoNames account had not enabled **Free Web Services**; the provider error was persisted but the Settings report discarded its reason and incorrectly presented the failed run as successful completion;
+- after web-service access was enabled, GeoNames enrichment successfully assigned correct automatic Places and Smart Collection location filtering found the assigned photo;
+- three live revisions (`IMG_0181.HEIC`, `IMG_0185.HEIC`, `IMG_0184.HEIC`) failed with `invalid-place-path` because their valid provider-derived `Places/...` hierarchies exceeded the generic 80-character photo-tag path limit;
+- the first-class Places parser and persisted Places/reverse-geocode storage now allow canonical hierarchies up to 500 characters, while ordinary non-Places tag input remains limited to 80 characters;
+- the existing SQLite catalogue is widened idempotently at startup, preserving existing tag IDs, place actions, enrichment attempts and cache rows; failed attempts remain retryable and require no manual catalogue cleanup;
+- operator reporting now preserves sanitized per-photo provider outcomes with an **Open photo** link, and genuine provider `no result` outcomes are distinguished from failures and completed terminally so normal runs do not spend credits retrying the same coordinates.
+
+Final WI-0064 acceptance still requires rerunning the affected live samples after PR #165 is merged, then completing manual-place protection, non-GPS exclusion and the small force-refresh check.
 
 ## In scope
 
@@ -83,7 +96,7 @@ The final live-provider sample is intentionally not automated. After Slice 2 mer
 - Leave failed/deferred revisions eligible for retry rather than inventing a place.
 - Never replace a current manual place automatically. Manual corrections are authoritative until a maintainer explicitly chooses otherwise.
 - If an automatically derived result becomes more specific on a later explicit refresh, replace the previous automatic place using WI-0063's single-place semantics.
-- Add operator-visible reporting for candidates, successful assignments, cached/reused results, skipped manual places, deferred requests and failures.
+- Add operator-visible reporting for candidates, successful assignments, cached/reused results, skipped manual places, no-result outcomes, deferred requests and failures.
 - Add GeoNames attribution in the application/operator documentation where provider-derived place data is presented or described.
 - Provide a controlled way to refresh/re-run automatic place enrichment after GPS metadata or provider interpretation changes.
 
@@ -108,6 +121,7 @@ The operation does not send photo bytes, filenames, people, tags, source paths o
 - [x] GeoNames configuration is private/local, uses the secure service endpoint and does not rely on the public demo account.
 - [x] Reverse geocoding operates from persisted GPS coordinates and never opens or hydrates the original photo.
 - [x] A successful response is normalized into the WI-0063 canonical place hierarchy with country, available administrative levels and populated locality as available.
+- [x] Provider-derived first-class Places are not constrained by the ordinary 80-character manual-tag path limit; existing catalogues are widened without recreation.
 - [x] The operation is explicit, bounded and resumable, with rate limiting and retry-safe handling of provider/network failures.
 - [x] Completed results can be cached/reused without unnecessary repeated provider requests.
 - [x] Automatic enrichment never silently overwrites a manual place, including an explicit manual clear.
@@ -115,9 +129,9 @@ The operation does not send photo bytes, filenames, people, tags, source paths o
 - [x] Photos without GPS remain unassigned rather than receiving inferred or fabricated locations.
 - [x] Outbound requests contain coordinates/provider parameters only and do not disclose photo bytes, filenames, people, tags or private source paths.
 - [x] GeoNames attribution and external-GPS privacy behavior are documented and presented for the operator.
-- [x] Automated tests use a fake/stub GeoNames HTTP boundary and cover normalization, caching, retries, rate-limit/error handling, manual precedence and no-hydration behavior.
+- [x] Automated tests use a fake/stub GeoNames HTTP boundary and cover normalization, caching, retries, rate-limit/error handling, manual precedence, long provider hierarchies and no-hydration behavior.
 - [ ] A maintainer-configured live GeoNames sample and the consolidated M19 browser/operator pass are recorded as verification evidence.
 
 ## Verification requirements
 
-Automated provider-contract and catalogue tests must not depend on the live GeoNames service. Final local verification should use a configured maintainer GeoNames account against a small bounded sample of GPS-tagged photos and compare several resulting place paths with expected real-world locations. That live sample and the deferred WI-0061/WI-0062/WI-0063 browser checks are intentionally consolidated after Slice 2 so M19 is verified as one integrated operator workflow.
+Automated provider-contract and catalogue tests must not depend on the live GeoNames service. Final local verification should use a configured maintainer GeoNames account against a small bounded sample of GPS-tagged photos and compare several resulting place paths with expected real-world locations. That live sample and the deferred WI-0061/WI-0062/WI-0063 browser checks are intentionally consolidated after the corrective slice so M19 is verified as one integrated operator workflow.
