@@ -128,6 +128,67 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
         }
     }
 
+    [Fact]
+    public async Task Provider_place_hierarchy_longer_than_ordinary_tag_limit_is_persisted_and_assigned()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            AssetRevisionId revisionId = await CreateRevisionWithGpsAsync(database, directory);
+
+            TimeProvider clock = TimeProvider.System;
+            SqlitePhotoPlaceRepository places = new(database, clock);
+            PhotoPlaceEnrichmentService service = new(
+                new LongHierarchyGeocoder(),
+                new SqlitePhotoPlaceEnrichmentRepository(database, clock),
+                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+
+            Assert.True(LongHierarchyGeocoder.CanonicalPlace.Length > 80);
+            PhotoPlaceEnrichmentReport report = await service.ExecuteBatchAsync(limit: 5);
+
+            Assert.Equal(1, report.Candidates);
+            Assert.Equal(1, report.ProviderRequests);
+            Assert.Equal(1, report.Assigned);
+            Assert.Equal(0, report.Failed);
+            Assert.Equal(0, report.NoResult);
+
+            CataloguePhotoPlaceState state = await places.GetStateAsync(revisionId);
+            Assert.NotNull(state.Place);
+            Assert.Equal(LongHierarchyGeocoder.Place, state.Place.Value);
+            Assert.Equal("automatic", state.Place.SourceKind);
+
+            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT
+                    (SELECT length(display_name)
+                     FROM photo_tags
+                     WHERE normalized_name = $normalized_place),
+                    (SELECT length(place_value)
+                     FROM photo_place_reverse_geocode_cache
+                     WHERE provider = 'geonames'),
+                    (SELECT length(place_value)
+                     FROM photo_place_enrichment_attempts
+                     WHERE asset_revision_id = $revision_id
+                       AND provider = 'geonames');
+                """;
+            command.Parameters.AddWithValue("$normalized_place", LongHierarchyGeocoder.CanonicalPlace.ToLowerInvariant());
+            command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.True(reader.GetInt32(0) > 80);
+            Assert.True(reader.GetInt32(1) > 80);
+            Assert.True(reader.GetInt32(2) > 80);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
     private static async Task<AssetRevisionId> CreateRevisionWithGpsAsync(
         SqliteCatalogueDatabase database,
         string directory)
@@ -218,6 +279,28 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
                 ReverseGeocodeStatus.NoResult,
                 ErrorCode: "15",
                 ErrorMessage: "raw-provider-message: no result found"));
+        }
+    }
+
+    private sealed class LongHierarchyGeocoder : IReverseGeocoder
+    {
+        public const string Place =
+            "Sweden/Västernorrland County/Sundsvall Municipality/Njurunda District/Sundsvall";
+        public const string CanonicalPlace = "Places/" + Place;
+
+        public string ProviderName => "geonames";
+
+        public string ContractKey => "long-hierarchy-reporting-test-v1";
+
+        public Task<ReverseGeocodeResponse> ReverseGeocodeAsync(
+            ReverseGeocodeQuery query,
+            CancellationToken cancellationToken = default)
+        {
+            query.Validate();
+            return Task.FromResult(ReverseGeocodeResponse.Succeeded(new ReverseGeocodePlace(
+                PhotoPlacePath.Parse(Place),
+                ProviderResultId: "2670781",
+                CountryCode: "SE")));
         }
     }
 }
