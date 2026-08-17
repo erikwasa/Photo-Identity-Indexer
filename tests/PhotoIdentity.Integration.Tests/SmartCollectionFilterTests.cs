@@ -30,6 +30,16 @@ public sealed class SmartCollectionFilterTests
     }
 
     [Fact]
+    public void Legacy_places_tag_with_generic_any_match_is_rejected_to_avoid_semantic_change()
+    {
+        ArgumentException exception = Assert.Throws<ArgumentException>(() => new SmartCollectionFilter(
+            tags: ["Places/Sweden", "Trips/Family"],
+            tagMatch: SmartCollectionMatchModes.Any));
+
+        Assert.Contains("cannot losslessly migrate", exception.Message);
+    }
+
+    [Fact]
     public void Invalid_location_bounds_are_rejected()
     {
         Assert.Throws<ArgumentException>(() => new SmartCollectionGeoBounds(60, 20, 50, 30));
