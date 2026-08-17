@@ -10,6 +10,7 @@ public sealed record PhotoPlacePath
 {
     public const string RootDisplayName = "Places";
     public const string RootNormalizedName = "places";
+    public const int MaximumCanonicalValueLength = PhotoTagPath.MaximumReservedHierarchyValueLength;
 
     private PhotoPlacePath(PhotoTagPath canonicalTagPath)
     {
