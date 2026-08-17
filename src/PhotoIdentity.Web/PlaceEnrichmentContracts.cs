@@ -18,6 +18,8 @@ public sealed record PhotoPlaceEnrichmentReportResponse(
     int SkippedConflict,
     int Deferred,
     int Failed,
-    bool StoppedEarly);
+    bool StoppedEarly,
+    string? StopReasonCode = null,
+    string? StopReasonMessage = null);
 
 public sealed record PhotoPlaceEnrichmentErrorResponse(string Error);
