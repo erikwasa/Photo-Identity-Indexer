@@ -78,6 +78,10 @@ $launcherConfiguration = [ordered]@{
         PhotoIdentity__DatabasePath = $databasePath
         PhotoIdentity__ArchiveAnalysisOutputRoot = $analysisPath
         PhotoIdentity__ReviewProxyRoot = $reviewProxyPath
+        PhotoIdentity__GeoNames__Username = "launcher-verification"
+        PhotoIdentity__GeoNames__BaseUrl = "https://secure.geonames.org/"
+        PhotoIdentity__GeoNames__Language = "en"
+        PhotoIdentity__GeoNames__MinimumRequestIntervalMilliseconds = "11000"
         PhotoIdentity__RepositoryRoot = $repositoryRoot
     }
 }
