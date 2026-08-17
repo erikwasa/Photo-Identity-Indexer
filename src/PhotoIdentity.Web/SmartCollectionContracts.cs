@@ -13,6 +13,12 @@ public sealed record SmartCollectionLocationRequest(
     }
 }
 
+public static class SmartCollectionLocationFormattingExtensions
+{
+    public static string ToString(this double? value, IFormatProvider provider) =>
+        value?.ToString(provider) ?? string.Empty;
+}
+
 public sealed record SmartCollectionDefinitionRequest(
     string Name,
     string[]? People = null,
