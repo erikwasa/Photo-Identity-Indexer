@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 14;
+    public const int CurrentSchemaVersion = 15;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -712,6 +712,56 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 14;
         """;
 
+    private const string VersionFifteenMigration = """
+        CREATE TABLE IF NOT EXISTS photo_place_reverse_geocode_cache (
+            provider TEXT NOT NULL,
+            contract_key TEXT NOT NULL,
+            latitude REAL NOT NULL CHECK (latitude BETWEEN -90 AND 90),
+            longitude REAL NOT NULL CHECK (longitude BETWEEN -180 AND 180),
+            place_value TEXT NOT NULL,
+            provider_result_id TEXT NULL,
+            country_code TEXT NULL,
+            resolved_at_utc TEXT NOT NULL,
+            PRIMARY KEY (provider, contract_key, latitude, longitude),
+            CHECK (length(provider) BETWEEN 1 AND 80),
+            CHECK (length(contract_key) BETWEEN 1 AND 500),
+            CHECK (length(place_value) BETWEEN 1 AND 80)
+        );
+
+        CREATE TABLE IF NOT EXISTS photo_place_enrichment_attempts (
+            asset_revision_id TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            contract_key TEXT NOT NULL,
+            latitude REAL NOT NULL CHECK (latitude BETWEEN -90 AND 90),
+            longitude REAL NOT NULL CHECK (longitude BETWEEN -180 AND 180),
+            status TEXT NOT NULL CHECK (status IN ('succeeded', 'skipped', 'deferred', 'failed')),
+            attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+            place_value TEXT NULL,
+            provider_result_id TEXT NULL,
+            country_code TEXT NULL,
+            last_error_code TEXT NULL,
+            last_error_message TEXT NULL,
+            last_attempted_at_utc TEXT NOT NULL,
+            completed_at_utc TEXT NULL,
+            PRIMARY KEY (asset_revision_id, provider, contract_key),
+            FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+            CHECK (length(provider) BETWEEN 1 AND 80),
+            CHECK (length(contract_key) BETWEEN 1 AND 500),
+            CHECK (place_value IS NULL OR length(place_value) BETWEEN 1 AND 80),
+            CHECK ((status = 'succeeded' AND completed_at_utc IS NOT NULL AND place_value IS NOT NULL)
+                OR (status = 'skipped' AND completed_at_utc IS NOT NULL AND place_value IS NULL)
+                OR status IN ('deferred', 'failed'))
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_photo_place_enrichment_attempts_resume
+            ON photo_place_enrichment_attempts (
+                provider, contract_key, status, last_attempted_at_utc, asset_revision_id);
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (15, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 15;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -832,6 +882,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 14)
         {
             await ApplyMigrationAsync(connection, VersionFourteenMigration, cancellationToken);
+            version = 14;
+        }
+
+        if (version < 15)
+        {
+            await ApplyMigrationAsync(connection, VersionFifteenMigration, cancellationToken);
         }
     }
 
