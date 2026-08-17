@@ -60,6 +60,11 @@ public partial class Program
             builder.Configuration["PhotoIdentity:GeoNames:BaseUrl"],
             builder.Configuration["PhotoIdentity:GeoNames:Language"],
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:MinimumRequestIntervalMilliseconds")));
+        builder.Services.AddSingleton(new GeoNamesAutomaticEnrichmentConfiguration(
+            ParseOptionalBool(builder.Configuration, "PhotoIdentity:GeoNames:AutomaticEnrichmentEnabled"),
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:AutomaticMinimumRequestIntervalMilliseconds"),
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:AutomaticIdlePollIntervalMilliseconds")));
+        builder.Services.AddSingleton<PhotoPlaceEnrichmentWorkerState>();
         builder.Services.AddSingleton<SqliteReviewRepository>();
         builder.Services.AddSingleton<SqliteReviewFilterRepository>();
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
@@ -117,6 +122,7 @@ public partial class Program
         builder.Services.AddHttpClient("GeoNames");
         builder.Services.AddSingleton<IReverseGeocoder, GeoNamesReverseGeocoder>();
         builder.Services.AddSingleton<PhotoPlaceEnrichmentService>();
+        builder.Services.AddHostedService<PhotoPlaceEnrichmentHostedService>();
         builder.Services.AddHostedService<ArchiveAdvancementHostedService>();
         builder.Services.AddHostedService<IdentityMatchRegenerationHostedService>();
         builder.Services.AddSingleton(serviceProvider => new DetectorEvaluationSessionStore(
@@ -225,5 +231,21 @@ public partial class Program
         }
 
         throw new InvalidOperationException($"Configuration '{key}' must be an integer.");
+    }
+
+    private static bool? ParseOptionalBool(IConfiguration configuration, string key)
+    {
+        string? value = configuration[key];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (bool.TryParse(value, out bool parsed))
+        {
+            return parsed;
+        }
+
+        throw new InvalidOperationException($"Configuration '{key}' must be true or false.");
     }
 }
