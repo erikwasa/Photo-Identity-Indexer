@@ -90,7 +90,7 @@
                            step="1"
                            @bind="BatchSize"
                            disabled="@Busy" />
-                    <p>Runs are bounded to 1–250 persisted-GPS candidates. Deferred or failed attempts remain eligible for a later run.</p>
+                    <p>Runs are bounded to 1–250 persisted-GPS candidates. Deferred or failed attempts remain eligible for a later run; a genuine no-result is treated as completed for the current provider contract.</p>
                 </div>
             </div>
 
@@ -111,7 +111,7 @@
 
             <p class="field-help">
                 Normal runs reuse cached coordinate results and skip completed revisions. Force refresh bypasses the reverse-geocode cache for eligible automatic
-                results and can spend additional provider credits; manual places, explicit manual clears, and unresolved migration conflicts remain protected.
+                results and can spend additional provider credits; manual places, explicit manual clears, unresolved migration conflicts, and completed no-result attempts remain protected.
             </p>
         }
 
@@ -135,8 +135,8 @@
                     <p>Manual history and unresolved migration conflicts are never overwritten automatically.</p>
                 </div>
                 <div>
-                    <span class="field-label">Deferred / failed</span>
-                    <strong>@report.Deferred / @report.Failed</strong>
+                    <span class="field-label">No place / deferred / failed</span>
+                    <strong>@report.NoResult / @report.Deferred / @report.Failed</strong>
                     <p>@(report.StoppedEarly ? "The batch stopped after the provider response shown below." : "The bounded batch reached a normal stopping point.")</p>
                 </div>
             </div>
@@ -153,6 +153,21 @@
                             <a href="https://www.geonames.org/manageaccount" target="_blank" rel="noopener noreferrer">Open the GeoNames account page</a>,
                             enable <strong>Free Web Services</strong>, then retry this batch.
                         </p>
+                    }
+                </div>
+            }
+
+            @if (report.Issues is { Count: > 0 })
+            {
+                <h4>Photo-level provider results</h4>
+                <div class="review-filter-grid">
+                    @foreach (PhotoPlaceEnrichmentIssueResponse issue in report.Issues)
+                    {
+                        <div>
+                            <span class="field-label">@FormatOutcome(issue.Outcome)@(string.IsNullOrWhiteSpace(issue.ProviderCode) ? string.Empty : $" · code {issue.ProviderCode}")</span>
+                            <p>@issue.Message</p>
+                            <a class="button secondary" href="@($"/photo/{issue.RevisionId}?returnUrl=%2Fsettings")">Open photo</a>
+                        </div>
                     }
                 </div>
             }
@@ -256,11 +271,15 @@
 
             if (LastReport.Failed > 0)
             {
-                Error = $"GeoNames enrichment stopped with {LastReport.Failed} failed provider request(s). See Latest batch result for the reason.";
+                Error = $"GeoNames enrichment completed with {LastReport.Failed} failed provider request(s). See Photo-level provider results for details.";
             }
             else if (LastReport.Deferred > 0)
             {
-                Warning = $"GeoNames enrichment paused with {LastReport.Deferred} deferred request(s). See Latest batch result before retrying.";
+                Warning = $"GeoNames enrichment paused or completed with {LastReport.Deferred} deferred request(s). See Photo-level provider results before retrying.";
+            }
+            else if (LastReport.NoResult > 0)
+            {
+                Warning = $"GeoNames enrichment finished with {LastReport.Assigned} assignment(s) and {LastReport.NoResult} photo(s) where no nearby populated place was found.";
             }
             else
             {
@@ -278,6 +297,14 @@
             Busy = false;
         }
     }
+
+    private static string FormatOutcome(string outcome) => outcome switch
+    {
+        "no-result" => "No nearby populated place",
+        "deferred" => "Deferred",
+        "failed" => "Failed",
+        _ => outcome,
+    };
 
     private static string FormatInterval(int milliseconds) =>
         milliseconds == 0
