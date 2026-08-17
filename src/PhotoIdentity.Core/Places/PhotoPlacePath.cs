@@ -71,7 +71,8 @@ public sealed record PhotoPlacePath
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
         string trimmed = value.Trim();
-        string firstSegment = trimmed.Split(PhotoTagPath.Separator, 2, StringSplitOptions.None)[0];
+        int separatorIndex = trimmed.IndexOf(PhotoTagPath.Separator, StringComparison.Ordinal);
+        string firstSegment = separatorIndex < 0 ? trimmed : trimmed[..separatorIndex];
         bool alreadyCanonical = string.Equals(
             PhotoTagName.Parse(firstSegment).NormalizedName,
             RootNormalizedName,
