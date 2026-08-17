@@ -72,12 +72,14 @@ public sealed class PhotoPlaceEnrichmentService
             if (eligibility.BlockedByManual)
             {
                 skippedManual++;
+                await MarkSkippedAsync(candidate, "manual-place", "Manual place history takes precedence over automatic enrichment.", cancellationToken);
                 continue;
             }
 
             if (eligibility.BlockedByConflict)
             {
                 skippedConflict++;
+                await MarkSkippedAsync(candidate, "migration-conflict", "The legacy place conflict requires explicit maintainer resolution.", cancellationToken);
                 continue;
             }
 
@@ -164,12 +166,14 @@ public sealed class PhotoPlaceEnrichmentService
             if (write.BlockedByManual)
             {
                 skippedManual++;
+                await MarkSkippedAsync(candidate, "manual-place", "Manual place history took precedence before the automatic write.", cancellationToken);
                 continue;
             }
 
             if (write.BlockedByConflict)
             {
                 skippedConflict++;
+                await MarkSkippedAsync(candidate, "migration-conflict", "A legacy place conflict appeared before the automatic write.", cancellationToken);
                 continue;
             }
 
@@ -204,4 +208,17 @@ public sealed class PhotoPlaceEnrichmentService
             failed,
             stoppedEarly);
     }
+
+    private Task MarkSkippedAsync(
+        CataloguePlaceEnrichmentCandidate candidate,
+        string reasonCode,
+        string reasonMessage,
+        CancellationToken cancellationToken) =>
+        _enrichment.MarkSkippedAsync(
+            _geocoder.ProviderName,
+            _geocoder.ContractKey,
+            candidate,
+            reasonCode,
+            reasonMessage,
+            cancellationToken);
 }
