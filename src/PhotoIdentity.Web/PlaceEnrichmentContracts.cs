@@ -6,7 +6,13 @@ public sealed record PhotoPlaceEnrichmentStatusResponse(
     string ContractKey,
     string ServiceHost,
     string Language,
-    int MinimumRequestIntervalMilliseconds);
+    int MinimumRequestIntervalMilliseconds,
+    bool AutomaticEnrichmentEnabled,
+    int AutomaticMinimumRequestIntervalMilliseconds,
+    string AutomaticState,
+    string AutomaticMessage,
+    DateTimeOffset? LastAutomaticActivityAtUtc,
+    DateTimeOffset? NextAutomaticAttemptAtUtc);
 
 public sealed record PhotoPlaceEnrichmentIssueResponse(
     string RevisionId,
