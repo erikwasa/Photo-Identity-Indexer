@@ -20,7 +20,7 @@ public sealed class SmartCollectionNameConflictException : Exception
 /// </summary>
 public sealed class SqliteSmartCollectionRepository
 {
-    private const int FilterSchemaVersion = 1;
+    private const int FilterSchemaVersion = 2;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -215,7 +215,7 @@ public sealed class SqliteSmartCollectionRepository
     private static SmartCollectionDefinition ReadDefinition(SqliteDataReader reader)
     {
         int filterSchemaVersion = reader.GetInt32(2);
-        if (filterSchemaVersion != FilterSchemaVersion)
+        if (filterSchemaVersion is not 1 and not FilterSchemaVersion)
         {
             throw new InvalidDataException(
                 $"Smart collection filter schema version {filterSchemaVersion} is not supported.");
@@ -235,7 +235,8 @@ public sealed class SqliteSmartCollectionRepository
         filter.Tags.OrderBy(tag => tag, StringComparer.Ordinal),
         filter.TagMatch,
         filter.Location,
-        filter.Taken);
+        filter.Taken,
+        filter.LocationPlace);
 
     private static string SerializeFilter(SmartCollectionFilter filter)
     {
@@ -244,13 +245,14 @@ public sealed class SqliteSmartCollectionRepository
             filter.PeopleMatch,
             filter.Tags.ToArray(),
             filter.TagMatch,
-            filter.Location is null
+            filter.Location is null && filter.LocationPlace is null
                 ? null
                 : new PersistedLocation(
-                    filter.Location.South,
-                    filter.Location.West,
-                    filter.Location.North,
-                    filter.Location.East),
+                    filter.LocationPlace,
+                    filter.Location?.South,
+                    filter.Location?.West,
+                    filter.Location?.North,
+                    filter.Location?.East),
             filter.Taken is null
                 ? null
                 : new PersistedTaken(
@@ -264,23 +266,44 @@ public sealed class SqliteSmartCollectionRepository
         PersistedFilter payload = JsonSerializer.Deserialize<PersistedFilter>(json, JsonOptions)
             ?? throw new InvalidDataException("Smart collection filter JSON is empty.");
 
+        SmartCollectionGeoBounds? bounds = ParseBounds(payload.Location);
         return new SmartCollectionFilter(
             payload.People.Select(ParsePersonId),
             payload.PeopleMatch,
             payload.Tags,
             payload.TagMatch,
-            payload.Location is null
-                ? null
-                : new SmartCollectionGeoBounds(
-                    payload.Location.South,
-                    payload.Location.West,
-                    payload.Location.North,
-                    payload.Location.East),
+            bounds,
             payload.Taken is null
                 ? null
                 : new SmartCollectionDateRange(
                     ParseDate(payload.Taken.From),
-                    ParseDate(payload.Taken.To)));
+                    ParseDate(payload.Taken.To)),
+            payload.Location?.Place);
+    }
+
+    private static SmartCollectionGeoBounds? ParseBounds(PersistedLocation? location)
+    {
+        if (location is null)
+        {
+            return null;
+        }
+
+        bool any = location.South.HasValue || location.West.HasValue ||
+            location.North.HasValue || location.East.HasValue;
+        bool all = location.South.HasValue && location.West.HasValue &&
+            location.North.HasValue && location.East.HasValue;
+        if (any && !all)
+        {
+            throw new InvalidDataException("Stored Smart Collection GPS bounds are incomplete.");
+        }
+
+        return all
+            ? new SmartCollectionGeoBounds(
+                location.South!.Value,
+                location.West!.Value,
+                location.North!.Value,
+                location.East!.Value)
+            : null;
     }
 
     private static PhotoIdentity.Core.Identifiers.PersonId ParsePersonId(string value)
@@ -314,7 +337,7 @@ public sealed class SqliteSmartCollectionRepository
                 id TEXT NOT NULL PRIMARY KEY,
                 normalized_name TEXT NOT NULL UNIQUE,
                 display_name TEXT NOT NULL,
-                filter_schema_version INTEGER NOT NULL CHECK (filter_schema_version = 1),
+                filter_schema_version INTEGER NOT NULL CHECK (filter_schema_version IN (1, 2)),
                 filter_json TEXT NOT NULL,
                 created_at_utc TEXT NOT NULL,
                 updated_at_utc TEXT NOT NULL,
@@ -323,6 +346,9 @@ public sealed class SqliteSmartCollectionRepository
                 CHECK (length(filter_json) > 0));
             CREATE INDEX IF NOT EXISTS ix_smart_collections_name
                 ON smart_collections (normalized_name, id);
+            UPDATE smart_collections
+            SET filter_schema_version = 2
+            WHERE filter_schema_version = 1;
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
@@ -336,10 +362,11 @@ public sealed class SqliteSmartCollectionRepository
         PersistedTaken? Taken);
 
     private sealed record PersistedLocation(
-        double South,
-        double West,
-        double North,
-        double East);
+        string? Place = null,
+        double? South = null,
+        double? West = null,
+        double? North = null,
+        double? East = null);
 
     private sealed record PersistedTaken(
         string From,

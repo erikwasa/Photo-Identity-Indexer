@@ -21,11 +21,22 @@ public sealed class SmartCollectionFilterTests
     }
 
     [Fact]
-    public void Tag_values_are_normalized_as_hierarchical_full_values()
+    public void Legacy_places_tag_migrates_to_named_location_while_generic_tags_remain_separate()
     {
-        SmartCollectionFilter filter = new(tags: [" Places / Sweden / Stockholm "]);
+        SmartCollectionFilter filter = new(tags: [" Places / Sweden / Stockholm ", "Trips / Family"]);
 
-        Assert.Equal(["places/sweden/stockholm"], filter.Tags);
+        Assert.Equal(["trips/family"], filter.Tags);
+        Assert.Equal("places/sweden/stockholm", filter.LocationPlace);
+    }
+
+    [Fact]
+    public void Legacy_places_tag_with_generic_any_match_is_rejected_to_avoid_semantic_change()
+    {
+        ArgumentException exception = Assert.Throws<ArgumentException>(() => new SmartCollectionFilter(
+            tags: ["Places/Sweden", "Trips/Family"],
+            tagMatch: SmartCollectionMatchModes.Any));
+
+        Assert.Contains("cannot losslessly migrate", exception.Message);
     }
 
     [Fact]

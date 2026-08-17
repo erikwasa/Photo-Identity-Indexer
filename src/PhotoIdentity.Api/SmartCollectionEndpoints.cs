@@ -1,14 +1,17 @@
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Places;
+using PhotoIdentity.Core.Tags;
 using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
 public sealed record SmartCollectionLocationRequest(
-    double South,
-    double West,
-    double North,
-    double East);
+    double? South = null,
+    double? West = null,
+    double? North = null,
+    double? East = null,
+    string? Place = null);
 
 public sealed record SmartCollectionQueryRequest(
     string[]? People = null,
@@ -148,10 +151,19 @@ public static class SmartCollectionEndpoints
 
         try
         {
+            SmartCollectionDefinition? existing = await repository.GetAsync(collectionId, cancellationToken);
+            if (existing is null)
+            {
+                return Results.NotFound();
+            }
+
+            string? fallbackLocationPlace = request.Location?.Place is null
+                ? existing.Filter.LocationPlace
+                : null;
             SmartCollectionDefinition? definition = await repository.UpdateAsync(
                 collectionId,
                 request.Name,
-                ToFilter(request),
+                ToFilter(request, fallbackLocationPlace),
                 cancellationToken);
             return definition is null
                 ? Results.NotFound()
@@ -246,10 +258,13 @@ public static class SmartCollectionEndpoints
             request.Tags,
             request.TagMatch,
             request.Location,
-            request.Taken);
+            request.Taken,
+            fallbackLocationPlace: null);
     }
 
-    private static SmartCollectionFilter ToFilter(SmartCollectionDefinitionRequest request)
+    private static SmartCollectionFilter ToFilter(
+        SmartCollectionDefinitionRequest request,
+        string? fallbackLocationPlace = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         return ToFilter(
@@ -258,7 +273,8 @@ public static class SmartCollectionEndpoints
             request.Tags,
             request.TagMatch,
             request.Location,
-            request.Taken);
+            request.Taken,
+            fallbackLocationPlace);
     }
 
     private static SmartCollectionFilter ToFilter(
@@ -267,24 +283,24 @@ public static class SmartCollectionEndpoints
         string[]? tags,
         string? tagMatch,
         SmartCollectionLocationRequest? location,
-        string? taken)
+        string? taken,
+        string? fallbackLocationPlace)
     {
+        ValidateGenericTags(tags);
+
         PersonId[] parsedPeople = (people ?? [])
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(ParsePersonId)
             .Distinct()
             .ToArray();
 
-        SmartCollectionGeoBounds? parsedLocation = location is null
-            ? null
-            : new SmartCollectionGeoBounds(
-                location.South,
-                location.West,
-                location.North,
-                location.East);
+        SmartCollectionGeoBounds? parsedLocation = ParseBounds(location);
         SmartCollectionDateRange? parsedTaken = string.IsNullOrWhiteSpace(taken)
             ? null
             : SmartCollectionDateRange.Parse(taken);
+        string? locationPlace = location?.Place is null
+            ? fallbackLocationPlace
+            : location.Place;
 
         return new SmartCollectionFilter(
             parsedPeople,
@@ -292,7 +308,54 @@ public static class SmartCollectionEndpoints
             tags,
             tagMatch,
             parsedLocation,
-            parsedTaken);
+            parsedTaken,
+            locationPlace);
+    }
+
+    private static void ValidateGenericTags(string[]? tags)
+    {
+        foreach (string value in tags ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                continue;
+            }
+
+            PhotoTagPath path = PhotoTagPath.Parse(value);
+            if (PhotoPlacePath.IsReservedTagPath(path))
+            {
+                throw new ArgumentException(
+                    $"The reserved '{PhotoPlacePath.RootDisplayName}' hierarchy belongs to Location, not Tags.",
+                    nameof(tags));
+            }
+        }
+    }
+
+    private static SmartCollectionGeoBounds? ParseBounds(SmartCollectionLocationRequest? location)
+    {
+        if (location is null)
+        {
+            return null;
+        }
+
+        bool any = location.South.HasValue || location.West.HasValue ||
+            location.North.HasValue || location.East.HasValue;
+        bool all = location.South.HasValue && location.West.HasValue &&
+            location.North.HasValue && location.East.HasValue;
+        if (any && !all)
+        {
+            throw new ArgumentException(
+                "Location GPS bounds require south, west, north and east together.",
+                nameof(location));
+        }
+
+        return all
+            ? new SmartCollectionGeoBounds(
+                location.South!.Value,
+                location.West!.Value,
+                location.North!.Value,
+                location.East!.Value)
+            : null;
     }
 
     private static SmartCollectionDefinitionResponse ToDefinitionResponse(
@@ -331,13 +394,16 @@ public static class SmartCollectionEndpoints
         filter.PeopleMatch,
         filter.Tags.ToArray(),
         filter.TagMatch,
-        filter.Location is null
+        filter.Location is null && filter.LocationPlace is null
             ? null
             : new SmartCollectionLocationRequest(
-                filter.Location.South,
-                filter.Location.West,
-                filter.Location.North,
-                filter.Location.East),
+                filter.Location?.South,
+                filter.Location?.West,
+                filter.Location?.North,
+                filter.Location?.East,
+                filter.LocationPlace is null
+                    ? null
+                    : PhotoPlacePath.Parse(filter.LocationPlace).DisplayValue),
         filter.Taken is null
             ? null
             : new SmartCollectionDateRangeResponse(

@@ -27,7 +27,9 @@ public sealed record SmartCollectionPhotoPage(
 /// Evaluates reusable smart-collection filters against current immutable revisions.
 /// Populated dimensions combine with AND semantics; people and tags independently support all/any.
 /// The people dimension is the union of confirmed face evidence and active manual photo-level presence.
-/// Missing capture metadata cannot satisfy location or taken-date predicates.
+/// The Location dimension may combine one canonical named place with GPS bounds; named-place matching
+/// uses canonical hierarchy ancestry rather than global leaf-name matching.
+/// Missing capture metadata cannot satisfy GPS or taken-date predicates.
 /// </summary>
 public sealed class SqliteSmartCollectionQueryRepository
 {
@@ -101,6 +103,27 @@ public sealed class SqliteSmartCollectionQueryRepository
             INNER JOIN photo_tags ON photo_tags.id = latest_tag_action.tag_id
             WHERE latest_tag_action.row_number = 1
               AND latest_tag_action.action_kind = 'add'
+              AND photo_tags.normalized_name <> 'places'
+              AND photo_tags.normalized_name NOT LIKE 'places/%'
+        ),
+        latest_place_action AS (
+            SELECT
+                photo_place_actions.asset_revision_id,
+                photo_place_actions.tag_id,
+                photo_place_actions.action_kind,
+                ROW_NUMBER() OVER (
+                    PARTITION BY photo_place_actions.asset_revision_id
+                    ORDER BY photo_place_actions.id DESC) AS row_number
+            FROM photo_place_actions
+        ),
+        effective_revision_places AS (
+            SELECT
+                latest_place_action.asset_revision_id AS revision_id,
+                photo_tags.normalized_name AS normalized_value
+            FROM latest_place_action
+            INNER JOIN photo_tags ON photo_tags.id = latest_place_action.tag_id
+            WHERE latest_place_action.row_number = 1
+              AND latest_place_action.action_kind = 'set'
         )
         """;
 
@@ -128,6 +151,7 @@ public sealed class SqliteSmartCollectionQueryRepository
         string where = BuildWhere(filter);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await SqlitePhotoPersonSchema.EnsureAsync(connection, transaction: null, cancellationToken);
+        await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(connection, cancellationToken);
         await EnsurePhotoMetadataSchemaAsync(connection, cancellationToken);
 
         int total;
@@ -233,6 +257,22 @@ public sealed class SqliteSmartCollectionQueryRepository
                 """);
         }
 
+        if (filter.LocationPlace is not null)
+        {
+            predicates.Add("""
+                AND EXISTS (
+                    SELECT 1
+                    FROM effective_revision_places
+                    WHERE effective_revision_places.revision_id = asset_revisions.id
+                      AND (
+                          effective_revision_places.normalized_value = $location_place
+                          OR substr(
+                              effective_revision_places.normalized_value,
+                              1,
+                              length($location_place) + 1) = $location_place || '/'))
+                """);
+        }
+
         if (filter.Location is not null)
         {
             predicates.Add("AND photo_capture_metadata.latitude BETWEEN $south AND $north");
@@ -261,6 +301,11 @@ public sealed class SqliteSmartCollectionQueryRepository
             command.Parameters.AddWithValue($"$tag_{index}", filter.Tags[index]);
         }
         command.Parameters.AddWithValue("$tag_count", filter.Tags.Count);
+
+        if (filter.LocationPlace is not null)
+        {
+            command.Parameters.AddWithValue("$location_place", filter.LocationPlace);
+        }
 
         if (filter.Location is not null)
         {

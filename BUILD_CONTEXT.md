@@ -10,34 +10,37 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 WI-0061 and WI-0062 implementation are merged. Their local browser verification is intentionally deferred and will be performed together with WI-0063/WI-0064 in the consolidated M19 maintainer pass.
 
-Slice 1 is in draft PR #156 and establishes the first-class Places foundation:
+Slice 1 merged through PR #156 and established the first-class Places persistence/API foundation. Slice 2 is in draft PR #157 on `agent/WI-0063-smart-location` and adds Smart Collection Location semantics:
 
-- reserve `Places`/`Places/...` so ordinary tag routes reject and hide the namespace;
-- reuse canonical hierarchical `photo_tags` vocabulary while storing one effective revision-level place in append-only `photo_place_actions`;
-- expose dedicated place vocabulary/state/set/replace/clear APIs without the literal `Places/` prefix in normal values;
-- migrate coherent legacy Places chains to the deepest node while surfacing divergent paths in `photo_place_migration_conflicts`;
-- keep all place operations catalogue-only with no original access or hydration.
+- Location can contain one canonical named place and optional GPS bounds; both predicates must match when both are supplied;
+- named-place matching is exact canonical hierarchy ancestry, never global leaf-text matching;
+- new Smart Collection requests reject the reserved Places hierarchy in Tags, while one legacy saved Places tag can migrate into Location without silent loss;
+- saved-filter schema v2 preserves coordinate-only v1 JSON compatibility;
+- SQLite schema v14 formalizes the M19 lazy capture-metadata, smart-collection, manual-person and first-class-place tables and promotes existing saved definitions to filter schema v2;
+- focused integration tests cover ancestry, duplicate locality names, cross-dimension composition, API reservation and v13/v1 migration.
 
-The current `smart_collections` table hard-constrains filter schema version 1. The formal catalogue schema migration is therefore intentionally paired with the Smart Collection v2 table rebuild in Slice 2 rather than forcing two adjacent migrations.
+All place and Smart Collection operations remain catalogue-only and do not open or hydrate originals.
 
 ## Next concrete step
 
-1. Validate draft PR #156 build, integration tests, living documentation, review smoke and Windows verification in GitHub Actions.
-2. Merge Slice 1 after automated validation and code review.
-3. Implement WI-0063 Slice 2: Smart Collection named-place Location contract, exact ancestor matching, Places exclusion from generic Smart tags, saved-filter v1→v2 migration and formal M19 schema migration.
-4. Implement Slice 3: Photo Details place editor and Smart Collection hierarchical place UI.
-5. Implement WI-0064 GeoNames enrichment, then perform the consolidated M19 browser/operator verification.
+1. Validate draft PR #157 build, integration tests, living documentation, review smoke and Windows verification in GitHub Actions.
+2. Merge Slice 2 after automated validation and code review.
+3. Implement WI-0063 Slice 3: Photo Details place editor and Smart Collection hierarchical place UI while preserving WI-0061 navigation state.
+4. Implement WI-0064 GeoNames enrichment.
+5. Perform the consolidated M19 browser/operator verification and close the remaining in-review work items as appropriate.
 
 ## Relevant files
 
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/work-items/WI-0063-first-class-places.md`
+- `src/PhotoIdentity.Core/Collections/SmartCollectionFilter.cs`
 - `src/PhotoIdentity.Core/Places/PhotoPlacePath.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoPlaceSchema.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoPlaceRepository.cs`
-- `src/PhotoIdentity.Api/PhotoPlaceEndpoints.cs`
-- `src/PhotoIdentity.Api/PhotoTagEndpoints.cs`
-- `tests/PhotoIdentity.Integration.Tests/PhotoPlaceFoundationApplicationTests.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteCatalogueDatabase.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionRepository.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionQueryRepository.cs`
+- `src/PhotoIdentity.Api/SmartCollectionEndpoints.cs`
+- `src/PhotoIdentity.Web/SmartCollectionContracts.cs`
+- `tests/PhotoIdentity.Integration.Tests/SmartCollectionPlaceLocationTests.cs`
 
 ## Repository validation
 

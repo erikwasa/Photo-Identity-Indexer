@@ -1,10 +1,11 @@
 namespace PhotoIdentity.Web.Contracts;
 
 public sealed record SmartCollectionLocationRequest(
-    double South,
-    double West,
-    double North,
-    double East);
+    double? South = null,
+    double? West = null,
+    double? North = null,
+    double? East = null,
+    string? Place = null);
 
 public sealed record SmartCollectionDefinitionRequest(
     string Name,

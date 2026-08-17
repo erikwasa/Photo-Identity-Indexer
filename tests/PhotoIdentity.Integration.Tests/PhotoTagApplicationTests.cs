@@ -176,7 +176,7 @@ public sealed class PhotoTagApplicationTests
     }
 
     [Fact]
-    public async Task Schema_version_thirteen_migrates_a_version_twelve_catalogue_to_manual_tag_tables()
+    public async Task Schema_version_thirteen_migration_is_preserved_when_upgrading_to_current_schema()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -191,7 +191,7 @@ public sealed class PhotoTagApplicationTests
                 rewind.CommandText = """
                     DROP TABLE photo_tag_actions;
                     DROP TABLE photo_tags;
-                    DELETE FROM schema_migrations WHERE version = 13;
+                    DELETE FROM schema_migrations WHERE version >= 13;
                     PRAGMA user_version = 12;
                     """;
                 await rewind.ExecuteNonQueryAsync();
@@ -200,10 +200,13 @@ public sealed class PhotoTagApplicationTests
             await database.InitializeAsync();
 
             await using SqliteConnection verify = await database.OpenConnectionAsync();
-            Assert.Equal(13, await ReadCountAsync(verify, "PRAGMA user_version;"));
+            Assert.Equal(SqliteCatalogueDatabase.CurrentSchemaVersion, await ReadCountAsync(verify, "PRAGMA user_version;"));
             Assert.Equal(1, await ReadCountAsync(
                 verify,
                 "SELECT COUNT(*) FROM schema_migrations WHERE version = 13;"));
+            Assert.Equal(1, await ReadCountAsync(
+                verify,
+                "SELECT COUNT(*) FROM schema_migrations WHERE version = 14;"));
             Assert.Equal(1, await ReadCountAsync(
                 verify,
                 "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'photo_tags';"));
