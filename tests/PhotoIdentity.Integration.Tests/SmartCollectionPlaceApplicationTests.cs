@@ -62,6 +62,9 @@ public sealed class SmartCollectionPlaceApplicationTests
             SqlitePhotoPlaceRepository places = new(database, TimeProvider.System);
             await places.SetManualPlaceAsync(inside, "Sweden/Stockholm", "test");
             await places.SetManualPlaceAsync(outside, "Sweden/Stockholm", "test");
+            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
+            await tags.AddManualTagAsync(inside, "Family", "test");
+            await tags.AddManualTagAsync(outside, "Family", "test");
             await SetCoordinatesAsync(database, inside, 59.33, 18.07);
             await SetCoordinatesAsync(database, outside, 65.58, 22.15);
 
@@ -133,7 +136,7 @@ public sealed class SmartCollectionPlaceApplicationTests
 
             await using SqliteConnection verify = await database.OpenConnectionAsync();
             using SqliteCommand versions = verify.CreateCommand();
-            versions.CommandText = "SELECT GROUP_CONCAT(filter_schema_version, ',') FROM smart_collections ORDER BY normalized_name;";
+            versions.CommandText = "SELECT GROUP_CONCAT(filter_schema_version, ',') FROM smart_collections;";
             string stored = Assert.IsType<string>(await versions.ExecuteScalarAsync());
             Assert.Contains('1', stored);
             Assert.Contains('2', stored);
@@ -147,7 +150,8 @@ public sealed class SmartCollectionPlaceApplicationTests
     private static async Task<AssetRevisionId> CreateRevisionAsync(SqliteCatalogueDatabase database, string sourceRoot, string sourceKey, char hashCharacter)
     {
         DateTimeOffset now = new(2026, 8, 17, 0, 0, 0, TimeSpan.Zero);
-        CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
+        string uniqueSourceRoot = Path.Combine(sourceRoot, $"source-{sourceKey}");
+        CatalogueSource source = new(SourceId.New(), "local-folder", uniqueSourceRoot, now);
         CatalogueAsset asset = new(AssetId.New(), source.Id, sourceKey, now);
         CatalogueAssetRevision revision = new(
             AssetRevisionId.New(), asset.Id, new Sha256Digest(new string(hashCharacter, 64)), 123,
