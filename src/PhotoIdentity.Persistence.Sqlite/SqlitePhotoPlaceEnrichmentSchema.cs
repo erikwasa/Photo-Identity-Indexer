@@ -45,7 +45,7 @@ public static class SqlitePhotoPlaceEnrichmentSchema
                 contract_key TEXT NOT NULL,
                 latitude REAL NOT NULL CHECK (latitude BETWEEN -90 AND 90),
                 longitude REAL NOT NULL CHECK (longitude BETWEEN -180 AND 180),
-                status TEXT NOT NULL CHECK (status IN ('succeeded', 'deferred', 'failed')),
+                status TEXT NOT NULL CHECK (status IN ('succeeded', 'skipped', 'deferred', 'failed')),
                 attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
                 place_value TEXT NULL,
                 provider_result_id TEXT NULL,
@@ -60,6 +60,7 @@ public static class SqlitePhotoPlaceEnrichmentSchema
                 CHECK (length(contract_key) BETWEEN 1 AND 500),
                 CHECK (place_value IS NULL OR length(place_value) BETWEEN 1 AND 80),
                 CHECK ((status = 'succeeded' AND completed_at_utc IS NOT NULL AND place_value IS NOT NULL)
+                    OR (status = 'skipped' AND completed_at_utc IS NOT NULL AND place_value IS NULL)
                     OR status IN ('deferred', 'failed'))
             );
 
