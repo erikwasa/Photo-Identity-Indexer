@@ -21,8 +21,8 @@
         @if (State?.MigrationConflict is PhotoPlaceMigrationConflictResponse conflict)
         {
             <div class="notice photo-place-conflict" role="status">
-                <strong>Legacy place needs review.</strong>
-                <p>More than one unrelated Places path was active. Choose or enter the correct place below; saving it resolves this conflict.</p>
+                <strong>Legacy location needs review.</strong>
+                <p>More than one unrelated location path was active. Choose or enter the correct place below; saving it resolves this conflict.</p>
                 <ul>
                     @foreach (string candidate in conflict.CandidateValues)
                     {
@@ -58,7 +58,7 @@
                    @bind="SelectedValue"
                    @bind:event="oninput" />
         </label>
-        <small class="photo-place-help">Use the hierarchy without the reserved <code>Places/</code> prefix. Entering a new path creates the reusable place vocabulary when you save.</small>
+        <small class="photo-place-help">Enter the hierarchy starting with the country. A new path becomes reusable place vocabulary when you save it.</small>
 
         <div class="photo-place-actions">
             <button type="button"
