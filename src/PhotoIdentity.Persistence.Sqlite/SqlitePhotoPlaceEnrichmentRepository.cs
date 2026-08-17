@@ -57,11 +57,10 @@ public sealed class SqlitePhotoPlaceEnrichmentRepository
             WHERE metadata.latitude IS NOT NULL
               AND metadata.longitude IS NOT NULL
               AND (
-                    $refresh = 1
-                    OR attempt.asset_revision_id IS NULL
-                    OR attempt.status <> 'succeeded'
+                    attempt.asset_revision_id IS NULL
                     OR attempt.latitude <> metadata.latitude
-                    OR attempt.longitude <> metadata.longitude)
+                    OR attempt.longitude <> metadata.longitude
+                    OR (attempt.status <> 'skipped' AND ($refresh = 1 OR attempt.status <> 'succeeded')))
             ORDER BY
                 CASE WHEN attempt.asset_revision_id IS NULL THEN 0 ELSE 1 END,
                 attempt.last_attempted_at_utc,
@@ -175,6 +174,26 @@ public sealed class SqlitePhotoPlaceEnrichmentRepository
             countryCode,
             errorCode: null,
             errorMessage: null,
+            completed: true,
+            cancellationToken);
+
+    public Task MarkSkippedAsync(
+        string provider,
+        string contractKey,
+        CataloguePlaceEnrichmentCandidate candidate,
+        string reasonCode,
+        string reasonMessage,
+        CancellationToken cancellationToken = default) =>
+        UpsertAttemptAsync(
+            provider,
+            contractKey,
+            candidate,
+            "skipped",
+            placeValue: null,
+            providerResultId: null,
+            countryCode: null,
+            reasonCode,
+            reasonMessage,
             completed: true,
             cancellationToken);
 
