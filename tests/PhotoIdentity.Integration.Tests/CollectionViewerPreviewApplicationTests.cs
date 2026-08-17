@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -106,6 +107,60 @@ public sealed class CollectionViewerPreviewApplicationTests
             Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
             Assert.Equal(PngBytes, await response.Content.ReadAsByteArrayAsync());
             Assert.Equal(0, platform.HydrationRequests);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Local_verified_browser_unsupported_original_uses_proxy_without_hydration()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            AssetRevisionId revisionId = await CreateRevisionAsync(
+                databasePath,
+                directory,
+                PngBytes,
+                mediaType: "image/heic",
+                fileName: "photo.heic");
+            await CreateProxyAsync(databasePath, directory, revisionId, ProxyBytes);
+            FakeFilesOnDemandPlatform platform = new(
+                new OneDriveFilesOnDemandState(AssetAvailability.Local, false, false));
+
+            await using ViewerApiFactory factory = new(databasePath, directory, platform);
+            using HttpClient client = factory.CreateClient();
+
+            using (HttpResponseMessage status = await client.GetAsync(
+                       $"/api/collections/photos/{revisionId}/original/status"))
+            {
+                status.EnsureSuccessStatusCode();
+                using JsonDocument payload = JsonDocument.Parse(await status.Content.ReadAsStringAsync());
+                Assert.Equal("ready", payload.RootElement.GetProperty("state").GetString());
+                Assert.False(payload.RootElement.GetProperty("canView").GetBoolean());
+            }
+
+            using (HttpResponseMessage preview = await client.GetAsync(
+                       $"/api/collections/photos/{revisionId}/viewer-preview"))
+            {
+                preview.EnsureSuccessStatusCode();
+                Assert.Equal("image/jpeg", preview.Content.Headers.ContentType?.MediaType);
+                Assert.Equal(ProxyBytes, await preview.Content.ReadAsByteArrayAsync());
+            }
+
+            using (HttpResponseMessage proxy = await client.GetAsync(
+                       $"/api/collections/photos/{revisionId}/viewer-proxy"))
+            {
+                proxy.EnsureSuccessStatusCode();
+                Assert.Equal("image/jpeg", proxy.Content.Headers.ContentType?.MediaType);
+                Assert.Equal(ProxyBytes, await proxy.Content.ReadAsByteArrayAsync());
+            }
+
+            Assert.Equal(0, platform.HydrationRequests);
+            Assert.Equal("local", await ReadAvailabilityAsync(databasePath, revisionId));
         }
         finally
         {
@@ -228,24 +283,26 @@ public sealed class CollectionViewerPreviewApplicationTests
     private static async Task<AssetRevisionId> CreateRevisionAsync(
         string databasePath,
         string sourceRoot,
-        byte[] content)
+        byte[] content,
+        string mediaType = "image/png",
+        string fileName = "photo.png")
     {
         string relativeDirectory = Path.Combine(sourceRoot, "family");
         Directory.CreateDirectory(relativeDirectory);
-        await File.WriteAllBytesAsync(Path.Combine(relativeDirectory, "photo.png"), content);
+        await File.WriteAllBytesAsync(Path.Combine(relativeDirectory, fileName), content);
 
         SqliteCatalogueDatabase database = new(databasePath);
         await database.InitializeAsync();
         DateTimeOffset now = new(2026, 8, 10, 20, 0, 0, TimeSpan.Zero);
         CatalogueSource source = new(SourceId.New(), "local-folder", sourceRoot, now);
-        CatalogueAsset asset = new(AssetId.New(), source.Id, "family/photo.png", now);
+        CatalogueAsset asset = new(AssetId.New(), source.Id, $"family/{fileName}", now);
         CatalogueAssetRevision revision = new(
             AssetRevisionId.New(),
             asset.Id,
             new Sha256Digest(Convert.ToHexString(SHA256.HashData(content)).ToLowerInvariant()),
             content.LongLength,
             now,
-            "image/png",
+            mediaType,
             10,
             8);
         return (await new SqliteAssetCatalogueRepository(database).SaveRevisionAsync(
