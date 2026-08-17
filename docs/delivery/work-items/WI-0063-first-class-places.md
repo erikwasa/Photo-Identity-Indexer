@@ -45,10 +45,10 @@ Draft PR #157 on `agent/WI-0063-smart-location` implements the non-UI Smart Coll
 - named places normalize to their full internal `places/...` path while API responses omit the literal `Places/` prefix.
 - named-place matching uses exact canonical ancestry (`assigned = selected` or the assigned path begins with `selected + '/'`) implemented without SQL wildcard matching.
 - the Places subtree is excluded from generic Smart Collection tag predicates and new API requests reject Places values in Tags.
-- a legacy saved definition containing one Places tag migrates that criterion into Location on read, preserving existing saved-filter intent rather than silently dropping it.
+- a representable legacy saved definition containing one Places tag migrates that criterion into Location on read; legacy `tagMatch: any` filters that mix a Places tag with generic tags are rejected because converting them to separate Location and Tags dimensions would silently change OR semantics to AND.
 - SQLite schema v14 formalizes the M19 lazy `photo_capture_metadata`, `smart_collections`, `photo_person_actions`, `photo_place_actions` and place-conflict structures.
 - schema v14 rebuilds `smart_collections` with filter schema v2 and promotes v1 rows without rewriting their compatible JSON payloads.
-- automated coverage combines named place + GPS + people + generic tags + taken date and verifies hierarchy ancestry, duplicate locality names, API reservation and a simulated v13/v1 migration.
+- automated coverage combines named place + GPS + people + generic tags + taken date and verifies hierarchy ancestry, duplicate locality names, API reservation, lossless legacy-filter handling and a simulated v13/v1 migration.
 
 ### Slice 3 — Photo Details and Smart Collection UI
 
@@ -99,7 +99,7 @@ while storing the canonical internal value `Places/Sweden/Stockholm region/Norrt
 - Existing divergent active Places paths for one revision must be surfaced as a migration/review conflict so data is not silently discarded.
 - Existing non-Places tags remain unchanged.
 - Existing v1 saved Smart Collections keep their GPS bounds, people, tags and taken-time criteria when promoted to filter schema v2.
-- A legacy saved definition with one Places tag migrates that tag into the named-place Location criterion; ambiguous multi-place saved filters are rejected rather than silently collapsed.
+- A legacy saved definition with one Places tag migrates that tag into the named-place Location criterion when its boolean semantics are representable in v2; ambiguous multi-place filters and `tagMatch: any` filters that mix Places with generic tags are rejected rather than silently collapsed or changed.
 
 ## Out of scope
 
@@ -119,7 +119,7 @@ while storing the canonical internal value `Places/Sweden/Stockholm region/Norrt
 - [ ] Smart Collections expose named-place filtering in the Location dimension. Persistence/query/API complete in Slice 2; hierarchical browser selector remains Slice 3.
 - [x] Selecting an ancestor such as Sweden matches all descendant place assignments, while selecting Norrtälje resolves its full canonical hierarchy rather than matching unrelated leaf names.
 - [x] Named-place and GPS criteria can be combined safely with people, generic tags and taken time.
-- [x] Existing coherent Places assignments and saved definitions migrate without loss; divergent legacy assignments are surfaced for review. Slice 1 covers photo-assignment migration/conflicts and Slice 2 covers saved-filter v1→v2 migration.
+- [x] Existing coherent Places assignments and representable saved definitions migrate without loss; divergent or non-representable legacy cases are surfaced/rejected rather than silently changing semantics. Slice 1 covers photo-assignment migration/conflicts and Slice 2 covers saved-filter v1→v2 migration.
 - [x] Place edits remain metadata-only and do not hydrate or modify originals.
 - [x] Automated tests cover reserved namespace enforcement, single-place replacement, ancestor matching, migration and Smart Collection persistence/query behavior. Browser/operator verification remains deferred.
 
