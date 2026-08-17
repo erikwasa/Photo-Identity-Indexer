@@ -6,41 +6,43 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0063 — Make Places a first-class location hierarchy** is the active M19 implementation item.
+**WI-0064 — Add GeoNames reverse-geocoded Places enrichment** is the active M19 implementation item.
 
-WI-0061 and WI-0062 implementation are merged. Their local browser verification is intentionally deferred and will be performed together with WI-0063/WI-0064 in the consolidated M19 maintainer pass.
+WI-0061, WI-0062 and WI-0063 implementation are merged. Their remaining local browser/operator verification is intentionally deferred to the consolidated M19 pass after the GeoNames operator workflow is complete.
 
-Slice 1 merged through PR #156 and established the first-class Places persistence/API foundation. Slice 2 is in draft PR #157 on `agent/WI-0063-smart-location` and adds Smart Collection Location semantics:
+Slice 1 is draft PR #160 on `agent/WI-0064-geonames-foundation` and establishes the non-UI reverse-geocoding foundation:
 
-- Location can contain one canonical named place and optional GPS bounds; both predicates must match when both are supplied;
-- named-place matching is exact canonical hierarchy ancestry, never global leaf-text matching;
-- new Smart Collection requests reject the reserved Places hierarchy in Tags, while one legacy saved Places tag can migrate into Location without silent loss;
-- saved-filter schema v2 preserves coordinate-only v1 JSON compatibility;
-- SQLite schema v14 formalizes the M19 lazy capture-metadata, smart-collection, manual-person and first-class-place tables and promotes existing saved definitions to filter schema v2;
-- focused integration tests cover ancestry, duplicate locality names, cross-dimension composition, API reservation and v13/v1 migration.
-
-All place and Smart Collection operations remain catalogue-only and do not open or hydrate originals.
+- a provider-neutral reverse-geocoder contract and secure GeoNames `findNearbyPlaceNameJSON` implementation;
+- private startup configuration with the public `demo` account and non-HTTPS provider URLs rejected;
+- persisted-GPS-only candidate selection: enrichment does not open, hash or hydrate source photos;
+- schema v15 cache and per-revision attempt state for bounded/resumable processing;
+- cache reuse for identical coordinate/provider-contract inputs and explicit refresh for later automatic reinterpretation;
+- automatic place writes respect any latest manual set or manual clear and unresolved WI-0063 migration conflicts;
+- quota/transient provider states defer cleanly and remain retryable;
+- explicit API status/batch endpoints with counts and no username exposure;
+- fake HTTP/provider integration coverage; automated tests never call the live GeoNames service.
 
 ## Next concrete step
 
-1. Validate draft PR #157 build, integration tests, living documentation, review smoke and Windows verification in GitHub Actions.
-2. Merge Slice 2 after automated validation and code review.
-3. Implement WI-0063 Slice 3: Photo Details place editor and Smart Collection hierarchical place UI while preserving WI-0061 navigation state.
-4. Implement WI-0064 GeoNames enrichment.
-5. Perform the consolidated M19 browser/operator verification and close the remaining in-review work items as appropriate.
+1. Validate PR #160 build, provider/integration tests, schema migration, living documentation, review smoke and Windows verification in GitHub Actions.
+2. Merge Slice 1 after automated validation and code review.
+3. Implement WI-0064 Slice 2: Settings/operator execution and refresh controls, external-GPS privacy disclosure and GeoNames attribution.
+4. Run a small maintainer-configured live GeoNames sample plus the deferred WI-0061/WI-0062/WI-0063 browser checks as one consolidated M19 verification pass.
+5. Close the M19 work items whose maintainer verification succeeds.
 
 ## Relevant files
 
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/work-items/WI-0063-first-class-places.md`
-- `src/PhotoIdentity.Core/Collections/SmartCollectionFilter.cs`
-- `src/PhotoIdentity.Core/Places/PhotoPlacePath.cs`
+- `docs/delivery/work-items/WI-0064-geonames-place-enrichment.md`
+- `src/PhotoIdentity.Core/Places/ReverseGeocoding.cs`
 - `src/PhotoIdentity.Persistence.Sqlite/SqliteCatalogueDatabase.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionRepository.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionQueryRepository.cs`
-- `src/PhotoIdentity.Api/SmartCollectionEndpoints.cs`
-- `src/PhotoIdentity.Web/SmartCollectionContracts.cs`
-- `tests/PhotoIdentity.Integration.Tests/SmartCollectionPlaceLocationTests.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoPlaceEnrichmentRepository.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteAutomaticPhotoPlaceRepository.cs`
+- `src/PhotoIdentity.Api/GeoNamesReverseGeocoder.cs`
+- `src/PhotoIdentity.Api/PhotoPlaceEnrichmentService.cs`
+- `src/PhotoIdentity.Api/PhotoPlaceEnrichmentEndpoints.cs`
+- `tests/PhotoIdentity.Integration.Tests/GeoNamesReverseGeocoderTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/PhotoPlaceEnrichmentTests.cs`
 
 ## Repository validation
 
