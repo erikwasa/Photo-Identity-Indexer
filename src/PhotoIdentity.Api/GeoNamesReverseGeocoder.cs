@@ -59,7 +59,7 @@ public sealed record GeoNamesReverseGeocodingConfiguration
     public bool IsConfigured => !string.IsNullOrWhiteSpace(Username);
 
     public string ContractKey =>
-        $"findNearbyPlaceName-v1|{BaseUri.GetLeftPart(UriPartial.Authority).ToLowerInvariant()}|lang={Language.ToLowerInvariant()}|localCountry=true|style=FULL|maxRows=1";
+        $"findNearbyPlaceName-v1|{BaseUri.AbsoluteUri.ToLowerInvariant()}|lang={Language.ToLowerInvariant()}|localCountry=true|style=FULL|maxRows=1";
 }
 
 public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
