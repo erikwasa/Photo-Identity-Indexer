@@ -41,7 +41,8 @@
             <p class="photo-place-empty">No place is assigned to this photo.</p>
         }
 
-        <PlacePicker Label="Choose existing place"
+        <PlacePicker @key="State?.Place?.Id"
+                     Label="Choose existing place"
                      EmptyLabel="No existing place selected"
                      Value="@SelectedValue"
                      ValueChanged="SetSelectedValue"
