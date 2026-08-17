@@ -334,6 +334,7 @@ public sealed class CollectionOriginalAccessService
             managed,
             () => VerifyContentAsync(resolved, cancellationToken),
             cancellationToken);
+        bool browserRenderable = BrowserImageContentTypes.CanRender(resolved.Revision.MediaType);
         return matches
             ? Snapshot(
                 resolved.Revision.RevisionId,
@@ -341,11 +342,13 @@ public sealed class CollectionOriginalAccessService
                 managed,
                 isPinned,
                 canHydrate: false,
-                canView: true,
+                canView: browserRenderable,
                 canRelease: managed,
-                managed
-                    ? "The original is local, revision-verified and owned by Photo Identity."
-                    : "The original is local and revision-verified. Photo Identity will not release it automatically.")
+                browserRenderable
+                    ? managed
+                        ? "The original is local, revision-verified and owned by Photo Identity."
+                        : "The original is local and revision-verified. Photo Identity will not release it automatically."
+                    : "The original is local and revision-verified, but its format is not directly browser-renderable. The photo viewer will use the durable review proxy when available." )
             : Snapshot(
                 resolved.Revision.RevisionId,
                 HashMismatchState,
