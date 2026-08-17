@@ -7,7 +7,7 @@
     <div>
         <p class="eyebrow">Operator settings</p>
         <h1>Settings</h1>
-        <p>Manage permanent archive coverage, inspect bounded archive storage policy, and configure the confidence policy used for future identity matching runs.</p>
+        <p>Manage permanent archive coverage, inspect bounded archive storage policy, run location enrichment, and configure the confidence policy used for future identity matching runs.</p>
     </div>
     <button class="button secondary" disabled="@Busy" @onclick="RefreshAsync">Refresh</button>
 </section>
@@ -188,6 +188,8 @@ else
             </p>
         }
     </section>
+
+    <GeoNamesPlaceEnrichmentSettings />
 
     <section class="review-filter-panel" aria-labelledby="matching-settings-heading">
         <div class="section-heading">
