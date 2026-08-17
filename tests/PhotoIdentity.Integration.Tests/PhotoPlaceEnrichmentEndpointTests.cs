@@ -31,6 +31,10 @@ public sealed class PhotoPlaceEnrichmentEndpointTests
             Assert.True(status.Configured);
             Assert.Equal("geonames", status.Provider);
             Assert.Equal("secure.geonames.org", status.ServiceHost);
+            Assert.False(status.AutomaticEnrichmentEnabled);
+            Assert.Equal(
+                GeoNamesAutomaticEnrichmentConfiguration.SafeMinimumRequestIntervalMilliseconds,
+                status.AutomaticMinimumRequestIntervalMilliseconds);
             Assert.DoesNotContain(username, payload, StringComparison.OrdinalIgnoreCase);
         }
         finally
@@ -123,6 +127,7 @@ public sealed class PhotoPlaceEnrichmentEndpointTests
             builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
             builder.UseSetting("PhotoIdentity:GeoNames:Username", _username ?? string.Empty);
             builder.UseSetting("PhotoIdentity:GeoNames:MinimumRequestIntervalMilliseconds", "0");
+            builder.UseSetting("PhotoIdentity:GeoNames:AutomaticEnrichmentEnabled", "false");
         }
     }
 }
