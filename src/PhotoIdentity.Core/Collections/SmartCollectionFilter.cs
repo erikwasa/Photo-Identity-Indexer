@@ -12,16 +12,12 @@ public static class SmartCollectionMatchModes
 
     public static string Normalize(string? value, string parameterName)
     {
-        string normalized = string.IsNullOrWhiteSpace(value)
-            ? All
-            : value.Trim().ToLowerInvariant();
+        string normalized = string.IsNullOrWhiteSpace(value) ? All : value.Trim().ToLowerInvariant();
         return normalized switch
         {
             Any => Any,
             All => All,
-            _ => throw new ArgumentException(
-                $"Unsupported match mode '{value}'. Use 'any' or 'all'.",
-                parameterName),
+            _ => throw new ArgumentException($"Unsupported match mode '{value}'. Use 'any' or 'all'.", parameterName),
         };
     }
 }
@@ -38,7 +34,6 @@ public sealed record SmartCollectionGeoBounds
         if (west > east) throw new ArgumentException("West longitude cannot be greater than east longitude in the initial bounds model.");
         South = south; West = west; North = north; East = east;
     }
-
     public double South { get; }
     public double West { get; }
     public double North { get; }
@@ -49,12 +44,9 @@ public sealed record SmartCollectionLocation
 {
     public SmartCollectionLocation(string? place = null, SmartCollectionGeoBounds? bounds = null)
     {
-        Place = string.IsNullOrWhiteSpace(place)
-            ? null
-            : PhotoPlacePath.Parse(place).NormalizedValue;
+        Place = string.IsNullOrWhiteSpace(place) ? null : PhotoPlacePath.Parse(place).CanonicalNormalizedValue;
         Bounds = bounds;
     }
-
     public string? Place { get; }
     public SmartCollectionGeoBounds? Bounds { get; }
 }
@@ -66,7 +58,6 @@ public sealed record SmartCollectionDateRange
         if (from > to) throw new ArgumentException("The taken-date start cannot be later than the end date.");
         From = from; To = to;
     }
-
     public DateOnly From { get; }
     public DateOnly To { get; }
 
@@ -79,9 +70,7 @@ public sealed record SmartCollectionDateRange
             ValidateYear(year);
             return new SmartCollectionDateRange(new DateOnly(year, 1, 1), new DateOnly(year, 12, 31));
         }
-        if (text.Length == 9 && text[4] == '-' &&
-            int.TryParse(text.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out int fromYear) &&
-            int.TryParse(text.AsSpan(5, 4), NumberStyles.None, CultureInfo.InvariantCulture, out int toYear))
+        if (text.Length == 9 && text[4] == '-' && int.TryParse(text.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out int fromYear) && int.TryParse(text.AsSpan(5, 4), NumberStyles.None, CultureInfo.InvariantCulture, out int toYear))
         {
             ValidateYear(fromYear); ValidateYear(toYear);
             return new SmartCollectionDateRange(new DateOnly(fromYear, 1, 1), new DateOnly(toYear, 12, 31));
@@ -105,30 +94,17 @@ public sealed record SmartCollectionDateRange
 
 public sealed record SmartCollectionFilter
 {
-    public SmartCollectionFilter(
-        IEnumerable<PersonId>? people = null,
-        string? peopleMatch = null,
-        IEnumerable<string>? tags = null,
-        string? tagMatch = null,
-        SmartCollectionLocation? location = null,
-        SmartCollectionDateRange? taken = null)
+    public SmartCollectionFilter(IEnumerable<PersonId>? people = null, string? peopleMatch = null, IEnumerable<string>? tags = null, string? tagMatch = null, SmartCollectionLocation? location = null, SmartCollectionDateRange? taken = null)
     {
         People = (people ?? []).Distinct().ToArray();
         if (People.Count > 100) throw new ArgumentException("A smart collection can contain at most 100 people.", nameof(people));
         PeopleMatch = SmartCollectionMatchModes.Normalize(peopleMatch, nameof(peopleMatch));
-
-        Tags = (tags ?? [])
-            .Select(PhotoTagPath.Parse)
-            .Where(path => !PhotoPlacePath.IsReservedTagPath(path.NormalizedValue))
-            .Select(path => path.NormalizedValue)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        Tags = (tags ?? []).Select(PhotoTagPath.Parse).Where(path => !PhotoPlacePath.IsReservedTagPath(path)).Select(path => path.NormalizedValue).Distinct(StringComparer.Ordinal).ToArray();
         if (Tags.Count > 100) throw new ArgumentException("A smart collection can contain at most 100 tags.", nameof(tags));
         TagMatch = SmartCollectionMatchModes.Normalize(tagMatch, nameof(tagMatch));
         Location = location;
         Taken = taken;
     }
-
     public IReadOnlyList<PersonId> People { get; }
     public string PeopleMatch { get; }
     public IReadOnlyList<string> Tags { get; }
