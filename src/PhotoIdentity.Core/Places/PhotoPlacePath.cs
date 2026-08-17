@@ -10,6 +10,7 @@ public sealed record PhotoPlacePath
 {
     public const string RootDisplayName = "Places";
     public const string RootNormalizedName = "places";
+    public const int MaximumCanonicalValueLength = PhotoTagPath.MaximumReservedHierarchyValueLength;
 
     private PhotoPlacePath(PhotoTagPath canonicalTagPath)
     {
@@ -64,15 +65,22 @@ public sealed record PhotoPlacePath
     /// <summary>
     /// Accepts either a normal UI path (Sweden/Stockholm) or a canonical stored path
     /// (Places/Sweden/Stockholm). The reserved root alone is vocabulary, not an assignable place.
+    /// Normal UI paths are canonicalized before the wider Places hierarchy limit is evaluated.
     /// </summary>
     public static PhotoPlacePath Parse(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
-        PhotoTagPath supplied = PhotoTagPath.Parse(value);
-        PhotoTagPath canonical = IsReservedTagPath(supplied)
-            ? supplied
-            : PhotoTagPath.Parse($"{RootDisplayName}{PhotoTagPath.Separator}{supplied.DisplayValue}");
-        return FromCanonicalTagPath(canonical);
+        string trimmed = value.Trim();
+        int separatorIndex = trimmed.IndexOf(PhotoTagPath.Separator);
+        string firstSegment = separatorIndex < 0 ? trimmed : trimmed[..separatorIndex];
+        bool alreadyCanonical = string.Equals(
+            PhotoTagName.Parse(firstSegment).NormalizedName,
+            RootNormalizedName,
+            StringComparison.Ordinal);
+        string canonicalValue = alreadyCanonical
+            ? trimmed
+            : $"{RootDisplayName}{PhotoTagPath.Separator}{trimmed}";
+        return FromCanonicalTagPath(PhotoTagPath.Parse(canonicalValue));
     }
 
     public static PhotoPlacePath FromCanonicalTagPath(PhotoTagPath path)

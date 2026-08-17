@@ -78,13 +78,18 @@ public readonly record struct PhotoTagName
 
 /// <summary>
 /// Canonical hierarchical tag value using Immich-compatible slash-separated path semantics.
-/// The current SQLite schema bounds the persisted full value to 80 characters.
+/// Ordinary manual tags remain capped at 80 characters. The reserved Places hierarchy may use
+/// the wider persisted path capacity because provider-derived administrative hierarchies can
+/// legitimately exceed the ordinary tag-input limit.
 /// </summary>
 public sealed record PhotoTagPath
 {
     public const char Separator = '/';
     public const int MaximumDepth = 32;
     public const int MaximumValueLength = 80;
+    public const int MaximumReservedHierarchyValueLength = 500;
+
+    private const string ReservedPlacesRoot = "places";
 
     private PhotoTagPath(PhotoTagName[] segments)
     {
@@ -138,10 +143,19 @@ public sealed record PhotoTagPath
         }
 
         PhotoTagPath path = new(segments);
-        if (path.DisplayValue.Length > MaximumValueLength)
+        bool reservedPlacesHierarchy = string.Equals(
+            path.Segments[0].NormalizedName,
+            ReservedPlacesRoot,
+            StringComparison.Ordinal);
+        int maximumValueLength = reservedPlacesHierarchy
+            ? MaximumReservedHierarchyValueLength
+            : MaximumValueLength;
+        if (path.DisplayValue.Length > maximumValueLength)
         {
             throw new ArgumentException(
-                $"Photo tag paths cannot exceed {MaximumValueLength} characters.",
+                reservedPlacesHierarchy
+                    ? $"Place paths cannot exceed {maximumValueLength} characters."
+                    : $"Photo tag paths cannot exceed {maximumValueLength} characters.",
                 nameof(value));
         }
 

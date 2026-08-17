@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// <summary>
 /// Compatibility-safe schema guard and legacy-assignment migrator for first-class Places.
 /// Catalogue schema v14 formalizes these structures, while the guard remains idempotent for
-/// direct repository use and normalizes any pre-release v14 preview shape before data access.
+/// direct repository use and normalizes compatibility corrections before data access.
 /// </summary>
 public static class SqlitePhotoPlaceSchema
 {
@@ -25,6 +25,8 @@ public static class SqlitePhotoPlaceSchema
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        await EnsurePlaceTagCapacityAsync(connection, cancellationToken);
+
         using (SqliteCommand schema = connection.CreateCommand())
         {
             schema.CommandText = """
@@ -175,6 +177,78 @@ public static class SqlitePhotoPlaceSchema
             conflict.Parameters.AddWithValue("$candidate_values", candidateValues);
             conflict.Parameters.AddWithValue("$detected_at_utc", UtcNow());
             await conflict.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
+    private static async Task EnsurePlaceTagCapacityAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        using SqliteCommand inspect = connection.CreateCommand();
+        inspect.CommandText = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'photo_tags';";
+        string? tableSql = Convert.ToString(
+            await inspect.ExecuteScalarAsync(cancellationToken),
+            CultureInfo.InvariantCulture);
+        if (string.IsNullOrWhiteSpace(tableSql) ||
+            !tableSql.Contains("length(normalized_name) BETWEEN 1 AND 80", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        using (SqliteCommand disable = connection.CreateCommand())
+        {
+            disable.CommandText = "PRAGMA foreign_keys = OFF;";
+            await disable.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        try
+        {
+            using SqliteTransaction transaction = connection.BeginTransaction();
+            using (SqliteCommand command = connection.CreateCommand())
+            {
+                command.Transaction = transaction;
+                command.CommandText = $"""
+                    CREATE TABLE photo_tags_place_capacity (
+                        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        normalized_name TEXT NOT NULL UNIQUE,
+                        display_name TEXT NOT NULL,
+                        created_by TEXT NOT NULL,
+                        created_at_utc TEXT NOT NULL,
+                        CHECK (length(normalized_name) BETWEEN 1 AND {PhotoPlacePath.MaximumCanonicalValueLength}),
+                        CHECK (length(display_name) BETWEEN 1 AND {PhotoPlacePath.MaximumCanonicalValueLength})
+                    );
+
+                    INSERT INTO photo_tags_place_capacity (
+                        id, normalized_name, display_name, created_by, created_at_utc)
+                    SELECT id, normalized_name, display_name, created_by, created_at_utc
+                    FROM photo_tags
+                    ORDER BY id;
+
+                    DROP TABLE photo_tags;
+                    ALTER TABLE photo_tags_place_capacity RENAME TO photo_tags;
+                    """;
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            using (SqliteCommand check = connection.CreateCommand())
+            {
+                check.Transaction = transaction;
+                check.CommandText = "PRAGMA foreign_key_check;";
+                await using SqliteDataReader reader = await check.ExecuteReaderAsync(cancellationToken);
+                if (await reader.ReadAsync(cancellationToken))
+                {
+                    throw new InvalidOperationException(
+                        $"Places storage-capacity migration created a foreign-key violation in table '{reader.GetString(0)}'.");
+                }
+            }
+
+            transaction.Commit();
+        }
+        finally
+        {
+            using SqliteCommand enable = connection.CreateCommand();
+            enable.CommandText = "PRAGMA foreign_keys = ON;";
+            await enable.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 

@@ -16,6 +16,10 @@
     {
         <div class="notice error" role="alert">@Error</div>
     }
+    @if (!string.IsNullOrWhiteSpace(Warning))
+    {
+        <div class="notice warning" role="status">@Warning</div>
+    }
     @if (!string.IsNullOrWhiteSpace(Message))
     {
         <div class="notice success" role="status">@Message</div>
@@ -86,7 +90,7 @@
                            step="1"
                            @bind="BatchSize"
                            disabled="@Busy" />
-                    <p>Runs are bounded to 1–250 persisted-GPS candidates. Deferred or failed attempts remain eligible for a later run.</p>
+                    <p>Runs are bounded to 1–250 persisted-GPS candidates. Deferred or failed attempts remain eligible for a later run; a genuine no-result is treated as completed for the current provider contract.</p>
                 </div>
             </div>
 
@@ -107,7 +111,7 @@
 
             <p class="field-help">
                 Normal runs reuse cached coordinate results and skip completed revisions. Force refresh bypasses the reverse-geocode cache for eligible automatic
-                results and can spend additional provider credits; manual places, explicit manual clears, and unresolved migration conflicts remain protected.
+                results and can spend additional provider credits; manual places, explicit manual clears, unresolved migration conflicts, and completed no-result attempts remain protected.
             </p>
         }
 
@@ -131,11 +135,42 @@
                     <p>Manual history and unresolved migration conflicts are never overwritten automatically.</p>
                 </div>
                 <div>
-                    <span class="field-label">Deferred / failed</span>
-                    <strong>@report.Deferred / @report.Failed</strong>
-                    <p>@(report.StoppedEarly ? "The provider asked this batch to stop early; retry later." : "The bounded batch reached a normal stopping point.")</p>
+                    <span class="field-label">No place / deferred / failed</span>
+                    <strong>@report.NoResult / @report.Deferred / @report.Failed</strong>
+                    <p>@(report.StoppedEarly ? "The batch stopped after the provider response shown below." : "The bounded batch reached a normal stopping point.")</p>
                 </div>
             </div>
+
+            @if (!string.IsNullOrWhiteSpace(report.StopReasonMessage))
+            {
+                <div class="notice @(report.Failed > 0 ? "error" : "warning")" role="status">
+                    <strong>Provider result@(string.IsNullOrWhiteSpace(report.StopReasonCode) ? string.Empty : $" ({report.StopReasonCode})")</strong>
+                    <p>@report.StopReasonMessage</p>
+                    @if (string.Equals(report.StopReasonCode, "10", StringComparison.Ordinal))
+                    {
+                        <p>
+                            GeoNames requires confirmed accounts to enable free web-service access separately.
+                            <a href="https://www.geonames.org/manageaccount" target="_blank" rel="noopener noreferrer">Open the GeoNames account page</a>,
+                            enable <strong>Free Web Services</strong>, then retry this batch.
+                        </p>
+                    }
+                </div>
+            }
+
+            @if (report.Issues is { Count: > 0 })
+            {
+                <h4>Photo-level provider results</h4>
+                <div class="review-filter-grid">
+                    @foreach (PhotoPlaceEnrichmentIssueResponse issue in report.Issues)
+                    {
+                        <div>
+                            <span class="field-label">@FormatOutcome(issue.Outcome)@(string.IsNullOrWhiteSpace(issue.ProviderCode) ? string.Empty : $" · code {issue.ProviderCode}")</span>
+                            <p>@issue.Message</p>
+                            <a class="button secondary" href="@($"/photo/{issue.RevisionId}?returnUrl=%2Fsettings")">Open photo</a>
+                        </div>
+                    }
+                </div>
+            }
         }
 
         <p class="field-help">
@@ -152,6 +187,7 @@
     private bool Loading { get; set; } = true;
     private bool Busy { get; set; }
     private string? Error { get; set; }
+    private string? Warning { get; set; }
     private string? Message { get; set; }
 
     private bool ValidBatchSize => BatchSize is >= 1 and <= 250;
@@ -204,6 +240,7 @@
 
         Busy = true;
         Error = null;
+        Warning = null;
         Message = null;
         try
         {
@@ -232,9 +269,24 @@
                 return;
             }
 
-            Message = refresh
-                ? $"GeoNames refresh finished: {LastReport.Assigned} automatic place assignment(s), {LastReport.Deferred} deferred, {LastReport.Failed} failed."
-                : $"GeoNames enrichment finished: {LastReport.Assigned} place assignment(s), {LastReport.CachedResults} cached result(s), {LastReport.Deferred} deferred, {LastReport.Failed} failed.";
+            if (LastReport.Failed > 0)
+            {
+                Error = $"GeoNames enrichment completed with {LastReport.Failed} failed provider request(s). See Photo-level provider results for details.";
+            }
+            else if (LastReport.Deferred > 0)
+            {
+                Warning = $"GeoNames enrichment paused or completed with {LastReport.Deferred} deferred request(s). See Photo-level provider results before retrying.";
+            }
+            else if (LastReport.NoResult > 0)
+            {
+                Warning = $"GeoNames enrichment finished with {LastReport.Assigned} assignment(s) and {LastReport.NoResult} photo(s) where no nearby populated place was found.";
+            }
+            else
+            {
+                Message = refresh
+                    ? $"GeoNames refresh finished: {LastReport.Assigned} automatic place assignment(s)."
+                    : $"GeoNames enrichment finished: {LastReport.Assigned} place assignment(s), {LastReport.CachedResults} cached result(s).";
+            }
         }
         catch (Exception exception)
         {
@@ -245,6 +297,14 @@
             Busy = false;
         }
     }
+
+    private static string FormatOutcome(string outcome) => outcome switch
+    {
+        "no-result" => "No nearby populated place",
+        "deferred" => "Deferred",
+        "failed" => "Failed",
+        _ => outcome,
+    };
 
     private static string FormatInterval(int milliseconds) =>
         milliseconds == 0
