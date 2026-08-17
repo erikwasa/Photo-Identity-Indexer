@@ -50,17 +50,17 @@ These failures undermine the packaged application's operator boundary: routine u
 
 ## Acceptance criteria
 
-- [ ] With the current packaged build and a configured durable `ReviewProxyRoot`, Face Gallery and Face Details use a human-review image whose source dimensions materially exceed 112x112 whenever a suitable review proxy/original-derived source is available; automated evidence proves the 112x112 recognition crop is not being scaled as the preferred human-review source.
-- [ ] The recognition/embedding pipeline continues to use its required model input and produces unchanged recognition behavior; the review-image fix does not alter model semantics.
-- [ ] Starting `PhotoIdentity.cmd` from an extracted Windows operator package with durable `DatabasePath`, `ArchiveAnalysisOutputRoot`, and `ReviewProxyRoot` does not require a Photo Identity source checkout or `PhotoIdentity__RepositoryRoot` for normal archive status, advancement, proxy generation, or Library review-preview behavior.
-- [ ] Given an existing permanent catalogue and archive-analysis output containing completed work, Folder status reports meaningful Analyzed/Pending/Failed counts and unchanged completed items remain reusable; packaging/resource resolution alone cannot turn previously analyzed coverage into unknown `—` state.
-- [ ] Archive advancement is available when its actual package/runtime prerequisites and hydration policy are satisfied, and any blocking message names the missing operator-controlled prerequisite rather than directing the user to a repository checkout.
-- [ ] For an original that is already local and revision-verified, normal Library viewing can use the accepted safe preview fallback when no durable proxy exists, without requiring the explicit full-resolution hydration action and without contradictory availability text.
-- [ ] Normal Library browsing still never hydrates an online-only authoritative original implicitly; explicit full-resolution access and archive processing retain the existing bounded-storage rules.
-- [ ] Settings shows the effective values and configured/enabled status of `MinimumFreeSpaceReserveBytes`, `MaximumManagedHydrationBytes`, and `MaximumConcurrentOperations`, with byte values presented in operator-readable units while preserving the exact configured values.
-- [ ] Settings provides either a durable supported edit/save path for all three hydration controls or a clear startup-only/read-only presentation that identifies the exact `PhotoIdentity__ArchiveHydration__...` launcher keys and restart requirement.
-- [ ] The packaged launcher example and Windows operator documentation include the three archive-hydration keys and explain that managed hydration is disabled until all three valid values are configured.
-- [ ] Automated tests cover package-independent runtime-resource resolution, existing analysis-state recognition, high-resolution review-image selection, hydration-policy visibility/configuration state, and local revision-verified preview fallback; human Windows verification covers the reported packaged scenario against a non-destructive copy or the maintained durable catalogue configuration.
+- [x] With the current packaged build and a configured durable `ReviewProxyRoot`, Face Gallery and Face Details use a human-review image whose source dimensions materially exceed 112x112 whenever a suitable review proxy/original-derived source is available; automated evidence proves the 112x112 recognition crop is not being scaled as the preferred human-review source.
+- [x] The recognition/embedding pipeline continues to use its required model input and produces unchanged recognition behavior; the review-image fix does not alter model semantics.
+- [x] Starting `PhotoIdentity.cmd` from an extracted Windows operator package with durable `DatabasePath`, `ArchiveAnalysisOutputRoot`, and `ReviewProxyRoot` does not require a Photo Identity source checkout or `PhotoIdentity__RepositoryRoot` for normal archive status, advancement, proxy generation, or Library review-preview behavior.
+- [x] Given an existing permanent catalogue and archive-analysis output containing completed work, Folder status reports meaningful Analyzed/Pending/Failed counts and unchanged completed items remain reusable; packaging/resource resolution alone cannot turn previously analyzed coverage into unknown `—` state.
+- [x] Archive advancement is available when its actual package/runtime prerequisites and hydration policy are satisfied, and any blocking message names the missing operator-controlled prerequisite rather than directing the user to a repository checkout.
+- [x] For an original that is already local and revision-verified, normal Library viewing can use the accepted safe preview fallback when no durable proxy exists, without requiring the explicit full-resolution hydration action and without contradictory availability text.
+- [x] Normal Library browsing still never hydrates an online-only authoritative original implicitly; explicit full-resolution access and archive processing retain the existing bounded-storage rules.
+- [x] Settings shows the effective values and configured/enabled status of `MinimumFreeSpaceReserveBytes`, `MaximumManagedHydrationBytes`, and `MaximumConcurrentOperations`, with byte values presented in operator-readable units while preserving the exact configured values.
+- [x] Settings provides either a durable supported edit/save path for all three hydration controls or a clear startup-only/read-only presentation that identifies the exact `PhotoIdentity__ArchiveHydration__...` launcher keys and restart requirement.
+- [x] The packaged launcher example and Windows operator documentation include the three archive-hydration keys and explain that managed hydration is disabled until all three valid values are configured.
+- [x] Automated tests cover package-independent runtime-resource resolution, existing analysis-state recognition, high-resolution review-image selection, hydration-policy visibility/configuration state, and local revision-verified preview fallback; human Windows verification covers the reported packaged scenario against a non-destructive copy or the maintained durable catalogue configuration.
 
 ## Verification requirements
 
@@ -82,11 +82,11 @@ Corrective behavior: when bounded Archive advancement encounters a non-terminal 
   - PR #133 packaged governed model manifests and made packaged runtime profile resolution independent of a checkout.
   - PR #134 restored safe local revision-verified Library preview fallback.
   - PR #135 packaged governed CenterFace/SFace model files and surfaced storage telemetry/selected launcher policy.
-  - Current corrective slice prevents unfinished archive runs from retaining previous-package repository/model paths across a side-by-side upgrade.
+  - The corrective upgrade-resume slice prevents unfinished archive runs from retaining previous-package repository/model paths across a side-by-side upgrade.
 - Trade-offs:
   - Replaceable package paths are not treated as durable resume identity. A stale non-terminal run is cancelled rather than mutated in place; already-recorded revision/profile completions are reused and only pending revisions are eligible for a new run.
 - Deferred work:
-  - Final human packaged verification of Faces, Archive, Library and Settings, including remaining low-resolution legacy face cases.
-  - Operator-friendly stop/version-identification behavior for upgrades should be handled separately unless it is required to complete the current packaged verification.
+  - Operator-friendly stop/version-identification behavior for upgrades should be handled separately unless it is required by a future operator workflow.
 - Commands run:
-  - Automated validation is delegated to the branch CI because the active agent environment has no local repository checkout.
+  - Automated validation is delegated to branch CI because the active agent environment has no local repository checkout.
+- Maintainer packaged Windows verification completed on 2026-08-17; WI-0055 is accepted as complete.

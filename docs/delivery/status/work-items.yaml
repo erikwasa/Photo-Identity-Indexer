@@ -133,37 +133,70 @@ work_items:
 - id: WI-0051
   title: Add a one-click Windows launcher
   milestone: M18
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0051-one-click-windows-launcher.md
+  completed_at: 2026-08-17
+  verified_at: 2026-08-17
+  verified_by: maintainer
+  last_updated_at: 2026-08-17
+  branch: agent/WI-0051-windows-launcher
   blockers:
   - WI-0041
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/126
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31522150852
+  - type: merge_commit
+    value: 0540c740f144f5c017a2be0bba7d72161d84a334
 - id: WI-0052
   title: Package Photo Identity as a Windows application
   milestone: M18
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0052-packaged-windows-application.md
+  completed_at: 2026-08-17
+  verified_at: 2026-08-17
+  verified_by: maintainer
+  last_updated_at: 2026-08-17
+  branch: agent/WI-0052-windows-package
   blockers:
   - WI-0048
   - WI-0051
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/127
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31531558178
+  - type: merge_commit
+    value: 0b0a44932104f0c5178925f957c8e765f65e8c15
 - id: WI-0055
   title: Fix packaged review, archive and storage-policy regressions
   milestone: M18
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0055-packaged-runtime-regressions.md
+  completed_at: 2026-08-17
+  verified_at: 2026-08-17
+  verified_by: maintainer
+  last_updated_at: 2026-08-17
+  branch: agent/WI-0055-upgrade-resume-model-path
   blockers:
   - WI-0042
   - WI-0048
   - WI-0052
   - WI-0054
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/133
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/134
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/135
 - id: WI-0056
   title: Add Immich-compatible hierarchical manual photo tags
   milestone: M19

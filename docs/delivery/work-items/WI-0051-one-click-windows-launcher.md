@@ -59,4 +59,5 @@ Human verification from Windows Explorer against a clean published output plus a
   - The `.cmd` wrapper invokes the repository PowerShell script with process-scoped `ExecutionPolicy Bypass` so a normal double-click is not blocked by a machine-wide script policy; the launcher itself remains plain text and reviewable.
   - The browser application remains restricted to a loopback HTTP URL by the launcher because it is unauthenticated; trusted-network hosting continues to require an explicit developer/diagnostic command.
 - Deferred work: packaged/self-contained Windows distribution and installer integration under WI-0052.
-- Commands run: validation is delegated to the repository GitHub Actions Windows gate, including the dedicated `verify-launcher.ps1` step; human Windows Explorer verification remains required before completion.
+- Commands run: validation is delegated to the repository GitHub Actions Windows gate, including the dedicated `verify-launcher.ps1` step.
+- Maintainer Windows verification completed on 2026-08-17; WI-0051 is accepted as complete.
