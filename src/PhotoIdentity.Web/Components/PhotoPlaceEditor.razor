@@ -22,7 +22,7 @@
         {
             <div class="notice photo-place-conflict" role="status">
                 <strong>Legacy place needs review.</strong>
-                <p>More than one unrelated Places path was active. Choose the correct place below; saving it resolves this conflict.</p>
+                <p>More than one unrelated Places path was active. Choose or enter the correct place below; saving it resolves this conflict.</p>
                 <ul>
                     @foreach (string candidate in conflict.CandidateValues)
                     {
@@ -41,11 +41,23 @@
             <p class="photo-place-empty">No place is assigned to this photo.</p>
         }
 
-        <PlacePicker Label="Choose place"
-                     EmptyLabel="No place selected"
+        <PlacePicker Label="Choose existing place"
+                     EmptyLabel="No existing place selected"
                      Value="@SelectedValue"
                      ValueChanged="SetSelectedValue"
                      Disabled="@Busy" />
+
+        <label class="photo-place-path-field">
+            <span class="field-label">Place path</span>
+            <input type="text"
+                   maxlength="80"
+                   autocomplete="off"
+                   placeholder="Sweden/Stockholm region/Norrtälje"
+                   disabled="@Busy"
+                   @bind="SelectedValue"
+                   @bind:event="oninput" />
+        </label>
+        <small class="photo-place-help">Use the hierarchy without the reserved <code>Places/</code> prefix. Entering a new path creates the reusable place vocabulary when you save.</small>
 
         <div class="photo-place-actions">
             <button type="button"
@@ -123,7 +135,7 @@
         {
             using HttpResponseMessage response = await Http.PutAsJsonAsync(
                 PlaceUrl,
-                new PhotoPlaceMutationRequest(SelectedValue));
+                new PhotoPlaceMutationRequest(SelectedValue.Trim()));
             if (!response.IsSuccessStatusCode)
             {
                 throw new InvalidOperationException(await ReadErrorAsync(response, "Place could not be saved."));
