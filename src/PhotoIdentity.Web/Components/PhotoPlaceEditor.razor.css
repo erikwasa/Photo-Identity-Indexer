@@ -1,0 +1,49 @@
+.photo-place-editor {
+    display: grid;
+    gap: 0.85rem;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--border);
+}
+
+.photo-place-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.photo-place-heading h3,
+.photo-place-heading p {
+    margin: 0;
+}
+
+.photo-place-source {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.photo-place-current,
+.photo-place-empty,
+.photo-place-help {
+    margin: 0;
+}
+
+.photo-place-empty,
+.photo-place-help {
+    color: var(--muted);
+}
+
+.photo-place-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+.photo-place-conflict ul {
+    margin-bottom: 0;
+}
+
+.photo-place-notice {
+    margin-top: 0.25rem;
+}
