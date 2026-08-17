@@ -4,6 +4,7 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
+using PhotoIdentity.Core.Tags;
 using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
@@ -146,7 +147,11 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
                 new SqlitePhotoPlaceEnrichmentRepository(database, clock),
                 new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
 
-            Assert.True(LongHierarchyGeocoder.CanonicalPlace.Length > 80);
+            string ordinaryTooLong = "Family/" + new string('x', PhotoTagPath.MaximumValueLength - "Family/".Length + 1);
+            Assert.Throws<ArgumentException>(() => PhotoTagPath.Parse(ordinaryTooLong));
+            Assert.True(LongHierarchyGeocoder.CanonicalPlace.Length > PhotoTagPath.MaximumValueLength);
+            Assert.True(LongHierarchyGeocoder.CanonicalPlace.Length <= PhotoPlacePath.MaximumCanonicalValueLength);
+
             PhotoPlaceEnrichmentReport report = await service.ExecuteBatchAsync(limit: 5);
 
             Assert.Equal(1, report.Candidates);
@@ -179,9 +184,9 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
             await using SqliteDataReader reader = await command.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
-            Assert.True(reader.GetInt32(0) > 80);
-            Assert.True(reader.GetInt32(1) > 80);
-            Assert.True(reader.GetInt32(2) > 80);
+            Assert.True(reader.GetInt64(0) > PhotoTagPath.MaximumValueLength);
+            Assert.True(reader.GetInt64(1) > PhotoTagPath.MaximumValueLength);
+            Assert.True(reader.GetInt64(2) > PhotoTagPath.MaximumValueLength);
         }
         finally
         {
