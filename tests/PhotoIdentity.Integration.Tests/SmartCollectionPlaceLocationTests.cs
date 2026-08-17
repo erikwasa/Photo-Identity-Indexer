@@ -120,7 +120,7 @@ public sealed class SmartCollectionPlaceLocationTests
     }
 
     [Fact]
-    public async Task Schema_fourteen_promotes_v1_saved_definitions_and_preserves_legacy_places_filter()
+    public async Task Schema_upgrade_promotes_v1_saved_definitions_and_preserves_legacy_places_filter()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -170,7 +170,7 @@ public sealed class SmartCollectionPlaceLocationTests
 
             await using (SqliteConnection verify = await database.OpenConnectionAsync())
             {
-                Assert.Equal(14L, await ScalarLongAsync(verify, "PRAGMA user_version;"));
+                Assert.Equal(SqliteCatalogueDatabase.CurrentSchemaVersion, await ScalarLongAsync(verify, "PRAGMA user_version;"));
                 Assert.Equal(2L, await ScalarLongAsync(
                     verify,
                     "SELECT COUNT(*) FROM smart_collections WHERE filter_schema_version = 2;"));
