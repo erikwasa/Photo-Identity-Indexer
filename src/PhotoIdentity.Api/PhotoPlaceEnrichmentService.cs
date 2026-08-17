@@ -3,6 +3,12 @@ using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
+public sealed record PhotoPlaceEnrichmentIssue(
+    string RevisionId,
+    string Outcome,
+    string? ProviderCode,
+    string Message);
+
 public sealed record PhotoPlaceEnrichmentReport(
     int Candidates,
     int ProviderRequests,
@@ -11,11 +17,13 @@ public sealed record PhotoPlaceEnrichmentReport(
     int UnchangedAutomatic,
     int SkippedManual,
     int SkippedConflict,
+    int NoResult,
     int Deferred,
     int Failed,
     bool StoppedEarly,
     string? StopReasonCode = null,
-    string? StopReasonMessage = null);
+    string? StopReasonMessage = null,
+    IReadOnlyList<PhotoPlaceEnrichmentIssue>? Issues = null);
 
 /// <summary>
 /// Applies reverse-geocoded places from persisted GPS only. The service never resolves source paths,
@@ -61,11 +69,13 @@ public sealed class PhotoPlaceEnrichmentService
         int unchangedAutomatic = 0;
         int skippedManual = 0;
         int skippedConflict = 0;
+        int noResult = 0;
         int deferred = 0;
         int failed = 0;
         bool stoppedEarly = false;
         string? stopReasonCode = null;
         string? stopReasonMessage = null;
+        List<PhotoPlaceEnrichmentIssue> issues = [];
 
         foreach (CataloguePlaceEnrichmentCandidate candidate in candidates)
         {
@@ -125,9 +135,28 @@ public sealed class PhotoPlaceEnrichmentService
                         resolvedPlace.CountryCode,
                         cancellationToken);
                 }
+                else if (response.Status == ReverseGeocodeStatus.NoResult)
+                {
+                    noResult++;
+                    string message = "GeoNames found no nearby populated place for this photo's persisted GPS coordinates.";
+                    await _enrichment.MarkSkippedAsync(
+                        _geocoder.ProviderName,
+                        _geocoder.ContractKey,
+                        candidate,
+                        response.ErrorCode ?? "no-result",
+                        response.ErrorMessage ?? message,
+                        cancellationToken);
+                    issues.Add(new PhotoPlaceEnrichmentIssue(
+                        candidate.RevisionId.ToString(),
+                        "no-result",
+                        response.ErrorCode,
+                        message));
+                    continue;
+                }
                 else if (response.Status == ReverseGeocodeStatus.Deferred)
                 {
                     deferred++;
+                    string message = BuildOperatorReason(response);
                     await _enrichment.MarkDeferredAsync(
                         _geocoder.ProviderName,
                         _geocoder.ContractKey,
@@ -135,11 +164,16 @@ public sealed class PhotoPlaceEnrichmentService
                         response.ErrorCode,
                         response.ErrorMessage,
                         cancellationToken);
+                    issues.Add(new PhotoPlaceEnrichmentIssue(
+                        candidate.RevisionId.ToString(),
+                        "deferred",
+                        response.ErrorCode,
+                        message));
                     if (response.StopBatch)
                     {
                         stoppedEarly = true;
                         stopReasonCode = response.ErrorCode;
-                        stopReasonMessage = BuildOperatorStopReason(response);
+                        stopReasonMessage = message;
                         break;
                     }
                     continue;
@@ -147,6 +181,7 @@ public sealed class PhotoPlaceEnrichmentService
                 else
                 {
                     failed++;
+                    string message = BuildOperatorReason(response);
                     await _enrichment.MarkFailedAsync(
                         _geocoder.ProviderName,
                         _geocoder.ContractKey,
@@ -154,11 +189,16 @@ public sealed class PhotoPlaceEnrichmentService
                         response.ErrorCode,
                         response.ErrorMessage,
                         cancellationToken);
+                    issues.Add(new PhotoPlaceEnrichmentIssue(
+                        candidate.RevisionId.ToString(),
+                        "failed",
+                        response.ErrorCode,
+                        message));
                     if (response.StopBatch)
                     {
                         stoppedEarly = true;
                         stopReasonCode = response.ErrorCode;
-                        stopReasonMessage = BuildOperatorStopReason(response);
+                        stopReasonMessage = message;
                         break;
                     }
                     continue;
@@ -212,14 +252,16 @@ public sealed class PhotoPlaceEnrichmentService
             unchangedAutomatic,
             skippedManual,
             skippedConflict,
+            noResult,
             deferred,
             failed,
             stoppedEarly,
             stopReasonCode,
-            stopReasonMessage);
+            stopReasonMessage,
+            issues);
     }
 
-    private static string BuildOperatorStopReason(ReverseGeocodeResponse response) => response.ErrorCode switch
+    private static string BuildOperatorReason(ReverseGeocodeResponse response) => response.ErrorCode switch
     {
         "10" => "GeoNames authorization failed. Confirm the configured username is correct and enable Free Web Services on the GeoNames account page after confirming the account email.",
         "18" => "GeoNames reports that the daily web-service credit limit has been exceeded. Retry after the provider limit resets.",
