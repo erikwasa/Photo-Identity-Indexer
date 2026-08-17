@@ -13,7 +13,9 @@ public sealed record PhotoPlaceEnrichmentReport(
     int SkippedConflict,
     int Deferred,
     int Failed,
-    bool StoppedEarly);
+    bool StoppedEarly,
+    string? StopReasonCode = null,
+    string? StopReasonMessage = null);
 
 /// <summary>
 /// Applies reverse-geocoded places from persisted GPS only. The service never resolves source paths,
@@ -62,6 +64,8 @@ public sealed class PhotoPlaceEnrichmentService
         int deferred = 0;
         int failed = 0;
         bool stoppedEarly = false;
+        string? stopReasonCode = null;
+        string? stopReasonMessage = null;
 
         foreach (CataloguePlaceEnrichmentCandidate candidate in candidates)
         {
@@ -134,6 +138,8 @@ public sealed class PhotoPlaceEnrichmentService
                     if (response.StopBatch)
                     {
                         stoppedEarly = true;
+                        stopReasonCode = response.ErrorCode;
+                        stopReasonMessage = BuildOperatorStopReason(response);
                         break;
                     }
                     continue;
@@ -151,6 +157,8 @@ public sealed class PhotoPlaceEnrichmentService
                     if (response.StopBatch)
                     {
                         stoppedEarly = true;
+                        stopReasonCode = response.ErrorCode;
+                        stopReasonMessage = BuildOperatorStopReason(response);
                         break;
                     }
                     continue;
@@ -206,8 +214,25 @@ public sealed class PhotoPlaceEnrichmentService
             skippedConflict,
             deferred,
             failed,
-            stoppedEarly);
+            stoppedEarly,
+            stopReasonCode,
+            stopReasonMessage);
     }
+
+    private static string BuildOperatorStopReason(ReverseGeocodeResponse response) => response.ErrorCode switch
+    {
+        "10" => "GeoNames authorization failed. Confirm the configured username is correct and enable Free Web Services on the GeoNames account page after confirming the account email.",
+        "18" => "GeoNames reports that the daily web-service credit limit has been exceeded. Retry after the provider limit resets.",
+        "19" => "GeoNames reports that the hourly web-service credit limit has been exceeded. Retry after the provider limit resets.",
+        "20" => "GeoNames reports that the weekly web-service credit limit has been exceeded. Retry after the provider limit resets.",
+        "13" or "22" => "GeoNames is temporarily unavailable. Retry the enrichment later.",
+        "transport" => "Photo Identity could not complete the HTTPS request to GeoNames. Check network access and retry.",
+        "14" or "21" or "23" or "24" or "27" =>
+            $"GeoNames rejected the reverse-geocoding request (provider code {response.ErrorCode}). This indicates a request or service-contract problem rather than a photo-data problem.",
+        _ when response.ErrorCode?.StartsWith("http-", StringComparison.Ordinal) == true =>
+            $"GeoNames rejected the HTTPS request ({response.ErrorCode}). Check provider availability and configuration before retrying.",
+        _ => "GeoNames could not process the reverse-geocoding request. The failed attempt remains retryable.",
+    };
 
     private Task MarkSkippedAsync(
         CataloguePlaceEnrichmentCandidate candidate,
