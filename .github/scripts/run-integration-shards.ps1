@@ -194,7 +194,7 @@ $filter = $patterns -join "|"
 $trxName = "integration-shard-$ShardNumber.trx"
 $logPath = Join-Path $ShardOutputDirectory "integration-shard-$ShardNumber.log"
 
-Write-Host "Running shard $ShardNumber/$ShardCount: $($selectedShard.testCount) tests, estimated $([Math]::Round($selectedShard.estimatedSeconds, 1))s from baseline."
+Write-Host "Running shard $ShardNumber/${ShardCount}: $($selectedShard.testCount) tests, estimated $([Math]::Round($selectedShard.estimatedSeconds, 1))s from baseline."
 & dotnet test $projectPath `
     --configuration Release `
     --no-build `
