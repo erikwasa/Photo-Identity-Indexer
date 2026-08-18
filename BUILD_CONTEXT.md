@@ -6,45 +6,31 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0064 — Add GeoNames reverse-geocoded Places enrichment** is the active M19 implementation item.
+**WI-0069 — Reduce GitHub Actions feedback time** is the active tooling item.
 
-WI-0061, WI-0062 and WI-0063 implementation are merged. Their remaining local browser/operator verification is intentionally deferred to the consolidated M19 pass after the GeoNames operator workflow is complete.
+Slice 1 is implemented on `agent/WI-0069-ci-runtime-optimization`:
 
-Slice 1 merged through PR #160 and established the provider/persistence foundation. Slice 2 is draft PR #161 on `agent/WI-0064-geonames-settings` and adds the operator workflow:
+- `verify-local.ps1` keeps its full build/test/documentation checkpoint by default but now has explicit `-SkipBuild`, `-SkipTests` and `-SkipDocumentation` switches for callers that already validated the same checkout;
+- skipped media verification requires the previously built `PhotoIdentity.Cli` assembly, so CI cannot silently run against missing build output;
+- the mixed-media GitHub Actions step reuses the earlier successful restore/build/test/documentation work instead of rerunning the repository checkpoint;
+- workflow-level concurrency groups pull-request runs by PR number and cancels superseded PR runs, while `main` push runs use a unique run ID and are not canceled by this policy.
 
-- Settings reports GeoNames configured/disabled state without exposing the configured username;
-- bounded 1–250 candidate execution and explicit automatic-place force refresh are available from the browser;
-- latest in-session candidate/provider/cache/assignment/skip/deferred/failure counts are visible;
-- the browser states the external-GPS privacy boundary before execution and keeps credentials as startup/server-side configuration only;
-- GeoNames attribution is presented with provider-derived place enrichment;
-- endpoint tests cover safe status, disabled execution and batch bounds without live provider calls.
-
-The persistence/provider foundation remains unchanged: enrichment reads persisted GPS only, never opens or hydrates originals, preserves manual place precedence, reuses safe cache entries and leaves deferred/failed attempts retryable.
+The existing decoder fixture/report assertions, launcher verification and package verification remain unchanged.
 
 ## Next concrete step
 
-1. Validate draft PR #161 build, integration tests, living/generated documentation, review smoke and Windows verification in GitHub Actions.
-2. Merge Slice 2 after automated validation and code review.
-3. Configure a maintainer GeoNames account locally and run a small bounded live sample from Settings; compare several resulting place paths with expected real-world locations.
-4. In the same consolidated M19 pass, perform the deferred WI-0061/WI-0062/WI-0063 browser/operator checks and record evidence.
-5. Close the M19 work items whose maintainer verification succeeds.
+1. Run the draft pull-request GitHub Actions workflow and confirm build, tests, documentation validation, review smoke, launcher verification and package verification all pass.
+2. Inspect the mixed-media log and confirm it reports repository validation as skipped and proceeds directly to the decoder fixtures without a second integration-test run.
+3. Compare `build-and-test` wall-clock duration with the pre-change run #1060 baseline and record timing evidence in WI-0069.
+4. Mark WI-0069 completed only after the CI behavior and timing evidence are verified.
+5. Treat package/publish reuse, SDK/package caching and isolated integration-test sharding as later follow-up decisions rather than silently extending Slice 1.
 
 ## Relevant files
 
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/work-items/WI-0064-geonames-place-enrichment.md`
-- `src/PhotoIdentity.Core/Places/ReverseGeocoding.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePhotoPlaceEnrichmentRepository.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteAutomaticPhotoPlaceRepository.cs`
-- `src/PhotoIdentity.Api/GeoNamesReverseGeocoder.cs`
-- `src/PhotoIdentity.Api/PhotoPlaceEnrichmentService.cs`
-- `src/PhotoIdentity.Api/PhotoPlaceEnrichmentEndpoints.cs`
-- `src/PhotoIdentity.Web/PlaceEnrichmentContracts.cs`
-- `src/PhotoIdentity.Web/Components/GeoNamesPlaceEnrichmentSettings.razor`
-- `src/PhotoIdentity.Web/Pages/Settings.razor`
-- `tests/PhotoIdentity.Integration.Tests/GeoNamesReverseGeocoderTests.cs`
-- `tests/PhotoIdentity.Integration.Tests/PhotoPlaceEnrichmentTests.cs`
-- `tests/PhotoIdentity.Integration.Tests/PhotoPlaceEnrichmentEndpointTests.cs`
+- `docs/delivery/work-items/WI-0069-ci-runtime-optimization.md`
+- `.github/workflows/build.yml`
+- `verify-local.ps1`
 
 ## Repository validation
 
