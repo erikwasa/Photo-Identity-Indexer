@@ -15,6 +15,13 @@ $trxFiles = @(Get-ChildItem -Path $ResultsDirectory -Filter "*.trx" -File -Recur
 
 foreach ($trxFile in $trxFiles) {
     [xml] $document = Get-Content $trxFile.FullName -Raw
+    $classByTestId = @{}
+    foreach ($definition in @($document.TestRun.TestDefinitions.UnitTest)) {
+        if ($null -ne $definition.TestMethod) {
+            $classByTestId[[string] $definition.id] = [string] $definition.TestMethod.className
+        }
+    }
+
     $unitResults = @($document.TestRun.Results.UnitTestResult)
     foreach ($result in $unitResults) {
         $testName = [string] $result.testName
@@ -28,8 +35,20 @@ foreach ($trxFile in $trxFiles) {
             [TimeSpan]::TryParse($durationText, [ref] $duration) | Out-Null
         }
 
-        $lastDot = $testName.LastIndexOf('.')
-        $className = if ($lastDot -gt 0) { $testName.Substring(0, $lastDot) } else { $testName }
+        $testId = [string] $result.testId
+        $className = if ($classByTestId.ContainsKey($testId)) {
+            [string] $classByTestId[$testId]
+        }
+        else {
+            $nameWithoutArguments = $testName
+            $argumentIndex = $nameWithoutArguments.IndexOf('(')
+            if ($argumentIndex -ge 0) {
+                $nameWithoutArguments = $nameWithoutArguments.Substring(0, $argumentIndex)
+            }
+            $lastDot = $nameWithoutArguments.LastIndexOf('.')
+            if ($lastDot -gt 0) { $nameWithoutArguments.Substring(0, $lastDot) } else { $nameWithoutArguments }
+        }
+
         $results.Add([pscustomobject]@{
             testName = $testName
             className = $className
@@ -60,6 +79,22 @@ $classSummaries = @(
         Select-Object -First $Top
 )
 
+$shardSummaries = @(
+    $results |
+        Group-Object resultFile |
+        ForEach-Object {
+            $items = @($_.Group)
+            $total = ($items | Measure-Object durationMilliseconds -Sum).Sum
+            [pscustomobject]@{
+                resultFile = $_.Name
+                testCount = $items.Count
+                failedCount = @($items | Where-Object { $_.outcome -eq "Failed" }).Count
+                totalRecordedDurationMilliseconds = [Math]::Round([double]($total ?? 0), 3)
+            }
+        } |
+        Sort-Object resultFile
+)
+
 $totalRecordedDuration = ($results | Measure-Object durationMilliseconds -Sum).Sum
 $summary = [ordered]@{
     generatedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
@@ -67,6 +102,7 @@ $summary = [ordered]@{
     testCount = $results.Count
     failedCount = @($results | Where-Object { $_.outcome -eq "Failed" }).Count
     totalRecordedDurationMilliseconds = [Math]::Round([double]($totalRecordedDuration ?? 0), 3)
+    shards = $shardSummaries
     slowestClasses = $classSummaries
     slowestTests = $slowestTests
 }
@@ -84,6 +120,18 @@ if ($results.Count -eq 0) {
 else {
     $lines.Add("")
     $lines.Add("Recorded $($results.Count) tests across $($trxFiles.Count) TRX file(s); failures: $($summary.failedCount).")
+
+    if ($shardSummaries.Count -gt 1) {
+        $lines.Add("")
+        $lines.Add("### Shard recorded durations")
+        $lines.Add("")
+        $lines.Add("| Result file | Tests | Failed | Recorded test time |")
+        $lines.Add("|---|---:|---:|---:|")
+        foreach ($shard in $shardSummaries) {
+            $lines.Add("| $($shard.resultFile) | $($shard.testCount) | $($shard.failedCount) | {0:N2}s |" -f ($shard.totalRecordedDurationMilliseconds / 1000.0))
+        }
+    }
+
     $lines.Add("")
     $lines.Add("### Slowest classes")
     $lines.Add("")
