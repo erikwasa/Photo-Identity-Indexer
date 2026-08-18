@@ -1,7 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
@@ -22,7 +20,7 @@ public sealed class ReviewProgressFilterApplicationTests
             await database.InitializeAsync();
             SeededProgress seeded = await SeedProgressAsync(database);
 
-            await using ReviewApiFactory factory = new(databasePath);
+            await using PhotoIdentityApiTestFactory factory = new(databasePath);
             using HttpClient client = factory.CreateClient();
 
             ReviewFilterOptionsResponse options = Assert.IsType<ReviewFilterOptionsResponse>(
@@ -59,8 +57,8 @@ public sealed class ReviewProgressFilterApplicationTests
             Assert.Equal("assigned", second.State);
             Assert.Equal("Ada", second.Person?.DisplayName);
 
-            string filtersJson = await client.GetStringAsync("/api/review/filters");
-            string facesJson = await client.GetStringAsync(
+            string filtersJson = await client.GetRequiredStringAsync("/api/review/filters");
+            string facesJson = await client.GetRequiredStringAsync(
                 $"/api/review/faces?state=all&processingRunId={seeded.FirstRunId}");
             Assert.DoesNotContain(seeded.SourceRoot, filtersJson, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(seeded.SourceRoot, facesJson, StringComparison.OrdinalIgnoreCase);
@@ -82,12 +80,14 @@ public sealed class ReviewProgressFilterApplicationTests
             await database.InitializeAsync();
             await SeedProgressAsync(database);
 
-            await using ReviewApiFactory factory = new(databasePath);
+            await using PhotoIdentityApiTestFactory factory = new(databasePath);
             using HttpClient client = factory.CreateClient();
             using HttpResponseMessage response = await client.GetAsync(
                 "/api/review/faces?state=all&modelId=sface");
 
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            await response.EnsureStatusCodeWithDiagnosticBodyAsync(
+                HttpStatusCode.BadRequest,
+                "review face model-scope validation");
         }
         finally
         {
@@ -238,19 +238,4 @@ public sealed class ReviewProgressFilterApplicationTests
         string SecondModelHash,
         string FirstFaceId,
         string SecondFaceId);
-
-    private sealed class ReviewApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
-    {
-        private readonly string _databasePath;
-
-        public ReviewApiFactory(string databasePath)
-        {
-            _databasePath = databasePath;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
-        }
-    }
 }
