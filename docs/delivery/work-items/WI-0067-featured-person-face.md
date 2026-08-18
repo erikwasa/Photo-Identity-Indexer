@@ -64,10 +64,10 @@ Automatic face-quality scoring as a new ML feature, editing/cropping portraits, 
 
 ## Acceptance criteria
 
-- [ ] An assigned named face can be set as that person's explicit featured face from Face Details.
+- [x] An assigned named face can be set as that person's explicit featured face from Face Details.
 - [x] A person has at most one explicit featured face.
 - [x] The explicit choice survives application restart.
-- [x] The user can clear the explicit choice and return to automatic representative selection through the API contract.
+- [x] The user can clear the explicit choice and return to automatic representative selection from Face Details or through the API contract.
 - [x] When no explicit choice exists, the same valid automatic representative is selected deterministically for unchanged catalogue state.
 - [x] An explicit featured face is never accepted for a different person.
 - [x] If the selected face is reassigned or otherwise becomes invalid, representative resolution safely falls back without showing the wrong identity.
@@ -84,4 +84,8 @@ Automatic face-quality scoring as a new ML feature, editing/cropping portraits, 
 
 ## Implementation status
 
-Slice 1 is implemented on `agent/WI-0067-featured-person-face`. The branch adds a durable, idempotently guarded person-to-face preference, validates explicit choices against the current active assignment, resolves stale preferences safely, uses the earliest currently assigned face as the first deterministic fallback, exposes GET/PUT representative-face contracts that reuse `/api/review/faces/{id}/image`, and adds integration coverage for persistence, clear-to-automatic behavior, reassignment fallback and wrong-person rejection.
+Slice 1 merged in PR #175. It adds a durable, idempotently guarded person-to-face preference, validates explicit choices against the current active assignment, resolves stale preferences safely, uses the earliest currently assigned face as the first deterministic fallback, exposes GET/PUT representative-face contracts that reuse `/api/review/faces/{id}/image`, and adds integration coverage for persistence, clear-to-automatic behavior, reassignment fallback and wrong-person rejection.
+
+Slice 2 is implemented on `agent/WI-0067-face-details-featured-controls`. Face Details now shows representative-photo state only when the current face is assigned to a named person, can set the current face as the explicit featured photo, and can clear an explicit choice back to automatic selection. The review image remains the current face occurrence rather than being replaced by the representative portrait, and the controls reuse the Slice 1 API/invalidation behavior without adding another host-heavy integration-test path.
+
+Slice 3 remains: show the resolved representative portrait in Maintain People and add deterministic person-merge behavior coverage.
