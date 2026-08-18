@@ -6,13 +6,17 @@ namespace PhotoIdentity.Api;
 
 public static class PersonMaintenanceEndpoints
 {
+    private const int RepresentativeImageSize = 360;
+
     public static IEndpointRouteBuilder MapPersonMaintenanceEndpoints(this IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/review/people");
         group.MapGet("/maintenance", GetPeopleAsync);
         group.MapGet("/maintenance/history", GetHistoryAsync);
+        group.MapGet("/{id}/representative-face", GetRepresentativeFaceAsync);
         group.MapPut("/{id}/favorite", SetFavoriteAsync);
         group.MapPut("/{id}/smart-collection-visibility", SetSmartCollectionVisibilityAsync);
+        group.MapPut("/{id}/featured-face", SetFeaturedFaceAsync);
         group.MapPost("/{id}/rename", RenameAsync);
         group.MapPost("/{id}/merge", MergeAsync);
         return endpoints;
@@ -54,6 +58,30 @@ public static class PersonMaintenanceEndpoints
         catch (ArgumentException exception)
         {
             return BadRequest(exception.Message);
+        }
+    }
+
+    private static async Task<IResult> GetRepresentativeFaceAsync(
+        string id,
+        SqliteCatalogueDatabase database,
+        CancellationToken cancellationToken)
+    {
+        if (!TryPersonId(id, out PersonId personId))
+        {
+            return BadRequest("The person identifier is invalid.");
+        }
+
+        try
+        {
+            CataloguePersonRepresentativeFace? representative =
+                await new SqlitePersonFeaturedFaceRepository(database).ResolveAsync(
+                    personId,
+                    cancellationToken);
+            return Results.Ok(ToResponse(personId, representative));
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
         }
     }
 
@@ -108,6 +136,54 @@ public static class PersonMaintenanceEndpoints
         catch (KeyNotFoundException)
         {
             return Results.NotFound();
+        }
+    }
+
+    private static async Task<IResult> SetFeaturedFaceAsync(
+        string id,
+        SetPersonFeaturedFaceRequest request,
+        SqliteCatalogueDatabase database,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        if (!TryPersonId(id, out PersonId personId))
+        {
+            return BadRequest("The person identifier is invalid.");
+        }
+
+        SqlitePersonFeaturedFaceRepository repository = new(database);
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.FaceId))
+            {
+                await repository.ClearFeaturedFaceAsync(personId, cancellationToken);
+            }
+            else
+            {
+                if (!TryFaceOccurrenceId(request.FaceId, out FaceOccurrenceId faceId))
+                {
+                    return BadRequest("The face occurrence identifier is invalid.");
+                }
+
+                await repository.SetFeaturedFaceAsync(
+                    personId,
+                    faceId,
+                    timeProvider.GetUtcNow(),
+                    cancellationToken);
+            }
+
+            CataloguePersonRepresentativeFace? representative = await repository.ResolveAsync(
+                personId,
+                cancellationToken);
+            return Results.Ok(ToResponse(personId, representative));
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
         }
     }
 
@@ -198,6 +274,16 @@ public static class PersonMaintenanceEndpoints
             isFavorite,
             hiddenFromSmartCollections);
 
+    private static PersonRepresentativeFaceResponse ToResponse(
+        PersonId personId,
+        CataloguePersonRepresentativeFace? representative) => new(
+            personId.ToString(),
+            representative?.FaceId.ToString(),
+            representative is null
+                ? null
+                : $"/api/review/faces/{representative.FaceId}/image?size={RepresentativeImageSize}",
+            representative?.IsExplicit ?? false);
+
     private static PersonMaintenanceActionResponse ToResponse(
         CataloguePersonMaintenanceAction action) => new(
             action.Id,
@@ -220,6 +306,18 @@ public static class PersonMaintenanceEndpoints
         }
 
         id = PersonId.From(parsed);
+        return true;
+    }
+
+    private static bool TryFaceOccurrenceId(string value, out FaceOccurrenceId id)
+    {
+        id = default;
+        if (!Guid.TryParse(value, out Guid parsed) || parsed == Guid.Empty)
+        {
+            return false;
+        }
+
+        id = FaceOccurrenceId.From(parsed);
         return true;
     }
 
