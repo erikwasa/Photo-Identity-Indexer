@@ -36,6 +36,7 @@ public sealed class PhotoPlaceEnrichmentService
     private readonly IReverseGeocoder _geocoder;
     private readonly SqlitePhotoPlaceEnrichmentRepository _enrichment;
     private readonly SqliteAutomaticPhotoPlaceRepository _automaticPlaces;
+    private readonly SemaphoreSlim _executionGate = new(1, 1);
 
     public PhotoPlaceEnrichmentService(
         IReverseGeocoder geocoder,
@@ -54,6 +55,22 @@ public sealed class PhotoPlaceEnrichmentService
         int limit = 10,
         bool refresh = false,
         CancellationToken cancellationToken = default)
+    {
+        await _executionGate.WaitAsync(cancellationToken);
+        try
+        {
+            return await ExecuteBatchCoreAsync(limit, refresh, cancellationToken);
+        }
+        finally
+        {
+            _executionGate.Release();
+        }
+    }
+
+    private async Task<PhotoPlaceEnrichmentReport> ExecuteBatchCoreAsync(
+        int limit,
+        bool refresh,
+        CancellationToken cancellationToken)
     {
         IReadOnlyList<CataloguePlaceEnrichmentCandidate> candidates =
             await _enrichment.GetCandidatesAsync(

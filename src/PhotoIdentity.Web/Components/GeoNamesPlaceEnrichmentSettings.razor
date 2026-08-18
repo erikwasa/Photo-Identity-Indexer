@@ -8,7 +8,7 @@
         </div>
         @if (Status is not null)
         {
-            <span class="model-summary">GeoNames: @(Status.Configured ? "enabled" : "disabled")</span>
+            <span class="model-summary">GeoNames: @(Status.AutomaticEnrichmentEnabled ? "automatic" : Status.Configured ? "configured" : "disabled")</span>
         }
     </div>
 
@@ -47,6 +47,21 @@
                 <p>The configured GeoNames username is kept server-side and is never returned by this status API.</p>
             </div>
             <div>
+                <span class="field-label">Automatic worker</span>
+                <strong>@FormatWorkerState(Status.AutomaticState)</strong>
+                <p>@Status.AutomaticMessage</p>
+            </div>
+            <div>
+                <span class="field-label">Automatic provider pacing</span>
+                <strong>@FormatInterval(Status.AutomaticMinimumRequestIntervalMilliseconds)</strong>
+                <p>The background worker enforces this conservative floor independently of the raw provider-client setting.</p>
+            </div>
+            <div>
+                <span class="field-label">Next automatic check</span>
+                <strong>@FormatTimestamp(Status.NextAutomaticAttemptAtUtc)</strong>
+                <p>Newly persisted GPS metadata becomes eligible automatically; archive analysis does not wait for GeoNames.</p>
+            </div>
+            <div>
                 <span class="field-label">Service</span>
                 <strong>@Status.ServiceHost</strong>
                 <p>Requests use the configured secure GeoNames service contract.</p>
@@ -57,9 +72,14 @@
                 <p>GeoNames place names are requested using this startup setting.</p>
             </div>
             <div>
-                <span class="field-label">Minimum request interval</span>
+                <span class="field-label">Raw provider-client interval</span>
                 <strong>@FormatInterval(Status.MinimumRequestIntervalMilliseconds)</strong>
-                <p>Photo Identity spaces provider requests by at least this configured interval.</p>
+                <p>Manual maintenance requests also respect this lower-level provider client interval.</p>
+            </div>
+            <div>
+                <span class="field-label">Last automatic activity</span>
+                <strong>@FormatTimestamp(Status.LastAutomaticActivityAtUtc)</strong>
+                <p>The worker state is in-memory; completed enrichment state remains durable in SQLite and resumes after restart.</p>
             </div>
         </div>
 
@@ -67,30 +87,44 @@
         {
             <div class="notice warning">
                 GeoNames enrichment is disabled. Configure <code>PhotoIdentity__GeoNames__Username</code> in the packaged application's
-                <code>%LOCALAPPDATA%\PhotoIdentity\launcher.json</code>, then restart Photo Identity. Optional startup settings are
-                <code>PhotoIdentity__GeoNames__BaseUrl</code>, <code>PhotoIdentity__GeoNames__Language</code>, and
-                <code>PhotoIdentity__GeoNames__MinimumRequestIntervalMilliseconds</code>.
+                <code>%LOCALAPPDATA%\PhotoIdentity\launcher.json</code>, then restart Photo Identity. Once configured, automatic enrichment
+                starts without a manual batch. Optional startup settings are <code>PhotoIdentity__GeoNames__BaseUrl</code>,
+                <code>PhotoIdentity__GeoNames__Language</code>, and <code>PhotoIdentity__GeoNames__MinimumRequestIntervalMilliseconds</code>.
             </div>
         }
         else
         {
             <div class="notice warning">
-                <strong>External GPS disclosure:</strong> when you run enrichment, Photo Identity sends each selected photo's persisted latitude and longitude,
-                the configured GeoNames username, and the documented service parameters to GeoNames. It does not send photo bytes, filenames, source paths,
-                people, tags, or other catalogue metadata. The username remains server-side and is not shown here.
+                <strong>External GPS disclosure:</strong> automatic enrichment sends an eligible photo's persisted latitude and longitude,
+                the configured GeoNames username, and the documented service parameters to GeoNames. It does not send photo bytes, filenames,
+                source paths, people, tags, or other catalogue metadata. The username remains server-side and is not shown here.
             </div>
+
+            @if (!Status.AutomaticEnrichmentEnabled)
+            {
+                <div class="notice warning">
+                    Automatic enrichment is disabled by local configuration. Remove the override or set
+                    <code>PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled</code> to <code>true</code>, then restart Photo Identity.
+                </div>
+            }
+
+            <h3>Maintenance controls</h3>
+            <p class="field-help">
+                Normal operation does not require these controls. The background worker automatically resumes unattempted, failed and deferred GPS photos.
+                Use a small manual batch only for diagnostics, or force refresh when intentionally replacing existing automatic results.
+            </p>
 
             <div class="review-filter-grid">
                 <div>
-                    <label class="field-label" for="settings-geonames-batch-size">Maximum candidates this run</label>
+                    <label class="field-label" for="settings-geonames-batch-size">Maximum candidates this maintenance run</label>
                     <input id="settings-geonames-batch-size"
                            type="number"
                            min="1"
-                           max="250"
+                           max="8"
                            step="1"
                            @bind="BatchSize"
                            disabled="@Busy" />
-                    <p>Runs are bounded to 1–250 persisted-GPS candidates. Deferred or failed attempts remain eligible for a later run; a genuine no-result is treated as completed for the current provider contract.</p>
+                    <p>Browser maintenance runs are deliberately kept small. Long-running catalogue enrichment belongs to the automatic server-side worker.</p>
                 </div>
             </div>
 
@@ -99,7 +133,7 @@
                         class="button primary"
                         disabled="@(Busy || !ValidBatchSize)"
                         @onclick="RunEnrichmentAsync">
-                    @(Busy ? "Running…" : "Enrich GPS places")
+                    @(Busy ? "Running…" : "Run maintenance batch")
                 </button>
                 <button type="button"
                         class="button secondary"
@@ -110,14 +144,14 @@
             </div>
 
             <p class="field-help">
-                Normal runs reuse cached coordinate results and skip completed revisions. Force refresh bypasses the reverse-geocode cache for eligible automatic
+                A maintenance run reuses cached coordinate results and skips completed revisions. Force refresh bypasses the reverse-geocode cache for eligible automatic
                 results and can spend additional provider credits; manual places, explicit manual clears, unresolved migration conflicts, and completed no-result attempts remain protected.
             </p>
         }
 
         @if (LastReport is PhotoPlaceEnrichmentReportResponse report)
         {
-            <h3>Latest batch result</h3>
+            <h3>Latest maintenance result</h3>
             <div class="review-filter-grid" aria-live="polite">
                 <div>
                     <span class="field-label">Candidates</span>
@@ -137,7 +171,7 @@
                 <div>
                     <span class="field-label">No place / deferred / failed</span>
                     <strong>@report.NoResult / @report.Deferred / @report.Failed</strong>
-                    <p>@(report.StoppedEarly ? "The batch stopped after the provider response shown below." : "The bounded batch reached a normal stopping point.")</p>
+                    <p>@(report.StoppedEarly ? "The batch stopped after the provider response shown below." : "The bounded maintenance batch reached a normal stopping point.")</p>
                 </div>
             </div>
 
@@ -151,7 +185,7 @@
                         <p>
                             GeoNames requires confirmed accounts to enable free web-service access separately.
                             <a href="https://www.geonames.org/manageaccount" target="_blank" rel="noopener noreferrer">Open the GeoNames account page</a>,
-                            enable <strong>Free Web Services</strong>, then retry this batch.
+                            enable <strong>Free Web Services</strong>, then allow the automatic worker to retry.
                         </p>
                     }
                 </div>
@@ -183,14 +217,14 @@
 @code {
     private PhotoPlaceEnrichmentStatusResponse? Status { get; set; }
     private PhotoPlaceEnrichmentReportResponse? LastReport { get; set; }
-    private int BatchSize { get; set; } = 10;
+    private int BatchSize { get; set; } = 5;
     private bool Loading { get; set; } = true;
     private bool Busy { get; set; }
     private string? Error { get; set; }
     private string? Warning { get; set; }
     private string? Message { get; set; }
 
-    private bool ValidBatchSize => BatchSize is >= 1 and <= 250;
+    private bool ValidBatchSize => BatchSize is >= 1 and <= 8;
 
     protected override async Task OnInitializedAsync()
     {
@@ -228,7 +262,7 @@
     {
         if (!ValidBatchSize)
         {
-            Error = "GeoNames batch size must be between 1 and 250.";
+            Error = "GeoNames maintenance batch size must be between 1 and 8.";
             return;
         }
 
@@ -275,7 +309,7 @@
             }
             else if (LastReport.Deferred > 0)
             {
-                Warning = $"GeoNames enrichment paused or completed with {LastReport.Deferred} deferred request(s). See Photo-level provider results before retrying.";
+                Warning = $"GeoNames enrichment paused or completed with {LastReport.Deferred} deferred request(s). The automatic worker will retry eligible deferred work.";
             }
             else if (LastReport.NoResult > 0)
             {
@@ -285,7 +319,7 @@
             {
                 Message = refresh
                     ? $"GeoNames refresh finished: {LastReport.Assigned} automatic place assignment(s)."
-                    : $"GeoNames enrichment finished: {LastReport.Assigned} place assignment(s), {LastReport.CachedResults} cached result(s).";
+                    : $"GeoNames maintenance run finished: {LastReport.Assigned} place assignment(s), {LastReport.CachedResults} cached result(s).";
             }
         }
         catch (Exception exception)
@@ -305,6 +339,21 @@
         "failed" => "Failed",
         _ => outcome,
     };
+
+    private static string FormatWorkerState(string state) => state switch
+    {
+        "starting" => "Starting",
+        "running" => "Running",
+        "waiting" => "Waiting",
+        "idle" => "Idle",
+        "disabled" => "Disabled",
+        _ => state,
+    };
+
+    private static string FormatTimestamp(DateTimeOffset? value) =>
+        value is null
+            ? "Not yet"
+            : value.Value.ToLocalTime().ToString("g");
 
     private static string FormatInterval(int milliseconds) =>
         milliseconds == 0

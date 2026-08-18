@@ -141,7 +141,7 @@ milestones:
   - WI-0047
 - id: M18
   title: Operator application experience
-  status: in_progress
+  status: ready
   document: ../milestones/M18-application-experience.md
   work_items:
   - WI-0046
@@ -163,3 +163,4 @@ milestones:
   - WI-0062
   - WI-0063
   - WI-0064
+  - WI-0065

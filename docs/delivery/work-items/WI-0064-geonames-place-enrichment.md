@@ -24,7 +24,7 @@ GeoNames is the selected first reverse-geocoding provider for M19 follow-up work
 - Do not use the public `demo` account for application operation or automated tests.
 - Respect the provider's current credit/rate limits and attribution requirements; implementation must not hard-code assumptions that prevent using different limits or a paid GeoNames service later.
 
-The implementation uses `findNearbyPlaceNameJSON` through the secure GeoNames host. The request interval is configurable; the default is deliberately conservative for a normal free GeoNames account and can be changed for another service allowance without changing catalogue semantics.
+The implementation uses `findNearbyPlaceNameJSON` through the secure GeoNames host. The provider-client request interval is configurable so the service contract can be tuned without changing catalogue semantics. WI-0065 adds a separate conservative floor for unattended automatic processing.
 
 ## Place normalization
 
@@ -63,7 +63,7 @@ Merged PR #160 established the non-UI enrichment path:
 Merged PR #161 added the operator-facing workflow:
 
 - Settings reports configured/disabled provider state, service host, language and request pacing without returning the configured GeoNames username;
-- the maintainer can choose a bounded 1–250 candidate batch and explicitly run normal enrichment or force-refresh automatic places;
+- the maintainer can choose a bounded candidate batch and explicitly run normal enrichment or force-refresh automatic places;
 - normal execution explains cache reuse/resumability, while force refresh states that it bypasses cached reverse-geocode results and can spend additional provider credits;
 - the operator sees the latest in-session candidates, provider requests, cache reuse, assignment, protected manual/conflict skip, deferred/failure and early-stop counts;
 - the Settings surface states that persisted latitude/longitude, the configured GeoNames username and documented service parameters leave the machine when enrichment is invoked, while photo bytes, filenames, source paths, people, tags and other catalogue metadata do not;
@@ -72,7 +72,7 @@ Merged PR #161 added the operator-facing workflow:
 
 ### Live-provider corrective slice
 
-Maintainer verification on 2026-08-17 exposed three operator/runtime issues that are corrected in PR #165:
+Maintainer verification on 2026-08-17 exposed three operator/runtime issues that were corrected in PR #165:
 
 - the first live request failed because the GeoNames account had not enabled **Free Web Services**; the provider error was persisted but the Settings report discarded its reason and incorrectly presented the failed run as successful completion;
 - after web-service access was enabled, GeoNames enrichment successfully assigned correct automatic Places and Smart Collection location filtering found the assigned photo;
@@ -81,7 +81,13 @@ Maintainer verification on 2026-08-17 exposed three operator/runtime issues that
 - the existing SQLite catalogue is widened idempotently at startup, preserving existing tag IDs, place actions, enrichment attempts and cache rows; failed attempts remain retryable and require no manual catalogue cleanup;
 - operator reporting now preserves sanitized per-photo provider outcomes with an **Open photo** link, and genuine provider `no result` outcomes are distinguished from failures and completed terminally so normal runs do not spend credits retrying the same coordinates.
 
-Final WI-0064 acceptance still requires rerunning the affected live samples after PR #165 is merged, then completing manual-place protection, non-GPS exclusion and the small force-refresh check.
+### Post-merge live verification and orchestration follow-up
+
+On 2026-08-18 the maintainer reran the previously failed long-hierarchy revisions against the live GeoNames service. All three succeeded after the compatibility fix, confirming that the persisted `failed` rows were selected again and that valid provider hierarchies beyond the old 80-character limit can now be cached, persisted and assigned.
+
+The same session exposed an orchestration issue rather than a provider/catalogue failure: a large 200-candidate manual browser request with a one-second configured provider delay exceeded the browser HTTP timeout after roughly 100 seconds. Rows completed before request cancellation remained durable; later rows simply remained eligible and subsequent smaller runs continued successfully. A query for persisted `failed`/`deferred` attempts returned no rows after the successful retries.
+
+That browser-lifetime mismatch is moved to [WI-0065](WI-0065-automatic-place-enrichment.md). WI-0065 makes the normal workflow a server-side automatic worker that drains the existing durable queue independently of browser requests and archive analysis.
 
 ## In scope
 
@@ -89,7 +95,7 @@ Final WI-0064 acceptance still requires rerunning the affected live samples afte
 - Configure the GeoNames username and service settings through private local Photo Identity configuration; do not commit real credentials/account data.
 - Use the secure GeoNames endpoint and documented reverse-geocoding services appropriate for obtaining country, administrative region(s) and nearest populated locality.
 - Read latitude/longitude only from persisted `photo_capture_metadata`; reverse geocoding must not open source photos.
-- Add an explicit bounded/resumable enrichment operation for revisions with GPS but no completed GeoNames place attempt for the current provider/configuration contract.
+- Add a bounded/resumable enrichment operation for revisions with GPS but no completed GeoNames place attempt for the current provider/configuration contract.
 - Persist successful normalized results plus enough provenance to distinguish `manual` from `geonames` location assignment and to support retries/audit.
 - Cache/reuse completed reverse-geocoding results for identical coordinates/provider inputs where safe, so repeated runs do not spend unnecessary service credits.
 - Rate-limit outbound requests and stop/defer cleanly when provider limits, transient errors or network failures occur.
@@ -102,7 +108,7 @@ Final WI-0064 acceptance still requires rerunning the affected live samples afte
 
 ## Privacy and safety boundary
 
-Reverse geocoding sends latitude/longitude to GeoNames. It is disabled until explicitly configured and invoked, and the Settings operator surface states that GPS coordinates are sent to the external GeoNames service during enrichment.
+Reverse geocoding sends latitude/longitude to GeoNames. WI-0064 introduced it as an explicitly configured and manually invoked operation. WI-0065 keeps private username configuration as the explicit opt-in but changes normal execution to automatic background processing once configured; Settings must make that continuing external-GPS behavior clear.
 
 The operation does not send photo bytes, filenames, people, tags, source paths or other catalogue information to GeoNames. The configured GeoNames username is provider authentication/configuration and is not returned by the Photo Identity status API or displayed by the browser.
 
@@ -111,7 +117,7 @@ The operation does not send photo bytes, filenames, people, tags, source paths o
 - Downloading or maintaining GeoNames database extracts locally.
 - OpenStreetMap/Nominatim as the production provider for this work item.
 - Forward geocoding arbitrary typed addresses.
-- Automatically reverse geocoding photos without GPS metadata.
+- Reverse geocoding photos without GPS metadata.
 - Replacing a maintainer-entered manual place without explicit maintainer action.
 - Map tiles, maps, route planning or administrative polygon storage.
 
@@ -122,7 +128,7 @@ The operation does not send photo bytes, filenames, people, tags, source paths o
 - [x] Reverse geocoding operates from persisted GPS coordinates and never opens or hydrates the original photo.
 - [x] A successful response is normalized into the WI-0063 canonical place hierarchy with country, available administrative levels and populated locality as available.
 - [x] Provider-derived first-class Places are not constrained by the ordinary 80-character manual-tag path limit; existing catalogues are widened without recreation.
-- [x] The operation is explicit, bounded and resumable, with rate limiting and retry-safe handling of provider/network failures.
+- [x] The operation is bounded and resumable, with rate limiting and retry-safe handling of provider/network failures.
 - [x] Completed results can be cached/reused without unnecessary repeated provider requests.
 - [x] Automatic enrichment never silently overwrites a manual place, including an explicit manual clear.
 - [x] A later more-specific automatic result can replace an earlier automatic place while retaining provenance/audit history.
@@ -130,8 +136,9 @@ The operation does not send photo bytes, filenames, people, tags, source paths o
 - [x] Outbound requests contain coordinates/provider parameters only and do not disclose photo bytes, filenames, people, tags or private source paths.
 - [x] GeoNames attribution and external-GPS privacy behavior are documented and presented for the operator.
 - [x] Automated tests use a fake/stub GeoNames HTTP boundary and cover normalization, caching, retries, rate-limit/error handling, manual precedence, long provider hierarchies and no-hydration behavior.
-- [ ] A maintainer-configured live GeoNames sample and the consolidated M19 browser/operator pass are recorded as verification evidence.
+- [x] The three live `invalid-place-path` revisions were retried successfully after PR #165, confirming the long Places path fix against the configured maintainer GeoNames account.
+- [ ] The consolidated M19 browser/operator pass is recorded as final verification evidence.
 
 ## Verification requirements
 
-Automated provider-contract and catalogue tests must not depend on the live GeoNames service. Final local verification should use a configured maintainer GeoNames account against a small bounded sample of GPS-tagged photos and compare several resulting place paths with expected real-world locations. That live sample and the deferred WI-0061/WI-0062/WI-0063 browser checks are intentionally consolidated after the corrective slice so M19 is verified as one integrated operator workflow.
+Automated provider-contract and catalogue tests must not depend on the live GeoNames service. The live maintainer sample has now established provider access, geographically correct automatic assignment, Smart Collection location filtering and successful retry of the three former long-path failures. Remaining M19 verification can concentrate on the consolidated browser workflow plus WI-0065 automatic orchestration rather than repeating the same manual large-batch GeoNames exercise.

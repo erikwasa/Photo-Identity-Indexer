@@ -6,13 +6,26 @@ public static class PhotoPlaceEnrichmentEndpoints
     {
         endpoints.MapGet(
             "/api/place-enrichment/status",
-            (GeoNamesReverseGeocodingConfiguration configuration) => Results.Ok(new PhotoPlaceEnrichmentStatusResponse(
-                Provider: "geonames",
-                Configured: configuration.IsConfigured,
-                ContractKey: configuration.ContractKey,
-                ServiceHost: configuration.BaseUri.Host,
-                Language: configuration.Language,
-                MinimumRequestIntervalMilliseconds: configuration.MinimumRequestIntervalMilliseconds)));
+            (
+                GeoNamesReverseGeocodingConfiguration configuration,
+                GeoNamesAutomaticEnrichmentConfiguration automatic,
+                PhotoPlaceEnrichmentWorkerState workerState) =>
+            {
+                PhotoPlaceEnrichmentWorkerSnapshot worker = workerState.GetSnapshot();
+                return Results.Ok(new PhotoPlaceEnrichmentStatusResponse(
+                    Provider: "geonames",
+                    Configured: configuration.IsConfigured,
+                    ContractKey: configuration.ContractKey,
+                    ServiceHost: configuration.BaseUri.Host,
+                    Language: configuration.Language,
+                    MinimumRequestIntervalMilliseconds: configuration.MinimumRequestIntervalMilliseconds,
+                    AutomaticEnrichmentEnabled: automatic.Enabled && configuration.IsConfigured,
+                    AutomaticMinimumRequestIntervalMilliseconds: automatic.MinimumRequestIntervalMilliseconds,
+                    AutomaticState: worker.State,
+                    AutomaticMessage: worker.Message,
+                    LastAutomaticActivityAtUtc: worker.LastActivityAtUtc,
+                    NextAutomaticAttemptAtUtc: worker.NextAttemptAtUtc));
+            });
 
         endpoints.MapPost(
             "/api/place-enrichment/geonames",
@@ -54,6 +67,12 @@ public sealed record PhotoPlaceEnrichmentStatusResponse(
     string ContractKey,
     string ServiceHost,
     string Language,
-    int MinimumRequestIntervalMilliseconds);
+    int MinimumRequestIntervalMilliseconds,
+    bool AutomaticEnrichmentEnabled,
+    int AutomaticMinimumRequestIntervalMilliseconds,
+    string AutomaticState,
+    string AutomaticMessage,
+    DateTimeOffset? LastAutomaticActivityAtUtc,
+    DateTimeOffset? NextAutomaticAttemptAtUtc);
 
 public sealed record PhotoPlaceEnrichmentErrorResponse(string Error);
