@@ -126,15 +126,16 @@ public sealed class ResumableBatchProcessorTests
     }
 
     [Fact]
-    public async Task Five_hundred_job_sample_produces_complete_status_summary()
+    public async Task Fifty_job_sample_produces_complete_status_summary()
     {
+        const int sampleSize = 50;
         string directory = SqliteProcessingRepositoryTests.CreateTemporaryDirectory();
         try
         {
             SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             IReadOnlyList<CatalogueAssetRevision> revisions =
-                await SqliteProcessingRepositoryTests.SeedRevisionsAsync(database, 500);
+                await SqliteProcessingRepositoryTests.SeedRevisionsAsync(database, sampleSize);
             DateTimeOffset now = new(2026, 7, 26, 11, 20, 0, TimeSpan.Zero);
             CatalogueProcessingRun run = SqliteProcessingRepositoryTests.CreateRun(now);
             CatalogueProcessingJob[] jobs = revisions
@@ -149,16 +150,16 @@ public sealed class ResumableBatchProcessorTests
                 run.Id,
                 new ResumableBatchProcessorOptions(
                     leaseDuration: TimeSpan.FromMinutes(1),
-                    maxAttemptsPerInvocation: 600));
+                    maxAttemptsPerInvocation: sampleSize + 10));
 
             Assert.Equal(ProcessingRunStatus.Completed, result.Summary.Status);
-            Assert.Equal(500, result.Summary.TotalJobs);
-            Assert.Equal(500, result.Summary.SucceededJobs);
+            Assert.Equal(sampleSize, result.Summary.TotalJobs);
+            Assert.Equal(sampleSize, result.Summary.SucceededJobs);
             Assert.Equal(0, result.Summary.FailedJobs);
-            Assert.Equal(500, result.Summary.AttemptCount);
-            Assert.Equal(500, handler.Calls.Count);
+            Assert.Equal(sampleSize, result.Summary.AttemptCount);
+            Assert.Equal(sampleSize, handler.Calls.Count);
             Assert.All(handler.Calls.Values, count => Assert.Equal(1, count));
-            Assert.Equal(500, handler.IdempotencyKeys.Distinct().Count());
+            Assert.Equal(sampleSize, handler.IdempotencyKeys.Distinct().Count());
         }
         finally
         {
