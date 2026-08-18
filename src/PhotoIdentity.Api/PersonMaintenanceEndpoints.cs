@@ -228,6 +228,7 @@ public static class PersonMaintenanceEndpoints
         string id,
         MergePersonRequest request,
         SqlitePersonMaintenanceRepository repository,
+        SqliteCatalogueDatabase database,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -239,6 +240,7 @@ public static class PersonMaintenanceEndpoints
 
         try
         {
+            await SqlitePersonFeaturedFaceSchema.EnsureAsync(database, cancellationToken);
             CataloguePersonMaintenanceAction action = await repository.MergeAsync(
                 sourcePersonId,
                 targetPersonId,
