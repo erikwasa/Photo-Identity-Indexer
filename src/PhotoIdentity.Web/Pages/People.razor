@@ -8,7 +8,7 @@
     <div>
         <p class="eyebrow">Canonical identity maintenance</p>
         <h1>Maintain people</h1>
-        <p>Rename a person with reversible audit history, consolidate duplicates with an explicitly irreversible merge, and keep frequently used people at the top of selectors.</p>
+        <p>Rename a person with reversible audit history, consolidate duplicates with an explicitly irreversible merge, keep frequently used people at the top of selectors, and control whether each person is offered in Smart Collection people selection.</p>
     </div>
 
     <form class="person-creator" @onsubmit="CreatePersonAsync" @onsubmit:preventDefault>
@@ -59,6 +59,7 @@ else
         {
             <article class="person-summary-card">
                 <strong>@FavoriteLabel(person)</strong>
+                <span class="state-badge">@SmartCollectionVisibilityLabel(person)</span>
                 <span>@person.LabelCount label@(person.LabelCount == 1 ? "" : "s")</span>
                 <span>@person.SuggestionCount suggestion@(person.SuggestionCount == 1 ? "" : "s")</span>
                 <button type="button"
@@ -67,6 +68,13 @@ else
                         aria-pressed="@person.IsFavorite"
                         @onclick="() => ToggleFavoriteAsync(person)">
                     @(person.IsFavorite ? "Remove favorite" : "Add favorite")
+                </button>
+                <button type="button"
+                        class="button secondary"
+                        disabled="@Busy"
+                        aria-pressed="@person.HiddenFromSmartCollections"
+                        @onclick="() => ToggleSmartCollectionVisibilityAsync(person)">
+                    @(person.HiddenFromSmartCollections ? "Show in Smart Collections" : "Hide from Smart Collections")
                 </button>
             </article>
         }
@@ -268,6 +276,18 @@ else
                 : $"Removed {person.DisplayName} from favorites.");
     }
 
+    private async Task ToggleSmartCollectionVisibilityAsync(PersonMaintenancePersonResponse person)
+    {
+        bool hidden = !person.HiddenFromSmartCollections;
+        await ApplyAsync(
+            () => Http.PutAsJsonAsync(
+                $"api/review/people/{Uri.EscapeDataString(person.Id)}/smart-collection-visibility",
+                new SetPersonSmartCollectionVisibilityRequest(hidden)),
+            hidden
+                ? $"Hidden {person.DisplayName} from Smart Collection people selection."
+                : $"Made {person.DisplayName} available in Smart Collection people selection.");
+    }
+
     private async Task RenameAsync()
     {
         string personId = SelectedPersonId;
@@ -320,6 +340,11 @@ else
 
     private static string FavoriteLabel(PersonMaintenancePersonResponse person) =>
         person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
+
+    private static string SmartCollectionVisibilityLabel(PersonMaintenancePersonResponse person) =>
+        person.HiddenFromSmartCollections
+            ? "Hidden from Smart Collections"
+            : "Available in Smart Collections";
 
     private static string ActionLabel(PersonMaintenanceActionResponse action) => action.Kind switch
     {
