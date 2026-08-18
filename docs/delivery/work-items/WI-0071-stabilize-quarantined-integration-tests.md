@@ -72,7 +72,23 @@ The first stabilization slice intentionally changes only `ReviewProgressFilterAp
 - keep `ReviewProgressFilterApplicationTests.Model_filter_requires_both_model_id_and_exact_hash` in `.github/flaky-integration-tests.txt` after this change; one green PR is not enough to restore blocking status;
 - count only representative CI diagnostic runs after this stabilization change toward the three-run exit criterion.
 
-The remaining three quarantined classes stay unchanged in this slice. If the migrated review-progress test remains clean through its evidence window, remove only that quarantine entry and prove it executes exactly once in the required shard before migrating/restoring the next case.
+PR #182 merged this slice as `05ecbf396b463c20732f1d18e02ec6336c81bccb`. Workflow #1139 (`32192474363`) was green: all four quarantined diagnostics executed exactly once and passed with no retries, so the review-progress case has clean post-change sample **1/3**. Both required integration shards also passed exact coverage, and the test/docs-only PR retained the WI-0070 fast path with launcher/package skipped.
+
+### Slice 2 — migrate the person-visibility quarantine case
+
+The second stabilization slice moves only `PersonSmartCollectionVisibilityApplicationTests` to the shared host. This class is deliberately different from Slice 1 because it exercises state-changing visibility and merge endpoints rather than only read/validation paths.
+
+- replace the local `ReviewApiFactory` with `PhotoIdentityApiTestFactory` for all three tests in the class;
+- route successful visibility updates and person merges through the bounded-body success diagnostic helper;
+- route the unknown-person 404 assertion through the expected-status diagnostic helper so an unexpected 500 preserves response context;
+- keep `PersonSmartCollectionVisibilityApplicationTests.Merge_preserves_the_surviving_person_visibility_and_discards_the_retired_source_preference` quarantined while its own three-run evidence window begins;
+- retain the review-progress quarantine entry until it reaches its own three consecutive post-change samples.
+
+Workflow #1143 (`32193192370`) validated this slice on PR #184: both required integration shards passed exact once-only coverage, all four quarantined diagnostics ran exactly once and passed with no retry, living/generated documentation passed, the PR `PublishedMinimum` smoke and mixed-media checks passed, and launcher/package verification was correctly skipped. This advances the review-progress case to **2/3** clean post-change samples and starts the person-visibility case at **1/3**.
+
+The same workflow exposed a separate CI timing outlier that does not implicate this host migration. Shard 2 passed all 143 assigned tests but took 7m19s of test execution and recorded 439.4s aggregate test duration, compared with 64.5s for the same 143-test shard in workflow #1139. The unchanged `IdentityAutoAssignmentManualSupersessionTests.Manual_reassignment_supersedes_automatic_assignment_for_later_matching` case alone moved from 0.75s in #1139 to 124.39s in #1143. Multiple other unchanged classes were also materially slower. Do not rebalance the timing baseline from this single outlier; WI-0070 should retain measured follow-up for runner/test-duration variance and use additional natural runs or a robust multi-run baseline before changing shard weights.
+
+The remaining collection-query and suggestion-gallery quarantined classes stay unchanged in this slice. No retry or quarantine removal is introduced.
 
 ## Non-goals
 

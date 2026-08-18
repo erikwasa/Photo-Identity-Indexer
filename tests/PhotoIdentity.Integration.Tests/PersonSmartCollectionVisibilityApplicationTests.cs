@@ -1,6 +1,5 @@
+using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
@@ -24,7 +23,7 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
             CatalogueReviewPerson ada = await reviewRepository.CreatePersonAsync("Ada", now);
             CatalogueReviewPerson grace = await reviewRepository.CreatePersonAsync("Grace", now.AddMinutes(1));
 
-            await using ReviewApiFactory factory = new(databasePath);
+            await using PhotoIdentityApiTestFactory factory = new(databasePath);
             using HttpClient client = factory.CreateClient();
 
             await SetHiddenAsync(client, grace.Id.ToString(), hidden: true);
@@ -87,7 +86,7 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
             await visibility.SetHiddenAsync(hiddenSource.Id, true, now.AddMinutes(4));
             await visibility.SetHiddenAsync(hiddenTarget.Id, true, now.AddMinutes(5));
 
-            await using ReviewApiFactory factory = new(databasePath);
+            await using PhotoIdentityApiTestFactory factory = new(databasePath);
             using HttpClient client = factory.CreateClient();
             await MergeAsync(client, hiddenSource.Id.ToString(), visibleTarget.Id.ToString());
             await MergeAsync(client, visibleSource.Id.ToString(), hiddenTarget.Id.ToString());
@@ -119,13 +118,15 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
             string databasePath = Path.Combine(directory, "catalogue.db");
             await new SqliteCatalogueDatabase(databasePath).InitializeAsync();
 
-            await using ReviewApiFactory factory = new(databasePath);
+            await using PhotoIdentityApiTestFactory factory = new(databasePath);
             using HttpClient client = factory.CreateClient();
             using HttpResponseMessage response = await client.PutAsJsonAsync(
                 $"/api/review/people/{Guid.NewGuid():D}/smart-collection-visibility",
                 new SetPersonSmartCollectionVisibilityRequest(true));
 
-            Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+            await response.EnsureStatusCodeWithDiagnosticBodyAsync(
+                HttpStatusCode.NotFound,
+                "unknown-person smart-collection visibility update");
         }
         finally
         {
@@ -138,7 +139,7 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
         using HttpResponseMessage response = await client.PutAsJsonAsync(
             $"/api/review/people/{personId}/smart-collection-visibility",
             new SetPersonSmartCollectionVisibilityRequest(hidden));
-        response.EnsureSuccessStatusCode();
+        await response.EnsureSuccessWithDiagnosticBodyAsync("smart-collection visibility update");
     }
 
     private static async Task MergeAsync(HttpClient client, string sourcePersonId, string targetPersonId)
@@ -146,7 +147,7 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
         using HttpResponseMessage response = await client.PostAsJsonAsync(
             $"/api/review/people/{sourcePersonId}/merge",
             new MergePersonRequest(targetPersonId, true, "local-reviewer"));
-        response.EnsureSuccessStatusCode();
+        await response.EnsureSuccessWithDiagnosticBodyAsync("person merge");
     }
 
     private static string CreateTemporaryDirectory()
@@ -164,21 +165,6 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
         if (Directory.Exists(directory))
         {
             Directory.Delete(directory, recursive: true);
-        }
-    }
-
-    private sealed class ReviewApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
-    {
-        private readonly string _databasePath;
-
-        public ReviewApiFactory(string databasePath)
-        {
-            _databasePath = databasePath;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
         }
     }
 }
