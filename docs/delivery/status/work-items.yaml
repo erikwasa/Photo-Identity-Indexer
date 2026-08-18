@@ -466,31 +466,48 @@ work_items:
 - id: WI-0067
   title: Add featured representative faces for people
   milestone: M19
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0067-featured-person-face.md
   started_at: 2026-08-18
-  last_updated_at: 2026-08-18
-  branch: agent/WI-0067-featured-person-face
+  last_updated_at: 2026-08-19
+  branch: agent/WI-0067-face-details-featured-controls
   blockers:
   - WI-0033
   - WI-0042
-  blocker_notes: []
+  blocker_notes:
+  - Implementation merged through PRs #175 and #178; exact-head workflow #1131 passed. Focused browser verification is deferred to the consolidated M19 maintainer pass.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/175
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/178
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32189503868
+  - type: merge_commit
+    value: f88bc5678503875e725bc36881a73eb0f13c772c
 - id: WI-0068
   title: Make Smart Collection people selection searchable and portrait-led
   milestone: M19
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0068-searchable-smart-collection-people.md
+  started_at: 2026-08-18
+  last_updated_at: 2026-08-19
+  branch: agent/WI-0068-smart-collection-people-picker
   blockers:
   - WI-0050
   - WI-0066
   - WI-0067
-  blocker_notes: []
-  evidence: []
+  blocker_notes:
+  - Implementation merged through PR #181; exact-head workflow #1135 passed. Focused browser verification is deferred to the consolidated M19 maintainer pass.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/181
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32191133225
+  - type: merge_commit
+    value: 2491c206dd76cb4354044fe420c6d5ff4a01c62a
 - id: WI-0069
   title: Reduce GitHub Actions feedback time
   milestone: M00
