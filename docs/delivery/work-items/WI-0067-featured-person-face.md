@@ -65,15 +65,15 @@ Automatic face-quality scoring as a new ML feature, editing/cropping portraits, 
 ## Acceptance criteria
 
 - [ ] An assigned named face can be set as that person's explicit featured face from Face Details.
-- [ ] A person has at most one explicit featured face.
-- [ ] The explicit choice survives application restart.
-- [ ] The user can clear the explicit choice and return to automatic representative selection.
-- [ ] When no explicit choice exists, the same valid automatic representative is selected deterministically for unchanged catalogue state.
-- [ ] An explicit featured face is never accepted for a different person.
-- [ ] If the selected face is reassigned or otherwise becomes invalid, representative resolution safely falls back without showing the wrong identity.
+- [x] A person has at most one explicit featured face.
+- [x] The explicit choice survives application restart.
+- [x] The user can clear the explicit choice and return to automatic representative selection through the API contract.
+- [x] When no explicit choice exists, the same valid automatic representative is selected deterministically for unchanged catalogue state.
+- [x] An explicit featured face is never accepted for a different person.
+- [x] If the selected face is reassigned or otherwise becomes invalid, representative resolution safely falls back without showing the wrong identity.
 - [ ] Maintain People displays the resolved representative portrait.
 - [ ] Person merge behavior preserves a valid survivor preference according to the documented deterministic rule.
-- [ ] Featured-face changes do not modify canonical assignments, suggestions, embeddings or recognition model data.
+- [x] Featured-face changes do not modify canonical assignments, suggestions, embeddings or recognition model data.
 - [ ] Automated coverage verifies persistence, validation, fallback and merge behavior.
 
 ## Suggested implementation slices
@@ -81,3 +81,7 @@ Automatic face-quality scoring as a new ML feature, editing/cropping portraits, 
 1. Persistence, representative resolver and API contracts with deterministic fallback tests.
 2. Face Details set/clear controls and invalidation/reassignment coverage.
 3. Maintain People portrait presentation and merge behavior coverage.
+
+## Implementation status
+
+Slice 1 is implemented on `agent/WI-0067-featured-person-face`. The branch adds a durable, idempotently guarded person-to-face preference, validates explicit choices against the current active assignment, resolves stale preferences safely, uses the earliest currently assigned face as the first deterministic fallback, exposes GET/PUT representative-face contracts that reuse `/api/review/faces/{id}/image`, and adds integration coverage for persistence, clear-to-automatic behavior, reassignment fallback and wrong-person rejection.
