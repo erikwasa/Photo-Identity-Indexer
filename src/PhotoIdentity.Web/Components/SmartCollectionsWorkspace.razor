@@ -96,25 +96,9 @@
                             </select>
                         </label>
 
-                        <div class="smart-option-list" role="group" aria-label="People filter">
-                            @if (!OrderedPeople.Any(person => !person.HiddenFromSmartCollections || SelectedPeople.Contains(person.Id)))
-                            {
-                                <span class="smart-muted">No people available.</span>
-                            }
-                            else
-                            {
-                                @foreach (ReviewPersonResponse person in OrderedPeople.Where(person => !person.HiddenFromSmartCollections || SelectedPeople.Contains(person.Id)))
-                                {
-                                    <label class="smart-check-option">
-                                        <input type="checkbox"
-                                               checked="@SelectedPeople.Contains(person.Id)"
-                                               disabled="@Busy"
-                                               @onchange="args => TogglePerson(person.Id, args)" />
-                                        <span>@(person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName)@(person.HiddenFromSmartCollections ? " · Hidden" : "")</span>
-                                    </label>
-                                }
-                            }
-                        </div>
+                        <SmartCollectionPeoplePicker People="People"
+                                                     SelectedPersonIds="SelectedPeople"
+                                                     Disabled="Busy" />
                     </fieldset>
 
                     <fieldset class="smart-filter-card">
