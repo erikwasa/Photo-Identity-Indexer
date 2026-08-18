@@ -12,6 +12,7 @@ milestones:
   - WI-0057
   - WI-0069
   - WI-0070
+  - WI-0071
 - id: M01
   title: Single-image inference
   status: completed

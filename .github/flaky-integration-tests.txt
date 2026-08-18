@@ -1,0 +1,11 @@
+# Temporarily quarantined integration tests.
+#
+# These tests remain visible in the non-blocking flaky diagnostic step and are never retried.
+# WI-0071 owns stabilization. Return an entry to the required integration shards after its
+# root cause/shared-host migration is complete and it passes three consecutive diagnostic runs
+# without a transient HTTP 500.
+
+PhotoIdentity_Integration_Tests.CollectionQueryApplicationTests.Confirmed_collection_queries_support_explicit_any_and_all_semantics_without_paths
+PhotoIdentity_Integration_Tests.ReviewProgressFilterApplicationTests.Model_filter_requires_both_model_id_and_exact_hash
+PhotoIdentity_Integration_Tests.PersonSmartCollectionVisibilityApplicationTests.Merge_preserves_the_surviving_person_visibility_and_discards_the_retired_source_preference
+PhotoIdentity_Integration_Tests.ReviewSuggestionGalleryApplicationTests.Gallery_requires_exact_model_revision_and_rejects_unknown_sort_or_confidence_group

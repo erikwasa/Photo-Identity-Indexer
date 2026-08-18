@@ -15,6 +15,13 @@ $trxFiles = @(Get-ChildItem -Path $ResultsDirectory -Filter "*.trx" -File -Recur
 
 foreach ($trxFile in $trxFiles) {
     [xml] $document = Get-Content $trxFile.FullName -Raw
+    $classByTestId = @{}
+    foreach ($definition in @($document.TestRun.TestDefinitions.UnitTest)) {
+        if ($null -ne $definition.TestMethod) {
+            $classByTestId[[string] $definition.id] = [string] $definition.TestMethod.className
+        }
+    }
+
     $unitResults = @($document.TestRun.Results.UnitTestResult)
     foreach ($result in $unitResults) {
         $testName = [string] $result.testName
@@ -28,8 +35,20 @@ foreach ($trxFile in $trxFiles) {
             [TimeSpan]::TryParse($durationText, [ref] $duration) | Out-Null
         }
 
-        $lastDot = $testName.LastIndexOf('.')
-        $className = if ($lastDot -gt 0) { $testName.Substring(0, $lastDot) } else { $testName }
+        $testId = [string] $result.testId
+        $className = if ($classByTestId.ContainsKey($testId)) {
+            [string] $classByTestId[$testId]
+        }
+        else {
+            $nameWithoutArguments = $testName
+            $argumentIndex = $nameWithoutArguments.IndexOf('(')
+            if ($argumentIndex -ge 0) {
+                $nameWithoutArguments = $nameWithoutArguments.Substring(0, $argumentIndex)
+            }
+            $lastDot = $nameWithoutArguments.LastIndexOf('.')
+            if ($lastDot -gt 0) { $nameWithoutArguments.Substring(0, $lastDot) } else { $nameWithoutArguments }
+        }
+
         $results.Add([pscustomobject]@{
             testName = $testName
             className = $className
@@ -60,13 +79,36 @@ $classSummaries = @(
         Select-Object -First $Top
 )
 
-$totalRecordedDuration = ($results | Measure-Object durationMilliseconds -Sum).Sum
+$shardSummaries = @(
+    $results |
+        Group-Object resultFile |
+        ForEach-Object {
+            $items = @($_.Group)
+            $total = ($items | Measure-Object durationMilliseconds -Sum).Sum
+            [pscustomobject]@{
+                resultFile = $_.Name
+                testCount = $items.Count
+                failedCount = @($items | Where-Object { $_.outcome -eq "Failed" }).Count
+                totalRecordedDurationMilliseconds = [Math]::Round([double]($total ?? 0), 3)
+            }
+        } |
+        Sort-Object resultFile
+)
+
+$totalRecordedDuration = if ($results.Count -gt 0) {
+    [double](($results | Measure-Object durationMilliseconds -Sum).Sum ?? 0)
+}
+else {
+    0.0
+}
+
 $summary = [ordered]@{
     generatedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
     resultFiles = @($trxFiles | ForEach-Object { $_.Name })
     testCount = $results.Count
     failedCount = @($results | Where-Object { $_.outcome -eq "Failed" }).Count
-    totalRecordedDurationMilliseconds = [Math]::Round([double]($totalRecordedDuration ?? 0), 3)
+    totalRecordedDurationMilliseconds = [Math]::Round($totalRecordedDuration, 3)
+    shards = $shardSummaries
     slowestClasses = $classSummaries
     slowestTests = $slowestTests
 }
@@ -79,11 +121,23 @@ $lines = [System.Collections.Generic.List[string]]::new()
 $lines.Add("## Integration test timing")
 if ($results.Count -eq 0) {
     $lines.Add("")
-    $lines.Add("No TRX timing results were available. The integration test step may have been skipped before execution.")
+    $lines.Add("No TRX timing results were available. The integration test step may have been skipped or failed before producing results.")
 }
 else {
     $lines.Add("")
     $lines.Add("Recorded $($results.Count) tests across $($trxFiles.Count) TRX file(s); failures: $($summary.failedCount).")
+
+    if ($shardSummaries.Count -gt 1) {
+        $lines.Add("")
+        $lines.Add("### Shard recorded durations")
+        $lines.Add("")
+        $lines.Add("| Result file | Tests | Failed | Recorded test time |")
+        $lines.Add("|---|---:|---:|---:|")
+        foreach ($shard in $shardSummaries) {
+            $lines.Add("| $($shard.resultFile) | $($shard.testCount) | $($shard.failedCount) | {0:N2}s |" -f ($shard.totalRecordedDurationMilliseconds / 1000.0))
+        }
+    }
+
     $lines.Add("")
     $lines.Add("### Slowest classes")
     $lines.Add("")

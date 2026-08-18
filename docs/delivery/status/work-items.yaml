@@ -522,8 +522,28 @@ work_items:
   document: ../work-items/WI-0070-pr-validation-streamlining.md
   started_at: 2026-08-18
   last_updated_at: 2026-08-18
-  branch: agent/WI-0070-ci-test-isolation
+  branch: agent/WI-0070-integration-shards
   blockers:
   - WI-0069
-  blocker_notes: []
+  blocker_notes:
+  - Slice 1 merged through PR #176 and workflow #1093 established timing evidence and the shared generic API test host. Slice 2 is active in PR #177; transient API-host failures are temporarily isolated into a visible diagnostic lane and stabilization is tracked by WI-0071.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/176
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32178207171
+  - type: merge_commit
+    value: ca17c5fb01981480d9c7d79b53ef75383415fe04
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/177
+- id: WI-0071
+  title: Stabilize quarantined API integration tests
+  milestone: M00
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0071-stabilize-quarantined-integration-tests.md
+  blockers:
+  - WI-0070
+  blocker_notes:
+  - Temporarily quarantined tests remain visible in the non-blocking diagnostic lane and require a root-cause/shared-host stabilization change plus three consecutive clean diagnostic CI runs before returning to the required shards.
   evidence: []

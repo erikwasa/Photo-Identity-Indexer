@@ -56,49 +56,31 @@ jobs:
       - name: Test fast assemblies
         shell: pwsh
         run: |
-          dotnet test PhotoIdentity.slnx --configuration Release --no-build --filter "FullyQualifiedName!~PhotoIdentity_Integration_Tests" 2>&1 | Tee-Object -FilePath fast-test.log
+          dotnet test PhotoIdentity.slnx --configuration Release --no-build --filter "FullyQualifiedName!~PhotoIdentity_Integration_Tests&FullyQualifiedName!~PhotoIdentity.Integration.Tests" 2>&1 | Tee-Object -FilePath fast-test.log
           exit $LASTEXITCODE
-
-      - name: Test integration assembly
-        shell: pwsh
-        run: |
-          $resultsDirectory = Join-Path $PWD ".artifacts/test-results"
-          New-Item -ItemType Directory -Path $resultsDirectory -Force | Out-Null
-          dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj `
-            --configuration Release `
-            --no-build `
-            --logger "trx;LogFileName=integration-tests.trx" `
-            --results-directory $resultsDirectory `
-            2>&1 | Tee-Object -FilePath integration-test.log
-          exit $LASTEXITCODE
-
-      - name: Summarize integration test timings
-        if: always()
-        shell: pwsh
-        run: ./.github/scripts/summarize-test-timings.ps1
-
-      - name: Upload test timing evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-timing-evidence
-          path: |
-            .artifacts/test-results
-            .artifacts/test-timings
-          retention-days: 3
-          if-no-files-found: warn
 
       - name: Upload test diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-diagnostics
-          path: |
-            fast-test.log
-            integration-test.log
-            .artifacts/test-timings/test-timings.json
-            .artifacts/test-timings/test-timings.md
+          name: fast-test-diagnostics
+          path: fast-test.log
           retention-days: 1
+          if-no-files-found: warn
+
+      - name: Run quarantined integration diagnostics
+        id: flaky-integration-diagnostics
+        continue-on-error: true
+        shell: pwsh
+        run: ./.github/scripts/run-flaky-integration-diagnostics.ps1
+
+      - name: Upload quarantined integration diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flaky-integration-diagnostics
+          path: .artifacts/flaky-integration-results
+          retention-days: 3
           if-no-files-found: warn
 
       - name: Validate living documentation
@@ -207,6 +189,49 @@ jobs:
           name: local-verification-diagnostics
           path: .artifacts/local-verification/verification-report.json
           retention-days: 1
+
+  integration-tests:
+    name: integration-shard-${{ matrix.shard }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore integration project
+        run: dotnet restore tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj
+
+      - name: Build integration project
+        run: dotnet build tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj --configuration Release --no-restore
+
+      - name: Test integration shard
+        shell: pwsh
+        run: ./.github/scripts/run-integration-shards.ps1 -ShardCount 2 -ShardNumber ${{ matrix.shard }}
+
+      - name: Summarize integration shard timings
+        if: always()
+        shell: pwsh
+        run: ./.github/scripts/summarize-test-timings.ps1
+
+      - name: Upload integration shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-shard-${{ matrix.shard }}-evidence
+          path: |
+            .artifacts/test-results
+            .artifacts/test-shards
+            .artifacts/test-timings
+          retention-days: 3
+          if-no-files-found: warn
 
   launcher-verification:
     runs-on: windows-latest

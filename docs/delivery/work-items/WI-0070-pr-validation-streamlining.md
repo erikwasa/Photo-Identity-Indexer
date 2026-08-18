@@ -83,21 +83,21 @@ The detailed strategy document should carry rationale and examples. `AGENTS.md` 
 
 ## Acceptance criteria
 
-- [ ] CI exposes enough timing data to identify slow test assemblies and the dominant slow integration classes/tests without reconstructing timestamps manually.
+- [x] CI exposes enough timing data to identify slow test assemblies and the dominant slow integration classes/tests without reconstructing timestamps manually.
 - [ ] Generic API integration tests use a shared host setup that disables irrelevant production hosted services by default; worker-specific tests explicitly opt in or exercise worker cycles directly.
-- [ ] The remaining transient HTTP 500 failure class has improved diagnostics and a documented root cause or narrowly tracked stabilization follow-up.
-- [ ] Integration coverage is partitioned into isolated sequential shards/processes so the required PR critical path no longer waits for the entire host-heavy assembly serially in one process.
-- [ ] In-process xUnit parallelism remains disabled for host-heavy integration tests unless later evidence demonstrates a safe replacement architecture.
-- [ ] Any temporarily quarantined flaky tests are visible in CI, tracked, non-silently retried, and have a documented condition for returning to the required gate.
+- [x] The remaining transient HTTP 500 failure class has improved diagnostics and a documented root cause or narrowly tracked stabilization follow-up. WI-0071 owns the remaining ad-hoc API-host cases and their quarantine exit evidence.
+- [x] Integration coverage is partitioned into isolated sequential shards/processes so the required PR critical path no longer waits for the entire host-heavy assembly serially in one process.
+- [x] In-process xUnit parallelism remains disabled for host-heavy integration tests unless later evidence demonstrates a safe replacement architecture.
+- [x] Any temporarily quarantined flaky tests are visible in CI, tracked, non-silently retried, and have a documented condition for returning to the required gate. `.github/flaky-integration-tests.txt` is the canonical temporary list; WI-0071 requires a stabilization change plus three consecutive clean diagnostic runs before restoration.
 - [ ] Published review smoke on PRs is reduced to behavior that adds unique signal beyond integration tests, while comprehensive published-app coverage remains on `main` or another explicit full gate.
 - [ ] Launcher/package checks no longer run on unrelated PR changes unless evidence shows keeping them unconditional is cheaper/safer than path-aware gating.
 - [ ] A comprehensive `main` gate retains the meaningful integration, published application, launcher and package coverage moved off the fast PR path.
 - [ ] At least three representative successful PR runs show the required validation critical path at or below 6 minutes, or the work item records measured evidence for the remaining blocker and a follow-up needed to reach that target.
-- [ ] Runner-minute impact is recorded as well as wall-clock impact so speed is not achieved by an unreasonable multiplication of expensive Windows jobs.
-- [ ] A durable testing/CI strategy document is added and linked from the repository documentation index where appropriate.
-- [ ] `AGENTS.md` contains concise rules for test-layer choice, host-heavy integration tests, flaky-test handling, and PR descriptions/CI-impact reporting.
-- [ ] PR guidance makes test-layer additions and material CI-cost changes explicit instead of allowing them to accumulate silently.
-- [ ] `PhotoIdentity.Docs validate` and `generate --check` pass after the work-item and documentation changes.
+- [x] Runner-minute impact is recorded as well as wall-clock impact so speed is not achieved by an unreasonable multiplication of expensive Windows jobs.
+- [x] A durable testing/CI strategy document is added and linked from the repository documentation index where appropriate.
+- [x] `AGENTS.md` contains concise rules for test-layer choice, host-heavy integration tests, flaky-test handling, and PR descriptions/CI-impact reporting.
+- [x] PR guidance makes test-layer additions and material CI-cost changes explicit instead of allowing them to accumulate silently.
+- [x] `PhotoIdentity.Docs validate` and `generate --check` pass after the Slice 1 work-item and documentation changes.
 
 ## Non-goals
 
@@ -117,11 +117,30 @@ The detailed strategy document should carry rationale and examples. `AGENTS.md` 
 
 ## Implementation notes
 
-### Slice 1 in progress — 2026-08-18
+### Slice 1 validated — 2026-08-18
 
-- CI now separates the fast/non-integration pass from the sequential integration assembly. The integration command writes TRX to `.artifacts/test-results` rather than being buried inside one solution-level test command.
-- `.github/scripts/summarize-test-timings.ps1` converts the integration TRX into JSON plus a GitHub Step Summary showing the slowest classes and individual tests. The timing artifact is retained even when the test run fails.
-- `PhotoIdentityApiTestFactory` is the shared generic API host foundation. It keeps detailed errors enabled and removes `PhotoPlaceEnrichmentHostedService`, `ArchiveAdvancementHostedService` and `IdentityMatchRegenerationHostedService` from generic test hosts by default.
-- The two hosted-style tests that failed in PR #173 are the first migrations to the shared factory and are tagged `Category=FlakyDiagnostic` for visibility only. They remain required; there is no retry or quarantine behavior in Slice 1.
-- The shared HTTP helper reads a bounded response body before throwing on non-success, so a future 500 can retain server-side diagnostic content instead of only the status exception.
-- `docs/operations/testing-and-ci-strategy.md` and concise `AGENTS.md` rules are added early in the work item so future PR/test work follows the intended layer and cost discipline while later slices refine the gate.
+- PR #176 merged as `ca17c5fb01981480d9c7d79b53ef75383415fe04` after successful workflow #1093 (`32178207171`).
+- CI separates the fast/non-integration pass from the sequential integration assembly and publishes TRX plus JSON/Markdown timing evidence.
+- Workflow #1093 completed `build-and-test` in about 6m58s. The full 294-test integration command took about 3m37s wall-clock and recorded 216.9s of aggregate test duration.
+- Two classes dominate the measured integration cost: `ResumableBatchProcessorTests` recorded about 40.2s and `DetectorEvaluationComparisonApplicationTests` about 38.5s. The next class was about 6.3s, confirming that test-count-only partitioning would be badly imbalanced.
+- The first shared-host migrations passed in #1093 without reproducing their prior HTTP 500 failures. The bounded non-success response diagnostic remains in place if the failure returns.
+- The #1093 fast-filter command exposed a second namespace spelling used by 16 integration tests: `PhotoIdentity.Integration.Tests`. Those tests ran for about eight seconds of recorded test time during the fast phase and were then run again in the full integration phase. Slice 2 excludes both integration namespaces from the fast pass.
+- `docs/operations/testing-and-ci-strategy.md` and concise `AGENTS.md` rules are merged, so future test/PR work now carries the intended layer and cost discipline.
+
+### Slice 2 validated — 2026-08-18
+
+- Runtime discovery groups every current integration test by class, and the scheduler greedily balances by measured class duration. New classes are automatically assigned with a conservative default weight until the baseline is refreshed.
+- The first Slice 2 attempt in workflow #1095 ran three concurrent `dotnet test` child processes on the same Windows runner. It did not fail immediately, but after the overall run exceeded eight minutes it was still inside the shard step; successful #1093 had already completed `build-and-test` in about 6m58s. Same-runner three-process concurrency was therefore rejected as a performance regression rather than being allowed to become the final design.
+- The revised Slice 2 design uses two separate Windows integration jobs, each internally sequential and independently restored/built. This intentionally spends additional runner setup/build minutes in exchange for real CPU/testhost isolation and a lower wall-clock critical path.
+- Workflow #1104 proved the revised scheduler and coverage accounting: shard 2 passed all 159 assigned tests and shard 1 executed all 135 assigned tests exactly once. Shard 1 was blocked only by `ReviewSuggestionGalleryApplicationTests.Gallery_requires_exact_model_revision_and_rejects_unknown_sort_or_confidence_group`, which expected HTTP 400 but intermittently received HTTP 500 from another ad-hoc API factory. This matches the existing cross-class host-flake pattern rather than a sharding coverage defect.
+- Four independently observed transient-500 tests are recorded in `.github/flaky-integration-tests.txt`. Required shards exclude those exact tests while retaining all other coverage. The same workflow executes the four tests exactly once in a visible `continue-on-error` diagnostic step, records TRX/JSON evidence, and never retries them.
+- WI-0071 is the stabilization follow-up. A quarantine entry returns to required blocking coverage only after a root-cause/shared-host stabilization change and three consecutive representative diagnostic CI passes without a transient 500.
+- Workflow #1112 (`32183423755`) was fully green on current `main`: both required shards passed exact coverage, all four quarantined diagnostics passed once, and build/docs/review/mixed-media/launcher/package checks passed. It also showed that the #1093 timing weights were no longer representative on the isolated runners: shard 1 recorded 486.8s of test duration and took 8m06 to execute, while shard 2 recorded 151.2s and took 2m31. Overall workflow wall-clock was therefore about 10m37, which is evidence against accepting that balance as the final optimization.
+- The largest outlier in #1112 was `ResumableBatchProcessorTests.Five_hundred_job_sample_produces_complete_status_summary` at 157.8s. The test asserted durable completion/accounting/idempotency semantics rather than a 500-item performance threshold, and no repository contract referenced the number 500. The required PR fixture is now 50 jobs with the same assertions and a sample-sized attempt bound; this retains non-trivial batch coverage without using the PR gate as a scale test.
+- `.github/test-timing-baseline.json` was rebalanced from #1112's actual required-shard TRX data. After the 50-job change, `ResumableBatchProcessorTests` carries a conservative 20s scheduling estimate until the next measured run.
+- Workflow #1116 (`32184890234`) demonstrated that the fixture reduction plus new balance materially shortened shard 1: all 152 assigned required tests executed in 1m54s. That run was red only because `CollectionViewerPreviewApplicationTests.Local_verified_original_without_proxy_is_served_directly_without_hydration` returned another transient HTTP 500 from an ad-hoc API host. The class was migrated to `PhotoIdentityApiTestFactory` instead of widening quarantine, preserving its custom Files-on-Demand/storage test doubles while disabling unrelated production background workers. A bounded-response-body success helper was added for non-string endpoints.
+- Workflow #1118 (`32185693518`) validated the final Slice 2 shape end to end. Both required shards passed exact coverage; shard 1 ran 139 required tests in 1m36s and shard 2 ran 153 required tests in 1m15s. The migrated viewer-preview tests passed without quarantine. All four tracked flaky diagnostics ran once and passed with no retries. Fast tests, living/generated documentation, review smoke, mixed-media verification, launcher verification and package verification all passed.
+- #1118 overall workflow wall-clock was about 6m17s (21:03:30–21:09:47 UTC). Integration was no longer the bottleneck: `build-and-test` completed in roughly 4m04s and package verification was the last job to finish. The remaining ~17 seconds above the <=6m target, plus the duplicated integration-runner setup cost, therefore belong to Slice 3 rather than further integration sharding.
+- Slice 2 uses five Windows jobs on full PR validation instead of Slice 1's three. Based on observed job spans, #1118 consumed roughly 19–20 Windows runner-minutes versus roughly 14–15 in the three-job Slice 1 shape. The wall-clock improvement is useful but the runner-cost increase is material; Slice 3 should reclaim some of that by making launcher/package/published-runtime work conditional or reusable rather than adding more integration runners.
+- The main `build-and-test` job no longer runs deterministic integration coverage serially. It retains true fast tests, the small flaky diagnostic lane, documentation validation, published review smoke and mixed-media verification.
+- The timing summarizer reads TRX `TestMethod.className` definitions instead of inferring class names from theory display text, avoiding incorrect grouping for parameterized cases.
