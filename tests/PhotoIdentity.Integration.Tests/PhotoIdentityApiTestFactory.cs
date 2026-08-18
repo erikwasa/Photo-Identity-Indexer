@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -94,6 +95,27 @@ internal static class IntegrationTestHttpClientExtensions
             response,
             body,
             requestDescription ?? response.RequestMessage?.RequestUri?.ToString() ?? "HTTP request");
+    }
+
+    public static async Task EnsureStatusCodeWithDiagnosticBodyAsync(
+        this HttpResponseMessage response,
+        HttpStatusCode expectedStatusCode,
+        string? requestDescription = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (response.StatusCode == expectedStatusCode)
+        {
+            return;
+        }
+
+        string body = await response.Content.ReadAsStringAsync(cancellationToken);
+        string description = requestDescription ??
+            response.RequestMessage?.RequestUri?.ToString() ??
+            "HTTP request";
+        throw CreateFailureException(
+            response,
+            body,
+            $"{description} expected {(int)expectedStatusCode} ({expectedStatusCode}) but");
     }
 
     private static HttpRequestException CreateFailureException(
