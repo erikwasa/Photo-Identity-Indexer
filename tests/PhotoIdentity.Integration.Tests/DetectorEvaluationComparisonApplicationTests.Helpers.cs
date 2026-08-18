@@ -1,7 +1,6 @@
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
@@ -150,21 +149,13 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
         double Width,
         double Height);
 
-    private sealed class DetectorEvaluationApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class DetectorEvaluationApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-        private readonly string _sessionRoot;
-
         public DetectorEvaluationApiFactory(string databasePath, string sessionRoot)
+            : base(
+                databasePath,
+                builder => builder.UseSetting("PhotoIdentity:DetectorEvaluationRoot", sessionRoot))
         {
-            _databasePath = databasePath;
-            _sessionRoot = sessionRoot;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
-            builder.UseSetting("PhotoIdentity:DetectorEvaluationRoot", _sessionRoot);
         }
     }
 }

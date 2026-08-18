@@ -12,7 +12,7 @@ namespace PhotoIdentity_Integration_Tests;
 /// Generic endpoint tests should not run unrelated production background loops; worker-specific
 /// behavior is covered by focused tests that exercise the worker directly or can opt back in.
 /// </summary>
-internal sealed class PhotoIdentityApiTestFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+internal class PhotoIdentityApiTestFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
 {
     private readonly string _databasePath;
     private readonly Action<IWebHostBuilder>? _configureWebHost;
