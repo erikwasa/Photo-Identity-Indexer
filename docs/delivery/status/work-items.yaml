@@ -440,27 +440,45 @@ work_items:
 - id: WI-0066
   title: Add Smart Collection visibility preference for people
   milestone: M19
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0066-smart-collection-person-visibility.md
   started_at: 2026-08-18
   last_updated_at: 2026-08-18
-  branch: agent/WI-0066-smart-collection-person-visibility
+  branch: agent/WI-0066-smart-collection-discovery
   blockers:
   - WI-0050
-  blocker_notes: []
-  evidence: []
+  blocker_notes:
+  - Implementation merged through PRs #170, #171 and #173; focused browser verification is deferred to the consolidated M19 manual verification pass per maintainer direction.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/170
+  - type: merge_commit
+    value: 3cab5d018229a022138c987497466fd7c710eff0
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/171
+  - type: merge_commit
+    value: ec8b04ed7d089d9d63e0e1b1d6d3f987bef2dd3d
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/173
+  - type: merge_commit
+    value: 360194200cc8b54359933131bd2b805e2b3820e4
 - id: WI-0067
   title: Add featured representative faces for people
   milestone: M19
-  status: ready
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0067-featured-person-face.md
+  started_at: 2026-08-18
+  last_updated_at: 2026-08-18
+  branch: agent/WI-0067-featured-person-face
   blockers:
   - WI-0033
   - WI-0042
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/175
 - id: WI-0068
   title: Make Smart Collection people selection searchable and portrait-led
   milestone: M19
