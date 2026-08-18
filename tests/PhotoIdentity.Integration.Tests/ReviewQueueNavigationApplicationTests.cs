@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
@@ -52,7 +51,7 @@ public sealed class ReviewQueueNavigationApplicationTests
             using HttpResponseMessage accepted = await client.PostAsJsonAsync(
                 $"/api/review/faces/{seeded.MiddleFaceId}/suggestions/{suggestion.Id}/accept",
                 new ReviewSuggestionActionRequest("queue-navigation:test"));
-            accepted.EnsureSuccessStatusCode();
+            await accepted.EnsureSuccessWithDiagnosticBodyAsync("accept queue-navigation suggestion");
 
             ReviewFaceDetailsResponse oldest = Assert.IsType<ReviewFaceDetailsResponse>(
                 await client.GetFromJsonAsync<ReviewFaceDetailsResponse>(
@@ -63,7 +62,7 @@ public sealed class ReviewQueueNavigationApplicationTests
             Assert.Equal(2, afterMutation.Position);
             Assert.Equal(2, afterMutation.Total);
 
-            string detailsJson = await client.GetStringAsync(
+            string detailsJson = await client.GetRequiredStringAsync(
                 $"/api/review/faces/{seeded.OldestFaceId}?{scope}");
             Assert.DoesNotContain(seeded.SourceRoot, detailsJson, StringComparison.OrdinalIgnoreCase);
         }
@@ -89,7 +88,9 @@ public sealed class ReviewQueueNavigationApplicationTests
             using HttpResponseMessage response = await client.GetAsync(
                 $"/api/review/faces/{seeded.NewestFaceId}?state=unreviewed&sort=alphabetical");
 
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            await response.EnsureStatusCodeWithDiagnosticBodyAsync(
+                HttpStatusCode.BadRequest,
+                "unsupported review queue sort");
         }
         finally
         {
@@ -216,18 +217,11 @@ public sealed class ReviewQueueNavigationApplicationTests
         string MiddleFaceId,
         string OldestFaceId);
 
-    private sealed class ReviewApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class ReviewApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-
         public ReviewApiFactory(string databasePath)
+            : base(databasePath)
         {
-            _databasePath = databasePath;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
         }
     }
 }
