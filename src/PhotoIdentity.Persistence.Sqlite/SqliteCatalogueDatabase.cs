@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase
 {
-    public const int CurrentSchemaVersion = 15;
+    public const int CurrentSchemaVersion = 16;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -762,6 +762,21 @@ public sealed class SqliteCatalogueDatabase
         PRAGMA user_version = 15;
         """;
 
+    private const string VersionSixteenMigration = """
+        CREATE TABLE IF NOT EXISTS person_smart_collection_visibility (
+            person_id TEXT NOT NULL PRIMARY KEY,
+            hidden_from_smart_collections INTEGER NOT NULL CHECK (hidden_from_smart_collections IN (0, 1)),
+            changed_at_utc TEXT NOT NULL,
+            FOREIGN KEY (person_id) REFERENCES people (id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS ix_person_smart_collection_visibility_hidden
+            ON person_smart_collection_visibility (hidden_from_smart_collections, person_id);
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (16, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 16;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -888,6 +903,12 @@ public sealed class SqliteCatalogueDatabase
         if (version < 15)
         {
             await ApplyMigrationAsync(connection, VersionFifteenMigration, cancellationToken);
+            version = 15;
+        }
+
+        if (version < 16)
+        {
+            await ApplyMigrationAsync(connection, VersionSixteenMigration, cancellationToken);
         }
     }
 
