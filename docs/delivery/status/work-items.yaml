@@ -435,3 +435,36 @@ work_items:
   blocker_notes:
   - First automatic hosted-worker slice is in implementation; maintainer verification follows merge.
   evidence: []
+- id: WI-0066
+  title: Add Smart Collection visibility preference for people
+  milestone: M19
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0066-smart-collection-person-visibility.md
+  blockers:
+  - WI-0050
+  blocker_notes: []
+  evidence: []
+- id: WI-0067
+  title: Add featured representative faces for people
+  milestone: M19
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0067-featured-person-face.md
+  blockers:
+  - WI-0033
+  - WI-0042
+  blocker_notes: []
+  evidence: []
+- id: WI-0068
+  title: Make Smart Collection people selection searchable and portrait-led
+  milestone: M19
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0068-searchable-smart-collection-people.md
+  blockers:
+  - WI-0050
+  - WI-0066
+  - WI-0067
+  blocker_notes: []
+  evidence: []
