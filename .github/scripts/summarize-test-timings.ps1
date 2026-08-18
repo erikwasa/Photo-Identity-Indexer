@@ -95,13 +95,19 @@ $shardSummaries = @(
         Sort-Object resultFile
 )
 
-$totalRecordedDuration = ($results | Measure-Object durationMilliseconds -Sum).Sum
+$totalRecordedDuration = if ($results.Count -gt 0) {
+    [double](($results | Measure-Object durationMilliseconds -Sum).Sum ?? 0)
+}
+else {
+    0.0
+}
+
 $summary = [ordered]@{
     generatedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
     resultFiles = @($trxFiles | ForEach-Object { $_.Name })
     testCount = $results.Count
     failedCount = @($results | Where-Object { $_.outcome -eq "Failed" }).Count
-    totalRecordedDurationMilliseconds = [Math]::Round([double]($totalRecordedDuration ?? 0), 3)
+    totalRecordedDurationMilliseconds = [Math]::Round($totalRecordedDuration, 3)
     shards = $shardSummaries
     slowestClasses = $classSummaries
     slowestTests = $slowestTests
@@ -115,7 +121,7 @@ $lines = [System.Collections.Generic.List[string]]::new()
 $lines.Add("## Integration test timing")
 if ($results.Count -eq 0) {
     $lines.Add("")
-    $lines.Add("No TRX timing results were available. The integration test step may have been skipped before execution.")
+    $lines.Add("No TRX timing results were available. The integration test step may have been skipped or failed before producing results.")
 }
 else {
     $lines.Add("")
