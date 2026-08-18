@@ -53,19 +53,53 @@ jobs:
           path: build.log
           retention-days: 1
 
-      - name: Test
+      - name: Test fast assemblies
         shell: pwsh
         run: |
-          dotnet test PhotoIdentity.slnx --configuration Release --no-build 2>&1 | Tee-Object -FilePath test.log
+          dotnet test PhotoIdentity.slnx --configuration Release --no-build --filter "FullyQualifiedName!~PhotoIdentity_Integration_Tests" 2>&1 | Tee-Object -FilePath fast-test.log
           exit $LASTEXITCODE
+
+      - name: Test integration assembly
+        shell: pwsh
+        run: |
+          $resultsDirectory = Join-Path $PWD ".artifacts/test-results"
+          New-Item -ItemType Directory -Path $resultsDirectory -Force | Out-Null
+          dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj `
+            --configuration Release `
+            --no-build `
+            --logger "trx;LogFileName=integration-tests.trx" `
+            --results-directory $resultsDirectory `
+            2>&1 | Tee-Object -FilePath integration-test.log
+          exit $LASTEXITCODE
+
+      - name: Summarize integration test timings
+        if: always()
+        shell: pwsh
+        run: ./.github/scripts/summarize-test-timings.ps1
+
+      - name: Upload test timing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-timing-evidence
+          path: |
+            .artifacts/test-results
+            .artifacts/test-timings
+          retention-days: 3
+          if-no-files-found: warn
 
       - name: Upload test diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-diagnostics
-          path: test.log
+          path: |
+            fast-test.log
+            integration-test.log
+            .artifacts/test-timings/test-timings.json
+            .artifacts/test-timings/test-timings.md
           retention-days: 1
+          if-no-files-found: warn
 
       - name: Validate living documentation
         run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- validate

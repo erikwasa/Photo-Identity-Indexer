@@ -12,6 +12,7 @@ Use this page to decide which runbook is current. Some files under `docs/operati
 
 ## Conditional maintenance and engineering procedures
 
+- [Testing and CI strategy](testing-and-ci-strategy.md) — engineering policy for test-layer choice, integration-host isolation, flaky-test handling, PR gates and timing evidence.
 - [Review-proxy measurement](review-proxy-measurement.md) — calibration/measurement procedure for selecting or re-evaluating a proxy profile; not a routine daily task.
 - [Detector pipeline rollout](detector-rollout.md) — maintenance-only migration procedure for an existing catalogue created with a different detector. New permanent-archive analysis already uses the governed CenterFace profile and does not require a rollout first.
 - [Local evaluation workflow](local-evaluation.md) — specialized reproducible model-evaluation tooling. Its original examples use the historical YuNet pilot corpus; do not treat those detector settings as the permanent archive profile.

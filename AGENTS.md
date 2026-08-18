@@ -56,6 +56,16 @@ dotnet run --project tools/PhotoIdentity.Docs -- review WI-0005
 
 Before work, mark the item `in_progress`. After implementation, add evidence and mark it `in_review`. Mark it `completed` only after required verification passes.
 
+## Testing and pull-request validation
+
+- Put behavior at the lowest practical test layer. Use full HTTP-host integration tests for cross-layer wiring and contracts that cannot be established more cheaply.
+- Generic API integration tests should reuse the shared test host and keep unrelated production background workers disabled. Worker-specific behavior should opt in explicitly or exercise the worker directly.
+- The host-heavy integration assembly remains sequential in-process. Do not re-enable broad xUnit parallelism without evidence that host isolation has changed enough to make it safe.
+- Do not normalize flaky tests with unconditional retries. Temporary quarantine must stay visible, have a tracked stabilization follow-up and an explicit condition for returning to the required gate.
+- When adding host-heavy tests or required CI checks, state why the added signal justifies the runtime cost and include timing evidence when the cost is material.
+- PR descriptions should state the test layer added or changed, whether the required CI gate changed, and any material timing or coverage tradeoff.
+- Keep detailed rationale in `docs/operations/testing-and-ci-strategy.md`; keep this file concise and action-oriented.
+
 ## Definition of done
 
 - Relevant code builds.
