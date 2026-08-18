@@ -23,6 +23,9 @@ param(
     [ValidateSet("Interactive", "Smoke", "Prepare")]
     [string] $Mode = "Interactive",
 
+    [ValidateSet("PublishedMinimum", "Comprehensive")]
+    [string] $SmokeProfile = "Comprehensive",
+
     [ValidateSet("Debug", "Release")]
     [string] $Configuration = "Release",
 
@@ -180,12 +183,46 @@ try {
         throw "Review API did not become ready at $healthUrl."
     }
 
-    $report.smoke = & $smokeScript -BaseUrl $baseUrl -Manifest $manifest
+    if ($SmokeProfile -eq "PublishedMinimum") {
+        $report.smoke.health = "passed"
+
+        $hostedClientResponse = Invoke-WebRequest -Uri "$baseUrl/" -UseBasicParsing -TimeoutSec 10
+        if ($hostedClientResponse.StatusCode -ne 200 -or
+            $hostedClientResponse.Content.IndexOf("blazor.webassembly.js", [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            throw "Published review verification did not serve the hosted Blazor client."
+        }
+        $report.smoke.hostedClient = "passed"
+
+        $galleryResponse = Invoke-WebRequest -Uri "$baseUrl/api/review/faces?state=all&offset=0&limit=1" `
+            -UseBasicParsing -TimeoutSec 10
+        $gallery = $galleryResponse.Content | ConvertFrom-Json
+        $galleryItems = @($gallery.Items)
+        if ($gallery.Total -ne $manifest.FaceCount -or $galleryItems.Count -ne 1) {
+            throw "Published review verification did not return the prepared synthetic review data."
+        }
+        foreach ($privateValue in @($manifest.DatabasePath, $manifest.ArtifactDirectory)) {
+            if (-not [string]::IsNullOrWhiteSpace([string]$privateValue) -and
+                $galleryResponse.Content.IndexOf([string]$privateValue, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                throw "Published review verification exposed a private verification path."
+            }
+        }
+        $galleryCache = [string]$galleryResponse.Headers["Cache-Control"]
+        if ($galleryCache.IndexOf("no-store", [StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            throw "Published review gallery response did not include Cache-Control: no-store."
+        }
+        $report.smoke.gallery = "passed"
+        $report.smoke.cacheControl = "passed"
+    }
+    else {
+        $report.smoke = & $smokeScript -BaseUrl $baseUrl -Manifest $manifest
+    }
+
     $report.result = "passed"
     $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 
     Write-Host "`nReview application verification passed."
     Write-Host "Mode: $Mode"
+    Write-Host "Smoke profile: $SmokeProfile"
     Write-Host "Windows/local URL: $($report.localUrl)"
     foreach ($url in $report.lanUrls) {
         Write-Host "Trusted-LAN URL: $url"
