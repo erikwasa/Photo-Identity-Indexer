@@ -76,6 +76,77 @@ public sealed class SqlitePersonFeaturedFaceRepository
             reader.GetInt32(1) == 1);
     }
 
+    public async Task<IReadOnlyDictionary<PersonId, CataloguePersonRepresentativeFace>> ResolveAllAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await SqlitePersonFeaturedFaceSchema.EnsureAsync(_database, cancellationToken);
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            WITH latest_action AS (
+                SELECT
+                    review_actions.face_occurrence_id,
+                    review_actions.action_kind,
+                    review_actions.person_id,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY review_actions.face_occurrence_id
+                        ORDER BY review_actions.id DESC) AS row_number
+                FROM review_actions
+                WHERE review_actions.action_kind IN ('assign', 'unknown', 'reject')
+                  AND review_actions.reversed_at_utc IS NULL
+            ),
+            ranked_faces AS (
+                SELECT
+                    latest_action.person_id,
+                    face_occurrences.id AS face_id,
+                    CASE
+                        WHEN featured.face_occurrence_id = face_occurrences.id THEN 1
+                        ELSE 0
+                    END AS is_explicit,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY latest_action.person_id
+                        ORDER BY
+                            CASE
+                                WHEN featured.face_occurrence_id = face_occurrences.id THEN 1
+                                ELSE 0
+                            END DESC,
+                            face_occurrences.created_at_utc,
+                            face_occurrences.id) AS representative_rank
+                FROM face_occurrences
+                INNER JOIN asset_revisions
+                    ON asset_revisions.id = face_occurrences.asset_revision_id
+                INNER JOIN latest_action
+                    ON latest_action.face_occurrence_id = face_occurrences.id
+                   AND latest_action.row_number = 1
+                INNER JOIN people AS person
+                    ON person.id = latest_action.person_id
+                   AND person.merged_into_person_id IS NULL
+                LEFT JOIN person_featured_faces AS featured
+                    ON featured.person_id = latest_action.person_id
+                   AND featured.face_occurrence_id = face_occurrences.id
+                WHERE latest_action.action_kind = 'assign'
+                  AND latest_action.person_id IS NOT NULL
+            )
+            SELECT person_id, face_id, is_explicit
+            FROM ranked_faces
+            WHERE representative_rank = 1;
+            """;
+
+        Dictionary<PersonId, CataloguePersonRepresentativeFace> representatives = [];
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            PersonId personId = PersonId.From(Guid.Parse(reader.GetString(0)));
+            representatives[personId] = new CataloguePersonRepresentativeFace(
+                personId,
+                FaceOccurrenceId.From(Guid.Parse(reader.GetString(1))),
+                reader.GetInt32(2) == 1);
+        }
+
+        return representatives;
+    }
+
     public async Task SetFeaturedFaceAsync(
         PersonId personId,
         FaceOccurrenceId faceId,

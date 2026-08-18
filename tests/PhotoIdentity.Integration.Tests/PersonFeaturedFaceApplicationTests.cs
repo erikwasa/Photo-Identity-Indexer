@@ -54,6 +54,13 @@ public sealed class PersonFeaturedFaceApplicationTests
             Assert.Equal(second.ToString(), explicitResult.FaceId);
             Assert.True(explicitResult.IsExplicit);
 
+            ReviewPersonResponse listedExplicit = Assert.Single(
+                await client.GetFromJsonAsync<ReviewPersonResponse[]>("/api/review/people") ?? []);
+            Assert.Equal(second.ToString(), listedExplicit.RepresentativeFaceId);
+            Assert.Equal($"/api/review/faces/{second}/image?size=360", listedExplicit.RepresentativeImageUrl);
+            Assert.True(listedExplicit.RepresentativeIsExplicit);
+            Assert.DoesNotContain(directory, listedExplicit.RepresentativeImageUrl, StringComparison.OrdinalIgnoreCase);
+
             CataloguePersonRepresentativeFace? reopened =
                 await new SqlitePersonFeaturedFaceRepository(new SqliteCatalogueDatabase(databasePath))
                     .ResolveAsync(alice.Id);
@@ -64,6 +71,12 @@ public sealed class PersonFeaturedFaceApplicationTests
             PersonRepresentativeFaceResponse cleared = await ClearFeaturedAsync(client, alice.Id);
             Assert.Equal(first.ToString(), cleared.FaceId);
             Assert.False(cleared.IsExplicit);
+
+            ReviewPersonResponse listedAutomatic = Assert.Single(
+                await client.GetFromJsonAsync<ReviewPersonResponse[]>("/api/review/people") ?? []);
+            Assert.Equal(first.ToString(), listedAutomatic.RepresentativeFaceId);
+            Assert.Equal($"/api/review/faces/{first}/image?size=360", listedAutomatic.RepresentativeImageUrl);
+            Assert.False(listedAutomatic.RepresentativeIsExplicit);
         }
         finally
         {

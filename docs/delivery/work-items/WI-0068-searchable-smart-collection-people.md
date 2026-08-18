@@ -63,21 +63,29 @@ Fuzzy biometric search, searching by filenames/tags, changing Smart Collection q
 
 ## Acceptance criteria
 
-- [ ] Typing in the Smart Collection People search filters visible candidates by display name case-insensitively.
-- [ ] Search text never changes existing selections implicitly.
-- [ ] Each normal candidate shows the resolved representative portrait and display name, with a safe fallback if no portrait resolves.
-- [ ] Hidden people are absent from normal search/discovery.
-- [ ] Already-selected hidden people from saved definitions remain visible as selected with an explicit hidden indicator and can be removed.
-- [ ] Selected people remain visible and removable when the current search text does not match them.
-- [ ] Clearing search restores the normal candidate list.
-- [ ] Existing `all` and `any` people matching semantics are unchanged.
-- [ ] Saved definitions continue to persist PersonId values and survive person renames.
-- [ ] Search/portrait rendering does not hydrate originals or expose source paths/filenames.
-- [ ] The picker is keyboard usable and display names remain the accessible identity label.
-- [ ] Automated UI/component coverage verifies search filtering, retained selection, hidden-person compatibility and portrait fallback.
+- [x] Typing in the Smart Collection People search filters visible candidates by display name case-insensitively.
+- [x] Search text never changes existing selections implicitly.
+- [x] Each normal candidate shows the resolved representative portrait and display name, with a safe fallback if no portrait resolves.
+- [x] Hidden people are absent from normal search/discovery.
+- [x] Already-selected hidden people from saved definitions remain visible as selected with an explicit hidden indicator and can be removed.
+- [x] Selected people remain visible and removable when the current search text does not match them.
+- [x] Clearing search restores the normal candidate list.
+- [x] Existing `all` and `any` people matching semantics are unchanged.
+- [x] Saved definitions continue to persist PersonId values and survive person renames.
+- [x] Search/portrait rendering does not hydrate originals or expose source paths/filenames.
+- [x] The picker is keyboard usable and display names remain the accessible identity label.
+- [x] Automated UI/component coverage verifies search filtering, retained selection, hidden-person compatibility and portrait fallback.
 
 ## Suggested implementation slices
 
 1. Searchable multi-select interaction with retained selections and existing all/any behavior.
 2. Integrate WI-0066 visibility rules and saved hidden-person compatibility.
 3. Integrate WI-0067 representative portraits, fallback and accessibility coverage.
+
+## Implementation status
+
+The three planned slices are implemented together on `agent/WI-0068-smart-collection-people-picker`. The modern Smart Collection editor now uses a dedicated searchable people picker with a persistent selected-person area. Discovery excludes hidden and already-selected people, while a hidden person restored from a saved definition remains visible in the selected area with a `Hidden` indicator and can be removed without becoming discoverable again. Search is incremental and case-insensitive and never mutates the selected PersonId set.
+
+`/api/review/people` now includes the resolved WI-0067 representative face ID/image URL and explicit-versus-automatic state. Representative faces are resolved for all active people in one SQLite query, avoiding per-person API/database fan-out. The picker renders the browser-safe `/api/review/faces/{id}/image?size=360` derivative as a supplementary cue and falls back to a stable initial when no representative is available; display names remain the accessible identity label.
+
+The existing Smart Collection request model is unchanged, so `all`/`any` semantics and persisted canonical PersonIds are preserved. Focused model coverage verifies case-insensitive filtering, selection retention, hidden-person compatibility, deterministic ordering and fallback behavior; existing featured-face API coverage now also verifies the people list exposes explicit/automatic representative URLs without source-path leakage. Required CI and the consolidated M19 maintainer browser verification remain before lifecycle completion.

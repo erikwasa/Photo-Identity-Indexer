@@ -4,7 +4,10 @@ public sealed record ReviewPersonResponse(
     string Id,
     string DisplayName,
     bool IsFavorite = false,
-    bool HiddenFromSmartCollections = false);
+    bool HiddenFromSmartCollections = false,
+    string? RepresentativeFaceId = null,
+    string? RepresentativeImageUrl = null,
+    bool RepresentativeIsExplicit = false);
 
 public sealed record ReviewTopSuggestionResponse(
     long Id,
