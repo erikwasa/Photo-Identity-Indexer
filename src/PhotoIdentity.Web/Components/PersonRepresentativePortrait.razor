@@ -1,0 +1,73 @@
+@inject HttpClient Http
+
+<div class="person-portrait" aria-live="polite">
+    @if (Loading)
+    {
+        <div class="portrait-placeholder" aria-hidden="true">…</div>
+        <div class="portrait-copy">
+            <strong>Loading portrait</strong>
+            <span>Resolving representative face…</span>
+        </div>
+    }
+    else if (Representative is { ImageUrl: string imageUrl, FaceId: string faceId })
+    {
+        <a class="portrait-link"
+           href="@BuildFaceUrl(faceId)"
+           title="Open representative face details">
+            <img src="@imageUrl" alt="Representative face for @DisplayName" />
+        </a>
+        <div class="portrait-copy">
+            <strong>@(Representative.IsExplicit ? "Featured photo" : "Automatic photo")</strong>
+            <span>@(Representative.IsExplicit ? "Selected explicitly" : "Selected automatically")</span>
+        </div>
+    }
+    else
+    {
+        <div class="portrait-placeholder" aria-hidden="true">@Initial</div>
+        <div class="portrait-copy">
+            <strong>No representative photo</strong>
+            <span>No assigned face is available yet.</span>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string PersonId { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string DisplayName { get; set; } = "";
+
+    private PersonRepresentativeFaceResponse? Representative { get; set; }
+    private bool Loading { get; set; }
+    private string Initial => string.IsNullOrWhiteSpace(DisplayName)
+        ? "?"
+        : DisplayName.Trim()[0].ToString().ToUpperInvariant();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Representative = null;
+        if (string.IsNullOrWhiteSpace(PersonId))
+        {
+            return;
+        }
+
+        Loading = true;
+        try
+        {
+            Representative = await Http.GetFromJsonAsync<PersonRepresentativeFaceResponse>(
+                $"api/review/people/{Uri.EscapeDataString(PersonId)}/representative-face");
+        }
+        catch
+        {
+            Representative = null;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private static string BuildFaceUrl(string faceId) =>
+        $"/faces/{Uri.EscapeDataString(faceId)}?returnUrl={Uri.EscapeDataString("/people")}";
+}
