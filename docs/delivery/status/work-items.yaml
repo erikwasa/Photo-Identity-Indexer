@@ -471,7 +471,7 @@ work_items:
 - id: WI-0069
   title: Reduce GitHub Actions feedback time
   milestone: M00
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0069-ci-runtime-optimization.md
   started_at: 2026-08-18
@@ -480,5 +480,7 @@ work_items:
   blockers:
   - WI-0004
   blocker_notes:
-  - Slice 1 removes duplicate repository validation from the mixed-media checkpoint and cancels superseded pull-request workflow runs; larger package/cache/test-sharding changes remain follow-up candidates.
-  evidence: []
+  - Slice 1 implementation is in draft PR #169; Windows CI behavior and timing evidence remain to be verified before completion.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/169
