@@ -231,11 +231,17 @@ public static class ReviewEndpoints
         IReadOnlyList<CatalogueReviewPerson> people = await repository.GetPeopleAsync(cancellationToken);
         IReadOnlySet<PersonId> favorites = await new SqliteFavoritePeopleRepository(database)
             .GetFavoritePersonIdsAsync(cancellationToken);
+        IReadOnlySet<PersonId> hiddenFromSmartCollections =
+            await new SqlitePersonSmartCollectionVisibilityRepository(database)
+                .GetHiddenPersonIdsAsync(cancellationToken);
         return Results.Ok(people
             .OrderByDescending(person => favorites.Contains(person.Id))
             .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(person => person.Id.ToString(), StringComparer.Ordinal)
-            .Select(person => ToResponse(person, favorites.Contains(person.Id)))
+            .Select(person => ToResponse(
+                person,
+                favorites.Contains(person.Id),
+                hiddenFromSmartCollections.Contains(person.Id)))
             .ToArray());
     }
 
@@ -398,8 +404,11 @@ public static class ReviewEndpoints
         face.Person is null ? null : ToResponse(face.Person),
         face.CreatedAtUtc);
 
-    private static ReviewPersonResponse ToResponse(CatalogueReviewPerson person, bool isFavorite = false) =>
-        new(person.Id.ToString(), person.DisplayName, isFavorite);
+    private static ReviewPersonResponse ToResponse(
+        CatalogueReviewPerson person,
+        bool isFavorite = false,
+        bool hiddenFromSmartCollections = false) =>
+        new(person.Id.ToString(), person.DisplayName, isFavorite, hiddenFromSmartCollections);
 
     private static ReviewActionResponse ToResponse(CatalogueReviewAction action) => new(
         action.Id,
