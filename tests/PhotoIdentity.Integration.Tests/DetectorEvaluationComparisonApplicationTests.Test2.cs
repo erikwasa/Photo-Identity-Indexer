@@ -44,7 +44,7 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
                             new("R001", "R001__group.jpg", "Representative", "Pilot", "Group", 1, null),
                             new("R002", "R002__small.jpg", "Difficult", "External", "Small", 0, null),
                         ]));
-                createResponse.EnsureSuccessStatusCode();
+                await createResponse.EnsureSuccessWithDiagnosticBodyAsync("create detector evaluation baseline session");
                 DetectorEvaluationSessionSummaryResponse created = Assert.IsType<DetectorEvaluationSessionSummaryResponse>(
                     await createResponse.Content.ReadFromJsonAsync<DetectorEvaluationSessionSummaryResponse>());
                 baselineSessionId = created.Id;
@@ -60,12 +60,12 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
                             [],
                             null,
                             null));
-                    save.EnsureSuccessStatusCode();
+                    await save.EnsureSuccessWithDiagnosticBodyAsync("save detector evaluation baseline review");
                 }
                 using HttpResponseMessage freeze = await client.PostAsync(
                     $"/api/detector-evaluation/sessions/{created.Id}/ground-truth",
                     null);
-                freeze.EnsureSuccessStatusCode();
+                await freeze.EnsureSuccessWithDiagnosticBodyAsync("freeze detector evaluation baseline ground truth");
             }
 
             string candidateDatabasePath = Path.Combine(directory, "candidate.db");
@@ -88,7 +88,9 @@ public sealed partial class DetectorEvaluationComparisonApplicationTests
                     baselineSessionId,
                     candidate.RunId.ToString(),
                     0.5));
-            Assert.Equal(System.Net.HttpStatusCode.BadRequest, comparisonResponse.StatusCode);
+            await comparisonResponse.EnsureStatusCodeWithDiagnosticBodyAsync(
+                System.Net.HttpStatusCode.BadRequest,
+                "attach changed detector-evaluation source revision");
             string payload = await comparisonResponse.Content.ReadAsStringAsync();
             Assert.Contains("does not match the frozen SHA-256", payload, StringComparison.OrdinalIgnoreCase);
         }
