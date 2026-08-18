@@ -496,3 +496,13 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32163493523
   - type: merge_commit
     value: b0c2f05cc4e889787d8d370cb06a6a67e2b6725c
+- id: WI-0070
+  title: Streamline pull-request validation and stabilize integration tests
+  milestone: M00
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0070-pr-validation-streamlining.md
+  blockers:
+  - WI-0069
+  blocker_notes: []
+  evidence: []
