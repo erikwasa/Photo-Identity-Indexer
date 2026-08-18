@@ -32,6 +32,8 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
             ReviewPersonResponse[] reviewPeople =
                 await client.GetFromJsonAsync<ReviewPersonResponse[]>("/api/review/people") ?? [];
             Assert.Equal(["Ada", "Grace"], reviewPeople.Select(person => person.DisplayName));
+            Assert.False(Assert.Single(reviewPeople, person => person.Id == ada.Id.ToString()).HiddenFromSmartCollections);
+            Assert.True(Assert.Single(reviewPeople, person => person.Id == grace.Id.ToString()).HiddenFromSmartCollections);
 
             PersonMaintenancePersonResponse[] maintenancePeople =
                 await client.GetFromJsonAsync<PersonMaintenancePersonResponse[]>(
@@ -46,6 +48,9 @@ public sealed class PersonSmartCollectionVisibilityApplicationTests
             Assert.DoesNotContain(ada.Id, persisted);
 
             await SetHiddenAsync(client, grace.Id.ToString(), hidden: false);
+
+            reviewPeople = await client.GetFromJsonAsync<ReviewPersonResponse[]>("/api/review/people") ?? [];
+            Assert.False(Assert.Single(reviewPeople, person => person.Id == grace.Id.ToString()).HiddenFromSmartCollections);
 
             maintenancePeople = await client.GetFromJsonAsync<PersonMaintenancePersonResponse[]>(
                 "/api/review/people/maintenance") ?? [];
