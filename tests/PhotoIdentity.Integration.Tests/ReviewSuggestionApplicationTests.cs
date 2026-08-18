@@ -1,8 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
@@ -33,7 +31,7 @@ public sealed class ReviewSuggestionApplicationTests
             using HttpResponseMessage response = await client.GetAsync(
                 $"/api/review/faces/{faceId}/suggestions");
 
-            response.EnsureSuccessStatusCode();
+            await response.EnsureSuccessWithDiagnosticBodyAsync("load ranked review suggestions");
             Assert.Contains(
                 "no-store",
                 response.Headers.CacheControl?.ToString() ?? string.Empty,
@@ -89,7 +87,7 @@ public sealed class ReviewSuggestionApplicationTests
                 $"/api/review/faces/{faceId}/suggestions/{suggestionId}/accept",
                 new ReviewSuggestionActionRequest("human:test", "Identity confirmed."));
 
-            response.EnsureSuccessStatusCode();
+            await response.EnsureSuccessWithDiagnosticBodyAsync("accept review suggestion");
             ReviewIdentitySuggestionResponse accepted =
                 await response.Content.ReadFromJsonAsync<ReviewIdentitySuggestionResponse>()
                 ?? throw new InvalidOperationException("The accepted suggestion response was empty.");
@@ -161,7 +159,7 @@ public sealed class ReviewSuggestionApplicationTests
                 $"/api/review/faces/{faceId}/suggestions/{suggestionId}/reject",
                 new ReviewSuggestionActionRequest("human:test", "Not the same person."));
 
-            response.EnsureSuccessStatusCode();
+            await response.EnsureSuccessWithDiagnosticBodyAsync("reject review suggestion");
             ReviewIdentitySuggestionResponse rejected =
                 await response.Content.ReadFromJsonAsync<ReviewIdentitySuggestionResponse>()
                 ?? throw new InvalidOperationException("The rejected suggestion response was empty.");
@@ -173,7 +171,9 @@ public sealed class ReviewSuggestionApplicationTests
             using HttpResponseMessage duplicate = await client.PostAsJsonAsync(
                 $"/api/review/faces/{faceId}/suggestions/{suggestionId}/accept",
                 new ReviewSuggestionActionRequest("human:test"));
-            Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+            await duplicate.EnsureStatusCodeWithDiagnosticBodyAsync(
+                HttpStatusCode.Conflict,
+                "accept already-rejected review suggestion");
 
             ReviewFaceDetailsResponse details =
                 await client.GetFromJsonAsync<ReviewFaceDetailsResponse>($"/api/review/faces/{faceId}")
@@ -351,18 +351,11 @@ public sealed class ReviewSuggestionApplicationTests
         }
     }
 
-    private sealed class ReviewApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class ReviewApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-
         public ReviewApiFactory(string databasePath)
+            : base(databasePath)
         {
-            _databasePath = databasePath;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
         }
     }
 }
