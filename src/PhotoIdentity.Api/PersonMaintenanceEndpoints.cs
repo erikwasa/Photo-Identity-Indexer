@@ -12,6 +12,7 @@ public static class PersonMaintenanceEndpoints
         group.MapGet("/maintenance", GetPeopleAsync);
         group.MapGet("/maintenance/history", GetHistoryAsync);
         group.MapPut("/{id}/favorite", SetFavoriteAsync);
+        group.MapPut("/{id}/smart-collection-visibility", SetSmartCollectionVisibilityAsync);
         group.MapPost("/{id}/rename", RenameAsync);
         group.MapPost("/{id}/merge", MergeAsync);
         return endpoints;
@@ -26,11 +27,16 @@ public static class PersonMaintenanceEndpoints
             await repository.GetPeopleAsync(cancellationToken);
         IReadOnlySet<PersonId> favorites = await new SqliteFavoritePeopleRepository(database)
             .GetFavoritePersonIdsAsync(cancellationToken);
+        IReadOnlySet<PersonId> hiddenPeople = await new SqlitePersonSmartCollectionVisibilityRepository(database)
+            .GetHiddenPersonIdsAsync(cancellationToken);
         return Results.Ok(people
             .OrderByDescending(person => favorites.Contains(person.Id))
             .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(person => person.Id.ToString(), StringComparer.Ordinal)
-            .Select(person => ToResponse(person, favorites.Contains(person.Id)))
+            .Select(person => ToResponse(
+                person,
+                favorites.Contains(person.Id),
+                hiddenPeople.Contains(person.Id)))
             .ToArray());
     }
 
@@ -68,6 +74,33 @@ public static class PersonMaintenanceEndpoints
             await new SqliteFavoritePeopleRepository(database).SetFavoriteAsync(
                 personId,
                 request.IsFavorite,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
+            return Results.NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+    }
+
+    private static async Task<IResult> SetSmartCollectionVisibilityAsync(
+        string id,
+        SetPersonSmartCollectionVisibilityRequest request,
+        SqliteCatalogueDatabase database,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        if (!TryPersonId(id, out PersonId personId))
+        {
+            return BadRequest("The person identifier is invalid.");
+        }
+
+        try
+        {
+            await new SqlitePersonSmartCollectionVisibilityRepository(database).SetHiddenAsync(
+                personId,
+                request.HiddenFromSmartCollections,
                 timeProvider.GetUtcNow(),
                 cancellationToken);
             return Results.NoContent();
@@ -156,12 +189,14 @@ public static class PersonMaintenanceEndpoints
 
     private static PersonMaintenancePersonResponse ToResponse(
         CataloguePersonMaintenancePerson person,
-        bool isFavorite) => new(
+        bool isFavorite,
+        bool hiddenFromSmartCollections) => new(
             person.Id.ToString(),
             person.DisplayName,
             person.LabelCount,
             person.SuggestionCount,
-            isFavorite);
+            isFavorite,
+            hiddenFromSmartCollections);
 
     private static PersonMaintenanceActionResponse ToResponse(
         CataloguePersonMaintenanceAction action) => new(
