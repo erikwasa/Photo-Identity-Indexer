@@ -32,7 +32,7 @@ public sealed class SmartCollectionHiddenPersonCompatibilityTests
 
             await visibility.SetHiddenAsync(
                 alice,
-                hidden: true,
+                hiddenFromSmartCollections: true,
                 new DateTimeOffset(2026, 8, 18, 18, 30, 0, TimeSpan.Zero));
 
             SmartCollectionDefinition reopened =
