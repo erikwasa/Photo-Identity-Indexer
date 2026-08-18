@@ -234,14 +234,22 @@ public static class ReviewEndpoints
         IReadOnlySet<PersonId> hiddenFromSmartCollections =
             await new SqlitePersonSmartCollectionVisibilityRepository(database)
                 .GetHiddenPersonIdsAsync(cancellationToken);
+        IReadOnlyDictionary<PersonId, CataloguePersonRepresentativeFace> representatives =
+            await new SqlitePersonFeaturedFaceRepository(database).ResolveAllAsync(cancellationToken);
+
         return Results.Ok(people
             .OrderByDescending(person => favorites.Contains(person.Id))
             .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(person => person.Id.ToString(), StringComparer.Ordinal)
-            .Select(person => ToResponse(
-                person,
-                favorites.Contains(person.Id),
-                hiddenFromSmartCollections.Contains(person.Id)))
+            .Select(person =>
+            {
+                representatives.TryGetValue(person.Id, out CataloguePersonRepresentativeFace? representative);
+                return ToResponse(
+                    person,
+                    favorites.Contains(person.Id),
+                    hiddenFromSmartCollections.Contains(person.Id),
+                    representative);
+            })
             .ToArray());
     }
 
@@ -407,8 +415,18 @@ public static class ReviewEndpoints
     private static ReviewPersonResponse ToResponse(
         CatalogueReviewPerson person,
         bool isFavorite = false,
-        bool hiddenFromSmartCollections = false) =>
-        new(person.Id.ToString(), person.DisplayName, isFavorite, hiddenFromSmartCollections);
+        bool hiddenFromSmartCollections = false,
+        CataloguePersonRepresentativeFace? representative = null) =>
+        new(
+            person.Id.ToString(),
+            person.DisplayName,
+            isFavorite,
+            hiddenFromSmartCollections,
+            representative?.FaceId.ToString(),
+            representative is null
+                ? null
+                : $"/api/review/faces/{representative.FaceId}/image?size={GalleryImageSize}",
+            representative?.IsExplicit ?? false);
 
     private static ReviewActionResponse ToResponse(CatalogueReviewAction action) => new(
         action.Id,
