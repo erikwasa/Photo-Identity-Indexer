@@ -445,11 +445,22 @@ work_items:
   document: ../work-items/WI-0066-smart-collection-person-visibility.md
   started_at: 2026-08-18
   last_updated_at: 2026-08-18
-  branch: agent/WI-0066-smart-collection-person-visibility
+  branch: agent/WI-0066-smart-collection-discovery
   blockers:
   - WI-0050
-  blocker_notes: []
-  evidence: []
+  blocker_notes:
+  - Slices 1 and 2 are merged through PR #170 and PR #171. Slice 3 is in draft PR #173; focused maintainer browser verification remains after merge.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/170
+  - type: merge_commit
+    value: 3cab5d018229a022138c987497466fd7c710eff0
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/171
+  - type: merge_commit
+    value: ec8b04ed7d089d9d63e0e1b1d6d3f987bef2dd3d
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/173
 - id: WI-0067
   title: Add featured representative faces for people
   milestone: M19
