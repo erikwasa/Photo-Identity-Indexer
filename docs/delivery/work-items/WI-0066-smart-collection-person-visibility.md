@@ -79,8 +79,10 @@ Global person hiding, deleting people, hiding photographs, suppressing face-revi
 
 ## Implementation status
 
-Slice 1 is in implementation on `agent/WI-0066-smart-collection-person-visibility`.
+Slice 1 merged through PR #170. The foundation uses schema v16 with a dedicated `person_smart_collection_visibility` table and a sparse hidden-person preference. The maintenance API exposes a reversible visibility mutation plus the current flag while the ordinary review people endpoint continues to return every active person. Merge semantics are target-wins: the surviving person's existing preference is unchanged, and preferences attached to a retired source identity are excluded from active visibility resolution.
 
-The foundation uses schema v16 with a dedicated `person_smart_collection_visibility` table and a sparse hidden-person preference. The maintenance API exposes a reversible visibility mutation plus the current flag while the ordinary review people endpoint continues to return every active person. Merge semantics are target-wins: the surviving person's existing preference is unchanged, and preferences attached to a retired source identity are excluded from active visibility resolution.
+Integration coverage verifies restart persistence, reversible hide/unhide behavior, continued review-person availability, unknown-person rejection and target-wins merge semantics.
 
-Integration coverage verifies restart persistence, reversible hide/unhide behavior, continued review-person availability, unknown-person rejection and target-wins merge semantics. Maintain People UI and Smart Collection picker behavior remain the next slices.
+Slice 2 is implemented on `agent/WI-0066-maintain-people-visibility`. Maintain People now displays an explicit `Available in Smart Collections` or `Hidden from Smart Collections` status for every active person and provides a reversible hide/show action using the Slice 1 endpoint. The page continues to list hidden people for maintenance, rename, favorite and merge operations; changing the preference reloads the canonical maintenance response and surfaces success or API failure through the existing page feedback path.
+
+Slice 3 remains next: filter normal Smart Collection people discovery while preserving and marking hidden people already referenced by saved definitions.
