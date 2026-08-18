@@ -155,6 +155,12 @@ public sealed record PersonMaintenancePersonResponse(
     bool IsFavorite = false,
     bool HiddenFromSmartCollections = false);
 
+public sealed record PersonRepresentativeFaceResponse(
+    string PersonId,
+    string? FaceId,
+    string? ImageUrl,
+    bool IsExplicit);
+
 public sealed record PersonMaintenanceActionResponse(
     long Id,
     string Kind,
@@ -202,6 +208,8 @@ public sealed record MergePersonRequest(
 public sealed record SetPersonFavoriteRequest(bool IsFavorite);
 
 public sealed record SetPersonSmartCollectionVisibilityRequest(bool HiddenFromSmartCollections);
+
+public sealed record SetPersonFeaturedFaceRequest(string? FaceId);
 
 public sealed record AssignFaceRequest(string PersonId, string Actor, string? Note = null);
 
