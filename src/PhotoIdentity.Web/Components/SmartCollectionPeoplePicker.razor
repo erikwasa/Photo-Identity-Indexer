@@ -1,0 +1,161 @@
+@using PhotoIdentity.Web.Contracts
+
+<div class="smart-people-picker">
+    <label class="smart-field" for="smart-people-search">
+        <span class="field-label">Search people</span>
+        <div class="smart-people-search-row">
+            <input id="smart-people-search"
+                   type="search"
+                   placeholder="Type a name"
+                   autocomplete="off"
+                   disabled="@Disabled"
+                   @bind="SearchText"
+                   @bind:event="oninput" />
+            @if (!string.IsNullOrWhiteSpace(SearchText))
+            {
+                <button type="button"
+                        class="button secondary smart-people-clear"
+                        disabled="@Disabled"
+                        @onclick="ClearSearch">
+                    Clear
+                </button>
+            }
+        </div>
+    </label>
+
+    @if (Selected.Count > 0)
+    {
+        <section class="smart-people-section" aria-label="Selected people">
+            <div class="smart-people-section-heading">
+                <strong>Selected</strong>
+                <span>@Selected.Count</span>
+            </div>
+            <div class="smart-selected-people">
+                @foreach (ReviewPersonResponse person in Selected)
+                {
+                    <article class="smart-selected-person">
+                        @if (!string.IsNullOrWhiteSpace(person.RepresentativeImageUrl))
+                        {
+                            <img class="smart-person-portrait"
+                                 src="@person.RepresentativeImageUrl"
+                                 alt=""
+                                 loading="lazy"
+                                 decoding="async" />
+                        }
+                        else
+                        {
+                            <span class="smart-person-portrait smart-person-portrait-fallback" aria-hidden="true">
+                                @SmartCollectionPeoplePickerModel.FallbackInitial(person)
+                            </span>
+                        }
+                        <span class="smart-person-copy">
+                            <strong>@person.DisplayName</strong>
+                            @if (person.HiddenFromSmartCollections)
+                            {
+                                <span class="state-badge">Hidden</span>
+                            }
+                            else if (person.IsFavorite)
+                            {
+                                <span>Favorite</span>
+                            }
+                        </span>
+                        <button type="button"
+                                class="smart-person-remove"
+                                disabled="@Disabled"
+                                aria-label="Remove @person.DisplayName from selected people"
+                                @onclick="() => RemoveAsync(person.Id)">
+                            Remove
+                        </button>
+                    </article>
+                }
+            </div>
+        </section>
+    }
+
+    <section class="smart-people-section" aria-label="People search results">
+        <div class="smart-people-section-heading">
+            <strong>Available people</strong>
+            <span>@Candidates.Count</span>
+        </div>
+
+        @if (Candidates.Count == 0)
+        {
+            <p class="smart-muted">@EmptyCandidateMessage</p>
+        }
+        else
+        {
+            <div class="smart-person-results" role="list">
+                @foreach (ReviewPersonResponse person in Candidates)
+                {
+                    <button type="button"
+                            class="smart-person-result"
+                            disabled="@Disabled"
+                            aria-label="Add @person.DisplayName to selected people"
+                            @onclick="() => AddAsync(person.Id)">
+                        @if (!string.IsNullOrWhiteSpace(person.RepresentativeImageUrl))
+                        {
+                            <img class="smart-person-portrait"
+                                 src="@person.RepresentativeImageUrl"
+                                 alt=""
+                                 loading="lazy"
+                                 decoding="async" />
+                        }
+                        else
+                        {
+                            <span class="smart-person-portrait smart-person-portrait-fallback" aria-hidden="true">
+                                @SmartCollectionPeoplePickerModel.FallbackInitial(person)
+                            </span>
+                        }
+                        <span class="smart-person-copy">
+                            <strong>@person.DisplayName</strong>
+                            @if (person.IsFavorite)
+                            {
+                                <span>Favorite</span>
+                            }
+                            else if (person.RepresentativeImageUrl is null)
+                            {
+                                <span>No representative photo</span>
+                            }
+                        </span>
+                        <span class="smart-person-add" aria-hidden="true">Add</span>
+                    </button>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlySet<string> SelectedPersonIds { get; set; } = new HashSet<string>(StringComparer.Ordinal);
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    [Parameter]
+    public EventCallback<string> PersonAdded { get; set; }
+
+    [Parameter]
+    public EventCallback<string> PersonRemoved { get; set; }
+
+    private string SearchText { get; set; } = "";
+
+    private IReadOnlyList<ReviewPersonResponse> Selected =>
+        SmartCollectionPeoplePickerModel.SelectedPeople(People, SelectedPersonIds);
+
+    private IReadOnlyList<ReviewPersonResponse> Candidates =>
+        SmartCollectionPeoplePickerModel.SearchCandidates(People, SelectedPersonIds, SearchText);
+
+    private string EmptyCandidateMessage => string.IsNullOrWhiteSpace(SearchText)
+        ? "No more visible people are available to add."
+        : $"No visible people match “{SearchText.Trim()}”.";
+
+    private Task AddAsync(string personId) => PersonAdded.InvokeAsync(personId);
+
+    private Task RemoveAsync(string personId) => PersonRemoved.InvokeAsync(personId);
+
+    private void ClearSearch() => SearchText = "";
+}
