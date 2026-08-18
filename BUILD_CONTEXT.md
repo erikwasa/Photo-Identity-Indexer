@@ -6,29 +6,34 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0069 — Reduce GitHub Actions feedback time** is the active tooling item.
+**WI-0066 — Add Smart Collection visibility preference for people** is the active M19 implementation item.
 
-Slice 1 is implemented on `agent/WI-0069-ci-runtime-optimization`:
+Slice 1 is implemented on `agent/WI-0066-smart-collection-person-visibility`. It establishes schema v16, a narrowly scoped durable `HiddenFromSmartCollections` preference, maintenance API read/write contracts, deterministic target-wins merge semantics and integration coverage. Hidden people remain part of ordinary review/identity people lists; Smart Collection discovery filtering is intentionally a later slice.
 
-- `verify-local.ps1` keeps its full build/test/documentation checkpoint by default but now has explicit `-SkipBuild`, `-SkipTests` and `-SkipDocumentation` switches for callers that already validated the same checkout;
-- skipped media verification requires the previously built `PhotoIdentity.Cli` assembly, so CI cannot silently run against missing build output;
-- the mixed-media GitHub Actions step reuses the earlier successful restore/build/test/documentation work instead of rerunning the repository checkpoint;
-- workflow-level concurrency groups pull-request runs by PR number and cancels superseded PR runs, while `main` push runs use a unique run ID and are not canceled by this policy.
+WI-0065 implementation merged through PR #166 and is in review pending maintainer verification of unattended pickup and restart/resume behavior.
 
-The existing decoder fixture/report assertions, launcher verification and package verification remain unchanged.
+WI-0069 implementation merged through PR #169 and remains in review pending its recorded CI timing/behavior evidence. Its CI optimization is now part of `main`: mixed-media verification can reuse successful build/test/documentation work and superseded pull-request runs are canceled.
 
 ## Next concrete step
 
-1. Run the draft pull-request GitHub Actions workflow and confirm build, tests, documentation validation, review smoke, launcher verification and package verification all pass.
-2. Inspect the mixed-media log and confirm it reports repository validation as skipped and proceeds directly to the decoder fixtures without a second integration-test run.
-3. Compare `build-and-test` wall-clock duration with the pre-change run #1060 baseline and record timing evidence in WI-0069.
-4. Mark WI-0069 completed only after the CI behavior and timing evidence are verified.
-5. Treat package/publish reuse, SDK/package caching and isolated integration-test sharding as later follow-up decisions rather than silently extending Slice 1.
+1. Validate WI-0066 Slice 1 after merging current `main`, including build/tests, living/generated documentation, review smoke and Windows verification.
+2. Merge Slice 1 after automated validation and code review.
+3. Implement Slice 2: add the reversible hide/unhide control and status indicator to Maintain People.
+4. Implement Slice 3: filter normal Smart Collection people discovery while preserving and marking hidden people already referenced by saved definitions.
+5. Run the focused maintainer browser pass for WI-0066 before moving to WI-0067.
 
 ## Relevant files
 
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/work-items/WI-0069-ci-runtime-optimization.md`
+- `docs/delivery/work-items/WI-0066-smart-collection-person-visibility.md`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteCatalogueDatabase.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqlitePersonSmartCollectionVisibilityRepository.cs`
+- `src/PhotoIdentity.Api/PersonMaintenanceEndpoints.cs`
+- `src/PhotoIdentity.Web/ReviewContracts.cs`
+- `src/PhotoIdentity.Web/Pages/People.razor`
+- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor`
+- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor.cs`
+- `tests/PhotoIdentity.Integration.Tests/PersonSmartCollectionVisibilityApplicationTests.cs`
 - `.github/workflows/build.yml`
 - `verify-local.ps1`
 

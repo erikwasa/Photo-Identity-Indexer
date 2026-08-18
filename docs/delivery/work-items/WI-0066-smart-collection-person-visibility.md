@@ -76,3 +76,11 @@ Global person hiding, deleting people, hiding photographs, suppressing face-revi
 1. Persistence/API contract for the person visibility preference, including merge semantics and tests.
 2. Maintain People hide/unhide control and status indicator.
 3. Smart Collection discovery filtering plus saved-definition compatibility coverage.
+
+## Implementation status
+
+Slice 1 is in implementation on `agent/WI-0066-smart-collection-person-visibility`.
+
+The foundation uses schema v16 with a dedicated `person_smart_collection_visibility` table and a sparse hidden-person preference. The maintenance API exposes a reversible visibility mutation plus the current flag while the ordinary review people endpoint continues to return every active person. Merge semantics are target-wins: the surviving person's existing preference is unchanged, and preferences attached to a retired source identity are excluded from active visibility resolution.
+
+Integration coverage verifies restart persistence, reversible hide/unhide behavior, continued review-person availability, unknown-person rejection and target-wins merge semantics. Maintain People UI and Smart Collection picker behavior remain the next slices.
