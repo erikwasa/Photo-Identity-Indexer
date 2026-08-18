@@ -30,9 +30,13 @@ Generic API tests should use `PhotoIdentityApiTestFactory`. The shared factory d
 
 The integration assembly has xUnit in-process parallelization disabled because concurrent `WebApplicationFactory` / `TestServer` lifetimes produced unrelated HTTP 500 failures on Windows. Do not simply turn broad in-process parallelism back on.
 
-WI-0070 instead shards by **separate `dotnet test` processes**. Each process still runs its assigned xUnit tests sequentially, which preserves isolation of application/testhost static state. The current implementation runs multiple shard processes concurrently inside the same already-built Windows job rather than creating multiple runner jobs; this avoids multiplying SDK setup, restore/build and Windows runner minutes.
+WI-0070 instead shards by **separate `dotnet test` processes on isolated Windows runners**. Each shard remains sequential internally, preserving xUnit/TestServer host-lifetime isolation. A three-process experiment inside one runner was rejected after its first PR run remained in the integration step after the whole successful sequential reference job had already completed; sharing one runner did not provide enough CPU/I/O isolation.
 
-Shard assignment is timing-based, not count-based. `.github/test-timing-baseline.json` contains measured class weights from a known successful workflow. `.github/scripts/run-integration-shards.ps1` discovers the current tests at runtime, assigns each class to exactly one shard, and gives new classes a default weight until the baseline is refreshed. The runner fails if the number of TRX results or unique test IDs differs from the discovery count, preventing an optimization from silently dropping or duplicating tests.
+The current design therefore uses two isolated integration jobs. This duplicates .NET setup, restore and integration-project build, so it is not free in runner minutes. That cost is intentional and must be measured against the wall-clock reduction. Later pipeline work should prefer artifact/build reuse if it reduces duplicated setup without coupling the testhosts back onto one constrained runner.
+
+Shard assignment is timing-based, not count-based. `.github/test-timing-baseline.json` contains measured class weights from a known successful workflow. Each integration job discovers the entire current suite, computes the same deterministic class plan, and runs one shard. New classes receive a conservative default weight until the baseline is refreshed.
+
+Each selected shard must produce exactly the number of unique TRX test IDs assigned by the plan. The full plan must also account for every discovered class and test before execution. This keeps sharding from silently dropping coverage.
 
 The timing baseline is scheduling input, not a performance assertion. Refresh it after material suite changes when the measured shard distribution becomes meaningfully imbalanced.
 
@@ -62,7 +66,7 @@ When a test is suspected flaky:
 
 ## Timing evidence
 
-The PR workflow records integration results as TRX and publishes both JSON and Markdown timing summaries. The summary should make shard duration, the slowest classes and individual tests visible without reconstructing timestamps from raw logs.
+The PR workflow records integration results as TRX and publishes JSON and Markdown timing summaries for each shard. The summary should make shard duration, the slowest classes and individual tests visible without reconstructing timestamps from raw logs.
 
 Use measured durations to balance integration shards. Do not balance shards only by test count: workflow #1093 showed two classes at roughly 40 seconds each while most classes were only a few seconds or less.
 
@@ -71,7 +75,7 @@ For material CI changes, record both:
 - required PR wall-clock critical path; and
 - approximate Windows runner minutes consumed across parallel jobs.
 
-Prefer concurrency inside already-required jobs when it gives safe isolation and materially reduces wall-clock time without multiplying expensive runner setup. Add separate jobs only when process/resource isolation or a different gate dependency actually requires them.
+Do not assume more concurrency is faster. Measure contention on the actual hosted runner. If concurrency requires separate runners, record the duplicate setup/build cost and keep the smallest shard count that reaches the feedback-time goal reliably.
 
 The WI-0070 target is a required PR critical path at or below six minutes across representative successful runs without unreasonable runner multiplication.
 
@@ -94,7 +98,7 @@ WI-0070 changes the pipeline in measured slices rather than all at once:
 
 1. separate fast and integration test commands, add timing evidence and establish shared test-host isolation;
 2. diagnose known transient HTTP 500 tests and classify any temporary diagnostic lane explicitly;
-3. partition deterministic integration tests into isolated sequential processes using measured timing while keeping exact discovery/result coverage checks;
+3. partition deterministic integration tests into timing-balanced isolated runner jobs while keeping exact per-shard coverage checks;
 4. reduce duplicate published-runtime coverage and make launcher/package checks appropriately path-aware while retaining comprehensive `main` validation;
 5. keep this document and `AGENTS.md` aligned with the resulting steady-state gate.
 
