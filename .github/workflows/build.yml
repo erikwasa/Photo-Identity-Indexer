@@ -8,12 +8,62 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  classify-pr-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      launcher: ${{ steps.changes.outputs.launcher }}
+      package: ${{ steps.changes.outputs.package }}
+    steps:
+      - name: Classify deployment-surface changes
+        id: changes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName !== 'pull_request') {
+              core.setOutput('launcher', 'true');
+              core.setOutput('package', 'true');
+              core.info('Comprehensive main validation: launcher and package verification are enabled.');
+              return;
+            }
+
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+              per_page: 100,
+            });
+            const paths = files.map(file => file.filename);
+            const exact = new Set(paths);
+
+            const sharedPublishSurface = paths.some(path => path.startsWith('src/')) ||
+              exact.has('Directory.Build.props') ||
+              exact.has('Directory.Packages.props') ||
+              exact.has('PhotoIdentity.slnx') ||
+              exact.has('.github/workflows/build.yml');
+
+            const launcher = sharedPublishSurface ||
+              exact.has('Start-PhotoIdentity.ps1') ||
+              exact.has('Start-PhotoIdentity.cmd') ||
+              exact.has('PhotoIdentity.launcher.example.json') ||
+              exact.has('verify-launcher.ps1');
+
+            const package = sharedPublishSurface || launcher ||
+              paths.some(path => path.startsWith('packaging/windows/')) ||
+              paths.some(path => path.startsWith('models/')) ||
+              exact.has('Package-PhotoIdentity.ps1') ||
+              exact.has('verify-package.ps1');
+
+            core.setOutput('launcher', launcher ? 'true' : 'false');
+            core.setOutput('package', package ? 'true' : 'false');
+            core.info(`Changed files: ${paths.length}; launcher=${launcher}; package=${package}`);
+
   build-and-test:
     runs-on: windows-latest
     steps:
@@ -89,9 +139,11 @@ jobs:
       - name: Check generated documentation
         run: dotnet run --project tools/PhotoIdentity.Docs --configuration Release --no-build -- generate --check
 
-      - name: Run review application smoke verification
+      - name: Run published review verification
         shell: powershell
-        run: ./verify-review.ps1 -Mode Smoke -Configuration Release -SkipBuild -Port 5081
+        run: |
+          $smokeProfile = if ("${{ github.event_name }}" -eq "pull_request") { "PublishedMinimum" } else { "Comprehensive" }
+          ./verify-review.ps1 -Mode Smoke -SmokeProfile $smokeProfile -Configuration Release -SkipBuild -Port 5081
 
       - name: Upload review verification diagnostics
         if: failure()
@@ -117,7 +169,7 @@ jobs:
           [IO.File]::WriteAllBytes(
             (Join-Path $fixtureDirectory "warning.jpg"),
             [Convert]::FromBase64String(
-              "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAIBAQEBAQIBAQECAgICAgQDAgICAgUEBAMEBgUGBgYFBgYGBwkIBgcJBwYGCAsICQoKCgoKBggLDAsKDAkKCgr/2wBDAQICAgICAgUDAwUKBwYHCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgr/wAARCAAKABQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEBPwD8V6KKK8M9gKKKKAP/2Q=="))
+              "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAIBAQEBAQIBAQECAgICAgQDAgICAgUEBAMEBgUGBgYFBgYGBwkIBgcJBwYGCAsICQoKCgoKBggLDAsKDAkKCgr/2wBDAQICAgICAgUDAwUKBwYHCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgr/wAARCAAKABQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD8V6KKK8M9gKKKKAP/2Q=="))
           [IO.File]::WriteAllBytes(
             (Join-Path $fixtureDirectory "corrupt.jpg"),
             [byte[]](0xff, 0xd8, 0xff, 0xd9))
@@ -234,6 +286,8 @@ jobs:
           if-no-files-found: warn
 
   launcher-verification:
+    needs: classify-pr-changes
+    if: github.event_name != 'pull_request' || needs.classify-pr-changes.outputs.launcher == 'true'
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -263,6 +317,8 @@ jobs:
           retention-days: 1
 
   package-verification:
+    needs: classify-pr-changes
+    if: github.event_name != 'pull_request' || needs.classify-pr-changes.outputs.package == 'true'
     runs-on: windows-latest
     steps:
       - name: Check out repository

@@ -44,11 +44,15 @@ The timing baseline is scheduling input, not a performance assertion. Refresh it
 
 Published-runtime smoke proves behavior that a TestServer integration test cannot: the published application starts, hosted client/static assets are present, and representative production packaging/hosting paths work.
 
-Do not duplicate the whole API integration suite in published smoke. Keep the PR smoke to uniquely valuable published-app checks; retain the broader smoke in the comprehensive `main` gate when it is useful for regression confidence.
+Do not duplicate the whole API integration suite in published smoke. Pull requests use `verify-review.ps1 -SmokeProfile PublishedMinimum`: the published host must become healthy, the hosted Blazor client must be served, and a representative review-gallery request must return the synthetic fixture without leaking private paths and with the expected no-store cache policy. The broader mutation-heavy published smoke remains `Comprehensive` and runs on `main`.
 
 ### Launcher and package verification
 
-Launcher/package verification protects Windows deployment behavior, durable-data upgrade behavior, self-contained publish output and the actual operator package. These checks are valuable but expensive. They should run for changes that can affect those surfaces and in the comprehensive `main` gate; unrelated documentation or narrow application-rule changes should not pay the full package cost once path-aware gating is implemented.
+Launcher/package verification protects Windows deployment behavior, durable-data upgrade behavior, self-contained publish output and the actual operator package. These checks are valuable but expensive.
+
+The pull-request workflow classifies changed paths before allocating those Windows jobs. Changes under `src/` and shared build metadata are conservatively treated as publish-surface changes. Launcher-specific scripts/configuration trigger launcher verification; packaging/model inputs trigger package verification. Documentation-only, test-only and other unrelated pull requests can therefore skip those expensive deployment jobs. A push to `main` always enables both jobs, preserving the comprehensive deployment gate even when the merged PR did not need them on its fast path.
+
+When adding a new deployment input, update the classifier in `.github/workflows/build.yml` in the same change so path-aware gating does not silently miss it.
 
 ## Flaky-test policy
 
@@ -106,4 +110,4 @@ WI-0070 changes the pipeline in measured slices rather than all at once:
 4. reduce duplicate published-runtime coverage and make launcher/package checks appropriately path-aware while retaining comprehensive `main` validation;
 5. keep this document and `AGENTS.md` aligned with the resulting steady-state gate.
 
-Until the later gate-right-sizing slice lands, launcher and package verification remain unconditional and the broad published review smoke remains part of the current workflow.
+Slice 3 implements the gate split described above: pull requests retain the minimum uniquely valuable published-app smoke, launcher/package jobs are path-aware, and `main` remains comprehensive. Representative workflow timing still needs to be measured before WI-0070 can claim the six-minute acceptance target.
