@@ -6,40 +6,34 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0066 — Add Smart Collection visibility preference for people** is the active M19 implementation item.
+**WI-0067 — Add featured representative faces for people** is the active M19 implementation item.
 
-Slice 1 merged through PR #170 and establishes schema v16, a narrowly scoped durable `HiddenFromSmartCollections` preference, maintenance API read/write contracts, deterministic target-wins merge semantics and integration coverage. Hidden people remain part of ordinary review/identity people lists.
+WI-0066 implementation is merged through PRs #170, #171 and #173. Per maintainer direction, its focused browser verification is deferred to the consolidated M19 manual verification pass after the remaining M19 implementation work is ready.
 
-Slice 2 merged through PR #171. Maintain People now shows whether each active person is available or hidden from Smart Collections and provides a reversible hide/show control backed by the Slice 1 endpoint. Hidden people remain fully present in Maintain People.
+WI-0067 Slice 1 is implemented on `agent/WI-0067-featured-person-face`: a durable explicit person-to-face presentation preference, assignment-safe representative resolver, deterministic automatic fallback, reusable representative-face GET/PUT API contracts and focused integration coverage. A stale explicit face is ignored during resolution rather than ever showing another person's face.
 
-Slice 3 is implemented on `agent/WI-0066-smart-collection-discovery`. `/api/review/people` still returns every active person but now exposes the persisted Smart Collection visibility flag. The Smart Collection people picker hides those people from normal discovery while retaining and marking a hidden person already selected by a restored saved or transient definition. Removing that hidden selection makes it unavailable for re-selection until unhidden. Saved definitions and query semantics are not rewritten by the preference.
-
-WI-0065 implementation merged through PR #166 and is in review pending maintainer verification of unattended pickup and restart/resume behavior.
-
-WI-0069 is completed: the CI optimization merged through PR #169 and successful workflow #1075 verified the mixed-media checkpoint reuses prior build/test/documentation validation instead of rerunning the integration suite. Timing and merge evidence are recorded in the work item.
+WI-0065 remains in review pending the same consolidated M19 verification pass. WI-0069 is completed with CI timing evidence recorded.
 
 ## Next concrete step
 
-1. Validate WI-0066 Slice 3 in GitHub Actions, including build/tests, living/generated documentation, review smoke and Windows verification.
-2. Merge Slice 3 after automated validation and code review.
-3. Run the focused maintainer browser pass for WI-0066: hide a person, confirm Maintain People state survives reload, confirm face/review workflows remain unchanged, confirm the person is absent from a new Smart Collection, and confirm a previously saved collection still shows that hidden selected person and reevaluates normally.
-4. Record PR/verification evidence and move WI-0066 to `in_review`.
-5. Continue with WI-0067 featured representative faces, followed by WI-0068 searchable portrait-led Smart Collection people selection.
+1. Validate WI-0067 Slice 1 in GitHub Actions and merge after automated validation and code review.
+2. Implement Slice 2: Face Details `Set as featured photo` / clear-to-automatic controls using the Slice 1 API.
+3. Implement Slice 3: show resolved portraits in Maintain People and apply deterministic merge semantics.
+4. Move WI-0067 to `in_review` with manual verification deferred to the consolidated M19 pass.
+5. Implement WI-0068 searchable portrait-led Smart Collection people selection using the representative-face contract.
+6. Run the consolidated M19 manual verification pass once the remaining M19 work items are ready.
 
 ## Relevant files
 
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/work-items/WI-0066-smart-collection-person-visibility.md`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePersonSmartCollectionVisibilityRepository.cs`
-- `src/PhotoIdentity.Api/ReviewEndpoints.cs`
+- `docs/delivery/work-items/WI-0067-featured-person-face.md`
+- `src/PhotoIdentity.Persistence.Sqlite/SqlitePersonFeaturedFaceSchema.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqlitePersonFeaturedFaceRepository.cs`
 - `src/PhotoIdentity.Api/PersonMaintenanceEndpoints.cs`
 - `src/PhotoIdentity.Web/ReviewContracts.cs`
+- `src/PhotoIdentity.Web/Pages/FaceDetails.razor`
 - `src/PhotoIdentity.Web/Pages/People.razor`
-- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor`
-- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor.cs`
-- `tests/PhotoIdentity.Integration.Tests/PersonSmartCollectionVisibilityApplicationTests.cs`
-- `tests/PhotoIdentity.Integration.Tests/SmartCollectionHiddenPersonCompatibilityTests.cs`
-- `.github/workflows/build.yml`
+- `tests/PhotoIdentity.Integration.Tests/PersonFeaturedFaceApplicationTests.cs`
 
 ## Repository validation
 
