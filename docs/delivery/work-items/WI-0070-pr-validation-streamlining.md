@@ -83,21 +83,21 @@ The detailed strategy document should carry rationale and examples. `AGENTS.md` 
 
 ## Acceptance criteria
 
-- [ ] CI exposes enough timing data to identify slow test assemblies and the dominant slow integration classes/tests without reconstructing timestamps manually.
+- [x] CI exposes enough timing data to identify slow test assemblies and the dominant slow integration classes/tests without reconstructing timestamps manually.
 - [ ] Generic API integration tests use a shared host setup that disables irrelevant production hosted services by default; worker-specific tests explicitly opt in or exercise worker cycles directly.
 - [ ] The remaining transient HTTP 500 failure class has improved diagnostics and a documented root cause or narrowly tracked stabilization follow-up.
 - [ ] Integration coverage is partitioned into isolated sequential shards/processes so the required PR critical path no longer waits for the entire host-heavy assembly serially in one process.
-- [ ] In-process xUnit parallelism remains disabled for host-heavy integration tests unless later evidence demonstrates a safe replacement architecture.
-- [ ] Any temporarily quarantined flaky tests are visible in CI, tracked, non-silently retried, and have a documented condition for returning to the required gate.
+- [x] In-process xUnit parallelism remains disabled for host-heavy integration tests unless later evidence demonstrates a safe replacement architecture.
+- [x] Any temporarily quarantined flaky tests are visible in CI, tracked, non-silently retried, and have a documented condition for returning to the required gate. No tests are currently quarantined; the observed flaky cases remain blocking and carry only a diagnostic trait.
 - [ ] Published review smoke on PRs is reduced to behavior that adds unique signal beyond integration tests, while comprehensive published-app coverage remains on `main` or another explicit full gate.
 - [ ] Launcher/package checks no longer run on unrelated PR changes unless evidence shows keeping them unconditional is cheaper/safer than path-aware gating.
 - [ ] A comprehensive `main` gate retains the meaningful integration, published application, launcher and package coverage moved off the fast PR path.
 - [ ] At least three representative successful PR runs show the required validation critical path at or below 6 minutes, or the work item records measured evidence for the remaining blocker and a follow-up needed to reach that target.
 - [ ] Runner-minute impact is recorded as well as wall-clock impact so speed is not achieved by an unreasonable multiplication of expensive Windows jobs.
-- [ ] A durable testing/CI strategy document is added and linked from the repository documentation index where appropriate.
-- [ ] `AGENTS.md` contains concise rules for test-layer choice, host-heavy integration tests, flaky-test handling, and PR descriptions/CI-impact reporting.
-- [ ] PR guidance makes test-layer additions and material CI-cost changes explicit instead of allowing them to accumulate silently.
-- [ ] `PhotoIdentity.Docs validate` and `generate --check` pass after the work-item and documentation changes.
+- [x] A durable testing/CI strategy document is added and linked from the repository documentation index where appropriate.
+- [x] `AGENTS.md` contains concise rules for test-layer choice, host-heavy integration tests, flaky-test handling, and PR descriptions/CI-impact reporting.
+- [x] PR guidance makes test-layer additions and material CI-cost changes explicit instead of allowing them to accumulate silently.
+- [x] `PhotoIdentity.Docs validate` and `generate --check` pass after the Slice 1 work-item and documentation changes.
 
 ## Non-goals
 
@@ -117,11 +117,20 @@ The detailed strategy document should carry rationale and examples. `AGENTS.md` 
 
 ## Implementation notes
 
-### Slice 1 in progress — 2026-08-18
+### Slice 1 validated — 2026-08-18
 
-- CI now separates the fast/non-integration pass from the sequential integration assembly. The integration command writes TRX to `.artifacts/test-results` rather than being buried inside one solution-level test command.
-- `.github/scripts/summarize-test-timings.ps1` converts the integration TRX into JSON plus a GitHub Step Summary showing the slowest classes and individual tests. The timing artifact is retained even when the test run fails.
-- `PhotoIdentityApiTestFactory` is the shared generic API host foundation. It keeps detailed errors enabled and removes `PhotoPlaceEnrichmentHostedService`, `ArchiveAdvancementHostedService` and `IdentityMatchRegenerationHostedService` from generic test hosts by default.
-- The two hosted-style tests that failed in PR #173 are the first migrations to the shared factory and are tagged `Category=FlakyDiagnostic` for visibility only. They remain required; there is no retry or quarantine behavior in Slice 1.
-- The shared HTTP helper reads a bounded response body before throwing on non-success, so a future 500 can retain server-side diagnostic content instead of only the status exception.
-- `docs/operations/testing-and-ci-strategy.md` and concise `AGENTS.md` rules are added early in the work item so future PR/test work follows the intended layer and cost discipline while later slices refine the gate.
+- PR #176 merged as `ca17c5fb01981480d9c7d79b53ef75383415fe04` after successful workflow #1093 (`32178207171`).
+- CI separates the fast/non-integration pass from the sequential integration assembly and publishes TRX plus JSON/Markdown timing evidence.
+- Workflow #1093 completed `build-and-test` in about 6m58s. The full 294-test integration command took about 3m37s wall-clock and recorded 216.9s of aggregate test duration.
+- Two classes dominate the measured integration cost: `ResumableBatchProcessorTests` recorded about 40.2s and `DetectorEvaluationComparisonApplicationTests` about 38.5s. The next class was about 6.3s, confirming that test-count-only partitioning would be badly imbalanced.
+- The first shared-host migrations passed in #1093 without reproducing their prior HTTP 500 failures. The bounded non-success response diagnostic remains in place if the failure returns.
+- The #1093 fast-filter command exposed a second namespace spelling used by 16 integration tests: `PhotoIdentity.Integration.Tests`. Those tests ran for about eight seconds of recorded test time during the fast phase and were then run again in the full integration phase. Slice 2 excludes both integration namespaces from the fast pass.
+- `docs/operations/testing-and-ci-strategy.md` and concise `AGENTS.md` rules are merged, so future test/PR work now carries the intended layer and cost discipline.
+
+### Slice 2 in progress — 2026-08-18
+
+- `.github/test-timing-baseline.json` records class weights from successful workflow #1093. It is scheduling data, not an expected-duration assertion.
+- `.github/scripts/run-integration-shards.ps1` discovers the current integration tests at runtime, groups them by class, and greedily balances three shards from the measured class weights. New classes are automatically assigned with a conservative default weight until the baseline is refreshed.
+- The current #1093 weights balance to approximately 72.3s of recorded test duration per shard. The three shards execute concurrently as separate `dotnet test` processes inside the existing Windows job, so xUnit remains sequential inside each process and SDK setup/restore/build are not multiplied across extra runners.
+- After execution, the shard runner requires the TRX result count and unique test-id count to equal the discovery count. A missing or multiply executed integration test fails the gate even if all shard processes individually report success.
+- The timing summarizer now reads the TRX `TestMethod.className` definition instead of inferring class names from display text, avoiding incorrect class grouping for parameterized theory cases.
