@@ -63,7 +63,7 @@
                                 class="smart-person-remove"
                                 disabled="@Disabled"
                                 aria-label="Remove @person.DisplayName from selected people"
-                                @onclick="() => RemoveAsync(person.Id)">
+                                @onclick="() => Remove(person.Id)">
                             Remove
                         </button>
                     </article>
@@ -91,7 +91,7 @@
                             class="smart-person-result"
                             disabled="@Disabled"
                             aria-label="Add @person.DisplayName to selected people"
-                            @onclick="() => AddAsync(person.Id)">
+                            @onclick="() => Add(person.Id)">
                         @if (!string.IsNullOrWhiteSpace(person.RepresentativeImageUrl))
                         {
                             <img class="smart-person-portrait"
@@ -130,32 +130,29 @@
     public IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
 
     [Parameter, EditorRequired]
-    public IReadOnlySet<string> SelectedPersonIds { get; set; } = new HashSet<string>(StringComparer.Ordinal);
+    public ISet<string> SelectedPersonIds { get; set; } = new HashSet<string>(StringComparer.Ordinal);
 
     [Parameter]
     public bool Disabled { get; set; }
 
-    [Parameter]
-    public EventCallback<string> PersonAdded { get; set; }
-
-    [Parameter]
-    public EventCallback<string> PersonRemoved { get; set; }
-
     private string SearchText { get; set; } = "";
 
+    private IReadOnlySet<string> SelectedSet =>
+        SelectedPersonIds as IReadOnlySet<string> ?? SelectedPersonIds.ToHashSet(StringComparer.Ordinal);
+
     private IReadOnlyList<ReviewPersonResponse> Selected =>
-        SmartCollectionPeoplePickerModel.SelectedPeople(People, SelectedPersonIds);
+        SmartCollectionPeoplePickerModel.SelectedPeople(People, SelectedSet);
 
     private IReadOnlyList<ReviewPersonResponse> Candidates =>
-        SmartCollectionPeoplePickerModel.SearchCandidates(People, SelectedPersonIds, SearchText);
+        SmartCollectionPeoplePickerModel.SearchCandidates(People, SelectedSet, SearchText);
 
     private string EmptyCandidateMessage => string.IsNullOrWhiteSpace(SearchText)
         ? "No more visible people are available to add."
         : $"No visible people match “{SearchText.Trim()}”.";
 
-    private Task AddAsync(string personId) => PersonAdded.InvokeAsync(personId);
+    private void Add(string personId) => SelectedPersonIds.Add(personId);
 
-    private Task RemoveAsync(string personId) => PersonRemoved.InvokeAsync(personId);
+    private void Remove(string personId) => SelectedPersonIds.Remove(personId);
 
     private void ClearSearch() => SearchText = "";
 }
