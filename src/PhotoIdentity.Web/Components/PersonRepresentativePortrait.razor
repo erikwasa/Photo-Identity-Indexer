@@ -21,6 +21,14 @@
             <span>@(Representative.IsExplicit ? "Selected explicitly" : "Selected automatically")</span>
         </div>
     }
+    else if (LoadFailed)
+    {
+        <div class="portrait-placeholder" aria-hidden="true">!</div>
+        <div class="portrait-copy">
+            <strong>Portrait unavailable</strong>
+            <span>Representative face could not be loaded.</span>
+        </div>
+    }
     else
     {
         <div class="portrait-placeholder" aria-hidden="true">@Initial</div>
@@ -40,6 +48,7 @@
 
     private PersonRepresentativeFaceResponse? Representative { get; set; }
     private bool Loading { get; set; }
+    private bool LoadFailed { get; set; }
     private string Initial => string.IsNullOrWhiteSpace(DisplayName)
         ? "?"
         : DisplayName.Trim()[0].ToString().ToUpperInvariant();
@@ -47,6 +56,7 @@
     protected override async Task OnParametersSetAsync()
     {
         Representative = null;
+        LoadFailed = false;
         if (string.IsNullOrWhiteSpace(PersonId))
         {
             return;
@@ -61,6 +71,7 @@
         catch
         {
             Representative = null;
+            LoadFailed = true;
         }
         finally
         {
