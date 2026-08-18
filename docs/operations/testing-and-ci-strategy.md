@@ -36,7 +36,7 @@ The current design therefore uses two isolated integration jobs. This duplicates
 
 Shard assignment is timing-based, not count-based. `.github/test-timing-baseline.json` contains measured class weights from a known successful workflow. Each integration job discovers the entire current suite, computes the same deterministic class plan, and runs one shard. New classes receive a conservative default weight until the baseline is refreshed.
 
-Each selected shard must produce exactly the number of unique TRX test IDs assigned by the plan. The full plan must also account for every discovered class and test before execution. This keeps sharding from silently dropping coverage.
+Each selected shard must produce exactly the number of unique TRX test IDs assigned by the plan. The full plan must also account for every discovered required class and test before execution. Tests named in `.github/flaky-integration-tests.txt` are deliberately excluded from blocking shards only while their stabilization work is open; they remain part of runtime discovery and are executed separately as diagnostics.
 
 The timing baseline is scheduling input, not a performance assertion. Refresh it after material suite changes when the measured shard distribution becomes meaningfully imbalanced.
 
@@ -62,7 +62,11 @@ When a test is suspected flaky:
 4. if temporary quarantine is needed, keep the test running in a visible diagnostic lane rather than deleting or silently skipping it;
 5. document the condition for restoring it to the required gate.
 
-`Category=FlakyDiagnostic` is the initial trait used to identify tests with observed intermittent infrastructure/host failures. The trait alone does not make a test non-blocking; gate behavior must be explicit in the workflow.
+`Category=FlakyDiagnostic` may annotate tests with observed intermittent infrastructure/host failures, but the canonical temporary quarantine is `.github/flaky-integration-tests.txt`. Quarantine membership must be exact and reviewable; stale or duplicate entries are treated as configuration errors rather than silently ignored.
+
+The workflow runs every quarantined test exactly once in `Run quarantined integration diagnostics` after the solution is already built. That step uses `continue-on-error` so a known intermittent host failure does not block unrelated PRs, but it still emits a failed step, TRX, a JSON summary and an uploaded artifact. **No retry is performed.**
+
+WI-0071 owns stabilization of the current quarantine. A test returns to required shard coverage only when its root-cause/shared-host stabilization change is in place and it has passed **three consecutive representative diagnostic CI runs** without the transient HTTP 500. Removing the quarantine entry must then cause the required shard coverage check to execute it exactly once. Quarantine is temporary architecture, not a permanent low-confidence test tier.
 
 ## Timing evidence
 
@@ -97,7 +101,7 @@ Agents should not add a new host-heavy integration test when the same behavior c
 WI-0070 changes the pipeline in measured slices rather than all at once:
 
 1. separate fast and integration test commands, add timing evidence and establish shared test-host isolation;
-2. diagnose known transient HTTP 500 tests and classify any temporary diagnostic lane explicitly;
+2. diagnose known transient HTTP 500 tests and isolate the explicitly tracked cases in a visible, non-retried diagnostic lane while WI-0071 stabilizes them;
 3. partition deterministic integration tests into timing-balanced isolated runner jobs while keeping exact per-shard coverage checks;
 4. reduce duplicate published-runtime coverage and make launcher/package checks appropriately path-aware while retaining comprehensive `main` validation;
 5. keep this document and `AGENTS.md` aligned with the resulting steady-state gate.
