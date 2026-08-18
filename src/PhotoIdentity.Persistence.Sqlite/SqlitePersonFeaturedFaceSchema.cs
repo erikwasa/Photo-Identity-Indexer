@@ -25,6 +25,43 @@ public static class SqlitePersonFeaturedFaceSchema
             );
             CREATE INDEX IF NOT EXISTS ix_person_featured_faces_face
                 ON person_featured_faces (face_occurrence_id, person_id);
+
+            CREATE TRIGGER IF NOT EXISTS trg_person_featured_faces_after_merge
+            AFTER UPDATE OF merged_into_person_id ON people
+            WHEN OLD.merged_into_person_id IS NULL
+             AND NEW.merged_into_person_id IS NOT NULL
+            BEGIN
+                INSERT OR IGNORE INTO person_featured_faces (
+                    person_id,
+                    face_occurrence_id,
+                    changed_at_utc)
+                SELECT
+                    NEW.merged_into_person_id,
+                    source.face_occurrence_id,
+                    source.changed_at_utc
+                FROM person_featured_faces AS source
+                WHERE source.person_id = NEW.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM person_featured_faces AS target
+                      WHERE target.person_id = NEW.merged_into_person_id)
+                  AND EXISTS (
+                      SELECT 1
+                      FROM review_actions AS latest
+                      WHERE latest.id = (
+                          SELECT candidate.id
+                          FROM review_actions AS candidate
+                          WHERE candidate.face_occurrence_id = source.face_occurrence_id
+                            AND candidate.action_kind IN ('assign', 'unknown', 'reject')
+                            AND candidate.reversed_at_utc IS NULL
+                          ORDER BY candidate.id DESC
+                          LIMIT 1)
+                        AND latest.action_kind = 'assign'
+                        AND latest.person_id = NEW.merged_into_person_id);
+
+                DELETE FROM person_featured_faces
+                WHERE person_id = NEW.id;
+            END;
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }

@@ -8,7 +8,7 @@
     <div>
         <p class="eyebrow">Canonical identity maintenance</p>
         <h1>Maintain people</h1>
-        <p>Rename a person with reversible audit history, consolidate duplicates with an explicitly irreversible merge, keep frequently used people at the top of selectors, and control whether each person is offered in Smart Collection people selection.</p>
+        <p>Rename a person with reversible audit history, consolidate duplicates with an explicitly irreversible merge, inspect each person's representative portrait, keep frequently used people at the top of selectors, and control whether each person is offered in Smart Collection people selection.</p>
     </div>
 
     <form class="person-creator" @onsubmit="CreatePersonAsync" @onsubmit:preventDefault>
@@ -58,6 +58,7 @@ else
         @foreach (PersonMaintenancePersonResponse person in ActivePeople)
         {
             <article class="person-summary-card">
+                <PersonRepresentativePortrait PersonId="@person.Id" DisplayName="@person.DisplayName" />
                 <strong>@FavoriteLabel(person)</strong>
                 <span class="state-badge">@SmartCollectionVisibilityLabel(person)</span>
                 <span>@person.LabelCount label@(person.LabelCount == 1 ? "" : "s")</span>
@@ -117,7 +118,7 @@ else
         <section class="maintenance-card danger-zone">
             <p class="eyebrow">Irreversible operation</p>
             <h2>Merge duplicate people</h2>
-            <p>Labels, reviewed assignments and suggestions move to the surviving person. If either person is a favorite, the survivor remains a favorite. The source person is permanently retired.</p>
+            <p>Labels, reviewed assignments and suggestions move to the surviving person. If either person is a favorite, the survivor remains a favorite. An existing featured photo on the survivor wins; otherwise a valid featured photo from the retired person carries over.</p>
 
             <label class="field-label" for="merge-target">Surviving person</label>
             <select id="merge-target" @bind="MergeTargetId" disabled="@(MergeTargets.Count == 0)">

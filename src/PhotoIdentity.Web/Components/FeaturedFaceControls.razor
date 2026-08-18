@@ -1,0 +1,180 @@
+@inject HttpClient Http
+
+@if (Face.Person is ReviewPersonResponse person)
+{
+    <section class="audit-section">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Person portrait</p>
+                <h2>Featured photo for @person.DisplayName</h2>
+                <p class="suggestion-guidance">@Guidance</p>
+            </div>
+            <span class="state-badge">@StateLabel</span>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <div class="notice error review-notice" role="alert">@Error</div>
+        }
+        @if (!string.IsNullOrWhiteSpace(Message))
+        {
+            <div class="notice success review-notice" role="status">@Message</div>
+        }
+
+        <div class="card-actions">
+            @if (!Loading && !CurrentFaceIsExplicitFeatured)
+            {
+                <button class="button primary"
+                        disabled="@Busy"
+                        @onclick="SetCurrentFaceAsFeaturedAsync">
+                    Set as featured photo
+                </button>
+            }
+            @if (!Loading && RepresentativeFace?.IsExplicit == true)
+            {
+                <button class="button secondary"
+                        disabled="@Busy"
+                        @onclick="UseAutomaticPhotoAsync">
+                    Use automatic photo
+                </button>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public ReviewFaceResponse Face { get; set; } = default!;
+
+    private PersonRepresentativeFaceResponse? RepresentativeFace { get; set; }
+    private bool Loading { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    private bool CurrentFaceIsExplicitFeatured =>
+        RepresentativeFace?.IsExplicit == true &&
+        string.Equals(RepresentativeFace.FaceId, Face.Id, StringComparison.Ordinal);
+
+    private bool CurrentFaceIsAutomaticRepresentative =>
+        RepresentativeFace is { IsExplicit: false } &&
+        string.Equals(RepresentativeFace.FaceId, Face.Id, StringComparison.Ordinal);
+
+    private string StateLabel => RepresentativeFace switch
+    {
+        null when Loading => "Loading…",
+        null => "Unavailable",
+        { IsExplicit: true } when CurrentFaceIsExplicitFeatured => "Featured photo",
+        { IsExplicit: true } => "Another photo featured",
+        _ => "Automatic choice",
+    };
+
+    private string Guidance => RepresentativeFace switch
+    {
+        null when Loading => "Checking the representative photo selection for this person.",
+        null => "No representative photo is currently available. This assigned face can be selected explicitly.",
+        { IsExplicit: true } when CurrentFaceIsExplicitFeatured =>
+            "This face is the explicit representative portrait. Changing this preference does not change the face assignment or identity evidence.",
+        { IsExplicit: true } =>
+            "Another assigned face is the explicit representative portrait. You can use this face instead or return to automatic selection.",
+        _ when CurrentFaceIsAutomaticRepresentative =>
+            "This face is currently selected automatically. You can pin it as the explicit featured photo or keep automatic selection.",
+        _ =>
+            "Another assigned face is currently selected automatically. You can make this face explicit without changing its identity assignment.",
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        RepresentativeFace = null;
+        Error = null;
+        Message = null;
+
+        if (Face.Person is not ReviewPersonResponse person)
+        {
+            return;
+        }
+
+        Loading = true;
+        try
+        {
+            RepresentativeFace = await Http.GetFromJsonAsync<PersonRepresentativeFaceResponse>(
+                $"api/review/people/{Uri.EscapeDataString(person.Id)}/representative-face");
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task SetCurrentFaceAsFeaturedAsync()
+    {
+        if (Face.Person is not ReviewPersonResponse person)
+        {
+            return;
+        }
+
+        await SetFeaturedFaceAsync(
+            person,
+            Face.Id,
+            $"{person.DisplayName} now uses this face as the featured photo.");
+    }
+
+    private async Task UseAutomaticPhotoAsync()
+    {
+        if (Face.Person is not ReviewPersonResponse person)
+        {
+            return;
+        }
+
+        await SetFeaturedFaceAsync(
+            person,
+            null,
+            $"{person.DisplayName} now uses automatic photo selection.");
+    }
+
+    private async Task SetFeaturedFaceAsync(
+        ReviewPersonResponse person,
+        string? faceId,
+        string successMessage)
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                $"api/review/people/{Uri.EscapeDataString(person.Id)}/featured-face",
+                new SetPersonFeaturedFaceRequest(faceId));
+            await RequireSuccessAsync(response);
+            RepresentativeFace = await response.Content.ReadFromJsonAsync<PersonRepresentativeFaceResponse>()
+                ?? throw new InvalidOperationException("The featured photo response was empty.");
+            Message = successMessage;
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private static async Task RequireSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string detail = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(detail)
+                ? $"The featured photo update failed with status {(int)response.StatusCode}."
+                : detail);
+    }
+}
