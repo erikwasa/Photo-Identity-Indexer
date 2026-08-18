@@ -71,10 +71,10 @@ Automatic face-quality scoring as a new ML feature, editing/cropping portraits, 
 - [x] When no explicit choice exists, the same valid automatic representative is selected deterministically for unchanged catalogue state.
 - [x] An explicit featured face is never accepted for a different person.
 - [x] If the selected face is reassigned or otherwise becomes invalid, representative resolution safely falls back without showing the wrong identity.
-- [ ] Maintain People displays the resolved representative portrait.
-- [ ] Person merge behavior preserves a valid survivor preference according to the documented deterministic rule.
+- [x] Maintain People displays the resolved representative portrait.
+- [x] Person merge behavior preserves a valid survivor preference according to the documented deterministic rule.
 - [x] Featured-face changes do not modify canonical assignments, suggestions, embeddings or recognition model data.
-- [ ] Automated coverage verifies persistence, validation, fallback and merge behavior.
+- [x] Automated coverage verifies persistence, validation, fallback and merge behavior.
 
 ## Suggested implementation slices
 
@@ -86,6 +86,8 @@ Automatic face-quality scoring as a new ML feature, editing/cropping portraits, 
 
 Slice 1 merged in PR #175. It adds a durable, idempotently guarded person-to-face preference, validates explicit choices against the current active assignment, resolves stale preferences safely, uses the earliest currently assigned face as the first deterministic fallback, exposes GET/PUT representative-face contracts that reuse `/api/review/faces/{id}/image`, and adds integration coverage for persistence, clear-to-automatic behavior, reassignment fallback and wrong-person rejection.
 
-Slice 2 is implemented on `agent/WI-0067-face-details-featured-controls`. Face Details now shows representative-photo state only when the current face is assigned to a named person, can set the current face as the explicit featured photo, and can clear an explicit choice back to automatic selection. The review image remains the current face occurrence rather than being replaced by the representative portrait, and the controls reuse the Slice 1 API/invalidation behavior without adding another host-heavy integration-test path.
+Slices 2 and 3 are included in PR #178 on `agent/WI-0067-face-details-featured-controls`. Face Details shows representative-photo state only when the current face is assigned to a named person, can set the current occurrence as the explicit featured photo, and can clear an explicit choice back to automatic selection. The review image remains the current face occurrence rather than being replaced by the representative portrait.
 
-Slice 3 remains: show the resolved representative portrait in Maintain People and add deterministic person-merge behavior coverage.
+Maintain People now displays the resolved portrait and explicit-versus-automatic state for each active person, linking the portrait back to the representative face details. Person merges install and apply an idempotent SQLite merge rule in the same database transaction: an existing target preference wins; otherwise a source preference is carried only when its face is validly assigned to the survivor after identity consolidation; stale source preferences are removed so the resolver falls back safely. Direct SQLite tests cover target-wins, valid source carry-over and stale-source fallback without adding another hosted API test path.
+
+Implementation is complete through the three planned slices. Required CI execution and focused maintainer browser verification remain before WI-0067 can move through review/completion; CI pipeline changes themselves are intentionally handled outside this work item.
