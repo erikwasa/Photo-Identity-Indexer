@@ -8,7 +8,9 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 **WI-0066 — Add Smart Collection visibility preference for people** is the active M19 implementation item.
 
-Slice 1 is implemented on `agent/WI-0066-smart-collection-person-visibility`. It establishes schema v16, a narrowly scoped durable `HiddenFromSmartCollections` preference, maintenance API read/write contracts, deterministic target-wins merge semantics and integration coverage. Hidden people remain part of ordinary review/identity people lists; Smart Collection discovery filtering is intentionally a later slice.
+Slice 1 merged through PR #170 and establishes schema v16, a narrowly scoped durable `HiddenFromSmartCollections` preference, maintenance API read/write contracts, deterministic target-wins merge semantics and integration coverage. Hidden people remain part of ordinary review/identity people lists.
+
+Slice 2 is implemented on `agent/WI-0066-maintain-people-visibility`. Maintain People now shows whether each active person is available or hidden from Smart Collections and provides a reversible hide/show control backed by the Slice 1 endpoint. Hidden people remain fully present in Maintain People.
 
 WI-0065 implementation merged through PR #166 and is in review pending maintainer verification of unattended pickup and restart/resume behavior.
 
@@ -16,17 +18,16 @@ WI-0069 implementation merged through PR #169 and remains in review pending its 
 
 ## Next concrete step
 
-1. Validate WI-0066 Slice 1 after merging current `main`, including build/tests, living/generated documentation, review smoke and Windows verification.
-2. Merge Slice 1 after automated validation and code review.
-3. Implement Slice 2: add the reversible hide/unhide control and status indicator to Maintain People.
-4. Implement Slice 3: filter normal Smart Collection people discovery while preserving and marking hidden people already referenced by saved definitions.
-5. Run the focused maintainer browser pass for WI-0066 before moving to WI-0067.
+1. Validate WI-0066 Slice 2 in GitHub Actions, including Razor compilation, tests, living/generated documentation, review smoke and Windows verification.
+2. Merge Slice 2 after automated validation and code review.
+3. Implement Slice 3: filter normal Smart Collection people discovery while preserving and marking hidden people already referenced by saved definitions.
+4. Run the focused maintainer browser pass for WI-0066: hide a person, confirm the Maintain People status survives reload, confirm face/review maintenance remains unchanged, and verify Smart Collection behavior after Slice 3.
+5. Move WI-0066 to review after Slice 3 and verification evidence are recorded, then continue with WI-0067.
 
 ## Relevant files
 
 - `docs/delivery/status/work-items.yaml`
 - `docs/delivery/work-items/WI-0066-smart-collection-person-visibility.md`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteCatalogueDatabase.cs`
 - `src/PhotoIdentity.Persistence.Sqlite/SqlitePersonSmartCollectionVisibilityRepository.cs`
 - `src/PhotoIdentity.Api/PersonMaintenanceEndpoints.cs`
 - `src/PhotoIdentity.Web/ReviewContracts.cs`
@@ -35,7 +36,6 @@ WI-0069 implementation merged through PR #169 and remains in review pending its 
 - `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor.cs`
 - `tests/PhotoIdentity.Integration.Tests/PersonSmartCollectionVisibilityApplicationTests.cs`
 - `.github/workflows/build.yml`
-- `verify-local.ps1`
 
 ## Repository validation
 
