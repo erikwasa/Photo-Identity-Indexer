@@ -56,21 +56,12 @@ jobs:
       - name: Test fast assemblies
         shell: pwsh
         run: |
-          dotnet test PhotoIdentity.slnx --configuration Release --no-build --filter "FullyQualifiedName!~PhotoIdentity_Integration_Tests" 2>&1 | Tee-Object -FilePath fast-test.log
+          dotnet test PhotoIdentity.slnx --configuration Release --no-build --filter "FullyQualifiedName!~PhotoIdentity_Integration_Tests&FullyQualifiedName!~PhotoIdentity.Integration.Tests" 2>&1 | Tee-Object -FilePath fast-test.log
           exit $LASTEXITCODE
 
-      - name: Test integration assembly
+      - name: Test integration shards
         shell: pwsh
-        run: |
-          $resultsDirectory = Join-Path $PWD ".artifacts/test-results"
-          New-Item -ItemType Directory -Path $resultsDirectory -Force | Out-Null
-          dotnet test tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj `
-            --configuration Release `
-            --no-build `
-            --logger "trx;LogFileName=integration-tests.trx" `
-            --results-directory $resultsDirectory `
-            2>&1 | Tee-Object -FilePath integration-test.log
-          exit $LASTEXITCODE
+        run: ./.github/scripts/run-integration-shards.ps1
 
       - name: Summarize integration test timings
         if: always()
@@ -84,6 +75,7 @@ jobs:
           name: test-timing-evidence
           path: |
             .artifacts/test-results
+            .artifacts/test-shards
             .artifacts/test-timings
           retention-days: 3
           if-no-files-found: warn
@@ -95,7 +87,7 @@ jobs:
           name: test-diagnostics
           path: |
             fast-test.log
-            integration-test.log
+            .artifacts/test-shards
             .artifacts/test-timings/test-timings.json
             .artifacts/test-timings/test-timings.md
           retention-days: 1
