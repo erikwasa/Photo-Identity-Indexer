@@ -6,6 +6,7 @@
 - [Build context](../BUILD_CONTEXT.md) — current development/verification handoff only
 - [Local operator guide](operations/local-operator-guide.md)
 - [Operations documentation map](operations/index.md)
+- [Testing and CI strategy](operations/testing-and-ci-strategy.md)
 - [Architecture overview](architecture/overview.md)
 - [Glossary](glossary.md)
 
@@ -17,6 +18,7 @@ Formal delivery lifecycle status is kept in the canonical YAML registries. They 
 
 - [Operations documentation map](operations/index.md)
 - [Local operator guide](operations/local-operator-guide.md)
+- [Testing and CI strategy](operations/testing-and-ci-strategy.md)
 - [Review-proxy serving and bounded originals](operations/review-proxy-serving.md)
 - [Bounded archive acceptance](operations/bounded-archive-acceptance.md)
 - [SQLite persistence operations](operations/sqlite-persistence.md)

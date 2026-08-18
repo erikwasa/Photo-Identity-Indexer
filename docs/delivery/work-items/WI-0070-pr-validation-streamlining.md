@@ -28,6 +28,8 @@ A successful PR #172 workflow run (#1080 / `32172257390`) showed:
 
 The integration assembly is deliberately sequential after PR #153 because concurrent `WebApplicationFactory` / `TestServer` hosts caused cross-test HTTP 500 failures. Recent runs have nevertheless produced different transient HTTP 500 failures even with assembly-level parallelism disabled. The current state therefore combines long sequential execution with unreliable signal.
 
+PR #173 provided another concrete example on 2026-08-18: build, launcher and package verification passed, while two unrelated hosted-client/style tests (`DetectorComparisonWorkspaceApplicationTests` and `HostedStylesApplicationTests`) returned HTTP 500 after several minutes of otherwise sequential integration execution. The failing calls used `GetStringAsync`, so the retained test diagnostic contained only the status exception and not the response body.
+
 ## Guiding principles
 
 - Preserve valuable behavior coverage; do not remove tests solely to make CI green or fast.
@@ -112,3 +114,14 @@ The detailed strategy document should carry rationale and examples. `AGENTS.md` 
 3. Split deterministic integration coverage into timing-balanced isolated shards.
 4. Move/reduce expensive published/package checks using measured path/gate value.
 5. Encode the resulting rules in durable CI/testing documentation and `AGENTS.md` before completing the item.
+
+## Implementation notes
+
+### Slice 1 in progress — 2026-08-18
+
+- CI now separates the fast/non-integration pass from the sequential integration assembly. The integration command writes TRX to `.artifacts/test-results` rather than being buried inside one solution-level test command.
+- `.github/scripts/summarize-test-timings.ps1` converts the integration TRX into JSON plus a GitHub Step Summary showing the slowest classes and individual tests. The timing artifact is retained even when the test run fails.
+- `PhotoIdentityApiTestFactory` is the shared generic API host foundation. It keeps detailed errors enabled and removes `PhotoPlaceEnrichmentHostedService`, `ArchiveAdvancementHostedService` and `IdentityMatchRegenerationHostedService` from generic test hosts by default.
+- The two hosted-style tests that failed in PR #173 are the first migrations to the shared factory and are tagged `Category=FlakyDiagnostic` for visibility only. They remain required; there is no retry or quarantine behavior in Slice 1.
+- The shared HTTP helper reads a bounded response body before throwing on non-success, so a future 500 can retain server-side diagnostic content instead of only the status exception.
+- `docs/operations/testing-and-ci-strategy.md` and concise `AGENTS.md` rules are added early in the work item so future PR/test work follows the intended layer and cost discipline while later slices refine the gate.

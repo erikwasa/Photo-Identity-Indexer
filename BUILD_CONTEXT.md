@@ -6,34 +6,34 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0067 — Add featured representative faces for people** is the active M19 implementation item.
+**WI-0070 — Streamline pull-request validation and stabilize integration tests** is the active M00 implementation item.
 
-WI-0066 implementation is merged through PRs #170, #171 and #173. Per maintainer direction, its focused browser verification is deferred to the consolidated M19 manual verification pass after the remaining M19 implementation work is ready.
+WI-0066 implementation is complete through merged PR #173. Its focused maintainer browser verification remains pending before completion. The final PR #173 run built successfully and passed launcher/package verification but two unrelated hosted-client/style integration tests returned transient HTTP 500 responses; that validation-system instability is now part of WI-0070 rather than further feature work in WI-0066.
 
-WI-0067 Slice 1 is implemented on `agent/WI-0067-featured-person-face`: a durable explicit person-to-face presentation preference, assignment-safe representative resolver, deterministic automatic fallback, reusable representative-face GET/PUT API contracts and focused integration coverage. A stale explicit face is ignored during resolution rather than ever showing another person's face.
+WI-0070 Slice 1 is establishing timing evidence and a shared API integration-test host that disables unrelated production background workers by default. The initial migration targets the hosted-style tests that failed in PR #173 and improves 500 diagnostics by preserving a bounded response body.
 
-WI-0065 remains in review pending the same consolidated M19 verification pass. WI-0069 is completed with CI timing evidence recorded.
+WI-0065 remains in review pending maintainer verification of unattended GeoNames pickup and restart/resume behavior.
 
 ## Next concrete step
 
-1. Validate WI-0067 Slice 1 in GitHub Actions and merge after automated validation and code review.
-2. Implement Slice 2: Face Details `Set as featured photo` / clear-to-automatic controls using the Slice 1 API.
-3. Implement Slice 3: show resolved portraits in Maintain People and apply deterministic merge semantics.
-4. Move WI-0067 to `in_review` with manual verification deferred to the consolidated M19 pass.
-5. Implement WI-0068 searchable portrait-led Smart Collection people selection using the representative-face contract.
-6. Run the consolidated M19 manual verification pass once the remaining M19 work items are ready.
+1. Validate WI-0070 Slice 1 in GitHub Actions: build, fast-test split, sequential integration run, TRX timing summary and shared-host migrations.
+2. Use the timing artifact to identify the dominant integration classes and balance the first isolated process/job shards.
+3. If transient HTTP 500 failures recur, use the new response diagnostics to narrow the host-lifetime/root-cause follow-up before quarantining anything.
+4. Continue migrating generic API tests to `PhotoIdentityApiTestFactory`; keep worker-specific tests direct or explicitly opted in.
+5. After measured host/timing evidence, implement the isolated integration shards before changing published/package gate coverage.
 
 ## Relevant files
 
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/work-items/WI-0067-featured-person-face.md`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePersonFeaturedFaceSchema.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqlitePersonFeaturedFaceRepository.cs`
-- `src/PhotoIdentity.Api/PersonMaintenanceEndpoints.cs`
-- `src/PhotoIdentity.Web/ReviewContracts.cs`
-- `src/PhotoIdentity.Web/Pages/FaceDetails.razor`
-- `src/PhotoIdentity.Web/Pages/People.razor`
-- `tests/PhotoIdentity.Integration.Tests/PersonFeaturedFaceApplicationTests.cs`
+- `docs/delivery/work-items/WI-0070-pr-validation-streamlining.md`
+- `docs/operations/testing-and-ci-strategy.md`
+- `AGENTS.md`
+- `.github/workflows/build.yml`
+- `.github/scripts/summarize-test-timings.ps1`
+- `tests/PhotoIdentity.Integration.Tests/PhotoIdentityApiTestFactory.cs`
+- `tests/PhotoIdentity.Integration.Tests/TestAssembly.cs`
+- `tests/PhotoIdentity.Integration.Tests/HostedStylesApplicationTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/DetectorComparisonWorkspaceApplicationTests.cs`
 
 ## Repository validation
 
