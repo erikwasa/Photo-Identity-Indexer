@@ -2,6 +2,7 @@
 param(
     [string] $Project = "tests/PhotoIdentity.Integration.Tests/PhotoIdentity.Integration.Tests.csproj",
     [string] $BaselinePath = ".github/test-timing-baseline.json",
+    [string] $QuarantinePath = ".github/flaky-integration-tests.txt",
     [string] $ResultsDirectory = ".artifacts/test-results",
     [string] $ShardOutputDirectory = ".artifacts/test-shards",
     [int] $ShardCount = 2,
@@ -24,6 +25,25 @@ $baseline = Get-Content $BaselinePath -Raw | ConvertFrom-Json
 $baselineWeights = @{}
 foreach ($property in $baseline.classWeightsSeconds.PSObject.Properties) {
     $baselineWeights[$property.Name] = [double] $property.Value
+}
+
+$quarantinedTests = @()
+if (Test-Path $QuarantinePath) {
+    $quarantinedTests = @(
+        Get-Content $QuarantinePath |
+            ForEach-Object { $_.Trim() } |
+            Where-Object {
+                -not [string]::IsNullOrWhiteSpace($_) -and
+                -not $_.StartsWith("#", [StringComparison]::Ordinal)
+            }
+    )
+}
+
+$quarantineSet = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+foreach ($testName in $quarantinedTests) {
+    if (-not $quarantineSet.Add($testName)) {
+        throw "Duplicate quarantine entry '$testName'."
+    }
 }
 
 New-Item -ItemType Directory -Path $ResultsDirectory -Force | Out-Null
@@ -61,9 +81,30 @@ if ($testNames.Count -eq 0) {
     throw "Integration test discovery returned no tests."
 }
 
+$discoveredSet = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+foreach ($testName in $testNames) {
+    [void] $discoveredSet.Add($testName)
+}
+
+$staleQuarantineEntries = @(
+    $quarantinedTests |
+        Where-Object { -not $discoveredSet.Contains($_) }
+)
+if ($staleQuarantineEntries.Count -gt 0) {
+    throw "Quarantine contains test names that are not present in discovery: $($staleQuarantineEntries -join ', '). Update the quarantine explicitly instead of silently dropping entries."
+}
+
+$requiredTestNames = @(
+    $testNames |
+        Where-Object { -not $quarantineSet.Contains($_) }
+)
+if ($requiredTestNames.Count -eq 0) {
+    throw "No required integration tests remain after applying quarantine."
+}
+
 $knownClasses = @($baselineWeights.Keys | Sort-Object Length -Descending)
 $classTests = @{}
-foreach ($testName in $testNames) {
+foreach ($testName in $requiredTestNames) {
     $className = $null
     foreach ($knownClass in $knownClasses) {
         if ($testName.StartsWith("$knownClass.", [StringComparison]::Ordinal)) {
@@ -128,8 +169,8 @@ foreach ($class in $classPlan) {
 
 $plannedTestCount = ($shards | Measure-Object testCount -Sum).Sum
 $plannedClassCount = ($shards | ForEach-Object { $_.classes.Count } | Measure-Object -Sum).Sum
-if ($plannedTestCount -ne $testNames.Count -or $plannedClassCount -ne $classPlan.Count) {
-    throw "Shard plan does not cover the complete discovered suite."
+if ($plannedTestCount -ne $requiredTestNames.Count -or $plannedClassCount -ne $classPlan.Count) {
+    throw "Shard plan does not cover the complete required integration suite."
 }
 
 $plan = [ordered]@{
@@ -138,6 +179,9 @@ $plan = [ordered]@{
     baselineRun = $baseline.sourceWorkflowRun
     baselineTestCount = $baseline.testCount
     discoveredTestCount = $testNames.Count
+    requiredTestCount = $requiredTestNames.Count
+    quarantinedTestCount = $quarantinedTests.Count
+    quarantinedTests = $quarantinedTests
     discoveredClassCount = $classPlan.Count
     shardCount = $ShardCount
     selectedShard = $ShardNumber
@@ -172,12 +216,16 @@ $plan | ConvertTo-Json -Depth 8 | Set-Content -Path $planJsonPath -Encoding utf8
 $planLines = [System.Collections.Generic.List[string]]::new()
 $planLines.Add("## Integration shard plan — shard $ShardNumber/$ShardCount")
 $planLines.Add("")
-$planLines.Add("Discovered $($testNames.Count) tests across $($classPlan.Count) classes. Baseline: workflow #$($baseline.sourceRunNumber) / run $($baseline.sourceWorkflowRun).")
+$planLines.Add("Discovered $($testNames.Count) tests; required: $($requiredTestNames.Count); quarantined diagnostics: $($quarantinedTests.Count). Baseline: workflow #$($baseline.sourceRunNumber) / run $($baseline.sourceWorkflowRun).")
 $planLines.Add("")
-$planLines.Add("| Shard | Classes | Tests | Estimated baseline time |")
+$planLines.Add("| Shard | Classes | Required tests | Estimated baseline time |")
 $planLines.Add("|---:|---:|---:|---:|")
 foreach ($shard in $plan.shards) {
     $planLines.Add("| $($shard.number) | $($shard.classCount) | $($shard.testCount) | {0:N1}s |" -f $shard.estimatedSeconds)
+}
+if ($quarantinedTests.Count -gt 0) {
+    $planLines.Add("")
+    $planLines.Add("Quarantined tests remain visible in the non-blocking diagnostic lane; they are not retried.")
 }
 $planLines | Set-Content -Path $planMarkdownPath -Encoding utf8
 if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
@@ -194,11 +242,22 @@ $patterns = @(
         Sort-Object className |
         ForEach-Object { "FullyQualifiedName~$($_.className)." }
 )
-$filter = $patterns -join "|"
+$classFilter = "(" + ($patterns -join "|") + ")"
+$quarantineExclusions = @(
+    $quarantinedTests |
+        ForEach-Object { "FullyQualifiedName!=$_" }
+)
+$filter = if ($quarantineExclusions.Count -gt 0) {
+    $classFilter + "&" + ($quarantineExclusions -join "&")
+}
+else {
+    $classFilter
+}
+
 $trxName = "integration-shard-$ShardNumber.trx"
 $logPath = Join-Path $ShardOutputDirectory "integration-shard-$ShardNumber.log"
 
-Write-Host "Running shard $ShardNumber/${ShardCount}: $($selectedShard.testCount) tests, estimated $([Math]::Round($selectedShard.estimatedSeconds, 1))s from baseline."
+Write-Host "Running shard $ShardNumber/${ShardCount}: $($selectedShard.testCount) required tests, estimated $([Math]::Round($selectedShard.estimatedSeconds, 1))s from baseline."
 & dotnet test $projectPath `
     --configuration Release `
     --no-build `
@@ -217,31 +276,40 @@ if (-not (Test-Path $trxPath)) {
 [xml] $document = Get-Content $trxPath -Raw
 $unitResults = @($document.TestRun.Results.UnitTestResult)
 $resultIds = @($unitResults | ForEach-Object { [string] $_.testId })
+$resultNames = @($unitResults | ForEach-Object { [string] $_.testName })
 $resultCount = $unitResults.Count
 $uniqueResultCount = @($resultIds | Sort-Object -Unique).Count
+$quarantinedResults = @(
+    $resultNames |
+        Where-Object { $quarantineSet.Contains($_) }
+)
 $coverageOk =
     $resultCount -eq $selectedShard.testCount -and
-    $uniqueResultCount -eq $selectedShard.testCount
+    $uniqueResultCount -eq $selectedShard.testCount -and
+    $quarantinedResults.Count -eq 0
 
 $coverage = [ordered]@{
     shardNumber = $ShardNumber
     shardCount = $ShardCount
     discoveredTestCount = $testNames.Count
+    requiredTestCount = $requiredTestNames.Count
+    quarantinedTestCount = $quarantinedTests.Count
     plannedShardTestCount = $selectedShard.testCount
     resultCount = $resultCount
     uniqueResultCount = $uniqueResultCount
+    quarantinedResultsInRequiredShard = $quarantinedResults
     coverageComplete = $coverageOk
     testExitCode = $testExitCode
 }
 $coveragePath = Join-Path $ShardOutputDirectory "coverage-$ShardNumber.json"
 $coverage | ConvertTo-Json -Depth 4 | Set-Content -Path $coveragePath -Encoding utf8
 
-Write-Host "Shard $ShardNumber coverage: planned=$($selectedShard.testCount), results=$resultCount, unique-results=$uniqueResultCount."
+Write-Host "Shard $ShardNumber coverage: planned=$($selectedShard.testCount), results=$resultCount, unique-results=$uniqueResultCount, quarantined-results=$($quarantinedResults.Count)."
 if (-not $coverageOk) {
-    throw "Integration shard $ShardNumber coverage check failed. Every test assigned to this shard must execute exactly once."
+    throw "Integration shard $ShardNumber coverage check failed. Every required test assigned to this shard must execute exactly once and quarantined tests must not enter the required lane."
 }
 if ($testExitCode -ne 0) {
     throw "Integration shard $ShardNumber failed with exit code $testExitCode."
 }
 
-Write-Host "Integration shard $ShardNumber passed and covered every assigned test exactly once."
+Write-Host "Integration shard $ShardNumber passed and covered every assigned required test exactly once."
