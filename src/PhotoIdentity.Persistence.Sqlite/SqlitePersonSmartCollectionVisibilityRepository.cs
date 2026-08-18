@@ -24,10 +24,12 @@ public sealed class SqlitePersonSmartCollectionVisibilityRepository
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
-            SELECT person_id
-            FROM person_smart_collection_visibility
-            WHERE hidden_from_smart_collections = 1
-            ORDER BY person_id;
+            SELECT visibility.person_id
+            FROM person_smart_collection_visibility AS visibility
+            INNER JOIN people AS person ON person.id = visibility.person_id
+            WHERE visibility.hidden_from_smart_collections = 1
+              AND person.merged_into_person_id IS NULL
+            ORDER BY visibility.person_id;
             """;
 
         HashSet<PersonId> result = [];
