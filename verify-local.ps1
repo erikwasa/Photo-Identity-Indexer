@@ -7,6 +7,10 @@ Builds and tests the solution, validates living documentation, optionally instal
 and verifies pinned models, then checks private JPEG and PNG files without
 modifying them. Multiple image paths must be supplied as one array value.
 
+By default the repository build, automated tests and documentation validation all
+run. Callers that already completed those checks for the same checkout can opt out
+of repeating them with -SkipBuild, -SkipTests and -SkipDocumentation.
+
 .EXAMPLE
 ./verify-local.ps1 -InstallModels
 
@@ -23,11 +27,25 @@ modifying them. Multiple image paths must be supplied as one array value.
     "C:\PrivateVerification\sample.png"
   ) `
   -UnsupportedImage "C:\PrivateVerification\sample.heic"
+
+.EXAMPLE
+./verify-local.ps1 `
+  -SkipBuild `
+  -SkipTests `
+  -SkipDocumentation `
+  -SkipModels `
+  -Image ".artifacts/ci-verification/valid.png"
 #>
 [CmdletBinding()]
 param(
     [ValidateSet("Debug", "Release")]
     [string] $Configuration = "Release",
+
+    [switch] $SkipBuild,
+
+    [switch] $SkipTests,
+
+    [switch] $SkipDocumentation,
 
     [switch] $InstallModels,
 
@@ -68,9 +86,9 @@ $report = [ordered]@{
     dotnetVersion = $null
     operatingSystem = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription
     configuration = $Configuration
-    build = "pending"
-    tests = "pending"
-    documentation = "pending"
+    build = if ($SkipBuild) { "skipped" } else { "pending" }
+    tests = if ($SkipTests) { "skipped" } else { "pending" }
+    documentation = if ($SkipDocumentation) { "skipped" } else { "pending" }
     modelsSkipped = [bool] $SkipModels
     models = @()
     manualImagesProvided = (($Image.Count + $UnsupportedImage.Count) -gt 0)
@@ -333,36 +351,54 @@ try {
     $dotnetVersionOutput = Invoke-CheckedCommand -Name ".NET SDK" -FilePath "dotnet" -ArgumentList @("--version")
     $report.dotnetVersion = ($dotnetVersionOutput | Select-Object -Last 1).Trim()
 
-    Invoke-CheckedCommand `
-        -Name "Restore and build" `
-        -FilePath (Join-Path $root "build.ps1") `
-        -Parameters @{ Configuration = $Configuration } | Out-Null
-    $report.build = "passed"
+    if ($SkipBuild) {
+        Write-Host "`n== Restore and build =="
+        Write-Host "Skipped; caller is reusing an existing build for this checkout."
+    }
+    else {
+        Invoke-CheckedCommand `
+            -Name "Restore and build" `
+            -FilePath (Join-Path $root "build.ps1") `
+            -Parameters @{ Configuration = $Configuration } | Out-Null
+        $report.build = "passed"
+    }
 
-    Invoke-CheckedCommand `
-        -Name "Automated tests" `
-        -FilePath (Join-Path $root "test.ps1") `
-        -Parameters @{ Configuration = $Configuration } | Out-Null
-    $report.tests = "passed"
+    if ($SkipTests) {
+        Write-Host "`n== Automated tests =="
+        Write-Host "Skipped; caller already ran the automated test suite for this checkout."
+    }
+    else {
+        Invoke-CheckedCommand `
+            -Name "Automated tests" `
+            -FilePath (Join-Path $root "test.ps1") `
+            -Parameters @{ Configuration = $Configuration } | Out-Null
+        $report.tests = "passed"
+    }
 
-    Invoke-CheckedCommand `
-        -Name "Living-document validation" `
-        -FilePath "dotnet" `
-        -ArgumentList @(
-            "run", "--project", (Join-Path $root "tools/PhotoIdentity.Docs"),
-            "--configuration", $Configuration,
-            "--no-build", "--", "validate"
-        ) | Out-Null
+    if ($SkipDocumentation) {
+        Write-Host "`n== Documentation validation =="
+        Write-Host "Skipped; caller already validated living and generated documentation for this checkout."
+    }
+    else {
+        Invoke-CheckedCommand `
+            -Name "Living-document validation" `
+            -FilePath "dotnet" `
+            -ArgumentList @(
+                "run", "--project", (Join-Path $root "tools/PhotoIdentity.Docs"),
+                "--configuration", $Configuration,
+                "--no-build", "--", "validate"
+            ) | Out-Null
 
-    Invoke-CheckedCommand `
-        -Name "Generated-document consistency" `
-        -FilePath "dotnet" `
-        -ArgumentList @(
-            "run", "--project", (Join-Path $root "tools/PhotoIdentity.Docs"),
-            "--configuration", $Configuration,
-            "--no-build", "--", "generate", "--check"
-        ) | Out-Null
-    $report.documentation = "passed"
+        Invoke-CheckedCommand `
+            -Name "Generated-document consistency" `
+            -FilePath "dotnet" `
+            -ArgumentList @(
+                "run", "--project", (Join-Path $root "tools/PhotoIdentity.Docs"),
+                "--configuration", $Configuration,
+                "--no-build", "--", "generate", "--check"
+            ) | Out-Null
+        $report.documentation = "passed"
+    }
 
     if (-not $SkipModels) {
         $modelList = Invoke-CheckedCommand `
@@ -401,6 +437,10 @@ try {
                     }
                 }
         )
+    }
+
+    if (($Image.Count + $UnsupportedImage.Count) -gt 0 -and -not (Test-Path -LiteralPath $cliAssemblyPath -PathType Leaf)) {
+        throw "Manual media checks require the built PhotoIdentity.Cli assembly at '$cliAssemblyPath'. Run the build first or omit -SkipBuild."
     }
 
     $decodeChecks = @()
