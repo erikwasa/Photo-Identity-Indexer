@@ -2,7 +2,6 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -34,13 +33,16 @@ public sealed class CollectionViewerPreviewApplicationTests
             FakeFilesOnDemandPlatform platform = new(
                 new OneDriveFilesOnDemandState(AssetAvailability.Local, false, false));
 
-            await using ViewerApiFactory factory = new(databasePath, directory, platform);
+            await using PhotoIdentityApiTestFactory factory = CreateViewerApiFactory(
+                databasePath,
+                directory,
+                platform);
             using HttpClient client = factory.CreateClient();
 
             using HttpResponseMessage response = await client.GetAsync(
                 $"/api/collections/photos/{revisionId}/viewer-preview");
 
-            response.EnsureSuccessStatusCode();
+            await response.EnsureSuccessWithDiagnosticBodyAsync("viewer preview for local original");
             Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
             Assert.Equal(PngBytes, await response.Content.ReadAsByteArrayAsync());
             Assert.Equal(0, platform.HydrationRequests);
@@ -63,7 +65,7 @@ public sealed class CollectionViewerPreviewApplicationTests
             FakeFilesOnDemandPlatform platform = new(
                 new OneDriveFilesOnDemandState(AssetAvailability.Local, false, false));
 
-            await using ViewerApiFactory factory = new(
+            await using PhotoIdentityApiTestFactory factory = CreateViewerApiFactory(
                 databasePath,
                 directory,
                 platform,
@@ -73,7 +75,7 @@ public sealed class CollectionViewerPreviewApplicationTests
             using HttpResponseMessage response = await client.GetAsync(
                 $"/api/collections/photos/{revisionId}/viewer-preview");
 
-            response.EnsureSuccessStatusCode();
+            await response.EnsureSuccessWithDiagnosticBodyAsync("viewer preview without configured proxy profile");
             Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
             Assert.Equal(PngBytes, await response.Content.ReadAsByteArrayAsync());
             Assert.Equal(0, platform.HydrationRequests);
@@ -97,13 +99,16 @@ public sealed class CollectionViewerPreviewApplicationTests
             FakeFilesOnDemandPlatform platform = new(
                 new OneDriveFilesOnDemandState(AssetAvailability.Local, false, false));
 
-            await using ViewerApiFactory factory = new(databasePath, directory, platform);
+            await using PhotoIdentityApiTestFactory factory = CreateViewerApiFactory(
+                databasePath,
+                directory,
+                platform);
             using HttpClient client = factory.CreateClient();
 
             using HttpResponseMessage response = await client.GetAsync(
                 $"/api/collections/photos/{revisionId}/viewer-preview");
 
-            response.EnsureSuccessStatusCode();
+            await response.EnsureSuccessWithDiagnosticBodyAsync("viewer preview when original and proxy both exist");
             Assert.Equal("image/png", response.Content.Headers.ContentType?.MediaType);
             Assert.Equal(PngBytes, await response.Content.ReadAsByteArrayAsync());
             Assert.Equal(0, platform.HydrationRequests);
@@ -131,13 +136,16 @@ public sealed class CollectionViewerPreviewApplicationTests
             FakeFilesOnDemandPlatform platform = new(
                 new OneDriveFilesOnDemandState(AssetAvailability.Local, false, false));
 
-            await using ViewerApiFactory factory = new(databasePath, directory, platform);
+            await using PhotoIdentityApiTestFactory factory = CreateViewerApiFactory(
+                databasePath,
+                directory,
+                platform);
             using HttpClient client = factory.CreateClient();
 
             using (HttpResponseMessage status = await client.GetAsync(
                        $"/api/collections/photos/{revisionId}/original/status"))
             {
-                status.EnsureSuccessStatusCode();
+                await status.EnsureSuccessWithDiagnosticBodyAsync("original status for browser-unsupported local original");
                 using JsonDocument payload = JsonDocument.Parse(await status.Content.ReadAsStringAsync());
                 Assert.Equal("ready", payload.RootElement.GetProperty("state").GetString());
                 Assert.False(payload.RootElement.GetProperty("canView").GetBoolean());
@@ -146,7 +154,7 @@ public sealed class CollectionViewerPreviewApplicationTests
             using (HttpResponseMessage preview = await client.GetAsync(
                        $"/api/collections/photos/{revisionId}/viewer-preview"))
             {
-                preview.EnsureSuccessStatusCode();
+                await preview.EnsureSuccessWithDiagnosticBodyAsync("viewer preview for browser-unsupported local original");
                 Assert.Equal("image/jpeg", preview.Content.Headers.ContentType?.MediaType);
                 Assert.Equal(ProxyBytes, await preview.Content.ReadAsByteArrayAsync());
             }
@@ -154,7 +162,7 @@ public sealed class CollectionViewerPreviewApplicationTests
             using (HttpResponseMessage proxy = await client.GetAsync(
                        $"/api/collections/photos/{revisionId}/viewer-proxy"))
             {
-                proxy.EnsureSuccessStatusCode();
+                await proxy.EnsureSuccessWithDiagnosticBodyAsync("viewer proxy for browser-unsupported local original");
                 Assert.Equal("image/jpeg", proxy.Content.Headers.ContentType?.MediaType);
                 Assert.Equal(ProxyBytes, await proxy.Content.ReadAsByteArrayAsync());
             }
@@ -180,13 +188,16 @@ public sealed class CollectionViewerPreviewApplicationTests
             FakeFilesOnDemandPlatform platform = new(
                 new OneDriveFilesOnDemandState(AssetAvailability.OnlineOnly, false, true));
 
-            await using ViewerApiFactory factory = new(databasePath, directory, platform);
+            await using PhotoIdentityApiTestFactory factory = CreateViewerApiFactory(
+                databasePath,
+                directory,
+                platform);
             using HttpClient client = factory.CreateClient();
 
             using HttpResponseMessage response = await client.GetAsync(
                 $"/api/collections/photos/{revisionId}/viewer-preview");
 
-            response.EnsureSuccessStatusCode();
+            await response.EnsureSuccessWithDiagnosticBodyAsync("viewer preview for online-only original with proxy");
             Assert.Equal("image/jpeg", response.Content.Headers.ContentType?.MediaType);
             Assert.Equal(ProxyBytes, await response.Content.ReadAsByteArrayAsync());
             Assert.Equal(0, platform.HydrationRequests);
@@ -209,7 +220,7 @@ public sealed class CollectionViewerPreviewApplicationTests
             FakeFilesOnDemandPlatform platform = new(
                 new OneDriveFilesOnDemandState(AssetAvailability.OnlineOnly, false, true));
 
-            await using ViewerApiFactory factory = new(
+            await using PhotoIdentityApiTestFactory factory = CreateViewerApiFactory(
                 databasePath,
                 directory,
                 platform,
@@ -240,13 +251,16 @@ public sealed class CollectionViewerPreviewApplicationTests
             FakeFilesOnDemandPlatform platform = new(
                 new OneDriveFilesOnDemandState(AssetAvailability.OnlineOnly, false, true));
 
-            await using ViewerApiFactory factory = new(databasePath, directory, platform);
+            await using PhotoIdentityApiTestFactory factory = CreateViewerApiFactory(
+                databasePath,
+                directory,
+                platform);
             using HttpClient client = factory.CreateClient();
 
             using (HttpResponseMessage initial = await client.GetAsync(
                        $"/api/collections/photos/{revisionId}/original/status"))
             {
-                initial.EnsureSuccessStatusCode();
+                await initial.EnsureSuccessWithDiagnosticBodyAsync("initial original status");
             }
             Assert.Equal("online-only", await ReadAvailabilityAsync(databasePath, revisionId));
 
@@ -254,7 +268,7 @@ public sealed class CollectionViewerPreviewApplicationTests
                        $"/api/collections/photos/{revisionId}/original/hydrate",
                        content: null))
             {
-                hydrate.EnsureSuccessStatusCode();
+                await hydrate.EnsureSuccessWithDiagnosticBodyAsync("original hydration request");
             }
             Assert.Equal("downloading", await ReadAvailabilityAsync(databasePath, revisionId));
 
@@ -262,7 +276,7 @@ public sealed class CollectionViewerPreviewApplicationTests
             using (HttpResponseMessage ready = await client.GetAsync(
                        $"/api/collections/photos/{revisionId}/original/status"))
             {
-                ready.EnsureSuccessStatusCode();
+                await ready.EnsureSuccessWithDiagnosticBodyAsync("ready original status");
             }
             Assert.Equal("local", await ReadAvailabilityAsync(databasePath, revisionId));
 
@@ -270,7 +284,7 @@ public sealed class CollectionViewerPreviewApplicationTests
                        $"/api/collections/photos/{revisionId}/original/release",
                        content: null))
             {
-                release.EnsureSuccessStatusCode();
+                await release.EnsureSuccessWithDiagnosticBodyAsync("original release request");
             }
             Assert.Equal("online-only", await ReadAvailabilityAsync(databasePath, revisionId));
         }
@@ -379,49 +393,38 @@ public sealed class CollectionViewerPreviewApplicationTests
         }
     }
 
-    private sealed class ViewerApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private static PhotoIdentityApiTestFactory CreateViewerApiFactory(
+        string databasePath,
+        string root,
+        FakeFilesOnDemandPlatform platform,
+        bool configureProxyProfile = true)
     {
-        private readonly string _databasePath;
-        private readonly string _root;
-        private readonly FakeFilesOnDemandPlatform _platform;
-        private readonly bool _configureProxyProfile;
-
-        public ViewerApiFactory(
-            string databasePath,
-            string root,
-            FakeFilesOnDemandPlatform platform,
-            bool configureProxyProfile = true)
-        {
-            _databasePath = databasePath;
-            _root = root;
-            _platform = platform;
-            _configureProxyProfile = configureProxyProfile;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
-            builder.UseSetting("PhotoIdentity:ReviewProxyRoot", Path.Combine(_root, "proxies"));
-            if (_configureProxyProfile)
+        return new PhotoIdentityApiTestFactory(
+            databasePath,
+            builder =>
             {
-                builder.UseSetting("PhotoIdentity:ReviewProxyProfileId", "test-preview");
-                builder.UseSetting("PhotoIdentity:ReviewProxyMaximumLongEdge", "1600");
-                builder.UseSetting("PhotoIdentity:ReviewProxyJpegQuality", "78");
-            }
+                builder.UseSetting("PhotoIdentity:ReviewProxyRoot", Path.Combine(root, "proxies"));
+                if (configureProxyProfile)
+                {
+                    builder.UseSetting("PhotoIdentity:ReviewProxyProfileId", "test-preview");
+                    builder.UseSetting("PhotoIdentity:ReviewProxyMaximumLongEdge", "1600");
+                    builder.UseSetting("PhotoIdentity:ReviewProxyJpegQuality", "78");
+                }
 
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IOneDriveFilesOnDemandPlatform>();
-                services.AddSingleton<IOneDriveFilesOnDemandPlatform>(_platform);
-                services.RemoveAll<ArchiveHydrationPolicyConfiguration>();
-                services.AddSingleton(new ArchiveHydrationPolicyConfiguration(
-                    MinimumFreeSpaceReserveBytes: 0,
-                    MaximumManagedHydrationBytes: 1024L * 1024L * 1024L,
-                    MaximumConcurrentOperations: 2));
-                services.RemoveAll<IArchiveStorageProbe>();
-                services.AddSingleton<IArchiveStorageProbe>(new FixedStorageProbe(10L * 1024L * 1024L * 1024L));
+                builder.ConfigureServices(services =>
+                {
+                    services.RemoveAll<IOneDriveFilesOnDemandPlatform>();
+                    services.AddSingleton<IOneDriveFilesOnDemandPlatform>(platform);
+                    services.RemoveAll<ArchiveHydrationPolicyConfiguration>();
+                    services.AddSingleton(new ArchiveHydrationPolicyConfiguration(
+                        MinimumFreeSpaceReserveBytes: 0,
+                        MaximumManagedHydrationBytes: 1024L * 1024L * 1024L,
+                        MaximumConcurrentOperations: 2));
+                    services.RemoveAll<IArchiveStorageProbe>();
+                    services.AddSingleton<IArchiveStorageProbe>(
+                        new FixedStorageProbe(10L * 1024L * 1024L * 1024L));
+                });
             });
-        }
     }
 
     private sealed class FixedStorageProbe(long availableBytes) : IArchiveStorageProbe

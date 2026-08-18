@@ -76,11 +76,36 @@ internal static class IntegrationTestHttpClientExtensions
             return body;
         }
 
+        throw CreateFailureException(response, body, $"GET '{requestUri}'");
+    }
+
+    public static async Task EnsureSuccessWithDiagnosticBodyAsync(
+        this HttpResponseMessage response,
+        string? requestDescription = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string body = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw CreateFailureException(
+            response,
+            body,
+            requestDescription ?? response.RequestMessage?.RequestUri?.ToString() ?? "HTTP request");
+    }
+
+    private static HttpRequestException CreateFailureException(
+        HttpResponseMessage response,
+        string body,
+        string requestDescription)
+    {
         string boundedBody = body.Length <= MaximumDiagnosticBodyLength
             ? body
             : body[..MaximumDiagnosticBodyLength] + "\n...[response body truncated]";
-        throw new HttpRequestException(
-            $"GET '{requestUri}' returned {(int)response.StatusCode} ({response.ReasonPhrase}). " +
+        return new HttpRequestException(
+            $"{requestDescription} returned {(int)response.StatusCode} ({response.ReasonPhrase}). " +
             $"Response body:\n{boundedBody}",
             inner: null,
             response.StatusCode);
