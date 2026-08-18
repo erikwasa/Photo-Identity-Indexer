@@ -8,19 +8,21 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 **WI-0070 — Streamline pull-request validation and stabilize integration tests** is the active M00 implementation item.
 
-WI-0066 implementation is complete through merged PR #173. Its focused maintainer browser verification remains pending before completion. The final PR #173 run built successfully and passed launcher/package verification but two unrelated hosted-client/style integration tests returned transient HTTP 500 responses; that validation-system instability is now part of WI-0070 rather than further feature work in WI-0066.
+Slice 1 merged through PR #176 and validated in workflow #1093. The 294-test integration assembly took about 3m37s wall-clock and recorded 216.9s of test duration. Two classes accounted for about 78.7s of that recorded time, confirming that timing-balanced process sharding is the next high-value optimization.
 
-WI-0070 Slice 1 is establishing timing evidence and a shared API integration-test host that disables unrelated production background workers by default. The initial migration targets the hosted-style tests that failed in PR #173 and improves 500 diagnostics by preserving a bounded response body.
+Slice 2 is implemented on `agent/WI-0070-integration-shards`. Three independent `dotnet test` processes run concurrently inside the existing Windows job after the single restore/build. Runtime discovery assigns every integration class to exactly one timing-balanced shard and fails the gate if any discovered test is missing or duplicated. Broad xUnit in-process parallelism remains disabled.
 
-WI-0065 remains in review pending maintainer verification of unattended GeoNames pickup and restart/resume behavior.
+The Slice 2 fast-test filter also excludes both integration namespaces after #1093 showed 16 integration tests using `PhotoIdentity.Integration.Tests` were accidentally duplicated in the fast phase.
+
+WI-0066 implementation is complete through merged PR #173 and remains in review pending its focused maintainer browser verification. WI-0065 remains in review pending maintainer verification of unattended GeoNames pickup and restart/resume behavior.
 
 ## Next concrete step
 
-1. Validate WI-0070 Slice 1 in GitHub Actions: build, fast-test split, sequential integration run, TRX timing summary and shared-host migrations.
-2. Use the timing artifact to identify the dominant integration classes and balance the first isolated process/job shards.
-3. If transient HTTP 500 failures recur, use the new response diagnostics to narrow the host-lifetime/root-cause follow-up before quarantining anything.
-4. Continue migrating generic API tests to `PhotoIdentityApiTestFactory`; keep worker-specific tests direct or explicitly opted in.
-5. After measured host/timing evidence, implement the isolated integration shards before changing published/package gate coverage.
+1. Validate WI-0070 Slice 2 in GitHub Actions: all integration tests execute exactly once across three shards and timing artifacts report the actual shard balance.
+2. Compare Slice 2 `build-and-test` wall-clock and runner consumption with successful Slice 1 workflow #1093.
+3. If process-level shard concurrency is stable, record the evidence and proceed to Slice 3: right-size published review smoke and launcher/package checks while preserving a comprehensive `main` gate.
+4. If transient HTTP 500 failures recur, use the shared-host response diagnostics and shard identity to narrow the affected host/test class before considering any quarantine.
+5. Refresh `.github/test-timing-baseline.json` only when later measured class timings become materially imbalanced; it is scheduling input, not a duration assertion.
 
 ## Relevant files
 
@@ -29,11 +31,11 @@ WI-0065 remains in review pending maintainer verification of unattended GeoNames
 - `docs/operations/testing-and-ci-strategy.md`
 - `AGENTS.md`
 - `.github/workflows/build.yml`
+- `.github/scripts/run-integration-shards.ps1`
 - `.github/scripts/summarize-test-timings.ps1`
+- `.github/test-timing-baseline.json`
 - `tests/PhotoIdentity.Integration.Tests/PhotoIdentityApiTestFactory.cs`
 - `tests/PhotoIdentity.Integration.Tests/TestAssembly.cs`
-- `tests/PhotoIdentity.Integration.Tests/HostedStylesApplicationTests.cs`
-- `tests/PhotoIdentity.Integration.Tests/DetectorComparisonWorkspaceApplicationTests.cs`
 
 ## Repository validation
 
