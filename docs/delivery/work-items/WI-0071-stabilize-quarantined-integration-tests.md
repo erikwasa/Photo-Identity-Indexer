@@ -58,6 +58,22 @@ If a test passes three times without any stabilization change but its original r
 - [ ] Required shard coverage proves each restored test executes exactly once.
 - [ ] `PhotoIdentity.Docs validate` and `generate --check` pass.
 
+## Implementation notes
+
+### Slice 1 — migrate the review-progress quarantine case
+
+Repository inspection confirmed that all four initially quarantined classes still use bare per-class `WebApplicationFactory` implementations that only set `PhotoIdentity:DatabasePath`; none of those local factories disables the production place-enrichment, archive-advancement or identity-regeneration hosted workers.
+
+The first stabilization slice intentionally changes only `ReviewProgressFilterApplicationTests` so the outcome remains attributable:
+
+- replace its local `ReviewApiFactory` with `PhotoIdentityApiTestFactory`, which keeps detailed errors enabled and removes unrelated production hosted workers;
+- use the shared bounded-body HTTP diagnostic helpers for successful string requests;
+- add a reusable expected-status diagnostic helper so the quarantined negative-validation test will retain the response body if an expected HTTP 400 is replaced by another HTTP 500;
+- keep `ReviewProgressFilterApplicationTests.Model_filter_requires_both_model_id_and_exact_hash` in `.github/flaky-integration-tests.txt` after this change; one green PR is not enough to restore blocking status;
+- count only representative CI diagnostic runs after this stabilization change toward the three-run exit criterion.
+
+The remaining three quarantined classes stay unchanged in this slice. If the migrated review-progress test remains clean through its evidence window, remove only that quarantine entry and prove it executes exactly once in the required shard before migrating/restoring the next case.
+
 ## Non-goals
 
 - Do not weaken endpoint behavior assertions merely to make the tests pass.
