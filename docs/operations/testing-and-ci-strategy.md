@@ -110,4 +110,12 @@ WI-0070 changes the pipeline in measured slices rather than all at once:
 4. reduce duplicate published-runtime coverage and make launcher/package checks appropriately path-aware while retaining comprehensive `main` validation;
 5. keep this document and `AGENTS.md` aligned with the resulting steady-state gate.
 
-Slice 3 implements the gate split described above: pull requests retain the minimum uniquely valuable published-app smoke, launcher/package jobs are path-aware, and `main` remains comprehensive. Representative workflow timing still needs to be measured before WI-0070 can claim the six-minute acceptance target.
+Slice 3 implements the gate split described above: pull requests retain the minimum uniquely valuable published-app smoke, launcher/package jobs are path-aware, and `main` remains comprehensive.
+
+### Slice 3 validation status — 2026-08-18
+
+PR #179 merged Slice 3 as `e50e26c0cfeca4a1cc1a2aea53ef7d41c2a57bdc`. Its workflow #1130 (`32189443581`) proved the affected-path branch of the classifier: changing the CI workflow enabled both launcher and package verification, the new `PublishedMinimum` review smoke passed, launcher/package verification passed, and the only initial red signal was an unrelated transient API-host HTTP 500 that passed a single manual diagnostic rerun with no code or quarantine change.
+
+PR #180 workflow #1134 (`32190714702`) provides the complementary unrelated-path evidence. With only this documentation file changed, the classifier reported `launcher=false; package=false`; both deployment jobs were skipped while `build-and-test`, both exact-coverage integration shards, published minimum smoke, documentation checks, mixed-media verification and all four once-only quarantined diagnostics passed. The required Windows critical path was about **3m37s**, with about **9.9 Windows runner-minutes** across the three required Windows jobs. Compared with Slice 2 workflow #1118 at about 6m17s and roughly 19–20 Windows runner-minutes, this representative fast-path run reduced wall-clock by about 43% and Windows runner consumption by roughly half.
+
+This is the first clean measured unrelated-path run after Slice 3. WI-0070's three-representative-run acceptance sample should accumulate from normal subsequent PRs rather than artificial reruns. The transient host failures remain owned by WI-0071 and are not normalized with retries.
