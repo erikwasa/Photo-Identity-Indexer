@@ -42,6 +42,18 @@ After Slice 1 has real run evidence, evaluate package/publish reuse, .NET/NuGet 
 - [ ] Living/generated documentation validation still passes for the new work-item state.
 - [ ] At least one pull-request CI run provides post-change timing evidence for comparison with the pre-change baseline.
 
+## Implementation status
+
+Slice 1 implementation is complete in draft PR #169:
+
+- `verify-local.ps1` now exposes opt-in `-SkipBuild`, `-SkipTests` and `-SkipDocumentation` switches while preserving the existing full checkpoint as the default path.
+- Skipped phases are recorded as `skipped` in the verification report, and manual media checks require the existing built CLI assembly before execution.
+- `.github/workflows/build.yml` uses those skip switches only after the normal restore/build/test/living-doc/generated-doc steps have already succeeded.
+- Pull-request workflow concurrency is keyed by PR number and cancels superseded in-progress runs; non-PR runs fall back to unique run IDs.
+- The mixed-media fixture inputs and report assertions are unchanged.
+
+The item remains in review until Windows CI confirms the behavior and provides post-change timing evidence.
+
 ## Verification
 
 Use GitHub Actions as the Windows execution gate. Review the first successful run to confirm that the mixed-media step reaches decoder checks immediately after the lightweight script setup rather than rebuilding/retesting the repository, and record the resulting job duration in this work item before completion.
