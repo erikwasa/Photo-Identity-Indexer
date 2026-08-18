@@ -15,7 +15,7 @@ Reduce pull-request CI wall-clock time and wasted Windows runner work without we
 
 ## Baseline finding
 
-The normal `build-and-test` job already restores, builds, tests and validates documentation before invoking the mixed-media checkpoint. `verify-local.ps1` currently repeats the solution build, full automated test suite and documentation validation before running the small decoder fixture checks. Recent CI also spends work on superseded pull-request commits when another commit is pushed before the previous run finishes.
+The normal `build-and-test` job already restores, builds, tests and validates documentation before invoking the mixed-media checkpoint. `verify-local.ps1` previously repeated the solution build, full automated test suite and documentation validation before running the small decoder fixture checks. Recent CI also spent work on superseded pull-request commits when another commit was pushed before the previous run finished.
 
 ## Scope
 
@@ -29,31 +29,43 @@ The normal `build-and-test` job already restores, builds, tests and validates do
 
 ### Follow-up candidates
 
-After Slice 1 has real run evidence, evaluate package/publish reuse, .NET/NuGet setup caching and isolated integration-test sharding. Those changes are deliberately deferred because they have larger verification or runner-cost tradeoffs.
+Package/publish reuse, .NET/NuGet setup caching and isolated integration-test sharding remain separate optimization candidates because they have larger verification or runner-cost tradeoffs.
 
 ## Acceptance criteria
 
-- [ ] A normal invocation of `verify-local.ps1` still builds, tests and validates documentation by default.
-- [ ] CI can explicitly skip build, tests and documentation validation only after those checks have already succeeded in the same job.
-- [ ] The CI mixed-media verification still exercises all four fixture outcomes and validates the generated report.
-- [ ] The mixed-media step no longer runs the full integration test suite a second time.
-- [ ] A newer pull-request workflow run cancels an older in-progress run for the same pull request.
-- [ ] Pushes to `main` are not canceled merely because a newer main push starts.
-- [ ] Living/generated documentation validation still passes for the new work-item state.
-- [ ] At least one pull-request CI run provides post-change timing evidence for comparison with the pre-change baseline.
+- [x] A normal invocation of `verify-local.ps1` still builds, tests and validates documentation by default.
+- [x] CI can explicitly skip build, tests and documentation validation only after those checks have already succeeded in the same job.
+- [x] The CI mixed-media verification still exercises all four fixture outcomes and validates the generated report.
+- [x] The mixed-media step no longer runs the full integration test suite a second time.
+- [x] A newer pull-request workflow run cancels an older in-progress run for the same pull request.
+- [x] Pushes to `main` are not canceled merely because a newer main push starts.
+- [x] Living/generated documentation validation still passes for the new work-item state.
+- [x] At least one pull-request CI run provides post-change timing evidence for comparison with the pre-change baseline.
 
-## Implementation status
+## Implementation
 
-Slice 1 implementation is complete in draft PR #169:
+Slice 1 merged through PR #169:
 
-- `verify-local.ps1` now exposes opt-in `-SkipBuild`, `-SkipTests` and `-SkipDocumentation` switches while preserving the existing full checkpoint as the default path.
+- `verify-local.ps1` exposes opt-in `-SkipBuild`, `-SkipTests` and `-SkipDocumentation` switches while preserving the existing full checkpoint as the default path.
 - Skipped phases are recorded as `skipped` in the verification report, and manual media checks require the existing built CLI assembly before execution.
 - `.github/workflows/build.yml` uses those skip switches only after the normal restore/build/test/living-doc/generated-doc steps have already succeeded.
 - Pull-request workflow concurrency is keyed by PR number and cancels superseded in-progress runs; non-PR runs fall back to unique run IDs.
 - The mixed-media fixture inputs and report assertions are unchanged.
 
-The item remains in review until Windows CI confirms the behavior and provides post-change timing evidence.
+## Verification evidence
 
-## Verification
+PR #169 merged as commit `b0c2f05cc4e889787d8d370cb06a6a67e2b6725c`. Its final PR run encountered one intermittent integration-test HTTP 500 before reaching the optimized media step; launcher and package verification passed.
 
-Use GitHub Actions as the Windows execution gate. Review the first successful run to confirm that the mixed-media step reaches decoder checks immediately after the lightweight script setup rather than rebuilding/retesting the repository, and record the resulting job duration in this work item before completion.
+The next pull request, PR #170, preserved the merged WI-0069 workflow changes and provided a clean end-to-end Windows run in workflow #1075 (`32163493523`):
+
+- all three jobs passed;
+- `build-and-test` ran from approximately 17:24:19 to 17:32:46 UTC, about 8m26s;
+- the integration suite itself had grown to 293 tests and took 5m14s in that run;
+- after build/test/docs and review smoke, mixed-media verification invoked `verify-local.ps1` with all three reuse switches;
+- build, automated tests and documentation validation were explicitly reported as skipped inside that invocation;
+- the four decoder/unsupported checks completed in about 1.4 seconds before the existing expected-failure assertion passed;
+- no second integration-test pass occurred.
+
+For comparison, the pre-change reference run #1060 had `build-and-test` at about 10m56s, with the old mixed-media invocation consuming roughly 4m26s largely because it rebuilt and reran the full test suite. The post-change successful job therefore finished about 2m30s faster overall despite a materially slower/larger integration-test pass, while the redundant mixed-media phase itself fell from minutes to seconds.
+
+Concurrency behavior was also observed directly during PR #169: run #1067 was canceled after the branch advanced, leaving the newer PR attempt to proceed. Non-PR runs use `${{ github.run_id }}` in the concurrency group, so separate `main` pushes do not share a cancellation group.

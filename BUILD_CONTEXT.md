@@ -8,15 +8,15 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 **WI-0066 — Add Smart Collection visibility preference for people** is the active M19 implementation item.
 
-Slice 1 merged through PR #170 and establishes schema v16, the durable `HiddenFromSmartCollections` preference, maintenance API read/write contracts, target-wins merge semantics and integration coverage.
+Slice 1 merged through PR #170 and establishes schema v16, a narrowly scoped durable `HiddenFromSmartCollections` preference, maintenance API read/write contracts, deterministic target-wins merge semantics and integration coverage. Hidden people remain part of ordinary review/identity people lists.
 
-Slice 2 merged through PR #171. Maintain People now shows whether each active person is available or hidden from Smart Collections and provides a reversible hide/show control while leaving hidden people fully available for identity maintenance.
+Slice 2 merged through PR #171. Maintain People now shows whether each active person is available or hidden from Smart Collections and provides a reversible hide/show control backed by the Slice 1 endpoint. Hidden people remain fully present in Maintain People.
 
 Slice 3 is implemented on `agent/WI-0066-smart-collection-discovery`. `/api/review/people` still returns every active person but now exposes the persisted Smart Collection visibility flag. The Smart Collection people picker hides those people from normal discovery while retaining and marking a hidden person already selected by a restored saved or transient definition. Removing that hidden selection makes it unavailable for re-selection until unhidden. Saved definitions and query semantics are not rewritten by the preference.
 
 WI-0065 implementation merged through PR #166 and is in review pending maintainer verification of unattended pickup and restart/resume behavior.
 
-WI-0069 implementation merged through PR #169 and remains in review pending its recorded CI timing/behavior evidence.
+WI-0069 is completed: the CI optimization merged through PR #169 and successful workflow #1075 verified the mixed-media checkpoint reuses prior build/test/documentation validation instead of rerunning the integration suite. Timing and merge evidence are recorded in the work item.
 
 ## Next concrete step
 
