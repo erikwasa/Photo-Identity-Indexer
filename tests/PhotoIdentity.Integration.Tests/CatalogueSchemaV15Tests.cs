@@ -7,7 +7,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class CatalogueSchemaV15Tests
 {
     [Fact]
-    public async Task Version_14_catalogue_upgrades_place_enrichment_schema_to_version_15()
+    public async Task Version_14_catalogue_applies_place_enrichment_schema_while_upgrading_to_current_version()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -20,9 +20,10 @@ public sealed class CatalogueSchemaV15Tests
             {
                 using SqliteCommand downgrade = connection.CreateCommand();
                 downgrade.CommandText = """
+                    DROP TABLE person_smart_collection_visibility;
                     DROP TABLE photo_place_enrichment_attempts;
                     DROP TABLE photo_place_reverse_geocode_cache;
-                    DELETE FROM schema_migrations WHERE version = 15;
+                    DELETE FROM schema_migrations WHERE version >= 15;
                     PRAGMA user_version = 14;
                     """;
                 await downgrade.ExecuteNonQueryAsync();
@@ -31,7 +32,7 @@ public sealed class CatalogueSchemaV15Tests
             await database.InitializeAsync();
 
             await using SqliteConnection upgraded = await database.OpenConnectionAsync();
-            Assert.Equal(15, await ReadUserVersionAsync(upgraded));
+            Assert.Equal(SqliteCatalogueDatabase.CurrentSchemaVersion, await ReadUserVersionAsync(upgraded));
             Assert.True(await TableExistsAsync(upgraded, "photo_place_reverse_geocode_cache"));
             Assert.True(await TableExistsAsync(upgraded, "photo_place_enrichment_attempts"));
             Assert.True(await MigrationExistsAsync(upgraded, 15));
