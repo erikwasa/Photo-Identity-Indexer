@@ -184,7 +184,11 @@ if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
     $planLines | Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8
 }
 
-$selectedShard = $shards | Where-Object number -eq $ShardNumber | Select-Object -Single
+$selectedShards = @($shards | Where-Object number -eq $ShardNumber)
+if ($selectedShards.Count -ne 1) {
+    throw "Expected exactly one shard plan entry for shard $ShardNumber, found $($selectedShards.Count)."
+}
+$selectedShard = $selectedShards[0]
 $patterns = @(
     $selectedShard.classes |
         Sort-Object className |
