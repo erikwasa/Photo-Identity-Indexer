@@ -6,6 +6,7 @@
                  QueryModelId="@QueryModelId"
                  QueryModelHash="@QueryModelHash"
                  QueryConfidenceGroup="@QueryConfidenceGroup"
+                 QuerySuggestedPersonId="@QuerySuggestedPersonId"
                  QueryLoaded="@QueryLoaded" />
 
 @code {
@@ -26,6 +27,9 @@
 
     [Parameter, SupplyParameterFromQuery(Name = "confidenceGroup")]
     public string? QueryConfidenceGroup { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "suggestedPersonId")]
+    public string? QuerySuggestedPersonId { get; set; }
 
     [Parameter, SupplyParameterFromQuery(Name = "loaded")]
     public int QueryLoaded { get; set; }
