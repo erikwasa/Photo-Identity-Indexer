@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -133,7 +134,39 @@ public static class PhotoDetailsEndpoints
                 person.PersonId.ToString(),
                 person.DisplayName,
                 person.ConfirmedFaceCount,
-                person.ManualPresence)).ToArray());
+                person.ManualPresence)).ToArray(),
+            ToMetadataResponse(details.CaptureMetadata, details.ExtendedMetadata));
+    }
+
+    private static PhotoMetadataResponse? ToMetadataResponse(
+        PhotoCaptureMetadata? capture,
+        CatalogueExtendedPhotoMetadata? extended)
+    {
+        if (capture is null)
+        {
+            return null;
+        }
+
+        return new PhotoMetadataResponse(
+            capture.TakenAtLocal,
+            capture.UtcOffset is null ? null : checked((int)capture.UtcOffset.Value.TotalMinutes),
+            capture.Latitude,
+            capture.Longitude,
+            extended?.CameraMake,
+            extended?.CameraModel,
+            extended?.LensModel,
+            extended?.Orientation,
+            extended?.ExposureTime,
+            extended?.Aperture,
+            extended?.Iso,
+            extended?.FocalLength,
+            extended?.FocalLength35Mm,
+            extended?.Flash,
+            extended?.GpsAltitude,
+            extended?.RawTags.Select(tag => new PhotoMetadataTagResponse(
+                tag.Directory,
+                tag.Name,
+                tag.Value)).ToArray() ?? []);
     }
 
     private static bool TryParseRevisionId(string value, out AssetRevisionId revisionId)
