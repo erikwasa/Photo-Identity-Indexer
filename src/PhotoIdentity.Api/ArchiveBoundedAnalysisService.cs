@@ -11,10 +11,10 @@ namespace PhotoIdentity.Api;
 public sealed record ArchiveBoundedAnalysisAdvanceResult(bool StartedNewRun);
 
 /// <summary>
-/// Advances the permanent archive by at most one governed source-verification, analysis or
-/// post-analysis step. Lightweight source divergence is reconciled before inference, online-only
-/// content uses the same bounded hydration policy, and successful analysis remains independent
-/// from durable review-proxy completion.
+/// Advances the permanent archive by at most one governed source-verification, metadata,
+/// analysis or post-analysis step. Lightweight source divergence is reconciled before inference,
+/// online-only content uses the same bounded hydration policy, and successful analysis remains
+/// independent from durable review-proxy completion.
 /// </summary>
 public sealed class ArchiveBoundedAnalysisService
 {
@@ -26,6 +26,7 @@ public sealed class ArchiveBoundedAnalysisService
     private readonly SqliteArchiveSourceVerificationStateRepository _sourceVerificationState;
     private readonly CollectionOriginalAccessService _originals;
     private readonly ArchiveSourceVerificationService _sourceVerification;
+    private readonly PhotoMetadataInspectionService _metadataInspection;
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
     private readonly TimeProvider _timeProvider;
     private readonly SemaphoreSlim _advanceGate = new(1, 1);
@@ -39,6 +40,7 @@ public sealed class ArchiveBoundedAnalysisService
         SqliteArchiveSourceVerificationStateRepository sourceVerificationState,
         CollectionOriginalAccessService originals,
         ArchiveSourceVerificationService sourceVerification,
+        PhotoMetadataInspectionService metadataInspection,
         ReviewProxyGenerationConfiguration proxyConfiguration,
         TimeProvider timeProvider)
     {
@@ -50,6 +52,7 @@ public sealed class ArchiveBoundedAnalysisService
         ArgumentNullException.ThrowIfNull(sourceVerificationState);
         ArgumentNullException.ThrowIfNull(originals);
         ArgumentNullException.ThrowIfNull(sourceVerification);
+        ArgumentNullException.ThrowIfNull(metadataInspection);
         ArgumentNullException.ThrowIfNull(proxyConfiguration);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _database = database;
@@ -60,6 +63,7 @@ public sealed class ArchiveBoundedAnalysisService
         _sourceVerificationState = sourceVerificationState;
         _originals = originals;
         _sourceVerification = sourceVerification;
+        _metadataInspection = metadataInspection;
         _proxyConfiguration = proxyConfiguration;
         _timeProvider = timeProvider;
     }
@@ -144,11 +148,6 @@ public sealed class ArchiveBoundedAnalysisService
                 LocalBatchConfiguration savedConfiguration = LocalBatchConfiguration.FromJson(savedRun.ConfigurationJson);
                 if (!AnalysisRuntimePathsEqual(savedConfiguration, batchConfiguration))
                 {
-                    // Repository/model directories belong to the replaceable application package, not
-                    // to durable archive identity. An unfinished run from an older side-by-side package
-                    // must not make the new package reach back into the old installation. Cancelling the
-                    // stale run is safe because successful revision/profile completions are recorded
-                    // independently and StartAsync schedules only the still-pending revisions.
                     _ = await processingRepository.RequestCancellationAsync(
                         latest.RunId,
                         _timeProvider.GetUtcNow(),
@@ -196,8 +195,6 @@ public sealed class ArchiveBoundedAnalysisService
             }
         }
 
-        // Finish durable proxy/release work before starting more inference. If this fails, the
-        // analysis completion remains durable and a later call retries only this post-analysis step.
         if (await TryAdvancePostAnalysisAsync(
                 coverage,
                 analysisProfileHash,
@@ -217,13 +214,15 @@ public sealed class ArchiveBoundedAnalysisService
             await _analysis.IsCompletedAsync(verifiedRevisionId, analysisProfileHash, cancellationToken) &&
             await _proxies.GetAsync(verifiedRevisionId, proxyProfile.Id, cancellationToken) is not null)
         {
-            // Source verification had to hydrate content but this exact revision already has both
-            // durable analysis and proxy outputs. Nothing downstream still needs the local bytes.
             CollectionOriginalAccessSnapshot? status = await _originals.GetStatusAsync(
                 verifiedRevisionId,
                 cancellationToken);
             if (status?.ManagedHydration == true && status.CanRelease)
             {
+                if (!await EnsureMetadataInspectedAsync(verifiedRevisionId, cancellationToken))
+                {
+                    return new ArchiveBoundedAnalysisAdvanceResult(false);
+                }
                 _ = await _originals.RequestReleaseAsync(verifiedRevisionId, cancellationToken);
             }
 
@@ -291,6 +290,10 @@ public sealed class ArchiveBoundedAnalysisService
             return new ArchiveBoundedAnalysisAdvanceResult(false);
         }
 
+        if (!await EnsureMetadataInspectedAsync(localPending[0], cancellationToken))
+        {
+            return new ArchiveBoundedAnalysisAdvanceResult(false);
+        }
         await RecordAvailabilityAsync(localPending[0], AssetAvailability.Local, cancellationToken);
         ArchiveAnalysisStartResult started = await coordinator.StartAsync(
             analysisConfiguration,
@@ -333,6 +336,10 @@ public sealed class ArchiveBoundedAnalysisService
             cancellationToken);
         if (status?.State == CollectionOriginalAccessService.ReadyState)
         {
+            if (!await EnsureMetadataInspectedAsync(next.AssetRevisionId, cancellationToken))
+            {
+                return false;
+            }
             await RecordAvailabilityAsync(next.AssetRevisionId, AssetAvailability.Local, cancellationToken);
             return true;
         }
@@ -357,7 +364,10 @@ public sealed class ArchiveBoundedAnalysisService
         switch (status.State)
         {
             case CollectionOriginalAccessService.ReadyState:
-                await RecordAvailabilityAsync(revisionId, AssetAvailability.Local, cancellationToken);
+                if (await EnsureMetadataInspectedAsync(revisionId, cancellationToken))
+                {
+                    await RecordAvailabilityAsync(revisionId, AssetAvailability.Local, cancellationToken);
+                }
                 return;
             case CollectionOriginalAccessService.OnlineOnlyState:
                 await RecordAvailabilityAsync(revisionId, AssetAvailability.OnlineOnly, cancellationToken);
@@ -441,6 +451,10 @@ public sealed class ArchiveBoundedAnalysisService
                 "An analyzed archive original is unavailable for review-proxy generation. Check archive availability and retry.");
         }
 
+        if (!await EnsureMetadataInspectedAsync(revisionId, cancellationToken))
+        {
+            return true;
+        }
         await RecordAvailabilityAsync(revisionId, AssetAvailability.Local, cancellationToken);
         CatalogueProcessingAssetRevision revision = await _catalogue.GetAssetRevisionAsync(revisionId, cancellationToken)
             ?? throw new InvalidOperationException("The analyzed archive revision disappeared before proxy generation.");
@@ -466,6 +480,31 @@ public sealed class ArchiveBoundedAnalysisService
             }
         }
 
+        return true;
+    }
+
+    private async Task<bool> EnsureMetadataInspectedAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken)
+    {
+        if (await _metadataInspection.IsInspectedAsync(revisionId, cancellationToken))
+        {
+            return true;
+        }
+
+        VerifiedCollectionOriginal? original = await _originals.OpenVerifiedAsync(revisionId, cancellationToken);
+        if (original is null)
+        {
+            await MarkRevisionNeedsVerificationAsync(revisionId, cancellationToken);
+            return false;
+        }
+
+        await using FileStream stream = original.Stream;
+        _ = await _metadataInspection.InspectVerifiedAsync(
+            revisionId,
+            stream,
+            original.ContentType,
+            cancellationToken);
         return true;
     }
 
