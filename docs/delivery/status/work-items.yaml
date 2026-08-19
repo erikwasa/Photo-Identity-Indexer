@@ -161,7 +161,7 @@ work_items:
   verified_at: 2026-08-17
   verified_by: maintainer
   last_updated_at: 2026-08-17
-  branch: agent/WI-0052-packaged-windows-application
+  branch: agent/WI-0052-windows-package
   blockers:
   - WI-0048
   - WI-0051
