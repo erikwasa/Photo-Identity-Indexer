@@ -24,6 +24,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M17 | Identity review automation | completed |
 | M18 | Operator application experience | ready |
 | M19 | Photo metadata and semantic collections | in_progress |
+| M20 | Operator polish and archive throughput | ready |
 
 Expected evolution:
 
