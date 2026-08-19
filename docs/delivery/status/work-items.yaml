@@ -590,3 +590,59 @@ work_items:
   blocker_notes:
   - Implements the metadata-ingestion gap found in the 2026-08-19 M19 maintainer pass and unblocks final WI-0064/WI-0065 verification.
   evidence: []
+- id: WI-0073
+  title: Polish cards, menus and archive navigation
+  milestone: M20
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0073-ui-navigation-polish.md
+  blockers:
+  - WI-0061
+  - WI-0066
+  - WI-0068
+  blocker_notes: []
+  evidence: []
+- id: WI-0074
+  title: Filter Face Review by suggested person
+  milestone: M20
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0074-face-review-suggested-person-filter.md
+  blockers:
+  - WI-0043
+  - WI-0047
+  blocker_notes: []
+  evidence: []
+- id: WI-0075
+  title: Make GeoNames background timing configurable from launcher settings
+  milestone: M20
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0075-geonames-timing-settings.md
+  blockers:
+  - WI-0065
+  blocker_notes: []
+  evidence: []
+- id: WI-0076
+  title: Improve archive processing throughput
+  milestone: M20
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0076-archive-throughput.md
+  blockers:
+  - WI-0042
+  - WI-0072
+  blocker_notes: []
+  evidence: []
+- id: WI-0077
+  title: Simplify Photo Viewer metadata and location editing
+  milestone: M20
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0077-photo-viewer-simplification.md
+  blockers:
+  - WI-0061
+  - WI-0063
+  - WI-0072
+  blocker_notes: []
+  evidence: []
