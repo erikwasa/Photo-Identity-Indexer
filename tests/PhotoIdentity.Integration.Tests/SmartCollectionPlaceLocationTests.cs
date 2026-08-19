@@ -3,10 +3,12 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
+using PhotoIdentity.Api;
+using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
-using PhotoIdentity.Web.Contracts;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -14,7 +16,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class SmartCollectionPlaceLocationTests
 {
     [Fact]
-    public async Task Location_place_matches_any_ancestor_or_leaf_component()
+    public async Task Named_place_matches_exact_canonical_ancestor_without_global_leaf_matching()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -22,80 +24,35 @@ public sealed class SmartCollectionPlaceLocationTests
             SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             SqliteAssetCatalogueRepository catalogue = new(database);
-            SqlitePhotoPlaceRepository places = new(database);
-            SqliteSmartCollectionRepository smartCollections = new(database, TimeProvider.System);
+            SqlitePhotoPlaceRepository places = new(database, TimeProvider.System);
+            SqliteSmartCollectionQueryRepository query = new(database);
 
-            CatalogueAssetRevision stockholm = await CreateRevisionAsync(
-                catalogue,
-                directory,
-                "stockholm.jpg",
-                'a');
-            await places.UpsertAsync(
-                stockholm.Id,
-                new PhotoPlaceTag("Places/Sweden/Stockholm region/Stockholm"),
-                DateTimeOffset.UtcNow);
+            CatalogueAssetRevision stockholm = await CreateRevisionAsync(catalogue, directory, "stockholm.jpg", 'a');
+            CatalogueAssetRevision norrtalje = await CreateRevisionAsync(catalogue, directory, "norrtalje.jpg", 'b');
+            CatalogueAssetRevision illinoisSpringfield = await CreateRevisionAsync(catalogue, directory, "springfield-us.jpg", 'c');
 
-            CatalogueAssetRevision gothenburg = await CreateRevisionAsync(
-                catalogue,
-                directory,
-                "gothenburg.jpg",
-                'b');
-            await places.UpsertAsync(
-                gothenburg.Id,
-                new PhotoPlaceTag("Places/Sweden/Västra Götaland/Gothenburg"),
-                DateTimeOffset.UtcNow);
+            await places.SetManualPlaceAsync(stockholm.Id, "Sweden/Stockholm region/Stockholm", "test");
+            await places.SetManualPlaceAsync(norrtalje.Id, "Sweden/Stockholm region/Norrtälje", "test");
+            await places.SetManualPlaceAsync(illinoisSpringfield.Id, "USA/Illinois/Stockholm", "test");
 
-            CatalogueAssetRevision oslo = await CreateRevisionAsync(
-                catalogue,
-                directory,
-                "oslo.jpg",
-                'c');
-            await places.UpsertAsync(
-                oslo.Id,
-                new PhotoPlaceTag("Places/Norway/Oslo/Oslo"),
-                DateTimeOffset.UtcNow);
+            SmartCollectionPhotoPage sweden = await query.QueryAsync(
+                new SmartCollectionFilter(locationPlace: "Sweden"));
+            Assert.Equal(2, sweden.Total);
+            Assert.Contains(sweden.Items, photo => photo.RevisionId == stockholm.Id);
+            Assert.Contains(sweden.Items, photo => photo.RevisionId == norrtalje.Id);
+            Assert.DoesNotContain(sweden.Items, photo => photo.RevisionId == illinoisSpringfield.Id);
 
-            SmartCollectionDefinition sweden = await smartCollections.CreateAsync(
-                "Sweden",
-                new SmartCollectionFilter(
-                    LocationPlace: "Sweden"),
-                "test");
-            SmartCollectionDefinition stockholmRegion = await smartCollections.CreateAsync(
-                "Stockholm region",
-                new SmartCollectionFilter(
-                    LocationPlace: "Sweden/Stockholm region"),
-                "test");
-            SmartCollectionDefinition stockholmCity = await smartCollections.CreateAsync(
-                "Stockholm city",
-                new SmartCollectionFilter(
-                    LocationPlace: "Stockholm"),
-                "test");
-            SmartCollectionDefinition exactStockholm = await smartCollections.CreateAsync(
-                "Exact Stockholm",
-                new SmartCollectionFilter(
-                    LocationPlace: "Sweden/Stockholm region/Stockholm"),
-                "test");
+            SmartCollectionPhotoPage region = await query.QueryAsync(
+                new SmartCollectionFilter(locationPlace: "Sweden/Stockholm region"));
+            Assert.Equal(2, region.Total);
 
-            IReadOnlyList<CatalogueSmartCollectionPhoto> country =
-                await smartCollections.QueryPhotosAsync(sweden.Id);
-            Assert.Equal(2, country.Count);
-            Assert.Contains(country, photo => photo.RevisionId == stockholm.Id);
-            Assert.Contains(country, photo => photo.RevisionId == gothenburg.Id);
+            SmartCollectionPhotoPage exactLocality = await query.QueryAsync(
+                new SmartCollectionFilter(locationPlace: "Sweden/Stockholm region/Stockholm"));
+            Assert.Equal(stockholm.Id, Assert.Single(exactLocality.Items).RevisionId);
 
-            IReadOnlyList<CatalogueSmartCollectionPhoto> region =
-                await smartCollections.QueryPhotosAsync(stockholmRegion.Id);
-            Assert.Single(region);
-            Assert.Equal(stockholm.Id, region[0].RevisionId);
-
-            IReadOnlyList<CatalogueSmartCollectionPhoto> leaf =
-                await smartCollections.QueryPhotosAsync(stockholmCity.Id);
-            Assert.Single(leaf);
-            Assert.Equal(stockholm.Id, leaf[0].RevisionId);
-
-            IReadOnlyList<CatalogueSmartCollectionPhoto> exact =
-                await smartCollections.QueryPhotosAsync(exactStockholm.Id);
-            Assert.Single(exact);
-            Assert.Equal(stockholm.Id, exact[0].RevisionId);
+            SmartCollectionPhotoPage bareLeaf = await query.QueryAsync(
+                new SmartCollectionFilter(locationPlace: "Stockholm"));
+            Assert.Empty(bareLeaf.Items);
         }
         finally
         {
@@ -104,7 +61,7 @@ public sealed class SmartCollectionPlaceLocationTests
     }
 
     [Fact]
-    public async Task Location_place_is_combined_with_other_smart_collection_filters()
+    public async Task Named_place_and_gps_compose_with_people_tags_and_taken_date()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -112,73 +69,49 @@ public sealed class SmartCollectionPlaceLocationTests
             SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             await database.InitializeAsync();
             SqliteAssetCatalogueRepository catalogue = new(database);
-            SqlitePhotoPlaceRepository places = new(database);
-            SqliteReviewRepository reviews = new(database);
-            SqliteSmartCollectionRepository smartCollections = new(database, TimeProvider.System);
-            DateTimeOffset now = new(2026, 8, 17, 12, 0, 0, TimeSpan.Zero);
+            SqlitePhotoPlaceRepository places = new(database, TimeProvider.System);
+            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
+            SqlitePhotoPersonRepository people = new(database, TimeProvider.System);
+            SqliteSmartCollectionQueryRepository query = new(database);
 
-            CatalogueReviewPerson alice = await reviews.CreatePersonAsync("Alice", now);
-            CatalogueReviewPerson bob = await reviews.CreatePersonAsync("Bob", now.AddSeconds(1));
+            PersonId ada = PersonId.New();
+            CatalogueAssetRevision matching = await CreateRevisionAsync(catalogue, directory, "matching.jpg", 'd');
+            CatalogueAssetRevision wrongPlace = await CreateRevisionAsync(catalogue, directory, "wrong-place.jpg", 'e');
+            CatalogueAssetRevision wrongGps = await CreateRevisionAsync(catalogue, directory, "wrong-gps.jpg", 'f');
 
-            CatalogueAssetRevision stockholm = await CreateRevisionAsync(
-                catalogue,
-                directory,
-                "stockholm-person.jpg",
-                'd');
-            await places.UpsertAsync(
-                stockholm.Id,
-                new PhotoPlaceTag("Places/Sweden/Stockholm region/Stockholm"),
-                now);
-            FaceOccurrenceId stockholmFace = FaceOccurrenceId.New();
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
-            using (SqliteCommand command = connection.CreateCommand())
+            await SeedPersonAsync(database, ada, "Ada");
+            foreach (CatalogueAssetRevision revision in new[] { matching, wrongPlace, wrongGps })
             {
-                command.CommandText = """
-                    INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
-                    VALUES ($id, $revision_id, 0, $now);
-                    """;
-                command.Parameters.AddWithValue("$id", stockholmFace.ToString());
-                command.Parameters.AddWithValue("$revision_id", stockholm.Id.ToString());
-                command.Parameters.AddWithValue("$now", now.ToString("O"));
-                await command.ExecuteNonQueryAsync();
+                await people.AddManualPersonAsync(revision.Id, ada, "test");
+                await tags.AddManualTagAsync(revision.Id, "Trips/Family", "test");
             }
-            await reviews.AssignAsync(stockholmFace, alice.Id, "test", now.AddMinutes(1));
 
-            CatalogueAssetRevision gothenburg = await CreateRevisionAsync(
-                catalogue,
-                directory,
-                "gothenburg-person.jpg",
-                'e');
-            await places.UpsertAsync(
-                gothenburg.Id,
-                new PhotoPlaceTag("Places/Sweden/Västra Götaland/Gothenburg"),
-                now);
-            FaceOccurrenceId gothenburgFace = FaceOccurrenceId.New();
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
-            using (SqliteCommand command = connection.CreateCommand())
-            {
-                command.CommandText = """
-                    INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
-                    VALUES ($id, $revision_id, 0, $now);
-                    """;
-                command.Parameters.AddWithValue("$id", gothenburgFace.ToString());
-                command.Parameters.AddWithValue("$revision_id", gothenburg.Id.ToString());
-                command.Parameters.AddWithValue("$now", now.ToString("O"));
-                await command.ExecuteNonQueryAsync();
-            }
-            await reviews.AssignAsync(gothenburgFace, bob.Id, "test", now.AddMinutes(1));
+            await places.SetManualPlaceAsync(matching.Id, "Sweden/Stockholm region/Norrtälje", "test");
+            await places.SetManualPlaceAsync(wrongPlace.Id, "Finland/Uusimaa/Helsinki", "test");
+            await places.SetManualPlaceAsync(wrongGps.Id, "Sweden/Stockholm region/Norrtälje", "test");
 
-            SmartCollectionDefinition collection = await smartCollections.CreateAsync(
-                "Alice in Sweden",
-                new SmartCollectionFilter(
-                    People: [alice.Id],
-                    LocationPlace: "Sweden"),
-                "test");
+            await catalogue.SavePhotoMetadataAsync(
+                matching.Id,
+                new PhotoCaptureMetadata(new DateTime(2025, 7, 10, 12, 0, 0), null, 59.7580, 18.7050),
+                DateTimeOffset.UtcNow);
+            await catalogue.SavePhotoMetadataAsync(
+                wrongPlace.Id,
+                new PhotoCaptureMetadata(new DateTime(2025, 7, 10, 12, 0, 0), null, 59.7580, 18.7050),
+                DateTimeOffset.UtcNow);
+            await catalogue.SavePhotoMetadataAsync(
+                wrongGps.Id,
+                new PhotoCaptureMetadata(new DateTime(2025, 7, 10, 12, 0, 0), null, 60.1699, 24.9384),
+                DateTimeOffset.UtcNow);
 
-            IReadOnlyList<CatalogueSmartCollectionPhoto> result =
-                await smartCollections.QueryPhotosAsync(collection.Id);
-            CatalogueSmartCollectionPhoto photo = Assert.Single(result);
-            Assert.Equal(stockholm.Id, photo.RevisionId);
+            SmartCollectionFilter filter = new(
+                people: [ada],
+                tags: ["Trips/Family"],
+                location: new SmartCollectionGeoBounds(59.0, 17.0, 60.0, 19.0),
+                taken: SmartCollectionDateRange.Parse("2025/07/01-2025/07/31"),
+                locationPlace: "Sweden/Stockholm region");
+
+            SmartCollectionPhotoPage result = await query.QueryAsync(filter);
+            Assert.Equal(matching.Id, Assert.Single(result.Items).RevisionId);
         }
         finally
         {
@@ -187,39 +120,75 @@ public sealed class SmartCollectionPlaceLocationTests
     }
 
     [Fact]
-    public async Task Persistence_normalizes_place_and_keeps_it_separate_from_GPS_bounds()
+    public async Task Schema_upgrade_promotes_v1_saved_definitions_and_preserves_legacy_places_filter()
     {
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
-            SqliteSmartCollectionRepository repository = new(database, TimeProvider.System);
 
             string gpsId = Guid.NewGuid().ToString("D");
             string placeId = Guid.NewGuid().ToString("D");
+            string now = new DateTimeOffset(2026, 8, 17, 0, 0, 0, TimeSpan.Zero).ToString("O");
             await using (SqliteConnection connection = await database.OpenConnectionAsync())
-            using (SqliteCommand command = connection.CreateCommand())
             {
-                command.CommandText = """
-                    INSERT INTO smart_collections (
-                        id, name, filter_json, created_at_utc, updated_at_utc, updated_by)
-                    VALUES
-                        ($gps_id, 'GPS', $gps_filter, $now, $now, 'test'),
-                        ($place_id, 'Place', $place_filter, $now, $now, 'test');
+                using SqliteCommand rewind = connection.CreateCommand();
+                rewind.CommandText = """
+                    DROP INDEX IF EXISTS ix_smart_collections_name;
+                    DROP TABLE smart_collections;
+                    CREATE TABLE smart_collections (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        normalized_name TEXT NOT NULL UNIQUE,
+                        display_name TEXT NOT NULL,
+                        filter_schema_version INTEGER NOT NULL CHECK (filter_schema_version = 1),
+                        filter_json TEXT NOT NULL,
+                        created_at_utc TEXT NOT NULL,
+                        updated_at_utc TEXT NOT NULL,
+                        CHECK (length(normalized_name) BETWEEN 1 AND 120),
+                        CHECK (length(display_name) BETWEEN 1 AND 120),
+                        CHECK (length(filter_json) > 0));
+                    INSERT INTO smart_collections VALUES (
+                        $gps_id, 'legacy gps', 'Legacy GPS', 1,
+                        '{"people":[],"peopleMatch":"all","tags":[],"tagMatch":"all","location":{"south":59.0,"west":17.0,"north":60.0,"east":19.0},"taken":null}',
+                        $now, $now);
+                    INSERT INTO smart_collections VALUES (
+                        $place_id, 'legacy place', 'Legacy Place', 1,
+                        '{"people":[],"peopleMatch":"all","tags":["places/sweden/stockholm region"],"tagMatch":"all","location":null,"taken":null}',
+                        $now, $now);
+                    DELETE FROM schema_migrations WHERE version = 14;
+                    PRAGMA user_version = 13;
                     """;
-                command.Parameters.AddWithValue("$gps_id", gpsId);
-                command.Parameters.AddWithValue(
-                    "$gps_filter",
-                    "{\"location\":{\"south\":59.0,\"west\":17.0,\"north\":60.0,\"east\":19.0}}");
-                command.Parameters.AddWithValue("$place_id", placeId);
-                command.Parameters.AddWithValue(
-                    "$place_filter",
-                    "{\"tags\":[\"Places/Sweden/Stockholm region\"]}");
-                command.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
-                await command.ExecuteNonQueryAsync();
+                rewind.Parameters.AddWithValue("$gps_id", gpsId);
+                rewind.Parameters.AddWithValue("$place_id", placeId);
+                rewind.Parameters.AddWithValue("$now", now);
+                await rewind.ExecuteNonQueryAsync();
             }
 
+            await database.InitializeAsync();
+
+            await using (SqliteConnection verify = await database.OpenConnectionAsync())
+            {
+                Assert.Equal(SqliteCatalogueDatabase.CurrentSchemaVersion, await ScalarLongAsync(verify, "PRAGMA user_version;"));
+                Assert.Equal(2L, await ScalarLongAsync(
+                    verify,
+                    "SELECT COUNT(*) FROM smart_collections WHERE filter_schema_version = 2;"));
+                Assert.Equal(1L, await ScalarLongAsync(
+                    verify,
+                    "SELECT COUNT(*) FROM schema_migrations WHERE version = 14;"));
+                Assert.Equal(1L, await ScalarLongAsync(
+                    verify,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'photo_capture_metadata';"));
+                Assert.Equal(1L, await ScalarLongAsync(
+                    verify,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'photo_person_actions';"));
+                Assert.Equal(1L, await ScalarLongAsync(
+                    verify,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'photo_place_actions';"));
+            }
+
+            SqliteSmartCollectionRepository repository = new(database, TimeProvider.System);
             SmartCollectionDefinition gps = await repository.GetAsync(SmartCollectionId.From(Guid.Parse(gpsId)))
                 ?? throw new InvalidOperationException();
             Assert.NotNull(gps.Filter.Location);
