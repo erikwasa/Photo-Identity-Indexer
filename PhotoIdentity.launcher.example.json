@@ -4,6 +4,9 @@
   "settings": {
     "PhotoIdentity__DatabasePath": "C:\\PhotoIdentity\\catalogue.db",
     "PhotoIdentity__ArchiveAnalysisOutputRoot": "C:\\PhotoIdentity\\analysis",
-    "PhotoIdentity__ReviewProxyRoot": "C:\\PhotoIdentity\\review-proxies"
+    "PhotoIdentity__ReviewProxyRoot": "C:\\PhotoIdentity\\review-proxies",
+    "PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled": "true",
+    "PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds": "30000",
+    "PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds": "5000"
   }
 }
