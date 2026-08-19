@@ -19,29 +19,21 @@ public sealed record PhotoMetadataBackfillReport(
 /// </summary>
 public sealed class PhotoMetadataBackfillService
 {
-    private readonly SqliteAssetCatalogueRepository _catalogue;
     private readonly SqlitePhotoMetadataBackfillRepository _backfill;
     private readonly IOneDriveFilesOnDemandPlatform _filesOnDemand;
-    private readonly IPhotoMetadataReader _metadataReader;
-    private readonly TimeProvider _timeProvider;
+    private readonly PhotoMetadataInspectionService _inspection;
 
     public PhotoMetadataBackfillService(
-        SqliteAssetCatalogueRepository catalogue,
         SqlitePhotoMetadataBackfillRepository backfill,
         IOneDriveFilesOnDemandPlatform filesOnDemand,
-        IPhotoMetadataReader metadataReader,
-        TimeProvider timeProvider)
+        PhotoMetadataInspectionService inspection)
     {
-        ArgumentNullException.ThrowIfNull(catalogue);
         ArgumentNullException.ThrowIfNull(backfill);
         ArgumentNullException.ThrowIfNull(filesOnDemand);
-        ArgumentNullException.ThrowIfNull(metadataReader);
-        ArgumentNullException.ThrowIfNull(timeProvider);
-        _catalogue = catalogue;
+        ArgumentNullException.ThrowIfNull(inspection);
         _backfill = backfill;
         _filesOnDemand = filesOnDemand;
-        _metadataReader = metadataReader;
-        _timeProvider = timeProvider;
+        _inspection = inspection;
     }
 
     public async Task<PhotoMetadataBackfillReport> ExecuteBatchAsync(
@@ -114,14 +106,10 @@ public sealed class PhotoMetadataBackfillService
                 }
 
                 stream.Position = 0;
-                PhotoCaptureMetadata metadata = await _metadataReader.ReadAsync(
+                _ = await _inspection.InspectVerifiedAsync(
+                    candidate.RevisionId,
                     stream,
                     candidate.MediaType,
-                    cancellationToken);
-                await _catalogue.SavePhotoMetadataAsync(
-                    candidate.RevisionId,
-                    metadata,
-                    _timeProvider.GetUtcNow(),
                     cancellationToken);
                 persisted++;
             }
