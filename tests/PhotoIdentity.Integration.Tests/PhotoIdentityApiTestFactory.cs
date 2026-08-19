@@ -1,11 +1,51 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 namespace PhotoIdentity_Integration_Tests;
+
+/// <summary>
+/// Compatibility foundation for API integration-test factories in this namespace.
+/// Legacy unqualified WebApplicationFactory references resolve here, so generic endpoint hosts
+/// disable unrelated production workers even before they are migrated to PhotoIdentityApiTestFactory.
+/// Worker-specific tests must explicitly opt back in.
+/// </summary>
+internal class WebApplicationFactory<TEntryPoint> :
+    Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<TEntryPoint>
+    where TEntryPoint : class
+{
+    protected virtual bool DisableBackgroundWorkers => true;
+
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        if (DisableBackgroundWorkers)
+        {
+            builder.ConfigureServices(services =>
+            {
+                RemoveHostedService<PhotoIdentity.Api.PhotoPlaceEnrichmentHostedService>(services);
+                RemoveHostedService<PhotoIdentity.Api.ArchiveAdvancementHostedService>(services);
+                RemoveHostedService<PhotoIdentity.Api.IdentityMatchRegenerationHostedService>(services);
+            });
+        }
+
+        return base.CreateHost(builder);
+    }
+
+    private static void RemoveHostedService<THostedService>(IServiceCollection services)
+        where THostedService : class, IHostedService
+    {
+        for (int index = services.Count - 1; index >= 0; index--)
+        {
+            ServiceDescriptor descriptor = services[index];
+            if (descriptor.ServiceType == typeof(IHostedService) &&
+                descriptor.ImplementationType == typeof(THostedService))
+            {
+                services.RemoveAt(index);
+            }
+        }
+    }
+}
 
 /// <summary>
 /// Shared host foundation for API integration tests.
@@ -29,35 +69,13 @@ internal class PhotoIdentityApiTestFactory : WebApplicationFactory<PhotoIdentity
         _disableBackgroundWorkers = disableBackgroundWorkers;
     }
 
+    protected override bool DisableBackgroundWorkers => _disableBackgroundWorkers;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
         builder.UseSetting(WebHostDefaults.DetailedErrorsKey, "true");
         _configureWebHost?.Invoke(builder);
-
-        if (_disableBackgroundWorkers)
-        {
-            builder.ConfigureTestServices(services =>
-            {
-                RemoveHostedService<PhotoIdentity.Api.PhotoPlaceEnrichmentHostedService>(services);
-                RemoveHostedService<PhotoIdentity.Api.ArchiveAdvancementHostedService>(services);
-                RemoveHostedService<PhotoIdentity.Api.IdentityMatchRegenerationHostedService>(services);
-            });
-        }
-    }
-
-    private static void RemoveHostedService<THostedService>(IServiceCollection services)
-        where THostedService : class, IHostedService
-    {
-        for (int index = services.Count - 1; index >= 0; index--)
-        {
-            ServiceDescriptor descriptor = services[index];
-            if (descriptor.ServiceType == typeof(IHostedService) &&
-                descriptor.ImplementationType == typeof(THostedService))
-            {
-                services.RemoveAt(index);
-            }
-        }
     }
 }
 

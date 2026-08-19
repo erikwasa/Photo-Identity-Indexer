@@ -77,6 +77,8 @@ public sealed class IdentityMatchRegenerationApplicationTests
             _databasePath = databasePath;
         }
 
+        protected override bool DisableBackgroundWorkers => false;
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);

@@ -1,8 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
@@ -152,7 +150,7 @@ public sealed class CollectionManifestApplicationTests
 
             using HttpResponseMessage response = await client.GetAsync(
                 $"/api/collections/manifest?people={person.Id}");
-            response.EnsureSuccessStatusCode();
+            await response.EnsureSuccessWithDiagnosticBodyAsync("collection manifest request");
             Assert.Equal(
                 "application/vnd.photoidentity.collection-manifest+json",
                 response.Content.Headers.ContentType?.MediaType);
@@ -211,7 +209,9 @@ public sealed class CollectionManifestApplicationTests
             Assert.DoesNotContain("sourceKey", json, StringComparison.OrdinalIgnoreCase);
 
             using HttpResponseMessage missingPeople = await client.GetAsync("/api/collections/manifest");
-            Assert.Equal(HttpStatusCode.BadRequest, missingPeople.StatusCode);
+            await missingPeople.EnsureStatusCodeWithDiagnosticBodyAsync(
+                HttpStatusCode.BadRequest,
+                "collection manifest request without people");
         }
         finally
         {
@@ -237,18 +237,11 @@ public sealed class CollectionManifestApplicationTests
         }
     }
 
-    private sealed class CollectionManifestApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class CollectionManifestApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-
         public CollectionManifestApiFactory(string databasePath)
+            : base(databasePath)
         {
-            _databasePath = databasePath;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
         }
     }
 }

@@ -1,6 +1,4 @@
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Api;
 using PhotoIdentity.Persistence.Sqlite;
@@ -33,7 +31,7 @@ public sealed class SmartCollectionLocationUpdateCompatibilityTests
                         North: 60,
                         East: 19,
                         Place: "Sweden/Stockholm region")));
-            create.EnsureSuccessStatusCode();
+            await create.EnsureSuccessWithDiagnosticBodyAsync("create smart collection with named place");
             SmartCollectionDefinitionResponse created =
                 await create.Content.ReadFromJsonAsync<SmartCollectionDefinitionResponse>()
                 ?? throw new InvalidOperationException("Create response was empty.");
@@ -47,7 +45,7 @@ public sealed class SmartCollectionLocationUpdateCompatibilityTests
                         West: 17.1,
                         North: 60.1,
                         East: 19.1)));
-            legacyUpdate.EnsureSuccessStatusCode();
+            await legacyUpdate.EnsureSuccessWithDiagnosticBodyAsync("update smart collection without place");
             SmartCollectionDefinitionResponse preserved =
                 await legacyUpdate.Content.ReadFromJsonAsync<SmartCollectionDefinitionResponse>()
                 ?? throw new InvalidOperationException("Update response was empty.");
@@ -64,7 +62,7 @@ public sealed class SmartCollectionLocationUpdateCompatibilityTests
                         North: 60.1,
                         East: 19.1,
                         Place: string.Empty)));
-            explicitClear.EnsureSuccessStatusCode();
+            await explicitClear.EnsureSuccessWithDiagnosticBodyAsync("clear smart collection place");
             SmartCollectionDefinitionResponse cleared =
                 await explicitClear.Content.ReadFromJsonAsync<SmartCollectionDefinitionResponse>()
                 ?? throw new InvalidOperationException("Clear response was empty.");
@@ -130,18 +128,11 @@ public sealed class SmartCollectionLocationUpdateCompatibilityTests
         }
     }
 
-    private sealed class SmartCollectionApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class SmartCollectionApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-
         public SmartCollectionApiFactory(string databasePath)
+            : base(databasePath)
         {
-            _databasePath = databasePath;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
         }
     }
 }
