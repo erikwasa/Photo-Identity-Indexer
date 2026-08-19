@@ -37,13 +37,23 @@ public sealed class PhotoMetadataInspectionService
         _timeProvider = timeProvider;
     }
 
-    public Task<bool> IsInspectedAsync(
+    public async Task<bool> IsInspectedAsync(
         AssetRevisionId revisionId,
-        CancellationToken cancellationToken = default) =>
-        _inspections.IsCurrentAsync(
-            revisionId,
-            PhotoMetadataExtractionContract.CurrentVersion,
-            cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        if (!await _inspections.IsCurrentAsync(
+                revisionId,
+                PhotoMetadataExtractionContract.CurrentVersion,
+                cancellationToken))
+        {
+            return false;
+        }
+
+        // The version marker is written last, so a current marker should always have its capture
+        // row. Treat a missing row as incomplete/corrupt rather than allowing archive advancement
+        // to skip repair.
+        return await _catalogue.GetPhotoMetadataAsync(revisionId, cancellationToken) is not null;
+    }
 
     public async Task<PhotoCaptureMetadata> InspectVerifiedAsync(
         AssetRevisionId revisionId,
