@@ -1,6 +1,7 @@
 .smart-workspace {
     display: grid;
     gap: 1.25rem;
+    min-width: 0;
     margin-bottom: 2rem;
     padding: 1.25rem;
     border: 1px solid var(--border, #d8dde6);
@@ -14,12 +15,14 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
+    min-width: 0;
 }
 
 .smart-workspace-heading h2,
 .smart-workspace-heading h3,
 .smart-workspace-heading p {
     margin-top: 0;
+    overflow-wrap: anywhere;
 }
 
 .smart-workspace-heading.compact {
@@ -30,6 +33,7 @@
     display: grid;
     grid-template-columns: minmax(15rem, 0.8fr) minmax(0, 2.2fr);
     gap: 1rem;
+    min-width: 0;
 }
 
 .smart-saved-list,
@@ -37,6 +41,7 @@
 .smart-results {
     display: grid;
     gap: 1rem;
+    min-width: 0;
 }
 
 .smart-saved-list {
@@ -51,7 +56,9 @@
 .smart-saved-card {
     display: grid;
     gap: 0.5rem;
+    min-width: 0;
     padding: 0.75rem;
+    overflow: hidden;
     border: 1px solid var(--border, #d8dde6);
     border-radius: 0.75rem;
 }
@@ -62,18 +69,28 @@
 
 .smart-open-button,
 .smart-delete-button {
+    max-width: 100%;
     font: inherit;
 }
 
 .smart-open-button {
     display: grid;
     gap: 0.25rem;
+    min-width: 0;
     padding: 0;
     border: 0;
     background: transparent;
     color: inherit;
     text-align: left;
     cursor: pointer;
+}
+
+.smart-open-button strong,
+.smart-open-button span,
+.smart-muted,
+.smart-help,
+.smart-photo-card span {
+    overflow-wrap: anywhere;
 }
 
 .smart-open-button span,
@@ -99,12 +116,14 @@
 .smart-location-toggle {
     display: grid;
     gap: 0.4rem;
+    min-width: 0;
 }
 
 .smart-filter-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
+    min-width: 0;
 }
 
 .smart-filter-card {
@@ -113,6 +132,7 @@
     min-width: 0;
     margin: 0;
     padding: 1rem;
+    overflow: hidden;
     border: 1px solid var(--border, #d8dde6);
     border-radius: 0.75rem;
 }
@@ -144,7 +164,13 @@
 .smart-check-option {
     display: grid;
     gap: 0.5rem;
+    min-width: 0;
     padding: 0.35rem 0;
+}
+
+.smart-check-option span {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .smart-coordinate-grid {
@@ -157,6 +183,11 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
+    min-width: 0;
+}
+
+.smart-actions > * {
+    max-width: 100%;
 }
 
 .smart-loading {
@@ -178,9 +209,11 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
     gap: 1rem;
+    min-width: 0;
 }
 
 .smart-photo-card {
+    min-width: 0;
     overflow: hidden;
     border: 1px solid var(--border, #d8dde6);
     border-radius: 0.75rem;
@@ -189,12 +222,17 @@
 
 .smart-photo-card a {
     display: block;
+    width: 100%;
+    max-width: 100%;
     aspect-ratio: 4 / 3;
+    overflow: hidden;
     background: #111;
 }
 
 .smart-photo-card img {
+    display: block;
     width: 100%;
+    max-width: 100%;
     height: 100%;
     object-fit: cover;
 }
@@ -202,6 +240,7 @@
 .smart-photo-card > div {
     display: grid;
     gap: 0.25rem;
+    min-width: 0;
     padding: 0.75rem;
 }
 

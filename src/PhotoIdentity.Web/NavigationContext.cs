@@ -61,6 +61,36 @@ public static class SmartCollectionNavigation
     }
 }
 
+public static class ArchiveNavigation
+{
+    private const string WorkspaceRoot = "/archive";
+
+    public static string BuildWorkspaceUrl(
+        string? folder,
+        string availability,
+        string verification,
+        string analysis,
+        int offset)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(availability);
+        ArgumentException.ThrowIfNullOrWhiteSpace(verification);
+        ArgumentException.ThrowIfNullOrWhiteSpace(analysis);
+
+        return $"{WorkspaceRoot}?folder={Uri.EscapeDataString(folder?.Trim() ?? string.Empty)}" +
+               $"&availability={Uri.EscapeDataString(availability.Trim())}" +
+               $"&verification={Uri.EscapeDataString(verification.Trim())}" +
+               $"&analysis={Uri.EscapeDataString(analysis.Trim())}" +
+               $"&offset={Math.Max(0, offset)}";
+    }
+
+    public static string BuildPhotoUrl(string revisionId, string returnUrl)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(revisionId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(returnUrl);
+        return $"/photo/{Uri.EscapeDataString(revisionId)}?returnUrl={Uri.EscapeDataString(returnUrl)}";
+    }
+}
+
 public static class PhotoReturnContext
 {
     public static string? NormalizeLocalReturnUrl(string? candidate)
@@ -83,15 +113,21 @@ public static class PhotoReturnContext
         return value;
     }
 
-    public static bool IsSmartCollectionsReturn(string? normalizedReturnUrl)
+    public static bool IsSmartCollectionsReturn(string? normalizedReturnUrl) =>
+        HasRouteBoundary(normalizedReturnUrl, "/smart-collections");
+
+    public static bool IsArchiveReturn(string? normalizedReturnUrl) =>
+        HasRouteBoundary(normalizedReturnUrl, "/archive");
+
+    private static bool HasRouteBoundary(string? normalizedReturnUrl, string route)
     {
         if (normalizedReturnUrl is null ||
-            !normalizedReturnUrl.StartsWith("/smart-collections", StringComparison.Ordinal))
+            !normalizedReturnUrl.StartsWith(route, StringComparison.Ordinal))
         {
             return false;
         }
 
-        return normalizedReturnUrl.Length == "/smart-collections".Length ||
-               normalizedReturnUrl["/smart-collections".Length] is '?' or '#';
+        return normalizedReturnUrl.Length == route.Length ||
+               normalizedReturnUrl[route.Length] is '?' or '#';
     }
 }

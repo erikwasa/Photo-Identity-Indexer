@@ -90,8 +90,36 @@ public sealed class NavigationContextTests
         Assert.DoesNotContain("&offset=40", url);
     }
 
+    [Fact]
+    public void Archive_workspace_url_preserves_filters_and_page_offset()
+    {
+        string url = ArchiveNavigation.BuildWorkspaceUrl(
+            "1970/01",
+            "online-only",
+            "needs-source-verification",
+            "pending",
+            100);
+
+        Assert.Equal(
+            "/archive?folder=1970%2F01&availability=online-only&verification=needs-source-verification&analysis=pending&offset=100",
+            url);
+    }
+
+    [Fact]
+    public void Archive_photo_url_escapes_the_entire_nested_return_url()
+    {
+        string returnUrl = ArchiveNavigation.BuildWorkspaceUrl("1970/01", "local", "verified", "analysed", 50);
+
+        string url = ArchiveNavigation.BuildPhotoUrl("revision-1", returnUrl);
+
+        Assert.StartsWith("/photo/revision-1?returnUrl=", url);
+        Assert.Contains("%2Farchive%3Ffolder%3D1970%252F01%26availability%3Dlocal", url);
+        Assert.DoesNotContain("&offset=50", url);
+    }
+
     [Theory]
     [InlineData("/smart-collections?mode=saved&collection=abc&offset=40")]
+    [InlineData("/archive?folder=1970%2F01&offset=50")]
     [InlineData("/collections")]
     [InlineData("/photo/abc?view=details")]
     public void Local_return_context_accepts_rooted_application_routes(string candidate)
@@ -121,5 +149,16 @@ public sealed class NavigationContextTests
     public void Smart_collection_return_label_requires_exact_route_boundary(string candidate, bool expected)
     {
         Assert.Equal(expected, PhotoReturnContext.IsSmartCollectionsReturn(candidate));
+    }
+
+    [Theory]
+    [InlineData("/archive", true)]
+    [InlineData("/archive?folder=1970%2F01", true)]
+    [InlineData("/archive#items", true)]
+    [InlineData("/archive-evil", false)]
+    [InlineData("/collections", false)]
+    public void Archive_return_label_requires_exact_route_boundary(string candidate, bool expected)
+    {
+        Assert.Equal(expected, PhotoReturnContext.IsArchiveReturn(candidate));
     }
 }

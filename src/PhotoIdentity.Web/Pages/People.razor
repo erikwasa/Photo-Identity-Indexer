@@ -57,9 +57,9 @@ else
     <section class="people-summary" aria-label="Active people">
         @foreach (PersonMaintenancePersonResponse person in ActivePeople)
         {
-            <article class="person-summary-card">
+            <article class="person-summary-card @(person.HiddenFromSmartCollections ? "hidden-from-smart-collections" : "visible-in-smart-collections")">
                 <PersonRepresentativePortrait PersonId="@person.Id" DisplayName="@person.DisplayName" />
-                <strong>@FavoriteLabel(person)</strong>
+                <strong>@PersonCardLabel(person)</strong>
                 <span class="state-badge">@SmartCollectionVisibilityLabel(person)</span>
                 <span>@person.LabelCount label@(person.LabelCount == 1 ? "" : "s")</span>
                 <span>@person.SuggestionCount suggestion@(person.SuggestionCount == 1 ? "" : "s")</span>
@@ -91,7 +91,7 @@ else
             <select id="person-to-maintain" @bind="SelectedPersonId" @bind:after="SelectedPersonChanged">
                 @foreach (PersonMaintenancePersonResponse person in ActivePeople)
                 {
-                    <option value="@person.Id">@FavoriteLabel(person)</option>
+                    <option value="@person.Id">@PersonSelectLabel(person)</option>
                 }
             </select>
 
@@ -124,7 +124,7 @@ else
             <select id="merge-target" @bind="MergeTargetId" disabled="@(MergeTargets.Count == 0)">
                 @foreach (PersonMaintenancePersonResponse person in MergeTargets)
                 {
-                    <option value="@person.Id">@FavoriteLabel(person)</option>
+                    <option value="@person.Id">@PersonSelectLabel(person)</option>
                 }
             </select>
 
@@ -215,8 +215,14 @@ else
         Error = null;
         try
         {
-            ActivePeople = await Http.GetFromJsonAsync<PersonMaintenancePersonResponse[]>(
+            PersonMaintenancePersonResponse[] people = await Http.GetFromJsonAsync<PersonMaintenancePersonResponse[]>(
                 "api/review/people/maintenance") ?? [];
+            ActivePeople = people
+                .OrderBy(person => person.HiddenFromSmartCollections)
+                .ThenByDescending(person => person.IsFavorite)
+                .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(person => person.Id, StringComparer.Ordinal)
+                .ToArray();
             History = await Http.GetFromJsonAsync<PersonMaintenanceActionResponse[]>(
                 "api/review/people/maintenance/history?limit=100") ?? [];
             ResetSelection();
@@ -339,8 +345,11 @@ else
         }
     }
 
-    private static string FavoriteLabel(PersonMaintenancePersonResponse person) =>
+    private static string PersonCardLabel(PersonMaintenancePersonResponse person) =>
         person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
+
+    private static string PersonSelectLabel(PersonMaintenancePersonResponse person) =>
+        person.IsFavorite ? $"{person.DisplayName} — Favorite" : person.DisplayName;
 
     private static string SmartCollectionVisibilityLabel(PersonMaintenancePersonResponse person) =>
         person.HiddenFromSmartCollections
