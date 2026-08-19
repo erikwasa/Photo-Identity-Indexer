@@ -173,7 +173,7 @@ milestones:
   - WI-0072
 - id: M20
   title: Operator polish and archive throughput
-  status: ready
+  status: in_progress
   document: ../milestones/M20-operator-polish-throughput.md
   work_items:
   - WI-0073
