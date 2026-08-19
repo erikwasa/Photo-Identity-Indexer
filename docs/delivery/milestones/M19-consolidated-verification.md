@@ -4,6 +4,16 @@ This checklist is the final local/browser verification pass for the M19 extensio
 
 Run the pass against a current build from `main`. Use normal catalogue data where safe. Any irreversible person-merge check should use a disposable test pair or known duplicates only; automated coverage remains the primary evidence for merge semantics if no safe local pair exists.
 
+## Maintainer result — 2026-08-19
+
+The maintainer completed the consolidated pass and reported **PASS** for WI-0061, WI-0062, WI-0063, WI-0066, WI-0067 and WI-0068. Those six items are verified for completion.
+
+WI-0064 and WI-0065 remain in review. During a new 190-image archive run, the images downloaded, were source-verified and analyzed, but capture date/GPS did not appear. Repository inspection confirms that the WI-0050 metadata reader is currently invoked only by explicit bounded photo-metadata backfill, not by archive advancement. Newly analyzed revisions therefore do not automatically become eligible for GPS-driven GeoNames enrichment. This gap must be resolved before the unattended automatic-pickup portion of the GeoNames checklist can be considered complete.
+
+The same run displayed `Waiting for OneDrive to finish a managed download or release.` while useful work continued. That status is consistent with the current archive state model, which labels the worker `waiting` whenever any managed hydration/release remains in progress even if other work is still advancing. It is recorded as a follow-up operator-clarity issue rather than evidence that the 190-image run stopped.
+
+Additional UI/navigation/metadata findings and proposed solution groupings are recorded in [M19-maintainer-review-2026-08-19.md](M19-maintainer-review-2026-08-19.md). M19 remains `in_progress` until the metadata-to-GeoNames gap is resolved and WI-0064/WI-0065 verification can finish.
+
 ## Suggested test data
 
 Prepare or identify:
@@ -29,6 +39,8 @@ Prepare or identify:
 
 Pass condition: navigation context survives both saved and transient flows, metadata stays privacy-safe, and ordinary viewing does not hydrate online-only originals.
 
+**Result 2026-08-19: PASS.**
+
 ## 2. Manual photo-level people — WI-0062
 
 1. On a photo where a known person has no detected face, add that canonical person from Photo Details.
@@ -38,6 +50,8 @@ Pass condition: navigation context survives both saved and transient flows, meta
 5. Remove the manual presence and confirm the Smart Collection no longer matches solely because of that manual assignment.
 
 Pass condition: manual presence affects Photo Details and Smart Collections only as photo-level metadata and never masquerades as face evidence.
+
+**Result 2026-08-19: PASS.**
 
 ## 3. First-class Places — WI-0063
 
@@ -49,6 +63,8 @@ Pass condition: manual presence affects Photo Details and Smart Collections only
 6. If useful, combine named place with people/tags/taken-time criteria and confirm the dimensions retain AND semantics.
 
 Pass condition: Places behave as one hierarchical Location value, not as generic tags.
+
+**Result 2026-08-19: PASS.**
 
 ## 4. GeoNames provider result and automatic orchestration — WI-0064 / WI-0065
 
@@ -63,6 +79,8 @@ The configured live GeoNames account, normalization, long-place compatibility an
 
 Pass condition: normal GeoNames enrichment is server-side, provider-paced, restart-resumable and independent of a long-lived browser request; manual precedence remains intact.
 
+**Result 2026-08-19: INCOMPLETE.** The live-provider behavior already verified for WI-0064 remains valid, but the integrated archive test exposed that metadata inspection is not part of archive advancement. Newly processed revisions can therefore finish analysis without GPS being persisted and never enter the automatic GeoNames queue. Resolve the metadata-ingestion gap, then repeat automatic pickup and restart/resume verification.
+
 ## 5. Smart Collection person visibility — WI-0066
 
 1. In Maintain People, hide a test person from Smart Collections and reload the application/page; confirm the preference persists.
@@ -75,6 +93,8 @@ Pass condition: normal GeoNames enrichment is server-side, provider-paced, resta
 
 Pass condition: hiding is strictly a reversible Smart Collection discovery preference and never weakens identity evidence or unrelated collection results.
 
+**Result 2026-08-19: PASS.** Follow-up UX polish is still desired: make hidden status more visually obvious and place hidden people after visible people on Maintain People.
+
 ## 6. Featured representative faces — WI-0067
 
 1. Open Face Details for an assigned named face and set it as that person's featured photo.
@@ -84,6 +104,8 @@ Pass condition: hiding is strictly a reversible Smart Collection discovery prefe
 5. If a safe disposable/known-duplicate person pair exists, optionally verify merge presentation behavior: an existing survivor preference wins; otherwise a valid source preference may carry to the survivor. Do not perform an irreversible merge solely for this checklist on valuable catalogue identities.
 
 Pass condition: representative portraits are presentation metadata, explicit/automatic state behaves predictably, and identity assignments/evidence are unchanged.
+
+**Result 2026-08-19: PASS.** Maintain People card containment is recorded separately as responsive layout polish rather than a failure of representative-face semantics.
 
 ## 7. Searchable portrait-led Smart Collection people picker — WI-0068
 
@@ -99,8 +121,10 @@ Pass condition: representative portraits are presentation metadata, explicit/aut
 
 Pass condition: search affects discovery only, selections remain stable canonical PersonIds, hidden-person compatibility is preserved, portraits are supplementary cues, and `all`/`any` semantics remain unchanged.
 
+**Result 2026-08-19: PASS.** Smart Collection image/card containment is recorded as a separate visual follow-up.
+
 ## Completion recording
 
-When the pass succeeds, record maintainer verification evidence and move WI-0061 through WI-0068 to `completed` as applicable. WI-0064 can reuse its prior live-provider evidence plus this integrated pass; WI-0065 specifically requires the automatic pickup/restart-resume checks above. Once all active M19 work items are complete, move milestone M19 to `completed` and record the consolidated verification date.
+The 2026-08-19 pass verifies WI-0061, WI-0062, WI-0063, WI-0066, WI-0067 and WI-0068 for completion. WI-0064 and WI-0065 remain in review until the metadata-ingestion gap is resolved and automatic pickup/restart-resume is verified on newly processed metadata-bearing revisions.
 
-If a step fails, keep the affected work item `in_review`, record the observed behavior and create a focused follow-up work item/PR rather than weakening the acceptance criterion.
+M19 remains `in_progress` until all active M19 work items are complete. Additional defects and requested enhancements found during this pass are tracked in [M19-maintainer-review-2026-08-19.md](M19-maintainer-review-2026-08-19.md) and should become focused follow-up work items rather than weakening already-passed acceptance criteria.
