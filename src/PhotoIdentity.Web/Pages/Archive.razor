@@ -1,6 +1,7 @@
 @page "/archive"
 @implements IAsyncDisposable
 @inject HttpClient Http
+@inject NavigationManager Navigation
 
 <PageTitle>Archive · Photo Identity</PageTitle>
 
@@ -105,13 +106,14 @@ else
             <strong>@AnalysisCount(Status.Totals.PendingImages)</strong>
         </article>
         <article class="@(Status.Totals.NeedsSourceVerificationImages > 0 ? "attention" : null)">
-<span>Needs verification</span>
-<strong>@Status.Totals.NeedsSourceVerificationImages</strong>
+            <span>Needs verification</span>
+            <strong>@Status.Totals.NeedsSourceVerificationImages</strong>
         </article>
         <article class="@(Status.Totals.UnverifiedSourceImages > 0 ? "attention" : null)">
-<span>First verification</span>
-<strong>@Status.Totals.UnverifiedSourceImages</strong>
-        </article>        <article class="@(Status.Totals.FailedImages > 0 ? "attention" : null)">
+            <span>First verification</span>
+            <strong>@Status.Totals.UnverifiedSourceImages</strong>
+        </article>
+        <article class="@(Status.Totals.FailedImages > 0 ? "attention" : null)">
             <span>Failed</span>
             <strong>@AnalysisCount(Status.Totals.FailedImages)</strong>
         </article>
@@ -150,6 +152,7 @@ else
             <div><dt>Embedder</dt><dd>@Status.EmbedderModelId</dd></div>
             <div><dt>Profile</dt><dd><code>@(Status.ProfileHash is null ? "unavailable" : HashPrefix(Status.ProfileHash))</code></dd></div>
             <div><dt>Archive advancement</dt><dd>@AdvancementLabel(Status.Advancement)</dd></div>
+            <div><dt>Last progress</dt><dd>@AdvancementProgressLabel(Status.Advancement)</dd></div>
         </dl>
 
         @if (!string.IsNullOrWhiteSpace(Status.Advancement?.Message))
@@ -349,7 +352,7 @@ else
                                 <td>
                                     @if (!string.IsNullOrWhiteSpace(item.RevisionId))
                                     {
-                                        <a class="button secondary" href="@($"/photo/{item.RevisionId}")">View</a>
+                                        <a class="button secondary" href="@BuildPhotoUrl(item.RevisionId)">View</a>
                                     }
                                 </td>
                             </tr>
@@ -368,6 +371,33 @@ else
 
 @code {
     private const int ItemPageSize = 50;
+    private static readonly HashSet<string> AvailabilityFilters = new(StringComparer.Ordinal)
+    {
+        "all", "local", "online-only", "downloading", "unavailable", "error",
+    };
+    private static readonly HashSet<string> VerificationFilters = new(StringComparer.Ordinal)
+    {
+        "all", "verified", "needs-source-verification", "unverified",
+    };
+    private static readonly HashSet<string> AnalysisFilters = new(StringComparer.Ordinal)
+    {
+        "all", "analysed", "pending", "failed", "not-ready", "missing",
+    };
+
+    [Parameter, SupplyParameterFromQuery(Name = "folder")]
+    public string? QueryItemFolder { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "availability")]
+    public string? QueryItemAvailability { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "verification")]
+    public string? QueryItemVerification { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "analysis")]
+    public string? QueryItemAnalysis { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "offset")]
+    public int? QueryItemOffset { get; set; }
 
     private ArchiveStatusResponse? Status { get; set; }
     private ArchiveItemPageResponse? ItemPage { get; set; }
@@ -383,12 +413,33 @@ else
     private bool Loading { get; set; } = true;
     private bool ItemLoading { get; set; }
     private bool Busy { get; set; }
+    private bool Initialized { get; set; }
     private CancellationTokenSource? AdvancementPolling { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
-        await RefreshAsync();
-        StartAdvancementPollingIfNeeded();
+        ApplyQueryState();
+        if (!Initialized)
+        {
+            Initialized = true;
+            await RefreshAsync();
+            StartAdvancementPollingIfNeeded();
+            return;
+        }
+
+        if (Status?.Configured == true)
+        {
+            await LoadItemsAsync();
+        }
+    }
+
+    private void ApplyQueryState()
+    {
+        ItemFolder = QueryItemFolder?.Trim() ?? string.Empty;
+        ItemAvailability = NormalizeFilter(QueryItemAvailability, AvailabilityFilters, "all");
+        ItemVerification = NormalizeFilter(QueryItemVerification, VerificationFilters, "all");
+        ItemAnalysis = NormalizeFilter(QueryItemAnalysis, AnalysisFilters, "all");
+        ItemOffset = Math.Max(0, QueryItemOffset ?? 0);
     }
 
     private async Task RefreshAsync()
@@ -456,6 +507,7 @@ else
             Message = $"Included '{RelativeFolder}'.";
             RelativeFolder = string.Empty;
             ItemOffset = 0;
+            UpdateArchiveUrl();
             await LoadItemsAsync();
         }
         catch (Exception exception)
@@ -480,6 +532,7 @@ else
             Status = result.Status;
             Message = $"Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged local, {result.NeedsSourceVerification} needing re-verification, {result.UnverifiedSources} awaiting first verification, {result.OnlineOnlyFiles} online-only, {result.DownloadingFiles} downloading, {result.AvailabilityErrors + result.UnavailableFiles} availability issue(s), {result.MarkedMissing} marked missing.";
             ItemOffset = 0;
+            UpdateArchiveUrl();
             await LoadItemsAsync();
         }
         catch (Exception exception)
@@ -588,19 +641,42 @@ else
     private async Task ApplyItemFiltersAsync()
     {
         ItemOffset = 0;
+        UpdateArchiveUrl();
         await LoadItemsAsync();
     }
 
     private async Task PreviousItemsAsync()
     {
         ItemOffset = Math.Max(0, ItemOffset - ItemPageSize);
+        UpdateArchiveUrl();
         await LoadItemsAsync();
     }
 
     private async Task NextItemsAsync()
     {
         ItemOffset += ItemPageSize;
+        UpdateArchiveUrl();
         await LoadItemsAsync();
+    }
+
+    private void UpdateArchiveUrl()
+    {
+        string target = BuildArchiveReturnUrl();
+        string current = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+        if (!string.Equals(current, target, StringComparison.Ordinal))
+        {
+            Navigation.NavigateTo(target, replace: true);
+        }
+    }
+
+    private string BuildArchiveReturnUrl() =>
+        $"/archive?folder={Uri.EscapeDataString(ItemFolder)}&availability={Uri.EscapeDataString(ItemAvailability)}&verification={Uri.EscapeDataString(ItemVerification)}&analysis={Uri.EscapeDataString(ItemAnalysis)}&offset={Math.Max(0, ItemOffset)}";
+
+    private string BuildPhotoUrl(string revisionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(revisionId);
+        string returnUrl = BuildArchiveReturnUrl();
+        return $"/photo/{Uri.EscapeDataString(revisionId)}?returnUrl={Uri.EscapeDataString(returnUrl)}";
     }
 
     private async Task<T> ReadResponseAsync<T>(HttpResponseMessage response)
@@ -626,6 +702,12 @@ else
 
     private string AnalysisCount(int value) => Status?.AnalysisReady == true ? value.ToString() : "—";
 
+    private static string NormalizeFilter(string? candidate, HashSet<string> allowed, string fallback)
+    {
+        string value = candidate?.Trim() ?? string.Empty;
+        return allowed.Contains(value) ? value : fallback;
+    }
+
     private static string AvailabilityLabel(string availability) => availability switch
     {
         "local" => "Local",
@@ -643,6 +725,7 @@ else
         "unverified" => "First verification",
         _ => state,
     };
+
     private static string AnalysisStateLabel(string state) => state switch
     {
         "analysed" => "Analyzed",
@@ -661,18 +744,56 @@ else
     private static string HashPrefix(string hash) =>
         hash[..Math.Min(12, hash.Length)];
 
-    private static string AdvancementLabel(ArchiveAdvancementStatusResponse? advancement) => advancement?.State switch
+    private string AdvancementLabel(ArchiveAdvancementStatusResponse? advancement)
     {
-        "queued" => "Queued",
-        "syncing" => "Synchronizing",
-        "running" => "Running",
-        "waiting" => "Waiting for OneDrive",
-        "blocked" => "Blocked",
-        "paused" => "Paused",
-        "complete" => "Complete",
-        null => "Not started",
-        _ => advancement.State,
-    };
+        if (advancement is null)
+        {
+            return "Not started";
+        }
+
+        int actionable = Status is null
+            ? 0
+            : Status.Totals.PendingImages + Status.Totals.NeedsSourceVerificationImages + Status.Totals.UnverifiedSourceImages;
+        int onlineOnly = Status?.Totals.OnlineOnlyImages ?? 0;
+        int downloading = Status?.Totals.DownloadingImages ?? 0;
+        int transitions = onlineOnly + downloading;
+        string transitionSummary = OneDriveTransitionSummary(onlineOnly, downloading);
+
+        return advancement.State switch
+        {
+            "queued" => "Queued",
+            "syncing" => "Synchronizing",
+            "running" when transitions > 0 => $"Running · {transitionSummary}",
+            "running" => "Running",
+            "waiting" when actionable == 0 && transitions > 0 => $"Waiting for OneDrive · {transitionSummary}",
+            "waiting" when transitions > 0 => $"Running · {actionable} actionable · {transitionSummary}",
+            "waiting" => "Running · checking for useful work",
+            "blocked" => "Blocked",
+            "paused" => "Paused",
+            "complete" => "Complete",
+            _ => advancement.State,
+        };
+    }
+
+    private static string AdvancementProgressLabel(ArchiveAdvancementStatusResponse? advancement) =>
+        advancement?.UpdatedAtUtc is DateTimeOffset updated
+            ? updated.ToLocalTime().ToString("g")
+            : "—";
+
+    private static string OneDriveTransitionSummary(int onlineOnly, int downloading)
+    {
+        if (onlineOnly > 0 && downloading > 0)
+        {
+            return $"{downloading} downloading · {onlineOnly} online-only";
+        }
+
+        if (downloading > 0)
+        {
+            return $"{downloading} downloading";
+        }
+
+        return $"{onlineOnly} online-only";
+    }
 
     public ValueTask DisposeAsync()
     {
