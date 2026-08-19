@@ -21,8 +21,9 @@ public static class PhotoPlaceEnrichmentEndpoints
                     MinimumRequestIntervalMilliseconds: configuration.MinimumRequestIntervalMilliseconds,
                     AutomaticEnrichmentEnabled: automatic.Enabled && configuration.IsConfigured,
                     AutomaticMinimumRequestIntervalMilliseconds: automatic.MinimumRequestIntervalMilliseconds,
+                    AutomaticIdlePollIntervalMilliseconds: automatic.IdlePollIntervalMilliseconds,
                     AutomaticState: worker.State,
-                    AutomaticMessage: worker.Message,
+                    AutomaticMessage: $"{worker.Message} Idle polling uses {automatic.IdlePollIntervalMilliseconds} ms when no immediate work is available.",
                     LastAutomaticActivityAtUtc: worker.LastActivityAtUtc,
                     NextAutomaticAttemptAtUtc: worker.NextAttemptAtUtc));
             });
@@ -70,6 +71,7 @@ public sealed record PhotoPlaceEnrichmentStatusResponse(
     int MinimumRequestIntervalMilliseconds,
     bool AutomaticEnrichmentEnabled,
     int AutomaticMinimumRequestIntervalMilliseconds,
+    int AutomaticIdlePollIntervalMilliseconds,
     string AutomaticState,
     string AutomaticMessage,
     DateTimeOffset? LastAutomaticActivityAtUtc,
