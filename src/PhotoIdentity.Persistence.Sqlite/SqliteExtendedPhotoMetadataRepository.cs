@@ -19,6 +19,43 @@ public sealed record CatalogueExtendedPhotoMetadata(
     string? GpsAltitude,
     IReadOnlyList<PhotoMetadataTag> RawTags);
 
+public static class SqliteExtendedPhotoMetadataSchema
+{
+    public static async Task EnsureAsync(
+        SqliteCatalogueDatabase database,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(database);
+        await using SqliteConnection connection = await database.OpenConnectionAsync(cancellationToken);
+        await EnsureAsync(connection, cancellationToken);
+    }
+
+    internal static async Task EnsureAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            CREATE TABLE IF NOT EXISTS photo_extended_metadata (
+                asset_revision_id TEXT NOT NULL PRIMARY KEY,
+                camera_make TEXT NULL,
+                camera_model TEXT NULL,
+                lens_model TEXT NULL,
+                orientation TEXT NULL,
+                exposure_time TEXT NULL,
+                aperture TEXT NULL,
+                iso TEXT NULL,
+                focal_length TEXT NULL,
+                focal_length_35mm TEXT NULL,
+                flash TEXT NULL,
+                gps_altitude TEXT NULL,
+                raw_tags_json TEXT NOT NULL DEFAULT '[]',
+                FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE);
+            """;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+}
+
 /// <summary>
 /// Persists non-query-critical photo metadata separately from the stable WI-0050
 /// capture-time/GPS table. This keeps existing collection/location contracts intact while
@@ -45,7 +82,7 @@ public sealed class SqliteExtendedPhotoMetadataRepository
     {
         ArgumentNullException.ThrowIfNull(metadata);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        await EnsureSchemaAsync(connection, cancellationToken);
+        await SqliteExtendedPhotoMetadataSchema.EnsureAsync(connection, cancellationToken);
 
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -112,7 +149,7 @@ public sealed class SqliteExtendedPhotoMetadataRepository
         CancellationToken cancellationToken = default)
     {
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        await EnsureSchemaAsync(connection, cancellationToken);
+        await SqliteExtendedPhotoMetadataSchema.EnsureAsync(connection, cancellationToken);
 
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
@@ -153,31 +190,6 @@ public sealed class SqliteExtendedPhotoMetadataRepository
             Optional(reader, 9),
             Optional(reader, 10),
             tags);
-    }
-
-    private static async Task EnsureSchemaAsync(
-        SqliteConnection connection,
-        CancellationToken cancellationToken)
-    {
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            CREATE TABLE IF NOT EXISTS photo_extended_metadata (
-                asset_revision_id TEXT NOT NULL PRIMARY KEY,
-                camera_make TEXT NULL,
-                camera_model TEXT NULL,
-                lens_model TEXT NULL,
-                orientation TEXT NULL,
-                exposure_time TEXT NULL,
-                aperture TEXT NULL,
-                iso TEXT NULL,
-                focal_length TEXT NULL,
-                focal_length_35mm TEXT NULL,
-                flash TEXT NULL,
-                gps_altitude TEXT NULL,
-                raw_tags_json TEXT NOT NULL DEFAULT '[]',
-                FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE);
-            """;
-        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static IReadOnlyList<PhotoMetadataTag> BoundTags(IReadOnlyList<PhotoMetadataTag> tags) =>
