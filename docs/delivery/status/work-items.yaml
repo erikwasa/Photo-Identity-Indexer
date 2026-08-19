@@ -161,7 +161,7 @@ work_items:
   verified_at: 2026-08-17
   verified_by: maintainer
   last_updated_at: 2026-08-17
-  branch: agent/WI-0052-windows-package
+  branch: agent/WI-0052-packaged-windows-application
   blockers:
   - WI-0048
   - WI-0051
@@ -310,17 +310,19 @@ work_items:
 - id: WI-0061
   title: Enrich Photo Details and preserve navigation context
   milestone: M19
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0061-photo-details-navigation-context.md
   started_at: 2026-08-16
-  last_updated_at: 2026-08-16
+  completed_at: 2026-08-19
+  verified_at: 2026-08-19
+  verified_by: maintainer
+  last_updated_at: 2026-08-19
   branch: agent/WI-0061-smart-navigation
   blockers:
   - WI-0025
   - WI-0050
-  blocker_notes:
-  - Local maintainer browser verification is intentionally deferred until the remaining M19 work items are implemented.
+  blocker_notes: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/150
@@ -337,17 +339,19 @@ work_items:
 - id: WI-0062
   title: Add manual photo-level people
   milestone: M19
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0062-manual-photo-people.md
   started_at: 2026-08-16
-  last_updated_at: 2026-08-17
+  completed_at: 2026-08-19
+  verified_at: 2026-08-19
+  verified_by: maintainer
+  last_updated_at: 2026-08-19
   branch: agent/WI-0062-manual-photo-people
   blockers:
   - WI-0050
   - WI-0061
-  blocker_notes:
-  - Implementation is merged; local browser verification is intentionally deferred to the consolidated M19 pass.
+  blocker_notes: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/155
@@ -358,17 +362,19 @@ work_items:
 - id: WI-0063
   title: Make Places a first-class location hierarchy
   milestone: M19
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0063-first-class-places.md
   started_at: 2026-08-17
-  last_updated_at: 2026-08-17
+  completed_at: 2026-08-19
+  verified_at: 2026-08-19
+  verified_by: maintainer
+  last_updated_at: 2026-08-19
   branch: agent/WI-0063-place-ui
   blockers:
   - WI-0050
   - WI-0056
-  blocker_notes:
-  - Implementation is merged; local browser verification is intentionally deferred to the consolidated M19 pass after WI-0064.
+  blocker_notes: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/156
@@ -395,13 +401,13 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0064-geonames-place-enrichment.md
   started_at: 2026-08-17
-  last_updated_at: 2026-08-18
+  last_updated_at: 2026-08-19
   branch: agent/WI-0064-provider-error-reporting
   blockers:
   - WI-0050
   - WI-0063
   blocker_notes:
-  - Provider, persistence, Settings diagnostics and long Places compatibility are merged. The maintainer verified real GeoNames assignment, Smart Collection location filtering and successful retries of all three former invalid-place-path revisions. Automatic unattended orchestration continues in WI-0065 before the consolidated M19 pass.
+  - Provider, persistence, Settings diagnostics and long Places compatibility are merged and prior live-provider verification remains valid. The 2026-08-19 integrated pass found that newly archived revisions can finish analysis without metadata inspection, so GPS-driven automatic pickup cannot yet be verified end-to-end.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/160
@@ -426,30 +432,32 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0065-automatic-place-enrichment.md
   started_at: 2026-08-18
-  last_updated_at: 2026-08-18
+  last_updated_at: 2026-08-19
   branch: agent/WI-0065-automatic-place-enrichment
   blockers:
   - WI-0050
   - WI-0063
   - WI-0064
   blocker_notes:
-  - Implementation is merged in PR #166; maintainer verification of automatic pickup and restart/resume behavior remains.
+  - Implementation is merged in PR #166. The 2026-08-19 integrated pass exposed that archive advancement does not invoke metadata extraction, so newly analyzed photos may never persist GPS and enter the automatic GeoNames queue; fix that ingestion gap before completing automatic pickup/restart-resume verification.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/166
 - id: WI-0066
   title: Add Smart Collection visibility preference for people
   milestone: M19
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0066-smart-collection-person-visibility.md
   started_at: 2026-08-18
-  last_updated_at: 2026-08-18
+  completed_at: 2026-08-19
+  verified_at: 2026-08-19
+  verified_by: maintainer
+  last_updated_at: 2026-08-19
   branch: agent/WI-0066-smart-collection-discovery
   blockers:
   - WI-0050
-  blocker_notes:
-  - Implementation merged through PRs #170, #171 and #173; focused browser verification is deferred to the consolidated M19 manual verification pass per maintainer direction.
+  blocker_notes: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/170
@@ -466,17 +474,19 @@ work_items:
 - id: WI-0067
   title: Add featured representative faces for people
   milestone: M19
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0067-featured-person-face.md
   started_at: 2026-08-18
+  completed_at: 2026-08-19
+  verified_at: 2026-08-19
+  verified_by: maintainer
   last_updated_at: 2026-08-19
   branch: agent/WI-0067-face-details-featured-controls
   blockers:
   - WI-0033
   - WI-0042
-  blocker_notes:
-  - Implementation merged through PRs #175 and #178; exact-head workflow #1131 passed. Focused browser verification is deferred to the consolidated M19 maintainer pass.
+  blocker_notes: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/175
@@ -489,18 +499,20 @@ work_items:
 - id: WI-0068
   title: Make Smart Collection people selection searchable and portrait-led
   milestone: M19
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0068-searchable-smart-collection-people.md
   started_at: 2026-08-18
+  completed_at: 2026-08-19
+  verified_at: 2026-08-19
+  verified_by: maintainer
   last_updated_at: 2026-08-19
   branch: agent/WI-0068-smart-collection-people-picker
   blockers:
   - WI-0050
   - WI-0066
   - WI-0067
-  blocker_notes:
-  - Implementation merged through PR #181; exact-head workflow #1135 passed. Focused browser verification is deferred to the consolidated M19 maintainer pass.
+  blocker_notes: []
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/181
