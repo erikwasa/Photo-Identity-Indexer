@@ -36,6 +36,14 @@ Allow the maintainer to restrict Face Review to faces whose current rank-one ide
 - [ ] Removing/clearing the filter restores normal queue semantics.
 - [ ] Repository/API/component/integration coverage includes empty results and stale/non-current suggestion cases.
 
+## Implementation evidence
+
+- PR #197 implements one parameterized `suggestedPersonId` predicate on the existing exact-model pending rank-one suggestion CTE; there is no schema or migration change and lower-ranked suggestions never participate in the predicate.
+- Face Review uses a searchable single-person picker over the complete `/api/review/people` response. People hidden from Smart Collections remain candidates and are labelled as such rather than filtered out.
+- The selected person is carried through gallery paging, generated Face Details URLs, previous/next suggestion-queue navigation and the Face Review return URL. Clearing suggestion-model context clears the person filter.
+- Workflow #1213 (`32311872263`) built the implementation successfully. Its focused shared-host test `SuggestedPersonReviewFilterApplicationTests.Suggested_person_filter_uses_only_current_rank_one_and_composes_with_review_scope` passed in integration shard 1 in 2.41s and covers rank-one-only behavior, lower-ranked and stale/unranked exclusion, confidence/review-state composition, hidden-person availability, empty results, invalid person ids and filtered previous/next navigation.
+- Acceptance checkboxes remain open until the focused browser/maintainer pass verifies the interactive picker and return-context behavior end to end.
+
 ## Source finding
 
 The 2026-08-19 maintainer review explicitly requested this filter after the existing suggestion-gallery/model/confidence workflow was verified. The semantic anchor is the current rank-one suggestion, not display name and not any historical/lower-ranked suggestion.
