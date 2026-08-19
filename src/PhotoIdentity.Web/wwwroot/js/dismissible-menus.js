@@ -1,7 +1,8 @@
 (() => {
     const menuSelector = '.advanced-menu, .collection-person-dropdown';
+    const openMenuSelector = '.advanced-menu[open], .collection-person-dropdown[open]';
 
-    const openMenus = () => document.querySelectorAll(`${menuSelector}[open]`);
+    const openMenus = () => document.querySelectorAll(openMenuSelector);
 
     const closeMenu = (menu, restoreFocus = false) => {
         if (!(menu instanceof HTMLDetailsElement) || !menu.open) {
