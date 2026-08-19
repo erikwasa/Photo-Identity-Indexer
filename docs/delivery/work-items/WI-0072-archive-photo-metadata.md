@@ -3,7 +3,7 @@ id: WI-0072
 title: Integrate archive photo metadata and enrich Photo Details
 milestone: M19
 status_source: ../status/work-items.yaml
-depends_on: [WI-0050, WI-0064, WI-0065]
+depends_on: [WI-0050]
 related_adrs: [ADR-0007]
 affected_modules: [PhotoIdentity.Core, PhotoIdentity.Source.Local, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Api, PhotoIdentity.Web]
 ---
