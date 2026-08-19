@@ -315,18 +315,11 @@ public sealed class SmartCollectionPlaceLocationTests
         }
     }
 
-    private sealed class SmartLocationApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class SmartLocationApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-
         public SmartLocationApiFactory(string databasePath)
+            : base(databasePath)
         {
-            _databasePath = databasePath;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
         }
     }
 }

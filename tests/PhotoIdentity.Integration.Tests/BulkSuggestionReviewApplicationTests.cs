@@ -313,18 +313,11 @@ public sealed class BulkSuggestionReviewApplicationTests
         long SecondAdaSuggestionId,
         long BobSuggestionId);
 
-    private sealed class ReviewApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class ReviewApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-
         public ReviewApiFactory(string databasePath)
+            : base(databasePath)
         {
-            _databasePath = databasePath;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
         }
     }
 }

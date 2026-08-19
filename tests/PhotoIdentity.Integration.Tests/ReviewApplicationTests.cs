@@ -463,34 +463,27 @@ public sealed class ReviewApplicationTests
         string CropPath,
         byte[] CropBytes);
 
-    private sealed class ReviewApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class ReviewApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-        private readonly string? _reviewProxyRoot;
-        private readonly string? _reviewProxyProfileId;
-
         public ReviewApiFactory(
             string databasePath,
             string? reviewProxyRoot = null,
             string? reviewProxyProfileId = null)
-        {
-            _databasePath = databasePath;
-            _reviewProxyRoot = reviewProxyRoot;
-            _reviewProxyProfileId = reviewProxyProfileId;
-        }
+            : base(
+                databasePath,
+                builder =>
+                {
+                    if (!string.IsNullOrWhiteSpace(reviewProxyRoot))
+                    {
+                        builder.UseSetting("PhotoIdentity:ReviewProxyRoot", reviewProxyRoot);
+                    }
 
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
+                    if (!string.IsNullOrWhiteSpace(reviewProxyProfileId))
+                    {
+                        builder.UseSetting("PhotoIdentity:ReviewProxyProfileId", reviewProxyProfileId);
+                    }
+                })
         {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
-            if (!string.IsNullOrWhiteSpace(_reviewProxyRoot))
-            {
-                builder.UseSetting("PhotoIdentity:ReviewProxyRoot", _reviewProxyRoot);
-            }
-
-            if (!string.IsNullOrWhiteSpace(_reviewProxyProfileId))
-            {
-                builder.UseSetting("PhotoIdentity:ReviewProxyProfileId", _reviewProxyProfileId);
-            }
         }
     }
 }

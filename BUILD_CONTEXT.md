@@ -6,21 +6,24 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0070 — Streamline pull-request validation and stabilize integration tests** has completed its gate-right-sizing implementation slices. PR #180 supplied a 3m37s representative fast-path run and PR #182 supplied a 4m15s run, both below the six-minute target. PR #184 workflow #1143 was functionally green but took about 10m23s because integration shard 2 had an extreme test-duration outlier: the same 143-test shard recorded 439.4s aggregate test duration versus 64.5s in #1139, and an unchanged auto-assignment test moved from 0.75s to 124.39s. Do not rebalance from this single outlier; WI-0070 retains measured follow-up for runner/test-duration variance and also remains open while WI-0071 completes the remaining shared generic API-host migrations.
+**WI-0070 — Streamline pull-request validation and stabilize integration tests** now has three independent successful sub-six-minute PR samples after Slice 3: PR #180 at about 3m37s, PR #182 at about 4m15s, and PR #186 workflow #1157 at about 3m04s overall. PR #184/#186 also demonstrated substantial hosted-runner timing variance, so timing baselines should not be rebalanced from a single pathological run. The remaining stability work is owned by WI-0071.
 
-**WI-0071 — Stabilize quarantined API integration tests** is the active implementation focus. Four transient-500 endpoint tests remain in `.github/flaky-integration-tests.txt`; they execute once per workflow in the visible non-blocking diagnostic lane with no retries.
+**WI-0071 — Stabilize quarantined API integration tests** is the active implementation focus. Four transient-500 endpoint tests remain in `.github/flaky-integration-tests.txt`; they execute once per workflow in the visible non-blocking diagnostic lane with no automatic retries.
 
-PR #182 merged the first host migration for `ReviewProgressFilterApplicationTests`. Workflow #1139 provided clean post-change diagnostic sample **1/3**. PR #184 migrates `PersonSmartCollectionVisibilityApplicationTests` to the same shared worker-disabled host. Workflow #1143 passed all four diagnostics once with no retry, advancing review-progress to **2/3** and person-visibility to **1/3**.
+PR #186 Slice 3 migrated `CollectionQueryApplicationTests` plus the generic API hosts surfaced by required-shard validation (`SmartCollectionPlaceLocationTests`, `PersonFeaturedFaceApplicationTests`, `BulkSuggestionReviewApplicationTests`, `ReviewApplicationTests`, `PhotoPlaceEnrichmentEndpointTests`, `CollectionOriginalAccessApplicationTests`, and `PhotoDetailsApplicationTests`) onto `PhotoIdentityApiTestFactory`. Custom proxy, GeoNames, Files-on-Demand, hydration-policy, and storage-probe test settings were preserved through the shared configuration callback. No assertions or quarantine membership were weakened.
+
+Workflow #1157 (`32204959714`) is the first fully green substantive head after that sweep: build/fast tests, all four diagnostics, docs, PublishedMinimum, mixed-media verification, and both exact-coverage integration shards passed; launcher/package were skipped. PR #186 counts as one representative clean diagnostic sample, advancing review-progress to **3/3**, person-visibility to **2/3**, and collection-query to **1/3**. Suggestion-gallery has not yet received its stabilization migration.
 
 M19 feature work remains separately in review/in progress and must be preserved when branches are synchronized with `main`.
 
 ## Next concrete step
 
-1. Merge PR #184 after its final-head validation remains green; do not count documentation-only reruns of the same PR as additional representative quarantine samples.
-2. Migrate one of the two remaining ad-hoc quarantined hosts (`CollectionQueryApplicationTests` or `ReviewSuggestionGalleryApplicationTests`) on the next normal PR.
-3. A successful next diagnostic lane should advance review-progress to **3/3**, person-visibility to **2/3**, and the newly migrated case to **1/3**.
-4. After review-progress has three clean post-change samples, remove only that quarantine entry in a subsequent change and prove it executes exactly once in required shard coverage.
-5. Continue collecting natural WI-0070 timing samples. Treat #1143 as measured blocker evidence rather than a new timing baseline; investigate or adjust shard timing only if the large variance recurs across representative runs.
+1. Merge PR #186 after its documentation-only final-head validation is green.
+2. Restore only `ReviewProgressFilterApplicationTests.Model_filter_requires_both_model_id_and_exact_hash` from `.github/flaky-integration-tests.txt` in a separate PR and prove it executes exactly once in required-shard coverage.
+3. Migrate `ReviewSuggestionGalleryApplicationTests` to the shared host so all four original quarantine classes have a stabilization change.
+4. Continue natural diagnostic samples: person-visibility needs 1 more, collection-query needs 2 more, and suggestion-gallery will need 3 after migration.
+5. Remove each quarantine entry only when its own three-run criterion is satisfied; never use automatic retries as a substitute.
+6. Keep WI-0070 timing variance as measured evidence; the three successful sub-six-minute samples are now satisfied.
 
 ## Relevant files
 

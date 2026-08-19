@@ -221,34 +221,29 @@ public sealed class CollectionOriginalAccessApplicationTests
         }
     }
 
-    private sealed class CollectionOriginalApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class CollectionOriginalApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-        private readonly FakeFilesOnDemandPlatform _platform;
-
         public CollectionOriginalApiFactory(
             string databasePath,
             FakeFilesOnDemandPlatform platform)
+            : base(
+                databasePath,
+                builder =>
+                {
+                    builder.ConfigureServices(services =>
+                    {
+                        services.RemoveAll<IOneDriveFilesOnDemandPlatform>();
+                        services.AddSingleton<IOneDriveFilesOnDemandPlatform>(platform);
+                        services.RemoveAll<ArchiveHydrationPolicyConfiguration>();
+                        services.AddSingleton(new ArchiveHydrationPolicyConfiguration(
+                            MinimumFreeSpaceReserveBytes: 0,
+                            MaximumManagedHydrationBytes: 1024L * 1024L * 1024L,
+                            MaximumConcurrentOperations: 2));
+                        services.RemoveAll<IArchiveStorageProbe>();
+                        services.AddSingleton<IArchiveStorageProbe>(new FixedStorageProbe(10L * 1024L * 1024L * 1024L));
+                    });
+                })
         {
-            _databasePath = databasePath;
-            _platform = platform;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
-            builder.ConfigureServices(services =>
-            {
-                services.RemoveAll<IOneDriveFilesOnDemandPlatform>();
-                services.AddSingleton<IOneDriveFilesOnDemandPlatform>(_platform);
-                services.RemoveAll<ArchiveHydrationPolicyConfiguration>();
-                services.AddSingleton(new ArchiveHydrationPolicyConfiguration(
-                    MinimumFreeSpaceReserveBytes: 0,
-                    MaximumManagedHydrationBytes: 1024L * 1024L * 1024L,
-                    MaximumConcurrentOperations: 2));
-                services.RemoveAll<IArchiveStorageProbe>();
-                services.AddSingleton<IArchiveStorageProbe>(new FixedStorageProbe(10L * 1024L * 1024L * 1024L));
-            });
         }
     }
 
