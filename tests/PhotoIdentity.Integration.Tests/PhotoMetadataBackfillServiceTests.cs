@@ -23,12 +23,7 @@ public sealed class PhotoMetadataBackfillServiceTests
             await CreateRevisionForFileAsync(repository, directory, "photo.jpg", [1, 2, 3, 4]);
             FakeFilesOnDemandPlatform platform = new(AssetAvailability.OnlineOnly);
             FakeMetadataReader reader = new();
-            PhotoMetadataBackfillService service = new(
-                repository,
-                new SqlitePhotoMetadataBackfillRepository(database),
-                platform,
-                reader,
-                TimeProvider.System);
+            PhotoMetadataBackfillService service = CreateService(database, repository, platform, reader);
 
             PhotoMetadataBackfillReport report = await service.ExecuteBatchAsync();
 
@@ -62,22 +57,36 @@ public sealed class PhotoMetadataBackfillServiceTests
                 new DateTime(2025, 5, 6, 7, 8, 9, DateTimeKind.Unspecified),
                 null,
                 59.3293,
-                18.0686));
-            PhotoMetadataBackfillService service = new(
-                repository,
-                new SqlitePhotoMetadataBackfillRepository(database),
-                platform,
-                reader,
-                TimeProvider.System);
+                18.0686,
+                cameraMake: "Example Camera Co.",
+                cameraModel: "Model X",
+                lensModel: "35mm Prime",
+                iso: "ISO 200",
+                gpsAltitude: "42 metres",
+                rawTags:
+                [
+                    new PhotoMetadataTag("Exif IFD0", "Make", "Example Camera Co."),
+                    new PhotoMetadataTag("GPS", "Altitude", "42 metres"),
+                ]));
+            PhotoMetadataBackfillService service = CreateService(database, repository, platform, reader);
 
             PhotoMetadataBackfillReport report = await service.ExecuteBatchAsync();
             PhotoCaptureMetadata? persisted = await repository.GetPhotoMetadataAsync(revisionId);
+            CatalogueExtendedPhotoMetadata? extended = await new SqliteExtendedPhotoMetadataRepository(database)
+                .GetAsync(revisionId);
 
             Assert.Equal(1, report.Persisted);
             Assert.NotNull(persisted);
             Assert.Equal(new DateTime(2025, 5, 6, 7, 8, 9, DateTimeKind.Unspecified), persisted.TakenAtLocal);
             Assert.Equal(59.3293, persisted.Latitude);
             Assert.Equal(18.0686, persisted.Longitude);
+            Assert.NotNull(extended);
+            Assert.Equal("Example Camera Co.", extended.CameraMake);
+            Assert.Equal("Model X", extended.CameraModel);
+            Assert.Equal("35mm Prime", extended.LensModel);
+            Assert.Equal("ISO 200", extended.Iso);
+            Assert.Equal("42 metres", extended.GpsAltitude);
+            Assert.Equal(2, extended.RawTags.Count);
             Assert.Equal(1, reader.ReadCount);
             Assert.Equal(0, platform.HydrationRequests);
         }
@@ -116,6 +125,23 @@ public sealed class PhotoMetadataBackfillServiceTests
         {
             DeleteTemporaryDirectory(directory);
         }
+    }
+
+    private static PhotoMetadataBackfillService CreateService(
+        SqliteCatalogueDatabase database,
+        SqliteAssetCatalogueRepository repository,
+        IOneDriveFilesOnDemandPlatform platform,
+        IPhotoMetadataReader reader)
+    {
+        PhotoMetadataInspectionService inspection = new(
+            repository,
+            new SqliteExtendedPhotoMetadataRepository(database),
+            reader,
+            TimeProvider.System);
+        return new PhotoMetadataBackfillService(
+            new SqlitePhotoMetadataBackfillRepository(database),
+            platform,
+            inspection);
     }
 
     private static async Task<AssetRevisionId> CreateRevisionForFileAsync(
