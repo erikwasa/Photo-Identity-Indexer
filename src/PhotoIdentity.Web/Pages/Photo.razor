@@ -223,9 +223,11 @@
     private CancellationTokenSource? PollCancellation { get; set; }
 
     private string BackDestination => PhotoReturnContext.NormalizeLocalReturnUrl(ReturnUrl) ?? "/collections";
-    private string BackLabel => PhotoReturnContext.IsSmartCollectionsReturn(BackDestination)
-        ? "Back to smart collections"
-        : "Back to collections";
+    private string BackLabel => PhotoReturnContext.IsArchiveReturn(BackDestination)
+        ? "Back to archive"
+        : PhotoReturnContext.IsSmartCollectionsReturn(BackDestination)
+            ? "Back to smart collections"
+            : "Back to collections";
     private string PreviewUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/viewer-preview";
     private string ProxyUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/viewer-proxy";
     private string OriginalUrl => $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/original";
