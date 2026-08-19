@@ -75,6 +75,24 @@ Optional launcher configuration belongs at:
 
 Copy the package's `PhotoIdentity.launcher.example.json` there when configuration is required. For packaged use, normally **do not set `publishPath`**. `PhotoIdentity.cmd` always runs the `app` directory beside the package launcher, while URL and whitelisted `PhotoIdentity__...` settings remain durable outside the package.
 
+### Automatic GeoNames timing
+
+The packaged launcher accepts these automatic-enrichment settings:
+
+```text
+PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled
+PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds
+PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds
+```
+
+Their startup semantics are:
+
+- `PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled`: `true` or `false`; default `true`. A GeoNames username must still be configured before the automatic worker can make provider requests.
+- `PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds`: milliseconds between normal automatic provider requests; default and minimum `30000` (30 seconds). The launcher rejects values below `30000` with a clear configuration error; it does not silently claim a faster value was applied while clamping it.
+- `PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds`: milliseconds between checks when no immediately eligible GPS work exists; default `5000`; supported range `1000` through `600000` (1 second through 10 minutes).
+
+These are process-startup settings. Edit `launcher.json`, restart Photo Identity, and inspect **Settings → GeoNames place enrichment** to confirm the effective timing. The `/api/place-enrichment/status` diagnostics also expose both effective automatic intervals. GeoNames quota, account and transport backoff remains authoritative and may delay a retry longer than the configured normal request interval.
+
 Do not place any of these inside the extracted package directory:
 
 - the canonical SQLite catalogue;
@@ -114,5 +132,7 @@ It uses disposable local application data and a dedicated loopback port. The ver
 - extracts the same package into a second install directory;
 - starts v2 against the same external configuration/catalogue; and
 - proves the external configuration and a preservation marker survive the replacement.
+
+Launcher verification additionally exercises the automatic GeoNames timing allow-list with non-default effective values and proves that a below-safe-floor request is rejected before the server starts. Because the launcher and packaged configuration example are deployment-surface inputs, changes to these settings also run the Windows package-verification lane in CI.
 
 M18 completion still requires a human Windows pass: extract/copy the package, double-click `PhotoIdentity.cmd`, inspect Review/Library/Settings on desktop and narrow layout, and perform one non-destructive side-by-side replacement using the maintained catalogue configuration.
