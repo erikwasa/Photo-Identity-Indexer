@@ -21,11 +21,18 @@
                     <dd>@TakenLabel(taken, Metadata.UtcOffsetMinutes)</dd>
                 </div>
             }
-            @if (!string.IsNullOrWhiteSpace(CameraLabel))
+            @if (!string.IsNullOrWhiteSpace(Metadata.CameraMake))
             {
                 <div>
-                    <dt>Camera</dt>
-                    <dd>@CameraLabel</dd>
+                    <dt>Camera make</dt>
+                    <dd>@Metadata.CameraMake</dd>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Metadata.CameraModel))
+            {
+                <div>
+                    <dt>Camera model</dt>
+                    <dd>@Metadata.CameraModel</dd>
                 </div>
             }
             @if (!string.IsNullOrWhiteSpace(Metadata.LensModel))
@@ -114,11 +121,6 @@
     [Parameter]
     public PhotoMetadataResponse? Metadata { get; set; }
 
-    private string CameraLabel => Metadata is null
-        ? string.Empty
-        : string.Join(" ", new[] { Metadata.CameraMake, Metadata.CameraModel }
-            .Where(value => !string.IsNullOrWhiteSpace(value)));
-
     private string FocalLengthLabel => Metadata is null
         ? string.Empty
         : string.IsNullOrWhiteSpace(Metadata.FocalLength35Mm)
@@ -127,7 +129,8 @@
 
     private bool HasKeyMetadata => Metadata is not null &&
         (Metadata.TakenAtLocal is not null ||
-         !string.IsNullOrWhiteSpace(CameraLabel) ||
+         !string.IsNullOrWhiteSpace(Metadata.CameraMake) ||
+         !string.IsNullOrWhiteSpace(Metadata.CameraModel) ||
          !string.IsNullOrWhiteSpace(Metadata.LensModel) ||
          !string.IsNullOrWhiteSpace(Metadata.ExposureTime) ||
          !string.IsNullOrWhiteSpace(Metadata.Aperture) ||
