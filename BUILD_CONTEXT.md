@@ -6,28 +6,25 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0070 — Streamline pull-request validation and stabilize integration tests** has three independent successful sub-six-minute PR samples after Slice 3: PR #180 at about 3m37s, PR #182 at about 4m15s, and PR #186 workflow #1157 at about 3m04s overall. Later WI-0071 runs continue to show material runner/setup/test-duration variance, so timing baselines must not be rebalanced from a single slow run. The remaining stability work is owned by WI-0071.
+**WI-0070 — Streamline pull-request validation and stabilize integration tests** has three independent successful sub-six-minute PR samples after Slice 3: PR #180 at about 3m37s, PR #182 at about 4m15s, and PR #186 workflow #1157 at about 3m04s overall. Later WI-0071 runs continue to show material hosted-runner/setup/test-duration variance, so timing baselines must not be rebalanced from a single slow run. The remaining integration-stability work is owned by WI-0071.
 
-**WI-0071 — Stabilize quarantined API integration tests** is the active implementation focus. PR #187 merged as `8708508565a6b7633a96912de546727fcd2b8c5a` and restored `ReviewProgressFilterApplicationTests.Model_filter_requires_both_model_id_and_exact_hash` to required blocking coverage. Workflow #1161 proved exactly three tests remained in diagnostics and the required shards covered 299 tests exactly once (156 + 143), one more than before restoration.
+**WI-0071 — Stabilize quarantined API integration tests** is the active implementation focus. PR #188 merged the structural generic-host isolation change. PR #190 then restored `PersonSmartCollectionVisibilityApplicationTests.Merge_preserves_the_surviving_person_visibility_and_discards_the_retired_source_preference` to blocking required coverage and merged as `aa9b63300b7e11d5dfdffa18e305d4fed07a4944`.
 
-PR #188 migrates `ReviewSuggestionGalleryApplicationTests`, the last original quarantine class without its own shared-host stabilization change, to `PhotoIdentityApiTestFactory`. Required-shard validation exposed additional standalone generic API hosts: #1164 failed `CollectionManifestApplicationTests` with HTTP 500, #1165 failed `DetectorEvaluationApplicationTests` with HTTP 500 after the manifest fix, #1167 failed `SmartCollectionLocationUpdateCompatibilityTests` with a disposed `TestServer`, and #1169 failed `PersonAuditApplicationTests.Audit_rejects_invalid_scope_and_missing_people` with an unexpected HTTP 500. None of those failed heads was rerun unchanged or counted as a representative quarantine sample.
+Workflow #1177 (`32290736530`) is the representative PR #190 restoration run: the diagnostic lane ran exactly the two remaining quarantined tests once with no retries; shard 1 passed **156/156** and shard 2 passed **144/144**, with planned=results=unique and `quarantined-results=0` in both shards. Required coverage therefore increased from 299 to **300**, proving the restored person-visibility case returned exactly once. Build/fast tests, living/generated documentation, PR `PublishedMinimum` smoke, and mixed-media verification also passed; launcher/package verification were correctly skipped.
 
-`CollectionManifestApplicationTests`, `DetectorEvaluationApplicationTests`, and `SmartCollectionLocationUpdateCompatibilityTests` were migrated directly to `PhotoIdentityApiTestFactory`, preserving their custom settings through the shared callback. After #1169 showed another untouched generic factory failing, the remaining direct-factory surface was inventoried instead of continuing one class at a time. `PhotoIdentityApiTestFactory.cs` now provides a namespace-level compatibility `WebApplicationFactory<TEntryPoint>` that disables the three unrelated production workers at `CreateHost`, after legacy factories have registered their custom settings/test doubles. Existing unqualified legacy factories therefore inherit worker isolation automatically. `IdentityMatchRegenerationApplicationTests` is the intentional exception and explicitly overrides `DisableBackgroundWorkers => false` because it verifies production background regeneration behavior.
+The same representative #1177 diagnostic run advances suggestion-gallery to **2/3** post-change samples (`#1166`, `#1177`). Collection-query had already reached **3/3** (`#1157`, `#1161`, `#1166`) and is restoration-eligible.
 
-Workflow #1166 (`32279373428`) remains the single representative clean diagnostic sample for PR #188 quarantine accounting. Workflow #1171 (`32282505397`) is fully green on the structural host-default head: build/fast tests, all three quarantined diagnostics, living/generated documentation, PR `PublishedMinimum` smoke, mixed-media verification, and both exact-coverage integration shards passed; launcher/package were skipped. #1171 validates the broader host-default fix but does not count as another independent PR sample.
+The current branch removes only `CollectionQueryApplicationTests.Confirmed_collection_queries_support_explicit_any_and_all_semantics_without_paths` from quarantine. Suggestion-gallery remains quarantined. A clean representative run should leave exactly one diagnostic test, increase required coverage from 300 to **301**, prove collection-query executes exactly once in the blocking shards, and advance suggestion-gallery to **3/3**.
 
-Collection-query has reached **3/3** (`#1157`, `#1161`, `#1166`) and is restoration-eligible. Person-visibility remains restoration-eligible after reaching **3/3** on #1161. Suggestion-gallery has post-change sample **1/3** from #1166.
-
-M19 feature work remains separately in review/in progress and must be preserved when branches are synchronized with `main`.
+M19 feature work remains separate and must be preserved when branches are synchronized with `main`.
 
 ## Next concrete step
 
-1. Merge PR #188 after final-head documentation/handoff validation remains green.
-2. Restore `PersonSmartCollectionVisibilityApplicationTests.Merge_preserves_the_surviving_person_visibility_and_discards_the_retired_source_preference` in its own PR and prove exact once-only required-shard execution; a clean representative run will also advance suggestion-gallery to **2/3**.
-3. Restore `CollectionQueryApplicationTests.Confirmed_collection_queries_support_explicit_any_and_all_semantics_without_paths` in a separate subsequent PR; a clean run should advance suggestion-gallery to **3/3**.
-4. Once suggestion-gallery has three clean post-change representative samples, restore it in its own final quarantine-removal PR and prove exact required coverage.
-5. Keep quarantine removal one entry at a time, with no automatic retries or assertion weakening.
-6. Reconcile the stale formal WI-0070/WI-0071 registry lifecycle when WI-0071 closes; do not mix registry-only churn into an attributable restoration change.
+1. Validate the collection-query restoration branch with exact required-shard coverage and one remaining once-only diagnostic test.
+2. If clean, merge the collection-query restoration and record its representative workflow evidence without adding retries, assertion weakening, or quarantine widening.
+3. With suggestion-gallery at **3/3**, restore `ReviewSuggestionGalleryApplicationTests.Gallery_requires_exact_model_revision_and_rejects_unknown_sort_or_confidence_group` in its own final quarantine-removal PR and prove exact required coverage.
+4. After the quarantine is empty, reconcile the formal WI-0070/WI-0071 registry lifecycle and final documentation as a closeout change.
+5. Do not rebalance `.github/test-timing-baseline.json` from a single hosted-runner outlier.
 
 ## Relevant files
 
@@ -44,13 +41,9 @@ M19 feature work remains separately in review/in progress and must be preserved 
 - `.github/test-timing-baseline.json`
 - `tests/PhotoIdentity.Integration.Tests/PhotoIdentityApiTestFactory.cs`
 - `tests/PhotoIdentity.Integration.Tests/IdentityMatchRegenerationApplicationTests.cs`
-- `tests/PhotoIdentity.Integration.Tests/ReviewProgressFilterApplicationTests.cs`
 - `tests/PhotoIdentity.Integration.Tests/PersonSmartCollectionVisibilityApplicationTests.cs`
 - `tests/PhotoIdentity.Integration.Tests/CollectionQueryApplicationTests.cs`
 - `tests/PhotoIdentity.Integration.Tests/ReviewSuggestionGalleryApplicationTests.cs`
-- `tests/PhotoIdentity.Integration.Tests/CollectionManifestApplicationTests.cs`
-- `tests/PhotoIdentity.Integration.Tests/DetectorEvaluationApplicationTests.cs`
-- `tests/PhotoIdentity.Integration.Tests/SmartCollectionLocationUpdateCompatibilityTests.cs`
 
 ## Repository validation
 

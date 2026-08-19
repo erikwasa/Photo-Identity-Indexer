@@ -5,5 +5,4 @@
 # root cause/shared-host migration is complete and it passes three consecutive diagnostic runs
 # without a transient HTTP 500.
 
-PhotoIdentity_Integration_Tests.CollectionQueryApplicationTests.Confirmed_collection_queries_support_explicit_any_and_all_semantics_without_paths
 PhotoIdentity_Integration_Tests.ReviewSuggestionGalleryApplicationTests.Gallery_requires_exact_model_revision_and_rejects_unknown_sort_or_confidence_group
