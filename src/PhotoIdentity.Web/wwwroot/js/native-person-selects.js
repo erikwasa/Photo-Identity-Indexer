@@ -32,6 +32,11 @@
 
     const observer = new MutationObserver(records => {
         for (const record of records) {
+            if (record.type === 'characterData' && record.target.parentElement instanceof HTMLOptionElement) {
+                normalizeOption(record.target.parentElement);
+                continue;
+            }
+
             for (const node of record.addedNodes) {
                 if (node instanceof Element) {
                     normalizeWithin(node);
@@ -42,6 +47,7 @@
 
     observer.observe(document.body, {
         childList: true,
+        characterData: true,
         subtree: true,
     });
 })();
