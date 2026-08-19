@@ -1,0 +1,103 @@
+.photo-capture-metadata {
+    display: grid;
+    gap: 0.75rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.photo-capture-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.photo-capture-heading h3 {
+    margin: 0;
+}
+
+.photo-metadata-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: 0.7rem;
+    margin: 0;
+}
+
+.photo-metadata-grid > div {
+    min-width: 0;
+    padding: 0.7rem 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.55);
+}
+
+.photo-metadata-grid dt {
+    margin-bottom: 0.2rem;
+    color: var(--muted);
+    font-size: 0.76rem;
+    font-weight: 750;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+}
+
+.photo-metadata-grid dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.photo-metadata-wide {
+    grid-column: 1 / -1;
+}
+
+.photo-metadata-empty {
+    margin: 0;
+    color: var(--muted);
+}
+
+.photo-all-metadata {
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    background: rgba(255, 255, 255, 0.42);
+}
+
+.photo-all-metadata summary {
+    cursor: pointer;
+    padding: 0.75rem 0.85rem;
+    font-weight: 700;
+}
+
+.photo-all-metadata summary span {
+    margin-left: 0.35rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.photo-all-metadata-table-wrap {
+    max-height: 24rem;
+    overflow: auto;
+    border-top: 1px solid var(--line);
+}
+
+.photo-all-metadata-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+}
+
+.photo-all-metadata-table th,
+.photo-all-metadata-table td {
+    padding: 0.55rem 0.65rem;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+
+.photo-all-metadata-table th {
+    position: sticky;
+    top: 0;
+    background: var(--surface-strong, #fff);
+}

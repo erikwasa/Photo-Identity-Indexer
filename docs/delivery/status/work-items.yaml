@@ -576,3 +576,17 @@ work_items:
   blocker_notes:
   - Temporarily quarantined tests remain visible in the non-blocking diagnostic lane and require a root-cause/shared-host stabilization change plus three consecutive clean diagnostic CI runs before returning to the required shards.
   evidence: []
+- id: WI-0072
+  title: Integrate archive photo metadata and enrich Photo Details
+  milestone: M19
+  status: in_progress
+  owner: ai-agent
+  document: ../work-items/WI-0072-archive-photo-metadata.md
+  started_at: 2026-08-19
+  last_updated_at: 2026-08-19
+  branch: agent/WI-0072-archive-photo-metadata
+  blockers:
+  - WI-0050
+  blocker_notes:
+  - Implements the metadata-ingestion gap found in the 2026-08-19 M19 maintainer pass and unblocks final WI-0064/WI-0065 verification.
+  evidence: []

@@ -85,6 +85,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteSmartCollectionRepository>();
         builder.Services.AddSingleton<SqliteAssetCatalogueRepository>();
         builder.Services.AddSingleton<SqlitePhotoMetadataBackfillRepository>();
+        builder.Services.AddSingleton<SqliteExtendedPhotoMetadataRepository>();
         builder.Services.AddSingleton<SqlitePhotoTagRepository>();
         builder.Services.AddSingleton<SqlitePhotoPlaceRepository>();
         builder.Services.AddSingleton<SqlitePhotoPlaceEnrichmentRepository>();
@@ -114,6 +115,7 @@ public partial class Program
         builder.Services.AddSingleton<ArchiveBoundedAnalysisService>();
         builder.Services.AddSingleton<IOneDriveFilesOnDemandPlatform, WindowsOneDriveFilesOnDemandPlatform>();
         builder.Services.AddSingleton<IPhotoMetadataReader, MetadataExtractorPhotoMetadataReader>();
+        builder.Services.AddSingleton<PhotoMetadataInspectionService>();
         builder.Services.AddSingleton<PhotoMetadataBackfillService>();
         builder.Services.AddSingleton<IArchiveStorageProbe, DriveArchiveStorageProbe>();
         builder.Services.AddSingleton<OpenCvThumbnailRenderer>();
@@ -138,6 +140,7 @@ public partial class Program
         WebApplication app = builder.Build();
         SqliteCatalogueDatabase catalogueDatabase = app.Services.GetRequiredService<SqliteCatalogueDatabase>();
         await catalogueDatabase.InitializeAsync();
+        await SqliteExtendedPhotoMetadataSchema.EnsureAsync(catalogueDatabase);
         await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(catalogueDatabase);
         await SqlitePhotoPlaceEnrichmentSchema.EnsureAsync(catalogueDatabase);
 

@@ -1,5 +1,10 @@
 @inject HttpClient Http
 
+@if (Details is not null)
+{
+    <PhotoMetadataPanel Metadata="Details.Metadata" />
+}
+
 <div class="photo-people-section">
     <h3>People</h3>
 

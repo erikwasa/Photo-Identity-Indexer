@@ -1,0 +1,161 @@
+@using System.Globalization
+@using PhotoIdentity.Web.Contracts
+
+<section class="photo-capture-metadata" aria-labelledby="photo-capture-metadata-heading">
+    <div class="photo-capture-heading">
+        <h3 id="photo-capture-metadata-heading">Capture metadata</h3>
+        <span class="state-badge">@(Metadata is null ? "Not inspected" : "Inspected")</span>
+    </div>
+
+    @if (Metadata is null)
+    {
+        <p class="photo-metadata-empty">Capture metadata has not been inspected for this revision yet.</p>
+    }
+    else
+    {
+        <dl class="photo-metadata-grid">
+            @if (Metadata.TakenAtLocal is DateTime taken)
+            {
+                <div>
+                    <dt>Photo taken</dt>
+                    <dd>@TakenLabel(taken, Metadata.UtcOffsetMinutes)</dd>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Metadata.CameraMake))
+            {
+                <div>
+                    <dt>Camera make</dt>
+                    <dd>@Metadata.CameraMake</dd>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Metadata.CameraModel))
+            {
+                <div>
+                    <dt>Camera model</dt>
+                    <dd>@Metadata.CameraModel</dd>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Metadata.LensModel))
+            {
+                <div>
+                    <dt>Lens</dt>
+                    <dd>@Metadata.LensModel</dd>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Metadata.ExposureTime))
+            {
+                <div><dt>Exposure</dt><dd>@Metadata.ExposureTime</dd></div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Metadata.Aperture))
+            {
+                <div><dt>Aperture</dt><dd>@Metadata.Aperture</dd></div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Metadata.Iso))
+            {
+                <div><dt>ISO</dt><dd>@Metadata.Iso</dd></div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Metadata.FocalLength))
+            {
+                <div>
+                    <dt>Focal length</dt>
+                    <dd>@FocalLengthLabel</dd>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Metadata.Orientation))
+            {
+                <div><dt>Orientation</dt><dd>@Metadata.Orientation</dd></div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Metadata.Flash))
+            {
+                <div><dt>Flash</dt><dd>@Metadata.Flash</dd></div>
+            }
+            @if (Metadata.Latitude is double latitude && Metadata.Longitude is double longitude)
+            {
+                <div class="photo-metadata-wide">
+                    <dt>GPS coordinates</dt>
+                    <dd><code>@Coordinate(latitude), @Coordinate(longitude)</code></dd>
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(Metadata.GpsAltitude))
+            {
+                <div><dt>GPS altitude</dt><dd>@Metadata.GpsAltitude</dd></div>
+            }
+        </dl>
+
+        @if (!HasKeyMetadata)
+        {
+            <p class="photo-metadata-empty">The revision was inspected, but no supported key capture fields were found.</p>
+        }
+
+        @if (Metadata.Tags.Count > 0)
+        {
+            <details class="photo-all-metadata">
+                <summary>All metadata <span>@Metadata.Tags.Count tag@(Metadata.Tags.Count == 1 ? "" : "s")</span></summary>
+                <div class="photo-all-metadata-table-wrap">
+                    <table class="photo-all-metadata-table">
+                        <thead>
+                            <tr>
+                                <th>Directory</th>
+                                <th>Tag</th>
+                                <th>Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (PhotoMetadataTagResponse tag in Metadata.Tags)
+                            {
+                                <tr>
+                                    <td>@tag.Directory</td>
+                                    <td>@tag.Name</td>
+                                    <td>@tag.Value</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+        }
+    }
+</section>
+
+@code {
+    [Parameter]
+    public PhotoMetadataResponse? Metadata { get; set; }
+
+    private string FocalLengthLabel => Metadata is null
+        ? string.Empty
+        : string.IsNullOrWhiteSpace(Metadata.FocalLength35Mm)
+            ? Metadata.FocalLength ?? string.Empty
+            : $"{Metadata.FocalLength} · 35 mm equivalent {Metadata.FocalLength35Mm}";
+
+    private bool HasKeyMetadata => Metadata is not null &&
+        (Metadata.TakenAtLocal is not null ||
+         !string.IsNullOrWhiteSpace(Metadata.CameraMake) ||
+         !string.IsNullOrWhiteSpace(Metadata.CameraModel) ||
+         !string.IsNullOrWhiteSpace(Metadata.LensModel) ||
+         !string.IsNullOrWhiteSpace(Metadata.ExposureTime) ||
+         !string.IsNullOrWhiteSpace(Metadata.Aperture) ||
+         !string.IsNullOrWhiteSpace(Metadata.Iso) ||
+         !string.IsNullOrWhiteSpace(Metadata.FocalLength) ||
+         !string.IsNullOrWhiteSpace(Metadata.Orientation) ||
+         !string.IsNullOrWhiteSpace(Metadata.Flash) ||
+         Metadata.Latitude is not null ||
+         !string.IsNullOrWhiteSpace(Metadata.GpsAltitude));
+
+    private static string TakenLabel(DateTime value, int? offsetMinutes)
+    {
+        string timestamp = DateTime.SpecifyKind(value, DateTimeKind.Unspecified)
+            .ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        if (offsetMinutes is not int minutes)
+        {
+            return timestamp;
+        }
+
+        TimeSpan offset = TimeSpan.FromMinutes(minutes);
+        string sign = offset < TimeSpan.Zero ? "−" : "+";
+        offset = offset.Duration();
+        return $"{timestamp} UTC{sign}{offset:hh\\:mm}";
+    }
+
+    private static string Coordinate(double value) =>
+        value.ToString("0.######", CultureInfo.InvariantCulture);
+}
