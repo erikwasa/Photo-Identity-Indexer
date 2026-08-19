@@ -15,9 +15,11 @@ Eliminate the remaining transient HTTP 500 failures in generic API integration t
 
 ## Context
 
-WI-0070 established a shared generic API test host that removes unrelated production background workers. The first migrated hosted-client tests stopped reproducing their previous transient 500 failures, but several older endpoint tests still use ad-hoc `WebApplicationFactory` implementations and have independently returned HTTP 500 in otherwise unrelated CI runs.
+WI-0070 established a shared generic API test host that removes unrelated production background workers. The first migrated hosted-client tests stopped reproducing their previous transient 500 failures, but several older endpoint tests still used ad-hoc `WebApplicationFactory` implementations and independently returned HTTP 500 or disposed-`TestServer` failures in otherwise unrelated CI runs.
 
-The temporary quarantine is recorded in `.github/flaky-integration-tests.txt`. These tests still execute exactly once in a visible diagnostic lane on every PR/main workflow. Their failures are temporarily non-blocking only so unrelated development is not repeatedly blocked while the host instability is diagnosed. There are no automatic retries.
+PR #188 extends the shared-host rule to legacy factories at the integration-test namespace boundary: unqualified `WebApplicationFactory<TEntryPoint>` usages now inherit the same background-worker isolation by default even when a class has not yet been rewritten around `PhotoIdentityApiTestFactory`. Worker-specific coverage must explicitly opt back in.
+
+The temporary quarantine is recorded in `.github/flaky-integration-tests.txt`. Quarantined tests still execute exactly once in a visible diagnostic lane on every PR/main workflow. Their failures are temporarily non-blocking only so unrelated development is not repeatedly blocked while the host instability is diagnosed. There are no automatic retries.
 
 ## Initial quarantined cases
 
@@ -26,11 +28,11 @@ The temporary quarantine is recorded in `.github/flaky-integration-tests.txt`. T
 - `PersonSmartCollectionVisibilityApplicationTests.Merge_preserves_the_surviving_person_visibility_and_discards_the_retired_source_preference`
 - `ReviewSuggestionGalleryApplicationTests.Gallery_requires_exact_model_revision_and_rejects_unknown_sort_or_confidence_group`
 
-The list in `.github/flaky-integration-tests.txt` is canonical for current quarantine membership; this work-item list is the initial evidence set.
+The list in `.github/flaky-integration-tests.txt` is canonical for current quarantine membership; this work-item list is the initial evidence set. The review-progress case has since completed its exit criterion and returned to required blocking coverage.
 
 ## Approach
 
-1. Migrate generic endpoint tests from ad-hoc application factories to `PhotoIdentityApiTestFactory` where they do not intentionally test production hosted workers.
+1. Migrate generic endpoint tests from ad-hoc application factories to `PhotoIdentityApiTestFactory` where practical, and ensure legacy generic factories inherit the same worker-disabled host behavior by default.
 2. Preserve or improve bounded server-response diagnostics so a remaining 500 exposes useful failure context.
 3. Check for shared/static filesystem, SQLite, environment-variable, hosted-service, configuration or application-lifetime state that can leak across sequential factories.
 4. Keep worker-specific coverage explicit rather than accidentally exercising background loops in every endpoint test.
@@ -50,19 +52,19 @@ If a test passes three times without any stabilization change but its original r
 
 ## Acceptance criteria
 
-- [ ] Every current quarantine entry has a documented stabilization change or root cause.
-- [ ] Generic endpoint tests in scope use the shared background-worker-disabled host unless they explicitly require production hosted workers.
+- [x] Every current quarantine entry has a documented stabilization change or root cause.
+- [x] Generic endpoint tests in scope use the shared background-worker-disabled host unless they explicitly require production hosted workers.
 - [ ] Each quarantine entry has three consecutive clean diagnostic CI runs after its stabilization change.
 - [ ] `.github/flaky-integration-tests.txt` is empty or removed because all tracked tests are back in the required shards.
 - [x] No unconditional retry mechanism is introduced.
 - [ ] Required shard coverage proves each restored test executes exactly once.
-- [ ] `PhotoIdentity.Docs validate` and `generate --check` pass.
+- [x] `PhotoIdentity.Docs validate` and `generate --check` pass.
 
 ## Implementation notes
 
 ### Slice 1 — migrate the review-progress quarantine case
 
-Repository inspection confirmed that all four initially quarantined classes still use bare per-class `WebApplicationFactory` implementations that only set `PhotoIdentity:DatabasePath`; none of those local factories disables the production place-enrichment, archive-advancement or identity-regeneration hosted workers.
+Repository inspection confirmed that all four initially quarantined classes still used bare per-class `WebApplicationFactory` implementations that only set `PhotoIdentity:DatabasePath`; none of those local factories disabled the production place-enrichment, archive-advancement or identity-regeneration hosted workers.
 
 The first stabilization slice intentionally changes only `ReviewProgressFilterApplicationTests` so the outcome remains attributable:
 
@@ -72,7 +74,7 @@ The first stabilization slice intentionally changes only `ReviewProgressFilterAp
 - keep `ReviewProgressFilterApplicationTests.Model_filter_requires_both_model_id_and_exact_hash` in `.github/flaky-integration-tests.txt` after this change; one green PR is not enough to restore blocking status;
 - count only representative CI diagnostic runs after this stabilization change toward the three-run exit criterion.
 
-PR #182 merged this slice as `05ecbf396b463c20732f1d18e02ec6336c81bccb`. Workflow #1139 (`32192474363`) was green: all four quarantined diagnostics executed exactly once and passed with no retries, so the review-progress case has clean post-change sample **1/3**. Both required integration shards also passed exact coverage, and the test/docs-only PR retained the WI-0070 fast path with launcher/package skipped.
+PR #182 merged this slice as `05ecbf396b463c20732f1d18e02ec6336c81bccb`. Workflow #1139 (`32192474363`) was green: all four quarantined diagnostics executed exactly once and passed with no retries, so the review-progress case had clean post-change sample **1/3**. Both required integration shards also passed exact coverage, and the test/docs-only PR retained the WI-0070 fast path with launcher/package skipped.
 
 ### Slice 2 — migrate the person-visibility quarantine case
 
@@ -84,7 +86,7 @@ The second stabilization slice moves only `PersonSmartCollectionVisibilityApplic
 - keep `PersonSmartCollectionVisibilityApplicationTests.Merge_preserves_the_surviving_person_visibility_and_discards_the_retired_source_preference` quarantined while its own three-run evidence window begins;
 - retain the review-progress quarantine entry until it reaches its own three consecutive post-change samples.
 
-Workflow #1143 (`32193192370`) validated this slice on PR #184: both required integration shards passed exact once-only coverage, all four quarantined diagnostics ran exactly once and passed with no retry, living/generated documentation passed, the PR `PublishedMinimum` smoke and mixed-media checks passed, and launcher/package verification was correctly skipped. This advances the review-progress case to **2/3** clean post-change samples and starts the person-visibility case at **1/3**.
+Workflow #1143 (`32193192370`) validated this slice on PR #184: both required integration shards passed exact once-only coverage, all four quarantined diagnostics ran exactly once and passed with no retry, living/generated documentation passed, the PR `PublishedMinimum` smoke and mixed-media checks passed, and launcher/package verification was correctly skipped. This advanced the review-progress case to **2/3** clean post-change samples and started the person-visibility case at **1/3**.
 
 The same workflow exposed a separate CI timing outlier that does not implicate this host migration. Shard 2 passed all 143 assigned tests but took 7m19s of test execution and recorded 439.4s aggregate test duration, compared with 64.5s for the same 143-test shard in workflow #1139. The unchanged `IdentityAutoAssignmentManualSupersessionTests.Manual_reassignment_supersedes_automatic_assignment_for_later_matching` case alone moved from 0.75s in #1139 to 124.39s in #1143. Multiple other unchanged classes were also materially slower. Do not rebalance the timing baseline from this single outlier; WI-0070 should retain measured follow-up for runner/test-duration variance and use additional natural runs or a robust multi-run baseline before changing shard weights.
 
@@ -112,14 +114,45 @@ Workflow #1157 (`32204959714`) is the first fully green substantive Slice 3 head
 
 For quarantine accounting, PR #186 counts as **one** representative clean post-change sample regardless of its earlier diagnostic/validation heads. After #1157:
 
-- review-progress is **3/3** (`#1139`, `#1143`, `#1157`) and is eligible for a separate quarantine-restoration change that proves exact required-shard execution;
-- person-visibility is **2/3** (`#1143`, `#1157`);
-- collection-query is **1/3** (`#1157`);
-- suggestion-gallery has not yet received its own stabilization migration, so its post-change counter has not started.
+- review-progress was **3/3** (`#1139`, `#1143`, `#1157`) and eligible for a separate quarantine-restoration change;
+- person-visibility was **2/3** (`#1143`, `#1157`);
+- collection-query was **1/3** (`#1157`);
+- suggestion-gallery had not yet received its own stabilization migration.
 
-The successful #1157 workflow also supplies WI-0070's third independent sub-six-minute PR sample: it ran from 01:26:58 to 01:30:02 UTC, about **3m04s** overall. Together with PR #180 (~3m37s) and PR #182 (~4m15s), the required PR gate now has three independent successful samples below six minutes. Earlier long/red PR #186 heads remain useful variance and host-instability evidence but are not substituted for successful timing samples.
+The successful #1157 workflow also supplies WI-0070's third independent sub-six-minute PR sample: it ran from 01:26:58 to 01:30:02 UTC, about **3m04s** overall. Together with PR #180 (~3m37s) and PR #182 (~4m15s), the required PR gate has three independent successful samples below six minutes. Earlier long/red PR #186 heads remain useful variance and host-instability evidence but are not substituted for successful timing samples.
 
-Next, restore only the review-progress quarantine entry and prove exact once-only required-shard coverage. Then migrate `ReviewSuggestionGalleryApplicationTests`, the last original quarantine class without a shared-host stabilization change, and continue accumulating person-visibility/collection-query/suggestion-gallery evidence on normal subsequent PRs.
+### Slice 4 — restore review-progress and make generic host isolation the default
+
+PR #187 removed only `ReviewProgressFilterApplicationTests.Model_filter_requires_both_model_id_and_exact_hash` from `.github/flaky-integration-tests.txt` after its three clean post-change samples. Workflow #1161 (`32274508367`) proved the restoration contract:
+
+- the diagnostic lane ran exactly the remaining **3** quarantined tests once and passed with no retries;
+- shard 1 passed **156/156** required tests with planned=results=unique=156 and `quarantined-results=0`;
+- shard 2 passed **143/143** required tests with planned=results=unique=143 and `quarantined-results=0`;
+- the required total increased from 298 to **299**, proving the restored review-progress test returned to blocking execution exactly once.
+
+PR #187 merged as `8708508565a6b7633a96912de546727fcd2b8c5a`. The same representative run advanced person-visibility to **3/3** and collection-query to **2/3**.
+
+PR #188 then migrated `ReviewSuggestionGalleryApplicationTests`, the final original quarantine class without its own stabilization change, to `PhotoIdentityApiTestFactory` while keeping the quarantine entry and all behavior assertions unchanged. Validation continued to expose the same standalone-host failure class in unrelated required tests:
+
+- #1164 (`32277873839`) failed `CollectionManifestApplicationTests.Manifest_pages_internally_and_returns_complete_path_free_consumer_document` with HTTP 500 on shard 2; the class was migrated to the shared host with bounded diagnostics;
+- #1165 (`32278292398`) passed the manifest path but failed `DetectorEvaluationApplicationTests.Detector_evaluation_sessions_persist_resume_and_export_private_ground_truth` with HTTP 500 on shard 1; its session-root configuration was preserved through the shared host callback;
+- #1166 (`32279373428`) was the first fully green substantive PR #188 head and is the **single representative clean diagnostic sample** for this PR;
+- #1167 (`32280183430`) later failed `SmartCollectionLocationUpdateCompatibilityTests.Update_without_place_preserves_existing_named_place_and_empty_place_clears_it` with a disposed `TestServer`; that database-path-only class was migrated to the shared host and #1168 (`32280599319`) was fully green;
+- #1169 (`32281348228`) then failed `PersonAuditApplicationTests.Audit_rejects_invalid_scope_and_missing_people` with an unexpected HTTP 500 even though the code difference from the prior green head was documentation-only. Exact shard coverage still passed, confirming another generic host-lifecycle failure rather than a sharding defect.
+
+After #1169, the remaining direct-factory surface was inventoried rather than continuing one class at a time. The integration-test namespace now defines a compatibility `WebApplicationFactory<TEntryPoint>` in `PhotoIdentityApiTestFactory.cs`. It derives from the ASP.NET Core testing factory and removes `PhotoPlaceEnrichmentHostedService`, `ArchiveAdvancementHostedService`, and `IdentityMatchRegenerationHostedService` during `CreateHost`. Because this happens after legacy subclasses register their custom host settings/test doubles, existing unqualified generic factories inherit the safe worker-disabled default without repetitive rewrites.
+
+`PhotoIdentityApiTestFactory` now derives from that same compatibility foundation. `IdentityMatchRegenerationApplicationTests` is the intentional worker-specific exception and explicitly overrides `DisableBackgroundWorkers => false`, making its production background-worker dependency visible rather than accidental.
+
+Workflow #1171 (`32282505397`) is fully green on that structural default: build/fast tests, all three quarantined diagnostics, living/generated documentation, PR `PublishedMinimum` smoke, mixed-media verification, and both exact-coverage integration shards passed; launcher/package remained skipped. #1171 validates the broader host architecture but does not count as a second independent PR #188 quarantine sample.
+
+After the representative #1166 sample:
+
+- person-visibility remains **3/3** and is restoration-eligible;
+- collection-query is **3/3** (`#1157`, `#1161`, `#1166`) and is restoration-eligible;
+- suggestion-gallery is **1/3** (`#1166`).
+
+Next, restore person-visibility and collection-query in separate PRs so each removal proves exact once-only required coverage. Those two natural representative runs should also advance suggestion-gallery to **2/3** and then **3/3**. Suggestion-gallery can then be restored in its own final quarantine-removal change.
 
 ## Non-goals
 
