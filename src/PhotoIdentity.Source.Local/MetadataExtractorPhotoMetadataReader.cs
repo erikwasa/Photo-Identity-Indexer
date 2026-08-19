@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using MetadataExtractor;
 using MetadataExtractor.Formats.Exif;
+using MetadataExtractor.Formats.Xmp;
 using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Source.Local;
@@ -31,6 +32,8 @@ public sealed class MetadataExtractorPhotoMetadataReader : IPhotoMetadataReader
         ExifSubIfdDirectory? exif = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
         ExifIfd0Directory? ifd0 = directories.OfType<ExifIfd0Directory>().FirstOrDefault();
         GpsDirectory? gps = directories.OfType<GpsDirectory>().FirstOrDefault();
+        XmpDirectory? xmp = directories.OfType<XmpDirectory>().FirstOrDefault();
+        IReadOnlyDictionary<string, string> xmpProperties = XmpProperties(xmp);
 
         DateTime? takenAtLocal = null;
         TimeSpan? utcOffset = null;
@@ -44,9 +47,14 @@ public sealed class MetadataExtractorPhotoMetadataReader : IPhotoMetadataReader
             takenAtLocal = DateTime.SpecifyKind(original, DateTimeKind.Unspecified);
             utcOffset = ParseOffset(ifd0?.GetString(ExifDirectoryBase.TagTimeZoneOriginal));
         }
+        else if (TryGetXmpDate(xmpProperties, out DateTime xmpDate, out TimeSpan? xmpOffset))
+        {
+            takenAtLocal = xmpDate;
+            utcOffset = xmpOffset;
+        }
 
         GeoLocation? location = gps?.GetGeoLocation();
-        IReadOnlyList<PhotoMetadataTag> rawTags = CaptureRawTags(directories, cancellationToken);
+        IReadOnlyList<PhotoMetadataTag> rawTags = CaptureRawTags(directories, xmpProperties, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
         return Task.FromResult(new PhotoCaptureMetadata(
@@ -54,9 +62,16 @@ public sealed class MetadataExtractorPhotoMetadataReader : IPhotoMetadataReader
             utcOffset,
             location?.Latitude,
             location?.Longitude,
-            Description(ifd0, ExifDirectoryBase.TagMake),
-            Description(ifd0, ExifDirectoryBase.TagModel),
-            Description(exif, ExifDirectoryBase.TagLensModel),
+            FirstNonEmpty(
+                Description(ifd0, ExifDirectoryBase.TagMake),
+                XmpValue(xmpProperties, "tiff:Make")),
+            FirstNonEmpty(
+                Description(ifd0, ExifDirectoryBase.TagModel),
+                XmpValue(xmpProperties, "tiff:Model")),
+            FirstNonEmpty(
+                Description(exif, ExifDirectoryBase.TagLensModel),
+                XmpValue(xmpProperties, "aux:Lens"),
+                XmpValue(xmpProperties, "exifEX:LensModel")),
             Description(ifd0, ExifDirectoryBase.TagOrientation),
             Description(exif, ExifDirectoryBase.TagExposureTime),
             Description(exif, ExifDirectoryBase.TagFNumber),
@@ -75,6 +90,64 @@ public sealed class MetadataExtractorPhotoMetadataReader : IPhotoMetadataReader
             directory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out value);
     }
 
+    private static bool TryGetXmpDate(
+        IReadOnlyDictionary<string, string> properties,
+        out DateTime takenAtLocal,
+        out TimeSpan? utcOffset)
+    {
+        takenAtLocal = default;
+        utcOffset = null;
+        string? raw = FirstNonEmpty(
+            XmpValue(properties, "exif:DateTimeOriginal"),
+            XmpValue(properties, "photoshop:DateCreated"),
+            XmpValue(properties, "xmp:CreateDate"));
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return false;
+        }
+
+        string value = raw.Trim();
+        bool hasExplicitOffset = value.EndsWith('Z') || HasTrailingOffset(value);
+        if (hasExplicitOffset && DateTimeOffset.TryParse(
+                value,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out DateTimeOffset timestamp))
+        {
+            takenAtLocal = DateTime.SpecifyKind(timestamp.DateTime, DateTimeKind.Unspecified);
+            utcOffset = timestamp.Offset;
+            return true;
+        }
+
+        if (DateTime.TryParse(
+                value,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AllowWhiteSpaces,
+                out DateTime parsed))
+        {
+            takenAtLocal = DateTime.SpecifyKind(parsed, DateTimeKind.Unspecified);
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasTrailingOffset(string value)
+    {
+        if (value.Length < 6)
+        {
+            return false;
+        }
+
+        int start = value.Length - 6;
+        return (value[start] == '+' || value[start] == '-') &&
+               char.IsDigit(value[start + 1]) &&
+               char.IsDigit(value[start + 2]) &&
+               value[start + 3] == ':' &&
+               char.IsDigit(value[start + 4]) &&
+               char.IsDigit(value[start + 5]);
+    }
+
     private static string? Description(MetadataExtractor.Directory? directory, int tagType)
     {
         string? value = directory?.GetDescription(tagType);
@@ -83,8 +156,27 @@ public sealed class MetadataExtractorPhotoMetadataReader : IPhotoMetadataReader
             : Sanitize(value, MaximumTagValueLength);
     }
 
+    private static IReadOnlyDictionary<string, string> XmpProperties(XmpDirectory? directory)
+    {
+        if (directory is null)
+        {
+            return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return new Dictionary<string, string>(directory.GetXmpProperties(), StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static string? XmpValue(IReadOnlyDictionary<string, string> properties, string key) =>
+        properties.TryGetValue(key, out string? value) && !string.IsNullOrWhiteSpace(value)
+            ? Sanitize(value, MaximumTagValueLength)
+            : null;
+
+    private static string? FirstNonEmpty(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
     private static IReadOnlyList<PhotoMetadataTag> CaptureRawTags(
         IReadOnlyList<MetadataExtractor.Directory> directories,
+        IReadOnlyDictionary<string, string> xmpProperties,
         CancellationToken cancellationToken)
     {
         List<PhotoMetadataTag> tags = [];
@@ -114,6 +206,24 @@ public sealed class MetadataExtractorPhotoMetadataReader : IPhotoMetadataReader
                     Sanitize(tag.Name, MaximumTagNameLength),
                     value));
             }
+        }
+
+        foreach ((string key, string value) in xmpProperties.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (tags.Count >= MaximumRawTags)
+            {
+                break;
+            }
+
+            string safeName = Sanitize(key, MaximumTagNameLength);
+            string safeValue = Sanitize(value, MaximumTagValueLength);
+            if (safeName.Length == 0 || safeValue.Length == 0 || !SafeForSnapshot("XMP", safeName))
+            {
+                continue;
+            }
+
+            tags.Add(new PhotoMetadataTag("XMP", safeName, safeValue));
         }
 
         return tags;
