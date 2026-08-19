@@ -11,13 +11,14 @@ depends_on: [M18, M19]
 
 Photo Identity is easier to operate during large archive runs and less visually noisy during normal review. The milestone captures the concrete follow-up feedback from the 2026-08-19 M19 maintainer pass plus the first successful archive-metadata run after WI-0072.
 
-The milestone focuses on five areas:
+The milestone focuses on six areas:
 
 - responsive UI/navigation polish and clearer archive state;
 - filtering Face Review by the current top suggested person;
 - operator-configurable GeoNames background timing through the launcher settings file;
 - materially improving archive-processing throughput without weakening bounded hydration, immutable revision verification or resumability;
-- simplifying Photo Details so common information is prominent while editing controls and secondary metadata stay collapsed until needed.
+- simplifying Photo Details so common information is prominent while editing controls and secondary metadata stay collapsed until needed;
+- versioning metadata extraction so existing catalogue rows can be reprocessed when supported fields expand.
 
 ## Work items
 
@@ -26,12 +27,15 @@ The milestone focuses on five areas:
 - [WI-0075](../work-items/WI-0075-geonames-timing-settings.md) — make automatic GeoNames timing settings accepted and documented in the launcher settings file, with the current safe pacing default retained unless explicitly overridden by supported policy.
 - [WI-0076](../work-items/WI-0076-archive-throughput.md) — profile and improve archive processing throughput, prioritizing model-session reuse, repeated full-file verification reads, batching and bounded OneDrive prefetch opportunities.
 - [WI-0077](../work-items/WI-0077-photo-viewer-simplification.md) — reduce visible Photo Details metadata and make Location read-first/edit-on-demand.
+- [WI-0078](../work-items/WI-0078-versioned-metadata-refresh.md) — version the metadata extraction contract and make existing rows eligible for bounded re-inspection when the supported metadata set changes.
 
 ## Existing-image metadata backfill
 
 WI-0072 deliberately retains the explicit `POST /api/photo-metadata/backfill` operation for catalogue revisions that predate automatic archive metadata inspection. Backfill reads only originals that are already local, verifies them against the immutable revision and never requests OneDrive hydration merely for metadata.
 
-This remains an operator maintenance operation rather than an M20 feature by default. If manual endpoint use proves too cumbersome for a large historical catalogue, add a separate M20 work item for a bounded maintenance UI/command rather than changing archive semantics implicitly.
+The current selector, however, only chooses revisions with **no** `photo_capture_metadata` row. That means a photo inspected under an older reader contract is currently considered complete even if newer fields were added later. WI-0078 closes that gap with a durable extraction-contract version so default backfill can select both missing and stale rows, while retaining an explicit force/repair mode for current-version rows.
+
+Until WI-0078 is implemented, existing rows that already have a capture-metadata inspection marker will **not** automatically be reprocessed just because the application now supports additional metadata fields.
 
 ## Archive-performance baseline
 
@@ -56,6 +60,8 @@ Each work item has focused automated coverage plus a maintainer browser/operator
 - correct metadata, face analysis, derivatives and review proxies;
 - responsive UI while archive processing is active.
 
+Metadata refresh verification must prove that a pre-WI-0072/legacy inspection row can gain newly supported fields without deleting manual Places or triggering metadata-only OneDrive hydration.
+
 ## Exit criteria
 
 - Known card/menu/hidden/archive-state and archive-return navigation issues are fixed without regressing previously verified M19 behavior.
@@ -63,3 +69,4 @@ Each work item has focused automated coverage plus a maintainer browser/operator
 - GeoNames automatic timing can be supplied through `PhotoIdentity.launcher.json` and is documented with units/defaults/safety semantics.
 - Archive throughput has a measured stage breakdown and a documented before/after improvement on representative hardware/data without weakening safety contracts.
 - Photo Details keeps secondary photographic metadata inside collapsed `All metadata` and presents Location in a read-first mode with an explicit Edit action.
+- Existing metadata rows carry an extraction-contract version and stale rows can be safely reprocessed to obtain fields added by newer readers.
