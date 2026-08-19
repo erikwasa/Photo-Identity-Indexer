@@ -330,6 +330,9 @@ else if (Details is not null)
     [Parameter, SupplyParameterFromQuery(Name = "modelHash")]
     public string? ModelHash { get; set; }
 
+    [Parameter, SupplyParameterFromQuery(Name = "suggestedPersonId")]
+    public string? SuggestedPersonId { get; set; }
+
     [Parameter, SupplyParameterFromQuery(Name = "sort")]
     public string? Sort { get; set; }
 
@@ -358,6 +361,7 @@ else if (Details is not null)
     private string NormalizedProcessingRunId => ProcessingRunId?.Trim() ?? "";
     private string NormalizedModelId => ModelId?.Trim() ?? "";
     private string NormalizedModelHash => ModelHash?.Trim() ?? "";
+    private string NormalizedSuggestedPersonId => SuggestedPersonId?.Trim() ?? "";
     private bool UsesSuggestionNavigation =>
         SuggestionQueue &&
         !string.IsNullOrWhiteSpace(NormalizedModelId) &&
@@ -720,6 +724,10 @@ else if (Details is not null)
         {
             query.Add($"modelId={Uri.EscapeDataString(NormalizedModelId)}");
             query.Add($"modelHash={Uri.EscapeDataString(NormalizedModelHash)}");
+            if (UsesSuggestionNavigation && !string.IsNullOrWhiteSpace(NormalizedSuggestedPersonId))
+            {
+                query.Add($"suggestedPersonId={Uri.EscapeDataString(NormalizedSuggestedPersonId)}");
+            }
         }
         return query;
     }
