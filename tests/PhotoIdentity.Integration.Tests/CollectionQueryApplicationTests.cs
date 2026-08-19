@@ -544,18 +544,11 @@ public sealed class CollectionQueryApplicationTests
         AssetRevisionId RevisionId,
         IReadOnlyList<FaceOccurrenceId> Faces);
 
-    private sealed class CollectionApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class CollectionApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-
         public CollectionApiFactory(string databasePath)
+            : base(databasePath)
         {
-            _databasePath = databasePath;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
         }
     }
 }
