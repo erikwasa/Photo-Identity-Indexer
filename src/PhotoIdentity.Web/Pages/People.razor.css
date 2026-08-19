@@ -4,13 +4,16 @@
 
 .people-summary {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(13rem, 100%), 1fr));
     gap: 0.75rem;
+    min-width: 0;
     margin-bottom: 1rem;
 }
 
 .person-summary-card,
 .maintenance-card {
+    min-width: 0;
+    overflow: hidden;
     background: rgba(255, 253, 248, 0.91);
     border: 1px solid var(--line);
     border-radius: 1rem;
@@ -19,8 +22,19 @@
 
 .person-summary-card {
     display: grid;
-    gap: 0.25rem;
+    gap: 0.4rem;
     padding: 0.9rem 1rem;
+}
+
+.person-summary-card > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.person-summary-card strong,
+.person-summary-card span,
+.person-summary-card button {
+    overflow-wrap: anywhere;
 }
 
 .person-summary-card span {
@@ -28,10 +42,29 @@
     font-size: 0.88rem;
 }
 
+.person-summary-card.hidden-from-smart-collections {
+    border-color: #9c4940;
+    background: #fff4f1;
+    box-shadow: inset 0 0 0 1px #9c4940, var(--shadow);
+}
+
+.person-summary-card.hidden-from-smart-collections .state-badge {
+    color: #6f2929;
+    background: #f7d8d2;
+    border-color: #c67a70;
+    font-weight: 700;
+}
+
+.person-summary-card .button {
+    width: 100%;
+    white-space: normal;
+}
+
 .maintenance-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
+    min-width: 0;
     margin-bottom: 1rem;
 }
 
@@ -41,6 +74,7 @@
 
 .maintenance-card h2 {
     margin: 0.2rem 0 0.55rem;
+    overflow-wrap: anywhere;
 }
 
 .maintenance-card > p:not(.eyebrow) {
@@ -48,6 +82,13 @@
     margin: 0 0 1rem;
     color: var(--muted);
     line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.maintenance-card select,
+.maintenance-card input,
+.maintenance-card button {
+    max-width: 100%;
 }
 
 .spaced {
@@ -67,6 +108,7 @@
     display: flex;
     align-items: flex-start;
     gap: 0.7rem;
+    min-width: 0;
     margin-top: 1rem;
     padding: 0.85rem;
     color: #6f2929;
@@ -74,6 +116,11 @@
     border: 1px solid #e9c7c0;
     border-radius: 0.75rem;
     line-height: 1.45;
+}
+
+.confirmation-row span {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .confirmation-row input {
