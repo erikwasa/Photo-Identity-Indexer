@@ -20,9 +20,8 @@ public sealed record ArchiveSourceVerificationAdvanceResult(
 /// <summary>
 /// Resolves unverified or metadata-divergent archive sources before analysis. Placeholder metadata
 /// can enqueue work but never becomes immutable identity: local bytes are SHA-256 hashed before a
-/// revision is established/reselected. Once the exact revision is known, capture metadata is read
-/// through the same verified-original boundary before downstream archive analysis can release a
-/// Photo-Identity-owned hydration.
+/// revision is established/reselected. Photo-Identity-owned pre-revision hydration is transferred
+/// to the resulting revision so analysis/proxy generation can finish before release.
 /// </summary>
 public sealed class ArchiveSourceVerificationService
 {
@@ -31,8 +30,6 @@ public sealed class ArchiveSourceVerificationService
     private readonly SqliteArchiveAvailabilityRepository _availability;
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
-    private readonly CollectionOriginalAccessService _originals;
-    private readonly PhotoMetadataInspectionService _metadataInspection;
     private readonly TimeProvider _timeProvider;
     private readonly StringComparison _pathComparison;
 
@@ -42,8 +39,6 @@ public sealed class ArchiveSourceVerificationService
         SqliteArchiveAvailabilityRepository availability,
         ArchiveHydrationCapacityService capacity,
         IOneDriveFilesOnDemandPlatform platform,
-        CollectionOriginalAccessService originals,
-        PhotoMetadataInspectionService metadataInspection,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(observations);
@@ -51,16 +46,12 @@ public sealed class ArchiveSourceVerificationService
         ArgumentNullException.ThrowIfNull(availability);
         ArgumentNullException.ThrowIfNull(capacity);
         ArgumentNullException.ThrowIfNull(platform);
-        ArgumentNullException.ThrowIfNull(originals);
-        ArgumentNullException.ThrowIfNull(metadataInspection);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _observations = observations;
         _sourceHydrations = sourceHydrations;
         _availability = availability;
         _capacity = capacity;
         _platform = platform;
-        _originals = originals;
-        _metadataInspection = metadataInspection;
         _timeProvider = timeProvider;
         _pathComparison = OperatingSystem.IsWindows()
             ? StringComparison.OrdinalIgnoreCase
@@ -181,9 +172,6 @@ public sealed class ArchiveSourceVerificationService
             persisted.RevisionId,
             _timeProvider.GetUtcNow(),
             cancellationToken);
-
-        await EnsureMetadataInspectedAsync(persisted.RevisionId, cancellationToken);
-
         AssetRevisionId? previousRevisionId = source.VerifiedRevisionId;
         bool revisionChanged = previousRevisionId is AssetRevisionId previous &&
             previous != persisted.RevisionId;
@@ -196,32 +184,6 @@ public sealed class ArchiveSourceVerificationService
             revisionChanged,
             persisted.NewRevision,
             transferred);
-    }
-
-    private async Task EnsureMetadataInspectedAsync(
-        AssetRevisionId revisionId,
-        CancellationToken cancellationToken)
-    {
-        if (await _metadataInspection.IsInspectedAsync(revisionId, cancellationToken))
-        {
-            return;
-        }
-
-        VerifiedCollectionOriginal? original = await _originals.OpenVerifiedAsync(
-            revisionId,
-            cancellationToken);
-        if (original is null)
-        {
-            throw new IOException(
-                "The archive source became unavailable or changed before capture metadata could be inspected.");
-        }
-
-        await using FileStream stream = original.Stream;
-        _ = await _metadataInspection.InspectVerifiedAsync(
-            revisionId,
-            stream,
-            original.ContentType,
-            cancellationToken);
     }
 
     private string ResolvePath(ArchiveSourceObservation source)
