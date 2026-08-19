@@ -8,14 +8,20 @@ namespace PhotoIdentity.Api;
 public sealed record PhotoMetadataBackfillReport(
     int Candidates,
     int Persisted,
+    int NewlyInspected,
+    int RefreshedStale,
+    int ForcedCurrentRefresh,
     int DeferredNonLocal,
     int DeferredChanged,
-    int DeferredUnavailable);
+    int DeferredUnavailable,
+    int CurrentContractVersion,
+    bool Force);
 
 /// <summary>
-/// Reads capture metadata only from source files that are already local and still match the
-/// immutable revision fingerprint. The service never requests Files On-Demand hydration.
-/// Execution is explicit and bounded so metadata inspection cannot compete with viewer requests.
+/// Reads photo metadata only from source files that are already local and still match the immutable
+/// revision fingerprint. Normal execution processes missing and stale extraction-contract rows;
+/// force mode can intentionally re-read current rows for repair. The service never requests Files
+/// On-Demand hydration.
 /// </summary>
 public sealed class PhotoMetadataBackfillService
 {
@@ -39,17 +45,27 @@ public sealed class PhotoMetadataBackfillService
     public async Task<PhotoMetadataBackfillReport> ExecuteBatchAsync(
         int limit = 250,
         int offset = 0,
+        bool force = false,
         CancellationToken cancellationToken = default)
     {
-        IReadOnlyList<PhotoMetadataBackfillCandidate> candidates =
-            await _backfill.GetCandidatesAsync(limit, offset, cancellationToken);
+        int currentVersion = PhotoMetadataExtractionContract.CurrentVersion;
+        IReadOnlyList<PhotoMetadataRefreshCandidate> candidates =
+            await _backfill.GetRefreshCandidatesAsync(
+                limit,
+                offset,
+                currentVersion,
+                force,
+                cancellationToken);
 
         int persisted = 0;
+        int newlyInspected = 0;
+        int refreshedStale = 0;
+        int forcedCurrentRefresh = 0;
         int deferredNonLocal = 0;
         int deferredChanged = 0;
         int deferredUnavailable = 0;
 
-        foreach (PhotoMetadataBackfillCandidate candidate in candidates)
+        foreach (PhotoMetadataRefreshCandidate candidate in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -112,6 +128,19 @@ public sealed class PhotoMetadataBackfillService
                     candidate.MediaType,
                     cancellationToken);
                 persisted++;
+
+                if (candidate.IsNew)
+                {
+                    newlyInspected++;
+                }
+                else if (candidate.IsStale(currentVersion))
+                {
+                    refreshedStale++;
+                }
+                else
+                {
+                    forcedCurrentRefresh++;
+                }
             }
             catch (Exception exception) when (
                 exception is IOException or
@@ -125,9 +154,14 @@ public sealed class PhotoMetadataBackfillService
         return new PhotoMetadataBackfillReport(
             candidates.Count,
             persisted,
+            newlyInspected,
+            refreshedStale,
+            forcedCurrentRefresh,
             deferredNonLocal,
             deferredChanged,
-            deferredUnavailable);
+            deferredUnavailable,
+            currentVersion,
+            force);
     }
 
     private static string ResolveSourcePath(string rootLocator, string sourceKey)
