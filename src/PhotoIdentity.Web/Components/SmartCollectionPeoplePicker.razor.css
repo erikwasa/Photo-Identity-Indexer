@@ -4,21 +4,25 @@
 .smart-person-results {
     display: grid;
     gap: 0.6rem;
+    min-width: 0;
 }
 
 .smart-field {
     display: grid;
     gap: 0.4rem;
+    min-width: 0;
 }
 
 .smart-people-search-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.5rem;
+    min-width: 0;
 }
 
 .smart-people-clear {
     align-self: stretch;
+    max-width: 100%;
 }
 
 .smart-people-section {
@@ -30,8 +34,14 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
+    min-width: 0;
     color: var(--text-muted, #667085);
     font-size: 0.875rem;
+}
+
+.smart-people-section-heading > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .smart-selected-people,
@@ -48,7 +58,9 @@
     align-items: center;
     gap: 0.65rem;
     min-width: 0;
+    max-width: 100%;
     padding: 0.5rem;
+    overflow: hidden;
     border: 1px solid var(--border, #d8dde6);
     border-radius: 0.7rem;
     background: var(--surface, #fff);
@@ -68,7 +80,9 @@
 }
 
 .smart-person-portrait {
+    display: block;
     width: 3rem;
+    max-width: 100%;
     height: 3rem;
     border: 1px solid var(--border, #d8dde6);
     border-radius: 50%;
@@ -92,6 +106,7 @@
 }
 
 .smart-person-copy strong {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -104,7 +119,13 @@
     font-size: 0.82rem;
 }
 
+.smart-person-copy > span,
+.smart-person-add {
+    overflow-wrap: anywhere;
+}
+
 .smart-person-remove {
+    max-width: 100%;
     padding: 0;
     border: 0;
     background: transparent;
@@ -114,6 +135,7 @@
 }
 
 .smart-person-add {
+    min-width: 0;
     font-weight: 700;
 }
 
