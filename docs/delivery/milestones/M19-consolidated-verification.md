@@ -1,18 +1,18 @@
 # M19 consolidated maintainer verification
 
-This checklist is the final local/browser verification pass for the M19 extension work items WI-0061 through WI-0068. The original WI-0050/WI-0056 baseline has already been verified; this pass concentrates on the later Photo Details, manual people, Places/GeoNames, person visibility, representative portraits and searchable Smart Collection people workflow.
+This checklist records the M19 extension verification. The original WI-0050/WI-0056 baseline was already verified; the 2026-08-19 pass completed six later extension items and exposed the remaining archive-to-metadata/GeoNames integration gap now owned by WI-0072.
 
-Run the pass against a current build from `main`. Use normal catalogue data where safe. Any irreversible person-merge check should use a disposable test pair or known duplicates only; automated coverage remains the primary evidence for merge semantics if no safe local pair exists.
+Run pending verification against a current build from `main`. Use normal catalogue data where safe. Any irreversible person-merge check should use a disposable test pair or known duplicates only; automated coverage remains the primary evidence for merge semantics if no safe local pair exists.
 
 ## Maintainer result — 2026-08-19
 
 The maintainer completed the consolidated pass and reported **PASS** for WI-0061, WI-0062, WI-0063, WI-0066, WI-0067 and WI-0068. Those six items are verified for completion.
 
-WI-0064 and WI-0065 remain in review. During a new 190-image archive run, the images downloaded, were source-verified and analyzed, but capture date/GPS did not appear. Repository inspection confirms that the WI-0050 metadata reader is currently invoked only by explicit bounded photo-metadata backfill, not by archive advancement. Newly analyzed revisions therefore do not automatically become eligible for GPS-driven GeoNames enrichment. This gap must be resolved before the unattended automatic-pickup portion of the GeoNames checklist can be considered complete.
+WI-0064 and WI-0065 remain in review. During a new 190-image archive run, the images downloaded, were source-verified and analyzed, but capture date/GPS did not appear. Repository inspection confirmed that the WI-0050 metadata reader was invoked only by explicit bounded photo-metadata backfill, not by archive advancement. Newly analyzed revisions therefore did not automatically become eligible for GPS-driven GeoNames enrichment. WI-0072 implements that missing lifecycle step and expands Photo Details metadata.
 
-The same run displayed `Waiting for OneDrive to finish a managed download or release.` while useful work continued. That status is consistent with the current archive state model, which labels the worker `waiting` whenever any managed hydration/release remains in progress even if other work is still advancing. It is recorded as a follow-up operator-clarity issue rather than evidence that the 190-image run stopped.
+The same run displayed `Waiting for OneDrive to finish a managed download or release.` while useful work continued. That status is recorded as a separate operator-clarity follow-up rather than evidence that the 190-image run stopped.
 
-Additional UI/navigation/metadata findings and proposed solution groupings are recorded in [M19-maintainer-review-2026-08-19.md](M19-maintainer-review-2026-08-19.md). M19 remains `in_progress` until the metadata-to-GeoNames gap is resolved and WI-0064/WI-0065 verification can finish.
+Additional UI/navigation findings and proposed solution groupings are recorded in [M19-maintainer-review-2026-08-19.md](M19-maintainer-review-2026-08-19.md). M19 remains `in_progress` until WI-0072 and the WI-0064/WI-0065 live automatic-pickup checks complete.
 
 ## Suggested test data
 
@@ -25,7 +25,7 @@ Prepare or identify:
 - one person that can safely be hidden/unhidden from Smart Collections;
 - one saved Smart Collection containing that person before hiding them;
 - one person with at least two assigned faces for featured-photo testing;
-- optionally, a disposable/known-duplicate person pair for irreversible merge presentation checks.
+- for WI-0072, at least one known date/GPS-bearing JPEG and one representative iPhone HEIC/HEIF file whose capture metadata can be independently checked.
 
 ## 1. Photo Details and navigation — WI-0061
 
@@ -68,18 +68,19 @@ Pass condition: Places behave as one hierarchical Location value, not as generic
 
 ## 4. GeoNames provider result and automatic orchestration — WI-0064 / WI-0065
 
-The configured live GeoNames account, normalization, long-place compatibility and Smart Collection location integration were already exercised during WI-0064. This pass should focus on unattended orchestration.
+The configured live GeoNames account, normalization, long-place compatibility and Smart Collection location integration were already exercised during WI-0064. The remaining pass focuses on unattended orchestration after WI-0072 supplies metadata automatically.
 
-1. With GeoNames configured and automatic enrichment enabled, identify or add/process a GPS-bearing revision that is not already complete for the current provider contract.
-2. Do **not** press the maintenance Enrich button. Confirm Settings reports the automatic worker as enabled/running and exposes useful last/next activity state.
-3. Confirm the eligible photo eventually receives the expected automatic Place while the browser is free to navigate elsewhere.
-4. Confirm archive/local processing itself is not held open waiting for the GeoNames result.
-5. For restart/resume, leave at least one eligible/retryable revision outstanding, close Photo Identity, restart it, and confirm the worker resumes from durable SQLite state without re-entering a browser batch.
-6. Confirm an existing manual Place or explicit manual clear is not silently overwritten by automatic enrichment.
+1. With GeoNames configured and automatic enrichment enabled, add/process a GPS-bearing revision that has not already completed the current provider contract.
+2. Do **not** press metadata Backfill or the maintenance Enrich button.
+3. Confirm Photo Details reports the revision as metadata-inspected and displays its GPS coordinates.
+4. Confirm the eligible photo eventually receives the expected automatic Place while the browser is free to navigate elsewhere.
+5. Confirm archive/local processing itself is not held open waiting for the GeoNames result.
+6. For restart/resume, leave at least one eligible/retryable revision outstanding, close Photo Identity, restart it, and confirm the worker resumes from durable SQLite state without re-entering a browser batch.
+7. Confirm an existing manual Place or explicit manual clear is not silently overwritten by automatic enrichment.
 
-Pass condition: normal GeoNames enrichment is server-side, provider-paced, restart-resumable and independent of a long-lived browser request; manual precedence remains intact.
+Pass condition: normal metadata-to-GeoNames enrichment is server-side, provider-paced, restart-resumable and independent of a long-lived browser request; manual precedence remains intact.
 
-**Result 2026-08-19: INCOMPLETE.** The live-provider behavior already verified for WI-0064 remains valid, but the integrated archive test exposed that metadata inspection is not part of archive advancement. Newly processed revisions can therefore finish analysis without GPS being persisted and never enter the automatic GeoNames queue. Resolve the metadata-ingestion gap, then repeat automatic pickup and restart/resume verification.
+**Result 2026-08-19: INCOMPLETE.** Prior live-provider behavior remains valid. Repeat this section after WI-0072 is merged using newly processed metadata-bearing revisions.
 
 ## 5. Smart Collection person visibility — WI-0066
 
@@ -123,8 +124,28 @@ Pass condition: search affects discovery only, selections remain stable canonica
 
 **Result 2026-08-19: PASS.** Smart Collection image/card containment is recorded as a separate visual follow-up.
 
+## 8. Archive metadata ingestion and Photo Details — WI-0072
+
+Run this after the WI-0072 implementation is merged.
+
+1. Add or synchronize a new archive folder containing at least one JPEG and one representative iPhone HEIC/HEIF file with known capture date/time; at least one should contain known GPS coordinates.
+2. Start normal archive advancement. Do **not** invoke `/api/photo-metadata/backfill` or any manual metadata operation.
+3. Confirm the photos become verified/analyzed normally and archive advancement does not add a second metadata-only hydration cycle.
+4. Open each photo and confirm **Capture metadata** reports `Inspected`.
+5. Confirm **Photo taken** matches the photographic capture timestamp. If a real source offset is available, confirm it is shown separately; if no offset exists, confirm no UTC conversion is invented.
+6. Confirm **Camera make**, **Camera model** and other available lens/exposure fields match the source metadata.
+7. On the GPS-bearing file, confirm exact latitude/longitude are shown and reasonable; confirm GPS altitude when present.
+8. Expand **All metadata** and confirm useful EXIF/XMP tags are present while embedded thumbnail/preview/binary payloads are absent.
+9. Identify a file with no supported capture metadata if practical and confirm it shows `Inspected` rather than `Not inspected`, with an explicit no-key-fields message.
+10. For an online-only revision that archive processing does not otherwise need to hydrate, confirm metadata inspection alone does not make it local.
+11. Continue into the WI-0064/WI-0065 steps above and confirm the newly persisted GPS enters automatic GeoNames enrichment without a manual Backfill/Enrich action.
+
+Pass condition: metadata is captured automatically from the exact local/hash-verified revision, no independent hydration path is introduced, JPEG/HEIC real-media fields display correctly, raw metadata remains bounded/safe, and persisted GPS flows into the existing asynchronous GeoNames worker.
+
+**Result: PENDING.** Automated implementation coverage exists in PR #191; real-media and live-provider verification is required after merge.
+
 ## Completion recording
 
-The 2026-08-19 pass verifies WI-0061, WI-0062, WI-0063, WI-0066, WI-0067 and WI-0068 for completion. WI-0064 and WI-0065 remain in review until the metadata-ingestion gap is resolved and automatic pickup/restart-resume is verified on newly processed metadata-bearing revisions.
+The 2026-08-19 pass verifies WI-0061, WI-0062, WI-0063, WI-0066, WI-0067 and WI-0068 for completion. WI-0064, WI-0065 and WI-0072 remain open until section 8 plus the automatic GeoNames pickup/restart-resume checks pass on newly processed metadata-bearing revisions.
 
-M19 remains `in_progress` until all active M19 work items are complete. Additional defects and requested enhancements found during this pass are tracked in [M19-maintainer-review-2026-08-19.md](M19-maintainer-review-2026-08-19.md) and should become focused follow-up work items rather than weakening already-passed acceptance criteria.
+M19 remains `in_progress` until all active M19 work items are complete. Other defects and requested enhancements found during the pass remain tracked in [M19-maintainer-review-2026-08-19.md](M19-maintainer-review-2026-08-19.md) and should become focused follow-up work items rather than weakening already-passed acceptance criteria.
