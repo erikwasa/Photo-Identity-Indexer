@@ -231,15 +231,18 @@ public sealed class MetadataExtractorPhotoMetadataReader : IPhotoMetadataReader
 
     private static bool SafeForSnapshot(string directoryName, string tagName)
     {
-        if (directoryName.Contains("thumbnail", StringComparison.OrdinalIgnoreCase))
+        if (directoryName.Contains("thumbnail", StringComparison.OrdinalIgnoreCase) ||
+            directoryName.Contains("preview", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
 
         return !tagName.Contains("makernote", StringComparison.OrdinalIgnoreCase) &&
-               !tagName.Contains("thumbnail data", StringComparison.OrdinalIgnoreCase) &&
-               !tagName.Contains("preview image", StringComparison.OrdinalIgnoreCase) &&
+               !tagName.Contains("thumbnail", StringComparison.OrdinalIgnoreCase) &&
+               !tagName.Contains("preview", StringComparison.OrdinalIgnoreCase) &&
                !tagName.Contains("image data", StringComparison.OrdinalIgnoreCase) &&
+               !tagName.EndsWith(":image", StringComparison.OrdinalIgnoreCase) &&
+               !tagName.Contains("iccprofile", StringComparison.OrdinalIgnoreCase) &&
                !tagName.Contains("intercolor profile", StringComparison.OrdinalIgnoreCase);
     }
 
