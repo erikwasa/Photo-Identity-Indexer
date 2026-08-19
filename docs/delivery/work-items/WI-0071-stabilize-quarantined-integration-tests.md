@@ -54,7 +54,7 @@ If a test passes three times without any stabilization change but its original r
 - [ ] Generic endpoint tests in scope use the shared background-worker-disabled host unless they explicitly require production hosted workers.
 - [ ] Each quarantine entry has three consecutive clean diagnostic CI runs after its stabilization change.
 - [ ] `.github/flaky-integration-tests.txt` is empty or removed because all tracked tests are back in the required shards.
-- [ ] No unconditional retry mechanism is introduced.
+- [x] No unconditional retry mechanism is introduced.
 - [ ] Required shard coverage proves each restored test executes exactly once.
 - [ ] `PhotoIdentity.Docs validate` and `generate --check` pass.
 
@@ -88,19 +88,38 @@ Workflow #1143 (`32193192370`) validated this slice on PR #184: both required in
 
 The same workflow exposed a separate CI timing outlier that does not implicate this host migration. Shard 2 passed all 143 assigned tests but took 7m19s of test execution and recorded 439.4s aggregate test duration, compared with 64.5s for the same 143-test shard in workflow #1139. The unchanged `IdentityAutoAssignmentManualSupersessionTests.Manual_reassignment_supersedes_automatic_assignment_for_later_matching` case alone moved from 0.75s in #1139 to 124.39s in #1143. Multiple other unchanged classes were also materially slower. Do not rebalance the timing baseline from this single outlier; WI-0070 should retain measured follow-up for runner/test-duration variance and use additional natural runs or a robust multi-run baseline before changing shard weights.
 
-PR #184 merged Slice 2 as `2bc2c926bb73df896f595da3b42940b1b8223205`. Its final-head workflow #1145 (`32194317428`) initially produced three unrelated required-shard HTTP 500 failures in `DetectorEvaluationComparisonApplicationTests`, `ReviewSuggestionApplicationTests`, and `ReviewQueueNavigationApplicationTests`. All three still used ad-hoc API factories. One manual failed-job diagnostic rerun passed both shards with no code, assertion, quarantine, or workflow-retry change, confirming another instance of the same nondeterministic host-failure class. These failures are follow-up migration evidence; they are not new quarantine entries and the rerun is not counted as a representative quarantine sample.
+PR #184 merged Slice 2 as `2bc2c926bb73df896f595da3b42940b1b8223205`. Its final-head workflow #1145 (`32194317428`) initially produced three unrelated required-shard HTTP 500 failures in `DetectorEvaluationComparisonApplicationTests`, `ReviewSuggestionApplicationTests`, and `ReviewQueueNavigationApplicationTests`. One manual failed-job diagnostic rerun passed both shards with no assertion, quarantine, or workflow-retry change. Before #184 merged, those three validation-exposed generic API hosts were also moved to `PhotoIdentityApiTestFactory` (preserving the detector-evaluation root callback where required). They therefore entered `main` as shared-host users rather than remaining known bare factories.
 
-### Slice 3 — migrate the collection-query quarantine case
+### Slice 3 — migrate collection-query and validation-exposed generic API hosts
 
-The third stabilization slice moves `CollectionQueryApplicationTests` onto the shared background-worker-disabled host while keeping the behavior assertions and quarantine membership unchanged.
+The third stabilization slice started by moving `CollectionQueryApplicationTests` onto the shared background-worker-disabled host while keeping its behavior assertions and quarantine membership unchanged. Required-shard validation then repeatedly surfaced different generic endpoint classes that still used ad-hoc API factories. Rather than retrying until a favorable host lifecycle occurred or widening quarantine, the slice migrated only the classes actually exposed by those runs and preserved each class's existing custom settings/test doubles through the shared factory callback.
 
-- replace the local standalone `WebApplicationFactory` behavior with a thin `CollectionApiFactory` wrapper over `PhotoIdentityApiTestFactory`;
-- preserve every existing collection query, review-state, suggestion-scope, privacy, and validation assertion so the CI outcome remains attributable to host isolation rather than assertion changes;
-- keep `CollectionQueryApplicationTests.Confirmed_collection_queries_support_explicit_any_and_all_semantics_without_paths` in `.github/flaky-integration-tests.txt` while its own three-run post-change evidence window begins;
-- do not remove the review-progress quarantine entry in this same slice even if the next diagnostic run makes it sample **3/3**; restoration will be a separate change that proves exact required-shard coverage;
-- keep the suggestion-gallery quarantine case unchanged so its migration remains independently attributable.
+The planned quarantine migration:
 
-A clean first CI run for this slice should advance review-progress to **3/3**, person-visibility to **2/3**, and collection-query to **1/3**. The same natural PR should also be inspected as another WI-0070 timing sample, but manual reruns are diagnostic only and do not count as independent timing or quarantine evidence.
+- `CollectionQueryApplicationTests` now uses a thin `CollectionApiFactory : PhotoIdentityApiTestFactory`;
+- every existing collection query, review-state, suggestion-scope, privacy, and validation assertion is unchanged;
+- `CollectionQueryApplicationTests.Confirmed_collection_queries_support_explicit_any_and_all_semantics_without_paths` remains quarantined while its own post-change evidence window starts.
+
+Validation-exposed shared-host migrations in the same PR:
+
+- workflow #1149 (`32202975825`) first exposed `SmartCollectionPlaceLocationTests`; one **job-level manual diagnostic rerun** was used only to determine whether that failure was a one-off, and the rerun instead exposed `PersonFeaturedFaceApplicationTests` with a disposed `TestServer` plus `BulkSuggestionReviewApplicationTests` with another HTTP 500;
+- no second rerun was attempted. `SmartCollectionPlaceLocationTests`, `PersonFeaturedFaceApplicationTests`, and `BulkSuggestionReviewApplicationTests` were moved to the shared host without assertion changes;
+- workflow #1153 (`32203904268`) then passed shard 2 but exposed `ReviewApplicationTests` and `PhotoPlaceEnrichmentEndpointTests` on shard 1; both were still custom generic hosts, so they were migrated while preserving review-proxy and GeoNames settings via the configuration callback;
+- workflow #1155 (`32204269605`) then passed shard 2 and exposed only `CollectionOriginalAccessApplicationTests` on shard 1. Its Files-on-Demand platform, hydration policy, and storage-probe test doubles were preserved through the shared callback;
+- workflow #1156 (`32204649495`) passed shard 2 and exposed only `PhotoDetailsApplicationTests`, another database-path-only generic host, which was migrated without assertion changes.
+
+Workflow #1157 (`32204959714`) is the first fully green substantive Slice 3 head after that evidence-driven sweep. Build/fast tests, all four once-only quarantined diagnostics, living/generated documentation, PR `PublishedMinimum` smoke, mixed-media verification, and both required exact-coverage integration shards passed; launcher/package verification remained correctly skipped for this test/docs-only PR. No automatic retry, new quarantine entry, or assertion weakening was introduced.
+
+For quarantine accounting, PR #186 counts as **one** representative clean post-change sample regardless of its earlier diagnostic/validation heads. After #1157:
+
+- review-progress is **3/3** (`#1139`, `#1143`, `#1157`) and is eligible for a separate quarantine-restoration change that proves exact required-shard execution;
+- person-visibility is **2/3** (`#1143`, `#1157`);
+- collection-query is **1/3** (`#1157`);
+- suggestion-gallery has not yet received its own stabilization migration, so its post-change counter has not started.
+
+The successful #1157 workflow also supplies WI-0070's third independent sub-six-minute PR sample: it ran from 01:26:58 to 01:30:02 UTC, about **3m04s** overall. Together with PR #180 (~3m37s) and PR #182 (~4m15s), the required PR gate now has three independent successful samples below six minutes. Earlier long/red PR #186 heads remain useful variance and host-instability evidence but are not substituted for successful timing samples.
+
+Next, restore only the review-progress quarantine entry and prove exact once-only required-shard coverage. Then migrate `ReviewSuggestionGalleryApplicationTests`, the last original quarantine class without a shared-host stabilization change, and continue accumulating person-visibility/collection-query/suggestion-gallery evidence on normal subsequent PRs.
 
 ## Non-goals
 
