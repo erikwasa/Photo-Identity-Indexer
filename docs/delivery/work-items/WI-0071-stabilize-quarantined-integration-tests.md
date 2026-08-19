@@ -88,7 +88,19 @@ Workflow #1143 (`32193192370`) validated this slice on PR #184: both required in
 
 The same workflow exposed a separate CI timing outlier that does not implicate this host migration. Shard 2 passed all 143 assigned tests but took 7m19s of test execution and recorded 439.4s aggregate test duration, compared with 64.5s for the same 143-test shard in workflow #1139. The unchanged `IdentityAutoAssignmentManualSupersessionTests.Manual_reassignment_supersedes_automatic_assignment_for_later_matching` case alone moved from 0.75s in #1139 to 124.39s in #1143. Multiple other unchanged classes were also materially slower. Do not rebalance the timing baseline from this single outlier; WI-0070 should retain measured follow-up for runner/test-duration variance and use additional natural runs or a robust multi-run baseline before changing shard weights.
 
-The remaining collection-query and suggestion-gallery quarantined classes stay unchanged in this slice. No retry or quarantine removal is introduced.
+PR #184 merged Slice 2 as `2bc2c926bb73df896f595da3b42940b1b8223205`. Its final-head workflow #1145 (`32194317428`) initially produced three unrelated required-shard HTTP 500 failures in `DetectorEvaluationComparisonApplicationTests`, `ReviewSuggestionApplicationTests`, and `ReviewQueueNavigationApplicationTests`. All three still used ad-hoc API factories. One manual failed-job diagnostic rerun passed both shards with no code, assertion, quarantine, or workflow-retry change, confirming another instance of the same nondeterministic host-failure class. These failures are follow-up migration evidence; they are not new quarantine entries and the rerun is not counted as a representative quarantine sample.
+
+### Slice 3 — migrate the collection-query quarantine case
+
+The third stabilization slice moves `CollectionQueryApplicationTests` onto the shared background-worker-disabled host while keeping the behavior assertions and quarantine membership unchanged.
+
+- replace the local standalone `WebApplicationFactory` behavior with a thin `CollectionApiFactory` wrapper over `PhotoIdentityApiTestFactory`;
+- preserve every existing collection query, review-state, suggestion-scope, privacy, and validation assertion so the CI outcome remains attributable to host isolation rather than assertion changes;
+- keep `CollectionQueryApplicationTests.Confirmed_collection_queries_support_explicit_any_and_all_semantics_without_paths` in `.github/flaky-integration-tests.txt` while its own three-run post-change evidence window begins;
+- do not remove the review-progress quarantine entry in this same slice even if the next diagnostic run makes it sample **3/3**; restoration will be a separate change that proves exact required-shard coverage;
+- keep the suggestion-gallery quarantine case unchanged so its migration remains independently attributable.
+
+A clean first CI run for this slice should advance review-progress to **3/3**, person-visibility to **2/3**, and collection-query to **1/3**. The same natural PR should also be inspected as another WI-0070 timing sample, but manual reruns are diagnostic only and do not count as independent timing or quarantine evidence.
 
 ## Non-goals
 
