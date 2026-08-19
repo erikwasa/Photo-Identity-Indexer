@@ -1,0 +1,112 @@
+<div class="review-suggested-person-picker">
+    <label class="field-label" for="review-suggested-person-search">Suggested person</label>
+    <input id="review-suggested-person-search"
+           type="search"
+           placeholder="Search people"
+           autocomplete="off"
+           disabled="@Disabled"
+           @bind="Search"
+           @bind:event="oninput" />
+
+    @if (SelectedPerson is ReviewPersonResponse selected)
+    {
+        <div class="review-suggested-person-selected" aria-label="Selected suggested person">
+            <div>
+                <strong>@selected.DisplayName</strong>
+                @if (selected.IsFavorite)
+                {
+                    <span class="state-badge">Favorite</span>
+                }
+                @if (selected.HiddenFromSmartCollections)
+                {
+                    <span class="state-badge">Hidden from Smart Collections</span>
+                }
+            </div>
+            <button type="button"
+                    class="button secondary"
+                    disabled="@Disabled"
+                    @onclick="ClearAsync">
+                Clear
+            </button>
+        </div>
+    }
+
+    @if (!Disabled && (SelectedPerson is null || !string.IsNullOrWhiteSpace(Search)))
+    {
+        <div class="review-suggested-person-results" role="listbox" aria-label="Suggested person search results">
+            @if (FilteredPeople.Count == 0)
+            {
+                <p>No people match this search.</p>
+            }
+            else
+            {
+                @foreach (ReviewPersonResponse person in FilteredPeople.Take(20))
+                {
+                    <button type="button"
+                            class="review-suggested-person-option"
+                            role="option"
+                            aria-selected="@(person.Id == SelectedPersonId)"
+                            @onclick="() => SelectAsync(person.Id)">
+                        <span>
+                            <strong>@person.DisplayName</strong>
+                            @if (person.IsFavorite)
+                            {
+                                <span class="state-badge">Favorite</span>
+                            }
+                            @if (person.HiddenFromSmartCollections)
+                            {
+                                <span class="state-badge">Hidden from Smart Collections</span>
+                            }
+                        </span>
+                        <span class="review-suggested-person-add">Use</span>
+                    </button>
+                }
+            }
+        </div>
+    }
+
+    <small class="review-suggested-person-help">
+        Matches only the current rank-one suggestion for the selected model. Smart Collection visibility does not hide people here.
+    </small>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+
+    [Parameter]
+    public string SelectedPersonId { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> SelectedPersonIdChanged { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    private string Search { get; set; } = string.Empty;
+
+    private ReviewPersonResponse? SelectedPerson =>
+        People.FirstOrDefault(person => person.Id == SelectedPersonId);
+
+    private IReadOnlyList<ReviewPersonResponse> FilteredPeople => People
+        .Where(person =>
+            person.Id != SelectedPersonId &&
+            (string.IsNullOrWhiteSpace(Search) ||
+             person.DisplayName.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase)))
+        .OrderByDescending(person => person.IsFavorite)
+        .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+        .ThenBy(person => person.Id, StringComparer.Ordinal)
+        .ToArray();
+
+    private async Task SelectAsync(string personId)
+    {
+        Search = string.Empty;
+        await SelectedPersonIdChanged.InvokeAsync(personId);
+    }
+
+    private async Task ClearAsync()
+    {
+        Search = string.Empty;
+        await SelectedPersonIdChanged.InvokeAsync(string.Empty);
+    }
+}

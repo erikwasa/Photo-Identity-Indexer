@@ -27,12 +27,14 @@ public static class SuggestionGalleryEndpoints
         string? processingRunId = null,
         string sort = CatalogueSuggestionGallerySorts.CreatedDescending,
         string confidenceGroup = CatalogueSuggestionConfidenceFilters.All,
+        string? suggestedPersonId = null,
         CancellationToken cancellationToken = default)
     {
         if (!TryModelRevision(modelId, modelHash, out ModelId parsedModelId, out Sha256Digest parsedModelHash) ||
-            !TryProcessingRunId(processingRunId, out ProcessingRunId? parsedRunId))
+            !TryProcessingRunId(processingRunId, out ProcessingRunId? parsedRunId) ||
+            !TryPersonId(suggestedPersonId, out PersonId? parsedSuggestedPersonId))
         {
-            return BadRequest("An exact suggestion model revision and a valid processing run are required.");
+            return BadRequest("An exact suggestion model revision, valid processing run, and valid suggested person are required.");
         }
 
         try
@@ -46,6 +48,7 @@ public static class SuggestionGalleryEndpoints
                 parsedRunId,
                 sort,
                 confidenceGroup,
+                parsedSuggestedPersonId,
                 cancellationToken);
             return Results.Ok(new ReviewFacePageResponse(
                 page.Items.Select(ToResponse).ToArray(),
@@ -70,13 +73,15 @@ public static class SuggestionGalleryEndpoints
         string? processingRunId = null,
         string sort = CatalogueSuggestionGallerySorts.CreatedDescending,
         string confidenceGroup = CatalogueSuggestionConfidenceFilters.All,
+        string? suggestedPersonId = null,
         CancellationToken cancellationToken = default)
     {
         if (!TryFaceOccurrenceId(id, out FaceOccurrenceId faceOccurrenceId) ||
             !TryModelRevision(modelId, modelHash, out ModelId parsedModelId, out Sha256Digest parsedModelHash) ||
-            !TryProcessingRunId(processingRunId, out ProcessingRunId? parsedRunId))
+            !TryProcessingRunId(processingRunId, out ProcessingRunId? parsedRunId) ||
+            !TryPersonId(suggestedPersonId, out PersonId? parsedSuggestedPersonId))
         {
-            return BadRequest("The face, exact suggestion model revision, or processing run is invalid.");
+            return BadRequest("The face, exact suggestion model revision, processing run, or suggested person is invalid.");
         }
 
         CatalogueReviewFace? face = await reviewRepository.GetFaceAsync(faceOccurrenceId, cancellationToken);
@@ -105,6 +110,7 @@ public static class SuggestionGalleryEndpoints
                 parsedRunId,
                 sort,
                 confidenceGroup,
+                parsedSuggestedPersonId,
                 cancellationToken);
             return Results.Ok(new ReviewFaceDetailsResponse(
                 ToDetailsResponse(face),
@@ -204,6 +210,23 @@ public static class SuggestionGalleryEndpoints
         }
 
         id = ProcessingRunId.From(parsed);
+        return true;
+    }
+
+    private static bool TryPersonId(string? value, out PersonId? id)
+    {
+        id = null;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        if (!Guid.TryParse(value, out Guid parsed) || parsed == Guid.Empty)
+        {
+            return false;
+        }
+
+        id = PersonId.From(parsed);
         return true;
     }
 

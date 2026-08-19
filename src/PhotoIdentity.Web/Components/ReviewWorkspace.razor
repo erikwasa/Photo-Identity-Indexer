@@ -82,6 +82,11 @@
             </select>
         </div>
 
+        <ReviewSuggestedPersonPicker People="People"
+                                     SelectedPersonId="@SuggestedPersonId"
+                                     SelectedPersonIdChanged="ChangeSuggestedPersonAsync"
+                                     Disabled="@(Loading || SelectedModel is null)" />
+
         <div>
             <label class="field-label" for="review-confidence-group">Confidence group</label>
             <select id="review-confidence-group"
@@ -157,7 +162,7 @@ else if (Faces.Count == 0)
 {
     <section class="empty-state">
         <h2>No faces in this view</h2>
-        <p>Choose another review state, run, model, or process additional photos.</p>
+        <p>Choose another review state, run, model, suggested person, confidence group, or process additional photos.</p>
     </section>
 }
 else
@@ -314,6 +319,7 @@ else
     [Parameter] public string? QueryModelId { get; set; }
     [Parameter] public string? QueryModelHash { get; set; }
     [Parameter] public string? QueryConfidenceGroup { get; set; }
+    [Parameter] public string? QuerySuggestedPersonId { get; set; }
     [Parameter] public int QueryLoaded { get; set; }
 
     private ReviewFilterOptionsResponse Options { get; set; } = new([], []);
@@ -323,6 +329,7 @@ else
     private string State { get; set; } = "unreviewed";
     private string Sort { get; set; } = DefaultSuggestionSort;
     private string ConfidenceGroup { get; set; } = AllConfidenceGroups;
+    private string SuggestedPersonId { get; set; } = "";
     private string SelectedRunIndex { get; set; } = "";
     private string SelectedModelIndex { get; set; } = "";
     private string NewPersonName { get; set; } = "";
@@ -416,6 +423,10 @@ else
         {
             BulkPersonId = People.FirstOrDefault()?.Id ?? "";
         }
+        if (People.All(person => person.Id != SuggestedPersonId))
+        {
+            SuggestedPersonId = "";
+        }
     }
 
     private void ResolveQuerySelections()
@@ -449,6 +460,11 @@ else
                           ConfidenceFilters.Any(option => option.Value == QueryConfidenceGroup)
             ? QueryConfidenceGroup!
             : AllConfidenceGroups;
+
+        SuggestedPersonId = SelectedModel is not null &&
+                            People.Any(person => person.Id == QuerySuggestedPersonId)
+            ? QuerySuggestedPersonId!
+            : "";
 
         string fallbackSort = SelectedModel is null ? CreatedSort : DefaultSuggestionSort;
         Sort = SortOptions.Any(option => option.Value == QuerySort && (!option.RequiresModel || SelectedModel is not null))
@@ -529,6 +545,10 @@ else
             query.Add($"modelId={Uri.EscapeDataString(model.ModelId)}");
             query.Add($"modelHash={Uri.EscapeDataString(model.ModelHash)}");
             query.Add($"confidenceGroup={Uri.EscapeDataString(ConfidenceGroup)}");
+            if (!string.IsNullOrWhiteSpace(SuggestedPersonId))
+            {
+                query.Add($"suggestedPersonId={Uri.EscapeDataString(SuggestedPersonId)}");
+            }
             return $"api/review/suggestion-faces?{string.Join("&", query)}";
         }
 
@@ -557,12 +577,21 @@ else
         {
             Sort = CreatedSort;
             ConfidenceGroup = AllConfidenceGroups;
+            SuggestedPersonId = "";
         }
         else if (Sort == CreatedSort)
         {
             Sort = DefaultSuggestionSort;
         }
 
+        await ApplyFiltersAsync();
+    }
+
+    private async Task ChangeSuggestedPersonAsync(string personId)
+    {
+        SuggestedPersonId = SelectedModel is not null && People.Any(person => person.Id == personId)
+            ? personId
+            : "";
         await ApplyFiltersAsync();
     }
 
@@ -637,6 +666,10 @@ else
             query.Add($"modelId={Uri.EscapeDataString(model.ModelId)}");
             query.Add($"modelHash={Uri.EscapeDataString(model.ModelHash)}");
             query.Add($"confidenceGroup={Uri.EscapeDataString(ConfidenceGroup)}");
+            if (!string.IsNullOrWhiteSpace(SuggestedPersonId))
+            {
+                query.Add($"suggestedPersonId={Uri.EscapeDataString(SuggestedPersonId)}");
+            }
         }
         if (includeLoaded)
         {

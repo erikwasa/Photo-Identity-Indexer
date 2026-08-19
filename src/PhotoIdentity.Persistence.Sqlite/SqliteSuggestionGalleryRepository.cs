@@ -131,6 +131,7 @@ public sealed class SqliteSuggestionGalleryRepository
         ProcessingRunId? processingRunId = null,
         string sort = CatalogueSuggestionGallerySorts.CreatedDescending,
         string confidenceGroup = CatalogueSuggestionConfidenceFilters.All,
+        PersonId? suggestedPersonId = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
@@ -140,7 +141,7 @@ public sealed class SqliteSuggestionGalleryRepository
         }
 
         IdentitySuggestionPolicy policy = await _policyRepository.GetAsync(modelId, modelHash, cancellationToken);
-        string predicate = BuildPredicate(state, processingRunId, confidenceGroup);
+        string predicate = BuildPredicate(state, processingRunId, confidenceGroup, suggestedPersonId);
         string orderBy = SortExpression(sort);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
 
@@ -154,7 +155,7 @@ public sealed class SqliteSuggestionGalleryRepository
             ORDER BY {orderBy}
             LIMIT $limit OFFSET $offset;
             """;
-        AddParameters(command, modelId, modelHash, processingRunId, policy);
+        AddParameters(command, modelId, modelHash, processingRunId, policy, suggestedPersonId);
         command.Parameters.AddWithValue("$limit", limit);
         command.Parameters.AddWithValue("$offset", offset);
 
@@ -174,7 +175,7 @@ public sealed class SqliteSuggestionGalleryRepository
             {From}
             WHERE {predicate};
             """;
-        AddParameters(countCommand, modelId, modelHash, processingRunId, policy);
+        AddParameters(countCommand, modelId, modelHash, processingRunId, policy, suggestedPersonId);
         object? count = await countCommand.ExecuteScalarAsync(cancellationToken);
         return new CatalogueSuggestionGalleryPage(
             items,
@@ -191,11 +192,12 @@ public sealed class SqliteSuggestionGalleryRepository
         ProcessingRunId? processingRunId = null,
         string sort = CatalogueSuggestionGallerySorts.CreatedDescending,
         string confidenceGroup = CatalogueSuggestionConfidenceFilters.All,
+        PersonId? suggestedPersonId = null,
         CancellationToken cancellationToken = default)
     {
         string normalizedSort = NormalizeSort(sort);
         IdentitySuggestionPolicy policy = await _policyRepository.GetAsync(modelId, modelHash, cancellationToken);
-        string predicate = BuildPredicate(state, processingRunId, confidenceGroup);
+        string predicate = BuildPredicate(state, processingRunId, confidenceGroup, suggestedPersonId);
         string orderBy = SortExpression(normalizedSort);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
 
@@ -216,7 +218,7 @@ public sealed class SqliteSuggestionGalleryRepository
             FROM scoped_faces
             WHERE id = $face_occurrence_id;
             """;
-        AddParameters(command, modelId, modelHash, processingRunId, policy);
+        AddParameters(command, modelId, modelHash, processingRunId, policy, suggestedPersonId);
         command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
 
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -236,7 +238,8 @@ public sealed class SqliteSuggestionGalleryRepository
     private static string BuildPredicate(
         string state,
         ProcessingRunId? processingRunId,
-        string confidenceGroup)
+        string confidenceGroup,
+        PersonId? suggestedPersonId)
     {
         List<string> predicates = [StatePredicate(state), ConfidencePredicate(confidenceGroup)];
         if (processingRunId is not null)
@@ -250,6 +253,11 @@ public sealed class SqliteSuggestionGalleryRepository
                 """);
         }
 
+        if (suggestedPersonId is not null)
+        {
+            predicates.Add("top_suggestion.suggested_person_id = $suggested_person_id");
+        }
+
         return string.Join(" AND ", predicates.Select(value => $"({value})"));
     }
 
@@ -258,7 +266,8 @@ public sealed class SqliteSuggestionGalleryRepository
         ModelId modelId,
         Sha256Digest modelHash,
         ProcessingRunId? processingRunId,
-        IdentitySuggestionPolicy policy)
+        IdentitySuggestionPolicy policy,
+        PersonId? suggestedPersonId)
     {
         command.Parameters.AddWithValue("$model_id", modelId.ToString());
         command.Parameters.AddWithValue("$model_hash", modelHash.ToString());
@@ -268,6 +277,10 @@ public sealed class SqliteSuggestionGalleryRepository
         if (processingRunId is ProcessingRunId runId)
         {
             command.Parameters.AddWithValue("$processing_run_id", runId.ToString());
+        }
+        if (suggestedPersonId is PersonId personId)
+        {
+            command.Parameters.AddWithValue("$suggested_person_id", personId.ToString());
         }
     }
 

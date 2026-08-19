@@ -593,26 +593,40 @@ work_items:
 - id: WI-0073
   title: Polish cards, menus and archive navigation
   milestone: M20
-  status: ready
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0073-ui-navigation-polish.md
+  started_at: 2026-08-19
+  last_updated_at: 2026-08-20
+  branch: agent/WI-0073-ui-navigation-polish
   blockers:
   - WI-0061
   - WI-0066
   - WI-0068
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/196
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32309615851
+  - type: merge_commit
+    value: bb52ae10470262e6e7a0573a0b70671af207ca49
 - id: WI-0074
   title: Filter Face Review by suggested person
   milestone: M20
-  status: ready
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0074-face-review-suggested-person-filter.md
+  started_at: 2026-08-20
+  last_updated_at: 2026-08-20
+  branch: agent/WI-0074-suggested-person-filter
   blockers:
   - WI-0043
   - WI-0047
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/197
 - id: WI-0075
   title: Make GeoNames background timing configurable from launcher settings
   milestone: M20

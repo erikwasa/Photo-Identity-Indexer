@@ -1,0 +1,71 @@
+.review-suggested-person-picker {
+    display: grid;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.review-suggested-person-selected,
+.review-suggested-person-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid var(--line, #d8dde6);
+    border-radius: 0.65rem;
+    background: var(--surface, #fff);
+}
+
+.review-suggested-person-selected > div,
+.review-suggested-person-option > span:first-child {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.45rem;
+    min-width: 0;
+}
+
+.review-suggested-person-selected strong,
+.review-suggested-person-option strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.review-suggested-person-results {
+    display: grid;
+    gap: 0.35rem;
+    max-height: 14rem;
+    overflow: auto;
+}
+
+.review-suggested-person-results > p {
+    margin: 0;
+    color: var(--muted, #667085);
+    font-size: 0.88rem;
+}
+
+.review-suggested-person-option {
+    width: 100%;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.review-suggested-person-option:hover,
+.review-suggested-person-option:focus-visible {
+    box-shadow: inset 0 0 0 2px currentColor;
+}
+
+.review-suggested-person-add,
+.review-suggested-person-help {
+    color: var(--muted, #667085);
+    font-size: 0.82rem;
+}
+
+.review-suggested-person-add {
+    flex: 0 0 auto;
+    font-weight: 700;
+}
