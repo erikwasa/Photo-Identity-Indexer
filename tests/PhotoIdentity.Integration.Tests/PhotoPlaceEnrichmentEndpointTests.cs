@@ -111,23 +111,18 @@ public sealed class PhotoPlaceEnrichmentEndpointTests
         }
     }
 
-    private sealed class PlaceEnrichmentApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class PlaceEnrichmentApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-        private readonly string? _username;
-
         public PlaceEnrichmentApiFactory(string databasePath, string? username)
+            : base(
+                databasePath,
+                builder =>
+                {
+                    builder.UseSetting("PhotoIdentity:GeoNames:Username", username ?? string.Empty);
+                    builder.UseSetting("PhotoIdentity:GeoNames:MinimumRequestIntervalMilliseconds", "0");
+                    builder.UseSetting("PhotoIdentity:GeoNames:AutomaticEnrichmentEnabled", "false");
+                })
         {
-            _databasePath = databasePath;
-            _username = username;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
-            builder.UseSetting("PhotoIdentity:GeoNames:Username", _username ?? string.Empty);
-            builder.UseSetting("PhotoIdentity:GeoNames:MinimumRequestIntervalMilliseconds", "0");
-            builder.UseSetting("PhotoIdentity:GeoNames:AutomaticEnrichmentEnabled", "false");
         }
     }
 }
