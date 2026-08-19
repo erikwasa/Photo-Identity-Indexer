@@ -6,24 +6,24 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0070 — Streamline pull-request validation and stabilize integration tests** now has three independent successful sub-six-minute PR samples after Slice 3: PR #180 at about 3m37s, PR #182 at about 4m15s, and PR #186 workflow #1157 at about 3m04s overall. PR #184/#186 also demonstrated substantial hosted-runner timing variance, so timing baselines should not be rebalanced from a single pathological run. The remaining stability work is owned by WI-0071.
+**WI-0070 — Streamline pull-request validation and stabilize integration tests** has three independent successful sub-six-minute PR samples after Slice 3: PR #180 at about 3m37s, PR #182 at about 4m15s, and PR #186 workflow #1157 at about 3m04s overall. PR #184/#186 also demonstrated substantial hosted-runner timing variance, so timing baselines should not be rebalanced from a single pathological run. The remaining stability work is owned by WI-0071.
 
-**WI-0071 — Stabilize quarantined API integration tests** is the active implementation focus. Four transient-500 endpoint tests remain in `.github/flaky-integration-tests.txt`; they execute once per workflow in the visible non-blocking diagnostic lane with no automatic retries.
+**WI-0071 — Stabilize quarantined API integration tests** is the active implementation focus. PR #187 removes only `ReviewProgressFilterApplicationTests.Model_filter_requires_both_model_id_and_exact_hash` from `.github/flaky-integration-tests.txt` after its shared-host migration and three consecutive representative clean diagnostic runs.
 
-PR #186 Slice 3 migrated `CollectionQueryApplicationTests` plus the generic API hosts surfaced by required-shard validation (`SmartCollectionPlaceLocationTests`, `PersonFeaturedFaceApplicationTests`, `BulkSuggestionReviewApplicationTests`, `ReviewApplicationTests`, `PhotoPlaceEnrichmentEndpointTests`, `CollectionOriginalAccessApplicationTests`, and `PhotoDetailsApplicationTests`) onto `PhotoIdentityApiTestFactory`. Custom proxy, GeoNames, Files-on-Demand, hydration-policy, and storage-probe test settings were preserved through the shared configuration callback. No assertions or quarantine membership were weakened.
+Workflow #1161 (`32274508367`) proves the restoration behavior on the substantive one-line change: the diagnostic lane ran exactly **3** remaining quarantined tests once with no retries; integration shard 1 passed **156/156** required tests and shard 2 passed **143/143**, with planned=results=unique and zero quarantined results in both shards. The total required count is therefore **299**, exactly one higher than the pre-restoration 298-test gate, proving the restored review-progress case returned to blocking coverage exactly once.
 
-Workflow #1157 (`32204959714`) is the first fully green substantive head after that sweep: build/fast tests, all four diagnostics, docs, PublishedMinimum, mixed-media verification, and both exact-coverage integration shards passed; launcher/package were skipped. PR #186 counts as one representative clean diagnostic sample, advancing review-progress to **3/3**, person-visibility to **2/3**, and collection-query to **1/3**. Suggestion-gallery has not yet received its stabilization migration.
+The same representative #1161 diagnostic run advances the still-quarantined post-change counters to: person-visibility **3/3**, collection-query **2/3**, and suggestion-gallery **not started** because its shared-host stabilization migration has not yet occurred.
 
 M19 feature work remains separately in review/in progress and must be preserved when branches are synchronized with `main`.
 
 ## Next concrete step
 
-1. Merge PR #186 after its documentation-only final-head validation is green.
-2. Restore only `ReviewProgressFilterApplicationTests.Model_filter_requires_both_model_id_and_exact_hash` from `.github/flaky-integration-tests.txt` in a separate PR and prove it executes exactly once in required-shard coverage.
-3. Migrate `ReviewSuggestionGalleryApplicationTests` to the shared host so all four original quarantine classes have a stabilization change.
-4. Continue natural diagnostic samples: person-visibility needs 1 more, collection-query needs 2 more, and suggestion-gallery will need 3 after migration.
-5. Remove each quarantine entry only when its own three-run criterion is satisfied; never use automatic retries as a substitute.
-6. Keep WI-0070 timing variance as measured evidence; the three successful sub-six-minute samples are now satisfied.
+1. Merge PR #187 after its final-head documentation/handoff validation remains green.
+2. Migrate `ReviewSuggestionGalleryApplicationTests` to `PhotoIdentityApiTestFactory` next so the last original quarantine case begins its own post-change evidence window.
+3. Keep person-visibility quarantined for one more PR despite already reaching 3/3; after the suggestion-gallery migration, restore person-visibility in a separate PR so that restoration run also advances suggestion-gallery naturally.
+4. Collection-query is at **2/3** and should reach **3/3** on the suggestion-gallery migration PR if that diagnostic lane is clean; restore it only in a later separate PR.
+5. Continue one-entry-at-a-time quarantine removal with exact required-shard coverage and no automatic retries.
+6. Reconcile the stale formal WI-0070/WI-0071 registry lifecycle when the stabilization work is being closed; do not mix registry-only churn into an attributable quarantine-restoration code change.
 
 ## Relevant files
 
