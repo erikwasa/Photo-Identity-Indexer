@@ -86,6 +86,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteAssetCatalogueRepository>();
         builder.Services.AddSingleton<SqlitePhotoMetadataBackfillRepository>();
         builder.Services.AddSingleton<SqliteExtendedPhotoMetadataRepository>();
+        builder.Services.AddSingleton<SqlitePhotoMetadataInspectionRepository>();
         builder.Services.AddSingleton<SqlitePhotoTagRepository>();
         builder.Services.AddSingleton<SqlitePhotoPlaceRepository>();
         builder.Services.AddSingleton<SqlitePhotoPlaceEnrichmentRepository>();
@@ -141,6 +142,7 @@ public partial class Program
         SqliteCatalogueDatabase catalogueDatabase = app.Services.GetRequiredService<SqliteCatalogueDatabase>();
         await catalogueDatabase.InitializeAsync();
         await SqliteExtendedPhotoMetadataSchema.EnsureAsync(catalogueDatabase);
+        await SqlitePhotoMetadataInspectionSchema.EnsureAsync(catalogueDatabase);
         await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(catalogueDatabase);
         await SqlitePhotoPlaceEnrichmentSchema.EnsureAsync(catalogueDatabase);
 
