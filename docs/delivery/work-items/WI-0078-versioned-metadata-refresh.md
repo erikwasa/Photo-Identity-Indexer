@@ -5,7 +5,7 @@ milestone: M20
 status_source: ../status/work-items.yaml
 depends_on: [WI-0072]
 related_adrs: []
-affected_modules: [PhotoIdentity.Api, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Source.Local, documentation]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Source.Local, documentation]
 ---
 
 # WI-0078: Reprocess stale photo metadata after extraction-contract changes
@@ -14,7 +14,7 @@ affected_modules: [PhotoIdentity.Api, PhotoIdentity.Persistence.Sqlite, PhotoIde
 
 Ensure catalogue revisions that were inspected by an older metadata reader are automatically eligible for bounded re-inspection when Photo Identity adds or changes supported metadata fields.
 
-The current backfill selector only chooses revisions with no `photo_capture_metadata` row. A revision inspected before WI-0072 therefore looks complete even though newer fields such as camera/lens/exposure/raw tags may never have been extracted.
+Before this item, the backfill selector only chose revisions with no `photo_capture_metadata` row. A revision inspected before WI-0072 therefore looked complete even though newer fields such as camera/lens/exposure/raw tags might never have been extracted.
 
 ## Contract
 
@@ -22,37 +22,70 @@ The current backfill selector only chooses revisions with no `photo_capture_meta
 - Treat legacy inspection rows that predate versioning as an older version rather than as permanently current.
 - Define one current extraction contract version in code; bump it intentionally when persisted metadata semantics or supported fields materially change.
 - The normal metadata backfill candidate query selects revisions that are either uninspected **or stale** (`stored version < current version`).
-- Re-inspection replaces the revision-bound structured/extended/raw metadata atomically enough that a failed refresh does not leave a row falsely marked current.
+- Re-inspection replaces the revision-bound structured/extended/raw metadata safely enough that a failed refresh does not leave a row falsely marked current.
 - Preserve existing capture-time/GPS semantics and do not mutate manual Places, people, tags or other operator-controlled metadata.
 - Keep the existing safety boundary: historical refresh only reads an already-local source whose size/SHA-256 still matches the immutable catalogue revision; it does not independently hydrate OneDrive content.
 - Provide an explicit force/repair mode for re-reading even current-version rows when diagnosing parser changes or corrupted persisted metadata.
-- Report counts that distinguish newly inspected, stale-version refreshed, current/skipped, online-only deferred, changed and unavailable revisions.
+- Report counts that distinguish newly inspected, stale-version refreshed, forced-current refreshed, online-only deferred, changed and unavailable revisions.
 - Document how operators can run the refresh in bounded batches for an existing catalogue.
 
-## Migration strategy
+## Implementation
 
-A practical first migration is:
+`PhotoMetadataExtractionContract` defines legacy contract version `1` and current richer WI-0072 contract version `2`.
 
-1. add an `extraction_contract_version` (or equivalent) to the durable metadata inspection marker;
-2. treat existing rows without a version as legacy version `1`;
-3. define the richer WI-0072 reader contract as the next current version;
-4. allow `/api/photo-metadata/backfill` to select legacy/stale rows as well as missing rows;
-5. only write the current version after the complete structured + extended/raw metadata save succeeds.
+A separate `photo_metadata_inspections` table records the extraction-contract version completed for each immutable revision. The stable WI-0050 `photo_capture_metadata` table is not repurposed or widened for versioning. Existing capture rows with no version marker are therefore naturally interpreted as legacy version 1.
 
-This lets existing JPEG/HEIC revisions acquire newly supported fields without deleting metadata rows manually or pretending they were never inspected.
+`PhotoMetadataInspectionService` writes in this order:
+
+1. extended/rich metadata;
+2. capture-time/GPS metadata;
+3. the current extraction-version marker **last**.
+
+If the process stops or a write fails before step 3, the revision remains missing/stale and is eligible for a later retry. Archive advancement's existing `IsInspectedAsync` guard now means **current extraction contract complete**, so a stale revision that the bounded archive workflow already has local can also be refreshed before continuing.
+
+The normal `POST /api/photo-metadata/backfill` candidate query now includes:
+
+- revisions with no capture-metadata row;
+- revisions with a capture row but no inspection-version marker (legacy version 1);
+- revisions whose stored version is below the current version.
+
+Current-version rows are omitted by default. `force=true` deliberately selects them too for parser/repair diagnostics. Both modes retain the existing local-only, size/SHA-256 verified behavior and never request OneDrive hydration solely for metadata.
+
+The response keeps total `Candidates`/`Persisted` and additionally reports `NewlyInspected`, `RefreshedStale`, `ForcedCurrentRefresh`, `CurrentContractVersion` and whether `Force` was requested.
+
+## Operator use after merge
+
+Normal historical upgrade (recommended):
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri "http://127.0.0.1:5080/api/photo-metadata/backfill?limit=1000&offset=0"
+```
+
+This automatically includes older already-inspected rows whose extraction contract is stale. Do not delete existing metadata first.
+
+Explicit repair of current-version local rows:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri "http://127.0.0.1:5080/api/photo-metadata/backfill?limit=1000&offset=0&force=true"
+```
+
+As before, online-only originals are deferred. To refresh those, make the desired OneDrive folder/files local through normal operator/OneDrive behavior and run bounded backfill again.
 
 ## Acceptance criteria
 
-- [ ] Existing pre-version metadata rows are recognized as stale after migration.
-- [ ] Default backfill processes both missing and stale metadata rows while skipping current-version rows.
-- [ ] A revision that already has capture date/GPS but lacks newer WI-0072 fields can be re-inspected and gains those fields when present in the original.
-- [ ] A successful refresh records the current extraction contract version.
-- [ ] Failed/deferred refresh does not falsely mark a revision current.
-- [ ] Online-only originals remain deferred and no metadata-only hydration is requested.
-- [ ] Manual Place and other operator-controlled metadata are untouched.
-- [ ] A force/repair path can intentionally refresh current rows without changing the default bounded behavior.
-- [ ] API/reporting and operator documentation clearly distinguish new inspection from stale refresh.
-- [ ] Tests cover legacy row migration, stale refresh, current-row skip, force refresh and online-only deferral.
+- [x] Existing pre-version metadata rows are recognized as stale by the implementation.
+- [x] Default backfill processes both missing and stale metadata rows while skipping current-version rows.
+- [x] A revision that already has capture date/GPS but lacks newer WI-0072 fields can be re-inspected and gains those fields when present in the original.
+- [x] A successful refresh records the current extraction contract version.
+- [x] Failed/deferred refresh cannot falsely mark a revision current because the version marker is written last.
+- [x] Online-only originals remain deferred and no metadata-only hydration is requested.
+- [x] Manual Place and other operator-controlled metadata are outside the refresh persistence path and remain untouched.
+- [x] A force/repair path can intentionally refresh current rows without changing the default bounded behavior.
+- [x] API/reporting and operator documentation distinguish new inspection from stale and forced-current refresh.
+- [x] Focused integration tests cover legacy stale refresh, current-row skip, force refresh, version persistence and online-only deferral.
+- [ ] Final exact-head CI passes after the stacked branch is retargeted to `main` following PR #194 merge.
 
 ## Non-goals
 
