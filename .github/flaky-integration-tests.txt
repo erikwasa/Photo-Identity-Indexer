@@ -1,8 +1,5 @@
 # Temporarily quarantined integration tests.
 #
-# These tests remain visible in the non-blocking flaky diagnostic step and are never retried.
-# WI-0071 owns stabilization. Return an entry to the required integration shards after its
-# root cause/shared-host migration is complete and it passes three consecutive diagnostic runs
-# without a transient HTTP 500.
-
-PhotoIdentity_Integration_Tests.ReviewSuggestionGalleryApplicationTests.Gallery_requires_exact_model_revision_and_rejects_unknown_sort_or_confidence_group
+# No active quarantine entries remain after WI-0071 restoration.
+# Keep this file present because the diagnostic script reads it unconditionally; comment-only
+# content makes the diagnostic step exit successfully with zero configured tests.
