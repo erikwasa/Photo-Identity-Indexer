@@ -1,12 +1,38 @@
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
+public sealed record PhotoMetadataRefreshCandidate(
+    AssetRevisionId RevisionId,
+    Sha256Digest ContentHash,
+    long SizeBytes,
+    string RootLocator,
+    string SourceKey,
+    string? MediaType,
+    bool HasCaptureMetadata,
+    int? ExtractionContractVersion)
+{
+    public bool IsNew => !HasCaptureMetadata;
+
+    public bool IsStale(int currentVersion) =>
+        HasCaptureMetadata &&
+        (ExtractionContractVersion ?? PhotoMetadataExtractionContract.LegacyVersion) < currentVersion;
+
+    public PhotoMetadataBackfillCandidate ToBackfillCandidate() => new(
+        RevisionId,
+        ContentHash,
+        SizeBytes,
+        RootLocator,
+        SourceKey,
+        MediaType);
+}
+
 /// <summary>
-/// Pages revisions that have not yet received a capture-metadata inspection record.
-/// Paging lets the executor move beyond deferred online-only placeholders without marking them complete.
+/// Pages revisions that are missing metadata or were inspected using an older extraction contract.
+/// Paging lets the executor move beyond deferred online-only placeholders without marking them current.
 /// </summary>
 public sealed class SqlitePhotoMetadataBackfillRepository
 {
@@ -23,14 +49,35 @@ public sealed class SqlitePhotoMetadataBackfillRepository
         int offset,
         CancellationToken cancellationToken = default)
     {
+        IReadOnlyList<PhotoMetadataRefreshCandidate> candidates = await GetRefreshCandidatesAsync(
+            limit,
+            offset,
+            PhotoMetadataExtractionContract.CurrentVersion,
+            force: false,
+            cancellationToken);
+        return candidates.Select(candidate => candidate.ToBackfillCandidate()).ToArray();
+    }
+
+    public async Task<IReadOnlyList<PhotoMetadataRefreshCandidate>> GetRefreshCandidatesAsync(
+        int limit,
+        int offset,
+        int currentVersion,
+        bool force,
+        CancellationToken cancellationToken = default)
+    {
         if (limit is < 1 or > 1000)
         {
             throw new ArgumentOutOfRangeException(nameof(limit), "Metadata backfill page size must be between 1 and 1000.");
         }
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        if (currentVersion <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(currentVersion));
+        }
 
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await EnsurePhotoMetadataSchemaAsync(connection, cancellationToken);
+        await SqlitePhotoMetadataInspectionSchema.EnsureAsync(connection, cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT
@@ -39,32 +86,47 @@ public sealed class SqlitePhotoMetadataBackfillRepository
                 asset_revisions.size_bytes,
                 sources.root_locator,
                 assets.source_key,
-                asset_revisions.media_type
+                asset_revisions.media_type,
+                photo_capture_metadata.asset_revision_id,
+                photo_metadata_inspections.extraction_contract_version
             FROM asset_revisions
             INNER JOIN assets ON assets.id = asset_revisions.asset_id
             INNER JOIN sources ON sources.id = assets.source_id
             LEFT JOIN photo_capture_metadata
                 ON photo_capture_metadata.asset_revision_id = asset_revisions.id
-            WHERE photo_capture_metadata.asset_revision_id IS NULL
-              AND assets.deleted_at_utc IS NULL
+            LEFT JOIN photo_metadata_inspections
+                ON photo_metadata_inspections.asset_revision_id = asset_revisions.id
+            WHERE assets.deleted_at_utc IS NULL
               AND sources.kind = 'local-folder'
+              AND (
+                    $force = 1
+                    OR photo_capture_metadata.asset_revision_id IS NULL
+                    OR COALESCE(
+                        photo_metadata_inspections.extraction_contract_version,
+                        $legacy_version) < $current_version
+                  )
             ORDER BY asset_revisions.observed_at_utc, asset_revisions.id
             LIMIT $limit OFFSET $offset;
             """;
+        command.Parameters.AddWithValue("$force", force ? 1 : 0);
+        command.Parameters.AddWithValue("$legacy_version", PhotoMetadataExtractionContract.LegacyVersion);
+        command.Parameters.AddWithValue("$current_version", currentVersion);
         command.Parameters.AddWithValue("$limit", limit);
         command.Parameters.AddWithValue("$offset", offset);
 
-        List<PhotoMetadataBackfillCandidate> candidates = [];
+        List<PhotoMetadataRefreshCandidate> candidates = [];
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            candidates.Add(new PhotoMetadataBackfillCandidate(
+            candidates.Add(new PhotoMetadataRefreshCandidate(
                 AssetRevisionId.From(Guid.Parse(reader.GetString(0))),
                 new Sha256Digest(reader.GetString(1)),
                 reader.GetInt64(2),
                 reader.GetString(3),
                 reader.GetString(4),
-                reader.IsDBNull(5) ? null : reader.GetString(5)));
+                reader.IsDBNull(5) ? null : reader.GetString(5),
+                !reader.IsDBNull(6),
+                reader.IsDBNull(7) ? null : reader.GetInt32(7)));
         }
 
         return candidates;

@@ -11,6 +11,7 @@ public static class PhotoMetadataEndpoints
     private static async Task<IResult> BackfillAsync(
         int? limit,
         int? offset,
+        bool? force,
         PhotoMetadataBackfillService service,
         CancellationToken cancellationToken)
     {
@@ -19,6 +20,7 @@ public static class PhotoMetadataEndpoints
             PhotoMetadataBackfillReport report = await service.ExecuteBatchAsync(
                 limit ?? 250,
                 offset ?? 0,
+                force ?? false,
                 cancellationToken);
             return Results.Ok(report);
         }
