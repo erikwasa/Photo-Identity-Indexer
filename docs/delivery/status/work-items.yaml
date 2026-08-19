@@ -616,33 +616,47 @@ work_items:
 - id: WI-0075
   title: Make GeoNames background timing configurable from launcher settings
   milestone: M20
-  status: ready
+  status: proposed
   owner: unassigned
   document: ../work-items/WI-0075-geonames-timing-settings.md
   blockers:
   - WI-0065
-  blocker_notes: []
+  blocker_notes:
+  - Design is ready, but lifecycle remains proposed until WI-0065 is formally completed.
   evidence: []
 - id: WI-0076
   title: Improve archive processing throughput
   milestone: M20
-  status: ready
+  status: proposed
   owner: unassigned
   document: ../work-items/WI-0076-archive-throughput.md
   blockers:
   - WI-0042
   - WI-0072
-  blocker_notes: []
+  blocker_notes:
+  - Design is ready, but lifecycle remains proposed until the metadata/archive prerequisite is formally completed.
   evidence: []
 - id: WI-0077
   title: Simplify Photo Viewer metadata and location editing
   milestone: M20
-  status: ready
+  status: proposed
   owner: unassigned
   document: ../work-items/WI-0077-photo-viewer-simplification.md
   blockers:
   - WI-0061
   - WI-0063
   - WI-0072
-  blocker_notes: []
+  blocker_notes:
+  - Design is ready, but lifecycle remains proposed until WI-0072 is formally completed.
+  evidence: []
+- id: WI-0078
+  title: Reprocess stale photo metadata after extraction-contract changes
+  milestone: M20
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0078-versioned-metadata-refresh.md
+  blockers:
+  - WI-0072
+  blocker_notes:
+  - Current backfill only selects revisions with no metadata inspection marker; versioned stale-row refresh is required for catalogue rows inspected before richer metadata fields were added.
   evidence: []
