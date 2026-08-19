@@ -140,6 +140,7 @@ public partial class Program
         WebApplication app = builder.Build();
         SqliteCatalogueDatabase catalogueDatabase = app.Services.GetRequiredService<SqliteCatalogueDatabase>();
         await catalogueDatabase.InitializeAsync();
+        await SqliteExtendedPhotoMetadataSchema.EnsureAsync(catalogueDatabase);
         await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(catalogueDatabase);
         await SqlitePhotoPlaceEnrichmentSchema.EnsureAsync(catalogueDatabase);
 
