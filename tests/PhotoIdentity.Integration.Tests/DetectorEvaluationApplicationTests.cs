@@ -168,7 +168,7 @@ public sealed class DetectorEvaluationApplicationTests
             using HttpClient restartedClient = restartedFactory.CreateClient();
             using HttpResponseMessage sessionResponse = await restartedClient.GetAsync(
                 $"/api/detector-evaluation/sessions/{created.Id}");
-            sessionResponse.EnsureSuccessStatusCode();
+            await sessionResponse.EnsureSuccessWithDiagnosticBodyAsync("resumed detector-evaluation session request");
             string sessionJson = await sessionResponse.Content.ReadAsStringAsync();
             Assert.DoesNotContain(seeded.SourceRoot, sessionJson, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(sessionRoot, sessionJson, StringComparison.OrdinalIgnoreCase);
@@ -350,21 +350,13 @@ public sealed class DetectorEvaluationApplicationTests
         string SourceRoot,
         byte[] DetectedPhotoBytes);
 
-    private sealed class DetectorEvaluationApiFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
+    private sealed class DetectorEvaluationApiFactory : PhotoIdentityApiTestFactory
     {
-        private readonly string _databasePath;
-        private readonly string _sessionRoot;
-
         public DetectorEvaluationApiFactory(string databasePath, string sessionRoot)
+            : base(
+                databasePath,
+                builder => builder.UseSetting("PhotoIdentity:DetectorEvaluationRoot", sessionRoot))
         {
-            _databasePath = databasePath;
-            _sessionRoot = sessionRoot;
-        }
-
-        protected override void ConfigureWebHost(IWebHostBuilder builder)
-        {
-            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
-            builder.UseSetting("PhotoIdentity:DetectorEvaluationRoot", _sessionRoot);
         }
     }
 }
