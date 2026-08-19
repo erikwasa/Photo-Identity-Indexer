@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
 using PhotoIdentity.Api;
 using Xunit;
 
@@ -18,7 +17,9 @@ public sealed class PhotoPlaceEnrichmentEndpointTests
         {
             await using PlaceEnrichmentApiFactory factory = new(
                 Path.Combine(directory, "catalogue.db"),
-                username);
+                username,
+                automaticMinimumRequestIntervalMilliseconds: 45_000,
+                automaticIdlePollIntervalMilliseconds: 7_000);
             using HttpClient client = factory.CreateClient();
 
             using HttpResponseMessage response = await client.GetAsync("/api/place-enrichment/status");
@@ -32,9 +33,9 @@ public sealed class PhotoPlaceEnrichmentEndpointTests
             Assert.Equal("geonames", status.Provider);
             Assert.Equal("secure.geonames.org", status.ServiceHost);
             Assert.False(status.AutomaticEnrichmentEnabled);
-            Assert.Equal(
-                GeoNamesAutomaticEnrichmentConfiguration.SafeMinimumRequestIntervalMilliseconds,
-                status.AutomaticMinimumRequestIntervalMilliseconds);
+            Assert.Equal(45_000, status.AutomaticMinimumRequestIntervalMilliseconds);
+            Assert.Equal(7_000, status.AutomaticIdlePollIntervalMilliseconds);
+            Assert.Contains("7000 ms", status.AutomaticMessage, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain(username, payload, StringComparison.OrdinalIgnoreCase);
         }
         finally
@@ -113,7 +114,11 @@ public sealed class PhotoPlaceEnrichmentEndpointTests
 
     private sealed class PlaceEnrichmentApiFactory : PhotoIdentityApiTestFactory
     {
-        public PlaceEnrichmentApiFactory(string databasePath, string? username)
+        public PlaceEnrichmentApiFactory(
+            string databasePath,
+            string? username,
+            int automaticMinimumRequestIntervalMilliseconds = 30_000,
+            int automaticIdlePollIntervalMilliseconds = 5_000)
             : base(
                 databasePath,
                 builder =>
@@ -121,6 +126,12 @@ public sealed class PhotoPlaceEnrichmentEndpointTests
                     builder.UseSetting("PhotoIdentity:GeoNames:Username", username ?? string.Empty);
                     builder.UseSetting("PhotoIdentity:GeoNames:MinimumRequestIntervalMilliseconds", "0");
                     builder.UseSetting("PhotoIdentity:GeoNames:AutomaticEnrichmentEnabled", "false");
+                    builder.UseSetting(
+                        "PhotoIdentity:GeoNames:AutomaticMinimumRequestIntervalMilliseconds",
+                        automaticMinimumRequestIntervalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    builder.UseSetting(
+                        "PhotoIdentity:GeoNames:AutomaticIdlePollIntervalMilliseconds",
+                        automaticIdlePollIntervalMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture));
                 })
         {
         }
