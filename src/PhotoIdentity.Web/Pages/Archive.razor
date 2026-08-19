@@ -507,8 +507,10 @@ else
             Message = $"Included '{RelativeFolder}'.";
             RelativeFolder = string.Empty;
             ItemOffset = 0;
-            UpdateArchiveUrl();
-            await LoadItemsAsync();
+            if (!UpdateArchiveUrl())
+            {
+                await LoadItemsAsync();
+            }
         }
         catch (Exception exception)
         {
@@ -532,8 +534,10 @@ else
             Status = result.Status;
             Message = $"Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged local, {result.NeedsSourceVerification} needing re-verification, {result.UnverifiedSources} awaiting first verification, {result.OnlineOnlyFiles} online-only, {result.DownloadingFiles} downloading, {result.AvailabilityErrors + result.UnavailableFiles} availability issue(s), {result.MarkedMissing} marked missing.";
             ItemOffset = 0;
-            UpdateArchiveUrl();
-            await LoadItemsAsync();
+            if (!UpdateArchiveUrl())
+            {
+                await LoadItemsAsync();
+            }
         }
         catch (Exception exception)
         {
@@ -641,43 +645,48 @@ else
     private async Task ApplyItemFiltersAsync()
     {
         ItemOffset = 0;
-        UpdateArchiveUrl();
-        await LoadItemsAsync();
+        if (!UpdateArchiveUrl())
+        {
+            await LoadItemsAsync();
+        }
     }
 
     private async Task PreviousItemsAsync()
     {
         ItemOffset = Math.Max(0, ItemOffset - ItemPageSize);
-        UpdateArchiveUrl();
-        await LoadItemsAsync();
+        if (!UpdateArchiveUrl())
+        {
+            await LoadItemsAsync();
+        }
     }
 
     private async Task NextItemsAsync()
     {
         ItemOffset += ItemPageSize;
-        UpdateArchiveUrl();
-        await LoadItemsAsync();
-    }
-
-    private void UpdateArchiveUrl()
-    {
-        string target = BuildArchiveReturnUrl();
-        string current = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
-        if (!string.Equals(current, target, StringComparison.Ordinal))
+        if (!UpdateArchiveUrl())
         {
-            Navigation.NavigateTo(target, replace: true);
+            await LoadItemsAsync();
         }
     }
 
-    private string BuildArchiveReturnUrl() =>
-        $"/archive?folder={Uri.EscapeDataString(ItemFolder)}&availability={Uri.EscapeDataString(ItemAvailability)}&verification={Uri.EscapeDataString(ItemVerification)}&analysis={Uri.EscapeDataString(ItemAnalysis)}&offset={Math.Max(0, ItemOffset)}";
-
-    private string BuildPhotoUrl(string revisionId)
+    private bool UpdateArchiveUrl()
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(revisionId);
-        string returnUrl = BuildArchiveReturnUrl();
-        return $"/photo/{Uri.EscapeDataString(revisionId)}?returnUrl={Uri.EscapeDataString(returnUrl)}";
+        string target = BuildArchiveReturnUrl();
+        string current = "/" + Navigation.ToBaseRelativePath(Navigation.Uri);
+        if (string.Equals(current, target, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        Navigation.NavigateTo(target, replace: true);
+        return true;
     }
+
+    private string BuildArchiveReturnUrl() =>
+        ArchiveNavigation.BuildWorkspaceUrl(ItemFolder, ItemAvailability, ItemVerification, ItemAnalysis, ItemOffset);
+
+    private string BuildPhotoUrl(string revisionId) =>
+        ArchiveNavigation.BuildPhotoUrl(revisionId, BuildArchiveReturnUrl());
 
     private async Task<T> ReadResponseAsync<T>(HttpResponseMessage response)
     {
@@ -751,23 +760,29 @@ else
             return "Not started";
         }
 
-        int actionable = Status is null
-            ? 0
-            : Status.Totals.PendingImages + Status.Totals.NeedsSourceVerificationImages + Status.Totals.UnverifiedSourceImages;
         int onlineOnly = Status?.Totals.OnlineOnlyImages ?? 0;
         int downloading = Status?.Totals.DownloadingImages ?? 0;
         int transitions = onlineOnly + downloading;
+        int activeAnalysisJobs = Status?.LatestRun is ArchiveRunStatusResponse run
+            ? run.RunningJobs + run.QueuedJobs
+            : 0;
         string transitionSummary = OneDriveTransitionSummary(onlineOnly, downloading);
+        string analysisSummary = activeAnalysisJobs == 1
+            ? "1 analysis job active"
+            : $"{activeAnalysisJobs} analysis jobs active";
 
         return advancement.State switch
         {
             "queued" => "Queued",
             "syncing" => "Synchronizing",
+            "running" when activeAnalysisJobs > 0 && transitions > 0 => $"Running · {analysisSummary} · {transitionSummary}",
+            "running" when activeAnalysisJobs > 0 => $"Running · {analysisSummary}",
             "running" when transitions > 0 => $"Running · {transitionSummary}",
             "running" => "Running",
-            "waiting" when actionable == 0 && transitions > 0 => $"Waiting for OneDrive · {transitionSummary}",
-            "waiting" when transitions > 0 => $"Running · {actionable} actionable · {transitionSummary}",
-            "waiting" => "Running · checking for useful work",
+            "waiting" when activeAnalysisJobs > 0 && transitions > 0 => $"Running · {analysisSummary} · {transitionSummary}",
+            "waiting" when activeAnalysisJobs > 0 => $"Running · {analysisSummary}",
+            "waiting" when transitions > 0 => $"Waiting for OneDrive · {transitionSummary}",
+            "waiting" => "Waiting",
             "blocked" => "Blocked",
             "paused" => "Paused",
             "complete" => "Complete",
