@@ -151,6 +151,7 @@ public sealed class ArchiveAnalysisCoordinator
 
         using SharedInspectionSession.Lease lease = await _inspectionSession.AcquireAsync(
             batchConfiguration,
+            profileHash,
             cancellationToken);
         AnalysisTrackingJobHandler handler = new(
             _database,
@@ -196,6 +197,7 @@ public sealed class ArchiveAnalysisCoordinator
 
         using SharedInspectionSession.Lease lease = await _inspectionSession.AcquireAsync(
             batchConfiguration,
+            currentHash,
             cancellationToken);
         AnalysisTrackingJobHandler handler = new(
             _database,
@@ -217,7 +219,7 @@ public sealed class ArchiveAnalysisCoordinator
         private readonly SqliteCatalogueDatabase _database;
         private readonly SemaphoreSlim _gate = new(1, 1);
         private LocalInspectionJobHandler? _handler;
-        private string? _configurationJson;
+        private string? _sessionKey;
         private int _sessionGeneration;
         private int _sessionInitializations;
         private long _attemptsProcessed;
@@ -230,20 +232,21 @@ public sealed class ArchiveAnalysisCoordinator
 
         public async Task<Lease> AcquireAsync(
             LocalBatchConfiguration configuration,
+            Sha256Digest profileHash,
             CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(configuration);
             await _gate.WaitAsync(cancellationToken);
             try
             {
-                string configurationJson = configuration.ToJson();
+                string sessionKey = $"{profileHash}:{configuration.ToJson()}";
                 bool reused = _handler is not null &&
-                    string.Equals(_configurationJson, configurationJson, StringComparison.Ordinal);
+                    string.Equals(_sessionKey, sessionKey, StringComparison.Ordinal);
                 if (!reused)
                 {
                     _handler?.Dispose();
                     _handler = null;
-                    _configurationJson = null;
+                    _sessionKey = null;
 
                     Stopwatch stopwatch = Stopwatch.StartNew();
                     LocalInspectionJobHandler created = await LocalInspectionJobHandler.CreateAsync(
@@ -252,7 +255,7 @@ public sealed class ArchiveAnalysisCoordinator
                         cancellationToken);
                     stopwatch.Stop();
                     _handler = created;
-                    _configurationJson = configurationJson;
+                    _sessionKey = sessionKey;
                     _sessionGeneration++;
                     _sessionInitializations++;
                     _lastInitializationMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
