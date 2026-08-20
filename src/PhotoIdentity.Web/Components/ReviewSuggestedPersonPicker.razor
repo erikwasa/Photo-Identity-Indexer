@@ -6,7 +6,9 @@
            autocomplete="off"
            disabled="@Disabled"
            @bind="Search"
-           @bind:event="oninput" />
+           @bind:event="oninput"
+           @onfocus="OpenResults"
+           @onkeydown="HandleKeyDown" />
 
     @if (SelectedPerson is ReviewPersonResponse selected)
     {
@@ -19,7 +21,7 @@
                 }
                 @if (selected.HiddenFromSmartCollections)
                 {
-                    <span class="state-badge">Hidden from Smart Collections</span>
+                    <span class="state-badge" title="Hidden from Smart Collections">Hidden</span>
                 }
             </div>
             <button type="button"
@@ -31,7 +33,7 @@
         </div>
     }
 
-    @if (!Disabled && (SelectedPerson is null || !string.IsNullOrWhiteSpace(Search)))
+    @if (ResultsOpen && !Disabled && (SelectedPerson is null || !string.IsNullOrWhiteSpace(Search)))
     {
         <div class="review-suggested-person-results" role="listbox" aria-label="Suggested person search results">
             @if (FilteredPeople.Count == 0)
@@ -55,7 +57,7 @@
                             }
                             @if (person.HiddenFromSmartCollections)
                             {
-                                <span class="state-badge">Hidden from Smart Collections</span>
+                                <span class="state-badge" title="Hidden from Smart Collections">Hidden</span>
                             }
                         </span>
                         <span class="review-suggested-person-add">Use</span>
@@ -84,6 +86,7 @@
     public bool Disabled { get; set; }
 
     private string Search { get; set; } = string.Empty;
+    private bool ResultsOpen { get; set; }
 
     private ReviewPersonResponse? SelectedPerson =>
         People.FirstOrDefault(person => person.Id == SelectedPersonId);
@@ -98,15 +101,27 @@
         .ThenBy(person => person.Id, StringComparer.Ordinal)
         .ToArray();
 
+    private void OpenResults() => ResultsOpen = true;
+
+    private void HandleKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            ResultsOpen = false;
+        }
+    }
+
     private async Task SelectAsync(string personId)
     {
         Search = string.Empty;
+        ResultsOpen = false;
         await SelectedPersonIdChanged.InvokeAsync(personId);
     }
 
     private async Task ClearAsync()
     {
         Search = string.Empty;
+        ResultsOpen = false;
         await SelectedPersonIdChanged.InvokeAsync(string.Empty);
     }
 }
