@@ -38,7 +38,7 @@
                 <div>
                     @if (State?.Place is PhotoPlaceResponse current)
                     {
-                        <p class="photo-place-current">@current.Value</p>
+                        <p class="photo-place-current" title="@current.Value">@PhotoIdentity.Web.PhotoPlaceDisplayLabel.Format(current)</p>
                     }
                     else
                     {
@@ -65,14 +65,14 @@
             <label class="photo-place-path-field">
                 <span class="field-label">Place path</span>
                 <input type="text"
-                       maxlength="80"
+                       maxlength="500"
                        autocomplete="off"
                        placeholder="Sweden/Stockholm region/Norrtälje"
                        disabled="@Busy"
                        @bind="SelectedValue"
                        @bind:event="oninput" />
             </label>
-            <small class="photo-place-help">Enter the hierarchy starting with the country. A new path becomes reusable place vocabulary when you save it.</small>
+            <small class="photo-place-help">Enter the full hierarchy starting with the country. A new path becomes reusable place vocabulary when you save it.</small>
 
             <div class="photo-place-actions">
                 <button type="button"
