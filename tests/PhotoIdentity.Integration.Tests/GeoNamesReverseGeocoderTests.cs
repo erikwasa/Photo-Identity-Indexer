@@ -8,7 +8,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class GeoNamesReverseGeocoderTests
 {
     [Fact]
-    public async Task Provider_sends_only_coordinate_contract_and_builds_canonical_hierarchy()
+    public async Task Swedish_provider_result_keeps_local_language_and_builds_canonical_hierarchy()
     {
         CapturingHandler handler = new(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
@@ -18,9 +18,9 @@ public sealed class GeoNamesReverseGeocoderTests
                     {
                       "geonameId": 2688250,
                       "name": "Norrtälje",
-                      "countryName": "Sweden",
+                      "countryName": "Sverige",
                       "countryCode": "SE",
-                      "adminName1": "Stockholm County"
+                      "adminName1": "Stockholms län"
                     }
                   ]
                 }
@@ -42,13 +42,17 @@ public sealed class GeoNamesReverseGeocoderTests
 
         Assert.Equal(ReverseGeocodeStatus.Success, response.Status);
         Assert.NotNull(response.Place);
-        Assert.Equal("Sweden/Stockholm County/Norrtälje", response.Place.Place.DisplayValue);
+        Assert.Equal("Sverige/Stockholms län/Norrtälje", response.Place.Place.DisplayValue);
         Assert.Equal("2688250", response.Place.ProviderResultId);
         Assert.Equal("SE", response.Place.CountryCode);
-        Assert.NotNull(handler.LastRequestUri);
-        Assert.Equal("https", handler.LastRequestUri.Scheme);
-        Assert.Equal("secure.geonames.org", handler.LastRequestUri.Host);
-        string query = handler.LastRequestUri.Query;
+        Assert.Equal(1, response.ProviderRequestCount);
+        Assert.Single(handler.RequestUris);
+        Assert.Contains("lang=local", handler.RequestUris[0].Query);
+        Assert.Contains("langPolicy=se-local-else-en", configuration.ContractKey);
+        Assert.Equal("Sweden: local; elsewhere: English", configuration.LanguageDescription);
+        Assert.Equal("https", handler.RequestUris[0].Scheme);
+        Assert.Equal("secure.geonames.org", handler.RequestUris[0].Host);
+        string query = handler.RequestUris[0].Query;
         Assert.Contains("lat=59.758", query);
         Assert.Contains("lng=18.705", query);
         Assert.Contains("username=private-user", query);
@@ -57,6 +61,96 @@ public sealed class GeoNamesReverseGeocoderTests
         Assert.DoesNotContain("filename", query, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("person", query, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("tag", query, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Non_swedish_local_result_is_requeried_in_english_before_assignment()
+    {
+        CapturingHandler handler = new(request =>
+        {
+            bool english = request.RequestUri?.Query.Contains("lang=en", StringComparison.Ordinal) == true;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(english
+                    ? """
+                        {
+                          "geonames": [
+                            {
+                              "geonameId": 3128760,
+                              "name": "Barcelona",
+                              "countryName": "Spain",
+                              "countryCode": "ES",
+                              "adminName1": "Catalonia"
+                            }
+                          ]
+                        }
+                        """
+                    : """
+                        {
+                          "geonames": [
+                            {
+                              "geonameId": 3128760,
+                              "name": "Barcelona",
+                              "countryName": "España",
+                              "countryCode": "ES",
+                              "adminName1": "Cataluña"
+                            }
+                          ]
+                        }
+                        """)
+            };
+        });
+        using HttpClient client = new(handler);
+        using GeoNamesReverseGeocoder geocoder = new(
+            new GeoNamesReverseGeocodingConfiguration("private-user", null, "local", 0),
+            new SingleClientFactory(client),
+            TimeProvider.System);
+
+        ReverseGeocodeResponse response = await geocoder.ReverseGeocodeAsync(
+            new ReverseGeocodeQuery(41.3874, 2.1686));
+
+        Assert.Equal(ReverseGeocodeStatus.Success, response.Status);
+        Assert.NotNull(response.Place);
+        Assert.Equal("Spain/Catalonia/Barcelona", response.Place.Place.DisplayValue);
+        Assert.Equal("ES", response.Place.CountryCode);
+        Assert.Equal(2, response.ProviderRequestCount);
+        Assert.Equal(2, handler.RequestUris.Count);
+        Assert.Contains("lang=local", handler.RequestUris[0].Query);
+        Assert.Contains("lang=en", handler.RequestUris[1].Query);
+    }
+
+    [Fact]
+    public async Task Explicit_language_override_uses_one_request_without_country_policy_fallback()
+    {
+        CapturingHandler handler = new(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""
+                {
+                  "geonames": [
+                    {
+                      "geonameId": 3128760,
+                      "name": "Barcelona",
+                      "countryName": "Spanien",
+                      "countryCode": "ES",
+                      "adminName1": "Katalonien"
+                    }
+                  ]
+                }
+                """)
+        });
+        using HttpClient client = new(handler);
+        using GeoNamesReverseGeocoder geocoder = new(
+            new GeoNamesReverseGeocodingConfiguration("private-user", null, "sv", 0),
+            new SingleClientFactory(client),
+            TimeProvider.System);
+
+        ReverseGeocodeResponse response = await geocoder.ReverseGeocodeAsync(
+            new ReverseGeocodeQuery(41.3874, 2.1686));
+
+        Assert.Equal("Spanien/Katalonien/Barcelona", response.Place?.Place.DisplayValue);
+        Assert.Equal(1, response.ProviderRequestCount);
+        Assert.Single(handler.RequestUris);
+        Assert.Contains("lang=sv", handler.RequestUris[0].Query);
     }
 
     [Fact]
@@ -80,15 +174,18 @@ public sealed class GeoNamesReverseGeocoderTests
         Assert.Equal(ReverseGeocodeStatus.Deferred, response.Status);
         Assert.Equal("19", response.ErrorCode);
         Assert.True(response.StopBatch);
+        Assert.Equal(1, response.ProviderRequestCount);
     }
 
     [Fact]
-    public void Configuration_rejects_demo_account_and_non_https_service_urls()
+    public void Configuration_rejects_demo_account_non_https_service_urls_and_invalid_pacing()
     {
         Assert.Throws<InvalidOperationException>(() =>
             new GeoNamesReverseGeocodingConfiguration("demo", null, null, 0));
         Assert.Throws<InvalidOperationException>(() =>
             new GeoNamesReverseGeocodingConfiguration("private-user", "http://api.geonames.org/", null, 0));
+        Assert.Throws<InvalidOperationException>(() =>
+            new GeoNamesReverseGeocodingConfiguration("private-user", null, null, -1));
     }
 
     private sealed class SingleClientFactory : IHttpClientFactory
@@ -106,13 +203,16 @@ public sealed class GeoNamesReverseGeocoderTests
 
         public CapturingHandler(Func<HttpRequestMessage, HttpResponseMessage> response) => _response = response;
 
-        public Uri? LastRequestUri { get; private set; }
+        public List<Uri> RequestUris { get; } = [];
 
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
-            LastRequestUri = request.RequestUri;
+            if (request.RequestUri is Uri uri)
+            {
+                RequestUris.Add(uri);
+            }
             return Task.FromResult(_response(request));
         }
     }
