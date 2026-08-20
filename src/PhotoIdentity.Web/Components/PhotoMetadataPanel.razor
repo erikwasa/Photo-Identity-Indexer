@@ -135,7 +135,7 @@
         (Metadata.TakenAtLocal is not null ||
          !string.IsNullOrWhiteSpace(Metadata.CameraMake) ||
          !string.IsNullOrWhiteSpace(Metadata.CameraModel) ||
-         Metadata.Latitude is not null);
+         (Metadata.Latitude is not null && Metadata.Longitude is not null));
 
     private bool HasDetailedMetadata => Metadata is not null &&
         (!string.IsNullOrWhiteSpace(Metadata.LensModel) ||
@@ -156,12 +156,13 @@
                 return string.Empty;
             }
 
-            if (Metadata.Tags.Count == 0)
+            string tagSummary = $"{Metadata.Tags.Count} tag{(Metadata.Tags.Count == 1 ? string.Empty : "s")}";
+            if (HasDetailedMetadata && Metadata.Tags.Count > 0)
             {
-                return "technical details";
+                return $"technical details · {tagSummary}";
             }
 
-            return $"technical details · {Metadata.Tags.Count} tag{(Metadata.Tags.Count == 1 ? string.Empty : "s")}";
+            return HasDetailedMetadata ? "technical details" : tagSummary;
         }
     }
 
