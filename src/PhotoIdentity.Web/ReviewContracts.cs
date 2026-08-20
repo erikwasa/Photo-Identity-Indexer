@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PhotoIdentity.Web.Contracts;
 
 public sealed record ReviewPersonResponse(
@@ -153,10 +155,14 @@ public sealed record ReviewFaceDetailsResponse(
 public sealed record PersonMaintenancePersonResponse(
     string Id,
     string DisplayName,
-    int LabelCount,
+    int PhotoCount,
     int SuggestionCount,
     bool IsFavorite = false,
-    bool HiddenFromSmartCollections = false);
+    bool HiddenFromSmartCollections = false)
+{
+    [JsonIgnore]
+    public int LabelCount => PhotoCount;
+}
 
 public sealed record PersonRepresentativeFaceResponse(
     string PersonId,
