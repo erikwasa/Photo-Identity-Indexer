@@ -12,15 +12,18 @@ public static class PhotoPlaceEnrichmentEndpoints
                 PhotoPlaceEnrichmentWorkerState workerState) =>
             {
                 PhotoPlaceEnrichmentWorkerSnapshot worker = workerState.GetSnapshot();
+                int effectiveAutomaticMinimumRequestInterval = Math.Max(
+                    automatic.MinimumRequestIntervalMilliseconds,
+                    configuration.MinimumRequestIntervalMilliseconds);
                 return Results.Ok(new PhotoPlaceEnrichmentStatusResponse(
                     Provider: "geonames",
                     Configured: configuration.IsConfigured,
                     ContractKey: configuration.ContractKey,
                     ServiceHost: configuration.BaseUri.Host,
-                    Language: configuration.Language,
+                    Language: configuration.LanguageDescription,
                     MinimumRequestIntervalMilliseconds: configuration.MinimumRequestIntervalMilliseconds,
                     AutomaticEnrichmentEnabled: automatic.Enabled && configuration.IsConfigured,
-                    AutomaticMinimumRequestIntervalMilliseconds: automatic.MinimumRequestIntervalMilliseconds,
+                    AutomaticMinimumRequestIntervalMilliseconds: effectiveAutomaticMinimumRequestInterval,
                     AutomaticIdlePollIntervalMilliseconds: automatic.IdlePollIntervalMilliseconds,
                     AutomaticState: worker.State,
                     AutomaticMessage: $"{worker.Message} Idle polling uses {automatic.IdlePollIntervalMilliseconds} ms when no immediate work is available.",
