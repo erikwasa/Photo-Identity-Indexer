@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
@@ -54,14 +56,24 @@ public sealed record ArchiveAnalysisResumeResult(
     AnalysisProfileDefinition Profile,
     ProcessingRunSummary ProcessingSummary);
 
+public sealed record ArchiveAnalysisSessionDiagnostics(
+    int SessionGeneration,
+    int SessionInitializations,
+    long AttemptsProcessed,
+    double? LastInitializationMilliseconds,
+    bool HasActiveSession);
+
 /// <summary>
 /// Runs the governed permanent-archive profile only for current, locally available revisions
 /// that have not already completed that exact profile.
 /// </summary>
 public sealed class ArchiveAnalysisCoordinator
 {
+    private static readonly ConditionalWeakTable<SqliteCatalogueDatabase, SharedInspectionSession> SharedInspectionSessions = new();
+
     private readonly SqliteCatalogueDatabase _database;
     private readonly TimeProvider _timeProvider;
+    private readonly SharedInspectionSession _inspectionSession;
 
     public ArchiveAnalysisCoordinator(
         SqliteCatalogueDatabase database,
@@ -70,7 +82,12 @@ public sealed class ArchiveAnalysisCoordinator
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _inspectionSession = SharedInspectionSessions.GetValue(
+            database,
+            static value => new SharedInspectionSession(value));
     }
+
+    public ArchiveAnalysisSessionDiagnostics GetSessionDiagnostics() => _inspectionSession.GetDiagnostics();
 
     public async Task<ArchiveAnalysisStartResult> StartAsync(
         ArchiveAnalysisConfiguration configuration,
@@ -132,13 +149,13 @@ public sealed class ArchiveAnalysisCoordinator
         await processingRepository.CreateRunAsync(run, jobs, cancellationToken);
         await analysisRepository.RegisterRunAsync(runId, profile, now, cancellationToken);
 
-        using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
-            _database,
+        using SharedInspectionSession.Lease lease = await _inspectionSession.AcquireAsync(
             batchConfiguration,
+            profileHash,
             cancellationToken);
         AnalysisTrackingJobHandler handler = new(
             _database,
-            inspection,
+            lease.Handler,
             analysisRepository,
             profileHash,
             _timeProvider);
@@ -147,6 +164,7 @@ public sealed class ArchiveAnalysisCoordinator
                 handler,
                 _timeProvider)
             .RunUntilIdleAsync(runId, processorOptions, cancellationToken);
+        lease.RecordAttempts(processing.AttemptsProcessed);
 
         return new ArchiveAnalysisStartResult(
             profile,
@@ -177,13 +195,13 @@ public sealed class ArchiveAnalysisCoordinator
                 $"Archive analysis run {runId} resolves to profile {currentHash}, but was registered as {registeredHash}.");
         }
 
-        using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
-            _database,
+        using SharedInspectionSession.Lease lease = await _inspectionSession.AcquireAsync(
             batchConfiguration,
+            currentHash,
             cancellationToken);
         AnalysisTrackingJobHandler handler = new(
             _database,
-            inspection,
+            lease.Handler,
             analysisRepository,
             currentHash,
             _timeProvider);
@@ -192,7 +210,113 @@ public sealed class ArchiveAnalysisCoordinator
                 handler,
                 _timeProvider)
             .RunUntilIdleAsync(runId, processorOptions, cancellationToken);
+        lease.RecordAttempts(processing.AttemptsProcessed);
         return new ArchiveAnalysisResumeResult(profile, processing.Summary);
+    }
+
+    private sealed class SharedInspectionSession
+    {
+        private readonly SqliteCatalogueDatabase _database;
+        private readonly SemaphoreSlim _gate = new(1, 1);
+        private LocalInspectionJobHandler? _handler;
+        private string? _sessionKey;
+        private int _sessionGeneration;
+        private int _sessionInitializations;
+        private long _attemptsProcessed;
+        private double? _lastInitializationMilliseconds;
+
+        public SharedInspectionSession(SqliteCatalogueDatabase database)
+        {
+            _database = database;
+        }
+
+        public async Task<Lease> AcquireAsync(
+            LocalBatchConfiguration configuration,
+            Sha256Digest profileHash,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(configuration);
+            await _gate.WaitAsync(cancellationToken);
+            try
+            {
+                string sessionKey = $"{profileHash}:{configuration.ToJson()}";
+                bool reused = _handler is not null &&
+                    string.Equals(_sessionKey, sessionKey, StringComparison.Ordinal);
+                if (!reused)
+                {
+                    _handler?.Dispose();
+                    _handler = null;
+                    _sessionKey = null;
+
+                    Stopwatch stopwatch = Stopwatch.StartNew();
+                    LocalInspectionJobHandler created = await LocalInspectionJobHandler.CreateAsync(
+                        _database,
+                        configuration,
+                        cancellationToken);
+                    stopwatch.Stop();
+                    _handler = created;
+                    _sessionKey = sessionKey;
+                    _sessionGeneration++;
+                    _sessionInitializations++;
+                    _lastInitializationMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
+                }
+
+                return new Lease(this, _handler!, reused);
+            }
+            catch
+            {
+                _gate.Release();
+                throw;
+            }
+        }
+
+        public ArchiveAnalysisSessionDiagnostics GetDiagnostics() => new(
+            _sessionGeneration,
+            _sessionInitializations,
+            Interlocked.Read(ref _attemptsProcessed),
+            _lastInitializationMilliseconds,
+            _handler is not null);
+
+        private void Release() => _gate.Release();
+
+        private void RecordAttempts(int attempts) => Interlocked.Add(ref _attemptsProcessed, attempts);
+
+        public sealed class Lease : IDisposable
+        {
+            private readonly SharedInspectionSession _owner;
+            private bool _disposed;
+
+            public Lease(
+                SharedInspectionSession owner,
+                LocalInspectionJobHandler handler,
+                bool reusedExistingSession)
+            {
+                _owner = owner;
+                Handler = handler;
+                ReusedExistingSession = reusedExistingSession;
+            }
+
+            public LocalInspectionJobHandler Handler { get; }
+            public bool ReusedExistingSession { get; }
+
+            public void RecordAttempts(int attempts)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                ArgumentOutOfRangeException.ThrowIfNegative(attempts);
+                _owner.RecordAttempts(attempts);
+            }
+
+            public void Dispose()
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _disposed = true;
+                _owner.Release();
+            }
+        }
     }
 }
 
