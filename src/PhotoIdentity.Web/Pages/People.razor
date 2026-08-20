@@ -60,8 +60,11 @@ else
             <article class="person-summary-card @(person.HiddenFromSmartCollections ? "hidden-from-smart-collections" : "visible-in-smart-collections")">
                 <PersonRepresentativePortrait PersonId="@person.Id" DisplayName="@person.DisplayName" />
                 <strong>@PersonCardLabel(person)</strong>
-                <span class="state-badge">@SmartCollectionVisibilityLabel(person)</span>
-                <span>@person.LabelCount label@(person.LabelCount == 1 ? "" : "s")</span>
+                @if (person.HiddenFromSmartCollections)
+                {
+                    <span class="state-badge" title="Hidden from Smart Collections">Hidden</span>
+                }
+                <span>@person.PhotoCount photo@(person.PhotoCount == 1 ? "" : "s")</span>
                 <span>@person.SuggestionCount suggestion@(person.SuggestionCount == 1 ? "" : "s")</span>
                 <button type="button"
                         class="button secondary"
@@ -74,8 +77,9 @@ else
                         class="button secondary"
                         disabled="@Busy"
                         aria-pressed="@person.HiddenFromSmartCollections"
+                        aria-label="@(person.HiddenFromSmartCollections ? $"Show {person.DisplayName} in Smart Collections" : $"Hide {person.DisplayName} from Smart Collections")"
                         @onclick="() => ToggleSmartCollectionVisibilityAsync(person)">
-                    @(person.HiddenFromSmartCollections ? "Show in Smart Collections" : "Hide from Smart Collections")
+                    @(person.HiddenFromSmartCollections ? "Show" : "Hide")
                 </button>
             </article>
         }
@@ -350,11 +354,6 @@ else
 
     private static string PersonSelectLabel(PersonMaintenancePersonResponse person) =>
         person.IsFavorite ? $"{person.DisplayName} — Favorite" : person.DisplayName;
-
-    private static string SmartCollectionVisibilityLabel(PersonMaintenancePersonResponse person) =>
-        person.HiddenFromSmartCollections
-            ? "Hidden from Smart Collections"
-            : "Available in Smart Collections";
 
     private static string ActionLabel(PersonMaintenanceActionResponse action) => action.Kind switch
     {
