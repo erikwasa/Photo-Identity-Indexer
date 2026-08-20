@@ -9,6 +9,7 @@ public sealed record PhotoPlaceEnrichmentStatusResponse(
     int MinimumRequestIntervalMilliseconds,
     bool AutomaticEnrichmentEnabled,
     int AutomaticMinimumRequestIntervalMilliseconds,
+    int AutomaticIdlePollIntervalMilliseconds,
     string AutomaticState,
     string AutomaticMessage,
     DateTimeOffset? LastAutomaticActivityAtUtc,

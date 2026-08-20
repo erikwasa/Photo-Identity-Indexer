@@ -41,6 +41,13 @@ The current launcher example also selects a conservative bounded archive-hydrati
 
 The reserve is a floor: Photo Identity refuses a managed hydration that would leave the archive volume below 20 GiB free. The 10 GiB limit applies only to Photo Identity-managed hydrated/downloading originals, not to files that were already local or user-pinned. Change these startup values if the machine's storage constraints require a different policy.
 
+Automatic GeoNames enrichment timing is also configurable in launcher.json:
+  PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled = true
+  PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds = 30000
+  PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds = 5000
+
+The request interval is milliseconds and must be at least 30000 (30 seconds). The launcher rejects lower values instead of silently clamping them. The idle poll interval is milliseconds from 1000 through 600000 (1 second through 10 minutes). Provider quota and transport backoff can still delay requests longer than the normal configured pacing. Restart Photo Identity after changing these startup values. Settings shows the effective automatic timing through the GeoNames status diagnostics.
+
 The Settings page shows the effective hydration values, whether managed hydration is enabled, current Photo Identity-managed usage, remaining managed budget, and current free space on the archive volume. These values are startup configuration; edit launcher.json and restart Photo Identity to apply changes.
 
 UPGRADE / REPLACEMENT

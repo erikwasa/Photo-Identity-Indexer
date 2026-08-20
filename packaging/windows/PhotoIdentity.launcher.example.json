@@ -9,6 +9,9 @@
     "PhotoIdentity__ReviewProxyJpegQuality": "78",
     "PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes": "21474836480",
     "PhotoIdentity__ArchiveHydration__MaximumManagedHydrationBytes": "10737418240",
-    "PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations": "2"
+    "PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations": "2",
+    "PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled": "true",
+    "PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds": "30000",
+    "PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds": "5000"
   }
 }

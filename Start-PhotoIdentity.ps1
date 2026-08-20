@@ -24,9 +24,48 @@ $SupportedSettings = @(
     "PhotoIdentity__GeoNames__BaseUrl",
     "PhotoIdentity__GeoNames__Language",
     "PhotoIdentity__GeoNames__MinimumRequestIntervalMilliseconds",
+    "PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled",
+    "PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds",
+    "PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds",
     "PhotoIdentity__RepositoryRoot",
     "PhotoIdentity__ModelDirectory"
 )
+
+function Assert-LauncherSettingValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        [Parameter(Mandatory = $true)]
+        [string]$Value
+    )
+
+    switch ($Name) {
+        "PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled" {
+            [bool]$parsed = $false
+            if (-not [bool]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be true or false."
+            }
+        }
+        "PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds" {
+            [int]$parsed = 0
+            if (-not [int]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be an integer millisecond value."
+            }
+            if ($parsed -lt 30000) {
+                throw "$Name must be at least 30000 milliseconds (30 seconds). Lower values are not applied."
+            }
+        }
+        "PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds" {
+            [int]$parsed = 0
+            if (-not [int]::TryParse($Value, [ref]$parsed)) {
+                throw "$Name must be an integer millisecond value."
+            }
+            if ($parsed -lt 1000 -or $parsed -gt 600000) {
+                throw "$Name must be between 1000 and 600000 milliseconds (1 second to 10 minutes)."
+            }
+        }
+    }
+}
 
 function Resolve-LauncherConfigurationPath {
     if (-not [string]::IsNullOrWhiteSpace($ConfigurationPath)) {
@@ -129,7 +168,9 @@ function Read-LauncherConfiguration {
                     continue
                 }
 
-                $settings[$property.Name] = [Environment]::ExpandEnvironmentVariables(([string]$property.Value).Trim())
+                $value = [Environment]::ExpandEnvironmentVariables(([string]$property.Value).Trim())
+                Assert-LauncherSettingValue -Name $property.Name -Value $value
+                $settings[$property.Name] = $value
             }
         }
     }
