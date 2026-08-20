@@ -34,12 +34,13 @@ WI-0076 remains separate archive-throughput work. Do not mix the review correcti
 ## Relevant files
 
 - `docs/delivery/milestones/M20-maintainer-review-2026-08-21.md`
+- `docs/delivery/work-items/WI-0064-geonames-place-enrichment.md`
+- `docs/delivery/work-items/WI-0065-automatic-place-enrichment.md`
 - `docs/delivery/work-items/WI-0073-ui-navigation-polish.md`
 - `docs/delivery/work-items/WI-0074-face-review-suggested-person-filter.md`
 - `docs/delivery/work-items/WI-0075-geonames-timing-settings.md`
 - `docs/delivery/work-items/WI-0077-photo-viewer-simplification.md`
 - `docs/delivery/work-items/WI-0078-versioned-metadata-refresh.md`
-- `docs/delivery/work-items/WI-0065-automatic-place-enrichment.md`
 - `docs/delivery/status/work-items.yaml`
 - `AGENTS.md`
 
