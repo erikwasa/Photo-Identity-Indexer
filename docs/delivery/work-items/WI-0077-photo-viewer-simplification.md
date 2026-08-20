@@ -48,17 +48,30 @@ Edit mode after `Edit location`:
 - after successful Set/Replace/Clear, return to read mode and show the new effective Location;
 - preserve WI-0063 single-effective-Place, hierarchy and manual-precedence semantics.
 
+## Implementation — 2026-08-20
+
+The implementation is on `agent/WI-0077-photo-viewer-simplification` and is intentionally awaiting the maintainer's later consolidated M20 browser review.
+
+- `PhotoMetadataPanel` now keeps only capture time, camera make/model and exact GPS coordinates in the always-visible grid.
+- Lens, exposure, aperture, ISO, focal length/35 mm equivalent, orientation, flash and GPS altitude are rendered as structured technical details inside the collapsed `All metadata` disclosure. The bounded raw-tag table remains beneath those structured values when raw tags are available.
+- `PhotoPlaceEditor` now defaults to read mode, showing the effective Place or `No location assigned` plus one `Edit location` button.
+- Entering edit mode reveals the existing Place picker/path field and Set/Replace/Clear controls plus Cancel. Entering or cancelling edit mode does not mutate catalogue data.
+- Successful Set/Replace/Clear returns to read mode immediately. Existing API, first-class Place, manual-precedence and single-effective-Place semantics are unchanged.
+- Narrow-screen CSS stacks the location value and Edit action rather than forcing them into one row.
+
+No persistence, API, original-file access, hydration or GeoNames behavior changes are part of this implementation.
+
 ## Acceptance criteria
 
-- [ ] Lens, Exposure, Aperture, ISO, Focal length, Orientation, Flash and GPS altitude are not shown in the always-visible key metadata grid.
-- [ ] Those fields remain available in collapsed `All metadata` when present in the persisted raw/structured metadata.
-- [ ] Capture time, camera make/model and exact GPS coordinates remain visible when present.
-- [ ] Location defaults to a read-only presentation of the current effective Place.
-- [ ] Location input fields and mutation buttons are hidden until `Edit location` is activated.
-- [ ] Edit mode supports Set/Replace/Clear plus Cancel without changing existing Place semantics.
-- [ ] Successful location mutation exits edit mode and immediately reflects the effective Place.
-- [ ] No private source path or original-file hydration is introduced by the presentation change.
-- [ ] Component/browser coverage verifies both assigned and unassigned Place states and narrow-screen layout.
+- [x] Lens, Exposure, Aperture, ISO, Focal length, Orientation, Flash and GPS altitude are not shown in the always-visible key metadata grid.
+- [x] Those fields remain available in collapsed `All metadata` when present in the persisted raw/structured metadata.
+- [x] Capture time, camera make/model and exact GPS coordinates remain visible when present.
+- [x] Location defaults to a read-only presentation of the current effective Place.
+- [x] Location input fields and mutation buttons are hidden until `Edit location` is activated.
+- [x] Edit mode supports Set/Replace/Clear plus Cancel without changing existing Place semantics.
+- [x] Successful location mutation exits edit mode and immediately reflects the effective Place.
+- [x] No private source path or original-file hydration is introduced by the presentation change.
+- [ ] Consolidated browser verification covers assigned and unassigned Place states, edit/cancel/mutation flow, collapsed metadata and narrow-screen layout.
 
 ## Non-goals
 
