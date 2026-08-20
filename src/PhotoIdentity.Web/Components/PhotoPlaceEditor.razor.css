@@ -23,10 +23,27 @@
     font-size: 0.9rem;
 }
 
+.photo-place-read {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-width: 0;
+}
+
+.photo-place-read > div {
+    min-width: 0;
+}
+
 .photo-place-current,
 .photo-place-empty,
 .photo-place-help {
     margin: 0;
+}
+
+.photo-place-current {
+    font-weight: 650;
+    overflow-wrap: anywhere;
 }
 
 .photo-place-empty,
@@ -55,4 +72,15 @@
 
 .photo-place-notice {
     margin-top: 0.25rem;
+}
+
+@media (max-width: 640px) {
+    .photo-place-read {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .photo-place-read .button {
+        width: 100%;
+    }
 }
