@@ -22,13 +22,32 @@ Repository inspection identifies several high-value hypotheses:
 
 1. `ArchiveBoundedAnalysisService` deliberately serializes advancement through a one-slot semaphore and advances at most one governed source-verification, metadata, analysis or post-analysis step at a time.
 2. Both new and resumed analysis use `ResumableBatchProcessorOptions(maxAttemptsPerInvocation: 1)`, effectively processing one analysis job per bounded advancement invocation.
-3. `ArchiveAnalysisCoordinator.StartAsync`/`ResumeAsync` creates a new `LocalInspectionJobHandler` for each invocation. `LocalInspectionJobHandler.CreateAsync` loads model manifests and constructs detector/embedder objects before processing, then disposes them after that invocation. With one job per invocation this may repeat expensive ONNX/model initialization for every image.
+3. Before the first WI-0076 optimization slice, `ArchiveAnalysisCoordinator.StartAsync`/`ResumeAsync` created a new `LocalInspectionJobHandler` for each invocation. `LocalInspectionJobHandler.CreateAsync` loads model manifests and constructs detector/embedder objects. With one job per invocation this repeated expensive ONNX/model initialization for every image.
 4. Exact-original safety checks can read and SHA-256 the same file repeatedly. `CollectionOriginalAccessService.GetStatusAsync` verifies local content; `OpenVerifiedAsync` verifies it again; metadata inspection uses the verified stream; `LocalInspectionJobHandler` computes SHA-256 again before decode; proxy/release status checks can trigger further verification reads.
 5. The archive loop normally prepares one hydratable pending revision at a time even though the storage policy has an explicit `MaximumConcurrentOperations` limit.
 6. Review-proxy and face-review derivative work is also advanced in small serial steps.
 7. The active-loop 500 ms delay adds some latency but is unlikely to explain the majority of a ~36-second-per-image average.
 
 These are hypotheses to measure, not permission to weaken safety checks.
+
+## Implementation progress
+
+### Slice 1 — reuse detector/embedder sessions across bounded advancements
+
+The first optimization keeps the governed one-job-per-advancement behavior unchanged and removes repeated model setup instead of adding concurrency.
+
+`ArchiveAnalysisCoordinator` now shares one `LocalInspectionJobHandler` session for the lifetime of the active catalogue database. Consecutive coordinator instances therefore reuse the same detector/embedder session across `StartAsync`/`ResumeAsync` calls when the exact analysis profile and full batch configuration match.
+
+Safety boundaries:
+
+- the cache key includes the exact analysis profile hash plus the serialized batch configuration, so a model/profile change or runtime-path/configuration change disposes the old handler and creates a new compatible session;
+- a per-catalogue semaphore prevents two coordinator invocations from using the same detector/embedder session concurrently;
+- durable processing checkpoints, one-job invocation limits, metadata-before-analysis behavior, SHA-256 verification and retry semantics are unchanged in this slice;
+- no new parallelism, hydration prefetch or broad retry behavior is introduced.
+
+Lightweight in-process diagnostics track session generation/initialization count, cumulative attempts processed and the latest model-session initialization duration through `ArchiveAnalysisCoordinator.GetSessionDiagnostics()`. The representative maintainer benchmark remains required to quantify the actual throughput improvement on the archive hardware.
+
+The next WI-0076 slice should use that benchmark to decide whether the dominant remaining cost is full-file verification I/O, image inference, OneDrive wait or the fixed one-job/one-hydration sequencing before batching or prefetch is introduced.
 
 ## Investigation slice
 
