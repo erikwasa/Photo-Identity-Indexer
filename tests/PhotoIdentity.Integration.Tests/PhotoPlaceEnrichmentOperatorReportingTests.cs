@@ -266,7 +266,8 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
                 ReverseGeocodeStatus.Failure,
                 ErrorCode: "10",
                 ErrorMessage: $"raw-provider-secret: user account {username} is not enabled for free webservice",
-                StopBatch: true));
+                StopBatch: true,
+                ProviderRequestCount: 1));
         }
     }
 
@@ -284,7 +285,8 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             return Task.FromResult(new ReverseGeocodeResponse(
                 ReverseGeocodeStatus.NoResult,
                 ErrorCode: "15",
-                ErrorMessage: "raw-provider-message: no result found"));
+                ErrorMessage: "raw-provider-message: no result found",
+                ProviderRequestCount: 1));
         }
     }
 
