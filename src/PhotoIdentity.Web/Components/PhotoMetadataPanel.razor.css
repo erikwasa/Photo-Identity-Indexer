@@ -75,6 +75,14 @@
     font-weight: 500;
 }
 
+.photo-technical-metadata {
+    padding: 0 0.85rem 0.85rem;
+}
+
+.photo-technical-metadata > div {
+    background: rgba(255, 255, 255, 0.35);
+}
+
 .photo-all-metadata-table-wrap {
     max-height: 24rem;
     overflow: auto;

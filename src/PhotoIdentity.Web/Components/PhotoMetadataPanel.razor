@@ -35,40 +35,6 @@
                     <dd>@Metadata.CameraModel</dd>
                 </div>
             }
-            @if (!string.IsNullOrWhiteSpace(Metadata.LensModel))
-            {
-                <div>
-                    <dt>Lens</dt>
-                    <dd>@Metadata.LensModel</dd>
-                </div>
-            }
-            @if (!string.IsNullOrWhiteSpace(Metadata.ExposureTime))
-            {
-                <div><dt>Exposure</dt><dd>@Metadata.ExposureTime</dd></div>
-            }
-            @if (!string.IsNullOrWhiteSpace(Metadata.Aperture))
-            {
-                <div><dt>Aperture</dt><dd>@Metadata.Aperture</dd></div>
-            }
-            @if (!string.IsNullOrWhiteSpace(Metadata.Iso))
-            {
-                <div><dt>ISO</dt><dd>@Metadata.Iso</dd></div>
-            }
-            @if (!string.IsNullOrWhiteSpace(Metadata.FocalLength))
-            {
-                <div>
-                    <dt>Focal length</dt>
-                    <dd>@FocalLengthLabel</dd>
-                </div>
-            }
-            @if (!string.IsNullOrWhiteSpace(Metadata.Orientation))
-            {
-                <div><dt>Orientation</dt><dd>@Metadata.Orientation</dd></div>
-            }
-            @if (!string.IsNullOrWhiteSpace(Metadata.Flash))
-            {
-                <div><dt>Flash</dt><dd>@Metadata.Flash</dd></div>
-            }
             @if (Metadata.Latitude is double latitude && Metadata.Longitude is double longitude)
             {
                 <div class="photo-metadata-wide">
@@ -76,42 +42,80 @@
                     <dd><code>@Coordinate(latitude), @Coordinate(longitude)</code></dd>
                 </div>
             }
-            @if (!string.IsNullOrWhiteSpace(Metadata.GpsAltitude))
-            {
-                <div><dt>GPS altitude</dt><dd>@Metadata.GpsAltitude</dd></div>
-            }
         </dl>
 
         @if (!HasKeyMetadata)
         {
-            <p class="photo-metadata-empty">The revision was inspected, but no supported key capture fields were found.</p>
+            <p class="photo-metadata-empty">The revision was inspected, but no at-a-glance capture fields were found.</p>
         }
 
-        @if (Metadata.Tags.Count > 0)
+        @if (HasDetailedMetadata || Metadata.Tags.Count > 0)
         {
             <details class="photo-all-metadata">
-                <summary>All metadata <span>@Metadata.Tags.Count tag@(Metadata.Tags.Count == 1 ? "" : "s")</span></summary>
-                <div class="photo-all-metadata-table-wrap">
-                    <table class="photo-all-metadata-table">
-                        <thead>
-                            <tr>
-                                <th>Directory</th>
-                                <th>Tag</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (PhotoMetadataTagResponse tag in Metadata.Tags)
-                            {
+                <summary>All metadata <span>@AllMetadataSummary</span></summary>
+
+                @if (HasDetailedMetadata)
+                {
+                    <dl class="photo-metadata-grid photo-technical-metadata">
+                        @if (!string.IsNullOrWhiteSpace(Metadata.LensModel))
+                        {
+                            <div><dt>Lens</dt><dd>@Metadata.LensModel</dd></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Metadata.ExposureTime))
+                        {
+                            <div><dt>Exposure</dt><dd>@Metadata.ExposureTime</dd></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Metadata.Aperture))
+                        {
+                            <div><dt>Aperture</dt><dd>@Metadata.Aperture</dd></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Metadata.Iso))
+                        {
+                            <div><dt>ISO</dt><dd>@Metadata.Iso</dd></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Metadata.FocalLength))
+                        {
+                            <div><dt>Focal length</dt><dd>@FocalLengthLabel</dd></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Metadata.Orientation))
+                        {
+                            <div><dt>Orientation</dt><dd>@Metadata.Orientation</dd></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Metadata.Flash))
+                        {
+                            <div><dt>Flash</dt><dd>@Metadata.Flash</dd></div>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(Metadata.GpsAltitude))
+                        {
+                            <div><dt>GPS altitude</dt><dd>@Metadata.GpsAltitude</dd></div>
+                        }
+                    </dl>
+                }
+
+                @if (Metadata.Tags.Count > 0)
+                {
+                    <div class="photo-all-metadata-table-wrap">
+                        <table class="photo-all-metadata-table">
+                            <thead>
                                 <tr>
-                                    <td>@tag.Directory</td>
-                                    <td>@tag.Name</td>
-                                    <td>@tag.Value</td>
+                                    <th>Directory</th>
+                                    <th>Tag</th>
+                                    <th>Value</th>
                                 </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody>
+                                @foreach (PhotoMetadataTagResponse tag in Metadata.Tags)
+                                {
+                                    <tr>
+                                        <td>@tag.Directory</td>
+                                        <td>@tag.Name</td>
+                                        <td>@tag.Value</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
             </details>
         }
     }
@@ -131,15 +135,36 @@
         (Metadata.TakenAtLocal is not null ||
          !string.IsNullOrWhiteSpace(Metadata.CameraMake) ||
          !string.IsNullOrWhiteSpace(Metadata.CameraModel) ||
-         !string.IsNullOrWhiteSpace(Metadata.LensModel) ||
+         (Metadata.Latitude is not null && Metadata.Longitude is not null));
+
+    private bool HasDetailedMetadata => Metadata is not null &&
+        (!string.IsNullOrWhiteSpace(Metadata.LensModel) ||
          !string.IsNullOrWhiteSpace(Metadata.ExposureTime) ||
          !string.IsNullOrWhiteSpace(Metadata.Aperture) ||
          !string.IsNullOrWhiteSpace(Metadata.Iso) ||
          !string.IsNullOrWhiteSpace(Metadata.FocalLength) ||
          !string.IsNullOrWhiteSpace(Metadata.Orientation) ||
          !string.IsNullOrWhiteSpace(Metadata.Flash) ||
-         Metadata.Latitude is not null ||
          !string.IsNullOrWhiteSpace(Metadata.GpsAltitude));
+
+    private string AllMetadataSummary
+    {
+        get
+        {
+            if (Metadata is null)
+            {
+                return string.Empty;
+            }
+
+            string tagSummary = $"{Metadata.Tags.Count} tag{(Metadata.Tags.Count == 1 ? string.Empty : "s")}";
+            if (HasDetailedMetadata && Metadata.Tags.Count > 0)
+            {
+                return $"technical details · {tagSummary}";
+            }
+
+            return HasDetailedMetadata ? "technical details" : tagSummary;
+        }
+    }
 
     private static string TakenLabel(DateTime value, int? offsetMinutes)
     {
