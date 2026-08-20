@@ -13,7 +13,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class PhotoPlaceEnrichmentHostedServiceTests
 {
     [Fact]
-    public async Task Automatic_cycle_assigns_pending_gps_and_enforces_safe_provider_delay()
+    public async Task Automatic_cycle_assigns_pending_gps_and_honors_explicit_provider_delay()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -51,12 +51,9 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
             Assert.Equal(1, cycle.Report.Candidates);
             Assert.Equal(1, cycle.Report.ProviderRequests);
             Assert.Equal(1, cycle.Report.Assigned);
-            Assert.Equal(
-                TimeSpan.FromMilliseconds(GeoNamesAutomaticEnrichmentConfiguration.SafeMinimumRequestIntervalMilliseconds),
-                cycle.Delay);
-            Assert.Equal(
-                GeoNamesAutomaticEnrichmentConfiguration.SafeMinimumRequestIntervalMilliseconds,
-                automatic.MinimumRequestIntervalMilliseconds);
+            Assert.Equal(TimeSpan.FromMilliseconds(1_000), cycle.Delay);
+            Assert.Equal(1_000, automatic.MinimumRequestIntervalMilliseconds);
+            Assert.Equal(1_000, worker.EffectiveMinimumRequestIntervalMilliseconds);
 
             CataloguePhotoPlaceState state = await places.GetStateAsync(revisionId);
             Assert.NotNull(state.Place);
@@ -73,6 +70,31 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
         {
             DeleteTemporaryDirectory(directory);
         }
+    }
+
+    [Fact]
+    public void Automatic_configuration_uses_30_seconds_by_default_but_accepts_lower_explicit_values()
+    {
+        GeoNamesAutomaticEnrichmentConfiguration defaults = new(
+            enabled: null,
+            minimumRequestIntervalMilliseconds: null,
+            idlePollIntervalMilliseconds: null);
+        GeoNamesAutomaticEnrichmentConfiguration lower = new(
+            enabled: null,
+            minimumRequestIntervalMilliseconds: 500,
+            idlePollIntervalMilliseconds: 1_000);
+        GeoNamesAutomaticEnrichmentConfiguration zero = new(
+            enabled: null,
+            minimumRequestIntervalMilliseconds: 0,
+            idlePollIntervalMilliseconds: 1_000);
+
+        Assert.Equal(30_000, defaults.MinimumRequestIntervalMilliseconds);
+        Assert.Equal(500, lower.MinimumRequestIntervalMilliseconds);
+        Assert.Equal(0, zero.MinimumRequestIntervalMilliseconds);
+        Assert.Throws<InvalidOperationException>(() =>
+            new GeoNamesAutomaticEnrichmentConfiguration(null, -1, 1_000));
+        Assert.Throws<InvalidOperationException>(() =>
+            new GeoNamesAutomaticEnrichmentConfiguration(null, 600_001, 1_000));
     }
 
     [Fact]
