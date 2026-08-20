@@ -29,6 +29,8 @@ public static class PersonMaintenanceEndpoints
     {
         IReadOnlyList<CataloguePersonMaintenancePerson> people =
             await repository.GetPeopleAsync(cancellationToken);
+        IReadOnlyDictionary<PersonId, int> photoCounts =
+            await new SqlitePersonPhotoCountRepository(database).GetActivePhotoCountsAsync(cancellationToken);
         IReadOnlySet<PersonId> favorites = await new SqliteFavoritePeopleRepository(database)
             .GetFavoritePersonIdsAsync(cancellationToken);
         IReadOnlySet<PersonId> hiddenPeople = await new SqlitePersonSmartCollectionVisibilityRepository(database)
@@ -39,6 +41,7 @@ public static class PersonMaintenanceEndpoints
             .ThenBy(person => person.Id.ToString(), StringComparer.Ordinal)
             .Select(person => ToResponse(
                 person,
+                photoCounts.TryGetValue(person.Id, out int photoCount) ? photoCount : 0,
                 favorites.Contains(person.Id),
                 hiddenPeople.Contains(person.Id)))
             .ToArray());
@@ -267,11 +270,12 @@ public static class PersonMaintenanceEndpoints
 
     private static PersonMaintenancePersonResponse ToResponse(
         CataloguePersonMaintenancePerson person,
+        int photoCount,
         bool isFavorite,
         bool hiddenFromSmartCollections) => new(
             person.Id.ToString(),
             person.DisplayName,
-            person.LabelCount,
+            photoCount,
             person.SuggestionCount,
             isFavorite,
             hiddenFromSmartCollections);
