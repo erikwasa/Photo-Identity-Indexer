@@ -72,11 +72,13 @@
                 <div><dt>File name</dt><dd>@Details.FileName</dd></div>
             </dl>
 
+            <PhotoMetadataPanel Metadata="@Details.Metadata" />
+
+            <PhotoPlaceEditor RevisionId="@RevisionId" />
+
             <ManualPhotoPeopleEditor RevisionId="@RevisionId"
                                      Details="@Details"
                                      DetailsChanged="@((PhotoDetailsResponse details) => Details = details)" />
-
-            <PhotoPlaceEditor RevisionId="@RevisionId" />
         }
 
         @if (!string.IsNullOrWhiteSpace(DetailsError))
