@@ -85,7 +85,13 @@ As before, online-only originals are deferred. To refresh those, make the desire
 - [x] A force/repair path can intentionally refresh current rows without changing the default bounded behavior.
 - [x] API/reporting and operator documentation distinguish new inspection from stale and forced-current refresh.
 - [x] Focused integration tests cover legacy stale refresh, current-row skip, force refresh, version persistence and online-only deferral.
-- [ ] Final exact-head CI passes after the stacked branch is retargeted to `main` following PR #194 merge.
+- [x] Final exact-head CI passed after retargeting to `main`: workflow #1207 (`32307001482`) on PR #195 head `d6b2d2ed205e83eeda407423bd0831c9b0944007`.
+
+## Maintainer verification — 2026-08-21
+
+The maintainer exercised normal bounded backfill, repeat/default behavior and `force=true` against the real catalogue and reported that WI-0078 works as expected. No corrective metadata-refresh implementation is requested.
+
+A language-output issue observed in automatically derived Places is explicitly **not** a WI-0078 defect. It concerns GeoNames reverse-geocoding language selection and is tracked against WI-0064/WI-0065 in `../milestones/M20-maintainer-review-2026-08-21.md`.
 
 ## Non-goals
 
