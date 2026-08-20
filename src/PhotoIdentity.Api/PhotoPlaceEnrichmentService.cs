@@ -135,10 +135,10 @@ public sealed class PhotoPlaceEnrichmentService
 
             if (resolvedPlace is null)
             {
-                providerRequests++;
                 ReverseGeocodeResponse response = await _geocoder.ReverseGeocodeAsync(
                     new ReverseGeocodeQuery(candidate.Latitude, candidate.Longitude),
                     cancellationToken);
+                providerRequests += response.ProviderRequestCount;
 
                 if (response.Status == ReverseGeocodeStatus.Success && response.Place is not null)
                 {
