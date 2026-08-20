@@ -16,36 +16,49 @@ Allow the operator to control automatic GeoNames background timing through the s
 
 ## Current state
 
-The API already binds:
+The API binds:
 
 - `PhotoIdentity:GeoNames:AutomaticEnrichmentEnabled`;
 - `PhotoIdentity:GeoNames:AutomaticMinimumRequestIntervalMilliseconds`;
 - `PhotoIdentity:GeoNames:AutomaticIdlePollIntervalMilliseconds`.
 
-However, `Start-PhotoIdentity.ps1` has an explicit `$SupportedSettings` allow-list and does **not** currently include the three automatic-enrichment keys. Supplying them in the launcher settings file therefore fails as unsupported.
+PR #198 exposed the corresponding launcher settings and implemented a conservative 30-second hard floor for unattended request pacing.
 
-The automatic request interval also has a hard safe floor of 30,000 ms. Values above the floor are already meaningful in API configuration; values below it are clamped. M20 must make the launcher behavior and safe-override semantics explicit rather than leaving the setting half-exposed.
+The 2026-08-21 maintainer review accepted the launcher integration but rejected the hard-floor policy. The 30-second value should be the **default**, not a mandatory minimum. An explicit lower non-negative value should override that default.
 
-## Contract
+## Revised contract — 2026-08-21
 
-- Add the automatic GeoNames settings to the launcher allow-list and packaged launcher behavior.
+- Keep the automatic GeoNames settings in the launcher allow-list and packaged launcher behavior.
 - Document the environment/launcher names:
   - `PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled`;
   - `PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds`;
   - `PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds`.
-- Document units, defaults and validation ranges.
-- Keep 30 seconds as the conservative unattended default.
-- Decide and implement explicit semantics for an operator requesting a value below the current 30-second safe floor. Do not silently pretend the requested value was applied if it is actually clamped.
+- Keep **30000 ms** as the conservative default automatic request interval.
+- Do **not** enforce 30000 ms as a minimum. Explicit lower non-negative values must be accepted and applied as requested.
+- Use `0` to represent no intentional normal automatic pacing delay if the provider client supports that value.
+- Validate only the actual supported numeric range; do not silently clamp a lower requested value back to 30000 ms.
 - Surface the effective automatic request interval and idle poll interval in Settings/diagnostics so the operator can confirm what the process is using.
-- Preserve provider backoff behavior for quota/transport failures; ordinary timing settings must not disable provider-directed backoff.
+- Reconcile the automatic worker interval with the lower-level GeoNames client pacing so a requested automatic interval is not silently defeated by a separate default throttle. The effective value reported to the operator must match actual normal pacing.
+- Preserve provider-directed quota/account/transport backoff. Backoff may delay a retry longer than the configured normal request interval.
+- Operator documentation may warn that aggressive intervals can spend GeoNames credits quickly, but the application should not reject an explicit lower value merely because it is below the conservative default.
+
+## Maintainer review — 2026-08-21
+
+Launcher propagation, restart behavior and diagnostics were verified successfully. The only requested correction is the pacing-policy change above.
+
+The original PR #198 behavior that rejects values below 30000 ms is therefore superseded and must be removed in the corrective implementation slice.
+
+See `../milestones/M20-maintainer-review-2026-08-21.md` for the consolidated review.
 
 ## Acceptance criteria
 
-- [ ] All automatic GeoNames keys are accepted in `PhotoIdentity.launcher.json` and passed to the API process.
-- [ ] Launcher example/operator documentation contains the keys and units.
-- [ ] Effective values appear in Settings/diagnostics.
-- [ ] A configured longer request interval is honored across restart.
-- [ ] A configured idle poll interval within the supported range is honored across restart.
-- [ ] Below-safe-floor behavior is explicit and tested: either a validated opt-in override or a clear configuration error/warning, never silent clamping without operator visibility.
+- [x] All automatic GeoNames keys are accepted in `PhotoIdentity.launcher.json` and passed to the API process.
+- [x] Launcher example/operator documentation contains the keys and units.
+- [x] Effective values appear in Settings/diagnostics.
+- [x] A configured longer request interval is honored across restart.
+- [x] A configured idle poll interval within the supported range is honored across restart.
+- [ ] 30000 ms is the default but not a minimum; explicitly configured lower non-negative values are accepted and applied without silent clamping.
+- [ ] Lower-level provider-client pacing does not silently override the effective automatic interval reported to the operator.
 - [ ] Provider quota/backoff responses still take precedence over normal pacing.
-- [ ] Launcher/package verification covers the newly accepted settings.
+- [ ] Launcher/package verification is updated to cover a below-30000 explicit override rather than expecting startup rejection.
+- [ ] Final maintainer verification confirms the configured lower value reaches the running worker unchanged.
