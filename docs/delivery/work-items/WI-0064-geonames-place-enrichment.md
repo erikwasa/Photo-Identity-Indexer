@@ -24,7 +24,7 @@ GeoNames is the selected first reverse-geocoding provider for M19 follow-up work
 - Do not use the public `demo` account for application operation or automated tests.
 - Respect the provider's current credit/rate limits and attribution requirements; implementation must not hard-code assumptions that prevent using different limits or a paid GeoNames service later.
 
-The implementation uses `findNearbyPlaceNameJSON` through the secure GeoNames host. The provider-client request interval is configurable so the service contract can be tuned without changing catalogue semantics. WI-0065 adds a separate conservative floor for unattended automatic processing.
+The implementation uses `findNearbyPlaceNameJSON` through the secure GeoNames host. Provider-client request pacing is configurable so the service contract can be tuned without changing catalogue semantics. WI-0065 owns unattended automatic orchestration and WI-0075 owns launcher-facing automatic timing configuration.
 
 ## Place normalization
 
@@ -89,6 +89,30 @@ The same session exposed an orchestration issue rather than a provider/catalogue
 
 That browser-lifetime mismatch is moved to [WI-0065](WI-0065-automatic-place-enrichment.md). WI-0065 makes the normal workflow a server-side automatic worker that drains the existing durable queue independently of browser requests and archive analysis.
 
+### Language-policy corrective slice — 2026-08-21
+
+The maintainer's consolidated M20 review found that `lang=local` is desirable for Swedish photos but produces undesirable local-language names for some photos outside Sweden.
+
+Revised desired provider behavior:
+
+- Sweden (`countryCode=SE`) uses GeoNames local-language names;
+- non-Swedish coordinates use the English GeoNames representation;
+- if this conditional policy cannot be implemented reliably with the provider contract, Swedish globally is preferred over arbitrary local-language output.
+
+Preferred implementation contract:
+
+1. Resolve the coordinate using `lang=local` first.
+2. If the result country is `SE`, use/cache that local result.
+3. If the result country is not `SE`, resolve/cache the same coordinate using `lang=en` before assigning the canonical automatic Place.
+4. Provider/cache contract keys must encode the effective language policy/version so pre-change local-language cache rows are not reused as though they satisfied the new contract.
+5. Reuse the English cached result for later revisions at the same foreign coordinate; do not repeatedly perform two live lookups once the policy-specific result exists.
+6. Preserve all existing manual-place/manual-clear precedence, migration-conflict protection, provider backoff, privacy and no-hydration behavior.
+7. Operator documentation should make clear that the first policy-compliant lookup for a non-Swedish coordinate can consume an additional GeoNames request.
+
+Automated coverage should include representative Swedish, English-speaking and non-English foreign coordinates plus cache reuse and manual-place protection. Live verification should sample at least one Swedish and one non-Swedish/non-English-local-language coordinate.
+
+Full consolidated notes are in `../milestones/M20-maintainer-review-2026-08-21.md`.
+
 ## In scope
 
 - Add a reverse-geocoding abstraction with a GeoNames implementation so provider-specific HTTP/parsing logic is isolated from catalogue/location semantics.
@@ -137,8 +161,10 @@ The operation does not send photo bytes, filenames, people, tags, source paths o
 - [x] GeoNames attribution and external-GPS privacy behavior are documented and presented for the operator.
 - [x] Automated tests use a fake/stub GeoNames HTTP boundary and cover normalization, caching, retries, rate-limit/error handling, manual precedence, long provider hierarchies and no-hydration behavior.
 - [x] The three live `invalid-place-path` revisions were retried successfully after PR #165, confirming the long Places path fix against the configured maintainer GeoNames account.
-- [ ] The consolidated M19 browser/operator pass is recorded as final verification evidence.
+- [ ] Sweden/local vs non-Sweden/English language policy is implemented with policy-aware cache semantics and automated coverage.
+- [ ] A maintainer sample verifies Swedish naming is retained in Sweden and English naming is used for a non-Swedish/non-English-local-language coordinate.
+- [ ] The consolidated M19/M20 operator verification is recorded as final verification evidence after the language-policy correction.
 
 ## Verification requirements
 
-Automated provider-contract and catalogue tests must not depend on the live GeoNames service. The live maintainer sample has now established provider access, geographically correct automatic assignment, Smart Collection location filtering and successful retry of the three former long-path failures. Remaining M19 verification can concentrate on the consolidated browser workflow plus WI-0065 automatic orchestration rather than repeating the same manual large-batch GeoNames exercise.
+Automated provider-contract and catalogue tests must not depend on the live GeoNames service. Existing live maintainer samples establish provider access, geographically correct automatic assignment, Smart Collection location filtering and successful retry of the former long-path failures. Remaining provider verification should focus on the revised language policy and its interaction with automatic orchestration/pacing in WI-0065/WI-0075.

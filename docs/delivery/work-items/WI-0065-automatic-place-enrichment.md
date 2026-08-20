@@ -12,7 +12,7 @@ affected_modules: [PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persisten
 
 ## Objective
 
-Remove GeoNames reverse geocoding from the normal manual/operator workflow. Once a private GeoNames username is configured, Photo Identity should continuously enrich eligible GPS-bearing revisions in the server process without requiring the browser to keep a long HTTP request open and without requiring the maintainer to calculate provider limits or repeatedly start batches.
+Remove GeoNames reverse geocoding from the normal manual/operator workflow. Once a private GeoNames username is configured, Photo Identity should continuously enrich eligible GPS-bearing revisions in the server process without requiring the browser to keep a long HTTP request open and without requiring the maintainer to repeatedly start batches.
 
 Automatic enrichment must remain resumable from durable catalogue state, must never block archive/local analysis on a network service, and must preserve all WI-0064 privacy, manual-place precedence, cache and failure semantics.
 
@@ -24,18 +24,21 @@ That exposed a design mismatch rather than a catalogue failure: large reverse-ge
 
 The maintainer also confirmed that the previously failing long-place revisions were automatically retryable and all succeeded after PR #165. WI-0065 therefore changes the operating model rather than reopening the long-path fix.
 
-## Provider budget decision
+## Provider pacing decision
 
-As of 2026-08-18, the GeoNames free web-service documentation states a 10,000-credit daily limit and 1,000-credit hourly limit per username/application. The GeoNames credit table lists `findNearbyPlaceName` at 3 credits per request.
+The first implementation used a conservative **30-second hard minimum** between automatic GeoNames requests so unattended free-tier operation stayed well below the provider credit limits.
 
-References:
+The maintainer review on 2026-08-21 supersedes that policy:
 
-- https://www.geonames.org/export/
-- https://www.geonames.org/export/credits.html
+- **30 seconds remains the default automatic request interval.**
+- It is **not** a mandatory minimum.
+- An explicitly configured lower non-negative interval is an operator override and must be honored rather than silently clamped or rejected solely for being below 30 seconds.
+- Settings/diagnostics must show the effective normal pacing actually used by the worker.
+- The automatic worker and lower-level GeoNames client must not apply contradictory independent defaults that make the reported override ineffective.
+- GeoNames quota/account/transport responses remain authoritative: provider-directed backoff may pause the worker longer than the configured normal interval.
+- Documentation should warn that aggressive values can consume provider credits quickly, while preserving operator control.
 
-Normal automatic operation must not require the maintainer to reason about those numbers. The first implementation slice therefore imposes a conservative **30-second minimum between actual automatic GeoNames requests**, independent of any lower raw provider-client interval configured for maintenance/testing. At continuous operation that is at most 120 requests/hour (360 credits) and 2,880 requests/day (8,640 credits), leaving headroom below both documented free-service limits.
-
-Provider quota/availability responses continue to pause the worker and are retried automatically with bounded backoff. Future provider tiers may make the automatic budget configurable upward, but lowering automatic pacing below the safe floor is intentionally not a normal operator setting.
+The launcher-facing correction is tracked in WI-0075.
 
 ## Architecture
 
@@ -52,30 +55,45 @@ archive/local ingestion or metadata backfill
         -> cache/manual/conflict rules run
         -> GeoNames request only when needed
         -> first-class Place is assigned
-        -> worker continues later at provider-safe pacing
+        -> worker continues later at configured/provider-safe pacing
 ```
 
 No archive-specific queue handoff is required. `photo_capture_metadata` is the durable boundary: as soon as GPS is present in SQLite, the existing WI-0064 candidate query makes that revision eligible. This keeps reverse geocoding independent of original-file availability and means closing/restarting the application simply resumes from existing attempt/cache state.
 
-## Slice 1 — automatic hosted worker and operator status
+## Automatic hosted worker and operator status
 
-Implement:
+The implementation provides:
 
 - a `PhotoPlaceEnrichmentHostedService` that continuously drains the existing normal GeoNames candidate queue one revision at a time;
 - automatic activation when GeoNames is configured, with an optional local `PhotoIdentity:GeoNames:AutomaticEnrichmentEnabled=false` escape hatch;
-- a 30-second automatic provider-request floor that cannot be reduced by the lower-level `MinimumRequestIntervalMilliseconds` setting;
+- configurable normal automatic request pacing with a conservative 30-second default;
 - fast continuation for cache hits/manual-protected/conflict rows because they do not spend provider credits;
 - automatic retry/backoff for provider quota, overload, transport and authorization stop states;
 - no browser/request cancellation token as the lifetime owner of catalogue-wide enrichment;
 - Settings status showing automatic worker state, last activity, next attempt and automatic pacing;
-- retain small manual maintenance and force-refresh controls for diagnostics only, with the browser-facing maintenance batch deliberately capped well below the previous 250-candidate workflow;
+- small manual maintenance and force-refresh controls for diagnostics only;
 - no new original-file reads or hydration.
 
-## Follow-up hardening
+## GeoNames language policy correction — 2026-08-21
 
-Before final completion, evaluate whether to add a durable provider-credit ledger. The 30-second floor is sufficient for unattended free-tier operation by itself, but a durable ledger would also account for unusual concurrent manual calls and repeated process restarts when enforcing provider budgets.
+The maintainer verified that `lang=local` produces the desired Swedish names for Swedish photos but undesirable local-language names for some photos outside Sweden.
 
-If implemented, the ledger must remain provider-neutral enough to support changed GeoNames limits or a premium tier without changing catalogue Place semantics.
+Desired policy:
+
+- for Sweden (`countryCode=SE`), retain GeoNames local-language names;
+- outside Sweden, assign the English GeoNames representation;
+- if the provider contract cannot support that policy reliably, the fallback preference is Swedish globally rather than arbitrary local languages.
+
+Preferred provider workflow:
+
+1. Query `lang=local` first so Swedish coordinates keep Swedish names without an unnecessary second request.
+2. If the result country is not `SE`, resolve/cache an English (`lang=en`) representation before assigning the automatic Place.
+3. Provider/cache contract keys must include the effective language policy so old local-language cached results are not mistaken for results produced under the new policy.
+4. A foreign coordinate that already has the English result cached under the current contract must not repeatedly incur two live requests.
+5. Preserve manual-place/manual-clear precedence, migration-conflict protection, privacy, no-hydration and provider-backoff behavior.
+6. Settings/operator documentation must state that the first lookup of a non-Swedish coordinate can consume an additional provider request.
+
+The provider-client normalization/cache details are owned jointly with WI-0064. Consolidated review notes are in `../milestones/M20-maintainer-review-2026-08-21.md`.
 
 ## Privacy and precedence
 
@@ -99,15 +117,16 @@ The worker must preserve WI-0064 protections:
 - [ ] Archive analysis does not wait for GeoNames and GeoNames never hydrates/open originals.
 - [ ] Unattempted, failed and deferred revisions resume automatically from existing SQLite state.
 - [ ] Completed success/no-result/manual-protected/conflict rows are not repeatedly sent to GeoNames.
-- [ ] Normal automatic operation enforces provider-safe pacing without requiring the maintainer to calculate hourly/daily limits.
-- [ ] GeoNames quota, overload and transport stop states pause/retry automatically rather than requiring repeated manual batches.
+- [ ] Normal automatic operation uses the configured non-negative request interval with a 30000 ms default and no hidden 30000 ms floor.
+- [ ] GeoNames quota, overload and transport stop states pause/retry automatically and can override the normal interval with longer provider backoff.
 - [ ] Closing/restarting Photo Identity resumes outstanding enrichment from durable catalogue state.
-- [ ] Settings clearly reports automatic worker state and explains that normal enrichment no longer requires a manual batch.
+- [ ] Settings clearly reports automatic worker state, effective pacing and explains that normal enrichment no longer requires a manual batch.
 - [ ] Manual maintenance/force-refresh remains available for focused diagnostics and intentional automatic-place refresh.
 - [ ] Manual Place/manual-clear precedence remains intact.
-- [ ] Automated coverage verifies automatic activation/disable behavior, provider-request pacing and resumable worker cycles without live GeoNames calls.
-- [ ] A maintainer local pass confirms that adding/processing a GPS photo eventually produces the expected Place without pressing the maintenance button.
+- [ ] Sweden uses local-language GeoNames place names while non-Swedish results use English, with cache keys/reuse matching the new language policy.
+- [ ] Automated coverage verifies automatic activation/disable behavior, configured pacing, resumable worker cycles and the Sweden-local/else-English language policy without live GeoNames calls.
+- [ ] A maintainer local pass confirms automatic pickup, restart/resume, an explicit below-30-second pacing override, and representative Swedish/non-Swedish place naming.
 
 ## Verification notes
 
-The WI-0064 live-provider verification already proves the configured GeoNames account, HTTPS provider path, canonical Place normalization, Smart Collection integration and long hierarchy storage. WI-0065 verification should therefore focus on orchestration: automatic pickup, safe pacing, restart/resume behavior and independence from the browser request lifetime.
+The WI-0064 live-provider verification already proves the configured GeoNames account, HTTPS provider path, canonical Place normalization, Smart Collection integration and long hierarchy storage. Remaining verification should focus on automatic orchestration, effective configurable pacing, restart/resume behavior, browser-lifetime independence and the revised language policy.

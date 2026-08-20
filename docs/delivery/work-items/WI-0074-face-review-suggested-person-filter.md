@@ -27,22 +27,29 @@ Allow the maintainer to restrict Face Review to faces whose current rank-one ide
 
 ## Acceptance criteria
 
-- [ ] Person-only filtering returns only faces whose current rank-one suggestion matches the selected canonical person.
-- [ ] Person + confidence group composes correctly.
-- [ ] Person + ordering/model/review-state criteria compose correctly.
-- [ ] Hidden-from-Smart-Collections people remain discoverable/selectable in Face Review.
-- [ ] Face Details previous/next navigation stays inside the filtered queue.
-- [ ] Returning from Face Details restores the selected suggested-person filter.
-- [ ] Removing/clearing the filter restores normal queue semantics.
-- [ ] Repository/API/component/integration coverage includes empty results and stale/non-current suggestion cases.
+- [x] Person-only filtering returns only faces whose current rank-one suggestion matches the selected canonical person.
+- [x] Person + confidence group composes correctly.
+- [x] Person + ordering/model/review-state criteria compose correctly.
+- [x] Hidden-from-Smart-Collections people remain discoverable/selectable in Face Review.
+- [x] Face Details previous/next navigation stays inside the filtered queue.
+- [x] Returning from Face Details restores the selected suggested-person filter.
+- [x] Removing/clearing the filter restores normal queue semantics.
+- [x] Repository/API/component/integration coverage includes empty results and stale/non-current suggestion cases.
 
 ## Implementation evidence
 
 - PR #197 implements one parameterized `suggestedPersonId` predicate on the existing exact-model pending rank-one suggestion CTE; there is no schema or migration change and lower-ranked suggestions never participate in the predicate.
-- Face Review uses a searchable single-person picker over the complete `/api/review/people` response. People hidden from Smart Collections remain candidates and are labelled as such rather than filtered out.
+- Face Review uses a searchable single-person picker over the complete `/api/review/people` response. People hidden from Smart Collections remain candidates rather than being filtered out.
 - The selected person is carried through gallery paging, generated Face Details URLs, previous/next suggestion-queue navigation and the Face Review return URL. Clearing suggestion-model context clears the person filter.
-- Workflow #1213 (`32311872263`) built the implementation successfully. Its focused shared-host test `SuggestedPersonReviewFilterApplicationTests.Suggested_person_filter_uses_only_current_rank_one_and_composes_with_review_scope` passed in integration shard 1 in 2.41s and covers rank-one-only behavior, lower-ranked and stale/unranked exclusion, confidence/review-state composition, hidden-person availability, empty results, invalid person ids and filtered previous/next navigation.
-- Acceptance checkboxes remain open until the focused browser/maintainer pass verifies the interactive picker and return-context behavior end to end.
+- Exact-head workflow #1218 (`32312949819`) passed the final merged implementation validation.
+
+## Maintainer verification — 2026-08-21
+
+The consolidated M20 browser review confirmed that suggested-person filtering works as intended, composes with the existing queue controls, and preserves Face Details navigation/return context. No corrective filtering-semantic work is requested.
+
+Compact picker presentation changes requested during the same review are tracked under WI-0073 because they are UI density/presentation corrections rather than changes to WI-0074 filtering semantics.
+
+See `../milestones/M20-maintainer-review-2026-08-21.md`.
 
 ## Source finding
 

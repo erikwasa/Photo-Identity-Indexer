@@ -29,7 +29,7 @@ Keep the primary/always-visible metadata compact. Do **not** show these as separ
 
 These values remain persisted and available inside the existing collapsed **All metadata** section.
 
-The compact visible metadata should retain the fields that are most useful at a glance, including photographic capture time, camera make/model and exact GPS coordinates when present. The named Place remains part of the separate Location section rather than being duplicated as raw metadata.
+The compact visible metadata should retain the fields that are most useful at a glance, including photographic capture time, camera make/model and exact GPS coordinates when present. The named Place remains a first-class Location presentation rather than being reduced to raw metadata.
 
 ## Location presentation
 
@@ -50,16 +50,64 @@ Edit mode after `Edit location`:
 
 ## Implementation — 2026-08-20
 
-The implementation is on `agent/WI-0077-photo-viewer-simplification` and is intentionally awaiting the maintainer's later consolidated M20 browser review.
+The first implementation was merged through PR #199.
 
-- `PhotoMetadataPanel` now keeps only capture time, camera make/model and exact GPS coordinates in the always-visible grid.
+- `PhotoMetadataPanel` keeps only capture time, camera make/model and exact GPS coordinates in the always-visible grid.
 - Lens, exposure, aperture, ISO, focal length/35 mm equivalent, orientation, flash and GPS altitude are rendered as structured technical details inside the collapsed `All metadata` disclosure. The bounded raw-tag table remains beneath those structured values when raw tags are available.
-- `PhotoPlaceEditor` now defaults to read mode, showing the effective Place or `No location assigned` plus one `Edit location` button.
+- `PhotoPlaceEditor` defaults to read mode, showing the effective Place or `No location assigned` plus one `Edit location` button.
 - Entering edit mode reveals the existing Place picker/path field and Set/Replace/Clear controls plus Cancel. Entering or cancelling edit mode does not mutate catalogue data.
 - Successful Set/Replace/Clear returns to read mode immediately. Existing API, first-class Place, manual-precedence and single-effective-Place semantics are unchanged.
-- Narrow-screen CSS stacks the location value and Edit action rather than forcing them into one row.
 
-No persistence, API, original-file access, hydration or GeoNames behavior changes are part of this implementation.
+No persistence, original-file access, hydration or GeoNames behavior changes were part of that first implementation.
+
+## Maintainer review — 2026-08-21
+
+The metadata-field visibility and location edit/read behavior were verified successfully. The remaining corrective work is presentation/layout.
+
+### At-a-glance metadata layout
+
+- Avoid ordinary desktop values wrapping across three lines.
+- Prefer a compact two-column desktop arrangement with one-column fallback on narrow screens.
+- `Photo taken` should normally fit on one line at desktop widths.
+- Camera make/model may be combined into one **Camera** value when that improves readability and fit.
+- GPS coordinates must not be forced to span the entire grid; use an ordinary metadata cell.
+- Do not use aggressive `overflow-wrap:anywhere` for short structured values as the normal desktop behavior.
+
+### Location position
+
+Refactor component/page ownership as needed so the visible order is:
+
+1. capture metadata/GPS;
+2. Location;
+3. People.
+
+The named Place should appear close to the GPS coordinates rather than after the People editor.
+
+### Compact location label
+
+The complete canonical hierarchy remains authoritative for persistence, editing and Smart Collection filtering. Read mode should not normally print the entire hierarchy when it is long.
+
+Example stored value:
+
+```text
+Sverige/Stockholms län/Stockholms stad/Brännkyrka/Långbro
+```
+
+Target read-mode presentation is **city + most-specific locality**, for example:
+
+```text
+Stockholm · Långbro
+```
+
+Requirements:
+
+- do not infer the city by blindly taking a fixed positional segment; GeoNames administrative depth varies by country;
+- for GeoNames-derived Places, expose or persist enough semantic display information to identify the appropriate city/locality reliably, or use a deterministic provider-aware compact-label rule;
+- retain the full hierarchy in edit mode and optionally as tooltip/secondary detail;
+- manual Places without provider semantic metadata need a deterministic compact fallback while the full stored path remains authoritative;
+- do not change WI-0063 hierarchy/query semantics merely to shorten display text.
+
+Full review notes are in `../milestones/M20-maintainer-review-2026-08-21.md`.
 
 ## Acceptance criteria
 
@@ -71,10 +119,13 @@ No persistence, API, original-file access, hydration or GeoNames behavior change
 - [x] Edit mode supports Set/Replace/Clear plus Cancel without changing existing Place semantics.
 - [x] Successful location mutation exits edit mode and immediately reflects the effective Place.
 - [x] No private source path or original-file hydration is introduced by the presentation change.
-- [ ] Consolidated browser verification covers assigned and unassigned Place states, edit/cancel/mutation flow, collapsed metadata and narrow-screen layout.
+- [ ] At-a-glance metadata uses a compact desktop layout without unnecessary multi-line wrapping, and GPS no longer spans the full width.
+- [ ] Location appears immediately after capture metadata/GPS and before People.
+- [ ] Read mode shows a compact city + most-specific-locality label where semantic location data supports it, while preserving the full canonical hierarchy for editing/querying.
+- [ ] Final browser verification covers assigned/unassigned Place states, edit/cancel/mutation flow, collapsed metadata and narrow-screen layout after the corrective slice.
 
 ## Non-goals
 
 - Do not remove detailed metadata from persistence/API solely because it moves out of the key view.
-- Do not change GeoNames enrichment, Places hierarchy or manual/automatic precedence rules.
+- Do not change Places hierarchy or manual/automatic precedence rules.
 - Do not redesign the full Photo Details navigation contract in this item; archive return-context polish belongs to WI-0073.
