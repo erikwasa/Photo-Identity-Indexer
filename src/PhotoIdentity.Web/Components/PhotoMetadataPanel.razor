@@ -13,33 +13,26 @@
     }
     else
     {
-        <dl class="photo-metadata-grid">
+        <dl class="photo-metadata-grid photo-key-metadata">
             @if (Metadata.TakenAtLocal is DateTime taken)
             {
                 <div>
                     <dt>Photo taken</dt>
-                    <dd>@TakenLabel(taken, Metadata.UtcOffsetMinutes)</dd>
+                    <dd class="photo-metadata-value-nowrap" title="@TakenLabel(taken, Metadata.UtcOffsetMinutes)">@TakenLabel(taken, Metadata.UtcOffsetMinutes)</dd>
                 </div>
             }
-            @if (!string.IsNullOrWhiteSpace(Metadata.CameraMake))
+            @if (!string.IsNullOrWhiteSpace(CameraLabel))
             {
                 <div>
-                    <dt>Camera make</dt>
-                    <dd>@Metadata.CameraMake</dd>
-                </div>
-            }
-            @if (!string.IsNullOrWhiteSpace(Metadata.CameraModel))
-            {
-                <div>
-                    <dt>Camera model</dt>
-                    <dd>@Metadata.CameraModel</dd>
+                    <dt>Camera</dt>
+                    <dd class="photo-metadata-value-nowrap" title="@CameraLabel">@CameraLabel</dd>
                 </div>
             }
             @if (Metadata.Latitude is double latitude && Metadata.Longitude is double longitude)
             {
-                <div class="photo-metadata-wide">
+                <div>
                     <dt>GPS coordinates</dt>
-                    <dd><code>@Coordinate(latitude), @Coordinate(longitude)</code></dd>
+                    <dd class="photo-metadata-value-nowrap"><code>@Coordinate(latitude), @Coordinate(longitude)</code></dd>
                 </div>
             }
         </dl>
@@ -124,6 +117,34 @@
 @code {
     [Parameter]
     public PhotoMetadataResponse? Metadata { get; set; }
+
+    private string CameraLabel
+    {
+        get
+        {
+            if (Metadata is null)
+            {
+                return string.Empty;
+            }
+
+            string make = Metadata.CameraMake?.Trim() ?? string.Empty;
+            string model = Metadata.CameraModel?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(make))
+            {
+                return model;
+            }
+            if (string.IsNullOrWhiteSpace(model))
+            {
+                return make;
+            }
+            if (model.StartsWith(make, StringComparison.OrdinalIgnoreCase))
+            {
+                return model;
+            }
+
+            return $"{make} {model}";
+        }
+    }
 
     private string FocalLengthLabel => Metadata is null
         ? string.Empty
