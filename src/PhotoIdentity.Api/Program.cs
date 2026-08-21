@@ -18,9 +18,6 @@ public partial class Program
 
         if (OperatingSystem.IsWindows() && builder.Environment.IsDevelopment())
         {
-            // WebApplicationFactory uses Development by default. Parallel integration-test hosts
-            // can otherwise share the Windows EventLog source lifetime and intermittently attempt
-            // to log through an EventLogInternal instance disposed by another completed host.
             builder.Logging.AddFilter<EventLogLoggerProvider>(_ => false);
         }
 
