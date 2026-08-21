@@ -25,7 +25,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M18 | Operator application experience | ready |
 | M19 | Photo metadata and semantic collections | in_progress |
 | M20 | Operator polish and archive throughput | in_progress |
-| M21 | Protected Smart Collection slideshow | proposed |
+| M21 | Protected Smart Collection slideshow | ready |
 
 Expected evolution:
 
