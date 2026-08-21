@@ -403,10 +403,10 @@ if ($mergeAction.kind -ne "merge" -or
     $mergeAction.targetPersonId -ne $Manifest.MergeTargetPersonId -or
     $mergeAction.reversible -or
     $sourceAfterMerge.Count -ne 0 -or
-    $targetAfterMerge.labelCount -lt 2 -or
+    $targetAfterMerge.photoCount -lt 2 -or
     $mergeSourceDetails.face.person.id -ne $Manifest.MergeTargetPersonId -or
     @($historyAfterMerge | Where-Object { $_.id -eq $mergeAction.id }).Count -ne 1) {
-    throw "Person merge did not retire the source and consolidate its labels."
+    throw "Person merge did not retire the source and consolidate its photos."
 }
 $smoke.personMerge = "passed"
 
