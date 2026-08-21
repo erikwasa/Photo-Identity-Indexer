@@ -2,14 +2,25 @@
 .bulk-review-panel {
     min-width: 0;
     margin: 0 0 1.2rem;
-    padding: clamp(1rem, 2vw, 1.35rem);
     background: rgba(255, 253, 248, 0.94);
     border: 1px solid var(--line);
     border-radius: 1.2rem;
     box-shadow: var(--shadow);
 }
 
-.review-filter-panel h2,
+.review-filter-panel {
+    padding: 0.8rem 0.95rem;
+}
+
+.bulk-review-panel {
+    padding: clamp(1rem, 2vw, 1.35rem);
+}
+
+.review-filter-panel h2 {
+    margin: 0.1rem 0 0.2rem;
+    font-size: clamp(1.15rem, 2vw, 1.5rem);
+}
+
 .bulk-review-heading h2 {
     margin: 0.15rem 0 0.35rem;
     font-size: clamp(1.35rem, 3vw, 2rem);
@@ -17,15 +28,24 @@
 
 .review-filter-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0.8rem;
-    margin-top: 1rem;
+    grid-template-columns: minmax(9rem, 0.75fr) minmax(9rem, 0.75fr) minmax(14rem, 1.4fr) minmax(9rem, 0.8fr) minmax(9rem, 0.8fr);
+    align-items: start;
+    gap: 0.6rem;
+    margin-top: 0.65rem;
+}
+
+.review-filter-grid > * {
+    min-width: 0;
+}
+
+.review-filter-panel .field-label {
+    font-size: 0.78rem;
 }
 
 .model-summary {
     max-width: 100%;
     color: var(--muted);
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     overflow-wrap: anywhere;
 }
 
@@ -121,6 +141,10 @@
 }
 
 @media (max-width: 1180px) {
+    .review-filter-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .bulk-action-bar {
         grid-template-columns: minmax(8rem, auto) minmax(12rem, 1fr) minmax(14rem, 1.3fr) repeat(3, auto);
     }

@@ -1,6 +1,6 @@
 @inject HttpClient Http
 
-<div class="person-portrait" aria-live="polite">
+<div class="person-portrait @(Representative is { ImageUrl: not null, FaceId: not null } ? "image-only" : null)" aria-live="polite">
     @if (Loading)
     {
         <div class="portrait-placeholder" aria-hidden="true">…</div>
@@ -16,10 +16,6 @@
            title="Open representative face details">
             <img src="@imageUrl" alt="Representative face for @DisplayName" />
         </a>
-        <div class="portrait-copy">
-            <strong>@(Representative.IsExplicit ? "Featured photo" : "Automatic photo")</strong>
-            <span>@(Representative.IsExplicit ? "Selected explicitly" : "Selected automatically")</span>
-        </div>
     }
     else if (LoadFailed)
     {

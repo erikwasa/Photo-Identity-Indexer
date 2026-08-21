@@ -7,6 +7,10 @@
     margin-bottom: 0.45rem;
 }
 
+.person-portrait.image-only {
+    grid-template-columns: 3.5rem;
+}
+
 .portrait-link,
 .portrait-placeholder {
     width: 3.5rem;

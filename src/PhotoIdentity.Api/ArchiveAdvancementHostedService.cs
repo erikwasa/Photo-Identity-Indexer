@@ -102,7 +102,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
 
                 _ = await _faceReviewBackfill.AdvanceAsync(coverage, stoppingToken);
                 _ = await _boundedAnalysis.AdvanceAsync(_operatorConfiguration, stoppingToken);
-                ArchiveAdvancementWorkState work = await GetWorkStateAsync(coverage, stoppingToken);
+                ArchiveAdvancementWorkClassification work = await GetWorkStateAsync(coverage, stoppingToken);
                 if (!work.HasWork)
                 {
                     await _control.CompleteAsync(coverage.Source.Id, _timeProvider.GetUtcNow(), stoppingToken);
@@ -161,7 +161,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             cancellationToken);
     }
 
-    private async Task<ArchiveAdvancementWorkState> GetWorkStateAsync(
+    private async Task<ArchiveAdvancementWorkClassification> GetWorkStateAsync(
         ArchiveCoverageConfiguration coverage,
         CancellationToken cancellationToken)
     {
@@ -206,6 +206,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         CatalogueArchiveRunStatus? latest = await new SqliteArchiveStatusRepository(_database)
             .GetLatestRunAsync(profileHash, cancellationToken);
         bool activeRun = latest is not null && (latest.QueuedJobs > 0 || latest.RunningJobs > 0);
+        bool hasRunnableWork = sourcePending || proxyPending || faceReviewPending || analysisPending || activeRun;
 
         // Observing the storage snapshot reconciles durable release ownership once OneDrive has
         // actually made a managed file online-only.
@@ -214,11 +215,11 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         IReadOnlyList<ArchiveManagedSourceHydrationLease> sourceLeases = await _sourceHydrations.GetActiveLeasesAsync(cancellationToken);
         bool releasePending = revisionLeases.Any(value => value.IsReleaseRequested) ||
             sourceLeases.Any(value => value.IsReleaseRequested);
-        bool waiting = storage.HydrationsInProgress > 0 || storage.ManagedReleasingBytes > 0 || releasePending;
+        bool hasOneDriveTransition = storage.HydrationsInProgress > 0 ||
+            storage.ManagedReleasingBytes > 0 ||
+            releasePending;
 
-        return new ArchiveAdvancementWorkState(
-            sourcePending || proxyPending || faceReviewPending || analysisPending || activeRun || releasePending,
-            waiting);
+        return ArchiveAdvancementWorkClassifier.Classify(hasRunnableWork, hasOneDriveTransition);
     }
 
     private static bool IsRetryableTransition(Exception exception)
@@ -233,6 +234,4 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             message.Contains("currently being released", StringComparison.OrdinalIgnoreCase) ||
             message.Contains("concurrency limit", StringComparison.OrdinalIgnoreCase);
     }
-
-    private sealed record ArchiveAdvancementWorkState(bool HasWork, bool WaitingForOneDrive);
 }
