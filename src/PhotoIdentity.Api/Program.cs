@@ -44,8 +44,11 @@ public partial class Program
             builder.Configuration,
             "PhotoIdentity:GeoNames:MinimumRequestIntervalMilliseconds");
         int resolvedGeoNamesMinimumRequestInterval = rawGeoNamesMinimumRequestInterval
-            ?? automaticGeoNamesMinimumRequestInterval
-            ?? GeoNamesAutomaticEnrichmentConfiguration.DefaultMinimumRequestIntervalMilliseconds;
+            ?? (automaticGeoNamesMinimumRequestInterval is int automaticInterval
+                ? Math.Min(
+                    automaticInterval,
+                    GeoNamesReverseGeocodingConfiguration.DefaultMinimumRequestIntervalMilliseconds)
+                : GeoNamesReverseGeocodingConfiguration.DefaultMinimumRequestIntervalMilliseconds);
 
         builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
         builder.Services.AddSingleton(new ArchiveOperatorConfiguration(
