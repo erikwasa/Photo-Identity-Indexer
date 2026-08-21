@@ -51,8 +51,8 @@ function Assert-LauncherSettingValue {
             if (-not [int]::TryParse($Value, [ref]$parsed)) {
                 throw "$Name must be an integer millisecond value."
             }
-            if ($parsed -lt 30000) {
-                throw "$Name must be at least 30000 milliseconds (30 seconds). Lower values are not applied."
+            if ($parsed -lt 0 -or $parsed -gt 600000) {
+                throw "$Name must be between 0 and 600000 milliseconds (0 to 10 minutes)."
             }
         }
         "PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds" {

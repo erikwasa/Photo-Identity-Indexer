@@ -3,13 +3,12 @@ namespace PhotoIdentity.Api;
 /// <summary>
 /// Controls automatic GeoNames enrichment independently of browser requests and archive analysis.
 /// A configured GeoNames username opts the application into automatic enrichment unless this
-/// worker is explicitly disabled. The automatic provider-request floor is deliberately slower
-/// than the raw provider client pacing so normal unattended operation remains within the current
-/// free-service credit limits for findNearbyPlaceName.
+/// worker is explicitly disabled. Thirty seconds is the conservative default request interval;
+/// an operator may explicitly choose a lower non-negative value.
 /// </summary>
 public sealed record GeoNamesAutomaticEnrichmentConfiguration
 {
-    public const int SafeMinimumRequestIntervalMilliseconds = 30_000;
+    public const int DefaultMinimumRequestIntervalMilliseconds = 30_000;
     public const int DefaultIdlePollIntervalMilliseconds = 5_000;
 
     public GeoNamesAutomaticEnrichmentConfiguration(
@@ -19,11 +18,13 @@ public sealed record GeoNamesAutomaticEnrichmentConfiguration
     {
         Enabled = enabled ?? true;
 
-        int requestedMinimum = minimumRequestIntervalMilliseconds
-            ?? SafeMinimumRequestIntervalMilliseconds;
-        MinimumRequestIntervalMilliseconds = Math.Max(
-            requestedMinimum,
-            SafeMinimumRequestIntervalMilliseconds);
+        MinimumRequestIntervalMilliseconds = minimumRequestIntervalMilliseconds
+            ?? DefaultMinimumRequestIntervalMilliseconds;
+        if (MinimumRequestIntervalMilliseconds is < 0 or > 600_000)
+        {
+            throw new InvalidOperationException(
+                "GeoNames automatic enrichment request pacing must be between 0 and 600000 milliseconds.");
+        }
 
         IdlePollIntervalMilliseconds = idlePollIntervalMilliseconds
             ?? DefaultIdlePollIntervalMilliseconds;
@@ -127,6 +128,10 @@ public sealed class PhotoPlaceEnrichmentHostedService : BackgroundService
         _logger = logger;
     }
 
+    public int EffectiveMinimumRequestIntervalMilliseconds => Math.Max(
+        _automatic.MinimumRequestIntervalMilliseconds,
+        _geoNames.MinimumRequestIntervalMilliseconds);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -217,7 +222,7 @@ public sealed class PhotoPlaceEnrichmentHostedService : BackgroundService
         if (report.ProviderRequests > 0)
         {
             TimeSpan providerDelay = TimeSpan.FromMilliseconds(
-                _automatic.MinimumRequestIntervalMilliseconds);
+                EffectiveMinimumRequestIntervalMilliseconds);
             _state.Update(
                 "running",
                 BuildProgressMessage(report),

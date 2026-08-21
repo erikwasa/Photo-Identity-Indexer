@@ -47,13 +47,13 @@ function Invoke-Launcher {
     }
 }
 
-function Assert-RejectsUnsafeGeoNamesTiming {
+function Assert-RejectsInvalidGeoNamesTiming {
     $invalidConfiguration = [ordered]@{
         publishPath = $publishPath
         url = $url
         settings = [ordered]@{
             PhotoIdentity__DatabasePath = $databasePath
-            PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds = "25000"
+            PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds = "-1"
         }
     }
     $invalidConfiguration | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $invalidConfigurationPath -Encoding UTF8
@@ -70,13 +70,13 @@ function Assert-RejectsUnsafeGeoNamesTiming {
     $message = $output -join [Environment]::NewLine
 
     if ($exitCode -eq 0) {
-        throw "Launcher accepted a GeoNames automatic request interval below the 30000 ms safe minimum."
+        throw "Launcher accepted a negative GeoNames automatic request interval."
     }
-    if ($message -notmatch "at least 30000 milliseconds") {
-        throw "Launcher rejected the unsafe GeoNames interval without the expected explicit safety message. Output: $message"
+    if ($message -notmatch "between 0 and 600000 milliseconds") {
+        throw "Launcher rejected the invalid GeoNames interval without the expected range message. Output: $message"
     }
     if (@(Get-LauncherServerProcesses).Count -ne 0) {
-        throw "Unsafe GeoNames launcher configuration started a server before being rejected."
+        throw "Invalid GeoNames launcher configuration started a server before being rejected."
     }
 }
 
@@ -115,9 +115,8 @@ $launcherConfiguration = [ordered]@{
         PhotoIdentity__GeoNames__Username = "launcher-verification"
         PhotoIdentity__GeoNames__BaseUrl = "https://secure.geonames.org/"
         PhotoIdentity__GeoNames__Language = "en"
-        PhotoIdentity__GeoNames__MinimumRequestIntervalMilliseconds = "11000"
         PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled = "false"
-        PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds = "45000"
+        PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds = "5000"
         PhotoIdentity__GeoNames__AutomaticIdlePollIntervalMilliseconds = "7000"
         PhotoIdentity__RepositoryRoot = $repositoryRoot
     }
@@ -131,7 +130,7 @@ try {
         throw "Port-specific Photo Identity process already exists before launcher verification: $($preexisting.ProcessId -join ', ')."
     }
 
-    Assert-RejectsUnsafeGeoNamesTiming
+    Assert-RejectsInvalidGeoNamesTiming
     Invoke-Launcher
 
     $firstProcesses = @(Get-LauncherServerProcesses)
@@ -152,8 +151,11 @@ try {
     if ([bool]$geoNamesStatus.automaticEnrichmentEnabled) {
         throw "Launcher GeoNames verification expected automatic enrichment to be disabled for the external-provider-safe test run."
     }
-    if ([int]$geoNamesStatus.automaticMinimumRequestIntervalMilliseconds -ne 45000) {
-        throw "Launcher did not pass the configured 45000 ms GeoNames automatic request interval to the API."
+    if ([int]$geoNamesStatus.automaticMinimumRequestIntervalMilliseconds -ne 5000) {
+        throw "Launcher did not pass the configured 5000 ms GeoNames automatic request interval to the API without hidden clamping."
+    }
+    if ([int]$geoNamesStatus.minimumRequestIntervalMilliseconds -ne 5000) {
+        throw "GeoNames provider request pacing did not inherit the explicit 5000 ms automatic interval."
     }
     if ([int]$geoNamesStatus.automaticIdlePollIntervalMilliseconds -ne 7000) {
         throw "Launcher did not pass the configured 7000 ms GeoNames automatic idle poll interval to the API."

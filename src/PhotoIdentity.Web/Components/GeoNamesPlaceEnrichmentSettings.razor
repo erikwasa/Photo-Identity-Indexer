@@ -54,7 +54,7 @@
             <div>
                 <span class="field-label">Automatic provider pacing</span>
                 <strong>@FormatInterval(Status.AutomaticMinimumRequestIntervalMilliseconds)</strong>
-                <p>The background worker enforces this conservative floor independently of the raw provider-client setting.</p>
+                <p>This is the effective interval between provider requests. The default is 30 seconds; an explicitly configured lower value is honored.</p>
             </div>
             <div>
                 <span class="field-label">Next automatic check</span>
@@ -69,12 +69,12 @@
             <div>
                 <span class="field-label">Place language</span>
                 <strong>@Status.Language</strong>
-                <p>GeoNames place names are requested using this startup setting.</p>
+                <p>With the default local policy, Swedish coordinates keep local names and locations outside Sweden are stored using English names.</p>
             </div>
             <div>
                 <span class="field-label">Raw provider-client interval</span>
                 <strong>@FormatInterval(Status.MinimumRequestIntervalMilliseconds)</strong>
-                <p>Manual maintenance requests also respect this lower-level provider client interval.</p>
+                <p>Every actual GeoNames HTTP request respects this interval, including an English fallback lookup for a non-Swedish coordinate.</p>
             </div>
             <div>
                 <span class="field-label">Last automatic activity</span>
@@ -89,7 +89,8 @@
                 GeoNames enrichment is disabled. Configure <code>PhotoIdentity__GeoNames__Username</code> in the packaged application's
                 <code>%LOCALAPPDATA%\PhotoIdentity\launcher.json</code>, then restart Photo Identity. Once configured, automatic enrichment
                 starts without a manual batch. Optional startup settings are <code>PhotoIdentity__GeoNames__BaseUrl</code>,
-                <code>PhotoIdentity__GeoNames__Language</code>, and <code>PhotoIdentity__GeoNames__MinimumRequestIntervalMilliseconds</code>.
+                <code>PhotoIdentity__GeoNames__Language</code>, <code>PhotoIdentity__GeoNames__MinimumRequestIntervalMilliseconds</code>, and
+                <code>PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds</code>. Lower automatic intervals can consume provider credits faster.
             </div>
         }
         else
@@ -97,7 +98,8 @@
             <div class="notice warning">
                 <strong>External GPS disclosure:</strong> automatic enrichment sends an eligible photo's persisted latitude and longitude,
                 the configured GeoNames username, and the documented service parameters to GeoNames. It does not send photo bytes, filenames,
-                source paths, people, tags, or other catalogue metadata. The username remains server-side and is not shown here.
+                source paths, people, tags, or other catalogue metadata. The username remains server-side and is not shown here. For a non-Swedish
+                coordinate under the default language policy, the first uncached lookup can require a second provider request to obtain the English name.
             </div>
 
             @if (!Status.AutomaticEnrichmentEnabled)

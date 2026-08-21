@@ -37,6 +37,15 @@ public partial class Program
             builder.Configuration["PhotoIdentity:ArchiveAnalysisOutputRoot"] ?? defaultArchiveAnalysisRoot;
         string? reviewProxyRoot = builder.Configuration["PhotoIdentity:ReviewProxyRoot"];
         string? reviewProxyProfileId = builder.Configuration["PhotoIdentity:ReviewProxyProfileId"];
+        int? automaticGeoNamesMinimumRequestInterval = ParseOptionalInt(
+            builder.Configuration,
+            "PhotoIdentity:GeoNames:AutomaticMinimumRequestIntervalMilliseconds");
+        int? rawGeoNamesMinimumRequestInterval = ParseOptionalInt(
+            builder.Configuration,
+            "PhotoIdentity:GeoNames:MinimumRequestIntervalMilliseconds");
+        int resolvedGeoNamesMinimumRequestInterval = rawGeoNamesMinimumRequestInterval
+            ?? automaticGeoNamesMinimumRequestInterval
+            ?? GeoNamesAutomaticEnrichmentConfiguration.DefaultMinimumRequestIntervalMilliseconds;
 
         builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
         builder.Services.AddSingleton(new ArchiveOperatorConfiguration(
@@ -59,10 +68,10 @@ public partial class Program
             builder.Configuration["PhotoIdentity:GeoNames:Username"],
             builder.Configuration["PhotoIdentity:GeoNames:BaseUrl"],
             builder.Configuration["PhotoIdentity:GeoNames:Language"],
-            ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:MinimumRequestIntervalMilliseconds")));
+            resolvedGeoNamesMinimumRequestInterval));
         builder.Services.AddSingleton(new GeoNamesAutomaticEnrichmentConfiguration(
             ParseOptionalBool(builder.Configuration, "PhotoIdentity:GeoNames:AutomaticEnrichmentEnabled"),
-            ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:AutomaticMinimumRequestIntervalMilliseconds"),
+            automaticGeoNamesMinimumRequestInterval,
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:AutomaticIdlePollIntervalMilliseconds")));
         builder.Services.AddSingleton<PhotoPlaceEnrichmentWorkerState>();
         builder.Services.AddSingleton<SqliteReviewRepository>();

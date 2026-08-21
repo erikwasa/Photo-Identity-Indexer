@@ -36,10 +36,16 @@ public sealed record ReverseGeocodeResponse(
     ReverseGeocodePlace? Place = null,
     string? ErrorCode = null,
     string? ErrorMessage = null,
-    bool StopBatch = false)
+    bool StopBatch = false,
+    int ProviderRequestCount = 0)
 {
-    public static ReverseGeocodeResponse Succeeded(ReverseGeocodePlace place) =>
-        new(ReverseGeocodeStatus.Success, place);
+    public static ReverseGeocodeResponse Succeeded(
+        ReverseGeocodePlace place,
+        int providerRequestCount = 1) =>
+        new(
+            ReverseGeocodeStatus.Success,
+            place,
+            ProviderRequestCount: providerRequestCount);
 }
 
 public interface IReverseGeocoder

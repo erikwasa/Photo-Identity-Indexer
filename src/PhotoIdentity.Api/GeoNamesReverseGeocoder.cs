@@ -58,8 +58,16 @@ public sealed record GeoNamesReverseGeocodingConfiguration
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(Username);
 
-    public string ContractKey =>
-        $"findNearbyPlaceName-v1|{BaseUri.AbsoluteUri.ToLowerInvariant()}|lang={Language.ToLowerInvariant()}|localCountry=true|style=FULL|maxRows=1";
+    public bool UsesSwedenLocalElseEnglishPolicy =>
+        string.Equals(Language, "local", StringComparison.OrdinalIgnoreCase);
+
+    public string LanguageDescription => UsesSwedenLocalElseEnglishPolicy
+        ? "Sweden: local; elsewhere: English"
+        : Language;
+
+    public string ContractKey => UsesSwedenLocalElseEnglishPolicy
+        ? $"findNearbyPlaceName-v2|{BaseUri.AbsoluteUri.ToLowerInvariant()}|langPolicy=se-local-else-en|localCountry=true|style=FULL|maxRows=1"
+        : $"findNearbyPlaceName-v1|{BaseUri.AbsoluteUri.ToLowerInvariant()}|lang={Language.ToLowerInvariant()}|localCountry=true|style=FULL|maxRows=1";
 }
 
 public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
@@ -101,9 +109,37 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
                 StopBatch: true);
         }
 
+        if (!_configuration.UsesSwedenLocalElseEnglishPolicy)
+        {
+            return await SendRequestAsync(query, _configuration.Language, cancellationToken);
+        }
+
+        ReverseGeocodeResponse local = await SendRequestAsync(query, "local", cancellationToken);
+        if (local.Status != ReverseGeocodeStatus.Success || local.Place is null)
+        {
+            return local;
+        }
+
+        if (string.Equals(local.Place.CountryCode, "SE", StringComparison.OrdinalIgnoreCase))
+        {
+            return local;
+        }
+
+        ReverseGeocodeResponse english = await SendRequestAsync(query, "en", cancellationToken);
+        return english with
+        {
+            ProviderRequestCount = local.ProviderRequestCount + english.ProviderRequestCount,
+        };
+    }
+
+    private async Task<ReverseGeocodeResponse> SendRequestAsync(
+        ReverseGeocodeQuery query,
+        string language,
+        CancellationToken cancellationToken)
+    {
         await WaitForRequestSlotAsync(cancellationToken);
 
-        Uri requestUri = BuildRequestUri(query);
+        Uri requestUri = BuildRequestUri(query, language);
         try
         {
             HttpClient client = _httpClientFactory.CreateClient("GeoNames");
@@ -114,7 +150,8 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
                     ReverseGeocodeStatus.Deferred,
                     ErrorCode: $"http-{(int)response.StatusCode}",
                     ErrorMessage: "GeoNames is temporarily unavailable or rate limited the request.",
-                    StopBatch: true);
+                    StopBatch: true,
+                    ProviderRequestCount: 1);
             }
 
             if (!response.IsSuccessStatusCode)
@@ -123,11 +160,12 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
                     ReverseGeocodeStatus.Failure,
                     ErrorCode: $"http-{(int)response.StatusCode}",
                     ErrorMessage: "GeoNames rejected the reverse-geocoding request.",
-                    StopBatch: true);
+                    StopBatch: true,
+                    ProviderRequestCount: 1);
             }
 
             string json = await response.Content.ReadAsStringAsync(cancellationToken);
-            return ParseResponse(json);
+            return ParseResponse(json) with { ProviderRequestCount = 1 };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -139,7 +177,8 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
                 ReverseGeocodeStatus.Deferred,
                 ErrorCode: "transport",
                 ErrorMessage: exception.Message,
-                StopBatch: true);
+                StopBatch: true,
+                ProviderRequestCount: 1);
         }
     }
 
@@ -166,7 +205,7 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
         }
     }
 
-    private Uri BuildRequestUri(ReverseGeocodeQuery query)
+    private Uri BuildRequestUri(ReverseGeocodeQuery query, string language)
     {
         Uri endpoint = new(_configuration.BaseUri, "findNearbyPlaceNameJSON");
         string queryString = string.Join(
@@ -176,7 +215,7 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
             "maxRows=1",
             "style=FULL",
             "localCountry=true",
-            $"lang={Uri.EscapeDataString(_configuration.Language)}",
+            $"lang={Uri.EscapeDataString(language)}",
             $"username={Uri.EscapeDataString(_configuration.Username!)}");
         return new UriBuilder(endpoint) { Query = queryString }.Uri;
     }
