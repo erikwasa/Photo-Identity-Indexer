@@ -674,3 +674,57 @@ work_items:
   blocker_notes:
   - Current backfill only selects revisions with no metadata inspection marker; versioned stale-row refresh is required for catalogue rows inspected before richer metadata fields were added.
   evidence: []
+- id: WI-0079
+  title: Add secure trusted-LAN phone access for slideshow use
+  milestone: M21
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0079-secure-mobile-slideshow-access.md
+  blockers:
+  - WI-0051
+  - WI-0052
+  blocker_notes: []
+  evidence: []
+- id: WI-0080
+  title: Add stable Smart Collection slideshow snapshots
+  milestone: M21
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0080-slideshow-snapshot-manifest.md
+  blockers:
+  - WI-0050
+  blocker_notes: []
+  evidence: []
+- id: WI-0081
+  title: Build fullscreen Smart Collection slideshow playback
+  milestone: M21
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0081-fullscreen-slideshow-playback.md
+  blockers:
+  - WI-0080
+  blocker_notes: []
+  evidence: []
+- id: WI-0082
+  title: Harden slideshow playback for toddler-safe phone use
+  milestone: M21
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0082-protected-toddler-slideshow.md
+  blockers:
+  - WI-0079
+  - WI-0081
+  blocker_notes: []
+  evidence: []
+- id: WI-0083
+  title: Prepare and retain slideshow originals for best-quality playback
+  milestone: M21
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0083-slideshow-original-preparation.md
+  blockers:
+  - WI-0042
+  - WI-0080
+  - WI-0081
+  blocker_notes: []
+  evidence: []
