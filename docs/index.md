@@ -38,6 +38,7 @@ Formal delivery lifecycle status is kept in the canonical YAML registries. They 
 
 - [Vision](product/vision.md)
 - [Product scope](product/scope.md)
+- [Protected Smart Collection slideshow](product/slideshow.md)
 - [Non-goals](product/non-goals.md)
 - [Success criteria](product/success-criteria.md)
 

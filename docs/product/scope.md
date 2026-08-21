@@ -31,7 +31,8 @@ The accepted roadmap then improves the permanent catalogue rather than replacing
 - add configurable High/Medium/Low identity confidence groups and optional canonical High-confidence automatic assignment;
 - add favorite people, Unknown review state and browser-triggered suggestion regeneration;
 - simplify the application around Review and Library and improve Windows startup/packaging;
-- extract EXIF capture metadata and location for smart collections; and
+- extract EXIF capture metadata and location for smart collections;
+- add protected fullscreen slideshows from saved Smart Collections, including toddler-resistant phone playback and optional bounded original preparation; and
 - experiment with local visible-content tagging before selecting a production semantic-tagging approach.
 
 ## Optional or deferred
