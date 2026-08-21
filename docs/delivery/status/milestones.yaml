@@ -182,3 +182,13 @@ milestones:
   - WI-0076
   - WI-0077
   - WI-0078
+- id: M21
+  title: Protected Smart Collection slideshow
+  status: proposed
+  document: ../milestones/M21-protected-smart-collection-slideshow.md
+  work_items:
+  - WI-0079
+  - WI-0080
+  - WI-0081
+  - WI-0082
+  - WI-0083
