@@ -52,7 +52,8 @@ public sealed class SqliteReviewRepository
             latest_action.id,
             latest_action.action_kind,
             latest_action.person_id,
-            people.display_name
+            people.display_name,
+            latest_observation.bounding_box_json
         FROM face_occurrences
         INNER JOIN asset_revisions
             ON asset_revisions.id = face_occurrences.asset_revision_id
@@ -639,7 +640,8 @@ public sealed class SqliteReviewRepository
             reader.IsDBNull(9) ? null : reader.GetDouble(9),
             state,
             person,
-            activeActionId);
+            activeActionId,
+            reader.IsDBNull(14) ? null : reader.GetString(14));
     }
 
     private static CatalogueReviewAction ReadAction(SqliteDataReader reader) => new(
