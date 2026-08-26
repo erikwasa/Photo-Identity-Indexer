@@ -53,7 +53,8 @@ public sealed class SqliteReviewFilterRepository
         latest_action.id,
         latest_action.action_kind,
         latest_action.person_id,
-        people.display_name
+        people.display_name,
+        latest_observation.bounding_box_json
         """;
 
     private const string ReviewFaceFrom = """
@@ -391,7 +392,8 @@ public sealed class SqliteReviewFilterRepository
             reader.IsDBNull(9) ? null : reader.GetDouble(9),
             reviewState,
             person,
-            activeActionId);
+            activeActionId,
+            reader.IsDBNull(14) ? null : reader.GetString(14));
     }
 
     private static DateTimeOffset Parse(string value) =>

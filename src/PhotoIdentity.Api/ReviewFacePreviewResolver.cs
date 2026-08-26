@@ -176,6 +176,25 @@ public sealed class ReviewFacePreviewResolver
         return new ReviewFaceGeometry(AssetRevisionId.From(revisionGuid), boundingBox);
     }
 
+    internal static NormalizedBoundingBox? CalculateTargetBoundingBox(
+        string? value,
+        int? photoWidth,
+        int? photoHeight)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            photoWidth is not > 0 ||
+            photoHeight is not > 0 ||
+            !TryParseBoundingBox(value, photoWidth, photoHeight, out NormalizedBoundingBox boundingBox))
+        {
+            return null;
+        }
+
+        return OpenCvReviewFaceRenderer.CalculateTargetBoundingBox(
+            photoWidth.Value,
+            photoHeight.Value,
+            boundingBox);
+    }
+
     private static bool TryParseBoundingBox(
         string value,
         int? photoWidth,

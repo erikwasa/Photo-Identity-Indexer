@@ -60,7 +60,10 @@ else if (Details is not null)
 
     <div class="details-grid">
         <section class="details-image-panel">
-            <img class="details-image" src="@Details.Face.ImageUrl" alt="Detected face" />
+            <div class="details-image-stage">
+                <img class="details-image" src="@Details.Face.ImageUrl" alt="@FaceImageAlt" />
+                <FaceTargetOverlay TargetBox="@Details.Face.TargetBox" />
+            </div>
             <div class="details-image-toolbar">
                 <a class="button secondary"
                    href="@FullPhotoUrl"
@@ -374,6 +377,10 @@ else if (Details is not null)
         : $"/photo/{Uri.EscapeDataString(Details.AssetRevisionId)}";
     private ReviewPersonResponse? SelectedPerson =>
         People.FirstOrDefault(person => person.Id == SelectedPersonId);
+
+    private string FaceImageAlt => Details?.Face.TargetBox is null
+        ? "Detected face"
+        : "Face context; detected face target is outlined";
 
     private string StateLabel => Details?.Face.State switch
     {

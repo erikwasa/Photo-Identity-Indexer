@@ -105,3 +105,7 @@
         padding: 0.75rem;
     }
 }
+
+.face-image-link {
+    position: relative;
+}

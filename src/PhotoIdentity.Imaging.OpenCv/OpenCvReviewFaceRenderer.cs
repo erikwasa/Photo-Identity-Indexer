@@ -135,6 +135,32 @@ public sealed class OpenCvReviewFaceRenderer
         }
     }
 
+    public static NormalizedBoundingBox CalculateTargetBoundingBox(
+        int imageWidth,
+        int imageHeight,
+        NormalizedBoundingBox boundingBox)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(imageWidth);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(imageHeight);
+
+        Rect crop = CalculateCrop(imageWidth, imageHeight, boundingBox);
+        double faceLeft = boundingBox.X * imageWidth;
+        double faceTop = boundingBox.Y * imageHeight;
+        double faceRight = faceLeft + (boundingBox.Width * imageWidth);
+        double faceBottom = faceTop + (boundingBox.Height * imageHeight);
+
+        double left = Math.Clamp(faceLeft - crop.X, 0d, crop.Width);
+        double top = Math.Clamp(faceTop - crop.Y, 0d, crop.Height);
+        double right = Math.Clamp(faceRight - crop.X, left, crop.Width);
+        double bottom = Math.Clamp(faceBottom - crop.Y, top, crop.Height);
+
+        return new NormalizedBoundingBox(
+            left / crop.Width,
+            top / crop.Height,
+            (right - left) / crop.Width,
+            (bottom - top) / crop.Height);
+    }
+
     private static EncodedReviewFace? RenderDecoded(
         Mat source,
         NormalizedBoundingBox boundingBox,

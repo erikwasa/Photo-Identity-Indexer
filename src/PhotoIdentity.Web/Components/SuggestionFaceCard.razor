@@ -1,6 +1,7 @@
 <article class="suggestion-face-card state-@Face.State">
     <a class="suggestion-image-link" href="@DetailsUrl" aria-label="Open quick review for @Face.PhotoName face @(Face.FaceOrdinal + 1)">
-        <img src="@Face.ImageUrl" alt="Detected face from @Face.PhotoName" loading="lazy" />
+        <img src="@Face.ImageUrl" alt="@FaceImageAlt" loading="lazy" />
+        <FaceTargetOverlay TargetBox="@Face.TargetBox" />
     </a>
 
     <div class="suggestion-card-body">
@@ -95,6 +96,10 @@
 
     private string SelectedPersonId { get; set; } = "";
     private bool Busy { get; set; }
+
+    private string FaceImageAlt => Face.TargetBox is null
+        ? $"Detected face from {Face.PhotoName}"
+        : $"Face context from {Face.PhotoName}; detected face target is outlined";
 
     private string StateLabel => Face.State switch
     {

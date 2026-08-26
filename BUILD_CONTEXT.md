@@ -6,50 +6,41 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-The consolidated M19/M20 maintainer verification completed on **2026-08-26**. The authoritative result is `docs/delivery/milestones/M20-maintainer-verification-2026-08-26.md`.
+M21 — Reliability and recognition quality is active.
 
-The maintainer reported **PASS** for every item in the planned review checklist:
+**WI-0079 is complete.** PR #208 merged after workflow #1259 and real-catalogue verification. The no-change repeat sync fell from 37.83 seconds to 0.988 seconds by batching persistence and reusing metadata-stable verified revisions instead of re-hashing all local files.
 
-- WI-0072 archive metadata integration on real media;
-- WI-0064/WI-0065 automatic GeoNames pickup, restart/resume, manual precedence and Sweden-local/else-English language policy;
-- WI-0073 Face Review/Smart Collection/Maintain People/archive-state corrective polish;
-- WI-0075 corrected GeoNames timing overrides/effective diagnostics;
-- WI-0077 compact Photo Details metadata/location presentation;
-- previously accepted WI-0074 and WI-0078 remained regression-free.
+The active item is now **WI-0080 — Make the detected face unambiguous in review images**.
 
-M19 is therefore complete. WI-0073, WI-0074, WI-0075, WI-0077 and WI-0078 are also accepted for completion.
+Static investigation found that review images intentionally use the durable `face-review-v1-context2.2-max960-q90` derivative: a square crop centered on the detected face with a 2.2× context scale. A nearby second face can therefore legitimately appear inside the same review image.
 
-WI-0076 remains separate archive-throughput work in PR #200 and is not part of the final acceptance result above.
+The authoritative detector bounding box still exists server-side and can be deterministically mapped into the review derivative, but `ReviewFaceResponse` currently exposes only `ImageUrl` and review metadata, so the browser cannot identify the target face visually.
 
-Immediately after the successful checklist, the maintainer reported three **new** issues. They are grouped into **M21 — Reliability and recognition quality** and must be investigated before selecting fixes:
+The preferred candidate is a **dynamic target overlay** on the existing derivative: expose a privacy-safe normalized target rectangle in derivative coordinates and render a high-contrast outline/corner marker plus a non-color target cue in the Web UI. This preserves the existing high-quality contextual crop and avoids regenerating/burning presentation into stored derivatives.
 
-1. **Critical — WI-0079:** `Sync included folders` is taking increasingly long and recent requests fail with `net_http_request_timedout, 100`.
-2. **High — WI-0080:** some face review images contain two visible faces, making the detected/review target ambiguous.
-3. **Medium — WI-0081:** identity suggestion accuracy appears to be degrading as the real catalogue/reference corpus grows.
+The maintainer approved **Option B** on 2026-08-26: preserve the contextual derivative and add a dynamic target overlay. Implementation is active on PR #209.
 
-Do not treat these findings as failures of the already-passed M19/M20 checklist. Do not silently fold them into WI-0076.
+WI-0081 remains the next M21 item after WI-0080 unless new evidence changes priority. WI-0076/PR #200 remains separate archive-throughput work.
 
 ## Next concrete step
 
-Start the next investigation with **WI-0079**.
-
-1. Read WI-0079 and trace the exact `Sync included folders` request path.
-2. Reproduce/characterize the timeout on representative catalogue size.
-3. Add or use phase timing/count diagnostics to determine the dominant scaling cost and request-cancellation semantics.
-4. Compare correction strategies and return the evidence/options to the maintainer before implementing a fix.
-5. After WI-0079 direction is agreed, investigate WI-0080 and then WI-0081 in priority order unless new evidence changes severity.
-6. Keep WI-0076/PR #200 isolated from these investigations unless measured evidence establishes a genuine shared cause.
+1. Complete required CI for PR #209.
+2. Verify the packaged build on a private real-catalogue example where two faces are visible in the same contextual review image.
+3. Confirm the **Target** outline/corner cue is unmistakable in the gallery and Face Details and does not obscure review actions.
+4. If maintainer verification passes, record evidence, complete WI-0080 and continue to WI-0081.
 
 ## Relevant files
 
-- `docs/delivery/milestones/M20-maintainer-verification-2026-08-26.md`
 - `docs/delivery/milestones/M21-reliability-recognition-quality.md`
-- `docs/delivery/work-items/WI-0079-included-folder-sync-timeout.md`
 - `docs/delivery/work-items/WI-0080-detected-face-clarity.md`
 - `docs/delivery/work-items/WI-0081-suggestion-accuracy-degradation.md`
-- `docs/delivery/work-items/WI-0076-archive-throughput.md`
+- `src/PhotoIdentity.Imaging.OpenCv/OpenCvReviewFaceRenderer.cs`
+- `src/PhotoIdentity.Worker/ArchiveFaceReviewDerivativeWriter.cs`
+- `src/PhotoIdentity.Api/ReviewFacePreviewResolver.cs`
+- `src/PhotoIdentity.Web/ReviewContracts.cs`
+- `src/PhotoIdentity.Web/Components/FaceCard.razor`
+- `src/PhotoIdentity.Web/Pages/FaceDetails.razor`
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/status/milestones.yaml`
 - `AGENTS.md`
 
 ## Repository validation

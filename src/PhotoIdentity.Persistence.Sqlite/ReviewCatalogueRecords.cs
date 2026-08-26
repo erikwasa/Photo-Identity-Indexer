@@ -52,7 +52,8 @@ public sealed record CatalogueReviewFace(
     double? Confidence,
     string State,
     CatalogueReviewPerson? Person,
-    long? ActiveActionId);
+    long? ActiveActionId,
+    string? BoundingBoxJson = null);
 
 public sealed record CatalogueReviewFacePage(
     IReadOnlyList<CatalogueReviewFace> Items,

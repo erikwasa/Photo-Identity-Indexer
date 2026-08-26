@@ -88,7 +88,8 @@ public sealed class SqliteSuggestionGalleryRepository
         top_suggestion.score,
         top_suggestion.score_margin,
         top_suggestion.status,
-        top_suggestion.generated_at_utc
+        top_suggestion.generated_at_utc,
+        latest_observation.bounding_box_json
         """;
 
     private const string From = """
@@ -455,7 +456,8 @@ public sealed class SqliteSuggestionGalleryRepository
             reader.IsDBNull(9) ? null : reader.GetDouble(9),
             reviewState,
             assignedPerson,
-            topSuggestion);
+            topSuggestion,
+            reader.IsDBNull(24) ? null : reader.GetString(24));
     }
 
     private static DateTimeOffset Parse(string value) =>

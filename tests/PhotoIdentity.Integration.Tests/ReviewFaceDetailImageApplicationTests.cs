@@ -51,6 +51,19 @@ public sealed class ReviewFaceDetailImageApplicationTests
 
             Assert.Equal(seeded.RevisionId.ToString(), details.AssetRevisionId);
             Assert.EndsWith("?size=960", details.Face.ImageUrl, StringComparison.Ordinal);
+            ReviewFaceTargetResponse detailsTarget = Assert.IsType<ReviewFaceTargetResponse>(
+                details.Face.TargetBox);
+            Assert.Equal(0.20, detailsTarget.X, 3);
+            Assert.Equal(0.20, detailsTarget.Y, 3);
+            Assert.Equal(0.60, detailsTarget.Width, 3);
+            Assert.Equal(0.60, detailsTarget.Height, 3);
+
+            ReviewFacePageResponse galleryPage = await client.GetFromJsonAsync<ReviewFacePageResponse>(
+                "/api/review/faces?state=all")
+                ?? throw new InvalidOperationException("Face gallery response was empty.");
+            ReviewFaceTargetResponse galleryTarget = Assert.IsType<ReviewFaceTargetResponse>(
+                Assert.Single(galleryPage.Items).TargetBox);
+            Assert.Equal(detailsTarget, galleryTarget);
 
             using HttpResponseMessage galleryResponse = await client.GetAsync(
                 $"/api/review/faces/{seeded.FaceId}/image?size=360");
@@ -135,6 +148,9 @@ public sealed class ReviewFaceDetailImageApplicationTests
         using (Mat original = new(new Size(2400, 1600), MatType.CV_8UC3, new Scalar(25, 65, 105)))
         {
             Cv2.Rectangle(original, new Rect(600, 320, 960, 960), new Scalar(190, 110, 45), thickness: -1);
+            // A neighboring face-like region deliberately sits inside the 2.2x context crop.
+            // The target rectangle must continue to identify only the persisted detection above.
+            Cv2.Rectangle(original, new Rect(1540, 500, 240, 240), new Scalar(70, 185, 210), thickness: -1);
             Cv2.ImEncode(
                 ".jpg",
                 original,

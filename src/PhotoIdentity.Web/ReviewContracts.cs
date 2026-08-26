@@ -41,6 +41,12 @@ public sealed record UpdateIdentitySuggestionPolicyRequest(
     double MediumScoreThreshold,
     string Actor);
 
+public sealed record ReviewFaceTargetResponse(
+    double X,
+    double Y,
+    double Width,
+    double Height);
+
 public sealed record ReviewFaceResponse(
     string Id,
     string ImageUrl,
@@ -50,7 +56,8 @@ public sealed record ReviewFaceResponse(
     string State,
     ReviewPersonResponse? Person,
     DateTimeOffset CreatedAtUtc,
-    ReviewTopSuggestionResponse? TopSuggestion = null);
+    ReviewTopSuggestionResponse? TopSuggestion = null,
+    ReviewFaceTargetResponse? TargetBox = null);
 
 public sealed record ReviewFacePageResponse(
     IReadOnlyList<ReviewFaceResponse> Items,

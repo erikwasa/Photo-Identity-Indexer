@@ -184,7 +184,7 @@ milestones:
   - WI-0078
 - id: M21
   title: Reliability and recognition quality
-  status: ready
+  status: in_progress
   document: ../milestones/M21-reliability-recognition-quality.md
   work_items:
   - WI-0079
