@@ -18,18 +18,16 @@ The authoritative detector bounding box still exists server-side and can be dete
 
 The preferred candidate is a **dynamic target overlay** on the existing derivative: expose a privacy-safe normalized target rectangle in derivative coordinates and render a high-contrast outline/corner marker plus a non-color target cue in the Web UI. This preserves the existing high-quality contextual crop and avoids regenerating/burning presentation into stored derivatives.
 
-Do not implement the visual treatment until the maintainer approves it.
+The maintainer approved **Option B** on 2026-08-26: preserve the contextual derivative and add a dynamic target overlay. Implementation is active on PR #209.
 
 WI-0081 remains the next M21 item after WI-0080 unless new evidence changes priority. WI-0076/PR #200 remains separate archive-throughput work.
 
 ## Next concrete step
 
-1. Get maintainer approval for the WI-0080 visual treatment recorded in `docs/delivery/work-items/WI-0080-detected-face-clarity.md`.
-2. If approved, share/reuse the contextual crop geometry calculation between rendering and API target-coordinate mapping so the two cannot drift.
-3. Extend the review contract with a normalized target rectangle in derivative coordinates.
-4. Add a reusable review-image target-overlay component and apply it to Face Review and Face Details first, then equivalent suggestion review surfaces where they display the same face image.
-5. Add geometry/contract regression coverage for a context crop that can contain another visible face.
-6. Verify the treatment on a private representative real-catalogue image without committing personal photo data.
+1. Complete required CI for PR #209.
+2. Verify the packaged build on a private real-catalogue example where two faces are visible in the same contextual review image.
+3. Confirm the **Target** outline/corner cue is unmistakable in the gallery and Face Details and does not obscure review actions.
+4. If maintainer verification passes, record evidence, complete WI-0080 and continue to WI-0081.
 
 ## Relevant files
 
