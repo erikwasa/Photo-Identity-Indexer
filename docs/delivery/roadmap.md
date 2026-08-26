@@ -23,8 +23,9 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M14 | Collection-ready API | completed |
 | M17 | Identity review automation | completed |
 | M18 | Operator application experience | ready |
-| M19 | Photo metadata and semantic collections | in_progress |
+| M19 | Photo metadata and semantic collections | completed |
 | M20 | Operator polish and archive throughput | in_progress |
+| M21 | Reliability and recognition quality | ready |
 
 Expected evolution:
 
