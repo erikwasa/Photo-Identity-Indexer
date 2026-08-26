@@ -9,6 +9,8 @@ using PhotoIdentity.Core.Sources;
 namespace PhotoIdentity.Persistence.Sqlite;
 
 public sealed record ArchiveSourceCatalogueScanDiagnostics(
+    int MetadataReuseCount,
+    TimeSpan BaselineReadElapsed,
     int HashedFileCount,
     long HashedBytes,
     TimeSpan HashingElapsed,
@@ -36,20 +38,22 @@ public sealed record ArchiveSourceCatalogueScanSummary(
 
 /// <summary>
 /// Catalogues permanent-archive presence and availability without opening OneDrive placeholders.
-/// Lightweight size/last-write observations are retained for every item. Only locally available
-/// items are hashed; placeholder metadata can require later source verification but never creates
-/// an immutable revision by itself.
+/// Lightweight size/last-write observations are retained for every item. A previously verified
+/// local file reuses its immutable revision when size, last-write timestamp and media type still
+/// match the verified baseline; otherwise local content is SHA-256 verified before persistence.
 /// </summary>
 public sealed class SqliteArchiveSourceCatalogueScanner
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly SqliteArchiveSourceObservationRepository _observations;
+    private readonly SqliteArchiveSourceScanBatchRepository _scanBatch;
 
     public SqliteArchiveSourceCatalogueScanner(SqliteCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
         _observations = new SqliteArchiveSourceObservationRepository(database);
+        _scanBatch = new SqliteArchiveSourceScanBatchRepository(database);
     }
 
     public async Task<ArchiveSourceCatalogueScanSummary> ScanAsync(
@@ -66,6 +70,14 @@ public sealed class SqliteArchiveSourceCatalogueScanner
         Stopwatch totalStopwatch = Stopwatch.StartNew();
         await _observations.EnsureSchemaAsync(cancellationToken);
         DateTimeOffset scannedAt = scannedAtUtc.ToUniversalTime();
+
+        Stopwatch baselineStopwatch = Stopwatch.StartNew();
+        IReadOnlyDictionary<string, ArchiveSourceScanBaseline> baselines = await _scanBatch.GetBaselinesAsync(
+            catalogueSource.Id,
+            options.RelativeRoot,
+            cancellationToken);
+        baselineStopwatch.Stop();
+
         int supported = 0;
         int local = 0;
         int onlineOnly = 0;
@@ -77,11 +89,11 @@ public sealed class SqliteArchiveSourceCatalogueScanner
         int verified = 0;
         int needsVerification = 0;
         int unverified = 0;
+        int metadataReuse = 0;
         int hashedFiles = 0;
         long hashedBytes = 0;
-        int observationWrites = 0;
         TimeSpan hashingElapsed = TimeSpan.Zero;
-        TimeSpan observationPersistenceElapsed = TimeSpan.Zero;
+        List<ArchiveSourceScanWrite> writes = [];
 
         await foreach (SourceAsset sourceAsset in source.EnumerateAsync(options, cancellationToken))
         {
@@ -118,7 +130,11 @@ public sealed class SqliteArchiveSourceCatalogueScanner
             }
 
             Sha256Digest? contentHash = null;
-            if (sourceAsset.Availability == AssetAvailability.Local)
+            bool reuseVerifiedRevision = sourceAsset.Availability == AssetAvailability.Local &&
+                baselines.TryGetValue(sourceAsset.Reference.ItemKey, out ArchiveSourceScanBaseline? baseline) &&
+                baseline.CanReuseVerifiedRevision(sourceAsset);
+
+            if (sourceAsset.Availability == AssetAvailability.Local && !reuseVerifiedRevision)
             {
                 Stopwatch hashStopwatch = Stopwatch.StartNew();
                 await using Stream content = await source.OpenContentAsync(
@@ -131,18 +147,28 @@ public sealed class SqliteArchiveSourceCatalogueScanner
                 hashedBytes += sourceAsset.SizeBytes;
                 contentHash = new Sha256Digest(Convert.ToHexString(hash).ToLowerInvariant());
             }
+            else if (reuseVerifiedRevision)
+            {
+                metadataReuse++;
+            }
 
-            Stopwatch persistenceStopwatch = Stopwatch.StartNew();
-            ArchiveSourceObservationWriteResult result = await _observations.RecordScanObservationAsync(
-                catalogueSource,
-                sourceAsset,
-                contentHash,
-                scannedAt,
-                cancellationToken);
-            persistenceStopwatch.Stop();
-            observationPersistenceElapsed += persistenceStopwatch.Elapsed;
-            observationWrites++;
-            if (contentHash is not null)
+            writes.Add(new ArchiveSourceScanWrite(sourceAsset, contentHash));
+        }
+
+        Stopwatch persistenceStopwatch = Stopwatch.StartNew();
+        IReadOnlyList<ArchiveSourceObservationWriteResult> results = await _scanBatch.RecordBatchAsync(
+            catalogueSource,
+            writes,
+            baselines,
+            scannedAt,
+            cancellationToken);
+        persistenceStopwatch.Stop();
+
+        for (int index = 0; index < results.Count; index++)
+        {
+            ArchiveSourceObservationWriteResult result = results[index];
+            ArchiveSourceScanWrite write = writes[index];
+            if (write.SourceAsset.Availability == AssetAvailability.Local)
             {
                 if (result.NewRevision)
                 {
@@ -180,11 +206,13 @@ public sealed class SqliteArchiveSourceCatalogueScanner
         totalStopwatch.Stop();
 
         ArchiveSourceCatalogueScanDiagnostics diagnostics = new(
+            metadataReuse,
+            baselineStopwatch.Elapsed,
             hashedFiles,
             hashedBytes,
             hashingElapsed,
-            observationWrites,
-            observationPersistenceElapsed,
+            writes.Count,
+            persistenceStopwatch.Elapsed,
             missingStopwatch.Elapsed,
             totalStopwatch.Elapsed);
 
