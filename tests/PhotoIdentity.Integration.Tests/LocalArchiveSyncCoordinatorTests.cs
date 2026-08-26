@@ -82,7 +82,10 @@ public sealed class LocalArchiveSyncCoordinatorTests
             Assert.Equal(1, yearDiagnostics.HashedFileCount);
             Assert.Equal(1, yearDiagnostics.HashedBytes);
             Assert.Equal(4, yearDiagnostics.ObservationWriteCount);
-            Assert.True(yearDiagnostics.AvailabilityCheckCount >= 8);
+            // Enumeration checks all four files; only the newly discovered local file is opened
+            // for hashing, so the fast path deliberately avoids the three extra status checks
+            // that the old unconditional-hash behavior performed.
+            Assert.True(yearDiagnostics.AvailabilityCheckCount >= 5);
             Assert.Equal(4, (await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: false)).Count);
         }
         finally
