@@ -40,6 +40,12 @@ public sealed class LocalArchiveSyncCoordinatorTests
 
             Assert.Equal(1, januarySync.SupportedFileCount);
             Assert.Equal(1, januarySync.NewRevisionCount);
+            LocalArchiveFolderSyncDiagnostics januaryDiagnostics = Assert.Single(januarySync.Diagnostics.Folders);
+            Assert.Equal(1, januaryDiagnostics.EnumeratedFileCount);
+            Assert.Equal(1, januaryDiagnostics.HashedFileCount);
+            Assert.Equal(1, januaryDiagnostics.HashedBytes);
+            Assert.Equal(1, januaryDiagnostics.ObservationWriteCount);
+            Assert.True(januaryDiagnostics.AvailabilityCheckCount >= 2);
             Assert.Single(await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: false));
 
             await File.WriteAllBytesAsync(Path.Combine(january, "new.jpg"), [4]);
@@ -51,6 +57,9 @@ public sealed class LocalArchiveSyncCoordinatorTests
 
             Assert.Equal(3, monthSync.SupportedFileCount);
             Assert.Equal(2, monthSync.NewRevisionCount);
+            Assert.Equal(2, monthSync.Diagnostics.Folders.Count);
+            Assert.Equal(3, monthSync.Diagnostics.Folders.Sum(static folder => folder.HashedFileCount));
+            Assert.Equal(3, monthSync.Diagnostics.Folders.Sum(static folder => folder.ObservationWriteCount));
             Assert.Equal(3, (await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: false)).Count);
 
             LocalArchiveSyncSummary yearSync = await coordinator.SyncAsync(
@@ -63,6 +72,12 @@ public sealed class LocalArchiveSyncCoordinatorTests
             Assert.Equal(4, yearSync.SupportedFileCount);
             Assert.Equal(1, yearSync.NewRevisionCount);
             Assert.Equal(3, yearSync.UnchangedFileCount);
+            LocalArchiveFolderSyncDiagnostics yearDiagnostics = Assert.Single(yearSync.Diagnostics.Folders);
+            Assert.Equal(4, yearDiagnostics.EnumeratedFileCount);
+            Assert.Equal(4, yearDiagnostics.HashedFileCount);
+            Assert.Equal(4, yearDiagnostics.HashedBytes);
+            Assert.Equal(4, yearDiagnostics.ObservationWriteCount);
+            Assert.True(yearDiagnostics.AvailabilityCheckCount >= 8);
             Assert.Equal(4, (await scanner.GetAssetsAsync(catalogueSource.Id, includeDeleted: false)).Count);
         }
         finally
