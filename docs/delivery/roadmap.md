@@ -25,7 +25,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M18 | Operator application experience | ready |
 | M19 | Photo metadata and semantic collections | completed |
 | M20 | Operator polish and archive throughput | in_progress |
-| M21 | Reliability and recognition quality | ready |
+| M21 | Reliability and recognition quality | in_progress |
 
 Expected evolution:
 
