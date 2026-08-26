@@ -24,18 +24,33 @@ The milestone focuses on six areas:
 
 - [WI-0073](../work-items/WI-0073-ui-navigation-polish.md) — fix card containment, hidden-person presentation/order, dismissible menus, favorite select type-ahead, archive return context and archive progress wording.
 - [WI-0074](../work-items/WI-0074-face-review-suggested-person-filter.md) — filter the Face Review queue by the current rank-one suggested canonical person while preserving existing queue semantics/navigation.
-- [WI-0075](../work-items/WI-0075-geonames-timing-settings.md) — make automatic GeoNames timing settings accepted and documented in the launcher settings file, with the current safe pacing default retained unless explicitly overridden by supported policy.
+- [WI-0075](../work-items/WI-0075-geonames-timing-settings.md) — make automatic GeoNames timing settings accepted and documented in the launcher settings file, with the conservative default retained unless explicitly overridden.
 - [WI-0076](../work-items/WI-0076-archive-throughput.md) — profile and improve archive processing throughput, prioritizing model-session reuse, repeated full-file verification reads, batching and bounded OneDrive prefetch opportunities.
 - [WI-0077](../work-items/WI-0077-photo-viewer-simplification.md) — reduce visible Photo Details metadata and make Location read-first/edit-on-demand.
 - [WI-0078](../work-items/WI-0078-versioned-metadata-refresh.md) — version the metadata extraction contract and make existing rows eligible for bounded re-inspection when the supported metadata set changes.
+
+## Final maintainer verification — 2026-08-26
+
+The authoritative final checklist result is [M20-maintainer-verification-2026-08-26.md](M20-maintainer-verification-2026-08-26.md).
+
+The maintainer reported **PASS** for all planned interactive/operator verification after the corrective PRs and PR #205 were merged:
+
+- WI-0073 corrective Face Review, Smart Collection, Maintain People and archive-state behavior passed;
+- WI-0074's previously accepted suggested-person filtering remained regression-free;
+- WI-0075 corrected below-30000 GeoNames timing overrides and effective diagnostics passed;
+- WI-0077 compact metadata/location presentation and edit/read behavior passed;
+- WI-0078's previously accepted real-catalogue stale metadata refresh remained regression-free;
+- the related M19 WI-0072/WI-0064/WI-0065 real-media/live-provider checks also passed, allowing M19 to close.
+
+These items are accepted for completion. **WI-0076 remains the only unfinished M20 item.** Its existing PR #200 and representative throughput verification remain separate from the acceptance pass above.
+
+Three new issues reported after the successful checklist are not treated as M20 acceptance failures. They are tracked under [M21 — Reliability and recognition quality](M21-reliability-recognition-quality.md): critical included-folder sync timeout/scaling (WI-0079), high-priority detected-face clarity (WI-0080), and medium-priority suggestion-accuracy degradation (WI-0081).
 
 ## Existing-image metadata backfill
 
 WI-0072 deliberately retains the explicit `POST /api/photo-metadata/backfill` operation for catalogue revisions that predate automatic archive metadata inspection. Backfill reads only originals that are already local, verifies them against the immutable revision and never requests OneDrive hydration merely for metadata.
 
-The current selector, however, only chooses revisions with **no** `photo_capture_metadata` row. That means a photo inspected under an older reader contract is currently considered complete even if newer fields were added later. WI-0078 closes that gap with a durable extraction-contract version so default backfill can select both missing and stale rows, while retaining an explicit force/repair mode for current-version rows.
-
-Until WI-0078 is implemented, existing rows that already have a capture-metadata inspection marker will **not** automatically be reprocessed just because the application now supports additional metadata fields.
+WI-0078 closes the historical stale-row gap with a durable extraction-contract version so default backfill can select both missing and stale rows, while retaining an explicit force/repair mode for current-version rows. The maintainer verified this behavior against the real catalogue.
 
 ## Archive-performance baseline
 
@@ -43,12 +58,12 @@ The maintainer observed roughly **100 images/hour** during the first successful 
 
 - bounded archive advancement deliberately advances at most one governed step at a time;
 - active analysis is resumed with `maxAttemptsPerInvocation: 1`;
-- every `ArchiveAnalysisCoordinator.StartAsync`/`ResumeAsync` invocation creates and disposes a `LocalInspectionJobHandler`, which constructs detector and embedder model objects;
+- every `ArchiveAnalysisCoordinator.StartAsync`/`ResumeAsync` invocation originally created and disposed a `LocalInspectionJobHandler`, which constructs detector and embedder model objects;
 - exact-original status/open operations may SHA-256 the same local file multiple times across metadata inspection, analysis, proxy generation and release checks;
 - hydration admission already has a bounded concurrency policy, but the advancement loop generally prepares one pending revision at a time;
 - the 500 ms active-loop delay contributes latency but is unlikely to explain the observed throughput by itself.
 
-The optimization work should therefore start with per-stage timing and model/session/hash-read counts. Prefer eliminating repeated setup/I/O and processing safe batches before introducing broad parallel inference or database concurrency.
+PR #200 implements the first isolated WI-0076 session-reuse slice, but it remains separate from the newly reported **Sync included folders** timeout/scaling problem in WI-0079. Do not assume they share a cause without measurement.
 
 ## Verification strategy
 
@@ -60,13 +75,13 @@ Each work item has focused automated coverage plus a maintainer browser/operator
 - correct metadata, face analysis, derivatives and review proxies;
 - responsive UI while archive processing is active.
 
-Metadata refresh verification must prove that a pre-WI-0072/legacy inspection row can gain newly supported fields without deleting manual Places or triggering metadata-only OneDrive hydration.
-
 ## Exit criteria
 
-- Known card/menu/hidden/archive-state and archive-return navigation issues are fixed without regressing previously verified M19 behavior.
-- Face Review can filter by current top suggested person and preserves that queue scope through Face Details navigation.
-- GeoNames automatic timing can be supplied through `PhotoIdentity.launcher.json` and is documented with units/defaults/safety semantics.
-- Archive throughput has a measured stage breakdown and a documented before/after improvement on representative hardware/data without weakening safety contracts.
-- Photo Details keeps secondary photographic metadata inside collapsed `All metadata` and presents Location in a read-first mode with an explicit Edit action.
-- Existing metadata rows carry an extraction-contract version and stale rows can be safely reprocessed to obtain fields added by newer readers.
+- [x] Known card/menu/hidden/archive-state and archive-return navigation issues are fixed without regressing previously verified M19 behavior.
+- [x] Face Review can filter by current top suggested person and preserves that queue scope through Face Details navigation.
+- [x] GeoNames automatic timing can be supplied through `PhotoIdentity.launcher.json`, lower supported overrides are honored, and effective pacing is operator-visible.
+- [ ] Archive throughput has a measured stage breakdown and a documented before/after improvement on representative hardware/data without weakening safety contracts.
+- [x] Photo Details keeps secondary photographic metadata inside collapsed `All metadata` and presents Location in a read-first mode with an explicit Edit action.
+- [x] Existing metadata rows carry an extraction-contract version and stale rows can be safely reprocessed to obtain fields added by newer readers.
+
+M20 remains active only for WI-0076.

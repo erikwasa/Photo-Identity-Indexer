@@ -27,13 +27,15 @@ The extended M19 scope also makes Photo Details a useful catalogue-inspection su
 - [WI-0068](../work-items/WI-0068-searchable-smart-collection-people.md) — replace the long people checkbox list with searchable portrait-led multi-selection while preserving PersonId and `all`/`any` semantics
 - [WI-0072](../work-items/WI-0072-archive-photo-metadata.md) — integrate safe metadata inspection into archive advancement, expand persisted camera/exposure metadata and expose key plus raw metadata in Photo Details
 
-Automatic visible-content tagging is intentionally deferred. [WI-0049](../work-items/WI-0049-visible-content-tagging-experiment.md) remains as a design/experiment note that can be revived later, but it is not part of the active M19 completion path.
+Automatic visible-content tagging is intentionally deferred. [WI-0049](../work-items/WI-0049-visible-content-tagging-experiment.md) remains as a design/experiment note that can be revived later, but it is not part of M19 completion.
 
-## Verified baseline
+## Completion and verification
 
-WI-0056 and WI-0050 established the original M19 baseline: hierarchical manual tags, capture-time/GPS persistence, safe metadata backfill and persistent smart collections over people/tags/GPS/taken time. The maintainer completed the integrated baseline verification on 2026-08-16 and reported that M19 and its work-item functions behaved as expected.
+The original WI-0056/WI-0050 baseline was verified on 2026-08-16. The 2026-08-19 consolidated extension pass completed WI-0061, WI-0062, WI-0063, WI-0066, WI-0067 and WI-0068 and exposed the missing archive-to-metadata lifecycle step later implemented by WI-0072.
 
-The 2026-08-19 consolidated extension pass completed WI-0061, WI-0062, WI-0063, WI-0066, WI-0067 and WI-0068. WI-0064/WI-0065 remain in review because that pass exposed that newly archived revisions could finish analysis without capture metadata being inspected, leaving GPS-bearing photos outside the automatic GeoNames queue. WI-0072 owns that ingestion and Photo Details metadata follow-up.
+The final real-application verification completed on **2026-08-26**. The maintainer reported PASS for the remaining WI-0072, WI-0064 and WI-0065 checks, including representative JPEG/iPhone HEIC metadata, automatic GPS-to-GeoNames pickup without a manual browser batch, restart/resume, manual Place precedence, corrected GeoNames pacing and Sweden-local/else-English naming. The authoritative closure record is [M20-maintainer-verification-2026-08-26.md](M20-maintainer-verification-2026-08-26.md).
+
+All M19 work items are therefore completed and the canonical milestone status is **completed**.
 
 ## Tag and Places architecture
 
@@ -72,9 +74,9 @@ Different dimensions combine with AND semantics. Named-place matching is hierarc
 
 Capture metadata remains revision-bound. `DateTimeOriginal` is photographic wall-clock time and must not be converted to UTC when the source has no offset. A real source offset is persisted separately. GPS latitude/longitude remain atomic.
 
-WI-0072 makes metadata inspection part of bounded archive advancement. The exact revision must already be local and hash-verified; metadata inspection never creates an independent hydration path. Before archive analysis, durable proxy generation or Photo Identity-managed release proceeds for a revision, the advancement path ensures a capture-metadata inspection row exists. That means both revisions established directly from already-local files and revisions hydrated for source verification enter the same metadata contract.
+WI-0072 makes metadata inspection part of bounded archive advancement. The exact revision must already be local and hash-verified; metadata inspection never creates an independent hydration path. Before archive analysis, durable proxy generation or Photo Identity-managed release proceeds for a revision, the advancement path ensures metadata inspection is current. That means both revisions established directly from already-local files and revisions hydrated for source verification enter the same metadata contract.
 
-The explicit `/api/photo-metadata/backfill` operation remains available for historical catalogue rows and repair/retry. It reuses the same inspection/persistence boundary and retains its local-only/hash-verification rules.
+The explicit `/api/photo-metadata/backfill` operation remains available for historical catalogue rows and repair/retry. WI-0078 later added extraction-contract versioning so legacy/stale rows can be revisited safely without deleting existing metadata. Both paths retain local-only/hash-verification rules and keep manual Places/people/tags outside metadata refresh persistence.
 
 Query-critical capture time/GPS stay in the stable WI-0050 persistence contract. Richer camera/lens/exposure fields and a bounded sanitized raw metadata snapshot are stored separately and exposed through Photo Details without reopening the original during normal viewing.
 
@@ -82,25 +84,25 @@ Query-critical capture time/GPS stay in the stable WI-0050 persistence contract.
 
 GeoNames is the selected M19 reverse-geocoding provider. Photo Identity uses the GeoNames web-service API rather than downloaded GeoNames database extracts.
 
-Reverse geocoding operates only from GPS coordinates already persisted in SQLite and never opens or hydrates originals. Configuring a private GeoNames username is the explicit opt-in to external reverse geocoding. Once configured, the normal operating model is automatic: a server-side hosted service notices eligible persisted-GPS revisions, reuses the existing WI-0064 cache/attempt state and continues until no eligible work remains.
+Reverse geocoding operates only from GPS coordinates already persisted in SQLite and never opens or hydrates originals. Configuring a private GeoNames username is the explicit opt-in to external reverse geocoding. Once configured, the normal operating model is automatic: a server-side hosted service notices eligible persisted-GPS revisions, reuses durable cache/attempt state and continues until no eligible work remains.
 
-GeoNames remains independent of archive analysis. WI-0072 ensures capture metadata is inspected while the exact revision is already local and verified; if GPS is present, the resulting database row becomes eligible for the existing background reverse-geocoding queue. Archive processing does not wait on external GeoNames response times or provider pacing.
+GeoNames remains independent of archive analysis. WI-0072 ensures capture metadata is inspected while the exact revision is already local and verified; if GPS is present, the resulting database row becomes eligible for the background reverse-geocoding queue. Archive processing does not wait on external GeoNames response times or provider pacing.
 
-Automatic provider pacing must be conservative enough that the maintainer does not need to calculate free-service limits. As of 2026-08-18 GeoNames documents 10,000 credits/day and 1,000 credits/hour per username/application, and `findNearbyPlaceName` costs 3 credits per request. WI-0065 therefore applies a 30-second automatic request floor, while provider quota/overload/transport responses pause and retry automatically. Small manual maintenance/force-refresh actions remain available for diagnostics only.
+The automatic normal request interval has a conservative **30000 ms default**, but it is **not a hard minimum**. An explicit supported non-negative override is honored. Lower-level provider pacing is reconciled with the automatic interval so Settings/diagnostics report the normal effective gate actually used. Provider quota/account/transport backoff remains authoritative and can delay requests longer than the configured normal interval.
 
-Manual place corrections take precedence over automatic GeoNames results. Operator documentation must make clear that latitude/longitude are sent to the external GeoNames service during automatic enrichment and must include required provider attribution.
+The default language policy is **Sweden-local / elsewhere-English**. The provider is first queried with local naming; Swedish results are retained, while non-Swedish coordinates obtain/cache the English representation under the policy-aware cache contract. Manual Place and manual-clear actions remain authoritative and are never silently overwritten by automatic enrichment.
+
+Operator documentation makes clear that latitude/longitude are sent to the external GeoNames service during automatic enrichment and includes required provider attribution.
 
 ## Navigation semantics
 
-Photo Details should preserve the context from which it was opened. In particular, opening a result from Smart Collections and returning through browser/mouse Back must restore the selected collection or transient preview, filters and result page rather than resetting the workspace. Photo Details should expose a context-aware Back action instead of always returning to `/collections`.
+Photo Details preserves the context from which it was opened. In particular, opening a result from Smart Collections and returning through browser/mouse Back restores the selected collection or transient preview, filters and result page rather than resetting the workspace. Photo Details exposes a context-aware Back action rather than always returning to `/collections`.
 
-## Verification strategy
+## Verification evidence
 
-The original M19 baseline was verified on 2026-08-16 and six later extension work items passed the consolidated maintainer check on 2026-08-19. WI-0064 live-provider verification already established real GeoNames normalization, Smart Collection integration and long hierarchy storage; WI-0065 verification still requires automatic pickup/restart-resume on newly processed GPS-bearing data.
+M19 verification was intentionally layered across real catalogue use, live GeoNames behavior and automated repository checks. The final 2026-08-26 maintainer pass established the remaining real-media/provider evidence after the corrective M20 slices were merged. The post-PR-#205 `main` comprehensive workflow #1244 (`32528282922`) was green before the final manual pass.
 
-WI-0072 is the active M19 completion path. Automated coverage should verify shared metadata persistence, no metadata-only hydration, Photo Details contracts and archive gating. Final maintainer verification should use at least one date/GPS-bearing JPEG and one representative iPhone HEIC/HEIF image so the real media metadata and automatic GeoNames path are exercised before WI-0064/WI-0065/WI-0072 and M19 are completed.
-
-Do not mark WI-0072 completed merely because implementation and CI are green. Keep it `in_review` until the real archive/metadata/GeoNames verification passes.
+Historical checklists remain in [M19-consolidated-verification.md](M19-consolidated-verification.md) and the 2026-08-19 review documents. Their older `PENDING`/`INCOMPLETE` markers describe the state at that time; [M20-maintainer-verification-2026-08-26.md](M20-maintainer-verification-2026-08-26.md) is authoritative for final lifecycle closure.
 
 ## Exit criteria
 
@@ -117,11 +119,12 @@ Do not mark WI-0072 completed merely because implementation and CI are green. Ke
 - Places are filtered through the Smart Collections Location dimension with ancestor/descendant semantics and are excluded from ordinary tags.
 - Persisted GPS can be reverse geocoded through the configured GeoNames web-service API without downloading GeoNames database extracts or hydrating originals.
 - Configured GeoNames enrichment runs automatically in the server process, resumes unattempted/failed/deferred work from SQLite and does not require a long-lived browser request.
-- Automatic GeoNames pacing stays within the documented normal free-service budget without requiring the maintainer to tune request counts.
+- GeoNames normal pacing is configurable with a 30000 ms default, effective pacing is operator-visible and provider-directed backoff can take precedence.
+- Sweden uses local GeoNames naming while non-Swedish automatic results use English under the policy-aware cache contract.
 - Archive/local processing never waits for GeoNames; newly persisted GPS metadata becomes eligible independently.
 - Manual place corrections override automatic GeoNames enrichment and provider failures never fabricate location data.
 - A person can be reversibly hidden from Smart Collection discovery without disappearing from identity review/maintenance or invalidating existing saved collections.
 - A person-oriented representative portrait resolves from an explicit valid face or deterministic automatic fallback without changing identity evidence.
 - The modern Smart Collection people selector supports incremental case-insensitive search, persistent selected people, hidden-selection compatibility, representative portraits and stable PersonId-based `all`/`any` semantics.
 - Missing EXIF/GPS/tag/person/place data fails the relevant predicate rather than inventing metadata.
-- The extended non-deferred M19 workflow passes final maintainer verification.
+- Final consolidated maintainer verification passed on 2026-08-26.
