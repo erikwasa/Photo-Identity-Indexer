@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
@@ -36,6 +37,11 @@ public sealed record OneDriveSyncScanReport(
     IReadOnlyList<SourceAsset> Assets,
     IReadOnlyList<OneDriveUnsupportedFile> UnsupportedFiles,
     IReadOnlyList<OneDriveAvailabilityFailure> AvailabilityFailures);
+
+public sealed record OneDriveSyncDiagnostics(
+    int EnumeratedDirectoryCount,
+    int EnumeratedFileCount,
+    TimeSpan SourceScanElapsed);
 
 public sealed class OneDriveHydrationRequiredException : IOException
 {
@@ -81,6 +87,7 @@ public sealed class OneDriveSyncAssetSource : IAssetSource
 
     private readonly IOneDriveFileStatusProvider _statusProvider;
     private readonly StringComparison _pathComparison;
+    private int _statusCheckCount;
 
     public OneDriveSyncAssetSource(SourceId sourceId, string rootPath)
         : this(sourceId, rootPath, new OneDriveFileAttributeStatusProvider())
@@ -104,6 +111,8 @@ public sealed class OneDriveSyncAssetSource : IAssetSource
 
     public SourceId SourceId { get; }
     public string RootPath { get; }
+    public OneDriveSyncDiagnostics? LastScanDiagnostics { get; private set; }
+    public int StatusCheckCount => _statusCheckCount;
 
     public async Task<OneDriveSyncScanReport> ScanAsync(
         SourceScanOptions options,
@@ -116,11 +125,15 @@ public sealed class OneDriveSyncAssetSource : IAssetSource
             throw new DirectoryNotFoundException($"The OneDrive sync directory does not exist: {scanRoot}");
         }
 
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        ScanCounters counters = new();
+        _statusCheckCount = 0;
+        LastScanDiagnostics = null;
         List<SourceAsset> assets = [];
         List<OneDriveUnsupportedFile> unsupported = [];
         List<OneDriveAvailabilityFailure> failures = [];
 
-        foreach (string path in EnumerateFiles(scanRoot, options.Recursive, cancellationToken))
+        foreach (string path in EnumerateFiles(scanRoot, options.Recursive, counters, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             string relativePath = NormalizeRelativePath(Path.GetRelativePath(RootPath, path));
@@ -165,6 +178,11 @@ public sealed class OneDriveSyncAssetSource : IAssetSource
         failures.Sort(static (left, right) =>
             StringComparer.Ordinal.Compare(left.RelativePath, right.RelativePath));
 
+        stopwatch.Stop();
+        LastScanDiagnostics = new OneDriveSyncDiagnostics(
+            counters.Directories,
+            counters.Files,
+            stopwatch.Elapsed);
         await Task.CompletedTask;
         return new OneDriveSyncScanReport(assets, unsupported, failures);
     }
@@ -219,7 +237,11 @@ public sealed class OneDriveSyncAssetSource : IAssetSource
         };
     }
 
-    internal OneDriveFileStatus ReadStatus(string path) => _statusProvider.GetStatus(path);
+    internal OneDriveFileStatus ReadStatus(string path)
+    {
+        _statusCheckCount++;
+        return _statusProvider.GetStatus(path);
+    }
 
     internal string ResolveAssetPath(string itemKey)
     {
@@ -255,6 +277,7 @@ public sealed class OneDriveSyncAssetSource : IAssetSource
     private static IEnumerable<string> EnumerateFiles(
         string root,
         bool recursive,
+        ScanCounters counters,
         CancellationToken cancellationToken)
     {
         Queue<string> directories = new();
@@ -263,9 +286,11 @@ public sealed class OneDriveSyncAssetSource : IAssetSource
         while (directories.TryDequeue(out string? directory))
         {
             cancellationToken.ThrowIfCancellationRequested();
+            counters.Directories++;
             foreach (string file in Directory.EnumerateFiles(directory))
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                counters.Files++;
                 yield return file;
             }
 
@@ -289,6 +314,12 @@ public sealed class OneDriveSyncAssetSource : IAssetSource
         string.IsNullOrWhiteSpace(relativeRoot) ? RootPath : ResolveAssetPath(relativeRoot);
 
     private static string NormalizeRelativePath(string path) => path.Replace('\\', '/');
+
+    private sealed class ScanCounters
+    {
+        public int Directories { get; set; }
+        public int Files { get; set; }
+    }
 }
 
 internal sealed record OneDriveFileStatus(AssetAvailability Availability, string? Error = null);
