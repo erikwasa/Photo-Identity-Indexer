@@ -13,7 +13,8 @@
     }
 
     <a class="face-image-link" href="@ResolvedDetailsUrl" aria-label="Open face details">
-        <img class="face-image" src="@Face.ImageUrl" alt="Detected face" loading="lazy" />
+        <img class="face-image" src="@Face.ImageUrl" alt="@FaceImageAlt" loading="lazy" />
+        <FaceTargetOverlay TargetBox="@Face.TargetBox" />
     </a>
 
     <div class="face-card-body">
@@ -127,6 +128,10 @@
     private string ResolvedDetailsUrl => string.IsNullOrWhiteSpace(DetailsUrl)
         ? $"/faces/{Uri.EscapeDataString(Face.Id)}"
         : DetailsUrl;
+
+    private string FaceImageAlt => Face.TargetBox is null
+        ? "Detected face"
+        : "Face context; detected face target is outlined";
 
     private bool CanAcceptTopSuggestion =>
         Face.State == "unreviewed" &&
