@@ -752,25 +752,40 @@ work_items:
 - id: WI-0079
   title: Investigate included-folder synchronization timeout and scaling
   milestone: M21
-  status: ready
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0079-included-folder-sync-timeout.md
+  started_at: 2026-08-26
+  completed_at: 2026-08-26
+  verified_at: 2026-08-26
+  verified_by: maintainer
+  last_updated_at: 2026-08-26
+  branch: agent/WI-0079-sync-diagnostics
   blockers:
   - WI-0041
   blocker_notes:
-  - Critical priority. Start with measurement/root-cause investigation; recent operator requests fail with net_http_request_timedout, 100.
-  evidence: []
+  - Strategy 2 verified on the real catalogue after workflow #1259: repeat no-change sync fell from 37.83 s to 0.988 s with 620 metadata-stable local files reused and zero files re-hashed. PR #208 merged.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/208
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33006288161
+  - type: merge_commit
+    value: eafc3aac8c6f30159530b882f4412671c6d6de25
 - id: WI-0080
   title: Make the detected face unambiguous in review images
   milestone: M21
-  status: ready
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0080-detected-face-clarity.md
+  started_at: 2026-08-26
+  last_updated_at: 2026-08-26
+  branch: agent/WI-0080-face-target-clarity
   blockers:
   - WI-0038
   - WI-0058
   blocker_notes:
-  - High priority. Investigate target geometry/presentation when more than one face is visible before selecting a visual treatment.
+  - Static investigation traced ambiguity to the intentional 2.2x contextual face crop. Persisted target geometry remains available server-side but is absent from the browser response. Candidate visual treatments are under maintainer review before implementation.
   evidence: []
 - id: WI-0081
   title: Investigate degraded identity suggestion accuracy
