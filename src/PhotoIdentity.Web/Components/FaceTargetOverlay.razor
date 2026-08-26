@@ -1,0 +1,26 @@
+@using System.Globalization
+
+@if (TargetBox is not null)
+{
+    <span class="face-target-overlay"
+          style="@OverlayStyle"
+          role="img"
+          aria-label="Detected face target">
+        <span class="face-target-label" aria-hidden="true">Target</span>
+        <span class="face-target-corner top-left" aria-hidden="true"></span>
+        <span class="face-target-corner top-right" aria-hidden="true"></span>
+        <span class="face-target-corner bottom-left" aria-hidden="true"></span>
+        <span class="face-target-corner bottom-right" aria-hidden="true"></span>
+    </span>
+}
+
+@code {
+    [Parameter]
+    public ReviewFaceTargetResponse? TargetBox { get; set; }
+
+    private string OverlayStyle => TargetBox is null
+        ? string.Empty
+        : string.Create(
+            CultureInfo.InvariantCulture,
+            $"left:{TargetBox.X * 100:F4}%;top:{TargetBox.Y * 100:F4}%;width:{TargetBox.Width * 100:F4}%;height:{TargetBox.Height * 100:F4}%;");
+}
