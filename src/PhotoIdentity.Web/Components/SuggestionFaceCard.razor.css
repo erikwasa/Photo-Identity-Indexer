@@ -15,6 +15,7 @@
 }
 
 .suggestion-image-link {
+    position: relative;
     display: block;
     aspect-ratio: 1;
     overflow: hidden;
