@@ -178,3 +178,27 @@ No product-code implementation should begin until the maintainer approves this t
 ## Source finding
 
 During the 2026-08-26 maintainer verification, the maintainer reported a separate high-priority usability issue: some face-detection images visibly contain two faces, making it unclear which one is the detected/reviewed face. This is a new review-clarity issue rather than a failure of the already-verified M19/M20 navigation or image-quality acceptance checks.
+
+
+## Maintainer decision — Option B
+
+On **2026-08-26**, the maintainer approved **Option B: preserve the existing 2.2× contextual review derivative and add a dynamic target overlay**.
+
+Implementation contract:
+
+1. Keep the existing high-quality contextual derivative and recognition evidence unchanged.
+2. Map the persisted detector bounding box into normalized contextual-derivative coordinates using the same crop calculation as `OpenCvReviewFaceRenderer`; do not maintain separate approximate geometry math.
+3. Extend the privacy-safe review response with an optional normalized `TargetBox`.
+4. Render a reusable browser overlay on normal Face Review, suggestion review cards, and Face Details.
+5. The cue must combine a high-contrast rectangle, strong corner brackets, visible **Target** text, and an accessible non-color description.
+6. Do not burn the marker into JPEG derivatives or modify originals.
+7. If usable target geometry is absent, omit the overlay rather than inventing coordinates.
+8. Regression coverage must use a contextual crop capable of containing another visible face/face-like region and prove that the response still identifies only the persisted target detection.
+
+## Implementation slice
+
+PR #209 now implements Option B. The renderer exposes the exact contextual-crop target mapping, review repositories retain the latest persisted bounding-box JSON, and both normal/suggestion review responses expose an optional normalized target rectangle. A reusable `FaceTargetOverlay` renders the target cue without modifying stored pixels.
+
+Regression coverage seeds a neighboring face-like region inside the contextual crop and verifies that Face Details and the normal review gallery return the same normalized target rectangle for the persisted detection.
+
+The PR remains pending until required CI is green and the maintainer verifies at least one private real-catalogue example where two faces are visible in the contextual review image.
