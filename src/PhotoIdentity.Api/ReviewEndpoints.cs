@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
@@ -410,7 +411,20 @@ public static class ReviewEndpoints
         face.Confidence,
         face.State,
         face.Person is null ? null : ToResponse(face.Person),
-        face.CreatedAtUtc);
+        face.CreatedAtUtc,
+        TopSuggestion: null,
+        TargetBox: ToTargetBox(face));
+
+    private static ReviewFaceTargetResponse? ToTargetBox(CatalogueReviewFace face)
+    {
+        NormalizedBoundingBox? target = ReviewFacePreviewResolver.CalculateTargetBoundingBox(
+            face.BoundingBoxJson,
+            face.PhotoWidth,
+            face.PhotoHeight);
+        return target is NormalizedBoundingBox box
+            ? new ReviewFaceTargetResponse(box.X, box.Y, box.Width, box.Height)
+            : null;
+    }
 
     private static ReviewPersonResponse ToResponse(
         CatalogueReviewPerson person,
