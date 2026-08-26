@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
@@ -144,7 +145,8 @@ public static class SuggestionGalleryEndpoints
         face.State,
         face.Person is null ? null : ToResponse(face.Person),
         face.CreatedAtUtc,
-        face.TopSuggestion is null ? null : ToResponse(face.TopSuggestion));
+        face.TopSuggestion is null ? null : ToResponse(face.TopSuggestion),
+        ToTargetBox(face.BoundingBoxJson, face.PhotoWidth, face.PhotoHeight));
 
     private static ReviewFaceResponse ToDetailsResponse(CatalogueReviewFace face) => new(
         face.Id.ToString(),
@@ -154,7 +156,23 @@ public static class SuggestionGalleryEndpoints
         face.Confidence,
         face.State,
         face.Person is null ? null : ToResponse(face.Person),
-        face.CreatedAtUtc);
+        face.CreatedAtUtc,
+        TopSuggestion: null,
+        TargetBox: ToTargetBox(face.BoundingBoxJson, face.PhotoWidth, face.PhotoHeight));
+
+    private static ReviewFaceTargetResponse? ToTargetBox(
+        string? boundingBoxJson,
+        int? photoWidth,
+        int? photoHeight)
+    {
+        NormalizedBoundingBox? target = ReviewFacePreviewResolver.CalculateTargetBoundingBox(
+            boundingBoxJson,
+            photoWidth,
+            photoHeight);
+        return target is NormalizedBoundingBox box
+            ? new ReviewFaceTargetResponse(box.X, box.Y, box.Width, box.Height)
+            : null;
+    }
 
     private static ReviewTopSuggestionResponse ToResponse(
         CatalogueSuggestionGalleryTopSuggestion suggestion) => new(
