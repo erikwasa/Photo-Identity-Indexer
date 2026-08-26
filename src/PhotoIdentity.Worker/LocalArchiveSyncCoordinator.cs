@@ -13,6 +13,8 @@ public sealed record LocalArchiveFolderSyncDiagnostics(
     int EnumeratedFileCount,
     int AvailabilityCheckCount,
     TimeSpan SourceScanElapsed,
+    int MetadataReuseCount,
+    TimeSpan BaselineReadElapsed,
     int HashedFileCount,
     long HashedBytes,
     TimeSpan HashingElapsed,
@@ -129,6 +131,8 @@ public sealed class LocalArchiveSyncCoordinator
                     sourceDiagnostics?.EnumeratedFileCount ?? summary.SupportedFileCount,
                     statusChecks,
                     sourceDiagnostics?.SourceScanElapsed ?? TimeSpan.Zero,
+                    scanDiagnostics.MetadataReuseCount,
+                    scanDiagnostics.BaselineReadElapsed,
                     scanDiagnostics.HashedFileCount,
                     scanDiagnostics.HashedBytes,
                     scanDiagnostics.HashingElapsed,
@@ -177,13 +181,15 @@ public sealed class LocalArchiveSyncCoordinator
     private static void WriteFolderDiagnostics(LocalArchiveFolderSyncDiagnostics diagnostics)
     {
         Console.WriteLine(
-            "[WI-0079 sync diagnostics] folder_index={0} total_ms={1:F1} source_scan_ms={2:F1} directories={3} files={4} status_checks={5} hashed_files={6} hashed_bytes={7} hash_ms={8:F1} observation_writes={9} persistence_ms={10:F1} missing_reconcile_ms={11:F1}",
+            "[WI-0079 sync diagnostics] folder_index={0} total_ms={1:F1} source_scan_ms={2:F1} directories={3} files={4} status_checks={5} metadata_reused={6} baseline_ms={7:F1} hashed_files={8} hashed_bytes={9} hash_ms={10:F1} observation_writes={11} persistence_ms={12:F1} missing_reconcile_ms={13:F1}",
             diagnostics.FolderIndex,
             diagnostics.TotalElapsed.TotalMilliseconds,
             diagnostics.SourceScanElapsed.TotalMilliseconds,
             diagnostics.EnumeratedDirectoryCount,
             diagnostics.EnumeratedFileCount,
             diagnostics.AvailabilityCheckCount,
+            diagnostics.MetadataReuseCount,
+            diagnostics.BaselineReadElapsed.TotalMilliseconds,
             diagnostics.HashedFileCount,
             diagnostics.HashedBytes,
             diagnostics.HashingElapsed.TotalMilliseconds,
@@ -195,12 +201,14 @@ public sealed class LocalArchiveSyncCoordinator
     private static void WriteTotalDiagnostics(LocalArchiveSyncDiagnostics diagnostics)
     {
         Console.WriteLine(
-            "[WI-0079 sync diagnostics] cancelled=false included_folders={0} total_ms={1:F1} directories={2} files={3} status_checks={4} hashed_files={5} hashed_bytes={6} source_scan_ms={7:F1} hash_ms={8:F1} observation_writes={9} persistence_ms={10:F1} missing_reconcile_ms={11:F1}",
+            "[WI-0079 sync diagnostics] cancelled=false included_folders={0} total_ms={1:F1} directories={2} files={3} status_checks={4} metadata_reused={5} baseline_ms={6:F1} hashed_files={7} hashed_bytes={8} source_scan_ms={9:F1} hash_ms={10:F1} observation_writes={11} persistence_ms={12:F1} missing_reconcile_ms={13:F1}",
             diagnostics.Folders.Count,
             diagnostics.TotalElapsed.TotalMilliseconds,
             diagnostics.Folders.Sum(static folder => folder.EnumeratedDirectoryCount),
             diagnostics.Folders.Sum(static folder => folder.EnumeratedFileCount),
             diagnostics.Folders.Sum(static folder => folder.AvailabilityCheckCount),
+            diagnostics.Folders.Sum(static folder => folder.MetadataReuseCount),
+            diagnostics.Folders.Sum(static folder => folder.BaselineReadElapsed.TotalMilliseconds),
             diagnostics.Folders.Sum(static folder => folder.HashedFileCount),
             diagnostics.Folders.Sum(static folder => folder.HashedBytes),
             diagnostics.Folders.Sum(static folder => folder.SourceScanElapsed.TotalMilliseconds),
