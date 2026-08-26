@@ -32,6 +32,8 @@ public sealed class ArchiveAvailabilityTests
                 Utc(10));
             Assert.Equal(1, local.LocalFileCount);
             Assert.Equal(1, local.NewRevisionCount);
+            Assert.Equal(1, local.Diagnostics.HashedFileCount);
+            Assert.Equal(0, local.Diagnostics.MetadataReuseCount);
             Assert.Equal(1, source.OpenContentCalls);
             Assert.Single(await new SqliteArchiveAnalysisRepository(database)
                 .GetPendingCurrentRevisionIdsAsync(catalogueSource.Id, profileHash));
@@ -44,6 +46,7 @@ public sealed class ArchiveAvailabilityTests
                 Utc(11));
             Assert.Equal(1, onlineOnly.OnlineOnlyFileCount);
             Assert.Equal(0, onlineOnly.NewRevisionCount);
+            Assert.Equal(0, onlineOnly.Diagnostics.HashedFileCount);
             Assert.Equal(1, source.OpenContentCalls);
             Assert.Empty(await new SqliteArchiveAnalysisRepository(database)
                 .GetPendingCurrentRevisionIdsAsync(catalogueSource.Id, profileHash));
@@ -96,7 +99,11 @@ public sealed class ArchiveAvailabilityTests
             Assert.Equal(1, hydrated.LocalFileCount);
             Assert.Equal(0, hydrated.NewRevisionCount);
             Assert.Equal(1, hydrated.UnchangedFileCount);
-            Assert.Equal(2, source.OpenContentCalls);
+            Assert.Equal(0, hydrated.Diagnostics.HashedFileCount);
+            Assert.Equal(1, hydrated.Diagnostics.MetadataReuseCount);
+            // The asset remained continuously present and its verified size/mtime/media baseline
+            // is unchanged, so returning from online-only to local does not require a content read.
+            Assert.Equal(1, source.OpenContentCalls);
             Assert.Single(await new SqliteArchiveAnalysisRepository(database)
                 .GetPendingCurrentRevisionIdsAsync(catalogueSource.Id, profileHash));
         }
@@ -172,11 +179,6 @@ public sealed class ArchiveAvailabilityTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             OpenContentCalls++;
-            if (Availability != AssetAvailability.Local)
-            {
-                throw new InvalidOperationException("A non-local archive item must never be opened by the scanner.");
-            }
-
             return Task.FromResult<Stream>(new MemoryStream(_content, writable: false));
         }
     }
