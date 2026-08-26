@@ -397,17 +397,20 @@ work_items:
 - id: WI-0064
   title: Add GeoNames reverse-geocoded Places enrichment
   milestone: M19
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0064-geonames-place-enrichment.md
   started_at: 2026-08-17
-  last_updated_at: 2026-08-19
+  completed_at: 2026-08-26
+  verified_at: 2026-08-26
+  verified_by: maintainer
+  last_updated_at: 2026-08-26
   branch: agent/WI-0064-provider-error-reporting
   blockers:
   - WI-0050
   - WI-0063
   blocker_notes:
-  - Provider, persistence, Settings diagnostics and long Places compatibility are merged and prior live-provider verification remains valid. The 2026-08-19 integrated pass found that newly archived revisions can finish analysis without metadata inspection, so GPS-driven automatic pickup cannot yet be verified end-to-end.
+  - Final 2026-08-26 maintainer verification passed automatic pickup, manual precedence and Sweden-local/else-English live naming after the GeoNames corrective slices.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/160
@@ -425,24 +428,39 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/165
   - type: merge_commit
     value: cec72d1a801fba7cb1ec6d75e5bee322da2e55f6
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/203
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/205
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32528282922
 - id: WI-0065
   title: Run GeoNames place enrichment automatically in the background
   milestone: M19
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0065-automatic-place-enrichment.md
   started_at: 2026-08-18
-  last_updated_at: 2026-08-19
+  completed_at: 2026-08-26
+  verified_at: 2026-08-26
+  verified_by: maintainer
+  last_updated_at: 2026-08-26
   branch: agent/WI-0065-automatic-place-enrichment
   blockers:
   - WI-0050
   - WI-0063
   - WI-0064
   blocker_notes:
-  - Implementation is merged in PR #166. The 2026-08-19 integrated pass exposed that archive advancement does not invoke metadata extraction, so newly analyzed photos may never persist GPS and enter the automatic GeoNames queue; fix that ingestion gap before completing automatic pickup/restart-resume verification.
+  - Final 2026-08-26 maintainer verification passed automatic pickup, browser-independent processing, restart/resume, manual precedence, corrected timing and the revised language policy.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/166
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/203
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/205
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32528282922
 - id: WI-0066
   title: Add Smart Collection visibility preference for people
   milestone: M19
@@ -579,98 +597,190 @@ work_items:
 - id: WI-0072
   title: Integrate archive photo metadata and enrich Photo Details
   milestone: M19
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0072-archive-photo-metadata.md
   started_at: 2026-08-19
-  last_updated_at: 2026-08-19
+  completed_at: 2026-08-26
+  verified_at: 2026-08-26
+  verified_by: maintainer
+  last_updated_at: 2026-08-26
   branch: agent/WI-0072-archive-photo-metadata
   blockers:
   - WI-0050
   blocker_notes:
-  - Implements the metadata-ingestion gap found in the 2026-08-19 M19 maintainer pass and unblocks final WI-0064/WI-0065 verification.
-  evidence: []
+  - Final 2026-08-26 real-media pass verified automatic archive metadata inspection, representative JPEG/HEIC fields and the GPS-to-automatic-GeoNames handoff.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/191
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32528282922
 - id: WI-0073
   title: Polish cards, menus and archive navigation
   milestone: M20
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0073-ui-navigation-polish.md
   started_at: 2026-08-19
-  last_updated_at: 2026-08-20
+  completed_at: 2026-08-26
+  verified_at: 2026-08-26
+  verified_by: maintainer
+  last_updated_at: 2026-08-26
   branch: agent/WI-0073-ui-navigation-polish
   blockers:
   - WI-0061
   - WI-0066
   - WI-0068
-  blocker_notes: []
+  blocker_notes:
+  - Final 2026-08-26 maintainer pass verified the corrective Face Review, Smart Collection, Maintain People and archive advancement-state behavior.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/196
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/202
   - type: workflow
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32309615851
-  - type: merge_commit
-    value: bb52ae10470262e6e7a0573a0b70671af207ca49
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32528282922
 - id: WI-0074
   title: Filter Face Review by suggested person
   milestone: M20
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0074-face-review-suggested-person-filter.md
   started_at: 2026-08-20
-  last_updated_at: 2026-08-20
+  completed_at: 2026-08-21
+  verified_at: 2026-08-21
+  verified_by: maintainer
+  last_updated_at: 2026-08-26
   branch: agent/WI-0074-suggested-person-filter
   blockers:
   - WI-0043
   - WI-0047
-  blocker_notes: []
+  blocker_notes:
+  - Maintainer verification passed on 2026-08-21 and remained regression-free in the 2026-08-26 consolidated pass.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/197
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32528282922
 - id: WI-0075
   title: Make GeoNames background timing configurable from launcher settings
   milestone: M20
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0075-geonames-timing-settings.md
+  started_at: 2026-08-20
+  completed_at: 2026-08-26
+  verified_at: 2026-08-26
+  verified_by: maintainer
+  last_updated_at: 2026-08-26
   blockers:
   - WI-0065
   blocker_notes:
-  - Design is ready, but lifecycle remains proposed until WI-0065 is formally completed.
-  evidence: []
+  - Final maintainer pass verified below-30000 overrides, effective diagnostics, raw-provider compatibility and provider-backoff precedence.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/198
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/203
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/205
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32528282922
 - id: WI-0076
   title: Improve archive processing throughput
   milestone: M20
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0076-archive-throughput.md
+  started_at: 2026-08-20
+  last_updated_at: 2026-08-26
+  branch: agent/WI-0076-archive-session-reuse
   blockers:
   - WI-0042
   - WI-0072
   blocker_notes:
-  - Design is ready, but lifecycle remains proposed until the metadata/archive prerequisite is formally completed.
-  evidence: []
+  - Prerequisites are now complete. PR #200 contains the isolated session-reuse slice; merge and representative before/after throughput verification remain pending. Keep this separate from WI-0079 unless measurements show a shared cause.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/200
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32337226065
 - id: WI-0077
   title: Simplify Photo Viewer metadata and location editing
   milestone: M20
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0077-photo-viewer-simplification.md
+  started_at: 2026-08-20
+  completed_at: 2026-08-26
+  verified_at: 2026-08-26
+  verified_by: maintainer
+  last_updated_at: 2026-08-26
   blockers:
   - WI-0061
   - WI-0063
   - WI-0072
   blocker_notes:
-  - Design is ready, but lifecycle remains proposed until WI-0072 is formally completed.
-  evidence: []
+  - Final maintainer pass verified compact metadata layout, Location ordering/compact label, edit flows and narrow-screen fallback.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/199
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/204
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32528282922
 - id: WI-0078
   title: Reprocess stale photo metadata after extraction-contract changes
   milestone: M20
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0078-versioned-metadata-refresh.md
+  started_at: 2026-08-20
+  completed_at: 2026-08-21
+  verified_at: 2026-08-21
+  verified_by: maintainer
+  last_updated_at: 2026-08-26
   blockers:
   - WI-0072
   blocker_notes:
-  - Current backfill only selects revisions with no metadata inspection marker; versioned stale-row refresh is required for catalogue rows inspected before richer metadata fields were added.
+  - Real-catalogue verification passed on 2026-08-21 and remained regression-free in the 2026-08-26 consolidated pass.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/195
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32307001482
+- id: WI-0079
+  title: Investigate included-folder synchronization timeout and scaling
+  milestone: M21
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0079-included-folder-sync-timeout.md
+  blockers:
+  - WI-0041
+  blocker_notes:
+  - Critical priority. Start with measurement/root-cause investigation; recent operator requests fail with net_http_request_timedout, 100.
+  evidence: []
+- id: WI-0080
+  title: Make the detected face unambiguous in review images
+  milestone: M21
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0080-detected-face-clarity.md
+  blockers:
+  - WI-0038
+  - WI-0058
+  blocker_notes:
+  - High priority. Investigate target geometry/presentation when more than one face is visible before selecting a visual treatment.
+  evidence: []
+- id: WI-0081
+  title: Investigate degraded identity suggestion accuracy
+  milestone: M21
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0081-suggestion-accuracy-degradation.md
+  blockers:
+  - WI-0016
+  - WI-0043
+  blocker_notes:
+  - Medium priority. Quantify the apparent regression and audit reference/ranking/model behavior before changing production suggestion semantics.
   evidence: []
