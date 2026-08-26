@@ -47,7 +47,8 @@ public sealed record CatalogueSuggestionGalleryFace(
     double? Confidence,
     string State,
     CatalogueReviewPerson? Person,
-    CatalogueSuggestionGalleryTopSuggestion? TopSuggestion);
+    CatalogueSuggestionGalleryTopSuggestion? TopSuggestion,
+    string? BoundingBoxJson = null);
 
 public sealed record CatalogueSuggestionGalleryPage(
     IReadOnlyList<CatalogueSuggestionGalleryFace> Items,
