@@ -8,6 +8,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 
 public sealed record ArchiveSourceScanBaseline(
     string SourceKey,
+    bool WasDeleted,
     ArchiveSourceVerificationState? VerificationState,
     AssetRevisionId? VerifiedRevisionId,
     long? VerifiedSizeBytes,
@@ -19,7 +20,8 @@ public sealed record ArchiveSourceScanBaseline(
     public bool CanReuseVerifiedRevision(SourceAsset sourceAsset)
     {
         ArgumentNullException.ThrowIfNull(sourceAsset);
-        return VerificationState == ArchiveSourceVerificationState.Verified &&
+        return !WasDeleted &&
+            VerificationState == ArchiveSourceVerificationState.Verified &&
             VerifiedRevisionId is not null &&
             VerifiedSizeBytes == sourceAsset.SizeBytes &&
             VerifiedLastWriteTimeUtc == sourceAsset.LastWriteTimeUtc.ToUniversalTime() &&
@@ -61,6 +63,7 @@ public sealed class SqliteArchiveSourceScanBatchRepository
             ? """
               SELECT
                   asset.source_key,
+                  CASE WHEN asset.deleted_at_utc IS NULL THEN 0 ELSE 1 END AS was_deleted,
                   observation.verification_state,
                   observation.verified_revision_id,
                   observation.verified_size_bytes,
@@ -76,12 +79,12 @@ public sealed class SqliteArchiveSourceScanBatchRepository
                   ) AS latest_revision_id
               FROM assets AS asset
               LEFT JOIN archive_source_observations AS observation ON observation.asset_id = asset.id
-              WHERE asset.source_id = $source_id
-                AND asset.deleted_at_utc IS NULL;
+              WHERE asset.source_id = $source_id;
               """
             : """
               SELECT
                   asset.source_key,
+                  CASE WHEN asset.deleted_at_utc IS NULL THEN 0 ELSE 1 END AS was_deleted,
                   observation.verification_state,
                   observation.verified_revision_id,
                   observation.verified_size_bytes,
@@ -98,7 +101,6 @@ public sealed class SqliteArchiveSourceScanBatchRepository
               FROM assets AS asset
               LEFT JOIN archive_source_observations AS observation ON observation.asset_id = asset.id
               WHERE asset.source_id = $source_id
-                AND asset.deleted_at_utc IS NULL
                 AND substr(asset.source_key, 1, length($scope_prefix)) = $scope_prefix;
               """;
         command.Parameters.AddWithValue("$source_id", sourceId.ToString());
@@ -114,15 +116,16 @@ public sealed class SqliteArchiveSourceScanBatchRepository
             string sourceKey = reader.GetString(0);
             baselines[sourceKey] = new ArchiveSourceScanBaseline(
                 sourceKey,
-                reader.IsDBNull(1)
+                reader.GetInt64(1) != 0,
+                reader.IsDBNull(2)
                     ? null
-                    : SqliteArchiveSourceObservationRepository.ParseVerificationState(reader.GetString(1)),
-                reader.IsDBNull(2) ? null : AssetRevisionId.From(Guid.Parse(reader.GetString(2))),
-                reader.IsDBNull(3) ? null : reader.GetInt64(3),
-                reader.IsDBNull(4) ? null : Parse(reader.GetString(4)),
-                reader.IsDBNull(5) ? null : reader.GetString(5),
-                reader.IsDBNull(6) ? null : Parse(reader.GetString(6)),
-                reader.IsDBNull(7) ? null : AssetRevisionId.From(Guid.Parse(reader.GetString(7))));
+                    : SqliteArchiveSourceObservationRepository.ParseVerificationState(reader.GetString(2)),
+                reader.IsDBNull(3) ? null : AssetRevisionId.From(Guid.Parse(reader.GetString(3))),
+                reader.IsDBNull(4) ? null : reader.GetInt64(4),
+                reader.IsDBNull(5) ? null : Parse(reader.GetString(5)),
+                reader.IsDBNull(6) ? null : reader.GetString(6),
+                reader.IsDBNull(7) ? null : Parse(reader.GetString(7)),
+                reader.IsDBNull(8) ? null : AssetRevisionId.From(Guid.Parse(reader.GetString(8))));
         }
 
         return baselines;
@@ -197,6 +200,10 @@ public sealed class SqliteArchiveSourceScanBatchRepository
                 verifiedWrite = observedWrite;
                 verifiedMediaType = sourceAsset.MediaType;
                 verifiedAt = scannedAt;
+            }
+            else if (baseline?.WasDeleted == true && baseline.LatestRevisionId is not null)
+            {
+                verificationState = ArchiveSourceVerificationState.NeedsSourceVerification;
             }
             else if (baseline?.VerificationState == ArchiveSourceVerificationState.NeedsSourceVerification)
             {
