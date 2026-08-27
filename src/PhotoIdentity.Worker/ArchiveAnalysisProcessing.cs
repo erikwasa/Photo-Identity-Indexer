@@ -62,14 +62,17 @@ public sealed class ArchiveAnalysisCoordinator
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly TimeProvider _timeProvider;
+    private readonly ArchiveThroughputMetrics? _metrics;
 
     public ArchiveAnalysisCoordinator(
         SqliteCatalogueDatabase database,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ArchiveThroughputMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _metrics = metrics;
     }
 
     public async Task<ArchiveAnalysisStartResult> StartAsync(
@@ -135,7 +138,8 @@ public sealed class ArchiveAnalysisCoordinator
         using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
             _database,
             batchConfiguration,
-            cancellationToken);
+            cancellationToken,
+            _metrics);
         AnalysisTrackingJobHandler handler = new(
             _database,
             inspection,
