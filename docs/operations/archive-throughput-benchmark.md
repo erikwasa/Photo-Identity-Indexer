@@ -74,9 +74,10 @@ $Started = Get-Date
 Invoke-RestMethod -Method Post "$Api/api/archive/advance/start" | Out-Null
 ```
 
-9. Poll `/api/archive/status` and `/api/archive/storage` every five seconds. Optionally collect
-Windows CPU, working-set and process I/O counters at the same cadence. Do not run other CPU/disk
-benchmarks while this test is active.
+9. Poll `/api/archive/status` and `/api/archive/storage` every five seconds. Collect Windows
+CPU, working-set and process I/O counters at the same cadence; CPU utilization is required WI-0076
+evidence because it distinguishes serialized/idle behavior from a saturated inference workload.
+Do not run other CPU/disk benchmarks while this test is active.
 10. Stop timing when `status.advancement.state` becomes `complete` or `blocked`.
 11. Save the final diagnostics:
 
@@ -130,6 +131,7 @@ Important stage names include:
 
 - `synchronization`
 - `onedrive-wait`
+- `active-loop-delay`
 - `source-verification`
 - `source-verification-hash`
 - `original-verification-hash`
@@ -158,6 +160,11 @@ Full-file hash-read kinds include:
 
 `SubjectCount`, `AverageReadsPerSubject` and `MaxReadsPerSubject` make redundant verification
 visible without exposing which revision was read.
+
+Stage timers can be nested (for example a session lifetime contains hashing, decode and inference),
+so **do not sum every stage total and compare that sum with wall-clock elapsed time**. Use the
+individual stages to identify dominant costs and use the separately measured benchmark elapsed time
+for overall throughput.
 
 ## Decision rule
 
