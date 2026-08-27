@@ -689,17 +689,17 @@ work_items:
 - id: WI-0076
   title: Improve archive processing throughput
   milestone: M20
-  status: in_review
+  status: in_progress
   owner: ai-agent
   document: ../work-items/WI-0076-archive-throughput.md
   started_at: 2026-08-20
-  last_updated_at: 2026-08-26
-  branch: agent/WI-0076-archive-session-reuse
+  last_updated_at: 2026-08-27
+  branch: agent/WI-0076-throughput-metrics
   blockers:
   - WI-0042
   - WI-0072
   blocker_notes:
-  - Prerequisites are now complete. PR #200 contains the isolated session-reuse slice; merge and representative before/after throughput verification remain pending. Keep this separate from WI-0079 unless measurements show a shared cause.
+  - Metrics-only baseline instrumentation is active from current main. PR #200 remains untouched as a later optimization candidate; benchmark evidence must be collected before selecting or reapplying an optimization.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/200
