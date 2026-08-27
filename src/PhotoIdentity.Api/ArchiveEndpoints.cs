@@ -80,6 +80,8 @@ public static class ArchiveEndpoints
         group.MapPost("/advance/start", StartAdvancementAsync);
         group.MapPost("/advance/pause", PauseAdvancementAsync);
         group.MapPost("/analysis/step", AnalysisStepAsync);
+        group.MapGet("/diagnostics/throughput", GetThroughputDiagnostics);
+        group.MapPost("/diagnostics/throughput/reset", ResetThroughputDiagnostics);
         return endpoints;
     }
 
@@ -226,6 +228,7 @@ public static class ArchiveEndpoints
     private static async Task<IResult> SyncAsync(
         SqliteCatalogueDatabase database,
         ArchiveOperatorConfiguration operatorConfiguration,
+        ArchiveThroughputMetrics metrics,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -236,12 +239,16 @@ public static class ArchiveEndpoints
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
 
             LocalFolderAssetSource source = new(configured.Source.Id, configured.Source.RootLocator);
-            LocalArchiveSyncSummary summary = await new LocalArchiveSyncCoordinator(database).SyncAsync(
-                source,
-                configured.Source,
-                configured.IncludedFolders,
-                timeProvider.GetUtcNow(),
-                cancellationToken);
+            LocalArchiveSyncSummary summary;
+            using (IDisposable syncTiming = metrics.Measure(ArchiveThroughputMetricNames.Synchronization))
+            {
+                summary = await new LocalArchiveSyncCoordinator(database).SyncAsync(
+                    source,
+                    configured.Source,
+                    configured.IncludedFolders,
+                    timeProvider.GetUtcNow(),
+                    cancellationToken);
+            }
             ArchiveStatusResponse status = await BuildStatusAsync(database, operatorConfiguration, cancellationToken);
             return Results.Ok(new ArchiveSyncResponse(
                 summary.SupportedFileCount,
@@ -330,6 +337,38 @@ public static class ArchiveEndpoints
             return BadRequest(exception);
         }
     }
+
+    private static IResult GetThroughputDiagnostics(ArchiveThroughputMetrics metrics) =>
+        Results.Ok(ToResponse(metrics.GetSnapshot()));
+
+    private static IResult ResetThroughputDiagnostics(ArchiveThroughputMetrics metrics) =>
+        Results.Ok(ToResponse(metrics.Reset()));
+
+    private static ArchiveThroughputDiagnosticsResponse ToResponse(ArchiveThroughputSnapshot snapshot) =>
+        new(
+            snapshot.Generation,
+            snapshot.ResetAtUtc,
+            snapshot.CapturedAtUtc,
+            snapshot.Stages
+                .Select(value => new ArchiveThroughputStageMetricResponse(
+                    value.Name,
+                    value.Count,
+                    value.TotalMilliseconds,
+                    value.AverageMilliseconds,
+                    value.MaxMilliseconds))
+                .ToArray(),
+            snapshot.Counters
+                .Select(value => new ArchiveThroughputCounterMetricResponse(value.Name, value.Value))
+                .ToArray(),
+            snapshot.HashReads
+                .Select(value => new ArchiveThroughputHashReadMetricResponse(
+                    value.Kind,
+                    value.Count,
+                    value.Bytes,
+                    value.SubjectCount,
+                    value.AverageReadsPerSubject,
+                    value.MaxReadsPerSubject))
+                .ToArray());
 
     private static async Task<ArchiveStatusResponse> BuildStatusAsync(
         SqliteCatalogueDatabase database,
