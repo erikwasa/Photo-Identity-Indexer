@@ -699,10 +699,12 @@ work_items:
   - WI-0042
   - WI-0072
   blocker_notes:
-  - PR #210 contains the fresh metrics-only baseline instrumentation from current main. Exact-head CI and the controlled local/online-only maintainer benchmark remain pending. PR #200 stays unmerged as a later optimization candidate and must not be treated as baseline behavior.
+  - PR #210 contains the fresh metrics-only baseline instrumentation from current main. Exact-head workflow #1285 passed all required lanes; the controlled local/online-only maintainer benchmark remains pending. PR #200 stays unmerged as a later optimization candidate and must not be treated as baseline behavior.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/210
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33094175596
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/200
   - type: workflow
