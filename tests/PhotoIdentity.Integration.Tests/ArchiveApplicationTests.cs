@@ -1,7 +1,9 @@
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using PhotoIdentity.Web;
+using PhotoIdentity.Worker;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -93,6 +95,76 @@ public sealed class ArchiveApplicationTests
             ArchiveItemStatusResponse missingItem = Assert.Single(missing.Items);
             Assert.Equal("1970/01/one.jpg", missingItem.RelativePath);
             Assert.Equal("missing", missingItem.AnalysisState);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Throughput_diagnostics_are_resettable_and_do_not_expose_internal_subject_keys()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            await using PhotoIdentityApiTestFactory factory = new(databasePath);
+            using HttpClient client = factory.CreateClient();
+
+            ArchiveThroughputDiagnosticsResponse initialReset = Assert.IsType<ArchiveThroughputDiagnosticsResponse>(
+                await (await client.PostAsync("/api/archive/diagnostics/throughput/reset", null))
+                    .Content.ReadFromJsonAsync<ArchiveThroughputDiagnosticsResponse>());
+            Assert.Empty(initialReset.Stages);
+            Assert.Empty(initialReset.Counters);
+            Assert.Empty(initialReset.HashReads);
+
+            ArchiveThroughputMetrics metrics = factory.Services.GetRequiredService<ArchiveThroughputMetrics>();
+            using (metrics.Measure(ArchiveThroughputMetricNames.ImageDecode))
+            {
+                await Task.Delay(1);
+            }
+            metrics.RecordCounter(ArchiveThroughputMetricNames.AnalysisAttempts, 2);
+            metrics.RecordHashRead(
+                ArchiveThroughputMetricNames.AnalysisHashKind,
+                "private-revision-key-that-must-not-leak",
+                1234);
+
+            using HttpResponseMessage response = await client.GetAsync("/api/archive/diagnostics/throughput");
+            response.EnsureSuccessStatusCode();
+            Assert.Contains(
+                "no-store",
+                response.Headers.CacheControl?.ToString() ?? string.Empty,
+                StringComparison.OrdinalIgnoreCase);
+            string json = await response.Content.ReadAsStringAsync();
+            Assert.DoesNotContain("private-revision-key-that-must-not-leak", json, StringComparison.Ordinal);
+
+            ArchiveThroughputDiagnosticsResponse snapshot = Assert.IsType<ArchiveThroughputDiagnosticsResponse>(
+                await response.Content.ReadFromJsonAsync<ArchiveThroughputDiagnosticsResponse>());
+            ArchiveThroughputStageMetricResponse stage = Assert.Single(snapshot.Stages);
+            Assert.Equal(ArchiveThroughputMetricNames.ImageDecode, stage.Name);
+            Assert.Equal(1, stage.Count);
+            Assert.True(stage.TotalMilliseconds >= 0d);
+
+            ArchiveThroughputCounterMetricResponse counter = Assert.Single(snapshot.Counters);
+            Assert.Equal(ArchiveThroughputMetricNames.AnalysisAttempts, counter.Name);
+            Assert.Equal(2, counter.Value);
+
+            ArchiveThroughputHashReadMetricResponse hashRead = Assert.Single(snapshot.HashReads);
+            Assert.Equal(ArchiveThroughputMetricNames.AnalysisHashKind, hashRead.Kind);
+            Assert.Equal(1, hashRead.Count);
+            Assert.Equal(1234, hashRead.Bytes);
+            Assert.Equal(1, hashRead.SubjectCount);
+            Assert.Equal(1d, hashRead.AverageReadsPerSubject);
+            Assert.Equal(1, hashRead.MaxReadsPerSubject);
+
+            ArchiveThroughputDiagnosticsResponse secondReset = Assert.IsType<ArchiveThroughputDiagnosticsResponse>(
+                await (await client.PostAsync("/api/archive/diagnostics/throughput/reset", null))
+                    .Content.ReadFromJsonAsync<ArchiveThroughputDiagnosticsResponse>());
+            Assert.True(secondReset.Generation > initialReset.Generation);
+            Assert.Empty(secondReset.Stages);
+            Assert.Empty(secondReset.Counters);
+            Assert.Empty(secondReset.HashReads);
         }
         finally
         {
