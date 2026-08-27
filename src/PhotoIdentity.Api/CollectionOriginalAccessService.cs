@@ -4,6 +4,7 @@ using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
+using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
 
@@ -37,6 +38,7 @@ public sealed class CollectionOriginalAccessService
     private readonly IOneDriveFilesOnDemandPlatform _platform;
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly TimeProvider _timeProvider;
+    private readonly ArchiveThroughputMetrics? _metrics;
     private readonly StringComparison _pathComparison;
 
     public CollectionOriginalAccessService(
@@ -45,7 +47,8 @@ public sealed class CollectionOriginalAccessService
         SqliteArchiveAvailabilityRepository availability,
         IOneDriveFilesOnDemandPlatform platform,
         ArchiveHydrationCapacityService capacity,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ArchiveThroughputMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(catalogue);
         ArgumentNullException.ThrowIfNull(hydrations);
@@ -59,6 +62,7 @@ public sealed class CollectionOriginalAccessService
         _platform = platform;
         _capacity = capacity;
         _timeProvider = timeProvider;
+        _metrics = metrics;
         _pathComparison = OperatingSystem.IsWindows()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
@@ -155,7 +159,11 @@ public sealed class CollectionOriginalAccessService
                     // Claim ownership only after Windows accepts our explicit pin request. A crash
                     // between these operations leaks local storage rather than risking release of
                     // content Photo Identity did not hydrate.
-                    await _platform.RequestHydrationAsync(resolved.Path, cancellationToken);
+                    using (IDisposable? timing = _metrics?.Measure(ArchiveThroughputMetricNames.HydrationRequest))
+                    {
+                        await _platform.RequestHydrationAsync(resolved.Path, cancellationToken);
+                    }
+                    _metrics?.RecordCounter(ArchiveThroughputMetricNames.HydrationRequests);
                     if (ownership is not { IsActive: true })
                     {
                         await _hydrations.ClaimAsync(
@@ -227,7 +235,11 @@ public sealed class CollectionOriginalAccessService
 
         if (!ownership.IsReleaseRequested)
         {
-            await _platform.RequestOnlineOnlyAsync(resolved.Path, cancellationToken);
+            using (IDisposable? timing = _metrics?.Measure(ArchiveThroughputMetricNames.ReleaseRequest))
+            {
+                await _platform.RequestOnlineOnlyAsync(resolved.Path, cancellationToken);
+            }
+            _metrics?.RecordCounter(ArchiveThroughputMetricNames.ReleaseRequests);
             await _hydrations.MarkReleaseRequestedAsync(
                 revisionId,
                 _timeProvider.GetUtcNow(),
@@ -285,10 +297,11 @@ public sealed class CollectionOriginalAccessService
         return state;
     }
 
-    private static async Task<VerifiedCollectionOriginal?> OpenVerifiedCoreAsync(
+    private async Task<VerifiedCollectionOriginal?> OpenVerifiedCoreAsync(
         ResolvedOriginal resolved,
         CancellationToken cancellationToken)
     {
+        using IDisposable? timing = _metrics?.Measure(ArchiveThroughputMetricNames.OriginalVerificationHash);
         FileStream stream = new(
             resolved.Path,
             FileMode.Open,
@@ -304,7 +317,12 @@ public sealed class CollectionOriginalAccessService
                 return null;
             }
 
+            long bytes = stream.Length;
             byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken);
+            _metrics?.RecordHashRead(
+                ArchiveThroughputMetricNames.OriginalOpenHashKind,
+                resolved.Revision.RevisionId.ToString(),
+                bytes);
             Sha256Digest actual = new(Convert.ToHexString(hash).ToLowerInvariant());
             if (actual != resolved.Revision.ContentHash)
             {
@@ -360,10 +378,11 @@ public sealed class CollectionOriginalAccessService
                 "The local bytes do not match the immutable catalogue revision, so the original will not be served.");
     }
 
-    private static async Task<bool> VerifyContentAsync(
+    private async Task<bool> VerifyContentAsync(
         ResolvedOriginal resolved,
         CancellationToken cancellationToken)
     {
+        using IDisposable? timing = _metrics?.Measure(ArchiveThroughputMetricNames.OriginalVerificationHash);
         try
         {
             await using FileStream stream = new(
@@ -378,7 +397,12 @@ public sealed class CollectionOriginalAccessService
                 return false;
             }
 
+            long bytes = stream.Length;
             byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken);
+            _metrics?.RecordHashRead(
+                ArchiveThroughputMetricNames.OriginalStatusHashKind,
+                resolved.Revision.RevisionId.ToString(),
+                bytes);
             return new Sha256Digest(Convert.ToHexString(hash).ToLowerInvariant()) ==
                 resolved.Revision.ContentHash;
         }
