@@ -18,7 +18,7 @@ WI-0081 remains ready but is deferred while WI-0076 measurement work is active.
 
 ## Next concrete step
 
-1. Finish the WI-0076 metrics-only PR and obtain exact-head CI.
+1. PR #210 exact-head workflow #1285 passed all required CI lanes.
 2. Build/use the resulting Windows package with a disposable benchmark catalogue.
 3. Run the same fixed 100–200 image sample twice following `docs/operations/archive-throughput-benchmark.md`: first with originals already local, then with the same originals online-only.
 4. Compare wall-clock throughput, OneDrive wait share, stage timings, model-session initialization frequency and aggregate full-file hash reads.
