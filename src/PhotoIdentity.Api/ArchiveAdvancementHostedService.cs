@@ -130,6 +130,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                 }
                 else
                 {
+                    using IDisposable activeDelayTiming = _metrics.Measure(
+                        ArchiveThroughputMetricNames.ActiveLoopDelay);
                     await Task.Delay(ActiveDelay, stoppingToken);
                 }
             }
