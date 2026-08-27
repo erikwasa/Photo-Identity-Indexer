@@ -15,6 +15,7 @@ public sealed class FaceReviewDerivativeBackfillService
     private readonly CollectionOriginalAccessService _originals;
     private readonly ReviewProxyGenerationConfiguration _configuration;
     private readonly TimeProvider _timeProvider;
+    private readonly ArchiveThroughputMetrics? _metrics;
     private readonly SqliteFaceReviewDerivativeBackfillRepository _pending;
 
     public FaceReviewDerivativeBackfillService(
@@ -22,7 +23,8 @@ public sealed class FaceReviewDerivativeBackfillService
         SqliteLocalBatchRepository catalogue,
         CollectionOriginalAccessService originals,
         ReviewProxyGenerationConfiguration configuration,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ArchiveThroughputMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(catalogue);
@@ -34,6 +36,7 @@ public sealed class FaceReviewDerivativeBackfillService
         _originals = originals;
         _configuration = configuration;
         _timeProvider = timeProvider;
+        _metrics = metrics;
         _pending = new SqliteFaceReviewDerivativeBackfillRepository(database);
     }
 
@@ -93,13 +96,18 @@ public sealed class FaceReviewDerivativeBackfillService
                 "The analyzed archive revision disappeared before face review derivative generation.");
         string sourcePath = ResolveSourcePath(revision.RootLocator, revision.SourceKey);
         ArchiveFaceReviewDerivativeWriter writer = new(_database);
-        _ = await writer.GenerateAsync(
-            revisionId,
-            sourcePath,
-            revision.RootLocator,
-            derivativeRoot,
-            _timeProvider.GetUtcNow(),
-            cancellationToken);
+        using (IDisposable? derivativeTiming = _metrics?.Measure(
+                   ArchiveThroughputMetricNames.FaceReviewDerivativeGeneration))
+        {
+            _ = await writer.GenerateAsync(
+                revisionId,
+                sourcePath,
+                revision.RootLocator,
+                derivativeRoot,
+                _timeProvider.GetUtcNow(),
+                cancellationToken);
+        }
+        _metrics?.RecordCounter(ArchiveThroughputMetricNames.FaceReviewDerivativeRevisions);
 
         if (status.ManagedHydration)
         {
