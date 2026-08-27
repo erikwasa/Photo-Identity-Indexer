@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
 using PhotoIdentity.Core.Identifiers;
@@ -33,6 +34,8 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
     private readonly IFaceAligner _aligner;
     private readonly IFaceEmbedder _embedder;
     private readonly TimeProvider _timeProvider;
+    private readonly ArchiveThroughputMetrics? _metrics;
+    private readonly IDisposable? _sessionLifetime;
     private bool _disposed;
 
     public LocalInspectionJobHandler(
@@ -43,7 +46,8 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         IFaceDetector detector,
         IFaceAligner aligner,
         IFaceEmbedder embedder,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ArchiveThroughputMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -62,13 +66,18 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         _aligner = aligner;
         _embedder = embedder;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _metrics = metrics;
+        _sessionLifetime = metrics?.Measure(ArchiveThroughputMetricNames.AnalysisSessionLifetime);
     }
 
     public static async Task<LocalInspectionJobHandler> CreateAsync(
         SqliteCatalogueDatabase database,
         LocalBatchConfiguration configuration,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ArchiveThroughputMetrics? metrics = null)
     {
+        using IDisposable? initialization = metrics?.Measure(
+            ArchiveThroughputMetricNames.AnalysisSessionInitialization);
         string manifestDirectory = Path.Combine(configuration.RepositoryRoot, "models", "manifests");
         ModelManifestLoader loader = new();
         IReadOnlyList<ModelManifest> manifests = await loader.LoadDirectoryAsync(
@@ -89,14 +98,17 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         try
         {
             SFaceFaceEmbedder embedder = new(embedderManifest, embedderPath);
-            return new LocalInspectionJobHandler(
+            LocalInspectionJobHandler handler = new(
                 database,
                 configuration,
                 new OpenCvImageDecoder(),
                 new OpenCvPngEncoder(),
                 detector,
                 new OpenCvFaceAligner(),
-                embedder);
+                embedder,
+                metrics: metrics);
+            metrics?.RecordCounter(ArchiveThroughputMetricNames.ModelSessionInitializations);
+            return handler;
         }
         catch
         {
@@ -120,6 +132,7 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
 
         try
         {
+            _metrics?.RecordCounter(ArchiveThroughputMetricNames.AnalysisAttempts);
             CatalogueProcessingAssetRevision asset = await _assetRepository.GetAssetRevisionAsync(
                 context.AssetRevisionId,
                 cancellationToken)
@@ -135,7 +148,10 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
                 throw Permanent($"The catalogued source file is unavailable: {inputPath}");
             }
 
-            Sha256Digest sourceHash = await ComputeHashAsync(inputPath, cancellationToken);
+            Sha256Digest sourceHash = await ComputeHashAsync(
+                inputPath,
+                context.AssetRevisionId.ToString(),
+                cancellationToken);
             if (sourceHash != asset.ContentHash)
             {
                 throw Permanent(
@@ -143,22 +159,28 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
             }
 
             ImageFrame image;
-            await using (FileStream stream = new(
-                             inputPath,
-                             FileMode.Open,
-                             FileAccess.Read,
-                             FileShare.Read,
-                             bufferSize: 64 * 1024,
-                             useAsync: true))
+            using (IDisposable? decodeTiming = _metrics?.Measure(ArchiveThroughputMetricNames.ImageDecode))
             {
+                await using FileStream stream = new(
+                    inputPath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize: 64 * 1024,
+                    useAsync: true);
                 image = await _decoder.DecodeAsync(stream, new DecodeOptions(), cancellationToken);
             }
 
-            IReadOnlyList<DetectedFaceCandidate> faces = (await _detector.DetectAsync(image, cancellationToken))
-                .OrderByDescending(face => face.Confidence)
-                .ThenBy(face => face.BoundingBox.Y)
-                .ThenBy(face => face.BoundingBox.X)
-                .ToArray();
+            IReadOnlyList<DetectedFaceCandidate> faces;
+            using (IDisposable? detectionTiming = _metrics?.Measure(ArchiveThroughputMetricNames.FaceDetection))
+            {
+                faces = (await _detector.DetectAsync(image, cancellationToken))
+                    .OrderByDescending(face => face.Confidence)
+                    .ThenBy(face => face.BoundingBox.Y)
+                    .ThenBy(face => face.BoundingBox.X)
+                    .ToArray();
+            }
+            _metrics?.RecordCounter(ArchiveThroughputMetricNames.FacesDetected, faces.Count);
             InspectionCheckpoint checkpoint = ParseCheckpoint(context.CheckpointJson);
             if (checkpoint.CompletedFaceCount > faces.Count)
             {
@@ -178,88 +200,104 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 DetectedFaceCandidate face = faces[index];
-                AlignedFace aligned = await _aligner.AlignAsync(image, face, protocol, cancellationToken);
-                EmbeddingVector embedding = await _embedder.EmbedAsync(aligned, cancellationToken);
-                byte[] alignedPng = await EncodePngAsync(aligned.Image, cancellationToken);
-                Sha256Digest cropHash = Digest(alignedPng);
-                string relativeStoragePath = Path.Combine(
-                        "runs",
-                        context.RunId.ToString(),
-                        "assets",
-                        context.AssetRevisionId.ToString(),
-                        "faces",
-                        $"face-{index + 1:000}",
-                        "aligned.png")
-                    .Replace('\\', '/');
-                string storagePath = Path.Combine(
-                    _configuration.OutputRoot,
-                    relativeStoragePath.Replace('/', Path.DirectorySeparatorChar));
-                await WriteAtomicallyAsync(storagePath, alignedPng, cancellationToken);
+                AlignedFace aligned;
+                using (IDisposable? alignmentTiming = _metrics?.Measure(ArchiveThroughputMetricNames.FaceAlignment))
+                {
+                    aligned = await _aligner.AlignAsync(image, face, protocol, cancellationToken);
+                }
 
-                DateTimeOffset observedAt = _timeProvider.GetUtcNow();
-                FaceOccurrenceId occurrenceId = FaceOccurrenceId.New();
-                FaceCropId cropId = FaceCropId.New();
-                await _faceRepository.SaveInspectionAsync(
-                    new CatalogueFaceOccurrence(
-                        occurrenceId,
-                        context.AssetRevisionId,
-                        index,
-                        observedAt),
-                    new CatalogueFaceObservation(
-                        occurrenceId,
-                        _detector.Descriptor.Id,
-                        _detector.Descriptor.ModelHash,
-                        face.Confidence,
-                        face.BoundingBox,
-                        face.Landmarks,
-                        observedAt),
-                    new CatalogueFaceCrop(
-                        cropId,
-                        occurrenceId,
-                        protocol,
-                        cropHash,
-                        relativeStoragePath,
-                        aligned.Image.Size.Width,
-                        aligned.Image.Size.Height,
-                        observedAt),
-                    new CatalogueFaceEmbedding(
-                        cropId,
-                        _embedder.Descriptor.Id,
-                        _embedder.Descriptor.ModelHash,
-                        embedding,
-                        observedAt),
-                    cancellationToken);
+                EmbeddingVector embedding;
+                using (IDisposable? embeddingTiming = _metrics?.Measure(ArchiveThroughputMetricNames.FaceEmbedding))
+                {
+                    embedding = await _embedder.EmbedAsync(aligned, cancellationToken);
+                }
 
-                await checkpointWriter.WriteAsync(
-                    JsonSerializer.Serialize(
-                        new InspectionCheckpoint(1, index + 1, faces.Count),
-                        JsonOptions),
-                    cancellationToken);
+                using (IDisposable? persistenceTiming = _metrics?.Measure(ArchiveThroughputMetricNames.FacePersistence))
+                {
+                    byte[] alignedPng = await EncodePngAsync(aligned.Image, cancellationToken);
+                    Sha256Digest cropHash = Digest(alignedPng);
+                    string relativeStoragePath = Path.Combine(
+                            "runs",
+                            context.RunId.ToString(),
+                            "assets",
+                            context.AssetRevisionId.ToString(),
+                            "faces",
+                            $"face-{index + 1:000}",
+                            "aligned.png")
+                        .Replace('\\', '/');
+                    string storagePath = Path.Combine(
+                        _configuration.OutputRoot,
+                        relativeStoragePath.Replace('/', Path.DirectorySeparatorChar));
+                    await WriteAtomicallyAsync(storagePath, alignedPng, cancellationToken);
+
+                    DateTimeOffset observedAt = _timeProvider.GetUtcNow();
+                    FaceOccurrenceId occurrenceId = FaceOccurrenceId.New();
+                    FaceCropId cropId = FaceCropId.New();
+                    await _faceRepository.SaveInspectionAsync(
+                        new CatalogueFaceOccurrence(
+                            occurrenceId,
+                            context.AssetRevisionId,
+                            index,
+                            observedAt),
+                        new CatalogueFaceObservation(
+                            occurrenceId,
+                            _detector.Descriptor.Id,
+                            _detector.Descriptor.ModelHash,
+                            face.Confidence,
+                            face.BoundingBox,
+                            face.Landmarks,
+                            observedAt),
+                        new CatalogueFaceCrop(
+                            cropId,
+                            occurrenceId,
+                            protocol,
+                            cropHash,
+                            relativeStoragePath,
+                            aligned.Image.Size.Width,
+                            aligned.Image.Size.Height,
+                            observedAt),
+                        new CatalogueFaceEmbedding(
+                            cropId,
+                            _embedder.Descriptor.Id,
+                            _embedder.Descriptor.ModelHash,
+                            embedding,
+                            observedAt),
+                        cancellationToken);
+
+                    await checkpointWriter.WriteAsync(
+                        JsonSerializer.Serialize(
+                            new InspectionCheckpoint(1, index + 1, faces.Count),
+                            JsonOptions),
+                        cancellationToken);
+                }
             }
 
-            Directory.CreateDirectory(assetOutputDirectory);
-            byte[] resultJson = JsonSerializer.SerializeToUtf8Bytes(
-                new InspectionResult(
-                    1,
-                    context.AssetRevisionId.ToString(),
-                    sourceHash.ToString(),
-                    faces.Count,
-                    _detector.Descriptor.Id.ToString(),
-                    _detector.Descriptor.ModelHash.ToString(),
-                    _embedder.Descriptor.Id.ToString(),
-                    _embedder.Descriptor.ModelHash.ToString(),
-                    context.IdempotencyKey),
-                JsonOptions);
-            await WriteAtomicallyAsync(
-                Path.Combine(assetOutputDirectory, "result.json"),
-                resultJson,
-                cancellationToken);
-
-            if (faces.Count == 0 || checkpoint.CompletedFaceCount == faces.Count)
+            using (IDisposable? resultTiming = _metrics?.Measure(ArchiveThroughputMetricNames.AnalysisResultPersistence))
             {
-                await checkpointWriter.WriteAsync(
-                    JsonSerializer.Serialize(new InspectionCheckpoint(1, faces.Count, faces.Count), JsonOptions),
+                Directory.CreateDirectory(assetOutputDirectory);
+                byte[] resultJson = JsonSerializer.SerializeToUtf8Bytes(
+                    new InspectionResult(
+                        1,
+                        context.AssetRevisionId.ToString(),
+                        sourceHash.ToString(),
+                        faces.Count,
+                        _detector.Descriptor.Id.ToString(),
+                        _detector.Descriptor.ModelHash.ToString(),
+                        _embedder.Descriptor.Id.ToString(),
+                        _embedder.Descriptor.ModelHash.ToString(),
+                        context.IdempotencyKey),
+                    JsonOptions);
+                await WriteAtomicallyAsync(
+                    Path.Combine(assetOutputDirectory, "result.json"),
+                    resultJson,
                     cancellationToken);
+
+                if (faces.Count == 0 || checkpoint.CompletedFaceCount == faces.Count)
+                {
+                    await checkpointWriter.WriteAsync(
+                        JsonSerializer.Serialize(new InspectionCheckpoint(1, faces.Count, faces.Count), JsonOptions),
+                        cancellationToken);
+                }
             }
         }
         catch (ProcessingJobFailureException)
@@ -296,6 +334,7 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
             embedder.Dispose();
         }
 
+        _sessionLifetime?.Dispose();
         _disposed = true;
     }
 
@@ -343,10 +382,12 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         return resolved;
     }
 
-    private static async Task<Sha256Digest> ComputeHashAsync(
+    private async Task<Sha256Digest> ComputeHashAsync(
         string path,
+        string subjectKey,
         CancellationToken cancellationToken)
     {
+        using IDisposable? timing = _metrics?.Measure(ArchiveThroughputMetricNames.AnalysisSourceHash);
         await using FileStream stream = new(
             path,
             FileMode.Open,
@@ -354,7 +395,12 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
             FileShare.Read,
             bufferSize: 64 * 1024,
             useAsync: true);
+        long bytes = stream.Length;
         byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken);
+        _metrics?.RecordHashRead(
+            ArchiveThroughputMetricNames.AnalysisHashKind,
+            subjectKey,
+            bytes);
         return new Sha256Digest(Convert.ToHexString(hash).ToLowerInvariant());
     }
 
