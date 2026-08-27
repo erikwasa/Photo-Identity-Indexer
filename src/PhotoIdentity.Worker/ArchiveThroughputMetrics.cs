@@ -6,6 +6,7 @@ public static class ArchiveThroughputMetricNames
 {
     public const string Synchronization = "synchronization";
     public const string OneDriveWait = "onedrive-wait";
+    public const string ActiveLoopDelay = "active-loop-delay";
     public const string SourceVerification = "source-verification";
     public const string SourceVerificationHash = "source-verification-hash";
     public const string OriginalVerificationHash = "original-verification-hash";
