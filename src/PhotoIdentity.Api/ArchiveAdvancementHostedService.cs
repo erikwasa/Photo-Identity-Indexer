@@ -168,7 +168,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     {
         LocalFolderAssetSource source = new(coverage.Source.Id, coverage.Source.RootLocator);
         using IDisposable syncTiming = _metrics.Measure(ArchiveThroughputMetricNames.Synchronization);
-        _ = await new LocalArchiveSyncCoordinator(_database).SyncAsync(
+        _ = await new LocalArchiveSyncCoordinator(_database, _metrics).SyncAsync(
             source,
             coverage.Source,
             coverage.IncludedFolders,
