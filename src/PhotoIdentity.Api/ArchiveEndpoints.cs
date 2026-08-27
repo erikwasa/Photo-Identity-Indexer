@@ -242,7 +242,7 @@ public static class ArchiveEndpoints
             LocalArchiveSyncSummary summary;
             using (IDisposable syncTiming = metrics.Measure(ArchiveThroughputMetricNames.Synchronization))
             {
-                summary = await new LocalArchiveSyncCoordinator(database).SyncAsync(
+                summary = await new LocalArchiveSyncCoordinator(database, metrics).SyncAsync(
                     source,
                     configured.Source,
                     configured.IncludedFolders,
