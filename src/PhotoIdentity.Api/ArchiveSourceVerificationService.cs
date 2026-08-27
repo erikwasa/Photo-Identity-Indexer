@@ -4,6 +4,7 @@ using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
+using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
 
@@ -31,6 +32,7 @@ public sealed class ArchiveSourceVerificationService
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
     private readonly TimeProvider _timeProvider;
+    private readonly ArchiveThroughputMetrics? _metrics;
     private readonly StringComparison _pathComparison;
 
     public ArchiveSourceVerificationService(
@@ -39,7 +41,8 @@ public sealed class ArchiveSourceVerificationService
         SqliteArchiveAvailabilityRepository availability,
         ArchiveHydrationCapacityService capacity,
         IOneDriveFilesOnDemandPlatform platform,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ArchiveThroughputMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(observations);
         ArgumentNullException.ThrowIfNull(sourceHydrations);
@@ -53,6 +56,7 @@ public sealed class ArchiveSourceVerificationService
         _capacity = capacity;
         _platform = platform;
         _timeProvider = timeProvider;
+        _metrics = metrics;
         _pathComparison = OperatingSystem.IsWindows()
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
@@ -69,6 +73,8 @@ public sealed class ArchiveSourceVerificationService
                 false, false, false, null, null, false, false, false);
         }
 
+        using IDisposable? verificationTiming = _metrics?.Measure(
+            ArchiveThroughputMetricNames.SourceVerification);
         string path = ResolvePath(source);
         ArchiveManagedSourceHydrationRecord? ownership = await _sourceHydrations.GetAsync(
             source.AssetId,
@@ -102,7 +108,11 @@ public sealed class ArchiveSourceVerificationService
                     source,
                     async () =>
                     {
-                        await _platform.RequestHydrationAsync(path, cancellationToken);
+                        using (IDisposable? timing = _metrics?.Measure(ArchiveThroughputMetricNames.HydrationRequest))
+                        {
+                            await _platform.RequestHydrationAsync(path, cancellationToken);
+                        }
+                        _metrics?.RecordCounter(ArchiveThroughputMetricNames.HydrationRequests);
                         if (ownership is not { IsActive: true })
                         {
                             await _sourceHydrations.ClaimAsync(
@@ -156,7 +166,11 @@ public sealed class ArchiveSourceVerificationService
         bool managed = ownership is { IsActive: true, IsReleaseRequested: false };
         VerifiedSourceContent verified = await _capacity.RunLargeReadAsync(
             managed,
-            () => HashLocalSourceAsync(path, source.MediaType, cancellationToken),
+            () => HashLocalSourceAsync(
+                path,
+                source.MediaType,
+                source.AssetId.ToString(),
+                cancellationToken),
             cancellationToken);
         ArchiveSourceVerificationWriteResult persisted = await _observations.RecordVerifiedContentAsync(
             source.AssetId,
@@ -175,6 +189,7 @@ public sealed class ArchiveSourceVerificationService
         AssetRevisionId? previousRevisionId = source.VerifiedRevisionId;
         bool revisionChanged = previousRevisionId is AssetRevisionId previous &&
             previous != persisted.RevisionId;
+        _metrics?.RecordCounter(ArchiveThroughputMetricNames.SourceVerificationsCompleted);
         return new ArchiveSourceVerificationAdvanceResult(
             true,
             false,
@@ -209,11 +224,13 @@ public sealed class ArchiveSourceVerificationService
         return path;
     }
 
-    private static async Task<VerifiedSourceContent> HashLocalSourceAsync(
+    private async Task<VerifiedSourceContent> HashLocalSourceAsync(
         string path,
         string mediaType,
+        string subjectKey,
         CancellationToken cancellationToken)
     {
+        using IDisposable? timing = _metrics?.Measure(ArchiveThroughputMetricNames.SourceVerificationHash);
         DateTimeOffset beforeWrite = File.GetLastWriteTimeUtc(path);
         await using FileStream stream = new(
             path,
@@ -224,6 +241,10 @@ public sealed class ArchiveSourceVerificationService
             FileOptions.Asynchronous | FileOptions.SequentialScan);
         long size = stream.Length;
         byte[] hash = await SHA256.HashDataAsync(stream, cancellationToken);
+        _metrics?.RecordHashRead(
+            ArchiveThroughputMetricNames.SourceVerificationHashKind,
+            subjectKey,
+            size);
         DateTimeOffset afterWrite = File.GetLastWriteTimeUtc(path);
         FileInfo after = new(path);
         if (beforeWrite != afterWrite || after.Length != size)
