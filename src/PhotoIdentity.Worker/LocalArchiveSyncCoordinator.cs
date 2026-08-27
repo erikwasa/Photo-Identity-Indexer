@@ -53,11 +53,15 @@ public sealed record LocalArchiveSyncSummary(
 public sealed class LocalArchiveSyncCoordinator
 {
     private readonly SqliteArchiveSourceCatalogueScanner _scanner;
+    private readonly ArchiveThroughputMetrics? _metrics;
 
-    public LocalArchiveSyncCoordinator(SqliteCatalogueDatabase database)
+    public LocalArchiveSyncCoordinator(
+        SqliteCatalogueDatabase database,
+        ArchiveThroughputMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         _scanner = new SqliteArchiveSourceCatalogueScanner(database);
+        _metrics = metrics;
     }
 
     public async Task<LocalArchiveSyncSummary> SyncAsync(
@@ -158,6 +162,13 @@ public sealed class LocalArchiveSyncCoordinator
         totalStopwatch.Stop();
         LocalArchiveSyncDiagnostics diagnosticsSummary = new(totalStopwatch.Elapsed, folderDiagnostics);
         WriteTotalDiagnostics(diagnosticsSummary);
+        int hashedFiles = folderDiagnostics.Sum(static value => value.HashedFileCount);
+        long hashedBytes = folderDiagnostics.Sum(static value => value.HashedBytes);
+        _metrics?.RecordAggregateHashReads(
+            ArchiveThroughputMetricNames.SynchronizationHashKind,
+            hashedFiles,
+            hashedBytes,
+            hashedFiles);
 
         return new LocalArchiveSyncSummary(
             catalogueSource.Id,
