@@ -184,7 +184,8 @@ public sealed class ArchiveAnalysisCoordinator
         using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
             _database,
             batchConfiguration,
-            cancellationToken);
+            cancellationToken,
+            _metrics);
         AnalysisTrackingJobHandler handler = new(
             _database,
             inspection,
