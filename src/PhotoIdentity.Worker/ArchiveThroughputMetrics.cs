@@ -40,6 +40,7 @@ public static class ArchiveThroughputMetricNames
     public const string OriginalStatusHashKind = "original-status";
     public const string OriginalOpenHashKind = "original-open";
     public const string AnalysisHashKind = "analysis";
+    public const string SynchronizationHashKind = "synchronization";
 }
 
 public sealed record ArchiveThroughputStageSnapshot(
@@ -127,6 +128,41 @@ public sealed class ArchiveThroughputMetrics
         }
     }
 
+    public void RecordAggregateHashReads(
+        string kind,
+        long count,
+        long bytes,
+        int subjectCount,
+        long maxReadsPerSubject = 1)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(kind);
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        ArgumentOutOfRangeException.ThrowIfNegative(bytes);
+        ArgumentOutOfRangeException.ThrowIfNegative(subjectCount);
+        ArgumentOutOfRangeException.ThrowIfNegative(maxReadsPerSubject);
+
+        if (count == 0)
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            if (!_hashReads.TryGetValue(kind, out HashAccumulator? accumulator))
+            {
+                accumulator = new HashAccumulator();
+                _hashReads.Add(kind, accumulator);
+            }
+
+            accumulator.Count = checked(accumulator.Count + count);
+            accumulator.Bytes = checked(accumulator.Bytes + bytes);
+            accumulator.AnonymousSubjectCount = checked(accumulator.AnonymousSubjectCount + subjectCount);
+            accumulator.AnonymousMaxReadsPerSubject = Math.Max(
+                accumulator.AnonymousMaxReadsPerSubject,
+                maxReadsPerSubject);
+        }
+    }
+
     public ArchiveThroughputSnapshot GetSnapshot()
     {
         lock (_gate)
@@ -149,10 +185,14 @@ public sealed class ArchiveThroughputMetrics
                 .OrderBy(value => value.Key, StringComparer.Ordinal)
                 .Select(value =>
                 {
-                    int subjectCount = value.Value.SubjectReads.Count;
-                    long maxReadsPerSubject = subjectCount == 0
+                    int explicitSubjectCount = value.Value.SubjectReads.Count;
+                    int subjectCount = explicitSubjectCount + value.Value.AnonymousSubjectCount;
+                    long explicitMaxReads = explicitSubjectCount == 0
                         ? 0
                         : value.Value.SubjectReads.Values.Max();
+                    long maxReadsPerSubject = Math.Max(
+                        explicitMaxReads,
+                        value.Value.AnonymousMaxReadsPerSubject);
                     return new ArchiveThroughputHashReadSnapshot(
                         value.Key,
                         value.Value.Count,
@@ -248,6 +288,8 @@ public sealed class ArchiveThroughputMetrics
     {
         public long Count { get; set; }
         public long Bytes { get; set; }
+        public int AnonymousSubjectCount { get; set; }
+        public long AnonymousMaxReadsPerSubject { get; set; }
         public Dictionary<string, long> SubjectReads { get; } = new(StringComparer.Ordinal);
     }
 }
