@@ -30,6 +30,44 @@ Repository inspection identifies several high-value hypotheses:
 
 These are hypotheses to measure, not permission to weaken safety checks.
 
+## Metrics-only baseline slice — 2026-08-27
+
+The maintainer selected a measurement-first reset of WI-0076 from current `main`. The earlier
+session-reuse PR #200 remains unmerged and is deliberately **not** part of the baseline build.
+
+This slice adds process-local, privacy-safe aggregate diagnostics without changing processing
+semantics. It does not alter:
+
+- analysis concurrency or one-job-per-advancement behavior;
+- detector/embedder models, thresholds or profile identity;
+- SHA-256 verification requirements;
+- hydration admission, byte/concurrency limits or release ownership;
+- retry/cancellation behavior; or
+- original/proxy/derivative bytes.
+
+The resettable diagnostics contract is:
+
+```text
+GET  /api/archive/diagnostics/throughput
+POST /api/archive/diagnostics/throughput/reset
+```
+
+It aggregates stage count/total/average/max timing, selected event counters and full-file SHA-256
+read count/bytes. Hash-read distribution exposes only aggregate subject count/average/max reads;
+opaque asset/revision keys used for the calculation are never returned.
+
+The instrumentation covers synchronization, OneDrive wait, source verification, metadata,
+model-session initialization/lifetime, analysis source hashing, image decode, detection,
+alignment/embedding, face/result persistence, review-proxy generation, face-review derivatives,
+hydration/release requests and archive errors. Existing WI-0079 synchronization hash diagnostics
+are reused rather than adding another scanner path.
+
+The maintainer benchmark procedure is
+[`docs/operations/archive-throughput-benchmark.md`](../../operations/archive-throughput-benchmark.md).
+Run the local-original and online-only scenarios against the same fixed 100–200 image media set
+before selecting the next optimization. PR #200's session-reuse idea is one candidate to reapply
+and A/B test only after the baseline identifies session setup as material.
+
 ## Investigation slice
 
 Add lightweight timing/counter evidence for a representative archive run, including at least:
