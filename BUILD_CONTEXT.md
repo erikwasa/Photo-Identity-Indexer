@@ -6,40 +6,35 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-M21 — Reliability and recognition quality is active.
+**WI-0076 — Improve archive processing throughput** is the active engineering item.
 
-**WI-0079 is complete.** PR #208 merged after workflow #1259 and real-catalogue verification. The no-change repeat sync fell from 37.83 seconds to 0.988 seconds by batching persistence and reusing metadata-stable verified revisions instead of re-hashing all local files.
+The maintainer chose a measurement-first baseline from current `main`. The previous session-reuse PR #200 remains unmerged and untouched as a later optimization candidate. Do not apply session reuse, new concurrency, hydration prefetch, verification caching or loop tuning until the baseline identifies the dominant cost.
 
-The active item is now **WI-0080 — Make the detected face unambiguous in review images**.
+The active branch is `agent/WI-0076-throughput-metrics`. It adds process-local aggregate throughput diagnostics and a reset/snapshot HTTP contract without changing archive-processing semantics. The report measures sync, OneDrive wait, verification/hash activity, metadata, model-session setup/lifetime, decode/detect/align/embed/persistence, proxies, face-review derivatives and hydration/release requests.
 
-Static investigation found that review images intentionally use the durable `face-review-v1-context2.2-max960-q90` derivative: a square crop centered on the detected face with a 2.2× context scale. A nearby second face can therefore legitimately appear inside the same review image.
+PR #209 for WI-0080 merged on 2026-08-26. Maintainer visual confirmation is intentionally deferred, so WI-0080 is not yet treated as completed.
 
-The authoritative detector bounding box still exists server-side and can be deterministically mapped into the review derivative, but `ReviewFaceResponse` currently exposes only `ImageUrl` and review metadata, so the browser cannot identify the target face visually.
-
-The preferred candidate is a **dynamic target overlay** on the existing derivative: expose a privacy-safe normalized target rectangle in derivative coordinates and render a high-contrast outline/corner marker plus a non-color target cue in the Web UI. This preserves the existing high-quality contextual crop and avoids regenerating/burning presentation into stored derivatives.
-
-The maintainer approved **Option B** on 2026-08-26: preserve the contextual derivative and add a dynamic target overlay. Implementation is active on PR #209.
-
-WI-0081 remains the next M21 item after WI-0080 unless new evidence changes priority. WI-0076/PR #200 remains separate archive-throughput work.
+WI-0081 remains ready but is deferred while WI-0076 measurement work is active.
 
 ## Next concrete step
 
-1. Complete required CI for PR #209.
-2. Verify the packaged build on a private real-catalogue example where two faces are visible in the same contextual review image.
-3. Confirm the **Target** outline/corner cue is unmistakable in the gallery and Face Details and does not obscure review actions.
-4. If maintainer verification passes, record evidence, complete WI-0080 and continue to WI-0081.
+1. Finish the WI-0076 metrics-only PR and obtain exact-head CI.
+2. Build/use the resulting Windows package with a disposable benchmark catalogue.
+3. Run the same fixed 100–200 image sample twice following `docs/operations/archive-throughput-benchmark.md`: first with originals already local, then with the same originals online-only.
+4. Compare wall-clock throughput, OneDrive wait share, stage timings, model-session initialization frequency and aggregate full-file hash reads.
+5. Select the next WI-0076 optimization only from measured evidence; PR #200 session reuse is one candidate, not a predetermined fix.
 
 ## Relevant files
 
-- `docs/delivery/milestones/M21-reliability-recognition-quality.md`
-- `docs/delivery/work-items/WI-0080-detected-face-clarity.md`
-- `docs/delivery/work-items/WI-0081-suggestion-accuracy-degradation.md`
-- `src/PhotoIdentity.Imaging.OpenCv/OpenCvReviewFaceRenderer.cs`
-- `src/PhotoIdentity.Worker/ArchiveFaceReviewDerivativeWriter.cs`
-- `src/PhotoIdentity.Api/ReviewFacePreviewResolver.cs`
-- `src/PhotoIdentity.Web/ReviewContracts.cs`
-- `src/PhotoIdentity.Web/Components/FaceCard.razor`
-- `src/PhotoIdentity.Web/Pages/FaceDetails.razor`
+- `docs/delivery/work-items/WI-0076-archive-throughput.md`
+- `docs/operations/archive-throughput-benchmark.md`
+- `src/PhotoIdentity.Worker/ArchiveThroughputMetrics.cs`
+- `src/PhotoIdentity.Worker/ArchiveAnalysisProcessing.cs`
+- `src/PhotoIdentity.Worker/LocalInspectionJobHandler.cs`
+- `src/PhotoIdentity.Worker/LocalArchiveSyncCoordinator.cs`
+- `src/PhotoIdentity.Api/ArchiveBoundedAnalysisService.cs`
+- `src/PhotoIdentity.Api/ArchiveAdvancementHostedService.cs`
+- `src/PhotoIdentity.Api/ArchiveEndpoints.cs`
 - `docs/delivery/status/work-items.yaml`
 - `AGENTS.md`
 
