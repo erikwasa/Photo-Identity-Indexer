@@ -166,6 +166,65 @@ public sealed class ArchiveSourceVerificationTests
     }
 
     [Fact]
+    public async Task Unavailable_source_without_managed_hydration_still_blocks()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string relativePath = "2026/08/missing.jpg";
+            string fullPath = Path.Combine(directory, "2026", "08", "missing.jpg");
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
+            byte[] bytes = [1, 2, 3, 4];
+            DateTimeOffset now = new(2026, 8, 28, 18, 45, 0, TimeSpan.Zero);
+
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            CatalogueSource catalogueSource = new(SourceId.New(), "local-folder", directory, now);
+            MutableAssetSource source = new(
+                catalogueSource.Id,
+                relativePath,
+                bytes,
+                now,
+                AssetAvailability.OnlineOnly);
+            _ = await new SqliteArchiveSourceCatalogueScanner(database).ScanAsync(
+                source,
+                catalogueSource,
+                new SourceScanOptions("2026/08", true),
+                now);
+
+            FakeFilesOnDemandPlatform platform = new();
+            platform.Set(fullPath, AssetAvailability.Unavailable);
+            SqliteArchiveSourceHydrationRepository sourceHydrations = new(database);
+            ArchiveHydrationCapacityService capacity = new(
+                database,
+                new SqliteArchiveHydrationRepository(database),
+                sourceHydrations,
+                new SqliteArchiveStorageRepository(database),
+                platform,
+                new FixedStorageProbe(100_000),
+                new ArchiveHydrationPolicyConfiguration(0, 1_000, 1),
+                new ReviewProxyServingConfiguration(null, null),
+                TimeProvider.System);
+            ArchiveSourceVerificationService verification = new(
+                new SqliteArchiveSourceObservationRepository(database),
+                sourceHydrations,
+                new SqliteArchiveAvailabilityRepository(database),
+                capacity,
+                platform,
+                TimeProvider.System);
+
+            FileNotFoundException exception = await Assert.ThrowsAsync<FileNotFoundException>(
+                () => verification.AdvanceAsync(catalogueSource.Id));
+            Assert.Contains("unavailable", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Empty(platform.HydrationRequests);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task First_time_source_hydration_obeys_same_managed_byte_budget()
     {
         string directory = CreateTemporaryDirectory();
