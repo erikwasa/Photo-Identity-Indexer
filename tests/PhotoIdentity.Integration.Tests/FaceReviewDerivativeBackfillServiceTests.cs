@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using OpenCvSharp;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
