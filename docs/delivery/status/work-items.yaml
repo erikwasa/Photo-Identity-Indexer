@@ -793,14 +793,18 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0080-detected-face-clarity.md
   started_at: 2026-08-26
-  last_updated_at: 2026-08-26
-  branch: agent/WI-0080-face-target-clarity
+  last_updated_at: 2026-08-28
+  branch: agent/WI-0080-existing-catalogue-target-overlay
   blockers:
   - WI-0038
   - WI-0058
   blocker_notes:
-  - Static investigation traced ambiguity to the intentional 2.2x contextual face crop. Persisted target geometry remains available server-side but is absent from the browser response. Candidate visual treatments are under maintainer review before implementation.
-  evidence: []
+  - PR #209 merged the approved dynamic target overlay, but real-catalogue verification on 2026-08-28 failed because existing asset revisions have null photo dimensions and therefore returned no TargetBox. The active corrective slice uses configured whole-photo review-proxy dimensions only as an aspect-ratio geometry fallback for normalized observations; no re-analysis or derivative regeneration is required. CI and repeat real-catalogue visual acceptance remain pending.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/209
+  - type: merge_commit
+    value: baec2e0b76cafea232e25ce45a065b5c52653b63
 - id: WI-0081
   title: Investigate degraded identity suggestion accuracy
   milestone: M21
