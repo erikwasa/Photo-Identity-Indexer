@@ -219,6 +219,15 @@ try {
         throw "Package launcher configuration example is missing."
     }
     $launcherExample = Get-Content -LiteralPath $launcherExamplePath -Raw | ConvertFrom-Json
+    if ([string]$launcherExample.url -ne "http://127.0.0.1:5080") {
+        throw "Package launcher example must preserve the default loopback HTTP URL."
+    }
+    if ($null -eq $launcherExample.PSObject.Properties["mobileAccess"] -or
+        $null -eq $launcherExample.mobileAccess -or
+        [bool]$launcherExample.mobileAccess.enabled) {
+        throw "Package launcher example must keep trusted-LAN mobile access explicitly disabled by default."
+    }
+
     $exampleSettingNames = @($launcherExample.settings.PSObject.Properties.Name)
     foreach ($requiredSetting in @(
         "PhotoIdentity__ArchiveHydration__MinimumFreeSpaceReserveBytes",
