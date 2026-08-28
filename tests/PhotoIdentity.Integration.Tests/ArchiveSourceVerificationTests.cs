@@ -134,6 +134,14 @@ public sealed class ArchiveSourceVerificationTests
             Assert.Single(platform.HydrationRequests);
             Assert.True((await sourceHydrations.GetAsync(pending.AssetId))?.IsActive);
 
+            platform.Set(fullPath, AssetAvailability.Unavailable);
+            ArchiveSourceVerificationAdvanceResult transient = await verification.AdvanceAsync(catalogueSource.Id);
+            Assert.True(transient.HadPendingSource);
+            Assert.True(transient.WaitingForLocalContent);
+            Assert.False(transient.VerificationCompleted);
+            Assert.Single(platform.HydrationRequests);
+            Assert.True((await sourceHydrations.GetAsync(pending.AssetId))?.IsActive);
+
             platform.Set(fullPath, AssetAvailability.Local);
             ArchiveSourceVerificationAdvanceResult verified = await verification.AdvanceAsync(catalogueSource.Id);
             Assert.True(verified.VerificationCompleted);
