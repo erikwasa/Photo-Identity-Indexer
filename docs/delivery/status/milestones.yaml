@@ -192,7 +192,7 @@ milestones:
   - WI-0081
 - id: M22
   title: Protected Smart Collection slideshow
-  status: ready
+  status: in_progress
   document: ../milestones/M22-protected-smart-collection-slideshow.md
   work_items:
   - WI-0082
