@@ -122,7 +122,9 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
                 _metrics?.RecordCounter(ArchiveThroughputMetricNames.ModelSessionReuses);
             }
 
-            return new Lease(this, _handler);
+            IProcessingJobHandler handler = _handler
+                ?? throw new InvalidOperationException("The archive inspection session was not initialized.");
+            return new Lease(this, handler);
         }
         catch
         {
