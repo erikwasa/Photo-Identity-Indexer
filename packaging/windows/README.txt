@@ -50,6 +50,26 @@ The request interval is milliseconds and must be at least 30000 (30 seconds). Th
 
 The Settings page shows the effective hydration values, whether managed hydration is enabled, current Photo Identity-managed usage, remaining managed budget, and current free space on the archive volume. These values are startup configuration; edit launcher.json and restart Photo Identity to apply changes.
 
+TRUSTED-LAN PHONE ACCESS
+------------------------
+Remote phone access is disabled by default. Photo Identity remains unauthenticated, so only enable this mode on a trusted private network and keep the firewall rule limited to the selected private interface/network.
+
+The normal "url" value must remain a loopback HTTP URL. Mobile access is configured separately:
+
+  "mobileAccess": {
+    "enabled": true,
+    "listenUrl": "https://<THIS-PC-LAN-IP>:5443",
+    "phoneUrl": "https://<CERTIFICATE-HOSTNAME-OR-LAN-IP>:5443",
+    "certificatePath": "C:\\PhotoIdentity\\private\\photoidentity-lan.pfx",
+    "certificatePasswordEnvironmentVariable": "PHOTOIDENTITY_MOBILE_CERT_PASSWORD"
+  }
+
+listenUrl must use one specific non-loopback IP address; wildcard bindings such as 0.0.0.0 and hostnames are rejected so enabling phone access does not silently expose unrelated interfaces. phoneUrl may use the DNS hostname present in the certificate and must use the same port.
+
+Keep the PFX and its password outside the package. If the PFX is password-protected, set the named environment variable before starting PhotoIdentity.cmd. The launcher never accepts or prints a certificate password in launcher.json. The certificate chain (or private issuing CA) must be trusted by the phone. Open phoneUrl on the phone and verify the browser reports a valid HTTPS connection before using slideshow features.
+
+Create a narrowly scoped inbound Windows Firewall rule for the configured HTTPS port on the trusted private network only. Do not expose this listener through a router, public firewall profile or internet-facing forwarding. Restart Photo Identity after changing mobile settings.
+
 UPGRADE / REPLACEMENT
 ---------------------
 1. Extract the new package to a new folder beside the old package.
@@ -65,4 +85,4 @@ DIAGNOSTICS
 Launcher logs are written below:
   %LOCALAPPDATA%\PhotoIdentity\launcher-logs
 
-The application listens only on the configured loopback HTTP URL. Do not expose it to an untrusted network.
+By default the application listens only on the configured loopback HTTP URL. The optional trusted-LAN listener is HTTPS-only, explicit, and must never be exposed to an untrusted or public network.
