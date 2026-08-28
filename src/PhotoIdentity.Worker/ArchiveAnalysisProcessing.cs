@@ -62,18 +62,36 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly ArchiveThroughputMetrics? _metrics;
+    private readonly Func<LocalBatchConfiguration, CancellationToken, Task<IProcessingJobHandler>> _handlerFactory;
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private LocalInspectionJobHandler? _handler;
+    private IProcessingJobHandler? _handler;
     private string? _sessionKey;
     private bool _disposed;
 
     public ArchiveAnalysisInspectionSession(
         SqliteCatalogueDatabase database,
         ArchiveThroughputMetrics? metrics = null)
+        : this(
+            database,
+            metrics,
+            (configuration, cancellationToken) => CreateHandlerAsync(
+                database,
+                configuration,
+                metrics,
+                cancellationToken))
+    {
+    }
+
+    internal ArchiveAnalysisInspectionSession(
+        SqliteCatalogueDatabase database,
+        ArchiveThroughputMetrics? metrics,
+        Func<LocalBatchConfiguration, CancellationToken, Task<IProcessingJobHandler>> handlerFactory)
     {
         ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(handlerFactory);
         _database = database;
         _metrics = metrics;
+        _handlerFactory = handlerFactory;
     }
 
     public async Task<Lease> AcquireAsync(
@@ -93,12 +111,12 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
                 string.Equals(_sessionKey, sessionKey, StringComparison.Ordinal);
             if (!reused)
             {
-                _handler?.Dispose();
-                _handler = await LocalInspectionJobHandler.CreateAsync(
-                    _database,
-                    configuration,
-                    cancellationToken,
-                    _metrics);
+                if (_handler is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+
+                _handler = await _handlerFactory(configuration, cancellationToken);
                 _sessionKey = sessionKey;
             }
             else
@@ -131,7 +149,11 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
             }
 
             _disposed = true;
-            _handler?.Dispose();
+            if (_handler is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+
             _handler = null;
             _sessionKey = null;
         }
@@ -143,6 +165,17 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
         _gate.Dispose();
     }
 
+    private static async Task<IProcessingJobHandler> CreateHandlerAsync(
+        SqliteCatalogueDatabase database,
+        LocalBatchConfiguration configuration,
+        ArchiveThroughputMetrics? metrics,
+        CancellationToken cancellationToken) =>
+        await LocalInspectionJobHandler.CreateAsync(
+            database,
+            configuration,
+            cancellationToken,
+            metrics);
+
     private void Release() => _gate.Release();
 
     public sealed class Lease : IDisposable
@@ -152,13 +185,13 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
 
         internal Lease(
             ArchiveAnalysisInspectionSession owner,
-            LocalInspectionJobHandler handler)
+            IProcessingJobHandler handler)
         {
             _owner = owner;
             Handler = handler;
         }
 
-        public LocalInspectionJobHandler Handler { get; }
+        public IProcessingJobHandler Handler { get; }
 
         public void Dispose()
         {
