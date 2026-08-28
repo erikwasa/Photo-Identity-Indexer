@@ -714,6 +714,8 @@ work_items:
   - type: merge_commit
     value: e05d0e06e22d98bf1f0de8d9b313967f388d8b53
   - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/212
+  - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/200
   - type: workflow
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32337226065
