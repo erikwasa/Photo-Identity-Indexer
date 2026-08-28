@@ -124,6 +124,124 @@ function Resolve-ConfiguredPath {
     return [IO.Path]::GetFullPath((Join-Path $BaseDirectory $expanded))
 }
 
+
+function Read-MobileAccessConfiguration {
+    param(
+        $ParsedConfiguration,
+        [string]$ConfigurationDirectory
+    )
+
+    $disabled = [pscustomobject]@{
+        Enabled = $false
+        ListenUri = $null
+        PhoneUri = $null
+        CertificatePath = $null
+        CertificatePasswordEnvironmentVariable = $null
+    }
+
+    if ($null -eq $ParsedConfiguration.PSObject.Properties["mobileAccess"] -or
+        $null -eq $ParsedConfiguration.mobileAccess) {
+        return $disabled
+    }
+
+    $mobile = $ParsedConfiguration.mobileAccess
+    [bool]$enabled = $false
+    if ($null -eq $mobile.PSObject.Properties["enabled"] -or
+        -not [bool]::TryParse(([string]$mobile.enabled), [ref]$enabled)) {
+        throw "mobileAccess.enabled must be true or false."
+    }
+
+    if (-not $enabled) {
+        return $disabled
+    }
+
+    if ($null -eq $mobile.PSObject.Properties["listenUrl"] -or
+        [string]::IsNullOrWhiteSpace([string]$mobile.listenUrl)) {
+        throw "mobileAccess.listenUrl is required when mobile access is enabled."
+    }
+
+    $listenUrl = ([string]$mobile.listenUrl).Trim()
+    try {
+        $listenUri = [Uri]$listenUrl
+    }
+    catch {
+        throw "mobileAccess.listenUrl is invalid: $listenUrl"
+    }
+
+    if (-not $listenUri.IsAbsoluteUri -or $listenUri.Scheme -ne "https") {
+        throw "mobileAccess.listenUrl must be an absolute HTTPS URL."
+    }
+    if (-not [string]::IsNullOrEmpty($listenUri.UserInfo) -or
+        -not [string]::IsNullOrEmpty($listenUri.Query) -or
+        -not [string]::IsNullOrEmpty($listenUri.Fragment) -or
+        $listenUri.AbsolutePath -ne "/") {
+        throw "mobileAccess.listenUrl may contain only scheme, host and port."
+    }
+
+    [Net.IPAddress]$listenAddress = $null
+    if (-not [Net.IPAddress]::TryParse($listenUri.Host, [ref]$listenAddress) -or
+        [Net.IPAddress]::IsLoopback($listenAddress) -or
+        $listenAddress.Equals([Net.IPAddress]::Any) -or
+        $listenAddress.Equals([Net.IPAddress]::IPv6Any)) {
+        throw "mobileAccess.listenUrl must use a specific non-loopback IP address assigned for trusted-LAN access. Use mobileAccess.phoneUrl for a DNS hostname."
+    }
+
+    if ($null -eq $mobile.PSObject.Properties["certificatePath"] -or
+        [string]::IsNullOrWhiteSpace([string]$mobile.certificatePath)) {
+        throw "mobileAccess.certificatePath is required when mobile access is enabled."
+    }
+
+    $certificatePath = Resolve-ConfiguredPath -Value ([string]$mobile.certificatePath) -BaseDirectory $ConfigurationDirectory
+    if (-not (Test-Path -LiteralPath $certificatePath -PathType Leaf)) {
+        throw "mobileAccess.certificatePath does not exist. Provide a PFX certificate file outside the Photo Identity package."
+    }
+
+    $certificatePasswordEnvironmentVariable = $null
+    if ($null -ne $mobile.PSObject.Properties["certificatePasswordEnvironmentVariable"] -and
+        -not [string]::IsNullOrWhiteSpace([string]$mobile.certificatePasswordEnvironmentVariable)) {
+        $certificatePasswordEnvironmentVariable = ([string]$mobile.certificatePasswordEnvironmentVariable).Trim()
+        if ($certificatePasswordEnvironmentVariable -notmatch "^[A-Za-z_][A-Za-z0-9_]*$") {
+            throw "mobileAccess.certificatePasswordEnvironmentVariable must be an environment-variable name."
+        }
+
+        $certificatePassword = [Environment]::GetEnvironmentVariable($certificatePasswordEnvironmentVariable, "Process")
+        if ([string]::IsNullOrEmpty($certificatePassword)) {
+            throw "The environment variable '$certificatePasswordEnvironmentVariable' configured for the mobile certificate password is not set."
+        }
+    }
+
+    $phoneUri = $listenUri
+    if ($null -ne $mobile.PSObject.Properties["phoneUrl"] -and
+        -not [string]::IsNullOrWhiteSpace([string]$mobile.phoneUrl)) {
+        $phoneUrl = ([string]$mobile.phoneUrl).Trim()
+        try {
+            $phoneUri = [Uri]$phoneUrl
+        }
+        catch {
+            throw "mobileAccess.phoneUrl is invalid: $phoneUrl"
+        }
+
+        if (-not $phoneUri.IsAbsoluteUri -or $phoneUri.Scheme -ne "https" -or
+            -not [string]::IsNullOrEmpty($phoneUri.UserInfo) -or
+            -not [string]::IsNullOrEmpty($phoneUri.Query) -or
+            -not [string]::IsNullOrEmpty($phoneUri.Fragment) -or
+            $phoneUri.AbsolutePath -ne "/") {
+            throw "mobileAccess.phoneUrl must be an absolute HTTPS origin without a path, query string or fragment."
+        }
+        if ($phoneUri.Port -ne $listenUri.Port) {
+            throw "mobileAccess.phoneUrl must use the same port as mobileAccess.listenUrl."
+        }
+    }
+
+    return [pscustomobject]@{
+        Enabled = $true
+        ListenUri = $listenUri
+        PhoneUri = $phoneUri
+        CertificatePath = $certificatePath
+        CertificatePasswordEnvironmentVariable = $certificatePasswordEnvironmentVariable
+    }
+}
+
 function Read-LauncherConfiguration {
     $configurationFile = Resolve-LauncherConfigurationPath
     $localApplicationRoot = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
@@ -137,6 +255,13 @@ function Read-LauncherConfiguration {
     $url = "http://127.0.0.1:5080"
     $settings = @{}
     $configurationDirectory = $null
+    $mobileAccess = [pscustomobject]@{
+        Enabled = $false
+        ListenUri = $null
+        PhoneUri = $null
+        CertificatePath = $null
+        CertificatePasswordEnvironmentVariable = $null
+    }
 
     if ($null -ne $configurationFile) {
         $configurationDirectory = Split-Path -Parent $configurationFile
@@ -157,6 +282,8 @@ function Read-LauncherConfiguration {
             -not [string]::IsNullOrWhiteSpace([string]$parsed.url)) {
             $url = ([string]$parsed.url).Trim()
         }
+
+        $mobileAccess = Read-MobileAccessConfiguration -ParsedConfiguration $parsed -ConfigurationDirectory $configurationDirectory
 
         if ($null -ne $parsed.PSObject.Properties["settings"] -and $null -ne $parsed.settings) {
             foreach ($property in $parsed.settings.PSObject.Properties) {
@@ -202,6 +329,7 @@ function Read-LauncherConfiguration {
         PublishPath = [IO.Path]::GetFullPath($publishPath)
         BaseUri = $baseUri
         Settings = $settings
+        MobileAccess = $mobileAccess
         LocalApplicationRoot = [IO.Path]::GetFullPath($localApplicationRoot)
     }
 }
@@ -266,9 +394,15 @@ function Start-PhotoIdentityServer {
     $filePath = $null
     $argumentList = $null
 
+    $serverUrls = @($Configuration.BaseUri.AbsoluteUri)
+    if ($Configuration.MobileAccess.Enabled) {
+        $serverUrls += $Configuration.MobileAccess.ListenUri.AbsoluteUri
+    }
+    $serverUrlArgument = $serverUrls -join ";"
+
     if (Test-Path -LiteralPath $executable -PathType Leaf) {
         $filePath = $executable
-        $argumentList = "--urls `"$($Configuration.BaseUri.AbsoluteUri)`""
+        $argumentList = "--urls `"$serverUrlArgument`""
     }
     elseif (Test-Path -LiteralPath $assembly -PathType Leaf) {
         $dotnet = Get-Command dotnet -ErrorAction SilentlyContinue
@@ -277,7 +411,7 @@ function Start-PhotoIdentityServer {
         }
 
         $filePath = $dotnet.Source
-        $argumentList = "`"$assembly`" --urls `"$($Configuration.BaseUri.AbsoluteUri)`""
+        $argumentList = "`"$assembly`" --urls `"$serverUrlArgument`""
     }
     else {
         throw "Publish output '$($Configuration.PublishPath)' does not contain PhotoIdentity.Api.exe or PhotoIdentity.Api.dll. Republish the API project before launching."
@@ -288,10 +422,27 @@ function Start-PhotoIdentityServer {
     $stdoutLog = Join-Path $logDirectory "api.stdout.log"
     $stderrLog = Join-Path $logDirectory "api.stderr.log"
 
-    $previousValues = @{}
+    $processEnvironment = @{}
     foreach ($name in $Configuration.Settings.Keys) {
+        $processEnvironment[$name] = $Configuration.Settings[$name]
+    }
+
+    if ($Configuration.MobileAccess.Enabled) {
+        $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Path"] = $Configuration.MobileAccess.CertificatePath
+        $passwordVariable = $Configuration.MobileAccess.CertificatePasswordEnvironmentVariable
+        if ([string]::IsNullOrWhiteSpace($passwordVariable)) {
+            $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Password"] = $null
+        }
+        else {
+            $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Password"] =
+                [Environment]::GetEnvironmentVariable($passwordVariable, "Process")
+        }
+    }
+
+    $previousValues = @{}
+    foreach ($name in $processEnvironment.Keys) {
         $previousValues[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
-        [Environment]::SetEnvironmentVariable($name, $Configuration.Settings[$name], "Process")
+        [Environment]::SetEnvironmentVariable($name, $processEnvironment[$name], "Process")
     }
 
     try {
@@ -305,7 +456,7 @@ function Start-PhotoIdentityServer {
             -PassThru
     }
     finally {
-        foreach ($name in $Configuration.Settings.Keys) {
+        foreach ($name in $processEnvironment.Keys) {
             [Environment]::SetEnvironmentVariable($name, $previousValues[$name], "Process")
         }
     }
@@ -316,12 +467,19 @@ try {
 
     if (Test-PhotoIdentityHealth -BaseUri $configuration.BaseUri) {
         Write-Host "Photo Identity is already running at $($configuration.BaseUri.AbsoluteUri)"
+        if ($configuration.MobileAccess.Enabled) {
+            Write-Host "The current launcher configuration requests trusted-LAN mobile access at $($configuration.MobileAccess.PhoneUri.AbsoluteUri). Restart the existing Photo Identity process if mobile settings changed."
+        }
         Open-PhotoIdentityBrowser -BaseUri $configuration.BaseUri
         exit 0
     }
 
     if (Test-TcpPortOpen -BaseUri $configuration.BaseUri) {
         throw "Port $($configuration.BaseUri.Port) is already in use, but Photo Identity did not answer its /health endpoint. Stop the conflicting process or change the loopback URL in the launcher configuration."
+    }
+
+    if ($configuration.MobileAccess.Enabled -and (Test-TcpPortOpen -BaseUri $configuration.MobileAccess.ListenUri)) {
+        throw "The configured mobile HTTPS port $($configuration.MobileAccess.ListenUri.Port) is already in use on the selected trusted-LAN address. Stop the conflicting process or change mobileAccess.listenUrl."
     }
 
     Write-Host "Starting Photo Identity from $($configuration.PublishPath)"
@@ -343,6 +501,9 @@ try {
 
         if (Test-PhotoIdentityHealth -BaseUri $configuration.BaseUri) {
             Write-Host "Photo Identity is ready at $($configuration.BaseUri.AbsoluteUri)"
+            if ($configuration.MobileAccess.Enabled) {
+                Write-Host "Trusted-LAN mobile HTTPS is enabled at $($configuration.MobileAccess.PhoneUri.AbsoluteUri)"
+            }
             Open-PhotoIdentityBrowser -BaseUri $configuration.BaseUri
             exit 0
         }
