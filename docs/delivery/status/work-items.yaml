@@ -699,7 +699,7 @@ work_items:
   - WI-0042
   - WI-0072
   blocker_notes:
-  - Metrics-only baseline PR #210 merged after exact-head workflow #1287 passed. Scenario A measured 359.24 images/hour; Scenario B reached 155/155 analysed at 236.22 images/hour but then exposed a 44m51s post-analysis face-derivative rehydration stall. PR #211 implements derivative-before-release and OneDrive-blocked waiting classification. Exact-head workflow #1293 passed after a single package-verification rerun; the first package attempt hit a transient startup SQLite exception before derivative logic executed. Fresh Scenario B maintainer validation remains pending. PR #200 remains untouched as the later session-reuse reference.
+  - Metrics-only baseline PR #210 merged after exact-head workflow #1287 passed. Scenario A measured 359.24 images/hour; baseline Scenario B reached 155/155 analysed at 236.22 images/hour but then exposed a 44m51s post-analysis face-derivative rehydration stall. PR #211 fixes derivative-before-release and OneDrive-blocked waiting classification. Maintainer validation on the same 155-image online-only corpus completed normally in 39m32s at 235.20 images/hour with 155 hydrations, 155 releases, zero active managed originals and no failures. The validation exposed stale persisted availability after completed release; PR #211 now reconciles that status to online-only and awaits exact-head CI. PR #200 remains untouched as the later session-reuse reference.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/210
