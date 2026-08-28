@@ -195,6 +195,25 @@ public sealed class ReviewFacePreviewResolver
             boundingBox);
     }
 
+    internal static NormalizedBoundingBox? CalculateTargetBoundingBoxFromNormalizedObservation(
+        string? value,
+        int geometryWidth,
+        int geometryHeight)
+    {
+        if (string.IsNullOrWhiteSpace(value) ||
+            geometryWidth <= 0 ||
+            geometryHeight <= 0 ||
+            !TryParseBoundingBox(value, photoWidth: null, photoHeight: null, out NormalizedBoundingBox boundingBox))
+        {
+            return null;
+        }
+
+        return OpenCvReviewFaceRenderer.CalculateTargetBoundingBox(
+            geometryWidth,
+            geometryHeight,
+            boundingBox);
+    }
+
     private static bool TryParseBoundingBox(
         string value,
         int? photoWidth,
