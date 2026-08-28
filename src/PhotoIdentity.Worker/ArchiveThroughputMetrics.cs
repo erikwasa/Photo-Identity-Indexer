@@ -28,6 +28,7 @@ public static class ArchiveThroughputMetricNames
     public const string AdvanceInvocations = "advance-invocations";
     public const string AnalysisAttempts = "analysis-attempts";
     public const string ModelSessionInitializations = "model-session-initializations";
+    public const string ModelSessionReuses = "model-session-reuses";
     public const string FacesDetected = "faces-detected";
     public const string MetadataInspections = "metadata-inspections";
     public const string SourceVerificationsCompleted = "source-verifications-completed";

@@ -16,7 +16,7 @@ public sealed record ArchiveBoundedAnalysisAdvanceResult(bool StartedNewRun);
 /// online-only content uses the same bounded hydration policy, and successful analysis remains
 /// independent from durable review-proxy completion.
 /// </summary>
-public sealed class ArchiveBoundedAnalysisService
+public sealed class ArchiveBoundedAnalysisService : IDisposable
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly SqliteLocalBatchRepository _catalogue;
@@ -31,7 +31,10 @@ public sealed class ArchiveBoundedAnalysisService
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
     private readonly TimeProvider _timeProvider;
     private readonly ArchiveThroughputMetrics? _metrics;
+    private readonly ArchiveAnalysisInspectionSession _inspectionSession;
+    private readonly ArchiveAnalysisCoordinator _analysisCoordinator;
     private readonly SemaphoreSlim _advanceGate = new(1, 1);
+    private bool _disposed;
 
     public ArchiveBoundedAnalysisService(
         SqliteCatalogueDatabase database,
@@ -77,6 +80,12 @@ public sealed class ArchiveBoundedAnalysisService
         _proxyConfiguration = proxyConfiguration;
         _timeProvider = timeProvider;
         _metrics = metrics;
+        _inspectionSession = new ArchiveAnalysisInspectionSession(database, metrics);
+        _analysisCoordinator = new ArchiveAnalysisCoordinator(
+            database,
+            timeProvider,
+            metrics,
+            _inspectionSession);
     }
 
     public async Task<ArchiveBoundedAnalysisAdvanceResult> AdvanceAsync(
@@ -249,7 +258,7 @@ public sealed class ArchiveBoundedAnalysisService
             return new ArchiveBoundedAnalysisAdvanceResult(false);
         }
 
-        ArchiveAnalysisCoordinator coordinator = new(_database, _timeProvider, _metrics);
+        ArchiveAnalysisCoordinator coordinator = _analysisCoordinator;
         if (latest is not null)
         {
             ProcessingRunSummary durable = await processingRepository.GetRunSummaryAsync(
@@ -586,6 +595,18 @@ public sealed class ArchiveBoundedAnalysisService
             ? StringComparison.OrdinalIgnoreCase
             : StringComparison.Ordinal;
         return string.Equals(Path.GetFullPath(left), Path.GetFullPath(right), comparison);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _inspectionSession.Dispose();
+        _advanceGate.Dispose();
     }
 
     private static string ResolveSourcePath(string rootLocator, string sourceKey)

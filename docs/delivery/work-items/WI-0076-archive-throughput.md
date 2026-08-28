@@ -175,6 +175,37 @@ online-only because release reconciliation marked hydration ownership released w
 `archive_asset_availability`. PR #211 now reconciles that persisted availability to online-only
 when a managed release is observed complete, with focused integration coverage.
 
+## Session reuse slice — 2026-08-28
+
+After PR #211 merged, the next measured bottleneck is repeated detector/embedder initialization.
+The clean Scenario B validation still created **155 model sessions for 155 images**, with
+**1,533.91 seconds total initialization time / 9.90 seconds per image**.
+
+This slice currentizes the safe core of PR #200 without merging that stale branch.
+
+- `ArchiveBoundedAnalysisService` owns one reusable `ArchiveAnalysisInspectionSession` for its
+  singleton host lifetime.
+- The session key is the exact analysis profile hash plus the full serialized
+  `LocalBatchConfiguration`; a profile, model, source/output/runtime path or other configuration
+  change disposes the old handler before creating a compatible replacement.
+- A one-slot semaphore serializes every lease, so reuse does **not** add parallel inference.
+- The normal coordinator behavior remains one-shot unless a reusable session is explicitly supplied;
+  CLI and unrelated callers therefore retain their previous lifecycle.
+- The host disposes the reusable detector/embedder handler deterministically with the singleton
+  bounded-analysis service.
+- Existing one-job-per-advancement, SHA-256 verification, metadata-before-analysis, durable
+  checkpoints, retry behavior, hydration ownership and derivative ordering remain unchanged.
+- Throughput diagnostics now expose `model-session-reuses` in addition to the existing
+  `model-session-initializations` counter.
+
+Focused tests use a fake processing handler to prove same-key reuse, incompatible-profile recreation,
+old-handler disposal and serialized access without loading ONNX models.
+
+After exact-head CI, rerun the same 155-image benchmark. The primary mechanism check is approximately
+**1 model-session initialization + 154 reuses**. Run Scenario A first because it isolates model setup
+from OneDrive transfer. If the local result materially improves as expected, repeat Scenario B to
+confirm the gain survives the bounded hydration/release lifecycle.
+
 ## Investigation slice
 
 Add lightweight timing/counter evidence for a representative archive run, including at least:

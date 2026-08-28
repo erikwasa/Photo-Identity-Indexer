@@ -694,12 +694,12 @@ work_items:
   document: ../work-items/WI-0076-archive-throughput.md
   started_at: 2026-08-20
   last_updated_at: 2026-08-28
-  branch: agent/WI-0076-derivative-liveness
+  branch: agent/WI-0076-session-reuse
   blockers:
   - WI-0042
   - WI-0072
   blocker_notes:
-  - Metrics-only baseline PR #210 merged after exact-head workflow #1287 passed. Scenario A measured 359.24 images/hour; baseline Scenario B reached 155/155 analysed at 236.22 images/hour but then exposed a 44m51s post-analysis face-derivative rehydration stall. PR #211 fixes derivative-before-release and OneDrive-blocked waiting classification. Maintainer validation on the same 155-image online-only corpus completed normally in 39m32s at 235.20 images/hour with 155 hydrations, 155 releases, zero active managed originals and no failures. The validation exposed stale persisted availability after completed release; PR #211 now reconciles that status to online-only and awaits exact-head CI. PR #200 remains untouched as the later session-reuse reference.
+  - Metrics baseline PR #210 and derivative-liveness PR #211 are merged. The clean 155-image online-only validation completed in 39m32s at 235.20 images/hour with 155 hydrations/releases and zero failures, while model initialization still consumed 1533.91 seconds total across 155 sessions. The active session-reuse slice currentizes PR #200's safe concept on current main: exact profile/config keyed reuse, serialized access, deterministic host disposal, no added concurrency. PR #200 remains unmerged as historical reference and will be superseded by the new PR.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/210
@@ -710,7 +710,11 @@ work_items:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/211
   - type: workflow
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33170344438
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33180515725
+  - type: merge_commit
+    value: e05d0e06e22d98bf1f0de8d9b313967f388d8b53
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/212
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/200
   - type: workflow
