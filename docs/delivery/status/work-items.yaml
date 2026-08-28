@@ -829,9 +829,12 @@ work_items:
 - id: WI-0082
   title: Add secure trusted-LAN phone access for slideshow use
   milestone: M22
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0082-secure-mobile-slideshow-access.md
+  started_at: 2026-08-28
+  last_updated_at: 2026-08-28
+  branch: agent/WI-0082-secure-mobile-access
   blockers:
   - WI-0051
   - WI-0052
