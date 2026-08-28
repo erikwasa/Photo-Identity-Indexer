@@ -124,6 +124,7 @@ public partial class Program
         builder.Services.AddSingleton<DetectorRolloutCropFileResolver>();
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();
         builder.Services.AddSingleton<CollectionReviewProxyFileResolver>();
+        builder.Services.AddSingleton<ReviewFaceTargetResolver>();
         builder.Services.AddSingleton<CollectionOriginalAccessService>();
         builder.Services.AddSingleton<ArchiveHydrationCapacityService>();
         builder.Services.AddSingleton<ArchiveSourceVerificationService>();
