@@ -89,8 +89,9 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             string sessionKey = $"{profileHash}:{configuration.ToJson()}";
-            if (_handler is null ||
-                !string.Equals(_sessionKey, sessionKey, StringComparison.Ordinal))
+            bool reused = _handler is not null &&
+                string.Equals(_sessionKey, sessionKey, StringComparison.Ordinal);
+            if (!reused)
             {
                 _handler?.Dispose();
                 _handler = await LocalInspectionJobHandler.CreateAsync(
@@ -99,6 +100,10 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
                     cancellationToken,
                     _metrics);
                 _sessionKey = sessionKey;
+            }
+            else
+            {
+                _metrics?.RecordCounter(ArchiveThroughputMetricNames.ModelSessionReuses);
             }
 
             return new Lease(this, _handler);
@@ -117,10 +122,24 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
             return;
         }
 
-        _disposed = true;
-        _handler?.Dispose();
-        _handler = null;
-        _sessionKey = null;
+        _gate.Wait();
+        try
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _handler?.Dispose();
+            _handler = null;
+            _sessionKey = null;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+
         _gate.Dispose();
     }
 
