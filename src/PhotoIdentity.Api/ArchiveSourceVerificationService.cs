@@ -149,6 +149,16 @@ public sealed class ArchiveSourceVerificationService
                 return Waiting();
 
             case AssetAvailability.Unavailable:
+                if (ownership is { IsActive: true, IsReleaseRequested: false })
+                {
+                    await _availability.RecordAsync(
+                        source.AssetId,
+                        AssetAvailability.Downloading,
+                        _timeProvider.GetUtcNow(),
+                        cancellationToken);
+                    return Waiting();
+                }
+
                 throw new FileNotFoundException(
                     "An archive source requiring content verification is unavailable at its catalogued location.");
 
