@@ -229,7 +229,12 @@ public sealed class ArchiveBoundedAnalysisService
             CollectionOriginalAccessSnapshot? status = await _originals.GetStatusAsync(
                 verifiedRevisionId,
                 cancellationToken);
-            if (status?.ManagedHydration == true && status.CanRelease)
+            if (status is
+                {
+                    State: CollectionOriginalAccessService.ReadyState,
+                    ManagedHydration: true,
+                    CanRelease: true,
+                })
             {
                 if (!await EnsureMetadataInspectedAsync(verifiedRevisionId, cancellationToken))
                 {
