@@ -379,6 +379,15 @@ public sealed class ArchiveHydrationCapacityService
         if (lease.IsReleaseRequested && state.Availability == AssetAvailability.OnlineOnly)
         {
             DateTimeOffset observedAt = _timeProvider.GetUtcNow();
+
+            // Persist observed availability before closing the managed lease. If the process stops
+            // between the two writes, the still-active release can be observed and reconciled again.
+            await _availability.RecordAsync(
+                lease.AssetId,
+                AssetAvailability.OnlineOnly,
+                observedAt,
+                cancellationToken);
+
             if (lease.RevisionId is AssetRevisionId revisionId)
             {
                 await _hydrations.MarkReleasedAsync(revisionId, observedAt, cancellationToken);
@@ -388,11 +397,6 @@ public sealed class ArchiveHydrationCapacityService
                 await _sourceHydrations.MarkReleasedAsync(sourceAssetId, observedAt, cancellationToken);
             }
 
-            await _availability.RecordAsync(
-                lease.AssetId,
-                AssetAvailability.OnlineOnly,
-                observedAt,
-                cancellationToken);
             return null;
         }
 
