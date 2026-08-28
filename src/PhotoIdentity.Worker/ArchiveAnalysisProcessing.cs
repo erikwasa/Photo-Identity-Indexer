@@ -60,13 +60,12 @@ public sealed record ArchiveAnalysisResumeResult(
 /// </summary>
 public sealed class ArchiveAnalysisInspectionSession : IDisposable
 {
-    private readonly SqliteCatalogueDatabase _database;
     private readonly ArchiveThroughputMetrics? _metrics;
     private readonly Func<LocalBatchConfiguration, CancellationToken, Task<IProcessingJobHandler>> _handlerFactory;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private IProcessingJobHandler? _handler;
     private string? _sessionKey;
-    private bool _disposed;
+    private int _disposeState;
 
     public ArchiveAnalysisInspectionSession(
         SqliteCatalogueDatabase database,
@@ -89,7 +88,6 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(handlerFactory);
-        _database = database;
         _metrics = metrics;
         _handlerFactory = handlerFactory;
     }
@@ -100,12 +98,12 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
 
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposeState) != 0, this);
             string sessionKey = $"{profileHash}:{configuration.ToJson()}";
             bool reused = _handler is not null &&
                 string.Equals(_sessionKey, sessionKey, StringComparison.Ordinal);
@@ -135,7 +133,7 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
 
     public void Dispose()
     {
-        if (_disposed)
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
         {
             return;
         }
@@ -143,12 +141,6 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
         _gate.Wait();
         try
         {
-            if (_disposed)
-            {
-                return;
-            }
-
-            _disposed = true;
             if (_handler is IDisposable disposable)
             {
                 disposable.Dispose();
@@ -160,9 +152,8 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
         finally
         {
             _gate.Release();
+            _gate.Dispose();
         }
-
-        _gate.Dispose();
     }
 
     private static async Task<IProcessingJobHandler> CreateHandlerAsync(
