@@ -16,6 +16,7 @@ public sealed record ArchiveManagedHydrationRecord(
 
 public sealed record ArchiveManagedHydrationLease(
     AssetRevisionId AssetRevisionId,
+    AssetId AssetId,
     long SizeBytes,
     string RootLocator,
     string SourceKey,
@@ -60,6 +61,7 @@ public sealed class SqliteArchiveHydrationRepository
         command.CommandText = """
             SELECT
                 hydration.asset_revision_id,
+                revision.asset_id,
                 revision.size_bytes,
                 source.root_locator,
                 asset.source_key,
@@ -82,12 +84,13 @@ public sealed class SqliteArchiveHydrationRepository
         {
             leases.Add(new ArchiveManagedHydrationLease(
                 AssetRevisionId.From(Guid.Parse(reader.GetString(0))),
-                reader.GetInt64(1),
-                reader.GetString(2),
+                AssetId.From(Guid.Parse(reader.GetString(1))),
+                reader.GetInt64(2),
                 reader.GetString(3),
-                Parse(reader.GetString(4)),
+                reader.GetString(4),
                 Parse(reader.GetString(5)),
-                reader.IsDBNull(6) ? null : Parse(reader.GetString(6))));
+                Parse(reader.GetString(6)),
+                reader.IsDBNull(7) ? null : Parse(reader.GetString(7))));
         }
 
         return leases;
