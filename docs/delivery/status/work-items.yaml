@@ -689,22 +689,24 @@ work_items:
 - id: WI-0076
   title: Improve archive processing throughput
   milestone: M20
-  status: in_review
+  status: in_progress
   owner: ai-agent
   document: ../work-items/WI-0076-archive-throughput.md
   started_at: 2026-08-20
-  last_updated_at: 2026-08-27
-  branch: agent/WI-0076-throughput-metrics
+  last_updated_at: 2026-08-28
+  branch: agent/WI-0076-derivative-liveness
   blockers:
   - WI-0042
   - WI-0072
   blocker_notes:
-  - PR #210 contains the fresh metrics-only baseline instrumentation from current main. Exact-head workflow #1285 passed all required lanes; the controlled local/online-only maintainer benchmark remains pending. PR #200 stays unmerged as a later optimization candidate and must not be treated as baseline behavior.
+  - Metrics-only baseline PR #210 merged after exact-head workflow #1287 passed. Scenario A measured 359.24 images/hour; Scenario B reached 155/155 analysed at 236.22 images/hour but then exposed a 44m51s post-analysis face-derivative rehydration stall. The active slice keeps managed originals local through face-review derivative generation and reports derivative work blocked on OneDrive as waiting. PR #200 remains untouched as the later session-reuse reference.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/210
   - type: workflow
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33094175596
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33167716983
+  - type: merge_commit
+    value: 1888bdb86a1b1b8f72e3b488338946125a1bdad4
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/200
   - type: workflow
