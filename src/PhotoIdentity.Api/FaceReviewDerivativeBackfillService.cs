@@ -89,25 +89,7 @@ public sealed class FaceReviewDerivativeBackfillService
                     "An analyzed archive original is unavailable for face review derivative backfill.");
         }
 
-        CatalogueProcessingAssetRevision revision = await _catalogue.GetAssetRevisionAsync(
-            revisionId,
-            cancellationToken)
-            ?? throw new InvalidOperationException(
-                "The analyzed archive revision disappeared before face review derivative generation.");
-        string sourcePath = ResolveSourcePath(revision.RootLocator, revision.SourceKey);
-        ArchiveFaceReviewDerivativeWriter writer = new(_database);
-        using (IDisposable? derivativeTiming = _metrics?.Measure(
-                   ArchiveThroughputMetricNames.FaceReviewDerivativeGeneration))
-        {
-            _ = await writer.GenerateAsync(
-                revisionId,
-                sourcePath,
-                revision.RootLocator,
-                derivativeRoot,
-                _timeProvider.GetUtcNow(),
-                cancellationToken);
-        }
-        _metrics?.RecordCounter(ArchiveThroughputMetricNames.FaceReviewDerivativeRevisions);
+        await GenerateRevisionAsync(revisionId, derivativeRoot, cancellationToken);
 
         if (status.ManagedHydration)
         {
@@ -117,6 +99,23 @@ public sealed class FaceReviewDerivativeBackfillService
         return true;
     }
 
+    public async Task GenerateReadyRevisionAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_configuration.TryResolve(
+                out string? derivativeRoot,
+                out _,
+                out string? message) ||
+            derivativeRoot is null)
+        {
+            throw new InvalidOperationException(
+                message ?? "Face review derivative generation is not configured.");
+        }
+
+        await GenerateRevisionAsync(revisionId, derivativeRoot, cancellationToken);
+    }
+
     public Task<AssetRevisionId?> GetNextPendingAsync(
         ArchiveCoverageConfiguration coverage,
         CancellationToken cancellationToken = default) =>
@@ -124,6 +123,37 @@ public sealed class FaceReviewDerivativeBackfillService
             coverage.Source.Id,
             ArchiveFaceReviewDerivativeWriter.ProfileId,
             cancellationToken);
+
+    private async Task GenerateRevisionAsync(
+        AssetRevisionId revisionId,
+        string derivativeRoot,
+        CancellationToken cancellationToken)
+    {
+        CatalogueProcessingAssetRevision revision = await _catalogue.GetAssetRevisionAsync(
+            revisionId,
+            cancellationToken)
+            ?? throw new InvalidOperationException(
+                "The analyzed archive revision disappeared before face review derivative generation.");
+        string sourcePath = ResolveSourcePath(revision.RootLocator, revision.SourceKey);
+        ArchiveFaceReviewDerivativeWriter writer = new(_database);
+        int generated;
+        using (IDisposable? derivativeTiming = _metrics?.Measure(
+                   ArchiveThroughputMetricNames.FaceReviewDerivativeGeneration))
+        {
+            generated = await writer.GenerateAsync(
+                revisionId,
+                sourcePath,
+                revision.RootLocator,
+                derivativeRoot,
+                _timeProvider.GetUtcNow(),
+                cancellationToken);
+        }
+
+        if (generated > 0)
+        {
+            _metrics?.RecordCounter(ArchiveThroughputMetricNames.FaceReviewDerivativeRevisions);
+        }
+    }
 
     private static string ResolveSourcePath(string rootLocator, string sourceKey)
     {
