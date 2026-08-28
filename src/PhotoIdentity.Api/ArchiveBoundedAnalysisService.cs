@@ -29,6 +29,7 @@ public sealed class ArchiveBoundedAnalysisService
     private readonly PhotoMetadataInspectionService _metadataInspection;
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
     private readonly TimeProvider _timeProvider;
+    private readonly ArchiveThroughputMetrics? _metrics;
     private readonly SemaphoreSlim _advanceGate = new(1, 1);
 
     public ArchiveBoundedAnalysisService(
@@ -42,7 +43,8 @@ public sealed class ArchiveBoundedAnalysisService
         ArchiveSourceVerificationService sourceVerification,
         PhotoMetadataInspectionService metadataInspection,
         ReviewProxyGenerationConfiguration proxyConfiguration,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ArchiveThroughputMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(catalogue);
@@ -66,6 +68,7 @@ public sealed class ArchiveBoundedAnalysisService
         _metadataInspection = metadataInspection;
         _proxyConfiguration = proxyConfiguration;
         _timeProvider = timeProvider;
+        _metrics = metrics;
     }
 
     public async Task<ArchiveBoundedAnalysisAdvanceResult> AdvanceAsync(
@@ -73,6 +76,7 @@ public sealed class ArchiveBoundedAnalysisService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(operatorConfiguration);
+        _metrics?.RecordCounter(ArchiveThroughputMetricNames.AdvanceInvocations);
         await _advanceGate.WaitAsync(cancellationToken);
         try
         {
@@ -229,7 +233,7 @@ public sealed class ArchiveBoundedAnalysisService
             return new ArchiveBoundedAnalysisAdvanceResult(false);
         }
 
-        ArchiveAnalysisCoordinator coordinator = new(_database, _timeProvider);
+        ArchiveAnalysisCoordinator coordinator = new(_database, _timeProvider, _metrics);
         if (latest is not null)
         {
             ProcessingRunSummary durable = await processingRepository.GetRunSummaryAsync(
@@ -460,14 +464,18 @@ public sealed class ArchiveBoundedAnalysisService
             ?? throw new InvalidOperationException("The analyzed archive revision disappeared before proxy generation.");
         string sourcePath = ResolveSourcePath(revision.RootLocator, revision.SourceKey);
         ArchiveReviewProxyWriter writer = new(_database);
-        _ = await writer.GenerateAsync(
-            revisionId,
-            sourcePath,
-            revision.RootLocator,
-            derivativeRoot,
-            proxyProfile,
-            _timeProvider.GetUtcNow(),
-            cancellationToken);
+        using (IDisposable? proxyTiming = _metrics?.Measure(ArchiveThroughputMetricNames.ReviewProxyGeneration))
+        {
+            _ = await writer.GenerateAsync(
+                revisionId,
+                sourcePath,
+                revision.RootLocator,
+                derivativeRoot,
+                proxyProfile,
+                _timeProvider.GetUtcNow(),
+                cancellationToken);
+        }
+        _metrics?.RecordCounter(ArchiveThroughputMetricNames.ReviewProxiesGenerated);
 
         if (status.ManagedHydration)
         {
@@ -500,11 +508,15 @@ public sealed class ArchiveBoundedAnalysisService
         }
 
         await using FileStream stream = original.Stream;
-        _ = await _metadataInspection.InspectVerifiedAsync(
-            revisionId,
-            stream,
-            original.ContentType,
-            cancellationToken);
+        using (IDisposable? metadataTiming = _metrics?.Measure(ArchiveThroughputMetricNames.MetadataInspection))
+        {
+            _ = await _metadataInspection.InspectVerifiedAsync(
+                revisionId,
+                stream,
+                original.ContentType,
+                cancellationToken);
+        }
+        _metrics?.RecordCounter(ArchiveThroughputMetricNames.MetadataInspections);
         return true;
     }
 

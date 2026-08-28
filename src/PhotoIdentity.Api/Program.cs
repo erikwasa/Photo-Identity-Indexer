@@ -7,6 +7,7 @@ using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Source.OneDriveSync;
+using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
 
@@ -51,6 +52,7 @@ public partial class Program
                 : GeoNamesReverseGeocodingConfiguration.DefaultMinimumRequestIntervalMilliseconds);
 
         builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
+        builder.Services.AddSingleton<ArchiveThroughputMetrics>();
         builder.Services.AddSingleton(new ArchiveOperatorConfiguration(
             archiveAnalysisRoot,
             builder.Configuration["PhotoIdentity:RepositoryRoot"],

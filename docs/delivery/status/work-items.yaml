@@ -693,14 +693,18 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0076-archive-throughput.md
   started_at: 2026-08-20
-  last_updated_at: 2026-08-26
-  branch: agent/WI-0076-archive-session-reuse
+  last_updated_at: 2026-08-27
+  branch: agent/WI-0076-throughput-metrics
   blockers:
   - WI-0042
   - WI-0072
   blocker_notes:
-  - Prerequisites are now complete. PR #200 contains the isolated session-reuse slice; merge and representative before/after throughput verification remain pending. Keep this separate from WI-0079 unless measurements show a shared cause.
+  - PR #210 contains the fresh metrics-only baseline instrumentation from current main. Exact-head workflow #1285 passed all required lanes; the controlled local/online-only maintainer benchmark remains pending. PR #200 stays unmerged as a later optimization candidate and must not be treated as baseline behavior.
   evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/210
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33094175596
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/200
   - type: workflow

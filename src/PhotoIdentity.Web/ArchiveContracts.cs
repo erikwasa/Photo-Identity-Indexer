@@ -107,3 +107,31 @@ public sealed record ArchiveAnalysisStepResponse(
     ArchiveStatusResponse Status);
 
 public sealed record ArchiveErrorResponse(string Error);
+
+
+public sealed record ArchiveThroughputStageMetricResponse(
+    string Name,
+    long Count,
+    double TotalMilliseconds,
+    double AverageMilliseconds,
+    double MaxMilliseconds);
+
+public sealed record ArchiveThroughputCounterMetricResponse(
+    string Name,
+    long Value);
+
+public sealed record ArchiveThroughputHashReadMetricResponse(
+    string Kind,
+    long Count,
+    long Bytes,
+    int SubjectCount,
+    double AverageReadsPerSubject,
+    long MaxReadsPerSubject);
+
+public sealed record ArchiveThroughputDiagnosticsResponse(
+    long Generation,
+    DateTimeOffset ResetAtUtc,
+    DateTimeOffset CapturedAtUtc,
+    IReadOnlyList<ArchiveThroughputStageMetricResponse> Stages,
+    IReadOnlyList<ArchiveThroughputCounterMetricResponse> Counters,
+    IReadOnlyList<ArchiveThroughputHashReadMetricResponse> HashReads);

@@ -24,6 +24,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     private readonly ArchiveOperatorConfiguration _operatorConfiguration;
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
     private readonly TimeProvider _timeProvider;
+    private readonly ArchiveThroughputMetrics _metrics;
 
     public ArchiveAdvancementHostedService(
         SqliteCatalogueDatabase database,
@@ -38,7 +39,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         CollectionOriginalAccessService originals,
         ArchiveOperatorConfiguration operatorConfiguration,
         ReviewProxyGenerationConfiguration proxyConfiguration,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ArchiveThroughputMetrics metrics)
     {
         _database = database;
         _control = control;
@@ -49,15 +51,18 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         _sourceHydrations = sourceHydrations;
         _capacity = capacity;
         _boundedAnalysis = boundedAnalysis;
+        ArgumentNullException.ThrowIfNull(metrics);
         _faceReviewBackfill = new FaceReviewDerivativeBackfillService(
             database,
             new SqliteLocalBatchRepository(database),
             originals,
             proxyConfiguration,
-            timeProvider);
+            timeProvider,
+            metrics);
         _operatorConfiguration = operatorConfiguration;
         _proxyConfiguration = proxyConfiguration;
         _timeProvider = timeProvider;
+        _metrics = metrics;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -118,7 +123,17 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                         : "Archive processing is continuing.",
                     _timeProvider.GetUtcNow(),
                     stoppingToken);
-                await Task.Delay(work.WaitingForOneDrive ? IdleDelay : ActiveDelay, stoppingToken);
+                if (work.WaitingForOneDrive)
+                {
+                    using IDisposable waitTiming = _metrics.Measure(ArchiveThroughputMetricNames.OneDriveWait);
+                    await Task.Delay(IdleDelay, stoppingToken);
+                }
+                else
+                {
+                    using IDisposable activeDelayTiming = _metrics.Measure(
+                        ArchiveThroughputMetricNames.ActiveLoopDelay);
+                    await Task.Delay(ActiveDelay, stoppingToken);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -126,6 +141,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             }
             catch (Exception exception)
             {
+                _metrics.RecordCounter(ArchiveThroughputMetricNames.ArchiveErrors);
                 if (IsRetryableTransition(exception))
                 {
                     await _control.UpdateRuntimeAsync(
@@ -153,7 +169,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         CancellationToken cancellationToken)
     {
         LocalFolderAssetSource source = new(coverage.Source.Id, coverage.Source.RootLocator);
-        _ = await new LocalArchiveSyncCoordinator(_database).SyncAsync(
+        using IDisposable syncTiming = _metrics.Measure(ArchiveThroughputMetricNames.Synchronization);
+        _ = await new LocalArchiveSyncCoordinator(_database, _metrics).SyncAsync(
             source,
             coverage.Source,
             coverage.IncludedFolders,
