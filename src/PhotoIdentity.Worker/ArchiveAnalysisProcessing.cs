@@ -81,7 +81,7 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
     {
     }
 
-    internal ArchiveAnalysisInspectionSession(
+    public ArchiveAnalysisInspectionSession(
         SqliteCatalogueDatabase database,
         ArchiveThroughputMetrics? metrics,
         Func<LocalBatchConfiguration, CancellationToken, Task<IProcessingJobHandler>> handlerFactory)
