@@ -49,15 +49,33 @@ public sealed class ArchiveAnalysisInspectionSessionTests
             Assert.Single(created);
             Assert.False(created[0].Disposed);
 
+            IProcessingJobHandler second;
             using (ArchiveAnalysisInspectionSession.Lease lease =
                    await session.AcquireAsync(configuration, secondProfile))
             {
                 Assert.NotSame(first, lease.Handler);
+                second = lease.Handler;
             }
 
             Assert.Equal(2, created.Count);
             Assert.True(created[0].Disposed);
             Assert.False(created[1].Disposed);
+
+            LocalBatchConfiguration changedConfiguration = new(
+                configuration.SourceRoot,
+                Path.Combine(directory, "other-output"),
+                configuration.RepositoryRoot,
+                configuration.ModelDirectory);
+
+            using (ArchiveAnalysisInspectionSession.Lease lease =
+                   await session.AcquireAsync(changedConfiguration, secondProfile))
+            {
+                Assert.NotSame(second, lease.Handler);
+            }
+
+            Assert.Equal(3, created.Count);
+            Assert.True(created[1].Disposed);
+            Assert.False(created[2].Disposed);
 
             ArchiveThroughputCounterSnapshot reuse = Assert.Single(
                 metrics.GetSnapshot().Counters,
