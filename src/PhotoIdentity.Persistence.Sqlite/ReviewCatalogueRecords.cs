@@ -53,6 +53,7 @@ public sealed record CatalogueReviewFace(
     string State,
     CatalogueReviewPerson? Person,
     long? ActiveActionId,
+    AssetRevisionId RevisionId,
     string? BoundingBoxJson = null);
 
 public sealed record CatalogueReviewFacePage(

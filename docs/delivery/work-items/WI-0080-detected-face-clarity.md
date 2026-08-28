@@ -202,3 +202,40 @@ PR #209 now implements Option B. The renderer exposes the exact contextual-crop 
 Regression coverage seeds a neighboring face-like region inside the contextual crop and verifies that Face Details and the normal review gallery return the same normalized target rectangle for the persisted detection.
 
 The PR remains pending until required CI is green and the maintainer verifies at least one private real-catalogue example where two faces are visible in the contextual review image.
+
+## Maintainer verification finding — 2026-08-28
+
+Initial real-catalogue verification against merged PR #209 **failed**. The maintainer confirmed that no
+Face Review gallery image or Face Details image showed a target overlay. Face Details also showed no
+value for **Photo dimensions** on the tested catalogue.
+
+The failure is an existing-catalogue compatibility gap rather than a need to rerun recognition:
+
+- the permanent archive scan/verification paths historically create `asset_revisions` with
+  `width`/`height` left `NULL`;
+- the face observation still contains normalized `bounding_box_json`, and durable review derivatives
+  and whole-photo review proxies already exist;
+- PR #209 calculated `TargetBox` only when `asset_revisions.width` and `height` were populated, so
+  existing rows returned `TargetBox = null` and the Web UI correctly omitted the overlay;
+- PR #209's integration seed supplied explicit 2400 × 1600 revision dimensions, so it did not cover
+  the real-catalogue shape.
+
+### Corrective slice
+
+Branch `agent/WI-0080-existing-catalogue-target-overlay` corrects the compatibility gap without
+re-analysis or derivative regeneration:
+
+1. carry the owning asset revision ID through normal and suggestion review records;
+2. prefer true persisted photo dimensions for target mapping when available;
+3. when those dimensions are absent and the observation is already normalized, use the configured
+   whole-photo review proxy's persisted dimensions **only as an aspect-ratio geometry surrogate**;
+4. keep `PhotoWidth`/`PhotoHeight` unchanged, so proxy dimensions are never presented as original
+   photo dimensions;
+5. never reinterpret legacy pixel-space bounding boxes with proxy dimensions;
+6. batch review-proxy metadata lookup for a review page; and
+7. add integration coverage where original revision dimensions are null while both Face Details and
+   the normal gallery must return the same non-null target box with zero original hydration.
+
+Acceptance remains pending required CI and a repeat packaged real-catalogue visual check. The overlay
+is expected for every face occurrence with usable geometry, regardless of whether another face was
+detected in the contextual image.

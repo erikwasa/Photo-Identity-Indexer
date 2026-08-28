@@ -1,4 +1,3 @@
-using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
@@ -20,6 +19,7 @@ public static class SuggestionGalleryEndpoints
 
     private static async Task<IResult> GetFacesAsync(
         SqliteSuggestionGalleryRepository repository,
+        ReviewFaceTargetResolver targetResolver,
         string? modelId,
         string? modelHash,
         int offset = 0,
@@ -51,8 +51,14 @@ public static class SuggestionGalleryEndpoints
                 confidenceGroup,
                 parsedSuggestedPersonId,
                 cancellationToken);
+            IReadOnlyDictionary<FaceOccurrenceId, ReviewFaceTargetResponse> targets =
+                await targetResolver.ResolveAsync(page.Items, cancellationToken);
             return Results.Ok(new ReviewFacePageResponse(
-                page.Items.Select(ToResponse).ToArray(),
+                page.Items.Select(face =>
+                {
+                    targets.TryGetValue(face.Id, out ReviewFaceTargetResponse? target);
+                    return ToResponse(face, target);
+                }).ToArray(),
                 page.Offset,
                 page.Limit,
                 page.Total));
@@ -67,7 +73,7 @@ public static class SuggestionGalleryEndpoints
         string id,
         SqliteReviewRepository reviewRepository,
         SqliteSuggestionGalleryRepository suggestionRepository,
-        SqliteCatalogueDatabase database,
+        ReviewFaceTargetResolver targetResolver,
         string? modelId,
         string? modelHash,
         string state = CatalogueReviewStates.Unreviewed,
@@ -91,13 +97,6 @@ public static class SuggestionGalleryEndpoints
             return Results.NotFound();
         }
 
-        AssetRevisionId? revisionId = await new ReviewFaceRevisionResolver(database)
-            .ResolveAsync(faceOccurrenceId, cancellationToken);
-        if (revisionId is null)
-        {
-            return Results.NotFound();
-        }
-
         try
         {
             IReadOnlyList<CatalogueReviewAction> actions = await reviewRepository.GetActionsAsync(
@@ -113,9 +112,12 @@ public static class SuggestionGalleryEndpoints
                 confidenceGroup,
                 parsedSuggestedPersonId,
                 cancellationToken);
+            IReadOnlyDictionary<FaceOccurrenceId, ReviewFaceTargetResponse> targets =
+                await targetResolver.ResolveAsync([face], cancellationToken);
+            targets.TryGetValue(face.Id, out ReviewFaceTargetResponse? target);
             return Results.Ok(new ReviewFaceDetailsResponse(
-                ToDetailsResponse(face),
-                revisionId.Value.ToString(),
+                ToDetailsResponse(face, target),
+                face.RevisionId.ToString(),
                 face.MediaType,
                 face.PhotoWidth,
                 face.PhotoHeight,
@@ -136,7 +138,9 @@ public static class SuggestionGalleryEndpoints
         }
     }
 
-    private static ReviewFaceResponse ToResponse(CatalogueSuggestionGalleryFace face) => new(
+    private static ReviewFaceResponse ToResponse(
+        CatalogueSuggestionGalleryFace face,
+        ReviewFaceTargetResponse? target) => new(
         face.Id.ToString(),
         $"/api/review/faces/{face.Id}/image",
         face.PhotoName,
@@ -146,9 +150,11 @@ public static class SuggestionGalleryEndpoints
         face.Person is null ? null : ToResponse(face.Person),
         face.CreatedAtUtc,
         face.TopSuggestion is null ? null : ToResponse(face.TopSuggestion),
-        ToTargetBox(face.BoundingBoxJson, face.PhotoWidth, face.PhotoHeight));
+        target);
 
-    private static ReviewFaceResponse ToDetailsResponse(CatalogueReviewFace face) => new(
+    private static ReviewFaceResponse ToDetailsResponse(
+        CatalogueReviewFace face,
+        ReviewFaceTargetResponse? target) => new(
         face.Id.ToString(),
         $"/api/review/faces/{face.Id}/image?size={DetailsImageSize}",
         face.PhotoName,
@@ -158,21 +164,7 @@ public static class SuggestionGalleryEndpoints
         face.Person is null ? null : ToResponse(face.Person),
         face.CreatedAtUtc,
         TopSuggestion: null,
-        TargetBox: ToTargetBox(face.BoundingBoxJson, face.PhotoWidth, face.PhotoHeight));
-
-    private static ReviewFaceTargetResponse? ToTargetBox(
-        string? boundingBoxJson,
-        int? photoWidth,
-        int? photoHeight)
-    {
-        NormalizedBoundingBox? target = ReviewFacePreviewResolver.CalculateTargetBoundingBox(
-            boundingBoxJson,
-            photoWidth,
-            photoHeight);
-        return target is NormalizedBoundingBox box
-            ? new ReviewFaceTargetResponse(box.X, box.Y, box.Width, box.Height)
-            : null;
-    }
+        TargetBox: target);
 
     private static ReviewTopSuggestionResponse ToResponse(
         CatalogueSuggestionGalleryTopSuggestion suggestion) => new(

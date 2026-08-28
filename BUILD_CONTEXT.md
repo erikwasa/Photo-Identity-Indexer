@@ -6,35 +6,32 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0076 — Improve archive processing throughput** is the active engineering item.
+**WI-0080 — Make the detected face unambiguous in review images** is the active corrective engineering item.
 
-The maintainer chose a measurement-first baseline from current `main`. The previous session-reuse PR #200 remains unmerged and untouched as a later optimization candidate. Do not apply session reuse, new concurrency, hydration prefetch, verification caching or loop tuning until the baseline identifies the dominant cost.
+PR #209 merged the approved dynamic **Target** overlay, but the 2026-08-28 real-catalogue verification failed: no overlay appeared in Face Review or Face Details, and the tested catalogue showed no persisted Photo dimensions. The permanent archive paths historically leave `asset_revisions.width`/`height` null, while PR #209's regression seed supplied explicit dimensions.
 
-The active branch is `agent/WI-0076-throughput-metrics`. It adds process-local aggregate throughput diagnostics and a reset/snapshot HTTP contract without changing archive-processing semantics. The report measures sync, OneDrive wait, verification/hash activity, metadata, model-session setup/lifetime, decode/detect/align/embed/persistence, proxies, face-review derivatives and hydration/release requests.
+The active branch is `agent/WI-0080-existing-catalogue-target-overlay`. It keeps existing analysis and derivatives intact, carries revision identity into review records, prefers true photo dimensions when present, and otherwise uses the configured whole-photo review proxy's persisted dimensions only as an aspect-ratio geometry surrogate for normalized face observations. Proxy dimensions must not be exposed as original Photo dimensions.
 
-PR #209 for WI-0080 merged on 2026-08-26. Maintainer visual confirmation is intentionally deferred, so WI-0080 is not yet treated as completed.
-
-WI-0081 remains ready but is deferred while WI-0076 measurement work is active.
+WI-0076 session reuse merged through PR #212 and remains separate throughput acceptance work. WI-0081 remains ready but should not start until WI-0080 real-catalogue acceptance is resolved.
 
 ## Next concrete step
 
-1. PR #210 exact-head workflow #1285 passed all required CI lanes.
-2. Build/use the resulting Windows package with a disposable benchmark catalogue.
-3. Run the same fixed 100–200 image sample twice following `docs/operations/archive-throughput-benchmark.md`: first with originals already local, then with the same originals online-only.
-4. Compare wall-clock throughput, OneDrive wait share, stage timings, model-session initialization frequency and aggregate full-file hash reads.
-5. Select the next WI-0076 optimization only from measured evidence; PR #200 session reuse is one candidate, not a predetermined fix.
+1. Complete the WI-0080 existing-catalogue corrective implementation and required CI.
+2. Package the exact corrective head/current main after merge; do **not** re-analyze or regenerate existing faces.
+3. Open Face Review and Face Details against the same permanent catalogue that previously showed no overlay.
+4. Confirm every face with usable persisted geometry now shows the **Target** outline/label, including a contextual image containing another visible face where available.
+5. Confirm Photo dimensions remain `—` when true original dimensions are unknown and that no original hydration occurs merely to render target geometry.
+6. If the visual treatment is unmistakable, record maintainer verification and complete WI-0080; otherwise keep the item open with the observed case.
 
 ## Relevant files
 
-- `docs/delivery/work-items/WI-0076-archive-throughput.md`
-- `docs/operations/archive-throughput-benchmark.md`
-- `src/PhotoIdentity.Worker/ArchiveThroughputMetrics.cs`
-- `src/PhotoIdentity.Worker/ArchiveAnalysisProcessing.cs`
-- `src/PhotoIdentity.Worker/LocalInspectionJobHandler.cs`
-- `src/PhotoIdentity.Worker/LocalArchiveSyncCoordinator.cs`
-- `src/PhotoIdentity.Api/ArchiveBoundedAnalysisService.cs`
-- `src/PhotoIdentity.Api/ArchiveAdvancementHostedService.cs`
-- `src/PhotoIdentity.Api/ArchiveEndpoints.cs`
+- `docs/delivery/work-items/WI-0080-detected-face-clarity.md`
+- `src/PhotoIdentity.Api/ReviewFaceTargetResolver.cs`
+- `src/PhotoIdentity.Api/ReviewFacePreviewResolver.cs`
+- `src/PhotoIdentity.Api/ReviewEndpoints.cs`
+- `src/PhotoIdentity.Api/SuggestionGalleryEndpoints.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteArchiveReviewProxyRepository.cs`
+- `tests/PhotoIdentity.Integration.Tests/ReviewFaceDetailImageApplicationTests.cs`
 - `docs/delivery/status/work-items.yaml`
 - `AGENTS.md`
 

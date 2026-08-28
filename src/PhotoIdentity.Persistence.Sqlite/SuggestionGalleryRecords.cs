@@ -48,6 +48,7 @@ public sealed record CatalogueSuggestionGalleryFace(
     string State,
     CatalogueReviewPerson? Person,
     CatalogueSuggestionGalleryTopSuggestion? TopSuggestion,
+    AssetRevisionId RevisionId,
     string? BoundingBoxJson = null);
 
 public sealed record CatalogueSuggestionGalleryPage(

@@ -197,6 +197,58 @@ public sealed class SqliteArchiveReviewProxyRepository
         return await ReadAsync(connection, null, revisionId, profileId.Trim(), cancellationToken);
     }
 
+    public async Task<IReadOnlyDictionary<AssetRevisionId, ArchiveReviewProxyRecord>> GetManyAsync(
+        IReadOnlyCollection<AssetRevisionId> revisionIds,
+        string profileId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(revisionIds);
+        ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
+
+        AssetRevisionId[] distinctRevisionIds = revisionIds.Distinct().ToArray();
+        if (distinctRevisionIds.Length == 0)
+        {
+            return new Dictionary<AssetRevisionId, ArchiveReviewProxyRecord>();
+        }
+
+        await EnsureSchemaAsync(cancellationToken);
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        string[] parameters = distinctRevisionIds
+            .Select((_, index) => $"$asset_revision_id_{index}")
+            .ToArray();
+        command.CommandText = $"""
+            SELECT asset_revision_id, profile_id, encoded_byte_length, content_sha256,
+                   width, height, generated_at_utc, relative_path
+            FROM asset_revision_review_proxies
+            WHERE profile_id = $profile_id
+              AND asset_revision_id IN ({string.Join(", ", parameters)});
+            """;
+        command.Parameters.AddWithValue("$profile_id", profileId.Trim());
+        for (int index = 0; index < distinctRevisionIds.Length; index++)
+        {
+            command.Parameters.AddWithValue(parameters[index], distinctRevisionIds[index].ToString());
+        }
+
+        Dictionary<AssetRevisionId, ArchiveReviewProxyRecord> results = [];
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            ArchiveReviewProxyRecord record = new(
+                AssetRevisionId.From(Guid.Parse(reader.GetString(0))),
+                reader.GetString(1),
+                reader.GetInt64(2),
+                new Sha256Digest(reader.GetString(3)),
+                reader.GetInt32(4),
+                reader.GetInt32(5),
+                Parse(reader.GetString(6)),
+                reader.GetString(7));
+            results[record.AssetRevisionId] = record;
+        }
+
+        return results;
+    }
+
     public async Task<IReadOnlyList<AssetRevisionId>> GetPendingCurrentRevisionIdsAsync(
         SourceId sourceId,
         string profileId,

@@ -1,4 +1,3 @@
-using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
@@ -34,6 +33,7 @@ public static class ReviewEndpoints
 
     private static async Task<IResult> GetFacesAsync(
         SqliteReviewFilterRepository repository,
+        ReviewFaceTargetResolver targetResolver,
         int offset = 0,
         int limit = 40,
         string state = CatalogueReviewStates.Unreviewed,
@@ -60,8 +60,14 @@ public static class ReviewEndpoints
                 parsedModelHash,
                 sort,
                 cancellationToken);
+            IReadOnlyDictionary<FaceOccurrenceId, ReviewFaceTargetResponse> targets =
+                await targetResolver.ResolveAsync(page.Items, cancellationToken);
             return Results.Ok(new ReviewFacePageResponse(
-                page.Items.Select(ToResponse).ToArray(),
+                page.Items.Select(face =>
+                {
+                    targets.TryGetValue(face.Id, out ReviewFaceTargetResponse? target);
+                    return ToResponse(face, target);
+                }).ToArray(),
                 page.Offset,
                 page.Limit,
                 page.Total));
@@ -95,7 +101,7 @@ public static class ReviewEndpoints
         string id,
         SqliteReviewRepository repository,
         SqliteReviewFilterRepository filterRepository,
-        SqliteCatalogueDatabase database,
+        ReviewFaceTargetResolver targetResolver,
         string state = "all",
         string? processingRunId = null,
         string? modelId = null,
@@ -120,13 +126,6 @@ public static class ReviewEndpoints
             return Results.NotFound();
         }
 
-        AssetRevisionId? revisionId = await new ReviewFaceRevisionResolver(database)
-            .ResolveAsync(faceOccurrenceId, cancellationToken);
-        if (revisionId is null)
-        {
-            return Results.NotFound();
-        }
-
         try
         {
             IReadOnlyList<CatalogueReviewAction> actions = await repository.GetActionsAsync(
@@ -140,9 +139,12 @@ public static class ReviewEndpoints
                 parsedModelHash,
                 sort,
                 cancellationToken);
+            IReadOnlyDictionary<FaceOccurrenceId, ReviewFaceTargetResponse> targets =
+                await targetResolver.ResolveAsync([face], cancellationToken);
+            targets.TryGetValue(face.Id, out ReviewFaceTargetResponse? target);
             return Results.Ok(new ReviewFaceDetailsResponse(
-                ToResponseWithImageSize(face, DetailsImageSize),
-                revisionId.Value.ToString(),
+                ToResponseWithImageSize(face, DetailsImageSize, target),
+                face.RevisionId.ToString(),
                 face.MediaType,
                 face.PhotoWidth,
                 face.PhotoHeight,
@@ -398,10 +400,15 @@ public static class ReviewEndpoints
         }
     }
 
-    private static ReviewFaceResponse ToResponse(CatalogueReviewFace face) =>
-        ToResponseWithImageSize(face, imageSize: null);
+    private static ReviewFaceResponse ToResponse(
+        CatalogueReviewFace face,
+        ReviewFaceTargetResponse? target) =>
+        ToResponseWithImageSize(face, imageSize: null, target);
 
-    private static ReviewFaceResponse ToResponseWithImageSize(CatalogueReviewFace face, int? imageSize) => new(
+    private static ReviewFaceResponse ToResponseWithImageSize(
+        CatalogueReviewFace face,
+        int? imageSize,
+        ReviewFaceTargetResponse? target) => new(
         face.Id.ToString(),
         imageSize is int requestedSize
             ? $"/api/review/faces/{face.Id}/image?size={requestedSize}"
@@ -413,18 +420,7 @@ public static class ReviewEndpoints
         face.Person is null ? null : ToResponse(face.Person),
         face.CreatedAtUtc,
         TopSuggestion: null,
-        TargetBox: ToTargetBox(face));
-
-    private static ReviewFaceTargetResponse? ToTargetBox(CatalogueReviewFace face)
-    {
-        NormalizedBoundingBox? target = ReviewFacePreviewResolver.CalculateTargetBoundingBox(
-            face.BoundingBoxJson,
-            face.PhotoWidth,
-            face.PhotoHeight);
-        return target is NormalizedBoundingBox box
-            ? new ReviewFaceTargetResponse(box.X, box.Y, box.Width, box.Height)
-            : null;
-    }
+        TargetBox: target);
 
     private static ReviewPersonResponse ToResponse(
         CatalogueReviewPerson person,

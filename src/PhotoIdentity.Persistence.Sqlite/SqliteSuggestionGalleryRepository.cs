@@ -89,7 +89,8 @@ public sealed class SqliteSuggestionGalleryRepository
         top_suggestion.score_margin,
         top_suggestion.status,
         top_suggestion.generated_at_utc,
-        latest_observation.bounding_box_json
+        latest_observation.bounding_box_json,
+        face_occurrences.asset_revision_id
         """;
 
     private const string From = """
@@ -457,6 +458,7 @@ public sealed class SqliteSuggestionGalleryRepository
             reviewState,
             assignedPerson,
             topSuggestion,
+            AssetRevisionId.From(Guid.Parse(reader.GetString(25))),
             reader.IsDBNull(24) ? null : reader.GetString(24));
     }
 

@@ -54,7 +54,8 @@ public sealed class SqliteReviewFilterRepository
         latest_action.action_kind,
         latest_action.person_id,
         people.display_name,
-        latest_observation.bounding_box_json
+        latest_observation.bounding_box_json,
+        face_occurrences.asset_revision_id
         """;
 
     private const string ReviewFaceFrom = """
@@ -393,6 +394,7 @@ public sealed class SqliteReviewFilterRepository
             reviewState,
             person,
             activeActionId,
+            AssetRevisionId.From(Guid.Parse(reader.GetString(15))),
             reader.IsDBNull(14) ? null : reader.GetString(14));
     }
 

@@ -90,6 +90,58 @@ public sealed class ReviewFaceDetailImageApplicationTests
     }
 
     [Fact]
+    public async Task Existing_catalogue_without_original_dimensions_uses_review_proxy_aspect_ratio_for_target()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SeededFace seeded = await SeedAsync(directory, includeRevisionDimensions: false);
+            SqliteCatalogueDatabase database = new(seeded.DatabasePath);
+            _ = await new ArchiveFaceReviewDerivativeWriter(database).GenerateAsync(
+                seeded.RevisionId,
+                seeded.SourcePath,
+                seeded.SourceRoot,
+                seeded.ProxyRoot,
+                new DateTimeOffset(2026, 8, 16, 18, 0, 0, TimeSpan.Zero));
+
+            FakeFilesOnDemandPlatform platform = new(
+                new OneDriveFilesOnDemandState(AssetAvailability.OnlineOnly, false, true));
+
+            await using ReviewApiFactory factory = new(
+                seeded.DatabasePath,
+                seeded.ProxyRoot,
+                seeded.ProfileId,
+                platform);
+            using HttpClient client = factory.CreateClient();
+
+            ReviewFaceDetailsResponse details = await client.GetFromJsonAsync<ReviewFaceDetailsResponse>(
+                $"/api/review/faces/{seeded.FaceId}")
+                ?? throw new InvalidOperationException("Face details response was empty.");
+
+            Assert.Null(details.PhotoWidth);
+            Assert.Null(details.PhotoHeight);
+            ReviewFaceTargetResponse detailsTarget = Assert.IsType<ReviewFaceTargetResponse>(
+                details.Face.TargetBox);
+            Assert.Equal(0.20, detailsTarget.X, 3);
+            Assert.Equal(0.20, detailsTarget.Y, 3);
+            Assert.Equal(0.60, detailsTarget.Width, 3);
+            Assert.Equal(0.60, detailsTarget.Height, 3);
+
+            ReviewFacePageResponse galleryPage = await client.GetFromJsonAsync<ReviewFacePageResponse>(
+                "/api/review/faces?state=all")
+                ?? throw new InvalidOperationException("Face gallery response was empty.");
+            ReviewFaceTargetResponse galleryTarget = Assert.IsType<ReviewFaceTargetResponse>(
+                Assert.Single(galleryPage.Items).TargetBox);
+            Assert.Equal(detailsTarget, galleryTarget);
+            Assert.Equal(0, platform.HydrationRequests);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Face_details_remains_high_resolution_after_original_becomes_online_only()
     {
         string directory = CreateTemporaryDirectory();
@@ -133,7 +185,9 @@ public sealed class ReviewFaceDetailImageApplicationTests
         }
     }
 
-    private static async Task<SeededFace> SeedAsync(string directory)
+    private static async Task<SeededFace> SeedAsync(
+        string directory,
+        bool includeRevisionDimensions = true)
     {
         string databasePath = Path.Combine(directory, "catalogue.db");
         string sourceRoot = Path.Combine(directory, "private-photos");
@@ -171,8 +225,8 @@ public sealed class ReviewFaceDetailImageApplicationTests
             originalBytes.LongLength,
             now,
             "image/jpeg",
-            2400,
-            1600);
+            includeRevisionDimensions ? 2400 : null,
+            includeRevisionDimensions ? 1600 : null);
         CatalogueAssetRevision persistedRevision = await new SqliteAssetCatalogueRepository(database)
             .SaveRevisionAsync(source, asset, revision);
 
