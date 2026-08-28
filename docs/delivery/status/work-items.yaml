@@ -826,3 +826,57 @@ work_items:
   blocker_notes:
   - Medium priority. Quantify the apparent regression and audit reference/ranking/model behavior before changing production suggestion semantics.
   evidence: []
+- id: WI-0082
+  title: Add secure trusted-LAN phone access for slideshow use
+  milestone: M22
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0082-secure-mobile-slideshow-access.md
+  blockers:
+  - WI-0051
+  - WI-0052
+  blocker_notes: []
+  evidence: []
+- id: WI-0083
+  title: Add stable Smart Collection slideshow snapshots
+  milestone: M22
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0083-slideshow-snapshot-manifest.md
+  blockers:
+  - WI-0050
+  blocker_notes: []
+  evidence: []
+- id: WI-0084
+  title: Build fullscreen Smart Collection slideshow playback
+  milestone: M22
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0084-fullscreen-slideshow-playback.md
+  blockers:
+  - WI-0083
+  blocker_notes: []
+  evidence: []
+- id: WI-0085
+  title: Harden slideshow playback for toddler-safe phone use
+  milestone: M22
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0085-protected-toddler-slideshow.md
+  blockers:
+  - WI-0082
+  - WI-0084
+  blocker_notes: []
+  evidence: []
+- id: WI-0086
+  title: Prepare and retain slideshow originals for best-quality playback
+  milestone: M22
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0086-slideshow-original-preparation.md
+  blockers:
+  - WI-0042
+  - WI-0083
+  - WI-0084
+  blocker_notes: []
+  evidence: []
