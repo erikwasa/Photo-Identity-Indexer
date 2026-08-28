@@ -27,6 +27,7 @@ public sealed class ArchiveBoundedAnalysisService
     private readonly CollectionOriginalAccessService _originals;
     private readonly ArchiveSourceVerificationService _sourceVerification;
     private readonly PhotoMetadataInspectionService _metadataInspection;
+    private readonly FaceReviewDerivativeBackfillService _faceReviewBackfill;
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
     private readonly TimeProvider _timeProvider;
     private readonly ArchiveThroughputMetrics? _metrics;
@@ -66,6 +67,13 @@ public sealed class ArchiveBoundedAnalysisService
         _originals = originals;
         _sourceVerification = sourceVerification;
         _metadataInspection = metadataInspection;
+        _faceReviewBackfill = new FaceReviewDerivativeBackfillService(
+            database,
+            catalogue,
+            originals,
+            proxyConfiguration,
+            timeProvider,
+            metrics);
         _proxyConfiguration = proxyConfiguration;
         _timeProvider = timeProvider;
         _metrics = metrics;
@@ -227,6 +235,9 @@ public sealed class ArchiveBoundedAnalysisService
                 {
                     return new ArchiveBoundedAnalysisAdvanceResult(false);
                 }
+                await _faceReviewBackfill.GenerateReadyRevisionAsync(
+                    verifiedRevisionId,
+                    cancellationToken);
                 _ = await _originals.RequestReleaseAsync(verifiedRevisionId, cancellationToken);
             }
 
@@ -476,6 +487,8 @@ public sealed class ArchiveBoundedAnalysisService
                 cancellationToken);
         }
         _metrics?.RecordCounter(ArchiveThroughputMetricNames.ReviewProxiesGenerated);
+
+        await _faceReviewBackfill.GenerateReadyRevisionAsync(revisionId, cancellationToken);
 
         if (status.ManagedHydration)
         {
