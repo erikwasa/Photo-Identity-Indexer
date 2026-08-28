@@ -123,6 +123,32 @@ Consequences for WI-0076:
 3. Defer duplicate-hash reduction until after the larger measured costs are removed; the repeated
    reads are real but comparatively cheap on the maintainer's local storage.
 
+## Derivative liveness slice — 2026-08-28
+
+After PR #210 merged, the first optimization slice addresses the Scenario B liveness defect without
+changing analysis concurrency or model-session behavior.
+
+The bounded post-analysis path now keeps a managed original local through both durable consumers:
+
+```text
+review proxy -> face-review derivative -> release
+```
+
+This removes the avoidable release/rehydrate boundary that produced the 156th hydration request in
+the 155-image online-only benchmark. The same ready-revision derivative generation is also applied
+before the separate verified-managed release path so older catalogues with an existing proxy cannot
+release a revision while its face-review derivative still needs the original.
+
+Legacy derivative backfill remains available for already-analysed catalogues. When its pending
+revision is downloading or releasing, that pending work is excluded from runnable CPU work and is
+reported explicitly as OneDrive-blocked work. The advancement classifier therefore reports
+`waiting` when no other runnable work remains instead of accruing the 500 ms active-loop delay.
+
+This slice deliberately does **not** apply PR #200 session reuse. After it passes CI, rerun Scenario B
+with a fresh disposable catalogue. A clean run must reach `complete`, settle managed hydration
+ownership, avoid the extra post-analysis rehydration cycle and record face-review derivative
+completion. Session reuse is the next separate slice after this liveness baseline is clean.
+
 ## Investigation slice
 
 Add lightweight timing/counter evidence for a representative archive run, including at least:
