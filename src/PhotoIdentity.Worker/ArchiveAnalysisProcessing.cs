@@ -55,6 +55,106 @@ public sealed record ArchiveAnalysisResumeResult(
     ProcessingRunSummary ProcessingSummary);
 
 /// <summary>
+/// Reuses one exact-compatible inspection handler across governed archive advancement calls.
+/// Access is serialized because detector/embedder sessions are not assumed to be thread-safe.
+/// </summary>
+public sealed class ArchiveAnalysisInspectionSession : IDisposable
+{
+    private readonly SqliteCatalogueDatabase _database;
+    private readonly ArchiveThroughputMetrics? _metrics;
+    private readonly SemaphoreSlim _gate = new(1, 1);
+    private LocalInspectionJobHandler? _handler;
+    private string? _sessionKey;
+    private bool _disposed;
+
+    public ArchiveAnalysisInspectionSession(
+        SqliteCatalogueDatabase database,
+        ArchiveThroughputMetrics? metrics = null)
+    {
+        ArgumentNullException.ThrowIfNull(database);
+        _database = database;
+        _metrics = metrics;
+    }
+
+    public async Task<Lease> AcquireAsync(
+        LocalBatchConfiguration configuration,
+        Sha256Digest profileHash,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        await _gate.WaitAsync(cancellationToken);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            string sessionKey = $"{profileHash}:{configuration.ToJson()}";
+            if (_handler is null ||
+                !string.Equals(_sessionKey, sessionKey, StringComparison.Ordinal))
+            {
+                _handler?.Dispose();
+                _handler = await LocalInspectionJobHandler.CreateAsync(
+                    _database,
+                    configuration,
+                    cancellationToken,
+                    _metrics);
+                _sessionKey = sessionKey;
+            }
+
+            return new Lease(this, _handler);
+        }
+        catch
+        {
+            _gate.Release();
+            throw;
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _handler?.Dispose();
+        _handler = null;
+        _sessionKey = null;
+        _gate.Dispose();
+    }
+
+    private void Release() => _gate.Release();
+
+    public sealed class Lease : IDisposable
+    {
+        private readonly ArchiveAnalysisInspectionSession _owner;
+        private bool _disposed;
+
+        internal Lease(
+            ArchiveAnalysisInspectionSession owner,
+            LocalInspectionJobHandler handler)
+        {
+            _owner = owner;
+            Handler = handler;
+        }
+
+        public LocalInspectionJobHandler Handler { get; }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _owner.Release();
+        }
+    }
+}
+
+/// <summary>
 /// Runs the governed permanent-archive profile only for current, locally available revisions
 /// that have not already completed that exact profile.
 /// </summary>
@@ -63,16 +163,19 @@ public sealed class ArchiveAnalysisCoordinator
     private readonly SqliteCatalogueDatabase _database;
     private readonly TimeProvider _timeProvider;
     private readonly ArchiveThroughputMetrics? _metrics;
+    private readonly ArchiveAnalysisInspectionSession? _inspectionSession;
 
     public ArchiveAnalysisCoordinator(
         SqliteCatalogueDatabase database,
         TimeProvider? timeProvider = null,
-        ArchiveThroughputMetrics? metrics = null)
+        ArchiveThroughputMetrics? metrics = null,
+        ArchiveAnalysisInspectionSession? inspectionSession = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _metrics = metrics;
+        _inspectionSession = inspectionSession;
     }
 
     public async Task<ArchiveAnalysisStartResult> StartAsync(
@@ -135,22 +238,38 @@ public sealed class ArchiveAnalysisCoordinator
         await processingRepository.CreateRunAsync(run, jobs, cancellationToken);
         await analysisRepository.RegisterRunAsync(runId, profile, now, cancellationToken);
 
-        using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
-            _database,
-            batchConfiguration,
-            cancellationToken,
-            _metrics);
-        AnalysisTrackingJobHandler handler = new(
-            _database,
-            inspection,
-            analysisRepository,
-            profileHash,
-            _timeProvider);
-        ResumableBatchProcessorResult processing = await new ResumableBatchProcessor(
+        ResumableBatchProcessorResult processing;
+        if (_inspectionSession is null)
+        {
+            using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
+                _database,
+                batchConfiguration,
+                cancellationToken,
+                _metrics);
+            processing = await RunProcessingAsync(
                 processingRepository,
-                handler,
-                _timeProvider)
-            .RunUntilIdleAsync(runId, processorOptions, cancellationToken);
+                analysisRepository,
+                inspection,
+                profileHash,
+                runId,
+                processorOptions,
+                cancellationToken);
+        }
+        else
+        {
+            using ArchiveAnalysisInspectionSession.Lease lease = await _inspectionSession.AcquireAsync(
+                batchConfiguration,
+                profileHash,
+                cancellationToken);
+            processing = await RunProcessingAsync(
+                processingRepository,
+                analysisRepository,
+                lease.Handler,
+                profileHash,
+                runId,
+                processorOptions,
+                cancellationToken);
+        }
 
         return new ArchiveAnalysisStartResult(
             profile,
@@ -181,23 +300,62 @@ public sealed class ArchiveAnalysisCoordinator
                 $"Archive analysis run {runId} resolves to profile {currentHash}, but was registered as {registeredHash}.");
         }
 
-        using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
-            _database,
-            batchConfiguration,
-            cancellationToken,
-            _metrics);
+        ResumableBatchProcessorResult processing;
+        if (_inspectionSession is null)
+        {
+            using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
+                _database,
+                batchConfiguration,
+                cancellationToken,
+                _metrics);
+            processing = await RunProcessingAsync(
+                processingRepository,
+                analysisRepository,
+                inspection,
+                currentHash,
+                runId,
+                processorOptions,
+                cancellationToken);
+        }
+        else
+        {
+            using ArchiveAnalysisInspectionSession.Lease lease = await _inspectionSession.AcquireAsync(
+                batchConfiguration,
+                currentHash,
+                cancellationToken);
+            processing = await RunProcessingAsync(
+                processingRepository,
+                analysisRepository,
+                lease.Handler,
+                currentHash,
+                runId,
+                processorOptions,
+                cancellationToken);
+        }
+
+        return new ArchiveAnalysisResumeResult(profile, processing.Summary);
+    }
+
+    private async Task<ResumableBatchProcessorResult> RunProcessingAsync(
+        SqliteProcessingRepository processingRepository,
+        SqliteArchiveAnalysisRepository analysisRepository,
+        IProcessingJobHandler inspection,
+        Sha256Digest profileHash,
+        ProcessingRunId runId,
+        ResumableBatchProcessorOptions? processorOptions,
+        CancellationToken cancellationToken)
+    {
         AnalysisTrackingJobHandler handler = new(
             _database,
             inspection,
             analysisRepository,
-            currentHash,
+            profileHash,
             _timeProvider);
-        ResumableBatchProcessorResult processing = await new ResumableBatchProcessor(
+        return await new ResumableBatchProcessor(
                 processingRepository,
                 handler,
                 _timeProvider)
             .RunUntilIdleAsync(runId, processorOptions, cancellationToken);
-        return new ArchiveAnalysisResumeResult(profile, processing.Summary);
     }
 }
 
