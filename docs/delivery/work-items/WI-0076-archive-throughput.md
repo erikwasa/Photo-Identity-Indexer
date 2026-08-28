@@ -68,6 +68,61 @@ Run the local-original and online-only scenarios against the same fixed 100–20
 before selecting the next optimization. PR #200's session-reuse idea is one candidate to reapply
 and A/B test only after the baseline identifies session setup as material.
 
+## Maintainer benchmark evidence — 2026-08-28
+
+The metrics-only PR was exercised against the same private 155-image corpus on the maintainer machine.
+
+### Scenario A — originals already local
+
+- 155 images analysed successfully with 0 failures.
+- Sample wall clock: **25m 53s**, or **359.24 images/hour** and **10.02 seconds/image**.
+- 155 analysis attempts created **155 model sessions**.
+- Model-session initialization consumed about **1,279 seconds total**, averaging about **8.25 seconds/image**.
+- This was the dominant local cost.
+- 741 full-file SHA-256 reads were observed across the 155 revisions, but local hash time was small relative to model setup.
+- The fixed active-loop delay contributed about 0.5 seconds/image.
+
+### Scenario B — the same originals online-only
+
+The 155th image reached analysed state after a sampled processing phase of **39m 22.19s**, or
+**236.22 images/hour** and **15.24 seconds/image**, with 0 analysis failures.
+
+The run did not terminate normally after analysis. It was deliberately paused after an additional
+**44m 51.37s** post-analysis stall so the evidence could be preserved without manually opening,
+pinning or otherwise contaminating the source media.
+
+At the stall:
+
+- 155 images were analysed, 0 pending and 0 failed;
+- 154 originals had returned to online-only;
+- one 5,539,796-byte managed original remained in `downloading`;
+- the stuck revision was already source-verified and analysed;
+- counters showed 155 analysis attempts, 155 model-session initializations, 155 release requests,
+  but **156 hydration requests**;
+- no face-review derivative completion had been recorded;
+- model-session initialization consumed **1,487.75 seconds total**, averaging **9.60 seconds/image**;
+- the useful analysis-session lifetime averaged only **0.92 seconds/image**;
+- 775 full-file hash reads were observed, exactly five per revision in this scenario
+  (source verification once, original-open once, original-status twice, analysis once);
+- 5,163 active-loop delays consumed about **43m 37s**.
+
+The extra hydration plus the pending face-review derivative path identifies a separate liveness /
+ordering defect: review-proxy generation releases a managed original before the independent
+face-review derivative backfill has consumed it. Backfill then rehydrates an already-analysed
+revision. If that hydration remains in progress, the derivative is still classified as runnable work,
+so advancement reports `running` and accrues the 500 ms active delay instead of reporting
+OneDrive `waiting`.
+
+Consequences for WI-0076:
+
+1. Fix post-analysis derivative ordering/liveness first so an online-only benchmark can terminate
+   cleanly. Prefer keeping a managed original hydrated through review-proxy and face-review
+   derivative generation before release, and classify a derivative blocked on hydration as waiting.
+2. Then reapply and benchmark the session-reuse concept from PR #200 against current code.
+   Scenario A and B both show per-image model initialization as the dominant throughput cost.
+3. Defer duplicate-hash reduction until after the larger measured costs are removed; the repeated
+   reads are real but comparatively cheap on the maintainer's local storage.
+
 ## Investigation slice
 
 Add lightweight timing/counter evidence for a representative archive run, including at least:
