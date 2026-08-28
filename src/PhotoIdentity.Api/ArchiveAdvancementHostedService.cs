@@ -20,6 +20,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     private readonly SqliteArchiveSourceHydrationRepository _sourceHydrations;
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly ArchiveBoundedAnalysisService _boundedAnalysis;
+    private readonly CollectionOriginalAccessService _originals;
     private readonly FaceReviewDerivativeBackfillService _faceReviewBackfill;
     private readonly ArchiveOperatorConfiguration _operatorConfiguration;
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
@@ -51,6 +52,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         _sourceHydrations = sourceHydrations;
         _capacity = capacity;
         _boundedAnalysis = boundedAnalysis;
+        _originals = originals;
         ArgumentNullException.ThrowIfNull(metrics);
         _faceReviewBackfill = new FaceReviewDerivativeBackfillService(
             database,
@@ -211,9 +213,21 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             profileHash,
             proxyProfile.Id,
             cancellationToken) is not null;
-        bool faceReviewPending = await _faceReviewBackfill.GetNextPendingAsync(
+        var faceReviewPendingRevision = await _faceReviewBackfill.GetNextPendingAsync(
             coverage,
-            cancellationToken) is not null;
+            cancellationToken);
+        bool faceReviewPending = faceReviewPendingRevision is not null;
+        bool faceReviewBlockedOnOneDrive = false;
+        if (faceReviewPendingRevision is not null)
+        {
+            CollectionOriginalAccessSnapshot? faceReviewStatus = await _originals.GetStatusAsync(
+                faceReviewPendingRevision.Value,
+                cancellationToken);
+            faceReviewBlockedOnOneDrive = faceReviewStatus?.State is
+                CollectionOriginalAccessService.DownloadingState or
+                CollectionOriginalAccessService.ReleasingState;
+        }
+
         bool analysisPending = (await _analysis.GetPendingCurrentRevisionIdsAsync(
             coverage.Source.Id,
             profileHash,
@@ -223,7 +237,11 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         CatalogueArchiveRunStatus? latest = await new SqliteArchiveStatusRepository(_database)
             .GetLatestRunAsync(profileHash, cancellationToken);
         bool activeRun = latest is not null && (latest.QueuedJobs > 0 || latest.RunningJobs > 0);
-        bool hasRunnableWork = sourcePending || proxyPending || faceReviewPending || analysisPending || activeRun;
+        bool hasRunnableWork = sourcePending ||
+            proxyPending ||
+            (faceReviewPending && !faceReviewBlockedOnOneDrive) ||
+            analysisPending ||
+            activeRun;
 
         // Observing the storage snapshot reconciles durable release ownership once OneDrive has
         // actually made a managed file online-only.
@@ -236,7 +254,10 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             storage.ManagedReleasingBytes > 0 ||
             releasePending;
 
-        return ArchiveAdvancementWorkClassifier.Classify(hasRunnableWork, hasOneDriveTransition);
+        return ArchiveAdvancementWorkClassifier.Classify(
+            hasRunnableWork,
+            hasOneDriveTransition,
+            faceReviewBlockedOnOneDrive);
     }
 
     private static bool IsRetryableTransition(Exception exception)
