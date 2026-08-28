@@ -163,6 +163,53 @@ public sealed class ArchiveHydrationCapacityServiceTests
         }
     }
 
+    [Fact]
+    public async Task Completed_managed_release_reconciles_archive_availability_to_online_only()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            DateTimeOffset now = new(2026, 8, 28, 16, 30, 0, TimeSpan.Zero);
+            CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
+            CatalogueProcessingAssetRevision revision = await SaveRevisionAsync(
+                database,
+                source,
+                "released.jpg",
+                400,
+                now);
+
+            SqliteArchiveHydrationRepository hydrations = new(database);
+            await hydrations.ClaimAsync(revision.RevisionId, now);
+            await hydrations.MarkReleaseRequestedAsync(revision.RevisionId, now.AddSeconds(1));
+
+            FakeFilesOnDemandPlatform platform = new();
+            platform.SetState(revision, AssetAvailability.OnlineOnly);
+            ArchiveHydrationCapacityService service = CreateService(
+                database,
+                platform,
+                new FixedStorageProbe(10_000),
+                new ArchiveHydrationPolicyConfiguration(0, 10_000, 2));
+
+            ArchiveStorageSnapshot snapshot = await service.GetStorageSnapshotAsync();
+
+            Assert.Equal(0, snapshot.ActiveManagedOriginals);
+            ArchiveManagedHydrationRecord? ownership = await hydrations.GetAsync(revision.RevisionId);
+            Assert.False(ownership?.IsActive);
+
+            CatalogueArchiveFolderStatus status = await new SqliteArchiveStatusRepository(database)
+                .GetStatusAsync(source.Id, string.Empty, profileHash: null);
+            Assert.Equal(1, status.CurrentImages);
+            Assert.Equal(0, status.LocalImages);
+            Assert.Equal(1, status.OnlineOnlyImages);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
     private static ArchiveHydrationCapacityService CreateService(
         SqliteCatalogueDatabase database,
         FakeFilesOnDemandPlatform platform,
