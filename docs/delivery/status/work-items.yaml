@@ -689,22 +689,28 @@ work_items:
 - id: WI-0076
   title: Improve archive processing throughput
   milestone: M20
-  status: in_review
+  status: in_progress
   owner: ai-agent
   document: ../work-items/WI-0076-archive-throughput.md
   started_at: 2026-08-20
-  last_updated_at: 2026-08-27
-  branch: agent/WI-0076-throughput-metrics
+  last_updated_at: 2026-08-28
+  branch: agent/WI-0076-derivative-liveness
   blockers:
   - WI-0042
   - WI-0072
   blocker_notes:
-  - PR #210 contains the fresh metrics-only baseline instrumentation from current main. Exact-head workflow #1285 passed all required lanes; the controlled local/online-only maintainer benchmark remains pending. PR #200 stays unmerged as a later optimization candidate and must not be treated as baseline behavior.
+  - Metrics-only baseline PR #210 merged after exact-head workflow #1287 passed. Scenario A measured 359.24 images/hour; baseline Scenario B reached 155/155 analysed at 236.22 images/hour but then exposed a 44m51s post-analysis face-derivative rehydration stall. PR #211 fixes derivative-before-release and OneDrive-blocked waiting classification. Maintainer validation on the same 155-image online-only corpus completed normally in 39m32s at 235.20 images/hour with 155 hydrations, 155 releases, zero active managed originals and no failures. The validation exposed stale persisted availability after completed release; PR #211 now reconciles that status to online-only and awaits exact-head CI. PR #200 remains untouched as the later session-reuse reference.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/210
   - type: workflow
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33094175596
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33167716983
+  - type: merge_commit
+    value: 1888bdb86a1b1b8f72e3b488338946125a1bdad4
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/211
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33170344438
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/200
   - type: workflow

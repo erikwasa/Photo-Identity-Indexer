@@ -123,6 +123,58 @@ Consequences for WI-0076:
 3. Defer duplicate-hash reduction until after the larger measured costs are removed; the repeated
    reads are real but comparatively cheap on the maintainer's local storage.
 
+## Derivative liveness slice — 2026-08-28
+
+After PR #210 merged, the first optimization slice addresses the Scenario B liveness defect without
+changing analysis concurrency or model-session behavior.
+
+The bounded post-analysis path now keeps a managed original local through both durable consumers:
+
+```text
+review proxy -> face-review derivative -> release
+```
+
+This removes the avoidable release/rehydrate boundary that produced the 156th hydration request in
+the 155-image online-only benchmark. The same ready-revision derivative generation is also applied
+before the separate verified-managed release path so older catalogues with an existing proxy cannot
+release a revision while its face-review derivative still needs the original.
+
+Legacy derivative backfill remains available for already-analysed catalogues. When its pending
+revision is downloading or releasing, that pending work is excluded from runnable CPU work and is
+reported explicitly as OneDrive-blocked work. The advancement classifier therefore reports
+`waiting` when no other runnable work remains instead of accruing the 500 ms active-loop delay.
+
+This slice deliberately does **not** apply PR #200 session reuse. After it passes CI, rerun Scenario B
+with a fresh disposable catalogue. A clean run must reach `complete`, settle managed hydration
+ownership, avoid the extra post-analysis rehydration cycle and record face-review derivative
+completion. Session reuse is the next separate slice after this liveness baseline is clean.
+
+### Maintainer validation — PR #211 package
+
+The same 155-image online-only corpus was rerun from a fresh catalogue/output/proxy set using the
+PR #211 package from workflow #1294.
+
+- advancement reached **`complete`** with **155 analysed / 0 failed**;
+- elapsed wall clock was **39m 32.42s**, or **235.20 images/hour** and **15.31 seconds/image**;
+- hydration/release counters were exactly **155 / 155**;
+- final storage was fully settled: 0 managed hydrated/downloading/releasing/reserved bytes,
+  0 active managed originals and 0 hydrations in progress;
+- face-review derivative generation ran 155 times and completed derivative revisions for 121
+  face-bearing images;
+- active-loop delay fell to **741 iterations / 375.83s (~6m 16s)** from the stalled baseline's
+  5,163 iterations / ~43m 37s;
+- OneDrive wait was explicitly recorded (1 iteration / ~1.0s);
+- model-session initialization remained dominant at **1,533.91s total / 9.90s per image**.
+
+The physical lifecycle therefore passes the liveness acceptance target: no post-analysis rehydration,
+no stranded managed original and normal advancement completion.
+
+The validation also exposed stale archive availability reporting. The final storage snapshot had
+fully released all managed originals, but `/api/archive/status` still reported 155 local / 0
+online-only because release reconciliation marked hydration ownership released without updating
+`archive_asset_availability`. PR #211 now reconciles that persisted availability to online-only
+when a managed release is observed complete, with focused integration coverage.
+
 ## Investigation slice
 
 Add lightweight timing/counter evidence for a representative archive run, including at least:

@@ -98,6 +98,7 @@ public sealed class ArchiveHydrationCapacityService
     private readonly SqliteArchiveHydrationRepository _hydrations;
     private readonly SqliteArchiveSourceHydrationRepository _sourceHydrations;
     private readonly SqliteArchiveStorageRepository _storage;
+    private readonly SqliteArchiveAvailabilityRepository _availability;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
     private readonly IArchiveStorageProbe _probe;
     private readonly ArchiveHydrationPolicyConfiguration _configuration;
@@ -130,6 +131,7 @@ public sealed class ArchiveHydrationCapacityService
         _hydrations = hydrations;
         _sourceHydrations = sourceHydrations;
         _storage = storage;
+        _availability = new SqliteArchiveAvailabilityRepository(database);
         _platform = platform;
         _probe = probe;
         _configuration = configuration;
@@ -339,7 +341,7 @@ public sealed class ArchiveHydrationCapacityService
                 lease.LastNeededAtUtc,
                 lease.IsReleaseRequested,
                 lease.AssetRevisionId,
-                null);
+                lease.AssetId);
             if (await ObserveLeaseAsync(normalized, cancellationToken) is ObservedManagedLease value)
             {
                 observed.Add(value);
@@ -376,13 +378,23 @@ public sealed class ArchiveHydrationCapacityService
             : _platform.GetState(path);
         if (lease.IsReleaseRequested && state.Availability == AssetAvailability.OnlineOnly)
         {
+            DateTimeOffset observedAt = _timeProvider.GetUtcNow();
+
+            // Persist observed availability before closing the managed lease. If the process stops
+            // between the two writes, the still-active release can be observed and reconciled again.
+            await _availability.RecordAsync(
+                lease.AssetId,
+                AssetAvailability.OnlineOnly,
+                observedAt,
+                cancellationToken);
+
             if (lease.RevisionId is AssetRevisionId revisionId)
             {
-                await _hydrations.MarkReleasedAsync(revisionId, _timeProvider.GetUtcNow(), cancellationToken);
+                await _hydrations.MarkReleasedAsync(revisionId, observedAt, cancellationToken);
             }
-            else if (lease.SourceAssetId is AssetId assetId)
+            else if (lease.SourceAssetId is AssetId sourceAssetId)
             {
-                await _sourceHydrations.MarkReleasedAsync(assetId, _timeProvider.GetUtcNow(), cancellationToken);
+                await _sourceHydrations.MarkReleasedAsync(sourceAssetId, observedAt, cancellationToken);
             }
 
             return null;
@@ -472,7 +484,10 @@ public sealed class ArchiveHydrationCapacityService
         DateTimeOffset LastNeededAtUtc,
         bool IsReleaseRequested,
         AssetRevisionId? RevisionId,
-        AssetId? SourceAssetId);
+        AssetId AssetId)
+    {
+        public AssetId? SourceAssetId => RevisionId is null ? AssetId : null;
+    }
 
     private sealed record ObservedManagedLease(
         ManagedLease Lease,

@@ -8,10 +8,11 @@ public static class ArchiveAdvancementWorkClassifier
 {
     public static ArchiveAdvancementWorkClassification Classify(
         bool hasRunnableWork,
-        bool hasOneDriveTransition)
+        bool hasOneDriveTransition,
+        bool hasOneDriveBlockedWork = false)
     {
         return new ArchiveAdvancementWorkClassification(
-            HasWork: hasRunnableWork || hasOneDriveTransition,
-            WaitingForOneDrive: hasOneDriveTransition && !hasRunnableWork);
+            HasWork: hasRunnableWork || hasOneDriveTransition || hasOneDriveBlockedWork,
+            WaitingForOneDrive: !hasRunnableWork && (hasOneDriveTransition || hasOneDriveBlockedWork));
     }
 }
