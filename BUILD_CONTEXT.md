@@ -6,33 +6,31 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0080 — Make the detected face unambiguous in review images** is the active corrective engineering item.
+**WI-0080 — Make the detected face unambiguous in review images** is complete.
 
-PR #209 merged the approved dynamic **Target** overlay, but the 2026-08-28 real-catalogue verification failed: no overlay appeared in Face Review or Face Details, and the tested catalogue showed no persisted Photo dimensions. The permanent archive paths historically leave `asset_revisions.width`/`height` null, while PR #209's regression seed supplied explicit dimensions.
+PR #213 merged the existing-catalogue compatibility correction and exact-head workflow #1311 passed.
+The maintainer then verified current `main` against the real catalogue and confirmed that WI-0080 now
+works as expected. No re-analysis or face-derivative regeneration was required.
 
-The active branch is `agent/WI-0080-existing-catalogue-target-overlay`. It keeps existing analysis and derivatives intact, carries revision identity into review records, prefers true photo dimensions when present, and otherwise uses the configured whole-photo review proxy's persisted dimensions only as an aspect-ratio geometry surrogate for normalized face observations. Proxy dimensions must not be exposed as original Photo dimensions.
-
-WI-0076 session reuse merged through PR #212 and remains separate throughput acceptance work. WI-0081 remains ready but should not start until WI-0080 real-catalogue acceptance is resolved.
+**WI-0076 — Improve archive processing throughput** remains the only in-progress engineering item.
+Its session-reuse implementation is merged through PR #212 and the maintainer Scenario A/B benchmarks
+passed; the registry still needs formal closeout against its acceptance criteria. **WI-0081** remains
+ready and should not be started implicitly before WI-0076 is closed or deliberately deferred.
 
 ## Next concrete step
 
-1. Complete the WI-0080 existing-catalogue corrective implementation and required CI.
-2. Package the exact corrective head/current main after merge; do **not** re-analyze or regenerate existing faces.
-3. Open Face Review and Face Details against the same permanent catalogue that previously showed no overlay.
-4. Confirm every face with usable persisted geometry now shows the **Target** outline/label, including a contextual image containing another visible face where available.
-5. Confirm Photo dimensions remain `—` when true original dimensions are unknown and that no original hydration occurs merely to render target geometry.
-6. If the visual treatment is unmistakable, record maintainer verification and complete WI-0080; otherwise keep the item open with the observed case.
+1. Review WI-0076's recorded Scenario A/B evidence against its acceptance criteria.
+2. If the remaining criteria are satisfied or intentionally scoped out, record maintainer verification and complete WI-0076.
+3. Close/supersede historical PR #200 if it is still open and no longer needed.
+4. After WI-0076 closeout, proceed to WI-0081 if that remains the next M21 priority.
 
 ## Relevant files
 
-- `docs/delivery/work-items/WI-0080-detected-face-clarity.md`
-- `src/PhotoIdentity.Api/ReviewFaceTargetResolver.cs`
-- `src/PhotoIdentity.Api/ReviewFacePreviewResolver.cs`
-- `src/PhotoIdentity.Api/ReviewEndpoints.cs`
-- `src/PhotoIdentity.Api/SuggestionGalleryEndpoints.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteArchiveReviewProxyRepository.cs`
-- `tests/PhotoIdentity.Integration.Tests/ReviewFaceDetailImageApplicationTests.cs`
+- `docs/delivery/work-items/WI-0076-archive-throughput.md`
 - `docs/delivery/status/work-items.yaml`
+- `docs/delivery/work-items/WI-0080-detected-face-clarity.md`
+- `docs/delivery/work-items/WI-0081-suggestion-accuracy-degradation.md`
+- `BUILD_CONTEXT.md`
 - `AGENTS.md`
 
 ## Repository validation

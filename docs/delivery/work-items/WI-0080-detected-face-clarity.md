@@ -239,3 +239,21 @@ re-analysis or derivative regeneration:
 Acceptance remains pending required CI and a repeat packaged real-catalogue visual check. The overlay
 is expected for every face occurrence with usable geometry, regardless of whether another face was
 detected in the contextual image.
+
+## Final maintainer verification — 2026-08-28
+
+PR #213 merged and the maintainer repeated the real-catalogue check on current `main`. WI-0080 is now
+working as expected.
+
+The corrective path resolves the prior compatibility failure without re-analysis or derivative
+regeneration: existing faces with null original photo dimensions can still produce the dynamic
+**Target** overlay from persisted normalized observation geometry plus the configured whole-photo
+review proxy aspect ratio.
+
+Final acceptance evidence:
+
+- exact-head workflow #1311 passed all required CI lanes;
+- PR #213 merged as commit `8d120dce6fd2780250868a7485d29c7585dea55d`; and
+- maintainer real-catalogue verification passed after merge.
+
+WI-0080 is complete.
