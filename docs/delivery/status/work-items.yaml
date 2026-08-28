@@ -789,22 +789,31 @@ work_items:
 - id: WI-0080
   title: Make the detected face unambiguous in review images
   milestone: M21
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0080-detected-face-clarity.md
   started_at: 2026-08-26
+  completed_at: 2026-08-28
+  verified_at: 2026-08-28
+  verified_by: maintainer
   last_updated_at: 2026-08-28
   branch: agent/WI-0080-existing-catalogue-target-overlay
   blockers:
   - WI-0038
   - WI-0058
   blocker_notes:
-  - PR #209 merged the approved dynamic target overlay, but real-catalogue verification on 2026-08-28 failed because existing asset revisions have null photo dimensions and therefore returned no TargetBox. The active corrective slice uses configured whole-photo review-proxy dimensions only as an aspect-ratio geometry fallback for normalized observations; no re-analysis or derivative regeneration is required. CI and repeat real-catalogue visual acceptance remain pending.
+  - Final 2026-08-28 maintainer real-catalogue verification passed after PR #213 corrected null-dimension compatibility. The Target overlay now works as expected without re-analysis or derivative regeneration.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/209
   - type: merge_commit
     value: baec2e0b76cafea232e25ce45a065b5c52653b63
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/213
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33199227541
+  - type: merge_commit
+    value: 8d120dce6fd2780250868a7485d29c7585dea55d
 - id: WI-0081
   title: Investigate degraded identity suggestion accuracy
   milestone: M21
