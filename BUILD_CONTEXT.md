@@ -6,36 +6,38 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0082 — Add secure trusted-LAN phone access for slideshow use** is implemented and in review on PR #215.
+**WI-0083 — Add stable Smart Collection slideshow snapshots** is the active M22 implementation item.
 
-The maintainer explicitly prioritized implementation of the current M22 slideshow work items on 2026-08-28 and asked to defer the full milestone review until all current M22 items are implemented. WI-0082 preserves the existing loopback-only desktop URL and adds a separate opt-in HTTPS mobile listener using one explicit non-loopback IP address, an operator-owned PFX and an optional advertised phone URL. Exact-head CI run #1320 is green; the remaining WI-0082 acceptance is the real trusted-LAN phone check, intentionally deferred to the consolidated M22 review.
+The slice adds a dedicated saved-collection slideshow snapshot operation rather than widening the existing paged Smart Collection workspace query. Snapshot creation reads the saved definition and complete matching revision set inside one SQLite read transaction, then returns a lightweight deterministic oldest-to-newest revision-ID manifest. The normal workspace remains newest-first and limited to pages of at most 200 items.
 
-WI-0076 remains recorded as `in_progress` and still needs formal closeout against its already collected benchmark evidence. That closeout is not part of this M22 slice.
+WI-0082 remains `in_review`; its real trusted-LAN phone HTTPS/secure-context acceptance is intentionally deferred to the consolidated M22 review after the current M22 implementation items are complete.
+
+WI-0076 remains separately recorded as `in_progress` and is not part of this M22 slice.
 
 ## Next concrete step
 
-1. Merge PR #215 after the lifecycle-only evidence/status update remains green.
-2. Begin WI-0083, the immutable complete Smart Collection slideshow snapshot contract.
-3. During the consolidated M22 review, complete WI-0082 maintainer verification on the real trusted-LAN phone: certificate trust, valid HTTPS, same-origin UI/images/API resources and `window.isSecureContext === true`.
+1. Run exact-head CI for WI-0083 and correct any build/test/documentation failures.
+2. After CI is green, record PR/workflow evidence and move WI-0083 to `in_review`.
+3. Merge WI-0083, then begin WI-0084 fullscreen slideshow playback.
+4. Perform the consolidated M22 real-device/product review only after the current M22 work items are implemented.
 
 ## Relevant files
 
-- `docs/delivery/work-items/WI-0082-secure-mobile-slideshow-access.md`
+- `docs/delivery/work-items/WI-0083-slideshow-snapshot-manifest.md`
 - `docs/delivery/milestones/M22-protected-smart-collection-slideshow.md`
 - `docs/product/slideshow.md`
-- `Start-PhotoIdentity.ps1`
-- `verify-launcher.ps1`
-- `docs/operations/windows-package.md`
+- `src/PhotoIdentity.Api/SmartCollectionEndpoints.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionQueryRepository.cs`
+- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionRepository.cs`
+- `tests/PhotoIdentity.Integration.Tests/SmartCollectionSlideshowSnapshotTests.cs`
 - `docs/delivery/status/work-items.yaml`
-- `docs/delivery/status/milestones.yaml`
 
 ## Repository validation
 
 ```powershell
 ./build.ps1
 ./test.ps1
-./verify-launcher.ps1 -Configuration Release
-./verify-package.ps1 -Configuration Release
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+./verify-review.ps1 -Mode Smoke -Configuration Release
 ```
