@@ -81,17 +81,17 @@ public sealed class SlideshowProtectionState
 
     public void PointerUp(SlideshowParentZone zone, long pointerId)
     {
-        switch (zone)
+        bool releasedActivePointer = zone switch
         {
-            case SlideshowParentZone.Left when _leftPointerId == pointerId:
-                _leftPointerId = null;
-                break;
-            case SlideshowParentZone.Right when _rightPointerId == pointerId:
-                _rightPointerId = null;
-                break;
-        }
+            SlideshowParentZone.Left => _leftPointerId == pointerId,
+            SlideshowParentZone.Right => _rightPointerId == pointerId,
+            _ => false,
+        };
 
-        _holdStartedAt = null;
+        if (releasedActivePointer)
+        {
+            CancelParentHold();
+        }
     }
 
     public bool TryCompleteParentUnlock(DateTimeOffset now)
