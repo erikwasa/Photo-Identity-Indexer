@@ -118,8 +118,19 @@ public sealed class SqliteSmartCollectionRepository
     {
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await EnsureSchemaAsync(connection, cancellationToken);
+        return await GetAsync(connection, transaction: null, id, cancellationToken);
+    }
+
+    internal static async Task<SmartCollectionDefinition?> GetAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        SmartCollectionId id,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
 
         using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
         command.CommandText = """
             SELECT id, display_name, filter_schema_version, filter_json, created_at_utc, updated_at_utc
             FROM smart_collections
@@ -212,7 +223,7 @@ public sealed class SqliteSmartCollectionRepository
         command.Parameters.AddWithValue("$updated_at_utc", updatedAtUtc.ToString("O", CultureInfo.InvariantCulture));
     }
 
-    private static SmartCollectionDefinition ReadDefinition(SqliteDataReader reader)
+    internal static SmartCollectionDefinition ReadDefinition(SqliteDataReader reader)
     {
         int filterSchemaVersion = reader.GetInt32(2);
         if (filterSchemaVersion is not 1 and not FilterSchemaVersion)
@@ -327,7 +338,7 @@ public sealed class SqliteSmartCollectionRepository
         CultureInfo.InvariantCulture,
         DateTimeStyles.RoundtripKind);
 
-    private static async Task EnsureSchemaAsync(
+    internal static async Task EnsureSchemaAsync(
         SqliteConnection connection,
         CancellationToken cancellationToken)
     {

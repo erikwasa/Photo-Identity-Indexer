@@ -23,6 +23,12 @@ public sealed record SmartCollectionPhotoPage(
     int Total,
     SmartCollectionFilter Filter);
 
+public sealed record SmartCollectionSlideshowSnapshot(
+    SmartCollectionId CollectionId,
+    string CollectionName,
+    DateTimeOffset CreatedAtUtc,
+    IReadOnlyList<AssetRevisionId> RevisionIds);
+
 /// <summary>
 /// Evaluates reusable smart-collection filters against current immutable revisions.
 /// Populated dimensions combine with AND semantics; people and tags independently support all/any.
@@ -128,11 +134,21 @@ public sealed class SqliteSmartCollectionQueryRepository
         """;
 
     private readonly SqliteCatalogueDatabase _database;
+    private readonly TimeProvider _timeProvider;
 
     public SqliteSmartCollectionQueryRepository(SqliteCatalogueDatabase database)
+        : this(database, TimeProvider.System)
+    {
+    }
+
+    public SqliteSmartCollectionQueryRepository(
+        SqliteCatalogueDatabase database,
+        TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(timeProvider);
         _database = database;
+        _timeProvider = timeProvider;
     }
 
     public async Task<SmartCollectionPhotoPage> QueryAsync(
@@ -220,6 +236,79 @@ public sealed class SqliteSmartCollectionQueryRepository
 
         return new SmartCollectionPhotoPage(items, offset, limit, total, filter);
     }
+
+    public async Task<SmartCollectionSlideshowSnapshot?> CreateSlideshowSnapshotAsync(
+        SmartCollectionId collectionId,
+        CancellationToken cancellationToken = default)
+    {
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await SqliteSmartCollectionRepository.EnsureSchemaAsync(connection, cancellationToken);
+        await SqlitePhotoPersonSchema.EnsureAsync(connection, transaction: null, cancellationToken);
+        await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(connection, cancellationToken);
+        await EnsurePhotoMetadataSchemaAsync(connection, cancellationToken);
+
+        DateTimeOffset createdAtUtc = _timeProvider.GetUtcNow();
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        SmartCollectionDefinition? definition = await SqliteSmartCollectionRepository.GetAsync(
+            connection,
+            transaction,
+            collectionId,
+            cancellationToken);
+        if (definition is null)
+        {
+            transaction.Commit();
+            return null;
+        }
+
+        string where = BuildWhere(definition.Filter);
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"""
+            {CommonCtes}
+            SELECT
+                asset_revisions.id,
+                asset_revisions.observed_at_utc,
+                photo_capture_metadata.taken_at_local
+            FROM asset_revisions
+            INNER JOIN assets ON assets.id = asset_revisions.asset_id
+            LEFT JOIN photo_capture_metadata
+                ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+            WHERE assets.deleted_at_utc IS NULL
+              {where};
+            """;
+        AddFilterParameters(command, definition.Filter);
+
+        List<SlideshowSnapshotCandidate> candidates = [];
+        await using (SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                candidates.Add(new SlideshowSnapshotCandidate(
+                    AssetRevisionId.From(Guid.Parse(reader.GetString(0))),
+                    ParseObserved(reader.GetString(1)),
+                    reader.IsDBNull(2) ? null : ParseLocal(reader.GetString(2))));
+            }
+        }
+
+        transaction.Commit();
+
+        AssetRevisionId[] revisionIds = candidates
+            .OrderBy(candidate => EffectiveSlideshowTime(candidate))
+            .ThenBy(candidate => candidate.RevisionId.ToString(), StringComparer.Ordinal)
+            .Select(candidate => candidate.RevisionId)
+            .ToArray();
+
+        return new SmartCollectionSlideshowSnapshot(
+            definition.Id,
+            definition.Name,
+            createdAtUtc,
+            revisionIds);
+    }
+
+    private static DateTime EffectiveSlideshowTime(SlideshowSnapshotCandidate candidate) =>
+        candidate.TakenAtLocal
+        ?? DateTime.SpecifyKind(candidate.ObservedAtUtc.UtcDateTime, DateTimeKind.Unspecified);
 
     private static string BuildWhere(SmartCollectionFilter filter)
     {
@@ -340,6 +429,11 @@ public sealed class SqliteSmartCollectionQueryRepository
             CultureInfo.InvariantCulture,
             DateTimeStyles.None),
         DateTimeKind.Unspecified);
+
+    private sealed record SlideshowSnapshotCandidate(
+        AssetRevisionId RevisionId,
+        DateTimeOffset ObservedAtUtc,
+        DateTime? TakenAtLocal);
 
     private static async Task EnsurePhotoMetadataSchemaAsync(
         SqliteConnection connection,

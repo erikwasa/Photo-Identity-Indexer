@@ -74,6 +74,16 @@ public sealed record SmartCollectionPageResponse(
     string? CollectionId = null,
     string? CollectionName = null);
 
+public sealed record SmartCollectionSlideshowSnapshotItemResponse(
+    string RevisionId);
+
+public sealed record SmartCollectionSlideshowSnapshotResponse(
+    string CollectionId,
+    string CollectionName,
+    DateTimeOffset CreatedAtUtc,
+    SmartCollectionSlideshowSnapshotItemResponse[] Items,
+    int Total);
+
 public static class SmartCollectionEndpoints
 {
     public static IEndpointRouteBuilder MapSmartCollectionEndpoints(this IEndpointRouteBuilder endpoints)
@@ -85,6 +95,7 @@ public static class SmartCollectionEndpoints
         endpoints.MapPut("/api/smart-collections/{id:guid}", UpdateAsync);
         endpoints.MapDelete("/api/smart-collections/{id:guid}", DeleteAsync);
         endpoints.MapGet("/api/smart-collections/{id:guid}/query", QuerySavedAsync);
+        endpoints.MapPost("/api/smart-collections/{id:guid}/slideshow-snapshot", CreateSlideshowSnapshotAsync);
         return endpoints;
     }
 
@@ -192,6 +203,35 @@ public static class SmartCollectionEndpoints
         return await repository.DeleteAsync(collectionId, cancellationToken)
             ? Results.NoContent()
             : Results.NotFound();
+    }
+
+    private static async Task<IResult> CreateSlideshowSnapshotAsync(
+        Guid id,
+        SqliteSmartCollectionQueryRepository query,
+        CancellationToken cancellationToken)
+    {
+        if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
+        {
+            return error!;
+        }
+
+        SmartCollectionSlideshowSnapshot? snapshot =
+            await query.CreateSlideshowSnapshotAsync(collectionId, cancellationToken);
+        if (snapshot is null)
+        {
+            return Results.NotFound();
+        }
+
+        SmartCollectionSlideshowSnapshotItemResponse[] items = snapshot.RevisionIds
+            .Select(revisionId => new SmartCollectionSlideshowSnapshotItemResponse(revisionId.ToString()))
+            .ToArray();
+
+        return Results.Ok(new SmartCollectionSlideshowSnapshotResponse(
+            snapshot.CollectionId.ToString(),
+            snapshot.CollectionName,
+            snapshot.CreatedAtUtc,
+            items,
+            items.Length));
     }
 
     private static async Task<IResult> QuerySavedAsync(
