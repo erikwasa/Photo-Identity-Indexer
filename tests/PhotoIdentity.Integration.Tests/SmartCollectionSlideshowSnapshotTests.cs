@@ -172,7 +172,7 @@ public sealed class SmartCollectionSlideshowSnapshotTests
                 ?? throw new InvalidOperationException();
 
             Assert.Equal(
-                [capture2018, observed2019, tiedFirst, tiedSecond, capture2021],
+                new[] { capture2018, observed2019, tiedFirst, tiedSecond, capture2021 },
                 snapshot.RevisionIds);
         }
         finally
