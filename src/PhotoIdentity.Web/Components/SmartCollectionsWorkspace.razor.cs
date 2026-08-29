@@ -19,6 +19,9 @@ public partial class SmartCollectionsWorkspace
     [Inject]
     public IJSRuntime JS { get; set; } = default!;
 
+    [Inject]
+    public NavigationManager Navigation { get; set; } = default!;
+
     [Parameter]
     [SupplyParameterFromQuery(Name = "mode")]
     public string? NavigationMode { get; set; }
@@ -82,6 +85,10 @@ public partial class SmartCollectionsWorkspace
             SmartCollectionNavigation.BuildTransientWorkspaceUrl(TransientPreviewKey, Results.Offset),
         _ => "/smart-collections",
     };
+
+    private string CurrentSavedWorkspaceUrl => EditingId is null
+        ? "/smart-collections"
+        : SmartCollectionNavigation.BuildSavedWorkspaceUrl(EditingId, Results?.Offset ?? 0);
 
     protected override async Task OnInitializedAsync()
     {
@@ -281,6 +288,29 @@ public partial class SmartCollectionsWorkspace
         {
             Busy = false;
         }
+    }
+
+    private async Task StartSlideshowAsync()
+    {
+        if (EditingId is null)
+        {
+            return;
+        }
+
+        Error = null;
+        Notice = null;
+
+        try
+        {
+            _ = await JS.InvokeAsync<bool>("photoIdentitySlideshow.requestFullscreen");
+        }
+        catch (JSException exception)
+        {
+            Notice = $"Fullscreen could not be requested before slideshow navigation: {exception.Message}";
+        }
+
+        string returnUrl = Uri.EscapeDataString(CurrentSavedWorkspaceUrl);
+        Navigation.NavigateTo($"/slideshow/{EditingId}?return={returnUrl}");
     }
 
     private async Task PreviewAsync()
