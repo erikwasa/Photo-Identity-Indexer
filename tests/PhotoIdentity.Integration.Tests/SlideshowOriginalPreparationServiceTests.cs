@@ -12,6 +12,39 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class SlideshowOriginalPreparationServiceTests
 {
     [Fact]
+    public async Task Zero_photo_snapshot_prepares_immediately_without_hydration()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            FakeFilesOnDemandPlatform platform = new();
+            TestServices services = CreateServices(
+                database,
+                platform,
+                new ArchiveHydrationPolicyConfiguration(0, 10_000, 2));
+
+            SlideshowOriginalPreparationSnapshot started =
+                await services.Preparation.StartAsync([]);
+            SlideshowOriginalPreparationSnapshot ready = await WaitForStateAsync(
+                services.Preparation,
+                started.SessionId,
+                SlideshowOriginalPreparationStates.Ready);
+
+            Assert.Equal(0, ready.Ready);
+            Assert.Equal(0, ready.Total);
+            Assert.Empty(platform.HydrationRequests);
+
+            services.Preparation.End(started.SessionId);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Mixed_local_and_online_snapshot_prepares_without_claiming_preexisting_local_content()
     {
         string directory = CreateTemporaryDirectory();
