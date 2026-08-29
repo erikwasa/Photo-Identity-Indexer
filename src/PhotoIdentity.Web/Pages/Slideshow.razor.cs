@@ -198,6 +198,7 @@ public partial class Slideshow : IAsyncDisposable
                     Playback.IsPlaying ||
                     _resumeAfterFullscreenRecovery ||
                     _resumeAfterParentControls;
+                _resumeAfterFullscreenRecovery = false;
                 Playback.Pause();
             }
             else
@@ -479,7 +480,7 @@ public partial class Slideshow : IAsyncDisposable
             case "ArrowRight":
                 await RequestNavigationAsync(SlideshowNavigationDirection.Next);
                 break;
-            case " " when FullscreenActive:
+            case " " when FullscreenActive && !PreparingOriginals && !PreparationFailed:
                 TogglePlay();
                 break;
         }
@@ -531,7 +532,10 @@ public partial class Slideshow : IAsyncDisposable
             Protection.ClearRecovery();
             await AcquireProtectionsAsync(showWarning: true);
 
-            if (!Protection.ParentControlsOpen && _resumeAfterFullscreenRecovery)
+            if (!Protection.ParentControlsOpen &&
+                !PreparingOriginals &&
+                !PreparationFailed &&
+                _resumeAfterFullscreenRecovery)
             {
                 _resumeAfterFullscreenRecovery = false;
                 Playback.Resume();
@@ -609,7 +613,10 @@ public partial class Slideshow : IAsyncDisposable
         Protection.ClearRecovery();
         await AcquireProtectionsAsync(showWarning: true);
 
-        if (!Protection.ParentControlsOpen && _resumeAfterFullscreenRecovery)
+        if (!Protection.ParentControlsOpen &&
+            !PreparingOriginals &&
+            !PreparationFailed &&
+            _resumeAfterFullscreenRecovery)
         {
             _resumeAfterFullscreenRecovery = false;
             Playback.Resume();
