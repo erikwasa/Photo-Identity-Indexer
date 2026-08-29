@@ -23,7 +23,9 @@ public partial class Slideshow : IAsyncDisposable
     private DotNetObjectReference<Slideshow>? _dotNetReference;
     private CancellationTokenSource? _parentUnlockCancellation;
     private CancellationTokenSource? _exitHoldCancellation;
+    private CancellationTokenSource? _preparationCancellation;
     private Task? _timerTask;
+    private Task? _preparationTask;
     private long _lastTickTimestamp;
     private long? _pointerId;
     private long? _exitPointerId;
@@ -32,6 +34,9 @@ public partial class Slideshow : IAsyncDisposable
     private bool _suppressNextClick;
     private bool _resumeAfterFullscreenRecovery;
     private bool _resumeAfterParentControls;
+    private bool _resumeAfterPreparation;
+    private bool _preparedOriginalsReady;
+    private bool _continueAvailableForSession;
     private bool _deliberateExit;
 
     [Inject]
@@ -52,6 +57,7 @@ public partial class Slideshow : IAsyncDisposable
 
     private SlideshowSettings Settings { get; set; } = SlideshowSettings.Defaults;
     private SmartCollectionSlideshowSnapshotResponse? Snapshot { get; set; }
+    private SlideshowOriginalPreparationResponse? OriginalPreparation { get; set; }
     private SlideshowBrowserProtectionStatus Capabilities { get; set; } =
         SlideshowBrowserProtectionStatus.Unknown;
     private bool ProtectionStatusKnown { get; set; }
@@ -69,8 +75,12 @@ public partial class Slideshow : IAsyncDisposable
         ? "Photo slideshow"
         : $"{Snapshot.CollectionName} slideshow";
     private string? CurrentImageUrl => Playback.CurrentRevisionId is string revisionId
-        ? ViewerPreviewUrl(revisionId)
+        ? PlaybackResourceUrl(revisionId)
         : null;
+    private bool PreparingOriginals =>
+        OriginalPreparation?.State == "preparing";
+    private bool PreparationFailed =>
+        OriginalPreparation?.State == "failed";
     private bool ShowTimerProgress =>
         FullscreenActive &&
         !Protection.ParentControlsOpen &&
@@ -81,6 +91,7 @@ public partial class Slideshow : IAsyncDisposable
     private bool ShowAdultToolbar =>
         FullscreenActive &&
         !Preparing &&
+        !PreparingOriginals &&
         string.IsNullOrWhiteSpace(Error) &&
         !Settings.ProtectedSlideshow;
     private IReadOnlyList<string> ProtectionWarnings =>
@@ -153,6 +164,7 @@ public partial class Slideshow : IAsyncDisposable
     {
         Preparing = true;
         Error = null;
+        bool beginOriginalPreparation = false;
         try
         {
             using HttpResponseMessage response = await Http.PostAsync(
@@ -178,7 +190,19 @@ public partial class Slideshow : IAsyncDisposable
                 Playback.Pause();
             }
 
-            await UpdatePrefetchAsync();
+            beginOriginalPreparation = Settings.PrepareOriginals;
+            if (beginOriginalPreparation)
+            {
+                _resumeAfterPreparation =
+                    Playback.IsPlaying ||
+                    _resumeAfterFullscreenRecovery ||
+                    _resumeAfterParentControls;
+                Playback.Pause();
+            }
+            else
+            {
+                await UpdatePrefetchAsync();
+            }
         }
         catch (Exception exception)
         {
@@ -187,6 +211,11 @@ public partial class Slideshow : IAsyncDisposable
         finally
         {
             Preparing = false;
+        }
+
+        if (beginOriginalPreparation && Snapshot is not null && Error is null)
+        {
+            await BeginOriginalPreparationAsync();
         }
     }
 
@@ -232,8 +261,35 @@ public partial class Slideshow : IAsyncDisposable
 
     private void OnCurrentImageError()
     {
-        ImageError = "This photo could not be displayed from the available local/proxy viewer source.";
         Playback.MarkCurrentImageUnavailable();
+
+        if (_preparedOriginalsReady && OriginalPreparation is not null)
+        {
+            ImageError = "A prepared original became unavailable or failed immutable verification.";
+            _preparedOriginalsReady = false;
+            OriginalPreparation = OriginalPreparation with
+            {
+                State = "failed",
+                Message = "A prepared original became unavailable or failed immutable verification. Continue with available/proxy images or cancel preparation.",
+                CanContinueWithAvailable = true,
+            };
+            _resumeAfterPreparation =
+                Playback.IsPlaying ||
+                _resumeAfterParentControls ||
+                _resumeAfterFullscreenRecovery ||
+                Settings.Autoplay;
+            Playback.Pause();
+
+            if (Settings.ProtectedSlideshow)
+            {
+                OpenParentControls(SlideshowRecoveryReason.PreparationFailure);
+                _resumeAfterParentControls = _resumeAfterPreparation;
+            }
+
+            return;
+        }
+
+        ImageError = "This photo could not be displayed from the available local/proxy viewer source.";
     }
 
     private async Task OnSurfaceClickAsync()
@@ -308,6 +364,8 @@ public partial class Slideshow : IAsyncDisposable
     private bool CanNavigatePresentation() =>
         FullscreenActive &&
         !Preparing &&
+        !PreparingOriginals &&
+        !PreparationFailed &&
         string.IsNullOrWhiteSpace(Error) &&
         !Protection.ParentControlsOpen;
 
