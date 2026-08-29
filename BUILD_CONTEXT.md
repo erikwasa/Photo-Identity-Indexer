@@ -6,17 +6,17 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0082 — Add secure trusted-LAN phone access for slideshow use** is the active M22 item.
+**WI-0082 — Add secure trusted-LAN phone access for slideshow use** is implemented and in review on PR #215.
 
-The maintainer explicitly prioritized implementation of the current M22 slideshow work items on 2026-08-28 and asked to defer the full milestone review until all current M22 items are implemented. This slice preserves the existing loopback-only desktop URL and adds a separate opt-in HTTPS mobile listener using one explicit non-loopback IP address, an operator-owned PFX and an optional advertised phone URL.
+The maintainer explicitly prioritized implementation of the current M22 slideshow work items on 2026-08-28 and asked to defer the full milestone review until all current M22 items are implemented. WI-0082 preserves the existing loopback-only desktop URL and adds a separate opt-in HTTPS mobile listener using one explicit non-loopback IP address, an operator-owned PFX and an optional advertised phone URL. Exact-head CI run #1320 is green; the remaining WI-0082 acceptance is the real trusted-LAN phone check, intentionally deferred to the consolidated M22 review.
 
 WI-0076 remains recorded as `in_progress` and still needs formal closeout against its already collected benchmark evidence. That closeout is not part of this M22 slice.
 
 ## Next concrete step
 
-1. Run the required launcher/package CI for the WI-0082 branch and correct any validation failures.
-2. After merge, perform WI-0082 maintainer verification on the real trusted-LAN phone: certificate trust, valid HTTPS, same-origin UI/images/API resources and `window.isSecureContext === true`.
-3. Then begin WI-0083, the immutable complete Smart Collection slideshow snapshot contract.
+1. Merge PR #215 after the lifecycle-only evidence/status update remains green.
+2. Begin WI-0083, the immutable complete Smart Collection slideshow snapshot contract.
+3. During the consolidated M22 review, complete WI-0082 maintainer verification on the real trusted-LAN phone: certificate trust, valid HTTPS, same-origin UI/images/API resources and `window.isSecureContext === true`.
 
 ## Relevant files
 
