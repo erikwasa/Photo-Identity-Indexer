@@ -200,3 +200,13 @@ milestones:
   - WI-0084
   - WI-0085
   - WI-0086
+- id: M23
+  title: Source-copy lifecycle and privacy exclusion
+  status: ready
+  document: ../milestones/M23-source-copy-lifecycle-and-exclusion.md
+  work_items:
+  - WI-0087
+  - WI-0088
+  - WI-0089
+  - WI-0090
+  - WI-0091
