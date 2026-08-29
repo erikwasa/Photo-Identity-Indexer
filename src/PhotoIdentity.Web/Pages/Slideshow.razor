@@ -68,6 +68,50 @@
             <p>Creating a stable snapshot of @CollectionLabel.</p>
         </section>
     }
+    else if (PreparingOriginals)
+    {
+        <section class="slideshow-state-card slideshow-preparation-card"
+                 role="status"
+                 aria-live="polite"
+                 @onclick:stopPropagation="true">
+            <div class="spinner" aria-hidden="true"></div>
+            <h1>Preparing slideshow</h1>
+            <p>@OriginalPreparation!.Ready / @OriginalPreparation.Total photos ready</p>
+            @if (!string.IsNullOrWhiteSpace(OriginalPreparation.Message))
+            {
+                <p class="slideshow-parent-hint">@OriginalPreparation.Message</p>
+            }
+        </section>
+    }
+    else if (PreparationFailed)
+    {
+        <section class="slideshow-state-card slideshow-preparation-card"
+                 role="alert"
+                 @onclick:stopPropagation="true">
+            <h1>Best-quality preparation could not complete</h1>
+            <p>@OriginalPreparation!.Message</p>
+            @if (OriginalPreparation.RequiredAdditionalBytes > 0)
+            {
+                <p>Required additional bytes: @OriginalPreparation.RequiredAdditionalBytes</p>
+                <p>Available managed capacity: @OriginalPreparation.AvailableManagedCapacity</p>
+            }
+            @if (!Settings.ProtectedSlideshow)
+            {
+                <div class="slideshow-state-actions">
+                    <button type="button" class="button primary" @onclick="ContinueWithAvailableAsync">
+                        Start with available/proxy images
+                    </button>
+                    <button type="button" class="button secondary" @onclick="CancelOriginalPreparationAsync">
+                        Cancel preparation
+                    </button>
+                </div>
+            }
+            else
+            {
+                <p class="slideshow-parent-hint">Use parent controls to choose a fallback or exit.</p>
+            }
+        </section>
+    }
     else if (!string.IsNullOrWhiteSpace(Error))
     {
         <section class="slideshow-state-card" role="alert" @onclick:stopPropagation="true">
@@ -161,8 +205,47 @@
                     </div>
                 }
 
+                @if (OriginalPreparation is not null &&
+                    OriginalPreparation.State is "preparing" or "failed")
+                {
+                    <div class="slideshow-preparation-parent" role="status">
+                        <strong>@(PreparingOriginals ? "Preparing best-quality originals" : "Best-quality preparation needs attention")</strong>
+                        <span>@OriginalPreparation.Ready / @OriginalPreparation.Total photos ready</span>
+                        @if (!string.IsNullOrWhiteSpace(OriginalPreparation.Message))
+                        {
+                            <span>@OriginalPreparation.Message</span>
+                        }
+                        @if (OriginalPreparation.RequiredAdditionalBytes > 0)
+                        {
+                            <span>Required additional bytes: @OriginalPreparation.RequiredAdditionalBytes</span>
+                            <span>Available managed capacity: @OriginalPreparation.AvailableManagedCapacity</span>
+                        }
+
+                        @if (PreparationFailed)
+                        {
+                            <div class="slideshow-parent-actions">
+                                <button type="button" class="slideshow-toolbar-button" @onclick="ContinueWithAvailableAsync">
+                                    Continue with available/proxy images
+                                </button>
+                                <button type="button" class="slideshow-toolbar-button" @onclick="CancelOriginalPreparationAsync">
+                                    Cancel preparation
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <button type="button" class="slideshow-toolbar-button" @onclick="CancelOriginalPreparationAsync">
+                                Cancel preparation
+                            </button>
+                        }
+                    </div>
+                }
+
                 <div class="slideshow-parent-actions">
-                    <button type="button" class="slideshow-toolbar-button" @onclick="ToggleParentPlayback">
+                    <button type="button"
+                            class="slideshow-toolbar-button"
+                            disabled="@(PreparingOriginals || PreparationFailed)"
+                            @onclick="ToggleParentPlayback">
                         @(_resumeAfterParentControls ? "Pause" : "Play")
                     </button>
                     <button type="button" class="slideshow-toolbar-button" @onclick="ToggleSettings">
