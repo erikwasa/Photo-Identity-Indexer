@@ -864,7 +864,7 @@ work_items:
 - id: WI-0084
   title: Build fullscreen Smart Collection slideshow playback
   milestone: M22
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0084-fullscreen-slideshow-playback.md
   started_at: 2026-08-29
@@ -874,7 +874,11 @@ work_items:
   - WI-0083
   blocker_notes:
   - WI-0083 is implemented/merged and remains in_review only because the maintainer deferred consolidated M22 acceptance.
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/217
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33264722035
 - id: WI-0085
   title: Harden slideshow playback for toddler-safe phone use
   milestone: M22
