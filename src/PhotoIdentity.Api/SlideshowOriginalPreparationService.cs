@@ -218,6 +218,12 @@ public sealed class SlideshowOriginalPreparationService
             maximumConcurrent = Math.Max(1, maximumConcurrent);
             HashSet<AssetRevisionId> ready = [];
 
+            if (session.Revisions.Count == 0)
+            {
+                session.MarkReady();
+                return;
+            }
+
             while (ready.Count < session.Revisions.Count)
             {
                 session.Cancellation.Token.ThrowIfCancellationRequested();
@@ -354,8 +360,10 @@ public sealed class SlideshowOriginalPreparationService
         DateTimeOffset cutoff = _timeProvider.GetUtcNow().Subtract(TimeSpan.FromHours(1));
         foreach ((Guid id, Session session) in _sessions)
         {
-            if (session.State is SlideshowOriginalPreparationStates.Failed or
-                    SlideshowOriginalPreparationStates.Cancelled &&
+            bool terminal =
+                session.State == SlideshowOriginalPreparationStates.Failed ||
+                session.State == SlideshowOriginalPreparationStates.Cancelled;
+            if (terminal &&
                 session.LastTouchedAtUtc < cutoff &&
                 _sessions.TryRemove(id, out Session? removed))
             {
