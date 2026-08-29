@@ -6,9 +6,9 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0083 — Add stable Smart Collection slideshow snapshots** is the active M22 implementation item.
+**WI-0083 — Add stable Smart Collection slideshow snapshots** is implemented and in review on PR #216.
 
-The slice adds a dedicated saved-collection slideshow snapshot operation rather than widening the existing paged Smart Collection workspace query. Snapshot creation reads the saved definition and complete matching revision set inside one SQLite read transaction, then returns a lightweight deterministic oldest-to-newest revision-ID manifest. The normal workspace remains newest-first and limited to pages of at most 200 items.
+The slice adds a dedicated saved-collection slideshow snapshot operation rather than widening the existing paged Smart Collection workspace query. Exact-head workflow #1324 passed before the lifecycle-only closeout commit. Snapshot creation reads the saved definition and complete matching revision set inside one SQLite read transaction, then returns a lightweight deterministic oldest-to-newest revision-ID manifest. The normal workspace remains newest-first and limited to pages of at most 200 items.
 
 WI-0082 remains `in_review`; its real trusted-LAN phone HTTPS/secure-context acceptance is intentionally deferred to the consolidated M22 review after the current M22 implementation items are complete.
 
@@ -16,10 +16,9 @@ WI-0076 remains separately recorded as `in_progress` and is not part of this M22
 
 ## Next concrete step
 
-1. Run exact-head CI for WI-0083 and correct any build/test/documentation failures.
-2. After CI is green, record PR/workflow evidence and move WI-0083 to `in_review`.
-3. Merge WI-0083, then begin WI-0084 fullscreen slideshow playback.
-4. Perform the consolidated M22 real-device/product review only after the current M22 work items are implemented.
+1. Merge PR #216 after the lifecycle-only status/evidence update remains green.
+2. Begin WI-0084 fullscreen slideshow playback against the immutable snapshot contract.
+3. Perform the consolidated M22 real-device/product review only after the current M22 work items are implemented.
 
 ## Relevant files
 
