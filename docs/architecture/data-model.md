@@ -16,6 +16,22 @@ An **asset revision** is an immutable observed content version of an asset. It r
 
 Processing attaches to revisions so changed content cannot silently reuse older detections, crops or embeddings.
 
+## Source-copy presence, duplicates and exclusion
+
+Source presence and operator exclusion are separate dimensions.
+
+A missing/removed source copy means the previously catalogued source locator was not observed during authoritative synchronization. Missing state is non-destructive so move/rename reconciliation and operator review can occur before any purge.
+
+Exact-duplicate membership is derived from authoritative revision SHA-256 values. Equal content hashes do not merge source assets and do not propagate operator actions between copies.
+
+Ordinary included assets may change source key/path after exact, unambiguous move reconciliation. An excluded source locator is different: exclusion is intentionally bound to that source plus normalized source key/path and the locator does not participate in automatic move reconciliation. If the same bytes appear at another path, that destination is a new independently controlled source copy.
+
+An **exclusion tombstone** is the minimal durable source-locator record that prevents an excluded path from being re-indexed. After the associated privacy purge completes, the tombstone retains no photo revision hash, pixel derivative, dimensions, location/tag metadata, face occurrence, embedding or identity link.
+
+Privacy exclusion is an explicit exception to ordinary canonical-history retention. Revision-linked canonical and derived records for an excluded photo are deliberately destroyed; shared Person entities and unrelated evidence for other photos remain.
+
+See [ADR-0008](../decisions/ADR-0008-source-copy-exclusion-and-purge.md) and [Source-copy lifecycle and privacy exclusion](../product/source-copy-lifecycle.md).
+
 ## Face occurrences and detector observations
 
 A **face occurrence** is the stable identity of one face within an immutable asset revision. It is the object that receives crops, embeddings, suggestions and canonical review/assignment actions.
@@ -131,6 +147,7 @@ Validated import matches known revision IDs, verifies checksums and provenance, 
 | Canonical or governed | Derived and regenerable |
 |---|---|
 | Source, asset and revision identity | Detector observations |
+| Source-copy exclusion tombstones and purge operational state | - |
 | People and favorite-selection preferences | Crops, thumbnails and review proxies |
 | Assignments, Unknown decisions and false-detection rejections | Embeddings |
 | Append-only assignment/review history | Suggestions and rankings |

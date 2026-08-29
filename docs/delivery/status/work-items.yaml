@@ -902,3 +902,58 @@ work_items:
   - WI-0084
   blocker_notes: []
   evidence: []
+- id: WI-0087
+  title: Add authoritative exact-duplicate source-copy inventory
+  milestone: M23
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0087-exact-duplicate-inventory.md
+  blockers:
+  - WI-0041
+  blocker_notes: []
+  evidence: []
+- id: WI-0088
+  title: Reconcile exact unambiguous source moves for included photos
+  milestone: M23
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0088-source-move-reconciliation.md
+  blockers:
+  - WI-0041
+  - WI-0087
+  blocker_notes: []
+  evidence: []
+- id: WI-0089
+  title: Add durable source-copy exclusion and access enforcement
+  milestone: M23
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0089-source-copy-exclusion-boundary.md
+  blockers:
+  - WI-0041
+  - WI-0042
+  blocker_notes: []
+  evidence: []
+- id: WI-0090
+  title: Purge excluded photo data and derivatives safely
+  milestone: M23
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0090-exclusion-purge-service.md
+  blockers:
+  - WI-0089
+  blocker_notes: []
+  evidence: []
+- id: WI-0091
+  title: Add archive lifecycle review and exclusion workflows
+  milestone: M23
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0091-archive-lifecycle-review.md
+  blockers:
+  - WI-0087
+  - WI-0088
+  - WI-0089
+  - WI-0090
+  blocker_notes: []
+  evidence: []
