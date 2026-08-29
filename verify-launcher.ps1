@@ -15,6 +15,10 @@ $artifactRoot = Join-Path $repositoryRoot ".artifacts\launcher-verification"
 $publishPath = Join-Path $artifactRoot "app"
 $configurationPath = Join-Path $artifactRoot "launcher.json"
 $invalidConfigurationPath = Join-Path $artifactRoot "launcher-invalid-geonames-timing.json"
+$invalidPrimaryUrlConfigurationPath = Join-Path $artifactRoot "launcher-invalid-primary-url.json"
+$invalidMobileHttpConfigurationPath = Join-Path $artifactRoot "launcher-invalid-mobile-http.json"
+$invalidMobileWildcardConfigurationPath = Join-Path $artifactRoot "launcher-invalid-mobile-wildcard.json"
+$invalidMobileCertificateConfigurationPath = Join-Path $artifactRoot "launcher-invalid-mobile-certificate.json"
 $launcherPath = Join-Path $repositoryRoot "Start-PhotoIdentity.ps1"
 $databasePath = Join-Path $artifactRoot "catalogue.db"
 $analysisPath = Join-Path $artifactRoot "analysis"
@@ -45,6 +49,75 @@ function Invoke-Launcher {
     if ($LASTEXITCODE -ne 0) {
         throw "Launcher exited with code $LASTEXITCODE."
     }
+}
+
+
+function Invoke-LauncherExpectFailure {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$ExpectedPattern,
+        [Parameter(Mandatory = $true)][string]$Description
+    )
+
+    $output = @(& powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $launcherPath -ConfigurationPath $Path -NoBrowser -StartupTimeoutSeconds 5 2>&1)
+    $exitCode = $LASTEXITCODE
+    $message = $output -join [Environment]::NewLine
+
+    if ($exitCode -eq 0) {
+        throw "Launcher accepted invalid configuration: $Description."
+    }
+    if ($message -notmatch $ExpectedPattern) {
+        throw "Launcher rejected '$Description' without the expected message '$ExpectedPattern'. Output: $message"
+    }
+    if (@(Get-LauncherServerProcesses).Count -ne 0) {
+        throw "Invalid launcher configuration '$Description' started a server before being rejected."
+    }
+}
+
+function Assert-RejectsUnsafeMobileAccess {
+    $primaryRemote = [ordered]@{
+        publishPath = $publishPath
+        url = "http://0.0.0.0:$Port"
+    }
+    $primaryRemote | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $invalidPrimaryUrlConfigurationPath -Encoding UTF8
+    Invoke-LauncherExpectFailure -Path $invalidPrimaryUrlConfigurationPath -ExpectedPattern "absolute loopback HTTP URL" -Description "remote primary launcher URL"
+
+    $mobileHttp = [ordered]@{
+        publishPath = $publishPath
+        url = $url
+        mobileAccess = [ordered]@{
+            enabled = $true
+            listenUrl = "http://192.0.2.10:5443"
+            certificatePath = "missing.pfx"
+        }
+    }
+    $mobileHttp | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $invalidMobileHttpConfigurationPath -Encoding UTF8
+    Invoke-LauncherExpectFailure -Path $invalidMobileHttpConfigurationPath -ExpectedPattern "absolute HTTPS URL" -Description "insecure mobile HTTP listener"
+
+    $mobileWildcard = [ordered]@{
+        publishPath = $publishPath
+        url = $url
+        mobileAccess = [ordered]@{
+            enabled = $true
+            listenUrl = "https://0.0.0.0:5443"
+            certificatePath = "missing.pfx"
+        }
+    }
+    $mobileWildcard | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $invalidMobileWildcardConfigurationPath -Encoding UTF8
+    Invoke-LauncherExpectFailure -Path $invalidMobileWildcardConfigurationPath -ExpectedPattern "specific non-loopback IP address" -Description "wildcard mobile HTTPS listener"
+
+    $mobileMissingCertificate = [ordered]@{
+        publishPath = $publishPath
+        url = $url
+        mobileAccess = [ordered]@{
+            enabled = $true
+            listenUrl = "https://192.0.2.10:5443"
+            phoneUrl = "https://photoidentity.invalid:5443"
+            certificatePath = "missing-mobile.pfx"
+        }
+    }
+    $mobileMissingCertificate | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $invalidMobileCertificateConfigurationPath -Encoding UTF8
+    Invoke-LauncherExpectFailure -Path $invalidMobileCertificateConfigurationPath -ExpectedPattern "certificatePath does not exist" -Description "missing mobile TLS certificate"
 }
 
 function Assert-RejectsInvalidGeoNamesTiming {
@@ -131,6 +204,7 @@ try {
     }
 
     Assert-RejectsInvalidGeoNamesTiming
+    Assert-RejectsUnsafeMobileAccess
     Invoke-Launcher
 
     $firstProcesses = @(Get-LauncherServerProcesses)
