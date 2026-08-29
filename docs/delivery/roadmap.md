@@ -27,6 +27,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M20 | Operator polish and archive throughput | in_progress |
 | M21 | Reliability and recognition quality | ready |
 | M22 | Protected Smart Collection slideshow | in_progress |
+| M23 | Source-copy lifecycle and privacy exclusion | ready |
 
 Expected evolution:
 
