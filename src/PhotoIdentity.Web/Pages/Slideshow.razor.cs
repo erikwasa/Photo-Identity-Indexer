@@ -23,7 +23,9 @@ public partial class Slideshow : IAsyncDisposable
     private DotNetObjectReference<Slideshow>? _dotNetReference;
     private CancellationTokenSource? _parentUnlockCancellation;
     private CancellationTokenSource? _exitHoldCancellation;
+    private CancellationTokenSource? _preparationCancellation;
     private Task? _timerTask;
+    private Task? _preparationTask;
     private long _lastTickTimestamp;
     private long? _pointerId;
     private long? _exitPointerId;
@@ -32,6 +34,9 @@ public partial class Slideshow : IAsyncDisposable
     private bool _suppressNextClick;
     private bool _resumeAfterFullscreenRecovery;
     private bool _resumeAfterParentControls;
+    private bool _resumeAfterPreparation;
+    private bool _preparedOriginalsReady;
+    private bool _continueAvailableForSession;
     private bool _deliberateExit;
 
     [Inject]
@@ -52,6 +57,7 @@ public partial class Slideshow : IAsyncDisposable
 
     private SlideshowSettings Settings { get; set; } = SlideshowSettings.Defaults;
     private SmartCollectionSlideshowSnapshotResponse? Snapshot { get; set; }
+    private SlideshowOriginalPreparationResponse? OriginalPreparation { get; set; }
     private SlideshowBrowserProtectionStatus Capabilities { get; set; } =
         SlideshowBrowserProtectionStatus.Unknown;
     private bool ProtectionStatusKnown { get; set; }
@@ -69,8 +75,12 @@ public partial class Slideshow : IAsyncDisposable
         ? "Photo slideshow"
         : $"{Snapshot.CollectionName} slideshow";
     private string? CurrentImageUrl => Playback.CurrentRevisionId is string revisionId
-        ? ViewerPreviewUrl(revisionId)
+        ? PlaybackResourceUrl(revisionId)
         : null;
+    private bool PreparingOriginals =>
+        OriginalPreparation?.State == "preparing";
+    private bool PreparationFailed =>
+        OriginalPreparation?.State == "failed";
     private bool ShowTimerProgress =>
         FullscreenActive &&
         !Protection.ParentControlsOpen &&
@@ -81,6 +91,7 @@ public partial class Slideshow : IAsyncDisposable
     private bool ShowAdultToolbar =>
         FullscreenActive &&
         !Preparing &&
+        !PreparingOriginals &&
         string.IsNullOrWhiteSpace(Error) &&
         !Settings.ProtectedSlideshow;
     private IReadOnlyList<string> ProtectionWarnings =>
@@ -97,6 +108,7 @@ public partial class Slideshow : IAsyncDisposable
         SlideshowRecoveryReason.BrowserBack => "Back navigation was blocked",
         SlideshowRecoveryReason.FullscreenLost => "Fullscreen was lost",
         SlideshowRecoveryReason.ProtectionWarning => "Check phone protection",
+        SlideshowRecoveryReason.PreparationFailure => "Best-quality preparation needs attention",
         _ => "Slideshow controls",
     };
 
@@ -153,6 +165,7 @@ public partial class Slideshow : IAsyncDisposable
     {
         Preparing = true;
         Error = null;
+        bool beginOriginalPreparation = false;
         try
         {
             using HttpResponseMessage response = await Http.PostAsync(
@@ -178,7 +191,20 @@ public partial class Slideshow : IAsyncDisposable
                 Playback.Pause();
             }
 
-            await UpdatePrefetchAsync();
+            beginOriginalPreparation = Settings.PrepareOriginals;
+            if (beginOriginalPreparation)
+            {
+                _resumeAfterPreparation =
+                    Playback.IsPlaying ||
+                    _resumeAfterFullscreenRecovery ||
+                    _resumeAfterParentControls;
+                _resumeAfterFullscreenRecovery = false;
+                Playback.Pause();
+            }
+            else
+            {
+                await UpdatePrefetchAsync();
+            }
         }
         catch (Exception exception)
         {
@@ -187,6 +213,11 @@ public partial class Slideshow : IAsyncDisposable
         finally
         {
             Preparing = false;
+        }
+
+        if (beginOriginalPreparation && Snapshot is not null && Error is null)
+        {
+            await BeginOriginalPreparationAsync();
         }
     }
 
@@ -232,8 +263,36 @@ public partial class Slideshow : IAsyncDisposable
 
     private void OnCurrentImageError()
     {
-        ImageError = "This photo could not be displayed from the available local/proxy viewer source.";
+        bool wasPlaying = Playback.IsPlaying;
         Playback.MarkCurrentImageUnavailable();
+
+        if (_preparedOriginalsReady && OriginalPreparation is not null)
+        {
+            ImageError = "A prepared original became unavailable or failed immutable verification.";
+            _preparedOriginalsReady = false;
+            OriginalPreparation = OriginalPreparation with
+            {
+                State = "failed",
+                Message = "A prepared original became unavailable or failed immutable verification. Continue with available/proxy images or cancel preparation.",
+                CanContinueWithAvailable = true,
+            };
+            _resumeAfterPreparation =
+                wasPlaying ||
+                _resumeAfterParentControls ||
+                _resumeAfterFullscreenRecovery ||
+                Settings.Autoplay;
+            Playback.Pause();
+
+            if (Settings.ProtectedSlideshow)
+            {
+                OpenParentControls(SlideshowRecoveryReason.PreparationFailure);
+                _resumeAfterParentControls = _resumeAfterPreparation;
+            }
+
+            return;
+        }
+
+        ImageError = "This photo could not be displayed from the available local/proxy viewer source.";
     }
 
     private async Task OnSurfaceClickAsync()
@@ -308,6 +367,8 @@ public partial class Slideshow : IAsyncDisposable
     private bool CanNavigatePresentation() =>
         FullscreenActive &&
         !Preparing &&
+        !PreparingOriginals &&
+        !PreparationFailed &&
         string.IsNullOrWhiteSpace(Error) &&
         !Protection.ParentControlsOpen;
 
@@ -419,7 +480,7 @@ public partial class Slideshow : IAsyncDisposable
             case "ArrowRight":
                 await RequestNavigationAsync(SlideshowNavigationDirection.Next);
                 break;
-            case " " when FullscreenActive:
+            case " " when FullscreenActive && !PreparingOriginals && !PreparationFailed:
                 TogglePlay();
                 break;
         }
@@ -471,7 +532,10 @@ public partial class Slideshow : IAsyncDisposable
             Protection.ClearRecovery();
             await AcquireProtectionsAsync(showWarning: true);
 
-            if (!Protection.ParentControlsOpen && _resumeAfterFullscreenRecovery)
+            if (!Protection.ParentControlsOpen &&
+                !PreparingOriginals &&
+                !PreparationFailed &&
+                _resumeAfterFullscreenRecovery)
             {
                 _resumeAfterFullscreenRecovery = false;
                 Playback.Resume();
@@ -549,7 +613,10 @@ public partial class Slideshow : IAsyncDisposable
         Protection.ClearRecovery();
         await AcquireProtectionsAsync(showWarning: true);
 
-        if (!Protection.ParentControlsOpen && _resumeAfterFullscreenRecovery)
+        if (!Protection.ParentControlsOpen &&
+            !PreparingOriginals &&
+            !PreparationFailed &&
+            _resumeAfterFullscreenRecovery)
         {
             _resumeAfterFullscreenRecovery = false;
             Playback.Resume();
@@ -644,8 +711,37 @@ public partial class Slideshow : IAsyncDisposable
     private async Task ChangeProtectedAsync(ChangeEventArgs args) =>
         await ApplyAndPersistSettingsAsync(Settings with { ProtectedSlideshow = ParseChecked(args) });
 
-    private async Task ChangePrepareOriginalsAsync(ChangeEventArgs args) =>
-        await ApplyAndPersistSettingsAsync(Settings with { PrepareOriginals = ParseChecked(args) });
+    private async Task ChangePrepareOriginalsAsync(ChangeEventArgs args)
+    {
+        bool enabled = ParseChecked(args);
+        await ApplyAndPersistSettingsAsync(Settings with { PrepareOriginals = enabled });
+
+        if (Snapshot is null)
+        {
+            return;
+        }
+
+        if (enabled)
+        {
+            _continueAvailableForSession = false;
+            await BeginOriginalPreparationAsync();
+        }
+        else
+        {
+            bool shouldResume = _resumeAfterPreparation;
+            await EndOriginalPreparationAsync();
+            _preparedOriginalsReady = false;
+            _continueAvailableForSession = false;
+            OriginalPreparation = null;
+            ImageError = null;
+            await UpdatePrefetchAsync();
+
+            if (shouldResume)
+            {
+                ResumeAfterPreparationHold();
+            }
+        }
+    }
 
     private async Task ApplyAndPersistSettingsAsync(SlideshowSettings settings)
     {
@@ -656,6 +752,12 @@ public partial class Slideshow : IAsyncDisposable
         Settings = settings.Normalize();
         Playback.ApplySettings(Settings);
         Protection.Configure(Settings.ProtectedSlideshow);
+
+        if (PreparingOriginals && previous.Autoplay != Settings.Autoplay)
+        {
+            _resumeAfterPreparation = Settings.Autoplay;
+            Playback.Pause();
+        }
 
         if (parentWasOpen && Settings.ProtectedSlideshow)
         {
@@ -697,6 +799,307 @@ public partial class Slideshow : IAsyncDisposable
         }
 
         await UpdatePrefetchAsync();
+    }
+
+    private async Task BeginOriginalPreparationAsync()
+    {
+        if (Snapshot is null || _continueAvailableForSession)
+        {
+            return;
+        }
+
+        await EndOriginalPreparationAsync();
+
+        _resumeAfterPreparation =
+            _resumeAfterPreparation ||
+            Playback.IsPlaying ||
+            _resumeAfterParentControls ||
+            _resumeAfterFullscreenRecovery;
+        Playback.Pause();
+        _preparedOriginalsReady = false;
+        ImageError = null;
+        OriginalPreparation = new SlideshowOriginalPreparationResponse(
+            string.Empty,
+            "preparing",
+            0,
+            Snapshot.Total,
+            0,
+            0,
+            "Preflighting the complete slideshow against the configured storage policy.",
+            false);
+
+        CancellationTokenSource cancellation = new();
+        _preparationCancellation = cancellation;
+        StateHasChanged();
+
+        try
+        {
+            SlideshowOriginalPreparationRequest request = new(
+                Snapshot.Items.Select(item => item.RevisionId).ToArray());
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/slideshows/original-preparation",
+                request,
+                cancellation.Token);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                SetPreparationFailure(
+                    $"Best-quality slideshow preparation could not start. Status {(int)response.StatusCode}.");
+                return;
+            }
+
+            SlideshowOriginalPreparationResponse status =
+                await response.Content.ReadFromJsonAsync<SlideshowOriginalPreparationResponse>(
+                    cancellationToken: cancellation.Token)
+                ?? throw new InvalidOperationException(
+                    "The slideshow original preparation response was empty.");
+            OriginalPreparation = status;
+            await ApplyPreparationStatusAsync(status);
+
+            if (!Guid.TryParse(status.SessionId, out Guid sessionId) ||
+                sessionId == Guid.Empty)
+            {
+                SetPreparationFailure(
+                    "The best-quality slideshow preparation session identifier was invalid.");
+                return;
+            }
+
+            _preparationTask = MaintainOriginalPreparationAsync(
+                sessionId,
+                cancellation.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            SetPreparationFailure(
+                $"Best-quality slideshow preparation could not start: {exception.Message}");
+        }
+    }
+
+    private async Task MaintainOriginalPreparationAsync(
+        Guid sessionId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                TimeSpan delay = _preparedOriginalsReady
+                    ? TimeSpan.FromMinutes(1)
+                    : TimeSpan.FromMilliseconds(500);
+                await Task.Delay(delay, cancellationToken);
+
+                using HttpResponseMessage response = await Http.GetAsync(
+                    $"api/slideshows/original-preparation/{sessionId:D}",
+                    cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    await InvokeAsync(() =>
+                    {
+                        SetPreparationFailure(
+                            "The best-quality slideshow preparation session expired or became unavailable.");
+                        return Task.CompletedTask;
+                    });
+                    return;
+                }
+
+                SlideshowOriginalPreparationResponse status =
+                    await response.Content.ReadFromJsonAsync<SlideshowOriginalPreparationResponse>(
+                        cancellationToken: cancellationToken)
+                    ?? throw new InvalidOperationException(
+                        "The slideshow original preparation status response was empty.");
+
+                await InvokeAsync(() => ApplyPreparationStatusAsync(status));
+                if (status.State is "failed" or "cancelled")
+                {
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            await InvokeAsync(() =>
+            {
+                SetPreparationFailure(
+                    $"Best-quality slideshow preparation status could not be refreshed: {exception.Message}");
+                return Task.CompletedTask;
+            });
+        }
+    }
+
+    private async Task ApplyPreparationStatusAsync(
+        SlideshowOriginalPreparationResponse status)
+    {
+        OriginalPreparation = status;
+
+        switch (status.State)
+        {
+            case "ready":
+                if (!_preparedOriginalsReady)
+                {
+                    _preparedOriginalsReady = true;
+                    ImageError = null;
+                    await UpdatePrefetchAsync();
+                    ResumeAfterPreparationHold();
+                }
+                break;
+
+            case "failed":
+                _preparedOriginalsReady = false;
+                Playback.Pause();
+                if (Settings.ProtectedSlideshow)
+                {
+                    OpenParentControls(SlideshowRecoveryReason.PreparationFailure);
+                    _resumeAfterParentControls = _resumeAfterPreparation;
+                }
+                break;
+
+            case "preparing":
+                Playback.Pause();
+                break;
+        }
+
+        StateHasChanged();
+    }
+
+    private void SetPreparationFailure(string message)
+    {
+        int ready = OriginalPreparation?.Ready ?? 0;
+        int total = OriginalPreparation?.Total ?? Snapshot?.Total ?? 0;
+        long required = OriginalPreparation?.RequiredAdditionalBytes ?? 0;
+        long available = OriginalPreparation?.AvailableManagedCapacity ?? 0;
+        string sessionId = OriginalPreparation?.SessionId ?? string.Empty;
+
+        OriginalPreparation = new SlideshowOriginalPreparationResponse(
+            sessionId,
+            "failed",
+            ready,
+            total,
+            required,
+            available,
+            message,
+            true);
+        _preparedOriginalsReady = false;
+        Playback.Pause();
+
+        if (Settings.ProtectedSlideshow)
+        {
+            OpenParentControls(SlideshowRecoveryReason.PreparationFailure);
+            _resumeAfterParentControls = _resumeAfterPreparation;
+        }
+
+        StateHasChanged();
+    }
+
+    private void ResumeAfterPreparationHold()
+    {
+        bool shouldResume = _resumeAfterPreparation;
+        _resumeAfterPreparation = false;
+
+        if (!shouldResume)
+        {
+            return;
+        }
+
+        if (Protection.ParentControlsOpen)
+        {
+            _resumeAfterParentControls = true;
+            return;
+        }
+
+        if (FullscreenActive)
+        {
+            _resumeAfterFullscreenRecovery = false;
+            Playback.Resume();
+        }
+        else
+        {
+            _resumeAfterFullscreenRecovery = true;
+        }
+
+        _lastTickTimestamp = Stopwatch.GetTimestamp();
+    }
+
+    private async Task ContinueWithAvailableAsync()
+    {
+        bool shouldResume =
+            _resumeAfterPreparation ||
+            _resumeAfterParentControls;
+
+        await EndOriginalPreparationAsync();
+        _preparedOriginalsReady = false;
+        _continueAvailableForSession = true;
+        OriginalPreparation = null;
+        ImageError = null;
+        await UpdatePrefetchAsync();
+
+        _resumeAfterPreparation = false;
+        if (Protection.ParentControlsOpen)
+        {
+            _resumeAfterParentControls = shouldResume;
+            CloseParentControls();
+        }
+        else if (shouldResume && FullscreenActive)
+        {
+            Playback.Resume();
+        }
+        else if (shouldResume)
+        {
+            _resumeAfterFullscreenRecovery = true;
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task CancelOriginalPreparationAsync()
+    {
+        await EndOriginalPreparationAsync();
+        _preparedOriginalsReady = false;
+        _continueAvailableForSession = true;
+        _resumeAfterPreparation = false;
+        _resumeAfterParentControls = false;
+        OriginalPreparation = null;
+        ImageError = null;
+        Playback.Pause();
+        await UpdatePrefetchAsync();
+        StateHasChanged();
+    }
+
+    private async Task EndOriginalPreparationAsync()
+    {
+        CancellationTokenSource? cancellation = _preparationCancellation;
+        _preparationCancellation = null;
+        if (cancellation is not null)
+        {
+            cancellation.Cancel();
+        }
+
+        Guid sessionId = default;
+        bool hasSession =
+            OriginalPreparation is not null &&
+            Guid.TryParse(OriginalPreparation.SessionId, out sessionId) &&
+            sessionId != Guid.Empty;
+
+        if (hasSession)
+        {
+            try
+            {
+                using HttpResponseMessage _ = await Http.DeleteAsync(
+                    $"api/slideshows/original-preparation/{sessionId:D}");
+            }
+            catch
+            {
+                // The server-side lease is also expiring, so failed cleanup cannot strand it.
+            }
+        }
+
+        cancellation?.Dispose();
+        _preparationTask = null;
     }
 
     private void BeginExitHold(PointerEventArgs args)
@@ -773,7 +1176,7 @@ public partial class Slideshow : IAsyncDisposable
     {
         string[] urls = Playback
             .GetPrefetchRevisionIds(PrefetchWindow)
-            .Select(ViewerPreviewUrl)
+            .Select(PlaybackResourceUrl)
             .ToArray();
         await JS.InvokeVoidAsync("photoIdentitySlideshow.setPrefetchUrls", (object)urls);
     }
@@ -785,6 +1188,7 @@ public partial class Slideshow : IAsyncDisposable
         _navigationGate.Reset();
         CancelParentUnlockTimer();
         CancelExitHoldInternal();
+        await EndOriginalPreparationAsync();
 
         try
         {
@@ -797,6 +1201,19 @@ public partial class Slideshow : IAsyncDisposable
         }
 
         Navigation.NavigateTo(NormalizeReturnUrl(ReturnUrl), replace: true);
+    }
+
+    private string PlaybackResourceUrl(string revisionId)
+    {
+        if (_preparedOriginalsReady &&
+            OriginalPreparation is not null &&
+            Guid.TryParse(OriginalPreparation.SessionId, out Guid sessionId) &&
+            sessionId != Guid.Empty)
+        {
+            return $"/api/slideshows/original-preparation/{sessionId:D}/photos/{Uri.EscapeDataString(revisionId)}/original";
+        }
+
+        return ViewerPreviewUrl(revisionId);
     }
 
     private static string ViewerPreviewUrl(string revisionId) =>
@@ -850,6 +1267,7 @@ public partial class Slideshow : IAsyncDisposable
         CancelParentUnlockTimer();
         CancelExitHoldInternal();
         _navigationGate.Reset();
+        await EndOriginalPreparationAsync();
 
         if (_timerTask is not null)
         {

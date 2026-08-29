@@ -126,7 +126,9 @@ public partial class Program
         builder.Services.AddSingleton<CollectionReviewProxyFileResolver>();
         builder.Services.AddSingleton<ReviewFaceTargetResolver>();
         builder.Services.AddSingleton<CollectionOriginalAccessService>();
+        builder.Services.AddSingleton<SlideshowOriginalLeaseRegistry>();
         builder.Services.AddSingleton<ArchiveHydrationCapacityService>();
+        builder.Services.AddSingleton<SlideshowOriginalPreparationService>();
         builder.Services.AddSingleton<ArchiveSourceVerificationService>();
         builder.Services.AddSingleton<ArchiveBoundedAnalysisService>();
         builder.Services.AddSingleton<IOneDriveFilesOnDemandPlatform, WindowsOneDriveFilesOnDemandPlatform>();
@@ -168,6 +170,7 @@ public partial class Program
             if (context.Request.Path.StartsWithSegments("/api/review") ||
                 context.Request.Path.StartsWithSegments("/api/collections") ||
                 context.Request.Path.StartsWithSegments("/api/smart-collections") ||
+                context.Request.Path.StartsWithSegments("/api/slideshows") ||
                 context.Request.Path.StartsWithSegments("/api/photo-metadata") ||
                 context.Request.Path.StartsWithSegments("/api/places") ||
                 context.Request.Path.StartsWithSegments("/api/place-enrichment") ||
@@ -204,6 +207,7 @@ public partial class Program
         app.MapCollectionEndpoints();
         app.MapPhotoDetailsEndpoints();
         app.MapSmartCollectionEndpoints();
+        app.MapSlideshowOriginalPreparationEndpoints();
         app.MapPhotoMetadataEndpoints();
         app.MapCollectionProxyEndpoints();
         app.MapCollectionViewerPreviewEndpoints();

@@ -66,6 +66,15 @@ public sealed record ArchiveHydrationAdmission(
     string? Message,
     long EvictionBytesRequested);
 
+public sealed record ArchiveHydrationSetAdmission(
+    bool Allowed,
+    bool WaitingForRelease,
+    string? Message,
+    long RequiredAdditionalBytes,
+    long AvailableManagedCapacity,
+    long EvictionBytesRequested,
+    int MaximumConcurrentOperations);
+
 public interface IArchiveStorageProbe
 {
     long GetAvailableFreeSpaceBytes(string path);
@@ -104,6 +113,7 @@ public sealed class ArchiveHydrationCapacityService
     private readonly ArchiveHydrationPolicyConfiguration _configuration;
     private readonly ReviewProxyServingConfiguration _proxyConfiguration;
     private readonly TimeProvider _timeProvider;
+    private readonly SlideshowOriginalLeaseRegistry _slideshowLeases;
     private readonly SemaphoreSlim _admissionGate = new(1, 1);
     private readonly SemaphoreSlim? _largeOperationGate;
 
@@ -116,7 +126,8 @@ public sealed class ArchiveHydrationCapacityService
         IArchiveStorageProbe probe,
         ArchiveHydrationPolicyConfiguration configuration,
         ReviewProxyServingConfiguration proxyConfiguration,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        SlideshowOriginalLeaseRegistry? slideshowLeases = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(hydrations);
@@ -137,6 +148,7 @@ public sealed class ArchiveHydrationCapacityService
         _configuration = configuration;
         _proxyConfiguration = proxyConfiguration;
         _timeProvider = timeProvider;
+        _slideshowLeases = slideshowLeases ?? new SlideshowOriginalLeaseRegistry(timeProvider);
         if (configuration.TryGetPolicy(out ArchiveHydrationPolicy? policy, out _))
         {
             _largeOperationGate = new SemaphoreSlim(policy!.MaximumConcurrentOperations, policy.MaximumConcurrentOperations);
@@ -198,6 +210,146 @@ public sealed class ArchiveHydrationCapacityService
 
     public Task TouchSourceAsync(AssetId assetId, CancellationToken cancellationToken = default) =>
         _sourceHydrations.TouchAsync(assetId, _timeProvider.GetUtcNow(), cancellationToken);
+
+    public async Task<ArchiveHydrationSetAdmission> PreflightHydrationSetAsync(
+        IReadOnlyCollection<CatalogueProcessingAssetRevision> revisions,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(revisions);
+
+        if (!_configuration.TryGetPolicy(out ArchiveHydrationPolicy? policy, out string? policyMessage) ||
+            policy is null)
+        {
+            return new ArchiveHydrationSetAdmission(
+                false,
+                false,
+                policyMessage,
+                0L,
+                0L,
+                0L,
+                0);
+        }
+
+        CatalogueProcessingAssetRevision[] requested = revisions
+            .DistinctBy(revision => revision.RevisionId)
+            .ToArray();
+        if (requested.Length == 0)
+        {
+            return new ArchiveHydrationSetAdmission(
+                true,
+                false,
+                null,
+                0L,
+                policy.MaximumManagedHydrationBytes,
+                0L,
+                policy.MaximumConcurrentOperations);
+        }
+
+        await _admissionGate.WaitAsync(cancellationToken);
+        try
+        {
+            IReadOnlyList<ObservedManagedLease> observed = await ObserveActiveLeasesAsync(cancellationToken);
+            long reservedBytes = observed
+                .Where(item => item.State.Availability is AssetAvailability.Local or AssetAvailability.Downloading)
+                .Sum(item => item.Lease.SizeBytes);
+
+            long additionalBytes = 0L;
+            string? storageRoot = null;
+            foreach (CatalogueProcessingAssetRevision revision in requested)
+            {
+                string? path = TryResolvePath(revision.RootLocator, revision.SourceKey);
+                OneDriveFilesOnDemandState state = path is null
+                    ? new OneDriveFilesOnDemandState(AssetAvailability.Unavailable, false, false)
+                    : _platform.GetState(path);
+
+                if (state.Availability == AssetAvailability.OnlineOnly)
+                {
+                    additionalBytes = checked(additionalBytes + revision.SizeBytes);
+                    storageRoot ??= revision.RootLocator;
+                }
+            }
+
+            long availableManagedCapacity = Math.Max(
+                0L,
+                policy.MaximumManagedHydrationBytes - reservedBytes);
+            if (additionalBytes == 0)
+            {
+                return new ArchiveHydrationSetAdmission(
+                    true,
+                    false,
+                    null,
+                    0L,
+                    availableManagedCapacity,
+                    0L,
+                    policy.MaximumConcurrentOperations);
+            }
+
+            storageRoot ??= requested[0].RootLocator;
+            long availableFreeBytes = _probe.GetAvailableFreeSpaceBytes(storageRoot);
+            long bytesToReclaimForBudget = Math.Max(
+                0L,
+                checked(reservedBytes + additionalBytes - policy.MaximumManagedHydrationBytes));
+            long freeCapacityAboveReserve = Math.Max(
+                0L,
+                availableFreeBytes - policy.MinimumFreeSpaceReserveBytes);
+            long bytesToReclaimForReserve = Math.Max(
+                0L,
+                checked(additionalBytes - freeCapacityAboveReserve));
+            long bytesToReclaim = Math.Max(bytesToReclaimForBudget, bytesToReclaimForReserve);
+
+            if (bytesToReclaim == 0)
+            {
+                return new ArchiveHydrationSetAdmission(
+                    true,
+                    false,
+                    null,
+                    additionalBytes,
+                    availableManagedCapacity,
+                    0L,
+                    policy.MaximumConcurrentOperations);
+            }
+
+            long pendingReleaseBytes = observed
+                .Where(item =>
+                    item.Lease.IsReleaseRequested &&
+                    item.State.Availability is AssetAvailability.Local or AssetAvailability.Downloading)
+                .Sum(item => item.Lease.SizeBytes);
+            long newlyNeeded = Math.Max(0L, bytesToReclaim - pendingReleaseBytes);
+            long newlyRequested = newlyNeeded == 0
+                ? 0L
+                : await RequestLeastRecentlyNeededReleaseAsync(
+                    observed,
+                    excludedKey: null,
+                    newlyNeeded,
+                    cancellationToken);
+
+            long expectedReclaim = checked(pendingReleaseBytes + newlyRequested);
+            if (expectedReclaim >= bytesToReclaim)
+            {
+                return new ArchiveHydrationSetAdmission(
+                    false,
+                    true,
+                    "Storage is being freed for best-quality slideshow preparation. Preparation will continue after OneDrive reports the requested releases online-only.",
+                    additionalBytes,
+                    availableManagedCapacity,
+                    newlyRequested,
+                    policy.MaximumConcurrentOperations);
+            }
+
+            return new ArchiveHydrationSetAdmission(
+                false,
+                false,
+                "Best-quality slideshow cannot prepare all originals under the current storage policy.",
+                additionalBytes,
+                availableManagedCapacity,
+                newlyRequested,
+                policy.MaximumConcurrentOperations);
+        }
+        finally
+        {
+            _admissionGate.Release();
+        }
+    }
 
     public async Task<ArchiveStorageSnapshot> GetStorageSnapshotAsync(
         CancellationToken cancellationToken = default)
@@ -405,7 +557,7 @@ public sealed class ArchiveHydrationCapacityService
 
     private async Task<long> RequestLeastRecentlyNeededReleaseAsync(
         IReadOnlyList<ObservedManagedLease> observed,
-        string excludedKey,
+        string? excludedKey,
         long bytesToReclaim,
         CancellationToken cancellationToken)
     {
@@ -417,7 +569,9 @@ public sealed class ArchiveHydrationCapacityService
         long requested = 0L;
         foreach (ObservedManagedLease candidate in observed
             .Where(item =>
-                !string.Equals(item.Lease.Key, excludedKey, StringComparison.Ordinal) &&
+                (excludedKey is null ||
+                    !string.Equals(item.Lease.Key, excludedKey, StringComparison.Ordinal)) &&
+                !_slideshowLeases.IsProtected(item.Lease.RevisionId, item.Lease.AssetId) &&
                 !item.Lease.IsReleaseRequested &&
                 item.State.Availability == AssetAvailability.Local &&
                 item.Path is not null)

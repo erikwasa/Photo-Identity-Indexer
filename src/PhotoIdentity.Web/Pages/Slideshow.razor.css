@@ -304,3 +304,29 @@
         padding: 1rem;
     }
 }
+
+
+.slideshow-preparation-card {
+    position: relative;
+    z-index: 6;
+    background: #000;
+}
+
+.slideshow-preparation-parent {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0.85rem;
+    border: 1px solid rgb(255 255 255 / 20%);
+    border-radius: 0.75rem;
+    background: rgb(255 255 255 / 5%);
+}
+
+.slideshow-preparation-parent > span {
+    color: rgb(255 255 255 / 72%);
+    overflow-wrap: anywhere;
+}
+
+.slideshow-toolbar-button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
