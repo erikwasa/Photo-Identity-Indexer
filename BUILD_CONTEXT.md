@@ -6,9 +6,9 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0084 — Build fullscreen Smart Collection slideshow playback** is the active M22 implementation item.
+**WI-0084 — Build fullscreen Smart Collection slideshow playback** is implemented and in review on PR #217.
 
-The slice builds the core presentation lifecycle on WI-0083's immutable saved-collection snapshot: Start slideshow requests browser fullscreen before navigation/network work, the slideshow route loads the stable manifest, normal pixels use the existing non-hydrating viewer-preview endpoint, and only the current image plus a one-item previous/next prefetch window are retained by slideshow-owned browser image objects.
+The slice builds the core presentation lifecycle on WI-0083's immutable saved-collection snapshot. Exact-head workflow #1328 passed before the lifecycle-only closeout commit: Start slideshow requests browser fullscreen before navigation/network work, the slideshow route loads the stable manifest, normal pixels use the existing non-hydrating viewer-preview endpoint, and only the current image plus a one-item previous/next prefetch window are retained by slideshow-owned browser image objects.
 
 Playback/settings behavior is isolated into testable C# state: autoplay waits for image readiness, pause/hidden-document states freeze the timer, manual navigation resets timing after the destination image is ready, and loop/stop/exit end behavior follows the M22 contract. Browser-local settings include the complete V1 object, including Protected slideshow and Prepare originals for WI-0085/WI-0086 to consume.
 
@@ -18,10 +18,9 @@ WI-0076 remains separately recorded as `in_progress` and is not part of this M22
 
 ## Next concrete step
 
-1. Run exact-head CI for WI-0084 and correct build/test/documentation failures.
-2. After CI is green, record PR/workflow evidence and move WI-0084 to `in_review`.
-3. Merge WI-0084, then begin WI-0085 toddler-safe fullscreen/orientation/wake hardening.
-4. Perform the consolidated M22 real-device/product review only after the current M22 work items are implemented.
+1. Merge PR #217 after the lifecycle-only status/evidence update remains green.
+2. Begin WI-0085 toddler-safe fullscreen/orientation/wake hardening.
+3. Perform the consolidated M22 real-device/product review only after the current M22 work items are implemented.
 
 ## Relevant files
 
