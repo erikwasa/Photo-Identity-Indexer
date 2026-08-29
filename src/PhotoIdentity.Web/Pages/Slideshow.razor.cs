@@ -262,6 +262,7 @@ public partial class Slideshow : IAsyncDisposable
 
     private void OnCurrentImageError()
     {
+        bool wasPlaying = Playback.IsPlaying;
         Playback.MarkCurrentImageUnavailable();
 
         if (_preparedOriginalsReady && OriginalPreparation is not null)
@@ -275,7 +276,7 @@ public partial class Slideshow : IAsyncDisposable
                 CanContinueWithAvailable = true,
             };
             _resumeAfterPreparation =
-                Playback.IsPlaying ||
+                wasPlaying ||
                 _resumeAfterParentControls ||
                 _resumeAfterFullscreenRecovery ||
                 Settings.Autoplay;
@@ -1021,8 +1022,7 @@ public partial class Slideshow : IAsyncDisposable
     {
         bool shouldResume =
             _resumeAfterPreparation ||
-            _resumeAfterParentControls ||
-            Settings.Autoplay;
+            _resumeAfterParentControls;
 
         await EndOriginalPreparationAsync();
         _preparedOriginalsReady = false;
