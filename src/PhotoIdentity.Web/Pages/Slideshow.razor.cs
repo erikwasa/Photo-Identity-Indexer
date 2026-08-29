@@ -524,6 +524,8 @@ public partial class Slideshow : IAsyncDisposable
         if (!Settings.ProtectedSlideshow ||
             !ProtectionStatusKnown ||
             !FullscreenActive ||
+            Preparing ||
+            Snapshot is null ||
             Protection.ParentControlsOpen ||
             ProtectionWarnings.Count == 0)
         {
