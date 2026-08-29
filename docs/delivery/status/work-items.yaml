@@ -901,7 +901,7 @@ work_items:
 - id: WI-0086
   title: Prepare and retain slideshow originals for best-quality playback
   milestone: M22
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0086-slideshow-original-preparation.md
   started_at: 2026-08-29
@@ -913,7 +913,11 @@ work_items:
   - WI-0084
   blocker_notes:
   - WI-0042 and the M22 snapshot/playback dependencies are implemented; M22 predecessors remain in_review only because consolidated maintainer acceptance is deferred.
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/220
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33270895553
 - id: WI-0087
   title: Add authoritative exact-duplicate source-copy inventory
   milestone: M23
