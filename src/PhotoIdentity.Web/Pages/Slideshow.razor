@@ -1,0 +1,141 @@
+@page "/slideshow/{CollectionId:guid}"
+
+<PageTitle>@PageTitleText</PageTitle>
+
+<div class="slideshow-shell"
+     role="application"
+     aria-label="@SlideshowAriaLabel"
+     @onclick="OnSurfaceClickAsync"
+     @onpointerdown="OnPointerDown"
+     @onpointerup="OnPointerUpAsync"
+     @onpointercancel="OnPointerCancel"
+     @oncontextmenu:preventDefault="true"
+     @ondragstart:preventDefault="true">
+    @if (!FullscreenActive)
+    {
+        <section class="slideshow-state-card" role="status" @onclick:stopPropagation="true">
+            <h1>Fullscreen is required</h1>
+            <p>The browser did not enter fullscreen, or fullscreen was lost. Playback is paused until you retry.</p>
+            <div class="slideshow-state-actions">
+                <button type="button" class="button primary" @onclick="RetryFullscreenAsync">Enter fullscreen</button>
+                <button type="button" class="button secondary" @onclick="ExitSlideshowAsync">Return to collection</button>
+            </div>
+        </section>
+    }
+    else if (Preparing)
+    {
+        <section class="slideshow-state-card" role="status" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <h1>Preparing slideshow…</h1>
+            <p>Creating a stable snapshot of @CollectionLabel.</p>
+        </section>
+    }
+    else if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <section class="slideshow-state-card" role="alert" @onclick:stopPropagation="true">
+            <h1>Slideshow unavailable</h1>
+            <p>@Error</p>
+            <button type="button" class="button secondary" @onclick="ExitSlideshowAsync">Return to collection</button>
+        </section>
+    }
+    else if (Snapshot?.Total == 0)
+    {
+        <section class="slideshow-state-card" role="status">
+            <h1>No photos are currently in this collection</h1>
+        </section>
+    }
+    else if (CurrentImageUrl is not null)
+    {
+        <img @key="Playback.CurrentRevisionId"
+             class="slideshow-image"
+             src="@CurrentImageUrl"
+             alt=""
+             draggable="false"
+             decoding="async"
+             @onload="OnCurrentImageLoadedAsync"
+             @onerror="OnCurrentImageError" />
+
+        @if (!string.IsNullOrWhiteSpace(ImageError))
+        {
+            <div class="slideshow-image-error" role="alert">@ImageError</div>
+        }
+    }
+
+    @if (ShowTimerProgress)
+    {
+        <div class="slideshow-progress" aria-hidden="true">
+            <span style="@ProgressStyle"></span>
+        </div>
+    }
+
+    @if (FullscreenActive && !Preparing && string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="slideshow-toolbar"
+             @onclick:stopPropagation="true"
+             @onpointerdown:stopPropagation="true"
+             @onpointerup:stopPropagation="true">
+            <button type="button" class="slideshow-toolbar-button" @onclick="TogglePlay">
+                @(Playback.IsPlaying ? "Pause" : "Play")
+            </button>
+            <button type="button" class="slideshow-toolbar-button" @onclick="ToggleSettings">
+                Settings
+            </button>
+            <button type="button" class="slideshow-toolbar-button" @onclick="ExitSlideshowAsync">
+                Exit
+            </button>
+        </div>
+
+        @if (SettingsOpen)
+        {
+            <section class="slideshow-settings"
+                     aria-label="Slideshow settings"
+                     @onclick:stopPropagation="true"
+                     @onpointerdown:stopPropagation="true"
+                     @onpointerup:stopPropagation="true">
+                <div class="slideshow-settings-heading">
+                    <strong>Slideshow settings</strong>
+                    <button type="button" class="slideshow-toolbar-button" @onclick="ToggleSettings">Close</button>
+                </div>
+
+                <label>
+                    <input type="checkbox" checked="@Settings.Autoplay" @onchange="ChangeAutoplayAsync" />
+                    <span>Autoplay</span>
+                </label>
+
+                <label class="slideshow-settings-field">
+                    <span>Image duration</span>
+                    <input type="number"
+                           min="@SlideshowSettings.MinimumImageDurationSeconds"
+                           max="@SlideshowSettings.MaximumImageDurationSeconds"
+                           value="@Settings.ImageDurationSeconds"
+                           @onchange="ChangeDurationAsync" />
+                    <span>seconds</span>
+                </label>
+
+                <label>
+                    <input type="checkbox" checked="@Settings.ShowTimerProgress" @onchange="ChangeProgressAsync" />
+                    <span>Show timer progress</span>
+                </label>
+
+                <label class="slideshow-settings-field">
+                    <span>After last photo</span>
+                    <select value="@Settings.AfterLastPhoto" @onchange="ChangeEndBehaviorAsync">
+                        <option value="@SlideshowSettings.Loop">Loop</option>
+                        <option value="@SlideshowSettings.Stop">Stop</option>
+                        <option value="@SlideshowSettings.Exit">Exit slideshow</option>
+                    </select>
+                </label>
+
+                <label>
+                    <input type="checkbox" checked="@Settings.ProtectedSlideshow" @onchange="ChangeProtectedAsync" />
+                    <span>Protected slideshow</span>
+                </label>
+
+                <label>
+                    <input type="checkbox" checked="@Settings.PrepareOriginals" @onchange="ChangePrepareOriginalsAsync" />
+                    <span>Prepare originals</span>
+                </label>
+            </section>
+        }
+    }
+</div>
