@@ -11,3 +11,4 @@ Accepted ADRs describe current architectural intent. When a decision changes mat
 | [ADR-0005](ADR-0005-precision-before-recall.md) | superseded | Its mandatory-human-confirmation rule is superseded by ADR-0006. Conservative precision remains an operating preference, not a requirement for every canonical assignment. |
 | [ADR-0006](ADR-0006-canonical-auto-assignment.md) | accepted | Allows configurable canonical automatic identity assignment with provenance and correction. |
 | [ADR-0007](ADR-0007-permanent-archive-bounded-storage.md) | accepted | Establishes one stable archive identity, incremental coverage and bounded local hydration/proxies. |
+| [ADR-0008](ADR-0008-source-copy-exclusion-and-purge.md) | accepted | Makes privacy exclusion source-copy-specific, prevents exclusion from following duplicates/moves and requires local Photo Identity data purge while preserving the source original. |
