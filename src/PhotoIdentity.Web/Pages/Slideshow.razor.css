@@ -1,0 +1,167 @@
+.slideshow-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: grid;
+    place-items: center;
+    width: 100vw;
+    height: 100dvh;
+    overflow: hidden;
+    background: #000;
+    color: #fff;
+    overscroll-behavior: none;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.slideshow-image {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100vw;
+    max-height: 100dvh;
+    object-fit: contain;
+    object-position: center;
+    pointer-events: none;
+    -webkit-user-drag: none;
+}
+
+.slideshow-state-card {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+    max-width: min(38rem, calc(100vw - 2rem));
+    padding: 1.5rem;
+    text-align: center;
+}
+
+.slideshow-state-card h1,
+.slideshow-state-card p {
+    margin: 0;
+}
+
+.slideshow-state-actions,
+.slideshow-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.6rem;
+}
+
+.slideshow-toolbar {
+    position: fixed;
+    top: max(0.75rem, env(safe-area-inset-top));
+    right: max(0.75rem, env(safe-area-inset-right));
+    z-index: 3;
+    padding: 0.45rem;
+    border-radius: 999px;
+    background: rgb(0 0 0 / 62%);
+    backdrop-filter: blur(8px);
+}
+
+.slideshow-toolbar-button {
+    padding: 0.55rem 0.8rem;
+    border: 1px solid rgb(255 255 255 / 32%);
+    border-radius: 999px;
+    background: rgb(255 255 255 / 12%);
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+.slideshow-toolbar-button:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.slideshow-settings {
+    position: fixed;
+    top: calc(max(0.75rem, env(safe-area-inset-top)) + 3.5rem);
+    right: max(0.75rem, env(safe-area-inset-right));
+    z-index: 4;
+    display: grid;
+    gap: 0.9rem;
+    width: min(24rem, calc(100vw - 1.5rem));
+    max-height: calc(100dvh - 5rem);
+    overflow: auto;
+    padding: 1rem;
+    border: 1px solid rgb(255 255 255 / 25%);
+    border-radius: 1rem;
+    background: rgb(18 18 18 / 94%);
+    box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 45%);
+}
+
+.slideshow-settings-heading,
+.slideshow-settings label,
+.slideshow-settings-field {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.slideshow-settings-heading {
+    justify-content: space-between;
+}
+
+.slideshow-settings-field {
+    flex-wrap: wrap;
+}
+
+.slideshow-settings input[type="number"],
+.slideshow-settings select {
+    min-width: 5rem;
+    padding: 0.45rem;
+    border: 1px solid rgb(255 255 255 / 30%);
+    border-radius: 0.4rem;
+    background: #111;
+    color: #fff;
+}
+
+.slideshow-progress {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    height: 4px;
+    background: rgb(255 255 255 / 16%);
+    pointer-events: none;
+}
+
+.slideshow-progress span {
+    display: block;
+    height: 100%;
+    background: currentColor;
+    transition: width 100ms linear;
+}
+
+.slideshow-image-error {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    left: 1rem;
+    z-index: 3;
+    padding: 0.8rem 1rem;
+    border-radius: 0.6rem;
+    background: rgb(120 0 0 / 88%);
+    text-align: center;
+    pointer-events: none;
+}
+
+@media (max-width: 600px) {
+    .slideshow-toolbar {
+        top: max(0.5rem, env(safe-area-inset-top));
+        right: max(0.5rem, env(safe-area-inset-right));
+    }
+
+    .slideshow-toolbar-button {
+        padding: 0.5rem 0.65rem;
+        font-size: 0.9rem;
+    }
+
+    .slideshow-settings {
+        top: calc(max(0.5rem, env(safe-area-inset-top)) + 3.25rem);
+        right: max(0.5rem, env(safe-area-inset-right));
+    }
+}

@@ -192,6 +192,9 @@
                     </button>
                     @if (EditingId is not null)
                     {
+                        <button type="button" class="button primary" disabled="@Busy" @onclick="StartSlideshowAsync">
+                            Start slideshow
+                        </button>
                         <button type="button" class="button secondary" disabled="@Busy" @onclick="() => QuerySavedAsync(0)">
                             Re-evaluate saved definition
                         </button>

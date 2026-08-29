@@ -6,29 +6,34 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0083 — Add stable Smart Collection slideshow snapshots** is implemented and in review on PR #216.
+**WI-0084 — Build fullscreen Smart Collection slideshow playback** is implemented and in review on PR #217.
 
-The slice adds a dedicated saved-collection slideshow snapshot operation rather than widening the existing paged Smart Collection workspace query. Exact-head workflow #1324 passed before the lifecycle-only closeout commit. Snapshot creation reads the saved definition and complete matching revision set inside one SQLite read transaction, then returns a lightweight deterministic oldest-to-newest revision-ID manifest. The normal workspace remains newest-first and limited to pages of at most 200 items.
+The slice builds the core presentation lifecycle on WI-0083's immutable saved-collection snapshot. Exact-head workflow #1328 passed before the lifecycle-only closeout commit: Start slideshow requests browser fullscreen before navigation/network work, the slideshow route loads the stable manifest, normal pixels use the existing non-hydrating viewer-preview endpoint, and only the current image plus a one-item previous/next prefetch window are retained by slideshow-owned browser image objects.
 
-WI-0082 remains `in_review`; its real trusted-LAN phone HTTPS/secure-context acceptance is intentionally deferred to the consolidated M22 review after the current M22 implementation items are complete.
+Playback/settings behavior is isolated into testable C# state: autoplay waits for image readiness, pause/hidden-document states freeze the timer, manual navigation resets timing after the destination image is ready, and loop/stop/exit end behavior follows the M22 contract. Browser-local settings include the complete V1 object, including Protected slideshow and Prepare originals for WI-0085/WI-0086 to consume.
+
+WI-0082 and WI-0083 remain `in_review` because the maintainer explicitly deferred consolidated M22 acceptance until all current M22 implementation items are complete. WI-0083 is already merged and is therefore an implementation dependency satisfied for WI-0084.
 
 WI-0076 remains separately recorded as `in_progress` and is not part of this M22 slice.
 
 ## Next concrete step
 
-1. Merge PR #216 after the lifecycle-only status/evidence update remains green.
-2. Begin WI-0084 fullscreen slideshow playback against the immutable snapshot contract.
+1. Merge PR #217 after the lifecycle-only status/evidence update remains green.
+2. Begin WI-0085 toddler-safe fullscreen/orientation/wake hardening.
 3. Perform the consolidated M22 real-device/product review only after the current M22 work items are implemented.
 
 ## Relevant files
 
-- `docs/delivery/work-items/WI-0083-slideshow-snapshot-manifest.md`
-- `docs/delivery/milestones/M22-protected-smart-collection-slideshow.md`
+- `docs/delivery/work-items/WI-0084-fullscreen-slideshow-playback.md`
 - `docs/product/slideshow.md`
-- `src/PhotoIdentity.Api/SmartCollectionEndpoints.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionQueryRepository.cs`
-- `src/PhotoIdentity.Persistence.Sqlite/SqliteSmartCollectionRepository.cs`
-- `tests/PhotoIdentity.Integration.Tests/SmartCollectionSlideshowSnapshotTests.cs`
+- `src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor`
+- `src/PhotoIdentity.Web/Pages/Slideshow.razor`
+- `src/PhotoIdentity.Web/SlideshowPlaybackState.cs`
+- `src/PhotoIdentity.Web/SlideshowSettings.cs`
+- `src/PhotoIdentity.Web/wwwroot/js/slideshow.js`
+- `tests/PhotoIdentity.Integration.Tests/SlideshowPlaybackStateTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/SlideshowSettingsTests.cs`
+- `tests/PhotoIdentity.Integration.Tests/SlideshowWebRouteTests.cs`
 - `docs/delivery/status/work-items.yaml`
 
 ## Repository validation

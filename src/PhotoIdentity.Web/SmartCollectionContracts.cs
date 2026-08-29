@@ -68,4 +68,14 @@ public sealed record SmartCollectionPageResponse(
     string? CollectionId = null,
     string? CollectionName = null);
 
+public sealed record SmartCollectionSlideshowSnapshotItemResponse(
+    string RevisionId);
+
+public sealed record SmartCollectionSlideshowSnapshotResponse(
+    string CollectionId,
+    string CollectionName,
+    DateTimeOffset CreatedAtUtc,
+    SmartCollectionSlideshowSnapshotItemResponse[] Items,
+    int Total);
+
 public sealed record SmartCollectionErrorResponse(string Error);
