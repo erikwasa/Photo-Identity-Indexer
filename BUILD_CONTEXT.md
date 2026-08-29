@@ -6,9 +6,9 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0086 — Prepare and retain slideshow originals for best-quality playback** is the active M22 implementation item.
+**WI-0086 — Prepare and retain slideshow originals for best-quality playback** is implemented and in review on PR #220.
 
-The slice adds an explicit full-snapshot best-quality preparation path without changing normal slideshow playback. With Prepare originals Off, WI-0084's viewer-preview boundary remains authoritative and never hydrates an online-only original solely because playback reaches it.
+The slice adds an explicit full-snapshot best-quality preparation path without changing normal slideshow playback. Exact-head workflow #1337 passed after rerunning a transient governed-model download failure in package verification; build-and-test, both integration shards, launcher verification and the package retry are green. With Prepare originals Off, WI-0084's viewer-preview boundary remains authoritative and never hydrates an online-only original solely because playback reaches it.
 
 With Prepare originals On, the immutable WI-0083 snapshot is protected as one ephemeral slideshow lease before hydration admission. The existing archive capacity service preflights aggregate additional bytes against the managed-byte limit and free-space reserve, requests only eligible non-session managed LRU releases, and waits until requested releases are observed online-only before the set is admitted. Existing per-revision hydration ownership/concurrency and immutable size/SHA-256 verification remain authoritative.
 
@@ -22,10 +22,9 @@ WI-0076 remains separately recorded as `in_progress` and is not part of this M22
 
 ## Next concrete step
 
-1. Run exact-head CI for WI-0086 and correct build/test/documentation failures.
-2. After CI is green, record PR/workflow evidence and move WI-0086 to `in_review`.
-3. Merge WI-0086.
-4. Perform the consolidated M22 maintainer review, including a real phone over the WI-0082 secure path and a mixed local/online prepared-original slideshow.
+1. Merge PR #220 after the lifecycle-only status/evidence update remains green.
+2. Perform the consolidated M22 maintainer review, including a real phone over the WI-0082 secure path and a mixed local/online prepared-original slideshow.
+3. Complete M22 work items only after the maintainer acceptance evidence is recorded.
 
 ## Relevant files
 
