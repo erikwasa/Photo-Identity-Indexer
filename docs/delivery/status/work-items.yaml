@@ -829,17 +829,21 @@ work_items:
 - id: WI-0082
   title: Add secure trusted-LAN phone access for slideshow use
   milestone: M22
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0082-secure-mobile-slideshow-access.md
   started_at: 2026-08-28
-  last_updated_at: 2026-08-28
+  last_updated_at: 2026-08-29
   branch: agent/WI-0082-secure-mobile-access
   blockers:
   - WI-0051
   - WI-0052
   blocker_notes: []
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/215
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33239754687
 - id: WI-0083
   title: Add stable Smart Collection slideshow snapshots
   milestone: M22
