@@ -6,9 +6,9 @@ Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Do
 
 ## Current focus
 
-**WI-0085 — Harden slideshow playback for toddler-safe phone use** is the active M22 implementation item.
+**WI-0085 — Harden slideshow playback for toddler-safe phone use** is implemented and in review on PR #218.
 
-The slice layers toddler-safe protection onto the merged WI-0084 playback shell without changing WI-0086 original-preparation behavior. Protected slideshow remains the default. Normal protected playback hides administrative chrome and exposes parent controls only after the two-corner hold gesture or the desktop `Ctrl+Shift+X` shortcut. Exit from protected mode requires a second press-and-hold confirmation.
+The slice layers toddler-safe protection onto the merged WI-0084 playback shell without changing WI-0086 original-preparation behavior. Exact-head workflow #1332 passed after correcting the parent-unlock early-release state bug found by #1331. Protected slideshow remains the default. Normal protected playback hides administrative chrome and exposes parent controls only after the two-corner hold gesture or the desktop `Ctrl+Shift+X` shortcut. Exit from protected mode requires a second press-and-hold confirmation.
 
 Browser Back is guarded through Blazor navigation interception, unexpected fullscreen loss pauses playback on the existing black slideshow shell, and explicit fullscreen recovery reacquires phone protections. Browser feature checks are centralized in `slideshow.js`: fullscreen, exact/family orientation lock, screen wake lock and secure-context state are reported independently as support/acquisition status. Wake lock is reacquired after visibility return and orientation/wake ownership is released on deliberate slideshow exit.
 
@@ -20,10 +20,9 @@ WI-0076 remains separately recorded as `in_progress` and is not part of this M22
 
 ## Next concrete step
 
-1. Run exact-head CI for WI-0085 and correct build/test/documentation failures.
-2. After CI is green, record PR/workflow evidence and move WI-0085 to `in_review`.
-3. Merge WI-0085, then begin WI-0086 slideshow original preparation.
-4. Perform the consolidated M22 real-device/product review only after WI-0086 is implemented.
+1. Merge PR #218 after the lifecycle-only status/evidence update remains green.
+2. Begin WI-0086 slideshow original preparation.
+3. Perform the consolidated M22 real-device/product review only after WI-0086 is implemented.
 
 ## Relevant files
 
