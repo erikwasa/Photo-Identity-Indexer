@@ -365,6 +365,7 @@ public partial class Slideshow : IAsyncDisposable
     }
 
     private bool CanNavigatePresentation() =>
+        Settings.ManualNavigation &&
         FullscreenActive &&
         !Preparing &&
         !PreparingOriginals &&
@@ -565,7 +566,8 @@ public partial class Slideshow : IAsyncDisposable
         try
         {
             Capabilities = await JS.InvokeAsync<SlideshowBrowserProtectionStatus>(
-                "photoIdentitySlideshow.acquireProtections");
+                "photoIdentitySlideshow.acquireProtections",
+                Settings.Orientation);
             ProtectionStatusKnown = true;
 
             if (showWarning)
@@ -705,6 +707,34 @@ public partial class Slideshow : IAsyncDisposable
     private async Task ChangeProgressAsync(ChangeEventArgs args) =>
         await ApplyAndPersistSettingsAsync(Settings with { ShowTimerProgress = ParseChecked(args) });
 
+    private async Task ChangeManualNavigationAsync(ChangeEventArgs args) =>
+        await ApplyAndPersistSettingsAsync(Settings with { ManualNavigation = ParseChecked(args) });
+
+    private async Task ChangeOrientationAsync(ChangeEventArgs args)
+    {
+        await ApplyAndPersistSettingsAsync(Settings with
+        {
+            Orientation = args.Value?.ToString() ?? SlideshowSettings.CurrentOrientation,
+        });
+
+        if (!FullscreenActive)
+        {
+            return;
+        }
+
+        try
+        {
+            Capabilities = await JS.InvokeAsync<SlideshowBrowserProtectionStatus>(
+                "photoIdentitySlideshow.setOrientation",
+                Settings.Orientation);
+            ProtectionStatusKnown = true;
+        }
+        catch (JSException)
+        {
+            ProtectionStatusKnown = false;
+        }
+    }
+
     private async Task ChangeEndBehaviorAsync(ChangeEventArgs args) =>
         await ApplyAndPersistSettingsAsync(Settings with { AfterLastPhoto = args.Value?.ToString() ?? SlideshowSettings.Loop });
 
@@ -752,6 +782,13 @@ public partial class Slideshow : IAsyncDisposable
         Settings = settings.Normalize();
         Playback.ApplySettings(Settings);
         Protection.Configure(Settings.ProtectedSlideshow);
+
+        if (previous.ManualNavigation && !Settings.ManualNavigation)
+        {
+            _navigationGate.Reset();
+            _pointerId = null;
+            _suppressNextClick = true;
+        }
 
         if (PreparingOriginals && previous.Autoplay != Settings.Autoplay)
         {
