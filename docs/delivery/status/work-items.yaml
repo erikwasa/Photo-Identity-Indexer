@@ -976,14 +976,17 @@ work_items:
 - id: WI-0092
   title: Add slideshow manual-navigation and orientation preferences
   milestone: M22
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0092-slideshow-input-orientation-settings.md
+  started_at: 2026-08-30
+  last_updated_at: 2026-08-30
+  branch: agent/WI-0092-slideshow-input-orientation-settings
   blockers:
   - WI-0084
   - WI-0085
   blocker_notes:
-  - Existing dependencies are implemented/merged; this follow-up is proposed from the 2026-08-30 real-phone M22 maintainer review and awaits implementation approval.
+  - WI-0084 and WI-0085 are implemented/merged; this follow-up was approved after the 2026-08-30 real-phone M22 maintainer review.
   evidence: []
 - id: WI-0093
   title: Make slideshow original preparation observable and recoverable
