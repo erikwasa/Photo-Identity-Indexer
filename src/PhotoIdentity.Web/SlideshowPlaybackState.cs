@@ -144,11 +144,12 @@ public sealed class SlideshowPlaybackState
         IsDocumentVisible = visible;
     }
 
-    public SlideshowAdvanceResult NextManual() => AdvanceFromCurrent();
+    public SlideshowAdvanceResult NextManual() =>
+        Settings.ManualNavigation ? AdvanceFromCurrent() : SlideshowAdvanceResult.None;
 
     public SlideshowAdvanceResult PreviousManual()
     {
-        if (_revisionIds.Count == 0 || CurrentIndex <= 0)
+        if (!Settings.ManualNavigation || _revisionIds.Count == 0 || CurrentIndex <= 0)
         {
             return SlideshowAdvanceResult.None;
         }
