@@ -26,6 +26,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
     private readonly TimeProvider _timeProvider;
     private readonly ArchiveThroughputMetrics _metrics;
+    private readonly ILogger<ArchiveAdvancementHostedService> _logger;
 
     public ArchiveAdvancementHostedService(
         SqliteCatalogueDatabase database,
@@ -41,7 +42,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         ArchiveOperatorConfiguration operatorConfiguration,
         ReviewProxyGenerationConfiguration proxyConfiguration,
         TimeProvider timeProvider,
-        ArchiveThroughputMetrics metrics)
+        ArchiveThroughputMetrics metrics,
+        ILogger<ArchiveAdvancementHostedService> logger)
     {
         _database = database;
         _control = control;
@@ -65,29 +67,34 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         _proxyConfiguration = proxyConfiguration;
         _timeProvider = timeProvider;
         _metrics = metrics;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            ArchiveCoverageConfiguration? coverage = await new SqliteArchiveCoverageRepository(_database)
-                .GetAsync(stoppingToken);
-            if (coverage is null)
-            {
-                await Task.Delay(IdleDelay, stoppingToken);
-                continue;
-            }
-
-            ArchiveAdvancementState? control = await _control.GetAsync(coverage.Source.Id, stoppingToken);
-            if (control?.IsRequested != true)
-            {
-                await Task.Delay(IdleDelay, stoppingToken);
-                continue;
-            }
+            ArchiveCoverageConfiguration? coverage = null;
+            bool advancementRequested = false;
 
             try
             {
+                coverage = await new SqliteArchiveCoverageRepository(_database)
+                    .GetAsync(stoppingToken);
+                if (coverage is null)
+                {
+                    await Task.Delay(IdleDelay, stoppingToken);
+                    continue;
+                }
+
+                ArchiveAdvancementState? control = await _control.GetAsync(coverage.Source.Id, stoppingToken);
+                if (control?.IsRequested != true)
+                {
+                    await Task.Delay(IdleDelay, stoppingToken);
+                    continue;
+                }
+
+                advancementRequested = true;
                 if (control.SyncRequired)
                 {
                     await _control.UpdateRuntimeAsync(
@@ -144,6 +151,16 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             catch (Exception exception)
             {
                 _metrics.RecordCounter(ArchiveThroughputMetricNames.ArchiveErrors);
+
+                if (coverage is null || !advancementRequested)
+                {
+                    _logger.LogError(
+                        exception,
+                        "Archive advancement could not read its startup/control state; retrying without stopping Photo Identity.");
+                    await Task.Delay(IdleDelay, stoppingToken);
+                    continue;
+                }
+
                 if (IsRetryableTransition(exception))
                 {
                     await _control.UpdateRuntimeAsync(
