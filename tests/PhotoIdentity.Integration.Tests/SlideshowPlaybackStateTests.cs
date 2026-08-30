@@ -69,6 +69,26 @@ public sealed class SlideshowPlaybackStateTests
     }
 
     [Fact]
+    public void Manual_navigation_can_be_disabled_without_disabling_autoplay()
+    {
+        SlideshowPlaybackState state = new();
+        state.LoadSnapshot(
+            ["a", "b"],
+            SlideshowSettings.Defaults with { ManualNavigation = false });
+        state.MarkCurrentImageReady();
+
+        Assert.True(state.IsPlaying);
+        Assert.Equal(SlideshowAdvanceResult.None, state.NextManual());
+        Assert.Equal(SlideshowAdvanceResult.None, state.PreviousManual());
+        Assert.Equal("a", state.CurrentRevisionId);
+
+        Assert.Equal(
+            SlideshowAdvanceResult.Moved,
+            state.AdvanceTime(TimeSpan.FromSeconds(5)));
+        Assert.Equal("b", state.CurrentRevisionId);
+    }
+
+    [Fact]
     public void Hidden_document_freezes_autoplay_without_changing_play_state()
     {
         SlideshowPlaybackState state = new();
