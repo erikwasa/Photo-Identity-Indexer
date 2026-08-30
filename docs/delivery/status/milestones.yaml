@@ -200,6 +200,9 @@ milestones:
   - WI-0084
   - WI-0085
   - WI-0086
+  - WI-0092
+  - WI-0093
+  - WI-0094
 - id: M23
   title: Source-copy lifecycle and privacy exclusion
   status: ready
