@@ -91,7 +91,16 @@
         invoke("OnProtectionStatusChanged", status());
     }
 
-    async function acquireOrientationLock() {
+    function normalizeOrientationPreference(value) {
+        const normalized = typeof value === "string"
+            ? value.trim().toLowerCase()
+            : "current";
+        return normalized === "portrait" || normalized === "landscape"
+            ? normalized
+            : "current";
+    }
+
+    async function acquireOrientationLock(preference = "current") {
         captureStartingOrientation();
         orientationActive = false;
         orientationFailed = false;
@@ -106,6 +115,19 @@
         if (!document.fullscreenElement) {
             orientationFailed = true;
             orientationMessage = "Orientation lock requires fullscreen on this browser.";
+            return;
+        }
+
+        const normalizedPreference = normalizeOrientationPreference(preference);
+        if (normalizedPreference !== "current") {
+            try {
+                await window.screen.orientation.lock(normalizedPreference);
+                orientationActive = true;
+                orientationMode = normalizedPreference;
+            } catch (error) {
+                orientationFailed = true;
+                orientationMessage = error?.message || "The browser rejected the orientation lock.";
+            }
             return;
         }
 
@@ -204,8 +226,8 @@
         }
     }
 
-    async function acquireProtections() {
-        await acquireOrientationLock();
+    async function acquireProtections(orientationPreference = "current") {
+        await acquireOrientationLock(orientationPreference);
         await acquireWakeLock();
         const current = status();
         notifyStatus();
@@ -287,6 +309,26 @@
         getProtectionStatus: () => status(),
 
         acquireProtections,
+
+        setOrientation: async (orientationPreference = "current") => {
+            if (orientationSupported()) {
+                try {
+                    window.screen.orientation.unlock();
+                } catch {
+                    // Best effort replacement of the application-owned lock.
+                }
+            }
+
+            orientationActive = false;
+            orientationFailed = false;
+            orientationMessage = null;
+            orientationMode = null;
+
+            await acquireOrientationLock(orientationPreference);
+            const current = status();
+            notifyStatus();
+            return current;
+        },
 
         releaseProtections,
 
