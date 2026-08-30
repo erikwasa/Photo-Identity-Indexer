@@ -14,7 +14,7 @@ The slideshow remains a read-only presentation surface. It does not edit people,
 - The Start slideshow user action immediately requests **true browser fullscreen** before awaiting snapshot preparation or other asynchronous work.
 - Photos are centered on a black presentation surface and use contain/no-crop fit in V1.
 - Autoplay starts immediately when the persisted Autoplay setting is enabled.
-- Manual next/previous navigation resets the current image timer.
+- Manual next/previous navigation is controlled by a persisted Manual navigation setting; when enabled, manual navigation resets the current image timer.
 - There is no photo-number counter in V1.
 - Zero-photo and one-photo snapshots enter the same slideshow shell and use the same fullscreen/protected-exit lifecycle as larger collections.
 
@@ -41,6 +41,8 @@ V1 settings are global across collections and slideshow sessions **within the sa
 | Autoplay | On | Start advancing automatically as soon as playback is ready. |
 | Image duration | 5 seconds | Persist a validated duration; V1 should support at least 1-60 seconds. |
 | Show timer progress | On | Show only while autoplay is active. |
+| Manual navigation | On | When Off, tap/click, swipe and Left/Right Arrow do not move between photos; autoplay and parent controls remain available. |
+| Orientation | Current at start | Choices: Current at start, Portrait, Landscape. Apply changes immediately where the browser permits orientation locking. |
 | After last photo | Loop | Choices: Loop, Stop on last photo, Exit slideshow. |
 | Protected slideshow | On | Hide ordinary exit/settings controls and require the parent unlock gesture. |
 | Prepare originals | Off | Explicitly prepare and retain best-quality originals for uninterrupted playback when storage policy permits. |
@@ -72,9 +74,11 @@ The gesture constants should be isolated in one implementation location so maint
 
 ## Orientation and wake behavior
 
-At slideshow start, capture the current screen orientation and attempt to lock to that exact orientation after fullscreen entry. The slideshow must not intentionally switch between portrait and landscape while running.
+Orientation is a persisted slideshow preference with **Current at start**, **Portrait** and **Landscape**. Current at start is the backward-compatible default: capture the current screen orientation when slideshow starts and attempt an exact lock after fullscreen entry, with matching portrait/landscape-family fallback. Portrait and Landscape explicitly request those orientation families.
 
-Browser support for `ScreenOrientation.lock()` is not universal and commonly depends on fullscreen/mobile context. The implementation must use capability detection. If the lock cannot be acquired, playback may continue only after showing a parent-facing warning that system rotation lock should be enabled for toddler use; the failure must not silently pretend orientation is protected.
+Changing the orientation preference from parent settings during an active fullscreen slideshow should replace the application-owned lock immediately without changing slideshow membership or current position. The browser may rotate the viewport to satisfy the selected family.
+
+Browser support for `ScreenOrientation.lock()` is not universal and commonly depends on fullscreen/mobile context. The implementation must use capability detection. If the requested lock cannot be acquired, playback may continue only after showing a parent-facing warning that system rotation lock should be enabled for toddler use; the failure must not silently pretend orientation is protected.
 
 While a slideshow is active, request a screen wake lock where supported. If the browser/system releases it while the document is hidden or for system reasons, attempt to reacquire it when the document becomes visible again. Failure to acquire a wake lock is non-fatal but must be visible to the parent before handoff.
 
@@ -97,6 +101,21 @@ The supported phone path must:
 - document browser/device capability verification before a phone is handed to a child.
 
 Photo Identity remains unauthenticated under the current trust model. Enabling remote access is therefore a deliberate operator action, not an automatic default.
+
+## Read-only slideshow library
+
+Provide a dedicated basic-user slideshow surface, recommended at `/slideshows`, that lists saved Smart Collections and exposes only consumption-oriented actions:
+
+- Start slideshow;
+- Prepare originals;
+- preparation status/recovery; and
+- the same global slideshow settings used during playback.
+
+The surface must not expose Smart Collection definition editing/deletion or photo metadata/tag/people/Places mutation controls. It should use a minimal consumer-oriented layout rather than normal operator navigation.
+
+This is a **read-only UI boundary, not an authorization boundary**. Photo Identity remains unauthenticated on the trusted-LAN path, so a knowledgeable user who deliberately visits operator URLs can still reach them until a future authentication/role milestone changes that trust model.
+
+Starting a slideshow from the slideshow library should return there on deliberate Exit.
 
 ## Snapshot contract
 
@@ -128,6 +147,10 @@ When **Prepare originals** is enabled, slideshow start becomes an explicit hydra
 
 If the entire snapshot cannot fit within configured managed-hydration/free-space limits, fail the full-quality preflight before silently starting a partial best-quality session. The parent may choose ordinary available/proxy playback instead.
 
+Preparation progress must distinguish at least ready/verified, actively downloading, queued online-only and waiting-for-release work. A ready-only counter is insufficient because bounded concurrency can legitimately leave the ready count unchanged while OneDrive downloads are active. If aggregate state makes no progress for a conservative centralized threshold, surface a parent-visible no-progress warning with Retry preparation and Cancel preparation rather than leaving an opaque counter indefinitely.
+
+The read-only slideshow library may start the same full-snapshot preparation without entering fullscreen or starting playback. Successful standalone preparation releases temporary preparation protection when complete but leaves Photo-Identity-owned hydrated originals local and eligible for normal managed LRU behavior. A later slideshow remains authoritative for its own new snapshot.
+
 ## End behavior
 
 - **Loop**: after the last photo, continue with the first. For a one-photo snapshot, the same photo remains displayed and its timer cycles without a visible reload flash.
@@ -148,7 +171,8 @@ If the document becomes hidden, autoplay pauses and the active timer is preserve
 - [ ] A running slideshow is based on one stable full-collection snapshot and is unaffected by later Smart Collection/catalogue changes.
 - [ ] The snapshot uses deterministic oldest-to-newest ordering with capture time preferred and observed time used as fallback.
 - [ ] Presentation uses a black fullscreen surface and contain/no-crop image fit.
-- [ ] Tap/click, swipe and desktop keyboard navigation work as specified and do not create per-photo browser-history entries.
+- [ ] Manual navigation defaults On; when Off, tap/click, swipe and Left/Right Arrow do not move between photos while autoplay and parent controls still work.
+- [ ] When Manual navigation is On, tap/click, swipe and desktop keyboard navigation work as specified and do not create per-photo browser-history entries.
 - [ ] Autoplay begins immediately when enabled, duration is persisted, and manual navigation restarts the timer after the destination image is displayed.
 - [ ] Timer progress can be hidden and is shown only when autoplay is active.
 - [ ] Loop, Stop and Exit end behaviors work; Loop is the default.
@@ -156,11 +180,14 @@ If the document becomes hidden, autoplay pauses and the active timer is preserve
 - [ ] Protected mode is enabled by default and normal playback exposes no visible exit/settings/navigation chrome.
 - [ ] The two-corner parent gesture opens controls only after the hold threshold; Exit requires the second hold confirmation.
 - [ ] Browser Back or unexpected fullscreen loss cannot directly expose normal application pages while protected playback is active.
-- [ ] Current orientation is captured and locked where supported; unsupported/failed lock is surfaced to the parent with a system-rotation-lock fallback instruction.
+- [ ] Orientation persists as Current at start, Portrait or Landscape; changing it during active fullscreen replaces the requested lock without changing slideshow position.
+- [ ] Current-at-start/exact and explicit Portrait/Landscape locks are capability-detected; unsupported/failed lock is surfaced to the parent with a system-rotation-lock fallback instruction.
 - [ ] A screen wake lock is acquired/reacquired where supported and failures are surfaced without crashing playback.
 - [ ] The supported phone access path is opt-in, secure-context HTTPS and preserves loopback-only default behavior.
 - [ ] Normal playback does not implicitly hydrate online-only originals.
 - [ ] Prepare originals preflights the complete snapshot, respects existing bounded storage policy and protects active-session originals from same-session eviction.
+- [ ] Preparation status distinguishes ready/downloading/queued/waiting work and surfaces an actionable no-progress state instead of an indefinitely opaque counter.
+- [ ] A read-only slideshow library lists saved Smart Collections, shares the global slideshow settings, starts slideshows and can prepare originals without entering fullscreen or exposing collection editing.
 - [ ] Best-quality autoplay does not begin until preparation completes or the parent explicitly accepts degraded/available playback.
 - [ ] Pre-existing local or user-pinned originals are never released or reclassified as slideshow-owned content.
 - [ ] Browser memory use stays bounded by lazy resource loading and a small image prefetch window rather than decoding the complete collection.
@@ -178,4 +205,5 @@ If the document becomes hidden, autoplay pauses and the active timer is preserve
 - Per-collection slideshow settings.
 - Cross-device synchronization of slideshow preferences.
 - Automatically supporting unsaved/transient Smart Collection previews.
+- Treating the read-only slideshow library as an authentication/authorization boundary; the trusted-LAN application remains unauthenticated.
 - Preventing operating-system Home/app-switch/power/notification gestures; use OS app/screen pinning in addition to Protected slideshow when stronger containment is required.

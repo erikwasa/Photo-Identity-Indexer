@@ -973,3 +973,42 @@ work_items:
   - WI-0090
   blocker_notes: []
   evidence: []
+- id: WI-0092
+  title: Add slideshow manual-navigation and orientation preferences
+  milestone: M22
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0092-slideshow-input-orientation-settings.md
+  blockers:
+  - WI-0084
+  - WI-0085
+  blocker_notes:
+  - Existing dependencies are implemented/merged; this follow-up is proposed from the 2026-08-30 real-phone M22 maintainer review and awaits implementation approval.
+  evidence: []
+- id: WI-0093
+  title: Make slideshow original preparation observable and recoverable
+  milestone: M22
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0093-slideshow-original-preparation-progress.md
+  blockers:
+  - WI-0042
+  - WI-0086
+  blocker_notes:
+  - Real-phone review observed a 56-photo preparation remaining at 1/56 with no useful downloading/queued/stall status. Existing bounded hydration semantics remain the base contract.
+  evidence: []
+- id: WI-0094
+  title: Add a read-only slideshow library with standalone original preparation
+  milestone: M22
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0094-read-only-slideshow-library.md
+  blockers:
+  - WI-0050
+  - WI-0083
+  - WI-0092
+  - WI-0093
+  blocker_notes:
+  - The consumer surface should reuse the finalized slideshow settings and observable preparation contracts; it is a UI boundary, not authentication/authorization.
+  evidence: []
+
