@@ -2,52 +2,54 @@
 
 This file is intentionally a short handoff for the next development or verification session. It should describe only the current focus, the next concrete step and the small set of documents needed to continue.
 
-Formal work-item lifecycle status and evidence are resolved by `PhotoIdentity.Docs` from the current registry plus archived terminal history.
+Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Docs from the current registry plus archived terminal history.
 
 ## Current focus
 
-**WI-0086 — Prepare and retain slideshow originals for best-quality playback** is implemented and in review on PR #220.
+M22 remains in progress after the 2026-08-30 real-phone maintainer review.
 
-The slice adds an explicit full-snapshot best-quality preparation path without changing normal slideshow playback. Exact-head workflow #1337 passed after rerunning a transient governed-model download failure in package verification; build-and-test, both integration shards, launcher verification and the package retry are green. With Prepare originals Off, WI-0084's viewer-preview boundary remains authoritative and never hydrates an online-only original solely because playback reaches it.
+The secure trusted-LAN path, stable slideshow snapshot, fullscreen/protected playback, wake/orientation capability handling and normal slideshow behaviors otherwise worked as expected. The review identified four gaps that must close before M22 completion:
 
-With Prepare originals On, the immutable WI-0083 snapshot is protected as one ephemeral slideshow lease before hydration admission. The existing archive capacity service preflights aggregate additional bytes against the managed-byte limit and free-space reserve, requests only eligible non-session managed LRU releases, and waits until requested releases are observed online-only before the set is admitted. Existing per-revision hydration ownership/concurrency and immutable size/SHA-256 verification remain authoritative.
+- a setting to disable manual next/previous navigation;
+- an explicit slideshow Orientation setting rather than only inheriting orientation at Start;
+- Prepare originals needs useful downloading/queued/waiting progress plus no-progress recovery after a 56-photo phone test remained at 1/56 without explanation;
+- a read-only basic-user slideshow library is needed to list saved Smart Collections, edit global slideshow settings, start slideshows and prepare originals without entering playback.
 
-Slideshow protection is ephemeral rather than new durable ownership: leases expire unless the active browser heartbeats them, so abandoned/crashed sessions cannot permanently strand managed content. Already-local/user-pinned content is never claimed. On successful preparation, only the current image plus the existing bounded neighbor prefetch window uses session-scoped verified-original resources. Deliberate slideshow exit removes slideshow protection but does not force prepared app-owned files online-only; they return to ordinary managed-LRU eligibility.
+These are split into WI-0092, WI-0093 and WI-0094. The consumer page is explicitly a read-only UI boundary, not an authentication/authorization boundary, because Photo Identity remains unauthenticated on the trusted LAN.
 
-Preparation failure pauses playback and presents an explicit parent choice to continue with normal available/proxy images or cancel preparation. A prepared original that later becomes unavailable or fails immutable verification also pauses and enters that fallback flow.
+The current hydration implementation uses Windows Files On-Demand pinning and bounded concurrency. A ready-only counter can stay unchanged while downloads are active, so WI-0093 first adds aggregate state observability and a safe retry/cancel path rather than speculatively replacing the storage model.
 
-WI-0082 through WI-0085 remain `in_review` because consolidated real-device/product acceptance is intentionally deferred until WI-0086 is implemented. Their implementation dependencies are merged and satisfied.
+Main workflow #1342 is green after PR #221 corrected packaged startup resilience.
 
-WI-0076 remains separately recorded as `in_progress` and is not part of this M22 slice.
+WI-0076 remains separately recorded as in_progress and is not part of this M22 follow-up.
 
 ## Next concrete step
 
-1. Merge PR #220 after the lifecycle-only status/evidence update remains green.
-2. Perform the consolidated M22 maintainer review, including a real phone over the WI-0082 secure path and a mixed local/online prepared-original slideshow.
-3. Complete M22 work items only after the maintainer acceptance evidence is recorded.
+1. Maintainer reviews the M22 follow-up contract/docs in the documentation PR.
+2. After approval, promote/start WI-0092 and implement manual-navigation/orientation settings.
+3. Implement WI-0093 preparation progress/no-progress recovery and verify mixed local/online behavior.
+4. Implement WI-0094 read-only slideshow library plus standalone Prepare originals.
+5. Repeat focused real-phone M22 acceptance, then complete the M22 work items/milestone.
 
 ## Relevant files
 
-- `docs/delivery/work-items/WI-0086-slideshow-original-preparation.md`
-- `docs/product/slideshow.md`
-- `src/PhotoIdentity.Api/ArchiveHydrationCapacityService.cs`
-- `src/PhotoIdentity.Api/SlideshowOriginalLeaseRegistry.cs`
-- `src/PhotoIdentity.Api/SlideshowOriginalPreparationService.cs`
-- `src/PhotoIdentity.Api/SlideshowOriginalPreparationEndpoints.cs`
-- `src/PhotoIdentity.Web/Pages/Slideshow.razor`
-- `src/PhotoIdentity.Web/Pages/Slideshow.razor.cs`
-- `src/PhotoIdentity.Web/SlideshowOriginalPreparationContracts.cs`
-- `tests/PhotoIdentity.Integration.Tests/ArchiveHydrationCapacityServiceTests.cs`
-- `tests/PhotoIdentity.Integration.Tests/SlideshowOriginalLeaseRegistryTests.cs`
-- `tests/PhotoIdentity.Integration.Tests/SlideshowOriginalPreparationServiceTests.cs`
-- `docs/delivery/status/work-items.yaml`
+- docs/product/slideshow.md
+- docs/delivery/milestones/M22-protected-smart-collection-slideshow.md
+- docs/delivery/work-items/WI-0092-slideshow-input-orientation-settings.md
+- docs/delivery/work-items/WI-0093-slideshow-original-preparation-progress.md
+- docs/delivery/work-items/WI-0094-read-only-slideshow-library.md
+- src/PhotoIdentity.Web/SlideshowSettings.cs
+- src/PhotoIdentity.Web/Pages/Slideshow.razor
+- src/PhotoIdentity.Web/Pages/Slideshow.razor.cs
+- src/PhotoIdentity.Web/wwwroot/js/slideshow.js
+- src/PhotoIdentity.Api/SlideshowOriginalPreparationService.cs
+- src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor
+- docs/delivery/status/work-items.yaml
 
 ## Repository validation
 
-```powershell
-./build.ps1
-./test.ps1
-dotnet run --project tools/PhotoIdentity.Docs -- validate
-dotnet run --project tools/PhotoIdentity.Docs -- generate --check
-./verify-review.ps1 -Mode Smoke -Configuration Release
-```
+    ./build.ps1
+    ./test.ps1
+    dotnet run --project tools/PhotoIdentity.Docs -- validate
+    dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+    ./verify-review.ps1 -Mode Smoke -Configuration Release
