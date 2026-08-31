@@ -113,6 +113,137 @@ public sealed class SlideshowOriginalPreparationServiceTests
     }
 
     [Fact]
+    public async Task Progress_reports_ready_downloading_and_queued_work()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            DateTimeOffset now = new(2026, 8, 31, 8, 0, 0, TimeSpan.Zero);
+            CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
+
+            CatalogueProcessingAssetRevision local = await SaveRevisionAndFileAsync(
+                database, source, "family/local.jpg", CreateBytes(96, 11), now);
+            CatalogueProcessingAssetRevision onlineOne = await SaveRevisionAndFileAsync(
+                database, source, "family/online-1.jpg", CreateBytes(128, 12), now.AddMinutes(1));
+            CatalogueProcessingAssetRevision onlineTwo = await SaveRevisionAndFileAsync(
+                database, source, "family/online-2.jpg", CreateBytes(128, 13), now.AddMinutes(2));
+
+            FakeFilesOnDemandPlatform platform = new()
+            {
+                CompleteHydrationImmediately = false,
+            };
+            platform.SetState(local, AssetAvailability.Local);
+            platform.SetState(onlineOne, AssetAvailability.OnlineOnly);
+            platform.SetState(onlineTwo, AssetAvailability.OnlineOnly);
+
+            ManualTimeProvider time = new(now);
+            TestServices services = CreateServices(
+                database,
+                platform,
+                new ArchiveHydrationPolicyConfiguration(0, 10_000, 1),
+                time);
+
+            SlideshowOriginalPreparationSnapshot started = await services.Preparation.StartAsync(
+                [local.RevisionId, onlineOne.RevisionId, onlineTwo.RevisionId]);
+            SlideshowOriginalPreparationSnapshot progress = await WaitForSnapshotAsync(
+                services.Preparation,
+                started.SessionId,
+                snapshot =>
+                    snapshot.Ready == 1 &&
+                    snapshot.Downloading == 1 &&
+                    snapshot.Queued == 1 &&
+                    snapshot.HydrationRequests == 1);
+
+            Assert.Equal(3, progress.Total);
+            Assert.Equal(0, progress.WaitingForRelease);
+            Assert.Equal("downloading", progress.Phase);
+            Assert.False(progress.NoProgressWarning);
+            Assert.False(progress.CanRetry);
+            Assert.DoesNotContain(directory, progress.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+
+            services.Preparation.End(started.SessionId);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task No_progress_warning_and_retry_reuse_the_same_immutable_session()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            DateTimeOffset now = new(2026, 8, 31, 8, 30, 0, TimeSpan.Zero);
+            CatalogueSource source = new(SourceId.New(), "local-folder", directory, now);
+
+            CatalogueProcessingAssetRevision online = await SaveRevisionAndFileAsync(
+                database, source, "family/stalled.jpg", CreateBytes(128, 14), now);
+
+            FakeFilesOnDemandPlatform platform = new()
+            {
+                CompleteHydrationImmediately = false,
+            };
+            platform.SetState(online, AssetAvailability.OnlineOnly);
+
+            ManualTimeProvider time = new(now);
+            TestServices services = CreateServices(
+                database,
+                platform,
+                new ArchiveHydrationPolicyConfiguration(0, 10_000, 1),
+                time);
+
+            SlideshowOriginalPreparationSnapshot started = await services.Preparation.StartAsync(
+                [online.RevisionId]);
+            SlideshowOriginalPreparationSnapshot downloading = await WaitForSnapshotAsync(
+                services.Preparation,
+                started.SessionId,
+                snapshot =>
+                    snapshot.Downloading == 1 &&
+                    snapshot.HydrationRequests == 1);
+
+            DateTimeOffset progressAt = downloading.LastProgressAtUtc;
+            time.Advance(
+                SlideshowOriginalPreparationService.NoProgressWarningThreshold +
+                TimeSpan.FromSeconds(1));
+
+            SlideshowOriginalPreparationSnapshot stalled =
+                services.Preparation.GetStatus(started.SessionId)
+                ?? throw new InvalidOperationException("Preparation session disappeared.");
+
+            Assert.True(stalled.NoProgressWarning);
+            Assert.True(stalled.CanRetry);
+            Assert.True(
+                stalled.NoProgressSeconds >=
+                (long)SlideshowOriginalPreparationService.NoProgressWarningThreshold.TotalSeconds);
+            Assert.Equal(started.SessionId, stalled.SessionId);
+            Assert.Equal(1, stalled.HydrationRequests);
+
+            SlideshowOriginalPreparationSnapshot retried =
+                services.Preparation.Retry(started.SessionId)
+                ?? throw new InvalidOperationException("Preparation retry lost the session.");
+
+            Assert.Equal(started.SessionId, retried.SessionId);
+            Assert.False(retried.NoProgressWarning);
+            Assert.False(retried.CanRetry);
+            Assert.True(retried.LastProgressAtUtc > progressAt);
+            Assert.Equal(1, retried.Total);
+            Assert.Equal(1, retried.HydrationRequests);
+
+            services.Preparation.End(started.SessionId);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Full_snapshot_admission_failure_happens_before_any_hydration_request()
     {
         string directory = CreateTemporaryDirectory();
@@ -240,13 +371,42 @@ public sealed class SlideshowOriginalPreparationServiceTests
         }
     }
 
+    private static async Task<SlideshowOriginalPreparationSnapshot> WaitForSnapshotAsync(
+        SlideshowOriginalPreparationService service,
+        Guid sessionId,
+        Func<SlideshowOriginalPreparationSnapshot, bool> predicate)
+    {
+        using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(8));
+        while (true)
+        {
+            timeout.Token.ThrowIfCancellationRequested();
+            SlideshowOriginalPreparationSnapshot snapshot = service.GetStatus(sessionId)
+                ?? throw new InvalidOperationException("Preparation session disappeared unexpectedly.");
+            if (predicate(snapshot))
+            {
+                return snapshot;
+            }
+
+            if (snapshot.State is SlideshowOriginalPreparationStates.Failed or
+                SlideshowOriginalPreparationStates.Cancelled)
+            {
+                throw new Xunit.Sdk.XunitException(
+                    $"Preparation became '{snapshot.State}' before the expected progress state: {snapshot.Message}");
+            }
+
+            await Task.Delay(50, timeout.Token);
+        }
+    }
+
     private static TestServices CreateServices(
         SqliteCatalogueDatabase database,
         FakeFilesOnDemandPlatform platform,
-        ArchiveHydrationPolicyConfiguration policy)
+        ArchiveHydrationPolicyConfiguration policy,
+        TimeProvider? timeProvider = null)
     {
+        TimeProvider time = timeProvider ?? TimeProvider.System;
         SqliteArchiveHydrationRepository hydrations = new(database);
-        SlideshowOriginalLeaseRegistry leases = new(TimeProvider.System);
+        SlideshowOriginalLeaseRegistry leases = new(time);
         ArchiveHydrationCapacityService capacity = new(
             database,
             hydrations,
@@ -256,7 +416,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
             new FixedStorageProbe(100_000),
             policy,
             new ReviewProxyServingConfiguration(null, null),
-            TimeProvider.System,
+            time,
             leases);
         CollectionOriginalAccessService originals = new(
             new SqliteLocalBatchRepository(database),
@@ -264,14 +424,14 @@ public sealed class SlideshowOriginalPreparationServiceTests
             new SqliteArchiveAvailabilityRepository(database),
             platform,
             capacity,
-            TimeProvider.System);
+            time);
         SlideshowOriginalPreparationService preparation = new(
             new SqliteLocalBatchRepository(database),
             originals,
             capacity,
             policy,
             leases,
-            TimeProvider.System);
+            time);
 
         return new TestServices(
             preparation,
@@ -337,6 +497,15 @@ public sealed class SlideshowOriginalPreparationServiceTests
         }
     }
 
+    private sealed class ManualTimeProvider(DateTimeOffset initial) : TimeProvider
+    {
+        private DateTimeOffset _utcNow = initial;
+
+        public override DateTimeOffset GetUtcNow() => _utcNow;
+
+        public void Advance(TimeSpan value) => _utcNow = _utcNow.Add(value);
+    }
+
     private sealed record TestServices(
         SlideshowOriginalPreparationService Preparation,
         SqliteArchiveHydrationRepository Hydrations,
@@ -354,6 +523,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
 
         public List<string> HydrationRequests { get; } = [];
         public List<string> ReleaseRequests { get; } = [];
+        public bool CompleteHydrationImmediately { get; set; } = true;
 
         public void SetState(
             CatalogueProcessingAssetRevision revision,
@@ -377,7 +547,9 @@ public sealed class SlideshowOriginalPreparationServiceTests
             string fullPath = Path.GetFullPath(path);
             HydrationRequests.Add(fullPath);
             _states[fullPath] = new OneDriveFilesOnDemandState(
-                AssetAvailability.Local,
+                CompleteHydrationImmediately
+                    ? AssetAvailability.Local
+                    : AssetAvailability.Downloading,
                 IsPinned: true,
                 IsUnpinned: false);
             return Task.CompletedTask;
