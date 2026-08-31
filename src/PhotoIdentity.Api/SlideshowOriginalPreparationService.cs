@@ -17,6 +17,15 @@ public sealed record SlideshowOriginalPreparationSnapshot(
     string State,
     int Ready,
     int Total,
+    int Downloading,
+    int Queued,
+    int WaitingForRelease,
+    int HydrationRequests,
+    string Phase,
+    DateTimeOffset LastProgressAtUtc,
+    long NoProgressSeconds,
+    bool NoProgressWarning,
+    bool CanRetry,
     long RequiredAdditionalBytes,
     long AvailableManagedCapacity,
     string? Message,
@@ -25,6 +34,7 @@ public sealed record SlideshowOriginalPreparationSnapshot(
 public sealed class SlideshowOriginalPreparationService
 {
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
+    public static TimeSpan NoProgressWarningThreshold { get; } = TimeSpan.FromMinutes(2);
 
     private readonly SqliteLocalBatchRepository _catalogue;
     private readonly CollectionOriginalAccessService _originals;
@@ -107,7 +117,7 @@ public sealed class SlideshowOriginalPreparationService
                 revision.AssetId)));
 
         session.RunTask = RunPreparationAsync(session);
-        return session.Snapshot();
+        return session.Snapshot(_timeProvider.GetUtcNow());
     }
 
     public SlideshowOriginalPreparationSnapshot? GetStatus(Guid sessionId)
@@ -128,7 +138,31 @@ public sealed class SlideshowOriginalPreparationService
                 "The best-quality slideshow lease expired. Prepare originals again or continue with available/proxy images.");
         }
 
-        return session.Snapshot();
+        return session.Snapshot(_timeProvider.GetUtcNow());
+    }
+
+    public SlideshowOriginalPreparationSnapshot? Retry(Guid sessionId)
+    {
+        CleanupTerminalSessions();
+
+        if (!_sessions.TryGetValue(sessionId, out Session? session))
+        {
+            return null;
+        }
+
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        session.Touch(now);
+        if (!_leases.Touch(sessionId) &&
+            session.State is SlideshowOriginalPreparationStates.Preparing or
+                SlideshowOriginalPreparationStates.Ready)
+        {
+            session.Fail(
+                "The best-quality slideshow lease expired. Prepare originals again or continue with available/proxy images.");
+            return session.Snapshot(now);
+        }
+
+        _ = session.RequestRetry(now);
+        return session.Snapshot(now);
     }
 
     public async Task<VerifiedCollectionOriginal?> OpenPreparedOriginalAsync(
@@ -191,7 +225,7 @@ public sealed class SlideshowOriginalPreparationService
                 admission = await _capacity.PreflightHydrationSetAsync(
                     session.Revisions,
                     session.Cancellation.Token);
-                session.UpdateAdmission(admission);
+                session.UpdateAdmission(admission, _timeProvider.GetUtcNow());
 
                 if (admission.Allowed)
                 {
@@ -204,7 +238,7 @@ public sealed class SlideshowOriginalPreparationService
                     return;
                 }
 
-                await Task.Delay(PollInterval, session.Cancellation.Token);
+                await session.WaitForNextPollAsync(PollInterval);
             }
 
             int maximumConcurrent = admission.MaximumConcurrentOperations;
@@ -220,7 +254,7 @@ public sealed class SlideshowOriginalPreparationService
 
             if (session.Revisions.Count == 0)
             {
-                session.MarkReady();
+                session.MarkReady(_timeProvider.GetUtcNow());
                 return;
             }
 
@@ -229,9 +263,10 @@ public sealed class SlideshowOriginalPreparationService
                 session.Cancellation.Token.ThrowIfCancellationRequested();
                 _leases.Touch(session.Id);
 
+                int downloading = 0;
                 int managedDownloading = 0;
+                int waitingForRelease = 0;
                 List<CatalogueProcessingAssetRevision> onlineOnly = [];
-                bool observedProgress = false;
 
                 foreach (CatalogueProcessingAssetRevision revision in session.Revisions)
                 {
@@ -261,8 +296,6 @@ public sealed class SlideshowOriginalPreparationService
                             }
 
                             ready.Add(revision.RevisionId);
-                            session.SetReadyCount(ready.Count);
-                            observedProgress = true;
                             break;
 
                         case CollectionOriginalAccessService.OnlineOnlyState:
@@ -270,6 +303,7 @@ public sealed class SlideshowOriginalPreparationService
                             break;
 
                         case CollectionOriginalAccessService.DownloadingState:
+                            downloading++;
                             if (status.ManagedHydration)
                             {
                                 managedDownloading++;
@@ -277,8 +311,7 @@ public sealed class SlideshowOriginalPreparationService
                             break;
 
                         case CollectionOriginalAccessService.ReleasingState:
-                            // An earlier release request cannot be revoked safely. Wait until
-                            // OneDrive reports online-only, then hydrate it under this session.
+                            waitingForRelease++;
                             break;
 
                         case CollectionOriginalAccessService.HashMismatchState:
@@ -300,9 +333,19 @@ public sealed class SlideshowOriginalPreparationService
 
                 if (ready.Count >= session.Revisions.Count)
                 {
-                    session.MarkReady();
+                    session.MarkReady(_timeProvider.GetUtcNow());
                     return;
                 }
+
+                int queued = onlineOnly.Count;
+                session.UpdateProgress(
+                    ready.Count,
+                    downloading,
+                    queued,
+                    waitingForRelease,
+                    ProgressPhase(downloading, queued, waitingForRelease),
+                    ProgressMessage(downloading, queued, waitingForRelease),
+                    _timeProvider.GetUtcNow());
 
                 int slots = Math.Max(0, maximumConcurrent - managedDownloading);
                 foreach (CatalogueProcessingAssetRevision revision in onlineOnly.Take(slots))
@@ -319,7 +362,17 @@ public sealed class SlideshowOriginalPreparationService
                             return;
                         }
 
-                        observedProgress = true;
+                        session.RecordHydrationRequest(_timeProvider.GetUtcNow());
+                        queued = Math.Max(0, queued - 1);
+                        if (requested.State == CollectionOriginalAccessService.DownloadingState)
+                        {
+                            downloading++;
+                        }
+                        else if (requested.State == CollectionOriginalAccessService.ReadyState &&
+                                 requested.CanView)
+                        {
+                            ready.Add(revision.RevisionId);
+                        }
                     }
                     catch (InvalidOperationException exception)
                         when (exception.Message.Contains("concurrency limit", StringComparison.OrdinalIgnoreCase) ||
@@ -338,10 +391,21 @@ public sealed class SlideshowOriginalPreparationService
                     }
                 }
 
-                session.SetPreparingMessage(observedProgress
-                    ? null
-                    : "Waiting for OneDrive to make the remaining originals local.");
-                await Task.Delay(PollInterval, session.Cancellation.Token);
+                if (ready.Count >= session.Revisions.Count)
+                {
+                    session.MarkReady(_timeProvider.GetUtcNow());
+                    return;
+                }
+
+                session.UpdateProgress(
+                    ready.Count,
+                    downloading,
+                    queued,
+                    waitingForRelease,
+                    ProgressPhase(downloading, queued, waitingForRelease),
+                    ProgressMessage(downloading, queued, waitingForRelease),
+                    _timeProvider.GetUtcNow());
+                await session.WaitForNextPollAsync(PollInterval);
             }
         }
         catch (OperationCanceledException) when (session.Cancellation.IsCancellationRequested)
@@ -353,6 +417,35 @@ public sealed class SlideshowOriginalPreparationService
             session.Fail(
                 $"Best-quality original preparation failed: {PathFreeMessage(exception.Message)}");
         }
+    }
+
+    private static string ProgressPhase(int downloading, int queued, int waitingForRelease) =>
+        waitingForRelease > 0
+            ? "waiting-release"
+            : downloading > 0
+                ? "downloading"
+                : queued > 0
+                    ? "queued"
+                    : "verifying";
+
+    private static string? ProgressMessage(int downloading, int queued, int waitingForRelease)
+    {
+        if (waitingForRelease > 0)
+        {
+            return "Waiting for OneDrive to finish releasing originals before they can be prepared.";
+        }
+
+        if (downloading > 0)
+        {
+            return "Waiting for OneDrive to download the requested originals.";
+        }
+
+        if (queued > 0)
+        {
+            return "Preparing the next originals for OneDrive download.";
+        }
+
+        return "Verifying the remaining local originals.";
     }
 
     private void CleanupTerminalSessions()
@@ -396,12 +489,19 @@ public sealed class SlideshowOriginalPreparationService
     private sealed class Session
     {
         private readonly object _gate = new();
+        private readonly SemaphoreSlim _retrySignal = new(0, 1);
         private int _ready;
+        private int _downloading;
+        private int _queued;
+        private int _waitingForRelease;
+        private int _hydrationRequests;
         private string _state = SlideshowOriginalPreparationStates.Preparing;
-        private string? _message;
+        private string _phase = "preflight";
+        private string? _message = "Preflighting the complete slideshow against the configured storage policy.";
         private long _requiredAdditionalBytes;
         private long _availableManagedCapacity;
         private DateTimeOffset _lastTouchedAtUtc;
+        private DateTimeOffset _lastProgressAtUtc;
 
         public Session(
             Guid id,
@@ -413,6 +513,7 @@ public sealed class SlideshowOriginalPreparationService
             Revisions = revisions;
             Cancellation = cancellation;
             _lastTouchedAtUtc = createdAtUtc;
+            _lastProgressAtUtc = createdAtUtc;
         }
 
         public Guid Id { get; }
@@ -453,43 +554,130 @@ public sealed class SlideshowOriginalPreparationService
             }
         }
 
-        public void UpdateAdmission(ArchiveHydrationSetAdmission admission)
+        public void UpdateAdmission(
+            ArchiveHydrationSetAdmission admission,
+            DateTimeOffset now)
         {
             lock (_gate)
             {
+                string phase = admission.WaitingForRelease ? "waiting-release" : "preflight";
+                string? message = admission.WaitingForRelease
+                    ? admission.Message ?? "Waiting for managed storage to be released before preparation can continue."
+                    : "Preflighting the complete slideshow against the configured storage policy.";
+
+                bool changed =
+                    _requiredAdditionalBytes != admission.RequiredAdditionalBytes ||
+                    _availableManagedCapacity != admission.AvailableManagedCapacity ||
+                    !string.Equals(_phase, phase, StringComparison.Ordinal) ||
+                    !string.Equals(_message, message, StringComparison.Ordinal);
+
                 _requiredAdditionalBytes = admission.RequiredAdditionalBytes;
                 _availableManagedCapacity = admission.AvailableManagedCapacity;
-                _message = admission.WaitingForRelease ? admission.Message : null;
-            }
-        }
-
-        public void SetReadyCount(int ready)
-        {
-            lock (_gate)
-            {
-                _ready = ready;
-                _message = null;
-            }
-        }
-
-        public void SetPreparingMessage(string? message)
-        {
-            lock (_gate)
-            {
-                if (_state == SlideshowOriginalPreparationStates.Preparing)
+                _phase = phase;
+                _message = message;
+                if (changed)
                 {
-                    _message = message;
+                    _lastProgressAtUtc = now;
                 }
             }
         }
 
-        public void MarkReady()
+        public void UpdateProgress(
+            int ready,
+            int downloading,
+            int queued,
+            int waitingForRelease,
+            string phase,
+            string? message,
+            DateTimeOffset now)
+        {
+            lock (_gate)
+            {
+                if (_state != SlideshowOriginalPreparationStates.Preparing)
+                {
+                    return;
+                }
+
+                bool changed =
+                    _ready != ready ||
+                    _downloading != downloading ||
+                    _queued != queued ||
+                    _waitingForRelease != waitingForRelease ||
+                    !string.Equals(_phase, phase, StringComparison.Ordinal) ||
+                    !string.Equals(_message, message, StringComparison.Ordinal);
+
+                _ready = ready;
+                _downloading = downloading;
+                _queued = queued;
+                _waitingForRelease = waitingForRelease;
+                _phase = phase;
+                _message = message;
+                if (changed)
+                {
+                    _lastProgressAtUtc = now;
+                }
+            }
+        }
+
+        public void RecordHydrationRequest(DateTimeOffset now)
+        {
+            lock (_gate)
+            {
+                if (_state != SlideshowOriginalPreparationStates.Preparing)
+                {
+                    return;
+                }
+
+                _hydrationRequests++;
+                _lastProgressAtUtc = now;
+            }
+        }
+
+        public bool RequestRetry(DateTimeOffset now)
+        {
+            lock (_gate)
+            {
+                if (_state != SlideshowOriginalPreparationStates.Preparing)
+                {
+                    return false;
+                }
+
+                _phase = "retrying";
+                _message = "Retry requested; rechecking OneDrive and the same slideshow snapshot.";
+                _lastProgressAtUtc = now;
+            }
+
+            if (_retrySignal.CurrentCount == 0)
+            {
+                try
+                {
+                    _retrySignal.Release();
+                }
+                catch (SemaphoreFullException)
+                {
+                }
+            }
+
+            return true;
+        }
+
+        public async Task WaitForNextPollAsync(TimeSpan delay)
+        {
+            _ = await _retrySignal.WaitAsync(delay, Cancellation.Token);
+        }
+
+        public void MarkReady(DateTimeOffset now)
         {
             lock (_gate)
             {
                 _ready = Revisions.Count;
+                _downloading = 0;
+                _queued = 0;
+                _waitingForRelease = 0;
                 _state = SlideshowOriginalPreparationStates.Ready;
+                _phase = "ready";
                 _message = null;
+                _lastProgressAtUtc = now;
             }
         }
 
@@ -503,6 +691,7 @@ public sealed class SlideshowOriginalPreparationService
                 }
 
                 _state = SlideshowOriginalPreparationStates.Failed;
+                _phase = "failed";
                 _message = message;
             }
         }
@@ -512,6 +701,7 @@ public sealed class SlideshowOriginalPreparationService
             lock (_gate)
             {
                 _state = SlideshowOriginalPreparationStates.Cancelled;
+                _phase = "cancelled";
                 _message = "Best-quality original preparation was cancelled.";
             }
         }
@@ -526,15 +716,32 @@ public sealed class SlideshowOriginalPreparationService
             MarkCancelled();
         }
 
-        public SlideshowOriginalPreparationSnapshot Snapshot()
+        public SlideshowOriginalPreparationSnapshot Snapshot(DateTimeOffset now)
         {
             lock (_gate)
             {
+                long noProgressSeconds = _state == SlideshowOriginalPreparationStates.Preparing
+                    ? Math.Max(0L, (long)(now - _lastProgressAtUtc).TotalSeconds)
+                    : 0L;
+                bool noProgressWarning =
+                    _state == SlideshowOriginalPreparationStates.Preparing &&
+                    _ready < Revisions.Count &&
+                    now - _lastProgressAtUtc >= NoProgressWarningThreshold;
+
                 return new SlideshowOriginalPreparationSnapshot(
                     Id,
                     _state,
                     _ready,
                     Revisions.Count,
+                    _downloading,
+                    _queued,
+                    _waitingForRelease,
+                    _hydrationRequests,
+                    _phase,
+                    _lastProgressAtUtc,
+                    noProgressSeconds,
+                    noProgressWarning,
+                    noProgressWarning,
                     _requiredAdditionalBytes,
                     _availableManagedCapacity,
                     _message,
@@ -542,4 +749,5 @@ public sealed class SlideshowOriginalPreparationService
             }
         }
     }
+
 }

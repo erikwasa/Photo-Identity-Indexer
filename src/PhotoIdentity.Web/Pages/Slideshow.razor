@@ -77,9 +77,36 @@
             <div class="spinner" aria-hidden="true"></div>
             <h1>Preparing slideshow</h1>
             <p>@OriginalPreparation!.Ready / @OriginalPreparation.Total photos ready</p>
+            <p>
+                @OriginalPreparation.Downloading downloading ·
+                @OriginalPreparation.Queued queued ·
+                @OriginalPreparation.WaitingForRelease waiting for release
+            </p>
             @if (!string.IsNullOrWhiteSpace(OriginalPreparation.Message))
             {
                 <p class="slideshow-parent-hint">@OriginalPreparation.Message</p>
+            }
+            @if (OriginalPreparation.NoProgressWarning)
+            {
+                <div class="slideshow-protection-warning" role="alert">
+                    <strong>OneDrive has not made progress</strong>
+                    <p>No preparation progress has been observed for @OriginalPreparation.NoProgressSeconds seconds.</p>
+                    @if (!Settings.ProtectedSlideshow)
+                    {
+                        <div class="slideshow-state-actions">
+                            <button type="button" class="button primary" @onclick="RetryOriginalPreparationAsync">
+                                Retry preparation
+                            </button>
+                            <button type="button" class="button secondary" @onclick="CancelOriginalPreparationAsync">
+                                Cancel preparation
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="slideshow-parent-hint">Use parent controls to retry or cancel preparation.</p>
+                    }
+                </div>
             }
         </section>
     }
@@ -211,6 +238,22 @@
                     <div class="slideshow-preparation-parent" role="status">
                         <strong>@(PreparingOriginals ? "Preparing best-quality originals" : "Best-quality preparation needs attention")</strong>
                         <span>@OriginalPreparation.Ready / @OriginalPreparation.Total photos ready</span>
+                        @if (PreparingOriginals)
+                        {
+                            <span>
+                                @OriginalPreparation.Downloading downloading ·
+                                @OriginalPreparation.Queued queued ·
+                                @OriginalPreparation.WaitingForRelease waiting for release
+                            </span>
+                            <span>Hydration requests issued: @OriginalPreparation.HydrationRequests</span>
+                        }
+                        @if (OriginalPreparation.NoProgressWarning)
+                        {
+                            <div class="slideshow-protection-warning" role="alert">
+                                <strong>OneDrive has not made progress</strong>
+                                <span>No preparation progress has been observed for @OriginalPreparation.NoProgressSeconds seconds.</span>
+                            </div>
+                        }
                         @if (!string.IsNullOrWhiteSpace(OriginalPreparation.Message))
                         {
                             <span>@OriginalPreparation.Message</span>
@@ -226,6 +269,17 @@
                             <div class="slideshow-parent-actions">
                                 <button type="button" class="slideshow-toolbar-button" @onclick="ContinueWithAvailableAsync">
                                     Continue with available/proxy images
+                                </button>
+                                <button type="button" class="slideshow-toolbar-button" @onclick="CancelOriginalPreparationAsync">
+                                    Cancel preparation
+                                </button>
+                            </div>
+                        }
+                        else if (OriginalPreparation.NoProgressWarning)
+                        {
+                            <div class="slideshow-parent-actions">
+                                <button type="button" class="slideshow-toolbar-button" @onclick="RetryOriginalPreparationAsync">
+                                    Retry preparation
                                 </button>
                                 <button type="button" class="slideshow-toolbar-button" @onclick="CancelOriginalPreparationAsync">
                                     Cancel preparation

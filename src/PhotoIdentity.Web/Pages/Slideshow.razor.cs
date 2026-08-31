@@ -108,6 +108,7 @@ public partial class Slideshow : IAsyncDisposable
         SlideshowRecoveryReason.BrowserBack => "Back navigation was blocked",
         SlideshowRecoveryReason.FullscreenLost => "Fullscreen was lost",
         SlideshowRecoveryReason.ProtectionWarning => "Check phone protection",
+        SlideshowRecoveryReason.PreparationNoProgress => "OneDrive preparation needs attention",
         SlideshowRecoveryReason.PreparationFailure => "Best-quality preparation needs attention",
         _ => "Slideshow controls",
     };
@@ -861,6 +862,15 @@ public partial class Slideshow : IAsyncDisposable
             0,
             Snapshot.Total,
             0,
+            Snapshot.Total,
+            0,
+            0,
+            "preflight",
+            DateTimeOffset.UtcNow,
+            0,
+            false,
+            false,
+            0,
             0,
             "Preflighting the complete slideshow against the configured storage policy.",
             false);
@@ -998,6 +1008,11 @@ public partial class Slideshow : IAsyncDisposable
 
             case "preparing":
                 Playback.Pause();
+                if (status.NoProgressWarning && Settings.ProtectedSlideshow)
+                {
+                    OpenParentControls(SlideshowRecoveryReason.PreparationNoProgress);
+                    _resumeAfterParentControls = _resumeAfterPreparation;
+                }
                 break;
         }
 
@@ -1008,6 +1023,12 @@ public partial class Slideshow : IAsyncDisposable
     {
         int ready = OriginalPreparation?.Ready ?? 0;
         int total = OriginalPreparation?.Total ?? Snapshot?.Total ?? 0;
+        int downloading = OriginalPreparation?.Downloading ?? 0;
+        int queued = OriginalPreparation?.Queued ?? 0;
+        int waitingForRelease = OriginalPreparation?.WaitingForRelease ?? 0;
+        int hydrationRequests = OriginalPreparation?.HydrationRequests ?? 0;
+        DateTimeOffset lastProgressAtUtc =
+            OriginalPreparation?.LastProgressAtUtc ?? DateTimeOffset.UtcNow;
         long required = OriginalPreparation?.RequiredAdditionalBytes ?? 0;
         long available = OriginalPreparation?.AvailableManagedCapacity ?? 0;
         string sessionId = OriginalPreparation?.SessionId ?? string.Empty;
@@ -1017,6 +1038,15 @@ public partial class Slideshow : IAsyncDisposable
             "failed",
             ready,
             total,
+            downloading,
+            queued,
+            waitingForRelease,
+            hydrationRequests,
+            "failed",
+            lastProgressAtUtc,
+            0,
+            false,
+            false,
             required,
             available,
             message,
@@ -1060,6 +1090,46 @@ public partial class Slideshow : IAsyncDisposable
         }
 
         _lastTickTimestamp = Stopwatch.GetTimestamp();
+    }
+
+    private async Task RetryOriginalPreparationAsync()
+    {
+        if (OriginalPreparation is null ||
+            !Guid.TryParse(OriginalPreparation.SessionId, out Guid sessionId) ||
+            sessionId == Guid.Empty)
+        {
+            return;
+        }
+
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsync(
+                $"api/slideshows/original-preparation/{sessionId:D}/retry",
+                content: null);
+            if (!response.IsSuccessStatusCode)
+            {
+                OriginalPreparation = OriginalPreparation with
+                {
+                    Message = $"Preparation retry could not be requested. Status {(int)response.StatusCode}.",
+                };
+                StateHasChanged();
+                return;
+            }
+
+            SlideshowOriginalPreparationResponse status =
+                await response.Content.ReadFromJsonAsync<SlideshowOriginalPreparationResponse>()
+                ?? throw new InvalidOperationException(
+                    "The slideshow preparation retry response was empty.");
+            await ApplyPreparationStatusAsync(status);
+        }
+        catch (Exception exception)
+        {
+            OriginalPreparation = OriginalPreparation with
+            {
+                Message = $"Preparation retry could not be requested: {exception.Message}",
+            };
+            StateHasChanged();
+        }
     }
 
     private async Task ContinueWithAvailableAsync()

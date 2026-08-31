@@ -995,15 +995,22 @@ work_items:
 - id: WI-0093
   title: Make slideshow original preparation observable and recoverable
   milestone: M22
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0093-slideshow-original-preparation-progress.md
+  started_at: 2026-08-31
+  last_updated_at: 2026-08-31
+  branch: agent/WI-0093-slideshow-preparation-progress
   blockers:
   - WI-0042
   - WI-0086
   blocker_notes:
-  - Real-phone review observed a 56-photo preparation remaining at 1/56 with no useful downloading/queued/stall status. Existing bounded hydration semantics remain the base contract.
-  evidence: []
+  - WI-0042 and WI-0086 are implemented/merged; WI-0086 remains in_review only because M22 maintainer acceptance is consolidated. Real-phone review observed a 56-photo preparation remaining at 1/56 with no useful downloading/queued/stall status.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/224
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33379685361
 - id: WI-0094
   title: Add a read-only slideshow library with standalone original preparation
   milestone: M22
