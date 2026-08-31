@@ -21,6 +21,7 @@ public enum SlideshowRecoveryReason
     BrowserBack,
     FullscreenLost,
     ProtectionWarning,
+    PreparationNoProgress,
     PreparationFailure,
 }
 
