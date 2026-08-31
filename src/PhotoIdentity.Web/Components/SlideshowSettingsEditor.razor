@@ -1,0 +1,119 @@
+@using System.Globalization
+
+<div class="slideshow-settings-editor">
+    <label>
+        <input type="checkbox" checked="@Settings.Autoplay" @onchange="ChangeAutoplayAsync" />
+        <span>Autoplay</span>
+    </label>
+
+    <label class="slideshow-settings-field">
+        <span>Image duration</span>
+        <input type="number"
+               min="@SlideshowSettings.MinimumImageDurationSeconds"
+               max="@SlideshowSettings.MaximumImageDurationSeconds"
+               value="@Settings.ImageDurationSeconds"
+               @onchange="ChangeDurationAsync" />
+        <span>seconds</span>
+    </label>
+
+    <label>
+        <input type="checkbox" checked="@Settings.ShowTimerProgress" @onchange="ChangeProgressAsync" />
+        <span>Show timer progress</span>
+    </label>
+
+    <label>
+        <input type="checkbox" checked="@Settings.ManualNavigation" @onchange="ChangeManualNavigationAsync" />
+        <span>Manual navigation</span>
+    </label>
+
+    <label class="slideshow-settings-field">
+        <span>Orientation</span>
+        <select value="@Settings.Orientation" @onchange="ChangeOrientationAsync">
+            <option value="@SlideshowSettings.CurrentOrientation">Current at start</option>
+            <option value="@SlideshowSettings.PortraitOrientation">Portrait</option>
+            <option value="@SlideshowSettings.LandscapeOrientation">Landscape</option>
+        </select>
+    </label>
+
+    <label class="slideshow-settings-field">
+        <span>After last photo</span>
+        <select value="@Settings.AfterLastPhoto" @onchange="ChangeEndBehaviorAsync">
+            <option value="@SlideshowSettings.Loop">Loop</option>
+            <option value="@SlideshowSettings.Stop">Stop</option>
+            <option value="@SlideshowSettings.Exit">Exit slideshow</option>
+        </select>
+    </label>
+
+    <label>
+        <input type="checkbox" checked="@Settings.ProtectedSlideshow" @onchange="ChangeProtectedAsync" />
+        <span>Protected slideshow</span>
+    </label>
+
+    @if (ShowPrepareOriginals)
+    {
+        <label>
+            <input type="checkbox" checked="@Settings.PrepareOriginals" @onchange="ChangePrepareOriginalsAsync" />
+            <span>Prepare originals when slideshow starts</span>
+        </label>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public SlideshowSettings Settings { get; set; } = SlideshowSettings.Defaults;
+
+    [Parameter]
+    public EventCallback<SlideshowSettings> SettingsChanged { get; set; }
+
+    [Parameter]
+    public bool ShowPrepareOriginals { get; set; } = true;
+
+    private Task EmitAsync(SlideshowSettings value) =>
+        SettingsChanged.InvokeAsync(value.Normalize());
+
+    private Task ChangeAutoplayAsync(ChangeEventArgs args) =>
+        EmitAsync(Settings with { Autoplay = ParseChecked(args) });
+
+    private Task ChangeDurationAsync(ChangeEventArgs args)
+    {
+        int value = int.TryParse(
+            args.Value?.ToString(),
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
+            out int parsed)
+            ? parsed
+            : SlideshowSettings.DefaultImageDurationSeconds;
+        return EmitAsync(Settings with { ImageDurationSeconds = value });
+    }
+
+    private Task ChangeProgressAsync(ChangeEventArgs args) =>
+        EmitAsync(Settings with { ShowTimerProgress = ParseChecked(args) });
+
+    private Task ChangeManualNavigationAsync(ChangeEventArgs args) =>
+        EmitAsync(Settings with { ManualNavigation = ParseChecked(args) });
+
+    private Task ChangeOrientationAsync(ChangeEventArgs args) =>
+        EmitAsync(Settings with
+        {
+            Orientation = args.Value?.ToString() ?? SlideshowSettings.CurrentOrientation,
+        });
+
+    private Task ChangeEndBehaviorAsync(ChangeEventArgs args) =>
+        EmitAsync(Settings with
+        {
+            AfterLastPhoto = args.Value?.ToString() ?? SlideshowSettings.Loop,
+        });
+
+    private Task ChangeProtectedAsync(ChangeEventArgs args) =>
+        EmitAsync(Settings with { ProtectedSlideshow = ParseChecked(args) });
+
+    private Task ChangePrepareOriginalsAsync(ChangeEventArgs args) =>
+        EmitAsync(Settings with { PrepareOriginals = ParseChecked(args) });
+
+    private static bool ParseChecked(ChangeEventArgs args) => args.Value switch
+    {
+        bool value => value,
+        string text when bool.TryParse(text, out bool value) => value,
+        _ => false,
+    };
+}

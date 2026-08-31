@@ -691,6 +691,57 @@ public partial class Slideshow : IAsyncDisposable
 
     private void ToggleSettings() => SettingsOpen = !SettingsOpen;
 
+    private async Task ChangeSettingsFromEditorAsync(SlideshowSettings settings)
+    {
+        SlideshowSettings previous = Settings;
+        SlideshowSettings next = settings.Normalize();
+        bool orientationChanged =
+            !string.Equals(previous.Orientation, next.Orientation, StringComparison.Ordinal);
+        bool prepareOriginalsChanged = previous.PrepareOriginals != next.PrepareOriginals;
+
+        await ApplyAndPersistSettingsAsync(next);
+
+        if (orientationChanged && FullscreenActive)
+        {
+            try
+            {
+                Capabilities = await JS.InvokeAsync<SlideshowBrowserProtectionStatus>(
+                    "photoIdentitySlideshow.setOrientation",
+                    Settings.Orientation);
+                ProtectionStatusKnown = true;
+            }
+            catch (JSException)
+            {
+                ProtectionStatusKnown = false;
+            }
+        }
+
+        if (!prepareOriginalsChanged || Snapshot is null)
+        {
+            return;
+        }
+
+        if (Settings.PrepareOriginals)
+        {
+            _continueAvailableForSession = false;
+            await BeginOriginalPreparationAsync();
+            return;
+        }
+
+        bool shouldResume = _resumeAfterPreparation;
+        await EndOriginalPreparationAsync();
+        _preparedOriginalsReady = false;
+        _continueAvailableForSession = false;
+        OriginalPreparation = null;
+        ImageError = null;
+        await UpdatePrefetchAsync();
+
+        if (shouldResume)
+        {
+            ResumeAfterPreparationHold();
+        }
+    }
+
     private async Task ChangeAutoplayAsync(ChangeEventArgs args)
     {
         bool value = ParseChecked(args);
@@ -1358,6 +1409,13 @@ public partial class Slideshow : IAsyncDisposable
         }
 
         string trimmed = value.Trim();
+        if (trimmed.Equals("/slideshows", StringComparison.Ordinal) ||
+            trimmed.StartsWith("/slideshows?", StringComparison.Ordinal) ||
+            trimmed.StartsWith("/slideshows#", StringComparison.Ordinal))
+        {
+            return trimmed;
+        }
+
         if (trimmed.Equals("/smart-collections", StringComparison.Ordinal) ||
             trimmed.StartsWith("/smart-collections?", StringComparison.Ordinal) ||
             trimmed.StartsWith("/smart-collections#", StringComparison.Ordinal))

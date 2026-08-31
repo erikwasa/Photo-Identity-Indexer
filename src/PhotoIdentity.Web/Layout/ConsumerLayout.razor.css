@@ -1,0 +1,52 @@
+.consumer-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.consumer-topbar {
+    padding: max(0.9rem, env(safe-area-inset-top)) clamp(1rem, 4vw, 2.5rem) 0.9rem;
+    color: #f7f4eb;
+    background: #162a2d;
+}
+
+.consumer-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.consumer-brand-mark {
+    display: grid;
+    place-items: center;
+    width: 2.6rem;
+    height: 2.6rem;
+    border-radius: 0.8rem;
+    color: #173033;
+    background: #d9e8c8;
+    font-weight: 800;
+}
+
+.consumer-brand strong,
+.consumer-brand small {
+    display: block;
+}
+
+.consumer-brand small {
+    color: #b9c7c8;
+}
+
+.consumer-content {
+    width: min(980px, 100%);
+    margin: 0 auto;
+    flex: 1;
+    padding: clamp(1rem, 4vw, 2.5rem);
+}
+
+.consumer-footer {
+    padding: 1rem clamp(1rem, 4vw, 2.5rem) calc(1rem + env(safe-area-inset-bottom));
+    color: #718083;
+    border-top: 1px solid #dedad1;
+    text-align: center;
+    font-size: 0.85rem;
+}

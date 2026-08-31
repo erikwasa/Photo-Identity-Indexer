@@ -1,0 +1,145 @@
+@page "/slideshows"
+@layout ConsumerLayout
+
+<PageTitle>Slideshows · Photo Identity</PageTitle>
+
+<section class="slideshow-library-header">
+    <div>
+        <p class="eyebrow">Read-only viewing</p>
+        <h1>Slideshows</h1>
+        <p>Choose a saved Smart Collection, prepare its originals, or start playback.</p>
+    </div>
+</section>
+
+<details class="slideshow-library-settings">
+    <summary>Slideshow settings</summary>
+    <div class="slideshow-library-settings-body">
+        <SlideshowSettingsEditor Settings="@Settings"
+                                 SettingsChanged="ChangeSettingsAsync" />
+        <p class="slideshow-library-note">
+            These are the same browser-local settings used during slideshow playback.
+        </p>
+    </div>
+</details>
+
+@if (Loading)
+{
+    <section class="slideshow-library-state" role="status">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading saved Smart Collections…</p>
+    </section>
+}
+else if (!string.IsNullOrWhiteSpace(Error))
+{
+    <section class="slideshow-library-state" role="alert">
+        <strong>Slideshows could not be loaded</strong>
+        <p>@Error</p>
+        <button type="button" class="button secondary" @onclick="LoadCollectionsAsync">Retry</button>
+    </section>
+}
+else if (Collections.Count == 0)
+{
+    <section class="slideshow-library-state">
+        <h2>No saved Smart Collections</h2>
+        <p>An operator needs to create a Smart Collection before it can be used here.</p>
+    </section>
+}
+else
+{
+    <section class="slideshow-library-grid" aria-label="Saved Smart Collections">
+        @foreach (SlideshowLibraryCollectionResponse collection in Collections)
+        {
+            SlideshowOriginalPreparationResponse? preparation = PreparationFor(collection.Id);
+            bool preparing = preparation?.State == "preparing";
+            bool needsAttention = preparation?.State == "failed";
+            bool busy = preparing || needsAttention || IsStarting(collection.Id);
+
+            <article class="slideshow-library-card">
+                <div>
+                    <h2>@collection.Name</h2>
+                    @if (preparation is not null)
+                    {
+                        <div class="slideshow-library-preparation" role="status">
+                            @if (preparation.State == "ready")
+                            {
+                                <strong>Originals prepared</strong>
+                                <span>@preparation.Ready / @preparation.Total photos ready</span>
+                            }
+                            else if (preparing)
+                            {
+                                <strong>Preparing originals</strong>
+                                <span>@preparation.Ready / @preparation.Total ready</span>
+                                <span>
+                                    @preparation.Downloading downloading ·
+                                    @preparation.Queued queued ·
+                                    @preparation.WaitingForRelease waiting for release
+                                </span>
+                                @if (!string.IsNullOrWhiteSpace(preparation.Message))
+                                {
+                                    <span>@preparation.Message</span>
+                                }
+                                @if (preparation.NoProgressWarning)
+                                {
+                                    <div class="slideshow-library-warning" role="alert">
+                                        <strong>OneDrive has not made progress</strong>
+                                        <span>No progress for @preparation.NoProgressSeconds seconds.</span>
+                                    </div>
+                                }
+                            }
+                            else if (needsAttention)
+                            {
+                                <strong>Preparation needs attention</strong>
+                                <span>@preparation.Message</span>
+                                @if (preparation.RequiredAdditionalBytes > 0)
+                                {
+                                    <span>Required additional bytes: @preparation.RequiredAdditionalBytes</span>
+                                    <span>Available managed capacity: @preparation.AvailableManagedCapacity</span>
+                                }
+                            }
+                        </div>
+                    }
+                </div>
+
+                <div class="slideshow-library-actions">
+                    <button type="button"
+                            class="button primary"
+                            disabled="@busy"
+                            @onclick="() => StartSlideshow(collection)">
+                        Start slideshow
+                    </button>
+
+                    @if (preparation?.NoProgressWarning == true && preparation.CanRetry)
+                    {
+                        <button type="button"
+                                class="button secondary"
+                                @onclick="() => RetryPreparationAsync(collection.Id)">
+                            Retry preparation
+                        </button>
+                    }
+                    else if (!busy)
+                    {
+                        <button type="button"
+                                class="button secondary"
+                                @onclick="() => PrepareOriginalsAsync(collection)">
+                            @(preparation?.State == "ready" ? "Prepare again" : "Prepare originals")
+                        </button>
+                    }
+
+                    @if (preparing || needsAttention)
+                    {
+                        <button type="button"
+                                class="button secondary"
+                                @onclick="() => CancelPreparationAsync(collection.Id)">
+                            Cancel preparation
+                        </button>
+                    }
+                </div>
+            </article>
+        }
+    </section>
+}
+
+<section class="slideshow-library-boundary">
+    <strong>Viewing surface only</strong>
+    <p>This page does not expose Smart Collection or photo editing. It is not an authentication boundary.</p>
+</section>

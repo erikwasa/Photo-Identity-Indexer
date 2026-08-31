@@ -84,6 +84,10 @@ public sealed record SmartCollectionSlideshowSnapshotResponse(
     SmartCollectionSlideshowSnapshotItemResponse[] Items,
     int Total);
 
+public sealed record SlideshowLibraryCollectionResponse(
+    string Id,
+    string Name);
+
 public static class SmartCollectionEndpoints
 {
     public static IEndpointRouteBuilder MapSmartCollectionEndpoints(this IEndpointRouteBuilder endpoints)
@@ -91,6 +95,7 @@ public static class SmartCollectionEndpoints
         endpoints.MapPost("/api/smart-collections/query", QueryAsync);
         endpoints.MapPost("/api/smart-collections", CreateAsync);
         endpoints.MapGet("/api/smart-collections", ListAsync);
+        endpoints.MapGet("/api/slideshows/collections", ListSlideshowCollectionsAsync);
         endpoints.MapGet("/api/smart-collections/{id:guid}", GetAsync);
         endpoints.MapPut("/api/smart-collections/{id:guid}", UpdateAsync);
         endpoints.MapDelete("/api/smart-collections/{id:guid}", DeleteAsync);
@@ -131,6 +136,19 @@ public static class SmartCollectionEndpoints
         IReadOnlyList<SmartCollectionDefinition> definitions =
             await repository.ListAsync(cancellationToken);
         return Results.Ok(definitions.Select(ToDefinitionResponse).ToArray());
+    }
+
+    private static async Task<IResult> ListSlideshowCollectionsAsync(
+        SqliteSmartCollectionRepository repository,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<SmartCollectionDefinition> definitions =
+            await repository.ListAsync(cancellationToken);
+        return Results.Ok(definitions
+            .Select(definition => new SlideshowLibraryCollectionResponse(
+                definition.Id.ToString(),
+                definition.Name))
+            .ToArray());
     }
 
     private static async Task<IResult> GetAsync(
