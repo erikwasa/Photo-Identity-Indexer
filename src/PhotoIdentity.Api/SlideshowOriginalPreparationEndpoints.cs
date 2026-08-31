@@ -11,6 +11,7 @@ public static class SlideshowOriginalPreparationEndpoints
         RouteGroupBuilder group = endpoints.MapGroup("/api/slideshows/original-preparation");
         group.MapPost("", StartAsync);
         group.MapGet("/{sessionId:guid}", GetStatus);
+        group.MapPost("/{sessionId:guid}/retry", Retry);
         group.MapDelete("/{sessionId:guid}", End);
         group.MapGet("/{sessionId:guid}/photos/{revisionId}/original", GetPreparedOriginalAsync);
         return endpoints;
@@ -58,6 +59,16 @@ public static class SlideshowOriginalPreparationEndpoints
             : Results.Ok(ToResponse(snapshot));
     }
 
+    private static IResult Retry(
+        Guid sessionId,
+        SlideshowOriginalPreparationService service)
+    {
+        SlideshowOriginalPreparationSnapshot? snapshot = service.Retry(sessionId);
+        return snapshot is null
+            ? Results.NotFound(new { error = "The slideshow preparation session is no longer available." })
+            : Results.Ok(ToResponse(snapshot));
+    }
+
     private static IResult End(
         Guid sessionId,
         SlideshowOriginalPreparationService service)
@@ -96,6 +107,15 @@ public static class SlideshowOriginalPreparationEndpoints
             snapshot.State,
             snapshot.Ready,
             snapshot.Total,
+            snapshot.Downloading,
+            snapshot.Queued,
+            snapshot.WaitingForRelease,
+            snapshot.HydrationRequests,
+            snapshot.Phase,
+            snapshot.LastProgressAtUtc,
+            snapshot.NoProgressSeconds,
+            snapshot.NoProgressWarning,
+            snapshot.CanRetry,
             snapshot.RequiredAdditionalBytes,
             snapshot.AvailableManagedCapacity,
             snapshot.Message,
