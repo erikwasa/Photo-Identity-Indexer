@@ -1014,7 +1014,7 @@ work_items:
 - id: WI-0094
   title: Add a read-only slideshow library with standalone original preparation
   milestone: M22
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0094-read-only-slideshow-library.md
   started_at: 2026-08-31
@@ -1027,5 +1027,9 @@ work_items:
   - WI-0093
   blocker_notes:
   - Dependencies are implemented/merged; WI-0083 and WI-0093 remain in_review only because M22 maintainer acceptance is consolidated. The consumer surface reuses the finalized slideshow settings and preparation contracts and remains a UI boundary rather than authentication/authorization.
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/225
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33391511779
 
