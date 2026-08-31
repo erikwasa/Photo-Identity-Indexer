@@ -1,0 +1,30 @@
+.slideshow-settings-editor {
+    display: grid;
+    gap: 0.9rem;
+}
+
+.slideshow-settings-editor label,
+.slideshow-settings-field {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.slideshow-settings-field {
+    flex-wrap: wrap;
+}
+
+.slideshow-settings-editor input[type="number"],
+.slideshow-settings-editor select {
+    min-width: 5rem;
+    padding: 0.45rem;
+    border: 1px solid currentColor;
+    border-radius: 0.4rem;
+    background: transparent;
+    color: inherit;
+}
+
+.slideshow-settings-editor input[type="checkbox"] {
+    min-width: 1.1rem;
+    min-height: 1.1rem;
+}
