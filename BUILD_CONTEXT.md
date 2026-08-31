@@ -6,29 +6,30 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**WI-0092 — Add slideshow manual-navigation and orientation preferences** is the active M22 phone-review follow-up.
+**WI-0092 — Add slideshow manual-navigation and orientation preferences** is implemented and in review on PR #223.
 
-The implementation extends the existing browser-local slideshow settings payload with backward-compatible defaults:
+The implementation extends the browser-local slideshow settings payload with backward-compatible defaults:
 
 - Manual navigation: On
 - Orientation: Current at start
 
 Manual navigation is enforced both by the presentation input guard and SlideshowPlaybackState, so tap/swipe/Left/Right input cannot move photos when disabled while autoplay, Space/parent Play-Pause, parent unlock and recovery remain independent.
 
-Orientation supports Current at start, Portrait and Landscape. Current at start retains the existing exact-orientation-first behavior with family fallback. Portrait/Landscape request the selected Screen Orientation family. Changing the setting during active fullscreen replaces only the application-owned orientation lock; it does not change the snapshot, current photo, wake lock or fullscreen state.
+Orientation supports Current at start, Portrait and Landscape. Current at start retains exact-orientation-first behavior with family fallback. Portrait/Landscape request the selected Screen Orientation family. Changing the setting during active fullscreen replaces only the application-owned orientation lock; it does not change the snapshot, current photo, wake lock or fullscreen state.
 
-Existing stored M22 slideshow settings without the two new fields deserialize to Manual navigation On and Current at start.
+Existing stored M22 slideshow settings without the new fields deserialize to Manual navigation On and Current at start.
 
-WI-0093 and WI-0094 remain proposed and should not be implemented until WI-0092 is through its implementation review.
+Exact-head workflow #1345 passed all lanes: build-and-test, both integration shards, launcher verification and package verification.
+
+WI-0093 and WI-0094 remain proposed and should not be implemented until WI-0092 is merged.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
 ## Next concrete step
 
-1. Run exact-head CI for WI-0092 and correct any build/Razor/test failures.
-2. When green, record PR/workflow evidence and move WI-0092 to in_review.
-3. Merge WI-0092 after the final lifecycle-only CI is green.
-4. Then start WI-0093 preparation progress/no-progress recovery.
+1. Wait for lifecycle-only CI on the current PR #223 head to complete.
+2. If green and no review blockers exist, merge PR #223.
+3. Then start WI-0093 preparation progress/no-progress recovery.
 
 ## Relevant files
 
