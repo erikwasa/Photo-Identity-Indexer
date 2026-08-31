@@ -104,7 +104,7 @@ Photo Identity remains unauthenticated under the current trust model. Enabling r
 
 ## Read-only slideshow library
 
-Provide a dedicated basic-user slideshow surface, recommended at `/slideshows`, that lists saved Smart Collections and exposes only consumption-oriented actions:
+Provide a dedicated basic-user slideshow surface at `/slideshows` that lists saved Smart Collections and exposes only consumption-oriented actions:
 
 - Start slideshow;
 - Prepare originals;
