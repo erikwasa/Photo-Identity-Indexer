@@ -338,58 +338,8 @@
                 <button type="button" class="slideshow-toolbar-button" @onclick="ToggleSettings">Close</button>
             </div>
 
-            <label>
-                <input type="checkbox" checked="@Settings.Autoplay" @onchange="ChangeAutoplayAsync" />
-                <span>Autoplay</span>
-            </label>
-
-            <label class="slideshow-settings-field">
-                <span>Image duration</span>
-                <input type="number"
-                       min="@SlideshowSettings.MinimumImageDurationSeconds"
-                       max="@SlideshowSettings.MaximumImageDurationSeconds"
-                       value="@Settings.ImageDurationSeconds"
-                       @onchange="ChangeDurationAsync" />
-                <span>seconds</span>
-            </label>
-
-            <label>
-                <input type="checkbox" checked="@Settings.ShowTimerProgress" @onchange="ChangeProgressAsync" />
-                <span>Show timer progress</span>
-            </label>
-
-            <label>
-                <input type="checkbox" checked="@Settings.ManualNavigation" @onchange="ChangeManualNavigationAsync" />
-                <span>Manual navigation</span>
-            </label>
-
-            <label class="slideshow-settings-field">
-                <span>Orientation</span>
-                <select value="@Settings.Orientation" @onchange="ChangeOrientationAsync">
-                    <option value="@SlideshowSettings.CurrentOrientation">Current at start</option>
-                    <option value="@SlideshowSettings.PortraitOrientation">Portrait</option>
-                    <option value="@SlideshowSettings.LandscapeOrientation">Landscape</option>
-                </select>
-            </label>
-
-            <label class="slideshow-settings-field">
-                <span>After last photo</span>
-                <select value="@Settings.AfterLastPhoto" @onchange="ChangeEndBehaviorAsync">
-                    <option value="@SlideshowSettings.Loop">Loop</option>
-                    <option value="@SlideshowSettings.Stop">Stop</option>
-                    <option value="@SlideshowSettings.Exit">Exit slideshow</option>
-                </select>
-            </label>
-
-            <label>
-                <input type="checkbox" checked="@Settings.ProtectedSlideshow" @onchange="ChangeProtectedAsync" />
-                <span>Protected slideshow</span>
-            </label>
-
-            <label>
-                <input type="checkbox" checked="@Settings.PrepareOriginals" @onchange="ChangePrepareOriginalsAsync" />
-                <span>Prepare originals</span>
-            </label>
+            <SlideshowSettingsEditor Settings="@Settings"
+                                     SettingsChanged="ChangeSettingsFromEditorAsync" />
 
             @if (ProtectionStatusKnown)
             {
