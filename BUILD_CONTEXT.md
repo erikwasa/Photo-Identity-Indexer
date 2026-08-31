@@ -6,44 +6,41 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-M22 remains in progress after the 2026-08-30 real-phone maintainer review.
+**WI-0092 — Add slideshow manual-navigation and orientation preferences** is implemented and in review on PR #223.
 
-The secure trusted-LAN path, stable slideshow snapshot, fullscreen/protected playback, wake/orientation capability handling and normal slideshow behaviors otherwise worked as expected. The review identified four gaps that must close before M22 completion:
+The implementation extends the browser-local slideshow settings payload with backward-compatible defaults:
 
-- a setting to disable manual next/previous navigation;
-- an explicit slideshow Orientation setting rather than only inheriting orientation at Start;
-- Prepare originals needs useful downloading/queued/waiting progress plus no-progress recovery after a 56-photo phone test remained at 1/56 without explanation;
-- a read-only basic-user slideshow library is needed to list saved Smart Collections, edit global slideshow settings, start slideshows and prepare originals without entering playback.
+- Manual navigation: On
+- Orientation: Current at start
 
-These are split into WI-0092, WI-0093 and WI-0094. The consumer page is explicitly a read-only UI boundary, not an authentication/authorization boundary, because Photo Identity remains unauthenticated on the trusted LAN.
+Manual navigation is enforced both by the presentation input guard and SlideshowPlaybackState, so tap/swipe/Left/Right input cannot move photos when disabled while autoplay, Space/parent Play-Pause, parent unlock and recovery remain independent.
 
-The current hydration implementation uses Windows Files On-Demand pinning and bounded concurrency. A ready-only counter can stay unchanged while downloads are active, so WI-0093 first adds aggregate state observability and a safe retry/cancel path rather than speculatively replacing the storage model.
+Orientation supports Current at start, Portrait and Landscape. Current at start retains exact-orientation-first behavior with family fallback. Portrait/Landscape request the selected Screen Orientation family. Changing the setting during active fullscreen replaces only the application-owned orientation lock; it does not change the snapshot, current photo, wake lock or fullscreen state.
 
-Main workflow #1342 is green after PR #221 corrected packaged startup resilience.
+Existing stored M22 slideshow settings without the new fields deserialize to Manual navigation On and Current at start.
 
-WI-0076 remains separately recorded as in_progress and is not part of this M22 follow-up.
+Exact-head workflow #1345 passed all lanes: build-and-test, both integration shards, launcher verification and package verification.
+
+WI-0093 and WI-0094 remain proposed and should not be implemented until WI-0092 is merged.
+
+WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
 ## Next concrete step
 
-1. Maintainer reviews the M22 follow-up contract/docs in the documentation PR.
-2. After approval, promote/start WI-0092 and implement manual-navigation/orientation settings.
-3. Implement WI-0093 preparation progress/no-progress recovery and verify mixed local/online behavior.
-4. Implement WI-0094 read-only slideshow library plus standalone Prepare originals.
-5. Repeat focused real-phone M22 acceptance, then complete the M22 work items/milestone.
+1. Wait for lifecycle-only CI on the current PR #223 head to complete.
+2. If green and no review blockers exist, merge PR #223.
+3. Then start WI-0093 preparation progress/no-progress recovery.
 
 ## Relevant files
 
-- docs/product/slideshow.md
-- docs/delivery/milestones/M22-protected-smart-collection-slideshow.md
 - docs/delivery/work-items/WI-0092-slideshow-input-orientation-settings.md
-- docs/delivery/work-items/WI-0093-slideshow-original-preparation-progress.md
-- docs/delivery/work-items/WI-0094-read-only-slideshow-library.md
 - src/PhotoIdentity.Web/SlideshowSettings.cs
+- src/PhotoIdentity.Web/SlideshowPlaybackState.cs
 - src/PhotoIdentity.Web/Pages/Slideshow.razor
 - src/PhotoIdentity.Web/Pages/Slideshow.razor.cs
 - src/PhotoIdentity.Web/wwwroot/js/slideshow.js
-- src/PhotoIdentity.Api/SlideshowOriginalPreparationService.cs
-- src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor
+- tests/PhotoIdentity.Integration.Tests/SlideshowSettingsTests.cs
+- tests/PhotoIdentity.Integration.Tests/SlideshowPlaybackStateTests.cs
 - docs/delivery/status/work-items.yaml
 
 ## Repository validation

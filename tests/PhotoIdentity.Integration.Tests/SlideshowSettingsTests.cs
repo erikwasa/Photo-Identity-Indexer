@@ -13,6 +13,8 @@ public sealed class SlideshowSettingsTests
         Assert.True(settings.Autoplay);
         Assert.Equal(5, settings.ImageDurationSeconds);
         Assert.True(settings.ShowTimerProgress);
+        Assert.True(settings.ManualNavigation);
+        Assert.Equal(SlideshowSettings.CurrentOrientation, settings.Orientation);
         Assert.Equal(SlideshowSettings.Loop, settings.AfterLastPhoto);
         Assert.True(settings.ProtectedSlideshow);
         Assert.False(settings.PrepareOriginals);
@@ -25,6 +27,8 @@ public sealed class SlideshowSettingsTests
             Autoplay: false,
             ImageDurationSeconds: 17,
             ShowTimerProgress: false,
+            ManualNavigation: false,
+            Orientation: SlideshowSettings.LandscapeOrientation,
             AfterLastPhoto: SlideshowSettings.Stop,
             ProtectedSlideshow: false,
             PrepareOriginals: true);
@@ -52,6 +56,8 @@ public sealed class SlideshowSettingsTests
               "autoplay": false,
               "imageDurationSeconds": 999,
               "showTimerProgress": false,
+              "manualNavigation": false,
+              "orientation": "sideways",
               "afterLastPhoto": "surprise",
               "protectedSlideshow": false,
               "prepareOriginals": true
@@ -61,9 +67,48 @@ public sealed class SlideshowSettingsTests
         Assert.False(settings.Autoplay);
         Assert.Equal(5, settings.ImageDurationSeconds);
         Assert.False(settings.ShowTimerProgress);
+        Assert.False(settings.ManualNavigation);
+        Assert.Equal(SlideshowSettings.CurrentOrientation, settings.Orientation);
         Assert.Equal(SlideshowSettings.Loop, settings.AfterLastPhoto);
         Assert.False(settings.ProtectedSlideshow);
         Assert.True(settings.PrepareOriginals);
+    }
+
+    [Fact]
+    public void Existing_M22_settings_without_new_fields_use_backward_compatible_defaults()
+    {
+        SlideshowSettings settings = SlideshowSettings.FromJson(
+            """
+            {
+              "autoplay": false,
+              "imageDurationSeconds": 9,
+              "showTimerProgress": false,
+              "afterLastPhoto": "stop",
+              "protectedSlideshow": false,
+              "prepareOriginals": true
+            }
+            """);
+
+        Assert.False(settings.Autoplay);
+        Assert.Equal(9, settings.ImageDurationSeconds);
+        Assert.False(settings.ShowTimerProgress);
+        Assert.True(settings.ManualNavigation);
+        Assert.Equal(SlideshowSettings.CurrentOrientation, settings.Orientation);
+        Assert.Equal(SlideshowSettings.Stop, settings.AfterLastPhoto);
+        Assert.False(settings.ProtectedSlideshow);
+        Assert.True(settings.PrepareOriginals);
+    }
+
+    [Theory]
+    [InlineData("current", SlideshowSettings.CurrentOrientation)]
+    [InlineData("PORTRAIT", SlideshowSettings.PortraitOrientation)]
+    [InlineData(" landscape ", SlideshowSettings.LandscapeOrientation)]
+    [InlineData("invalid", SlideshowSettings.CurrentOrientation)]
+    public void Orientation_normalizes_supported_values(string value, string expected)
+    {
+        SlideshowSettings settings = (SlideshowSettings.Defaults with { Orientation = value }).Normalize();
+
+        Assert.Equal(expected, settings.Orientation);
     }
 
     [Theory]

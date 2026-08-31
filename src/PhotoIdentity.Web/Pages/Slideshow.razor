@@ -304,6 +304,20 @@
                 <span>Show timer progress</span>
             </label>
 
+            <label>
+                <input type="checkbox" checked="@Settings.ManualNavigation" @onchange="ChangeManualNavigationAsync" />
+                <span>Manual navigation</span>
+            </label>
+
+            <label class="slideshow-settings-field">
+                <span>Orientation</span>
+                <select value="@Settings.Orientation" @onchange="ChangeOrientationAsync">
+                    <option value="@SlideshowSettings.CurrentOrientation">Current at start</option>
+                    <option value="@SlideshowSettings.PortraitOrientation">Portrait</option>
+                    <option value="@SlideshowSettings.LandscapeOrientation">Landscape</option>
+                </select>
+            </label>
+
             <label class="slideshow-settings-field">
                 <span>After last photo</span>
                 <select value="@Settings.AfterLastPhoto" @onchange="ChangeEndBehaviorAsync">
