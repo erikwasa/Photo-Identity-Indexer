@@ -1,0 +1,118 @@
+.slideshow-library-header {
+    margin-bottom: 1rem;
+}
+
+.slideshow-library-header h1 {
+    margin: 0.2rem 0 0.5rem;
+    font-size: clamp(2rem, 7vw, 4rem);
+    line-height: 1;
+}
+
+.slideshow-library-header p:last-child {
+    max-width: 42rem;
+    color: var(--muted);
+}
+
+.slideshow-library-settings,
+.slideshow-library-card,
+.slideshow-library-state,
+.slideshow-library-boundary {
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.slideshow-library-settings {
+    margin-bottom: 1.25rem;
+}
+
+.slideshow-library-settings > summary {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 0.8rem 1rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.slideshow-library-settings-body {
+    display: grid;
+    gap: 0.9rem;
+    padding: 0 1rem 1rem;
+}
+
+.slideshow-library-note,
+.slideshow-library-boundary p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.slideshow-library-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.slideshow-library-card {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+}
+
+.slideshow-library-card h2 {
+    margin: 0;
+    font-size: clamp(1.25rem, 4vw, 1.7rem);
+}
+
+.slideshow-library-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+.slideshow-library-preparation {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.8rem;
+    color: var(--muted);
+}
+
+.slideshow-library-preparation strong {
+    color: var(--ink);
+}
+
+.slideshow-library-warning {
+    display: grid;
+    gap: 0.3rem;
+    margin-top: 0.45rem;
+    padding: 0.75rem;
+    border: 1px solid #d7a55b;
+    border-radius: 0.7rem;
+    background: #fff7e8;
+}
+
+.slideshow-library-state,
+.slideshow-library-boundary {
+    padding: 1rem;
+}
+
+.slideshow-library-boundary {
+    margin-top: 1.25rem;
+}
+
+button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+@media (min-width: 720px) {
+    .slideshow-library-card {
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+    }
+
+    .slideshow-library-actions {
+        justify-content: flex-end;
+    }
+}
