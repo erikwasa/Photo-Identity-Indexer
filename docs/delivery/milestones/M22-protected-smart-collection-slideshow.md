@@ -21,7 +21,7 @@ Web platform/OS restrictions are explicit: Photo Identity cannot disable Home/ap
 
 ## Scope
 
-M22 includes the original five implementation areas plus three real-phone acceptance follow-ups:
+M22 includes the original implementation areas plus real-phone acceptance follow-ups and corrective stabilization:
 
 - an explicit secure trusted-LAN phone access path while retaining loopback-only packaged defaults;
 - an atomic full-collection slideshow snapshot/manifest with deterministic oldest-to-newest ordering;
@@ -46,6 +46,7 @@ V1 starts from saved Smart Collections only. Transient/unsaved Smart Collection 
 - [WI-0094](../work-items/WI-0094-read-only-slideshow-library.md) — add the basic-user slideshow library and standalone collection original preparation.
 - [WI-0095](../work-items/WI-0095-model-download-retry.md) — keep the required Windows package gate reliable when governed model downloads encounter transient HTTP/stream interruptions, without weakening integrity verification.
 - [WI-0096](../work-items/WI-0096-slideshow-preparation-quiescence.md) — make preparation cancellation await background-task quiescence so session teardown releases catalogue resources deterministically.
+- [WI-0107](../work-items/WI-0107-m22-slideshow-acceptance-gaps.md) — close the final real-phone acceptance gaps by acquiring fullscreen directly from the Start slideshow gesture and retaining/revalidating successful prepared-original state across navigation.
 
 ## Delivery sequence
 
@@ -59,8 +60,20 @@ V1 starts from saved Smart Collections only. Transient/unsaved Smart Collection 
 8. WI-0094 adds the read-only consumer entry point and reuses the finalized settings/preparation contracts.
 9. WI-0095 makes the required package gate resilient to transient governed-model transport interruption.
 10. WI-0096 stabilizes preparation teardown before consolidated acceptance.
+11. WI-0107 closes the two remaining functional gaps found by consolidated real-phone acceptance.
 
 WI-0083 and WI-0082 can be implemented independently. WI-0084 depends on the snapshot contract. WI-0085 depends on both working playback and the supported mobile access path. WI-0086 depends on the snapshot/playback lifecycle plus WI-0042's bounded-original semantics.
+
+## Current maintainer acceptance status
+
+Consolidated real-phone acceptance on 2026-09-02 passed the implemented slideshow behavior except for two functional gaps tracked by WI-0107:
+
+- pressing **Start slideshow** from the read-only slideshow library must enter fullscreen from that initiating user gesture without an intermediate application step;
+- after successful standalone original preparation, returning from slideshow playback must still show **Originals prepared** when the exact prepared set remains reusable, while downgrading the state if the originals are no longer reusable or collection membership changed.
+
+The same acceptance session found three material performance problems: slow saved Smart Collection loading, long slideshow startup even for an immediately reopened already-prepared one-photo collection, and slow image-to-image transitions that appear to worsen during playback. Those findings are explicitly tracked by M24 WI-0108 and are not additional WI-0107 scope.
+
+After WI-0107 is implemented, only these two corrected behaviors require targeted real-phone re-verification; the already-passed M22 behavior does not need to be repeated unless the corrective implementation touches it materially.
 
 ## Defaults retained by this milestone
 
