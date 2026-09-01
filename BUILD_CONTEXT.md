@@ -8,25 +8,24 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 **WI-0097 — Establish PostgreSQL runtime and migration foundation** remains in progress.
 
-PRs #229–#234 are merged. Maintainer verification now proves PostgreSQL is healthy and authenticated inside the container, while Windows localhost accepts TCP but fails the PostgreSQL startup protocol. Podman reports `UserModeNetworking=false`, so the failing boundary is the default Windows/WSL network path rather than PostgreSQL, credentials or Npgsql.
+PRs #229–#234 are merged. Maintainer verification proves PostgreSQL is healthy and authenticated inside the container, while Windows localhost accepts TCP but fails the PostgreSQL startup protocol. Enabling Podman WSL user-mode networking did not fix the failure.
 
-The active branch is `agent/WI-0097-user-mode-networking-remediation`. The verifier now recommends Podman's supported WSL user-mode networking mode directly for this state rather than requiring the dynamic Podman-machine IP diagnostic to succeed.
+Current upstream evidence matches a Podman 6.0.x Windows/WSL regression rather than a Photo Identity defect: Podman issue #29377 is open/triaged for Windows localhost port forwarding after upgrading to 6.0.2, and Microsoft WSL issue #41204 separately reports Podman 6 host forwarding broken while Podman 4.x/5.x worked.
+
+The active PR #235 now detects Podman client/server versions and classifies that failure signature explicitly. The known-good Windows/WSL fallback baseline for WI-0097 is Podman 5.8.5; Podman Desktop 1.28.3 shipped that version.
 
 SQLite remains authoritative and untouched. WI-0098 stays blocked until the Windows-host live migration test succeeds.
 
 ## Next concrete step
 
-1. On the maintainer machine run:
-   `podman machine stop`
-   `podman machine set --user-mode-networking=true`
-   `podman machine start`
-2. Rerun `./verify-postgres.ps1`.
-3. If the isolated PostgreSQL bootstrap passes, verify Photo Identity `/health` with the documented local connection string.
-4. Complete WI-0097 and begin WI-0098.
+1. Confirm the maintainer Podman version using `podman version` (the updated verifier also prints it).
+2. If it is Podman 6.0.x and the same localhost protocol failure occurs, use the known-good Podman 5.8.5 WSL runtime baseline rather than changing PostgreSQL/Npgsql.
+3. Recreate only the disposable local PostgreSQL runtime if the Podman machine/runtime downgrade requires it; do not touch the SQLite catalogue.
+4. Run `./verify-postgres.ps1` until the isolated PostgreSQL bootstrap succeeds through Windows localhost.
+5. Verify Photo Identity `/health` reports `catalogueProvider=sqlite` and PostgreSQL `ready` at schema version 1.
+6. Complete WI-0097 and begin WI-0098.
 
-Enabling Podman WSL user-mode networking can affect other active WSL distributions while the Podman machine is running because WSL distributions share the kernel/networking layer. Stopping the last Podman machine using user-mode networking restores the original WSL network path.
-
-Do not migrate or delete the real SQLite catalogue. Do not use the dynamic Podman-machine IP as permanent application configuration.
+Do not use the dynamic Podman-machine IP as permanent application configuration.
 
 ## Relevant files
 
