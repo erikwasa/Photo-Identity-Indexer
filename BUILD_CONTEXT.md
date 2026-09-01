@@ -6,32 +6,37 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**WI-0096 — Wait for slideshow preparation cancellation to quiesce** is the active M22 stabilization item.
+**WI-0095 — Retry transient governed-model download interruptions** is implemented and in review on PR #226.
 
-While validating WI-0095, workflow #1360 reproduced the same WI-0093 integration failure twice. The no-progress/retry test completed its assertions, called Preparation.End, then Windows refused to delete its temporary catalogue.db because the preparation background RunTask still held the file.
+Main workflow #1356 failed only in Windows package verification while installing governed ONNX model files:
 
-The correction makes preparation end asynchronous. The service removes/releases the session, signals cancellation and awaits the existing background RunTask before completion. The HTTP DELETE endpoint and preparation integration tests await that same lifecycle operation. No test cleanup retries or arbitrary delays are added.
+    error: The response ended prematurely. (ResponseEnded)
 
-WI-0095 remains separately open on PR #226. Its key corrective evidence is already positive: package verification passed on workflow #1360, fixing the post-merge main #1356 ResponseEnded model-download failure. PR #226 remains red only because the WI-0093 cleanup race reproduced.
+The ModelInstaller correction retries only transient HTTP/stream failures up to three attempts. Integrity mismatch remains non-retryable, partial temporary files are deleted before retry, valid existing models still perform no network request, and cancellation is not converted into retry.
 
-WI-0082 through WI-0086 and WI-0092 through WI-0094 remain in review pending consolidated real-phone M22 acceptance after the corrective CI gates are green.
+WI-0096 / PR #227 is merged. Its PR workflow #1361 and post-merge main workflow #1362 are green, confirming preparation cancellation now quiesces its background RunTask before catalogue teardown.
+
+PR #226 was rebuilt on the WI-0096 merge commit. Exact-head workflow #1363 passed build-and-test, both integration shards, launcher verification and package verification together. This simultaneously confirms the original package-download failure is corrected and the previous WI-0093 SQLite teardown failure no longer reproduces.
+
+WI-0082 through WI-0086 and WI-0092 through WI-0096 remain in review pending the final corrective lifecycle gate and consolidated real-phone M22 acceptance.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
 ## Next concrete step
 
-1. Run exact-head CI for WI-0096.
-2. If green, record evidence and move WI-0096 to in_review.
-3. Merge WI-0096 before returning to PR #226.
-4. Revalidate PR #226 against the updated main branch; package verification must remain green.
-5. Then perform consolidated real-phone M22 acceptance.
+1. Wait for lifecycle-only CI on the current PR #226 head.
+2. If green and no review blockers exist, merge PR #226.
+3. Require the post-merge main package verification to pass.
+4. Then perform consolidated real-phone M22 acceptance.
 
 ## Relevant files
 
+- docs/delivery/work-items/WI-0095-model-download-retry.md
+- src/PhotoIdentity.Recognition.Onnx/Models/ModelInstaller.cs
+- tests/PhotoIdentity.Recognition.Tests/ModelInstallerTests.cs
 - docs/delivery/work-items/WI-0096-slideshow-preparation-quiescence.md
 - src/PhotoIdentity.Api/SlideshowOriginalPreparationService.cs
 - src/PhotoIdentity.Api/SlideshowOriginalPreparationEndpoints.cs
-- tests/PhotoIdentity.Integration.Tests/SlideshowOriginalPreparationServiceTests.cs
 - docs/delivery/status/work-items.yaml
 - docs/delivery/status/milestones.yaml
 

@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace PhotoIdentity.Recognition.Onnx.Models;
 
 public enum ModelInstallStatus
@@ -13,6 +15,8 @@ public sealed record InstalledModel(
 
 public sealed class ModelInstaller
 {
+    public const int MaximumDownloadAttempts = 3;
+
     private readonly HttpClient _httpClient;
     private readonly ModelFileVerifier _verifier;
 
@@ -52,51 +56,106 @@ public sealed class ModelInstaller
 
         try
         {
-            using HttpResponseMessage response = await _httpClient.GetAsync(
-                manifest.DownloadUri,
-                HttpCompletionOption.ResponseHeadersRead,
-                cancellationToken);
-            response.EnsureSuccessStatusCode();
-
-            if (response.Content.Headers.ContentLength is long contentLength &&
-                contentLength != manifest.SizeBytes)
+            for (int attempt = 1; ; attempt++)
             {
-                throw new ModelIntegrityException(
-                    $"Model '{manifest.ModelId}' download declared {contentLength} bytes, " +
-                    $"but the manifest requires {manifest.SizeBytes} bytes.");
+                try
+                {
+                    return await DownloadAndInstallAsync(
+                        manifest,
+                        destinationPath,
+                        temporaryPath,
+                        cancellationToken);
+                }
+                catch (Exception exception) when (
+                    attempt < MaximumDownloadAttempts &&
+                    IsTransientDownloadFailure(exception))
+                {
+                    DeleteTemporaryFile(temporaryPath);
+                    await Task.Delay(
+                        RetryDelay(attempt),
+                        cancellationToken);
+                }
             }
-
-            await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken);
-            await using (FileStream output = new(
-                             temporaryPath,
-                             FileMode.CreateNew,
-                             FileAccess.Write,
-                             FileShare.None,
-                             bufferSize: 128 * 1024,
-                             useAsync: true))
-            {
-                await input.CopyToAsync(output, cancellationToken);
-                await output.FlushAsync(cancellationToken);
-            }
-
-            await _verifier.VerifyOrThrowAsync(
-                temporaryPath,
-                manifest,
-                cancellationToken);
-
-            File.Move(temporaryPath, destinationPath, overwrite: true);
-
-            return new InstalledModel(
-                manifest,
-                destinationPath,
-                ModelInstallStatus.Downloaded);
         }
         finally
         {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
+            DeleteTemporaryFile(temporaryPath);
+        }
+    }
+
+    private async Task<InstalledModel> DownloadAndInstallAsync(
+        ModelManifest manifest,
+        string destinationPath,
+        string temporaryPath,
+        CancellationToken cancellationToken)
+    {
+        using HttpResponseMessage response = await _httpClient.GetAsync(
+            manifest.DownloadUri,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        if (response.Content.Headers.ContentLength is long contentLength &&
+            contentLength != manifest.SizeBytes)
+        {
+            throw new ModelIntegrityException(
+                $"Model '{manifest.ModelId}' download declared {contentLength} bytes, " +
+                $"but the manifest requires {manifest.SizeBytes} bytes.");
+        }
+
+        await using Stream input = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using (FileStream output = new(
+                         temporaryPath,
+                         FileMode.Create,
+                         FileAccess.Write,
+                         FileShare.None,
+                         bufferSize: 128 * 1024,
+                         useAsync: true))
+        {
+            await input.CopyToAsync(output, cancellationToken);
+            await output.FlushAsync(cancellationToken);
+        }
+
+        await _verifier.VerifyOrThrowAsync(
+            temporaryPath,
+            manifest,
+            cancellationToken);
+
+        File.Move(temporaryPath, destinationPath, overwrite: true);
+
+        return new InstalledModel(
+            manifest,
+            destinationPath,
+            ModelInstallStatus.Downloaded);
+    }
+
+    private static bool IsTransientDownloadFailure(Exception exception) =>
+        exception switch
+        {
+            HttpRequestException http when http.StatusCode is null => true,
+            HttpRequestException http when http.StatusCode is HttpStatusCode statusCode =>
+                IsTransientStatusCode(statusCode),
+            IOException => true,
+            _ => false,
+        };
+
+    private static bool IsTransientStatusCode(HttpStatusCode statusCode) =>
+        statusCode is
+            HttpStatusCode.RequestTimeout or
+            HttpStatusCode.TooManyRequests or
+            HttpStatusCode.InternalServerError or
+            HttpStatusCode.BadGateway or
+            HttpStatusCode.ServiceUnavailable or
+            HttpStatusCode.GatewayTimeout;
+
+    private static TimeSpan RetryDelay(int failedAttempt) =>
+        TimeSpan.FromMilliseconds(250 * failedAttempt);
+
+    private static void DeleteTemporaryFile(string temporaryPath)
+    {
+        if (File.Exists(temporaryPath))
+        {
+            File.Delete(temporaryPath);
         }
     }
 }

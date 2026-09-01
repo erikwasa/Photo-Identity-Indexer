@@ -1036,7 +1036,7 @@ work_items:
 - id: WI-0096
   title: Wait for slideshow preparation cancellation to quiesce
   milestone: M22
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0096-slideshow-preparation-quiescence.md
   started_at: 2026-09-01
@@ -1045,5 +1045,28 @@ work_items:
   blockers:
   - WI-0093
   blocker_notes:
-  - WI-0093 is implemented/merged. Workflow #1360 reproduced a deterministic resource-lifecycle race after Preparation.End returned before its background RunTask released catalogue.db.
-  evidence: []
+  - WI-0093 is implemented/merged. The corrective implementation is merged; post-merge main verification remains part of the M22 acceptance sequence.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/227
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33552806915
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33553799973
+- id: WI-0095
+  title: Retry transient governed-model download interruptions
+  milestone: M22
+  status: in_review
+  owner: ai-agent
+  document: ../work-items/WI-0095-model-download-retry.md
+  started_at: 2026-09-01
+  last_updated_at: 2026-09-01
+  branch: agent/WI-0095-model-download-retry
+  blockers: []
+  blocker_notes:
+  - Main workflow #1356 failed only in package verification because a governed model HTTP response ended prematurely. The branch was rebased after WI-0096 merged, and workflow #1363 passed build, both integration shards, launcher verification and package verification together.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/226
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33554309892
