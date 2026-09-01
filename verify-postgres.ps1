@@ -241,7 +241,7 @@ if (-not (Test-TcpPortOpen -HostName "127.0.0.1" -Port $hostPort)) {
     }
 
     if ($null -ne $reachableMachineAddress) {
-        Write-Host "Windows can reach the PostgreSQL port through Podman machine address $reachableMachineAddress:$hostPort, but that address is not used as application configuration because it can change after WSL restart."
+        Write-Host "Windows can reach the PostgreSQL port through Podman machine address ${reachableMachineAddress}:$hostPort, but that address is not used as application configuration because it can change after WSL restart."
     }
 
     if ($wslConfig.LocalhostForwarding -eq "false" -and $networkingMode -ne "mirrored") {
