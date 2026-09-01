@@ -9,6 +9,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Npgsql" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio">
       <PrivateAssets>all</PrivateAssets>
@@ -16,6 +17,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/PhotoIdentity.Persistence.Postgres/PhotoIdentity.Persistence.Postgres.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Persistence.Sqlite/PhotoIdentity.Persistence.Sqlite.csproj" />
   </ItemGroup>
 </Project>
