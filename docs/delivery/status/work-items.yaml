@@ -1027,7 +1027,7 @@ work_items:
   - WI-0093
   blocker_notes:
   - Dependencies are implemented/merged; WI-0083 and WI-0093 remain in_review only because M22 maintainer acceptance is consolidated. The consumer surface reuses the finalized slideshow settings and preparation contracts and remains a UI boundary rather than authentication/authorization.
-  - Consolidated real-phone acceptance on 2026-09-02 found two final consumer-surface gaps: Start slideshow must acquire fullscreen from the initiating tap without an intermediate application step, and successful prepared-original state must survive navigation while remaining truthful. Follow-up WI-0107 owns both corrections.
+  - Consolidated real-phone acceptance on 2026-09-02 found two final consumer-surface gaps. Start slideshow must acquire fullscreen from the initiating tap without an intermediate application step, and successful prepared-original state must survive navigation while remaining truthful. Follow-up WI-0107 owns both corrections.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/225
@@ -1210,7 +1210,7 @@ work_items:
   document: ../work-items/WI-0107-m22-slideshow-acceptance-gaps.md
   blockers: []
   blocker_notes:
-  - Consolidated real-phone M22 acceptance passed the remaining slideshow behavior but found two functional gaps: Start slideshow shows an intermediate fullscreen recovery step, and successful standalone prepared-original state disappears after slideshow navigation even when the originals remain reusable.
+  - Consolidated real-phone M22 acceptance passed the remaining slideshow behavior but found two functional gaps. Start slideshow shows an intermediate fullscreen recovery step, and successful standalone prepared-original state disappears after slideshow navigation even when the originals remain reusable.
   - Performance observations from the same acceptance are intentionally tracked in M24 WI-0108 and do not expand this corrective M22 slice.
   evidence: []
 - id: WI-0108
