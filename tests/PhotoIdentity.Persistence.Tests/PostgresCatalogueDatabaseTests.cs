@@ -1,3 +1,4 @@
+using Xunit;
 using Npgsql;
 using PhotoIdentity.Persistence.Postgres;
 
