@@ -199,7 +199,7 @@ public sealed class SlideshowOriginalPreparationService
         return original;
     }
 
-    public bool End(Guid sessionId)
+    public async Task<bool> EndAsync(Guid sessionId)
     {
         if (!_sessions.TryRemove(sessionId, out Session? session))
         {
@@ -209,6 +209,12 @@ public sealed class SlideshowOriginalPreparationService
 
         session.Cancel();
         _leases.Release(sessionId);
+
+        if (session.RunTask is not null)
+        {
+            await session.RunTask.ConfigureAwait(false);
+        }
+
         return true;
     }
 

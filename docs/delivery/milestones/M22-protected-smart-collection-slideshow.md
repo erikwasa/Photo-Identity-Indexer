@@ -44,6 +44,7 @@ V1 starts from saved Smart Collections only. Transient/unsaved Smart Collection 
 - [WI-0092](../work-items/WI-0092-slideshow-input-orientation-settings.md) — add a Manual navigation preference and explicit Current/Portrait/Landscape orientation settings.
 - [WI-0093](../work-items/WI-0093-slideshow-original-preparation-progress.md) — make preparation progress show downloading/queued/waiting state and provide no-progress retry/cancel recovery.
 - [WI-0094](../work-items/WI-0094-read-only-slideshow-library.md) — add the basic-user slideshow library and standalone collection original preparation.
+- [WI-0096](../work-items/WI-0096-slideshow-preparation-quiescence.md) — make preparation cancellation await background-task quiescence so session teardown releases catalogue resources deterministically.
 
 ## Delivery sequence
 
@@ -55,6 +56,7 @@ V1 starts from saved Smart Collections only. Transient/unsaved Smart Collection 
 6. WI-0092 closes phone-review input/orientation gaps without changing snapshot semantics.
 7. WI-0093 makes OneDrive preparation observable/recoverable before relying on it as a handoff workflow.
 8. WI-0094 adds the read-only consumer entry point and reuses the finalized settings/preparation contracts.
+9. WI-0096 stabilizes preparation teardown before consolidated acceptance.
 
 WI-0083 and WI-0082 can be implemented independently. WI-0084 depends on the snapshot contract. WI-0085 depends on both working playback and the supported mobile access path. WI-0086 depends on the snapshot/playback lifecycle plus WI-0042's bounded-original semantics.
 

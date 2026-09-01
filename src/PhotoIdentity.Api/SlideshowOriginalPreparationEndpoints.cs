@@ -12,7 +12,7 @@ public static class SlideshowOriginalPreparationEndpoints
         group.MapPost("", StartAsync);
         group.MapGet("/{sessionId:guid}", GetStatus);
         group.MapPost("/{sessionId:guid}/retry", Retry);
-        group.MapDelete("/{sessionId:guid}", End);
+        group.MapDelete("/{sessionId:guid}", EndAsync);
         group.MapGet("/{sessionId:guid}/photos/{revisionId}/original", GetPreparedOriginalAsync);
         return endpoints;
     }
@@ -69,11 +69,11 @@ public static class SlideshowOriginalPreparationEndpoints
             : Results.Ok(ToResponse(snapshot));
     }
 
-    private static IResult End(
+    private static async Task<IResult> EndAsync(
         Guid sessionId,
         SlideshowOriginalPreparationService service)
     {
-        _ = service.End(sessionId);
+        _ = await service.EndAsync(sessionId);
         return Results.NoContent();
     }
 

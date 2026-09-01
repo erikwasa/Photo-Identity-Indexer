@@ -36,7 +36,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
             Assert.Equal(0, ready.Total);
             Assert.Empty(platform.HydrationRequests);
 
-            services.Preparation.End(started.SessionId);
+            await services.Preparation.EndAsync(started.SessionId);
         }
         finally
         {
@@ -99,7 +99,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
             Assert.NotNull(prepared);
             await prepared!.Stream.DisposeAsync();
 
-            Assert.True(services.Preparation.End(started.SessionId));
+            Assert.True(await services.Preparation.EndAsync(started.SessionId));
             Assert.False(services.Leases.Contains(started.SessionId));
 
             onlineOwnership = await services.Hydrations.GetAsync(online.RevisionId);
@@ -163,7 +163,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
             Assert.False(progress.CanRetry);
             Assert.DoesNotContain(directory, progress.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
 
-            services.Preparation.End(started.SessionId);
+            await services.Preparation.EndAsync(started.SessionId);
         }
         finally
         {
@@ -235,7 +235,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
             Assert.Equal(1, retried.Total);
             Assert.Equal(1, retried.HydrationRequests);
 
-            services.Preparation.End(started.SessionId);
+            await services.Preparation.EndAsync(started.SessionId);
         }
         finally
         {
@@ -282,7 +282,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
             Assert.DoesNotContain(directory, failed.Message ?? string.Empty, StringComparison.OrdinalIgnoreCase);
             Assert.True(failed.CanContinueWithAvailable);
 
-            services.Preparation.End(started.SessionId);
+            await services.Preparation.EndAsync(started.SessionId);
         }
         finally
         {
@@ -336,7 +336,7 @@ public sealed class SlideshowOriginalPreparationServiceTests
                 failed.Message ?? string.Empty,
                 StringComparison.OrdinalIgnoreCase);
 
-            services.Preparation.End(started.SessionId);
+            await services.Preparation.EndAsync(started.SessionId);
         }
         finally
         {
