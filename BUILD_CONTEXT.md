@@ -6,7 +6,7 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**WI-0095 — Retry transient governed-model download interruptions** is the active corrective M22 item on PR #226, rebased onto main after WI-0096 merged.
+**WI-0095 — Retry transient governed-model download interruptions** is implemented and in review on PR #226.
 
 Main workflow #1356 failed only in Windows package verification while installing governed ONNX model files:
 
@@ -14,21 +14,20 @@ Main workflow #1356 failed only in Windows package verification while installing
 
 The ModelInstaller correction retries only transient HTTP/stream failures up to three attempts. Integrity mismatch remains non-retryable, partial temporary files are deleted before retry, valid existing models still perform no network request, and cancellation is not converted into retry.
 
-Earlier workflow #1360 demonstrated that package verification passes with this correction. That run also exposed a separate deterministic WI-0093 preparation teardown race; WI-0096 corrected it by awaiting preparation background-task quiescence. PR #227 / workflow #1361 are green and merged, and WI-0096 is now recorded in_review.
+WI-0096 / PR #227 is merged. Its PR workflow #1361 and post-merge main workflow #1362 are green, confirming preparation cancellation now quiesces its background RunTask before catalogue teardown.
 
-PR #226 has been rebuilt directly on the WI-0096 merge commit so final CI validates both corrections together without overwriting WI-0096 lifecycle/docs changes.
+PR #226 was rebuilt on the WI-0096 merge commit. Exact-head workflow #1363 passed build-and-test, both integration shards, launcher verification and package verification together. This simultaneously confirms the original package-download failure is corrected and the previous WI-0093 SQLite teardown failure no longer reproduces.
 
-WI-0082 through WI-0086 and WI-0092 through WI-0096 remain in review/in progress as appropriate pending the remaining corrective gate and consolidated real-phone M22 acceptance.
+WI-0082 through WI-0086 and WI-0092 through WI-0096 remain in review pending the final corrective lifecycle gate and consolidated real-phone M22 acceptance.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
 ## Next concrete step
 
-1. Run exact-head CI for rebased PR #226.
-2. Require build-and-test, both integration shards, launcher verification and package verification to pass together.
-3. If green, record evidence and move WI-0095 to in_review.
-4. Merge PR #226 and require the post-merge main package verification to pass.
-5. Then perform consolidated real-phone M22 acceptance.
+1. Wait for lifecycle-only CI on the current PR #226 head.
+2. If green and no review blockers exist, merge PR #226.
+3. Require the post-merge main package verification to pass.
+4. Then perform consolidated real-phone M22 acceptance.
 
 ## Relevant files
 
