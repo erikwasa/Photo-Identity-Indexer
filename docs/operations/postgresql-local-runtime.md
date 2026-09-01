@@ -28,7 +28,7 @@ From the repository root:
 ./verify-postgres.ps1
 ~~~
 
-The Windows application requires a stable localhost endpoint for PostgreSQL. WSL normally forwards Linux-bound ports to Windows localhost. If the container is healthy but localhost is unreachable, the verifier now reports the active WSL networking mode, relevant `.wslconfig` settings and whether the Podman-machine IP itself is reachable. It does not silently use the machine IP because that address can change after WSL restart. For Photo Identity, a failing mirrored-networking setup should be changed to WSL NAT with `localhostForwarding=true`, followed by `wsl --shutdown` and a Podman-machine restart.
+The Windows application requires a stable localhost endpoint for PostgreSQL. The local Podman runtime does not configure PostgreSQL TLS or GSS encryption, so the supported local connection string explicitly disables both Npgsql negotiation modes. Npgsql defaults both SSL and GSS encryption to `Prefer`; explicit disable avoids a Windows/WSL relay timeout during the optional negotiation round trip while keeping this development/runtime boundary limited to the local machine. WSL normally forwards Linux-bound ports to Windows localhost. If the container is healthy but localhost is unreachable, the verifier now reports the active WSL networking mode, relevant `.wslconfig` settings and whether the Podman-machine IP itself is reachable. It does not silently use the machine IP because that address can change after WSL restart. For Photo Identity, a failing mirrored-networking setup should be changed to WSL NAT with `localhostForwarding=true`, followed by `wsl --shutdown` and a Podman-machine restart.
 
 The verification script:
 
@@ -46,7 +46,7 @@ The script does not print the configured PostgreSQL password or connection strin
 Supply the PostgreSQL connection string outside source control. For a development shell:
 
 ~~~powershell
-$env:PhotoIdentity__Postgres__ConnectionString = "Host=127.0.0.1;Port=5432;Database=photoidentity;Username=photoidentity;Password=<private-password>"
+$env:PhotoIdentity__Postgres__ConnectionString = "Host=127.0.0.1;Port=5432;Database=photoidentity;Username=photoidentity;Password=<private-password>;SSL Mode=Disable;GSS Encryption Mode=Disable"
 ~~~
 
 Start Photo Identity normally. SQLite remains the active catalogue in WI-0097; PostgreSQL is initialized only as the migration target.

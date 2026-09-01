@@ -261,6 +261,7 @@ $hostConnectionString =
     "Database=$($settings["PHOTOIDENTITY_POSTGRES_DATABASE"]);" +
     "Username=$($settings["PHOTOIDENTITY_POSTGRES_USER"]);" +
     "Password=$($settings["PHOTOIDENTITY_POSTGRES_PASSWORD"]);" +
+    "SSL Mode=Disable;GSS Encryption Mode=Disable;" +
     "Pooling=false;Timeout=5;Command Timeout=10"
 
 $previous = [Environment]::GetEnvironmentVariable(
