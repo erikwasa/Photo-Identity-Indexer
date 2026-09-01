@@ -11,7 +11,7 @@ The slideshow remains a read-only presentation surface. It does not edit people,
 - A slideshow starts from a **saved Smart Collection**. Supporting an unsaved/transient Smart Collection preview is deferred because saved collections already provide a durable source identity.
 - Starting a slideshow creates a **snapshot** of the collection. Changes to the collection definition, tags, people, Places or catalogue membership after start do not alter the running session.
 - Snapshot order defaults to **oldest to newest**. Use photographic capture time when available and catalogue observation time as the fallback, with a deterministic immutable-revision tie break.
-- The Start slideshow user action immediately requests **true browser fullscreen** before awaiting snapshot preparation or other asynchronous work.
+- The Start slideshow user action immediately requests **true browser fullscreen** from the initiating click/tap before navigation, snapshot preparation or other asynchronous work. On a supported browser that accepts fullscreen, there is no intermediate application step asking the user to enter fullscreen; loading/preparation continues inside fullscreen.
 - Photos are centered on a black presentation surface and use contain/no-crop fit in V1.
 - Autoplay starts immediately when the persisted Autoplay setting is enabled.
 - Manual next/previous navigation is controlled by a persisted Manual navigation setting; when enabled, manual navigation resets the current image timer.
@@ -150,6 +150,8 @@ If the entire snapshot cannot fit within configured managed-hydration/free-space
 Preparation progress must distinguish at least ready/verified, actively downloading, queued online-only and waiting-for-release work. A ready-only counter is insufficient because bounded concurrency can legitimately leave the ready count unchanged while OneDrive downloads are active. If aggregate state makes no progress for a conservative centralized threshold, surface a parent-visible no-progress warning with Retry preparation and Cancel preparation rather than leaving an opaque counter indefinitely.
 
 The read-only slideshow library may start the same full-snapshot preparation without entering fullscreen or starting playback. Successful standalone preparation releases temporary preparation protection when complete but leaves Photo-Identity-owned hydrated originals local and eligible for normal managed LRU behavior. A later slideshow remains authoritative for its own new snapshot.
+
+Successful standalone preparation should remain visible across navigation/recreation of the `/slideshows` page in the same browser/device profile when the exact prepared snapshot remains reusable. This UI state is a path-free preparation receipt, not a permanent offline pin: it must be revalidated and downgraded if the relevant originals are no longer reusable or collection membership has changed.
 
 ## End behavior
 
