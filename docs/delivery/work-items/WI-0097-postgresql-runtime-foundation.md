@@ -86,3 +86,16 @@ The verifier now diagnoses the host boundary instead of assuming Compose is at f
 - gives targeted remediation for disabled localhost forwarding or a mirrored-networking setup that does not forward the published port.
 
 A stable Windows-localhost endpoint remains an acceptance requirement because the Photo Identity application runs on Windows and the PostgreSQL container address must survive WSL restarts without operator reconfiguration.
+
+
+## Corrective slice — local Npgsql encryption negotiation
+
+After Windows localhost forwarding became reachable, maintainer verification progressed to Npgsql but timed out in `NpgsqlConnector.SetupEncryption` before authentication. Npgsql 10 defaults SSL and GSS encryption modes to `Prefer`, while the local Podman PostgreSQL runtime does not configure either transport.
+
+The supported local verification/runtime connection therefore explicitly uses:
+
+```text
+SSL Mode=Disable;GSS Encryption Mode=Disable
+```
+
+This is scoped to the loopback-only local PostgreSQL runtime. The persistence layer does not override security settings supplied by an external production PostgreSQL connection string; a future external/remote deployment can require TLS independently.
