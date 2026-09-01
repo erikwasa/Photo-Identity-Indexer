@@ -1051,10 +1051,12 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/227
   - type: workflow
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33552806915
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33553799973
 - id: WI-0095
   title: Retry transient governed-model download interruptions
   milestone: M22
-  status: in_progress
+  status: in_review
   owner: ai-agent
   document: ../work-items/WI-0095-model-download-retry.md
   started_at: 2026-09-01
@@ -1062,5 +1064,9 @@ work_items:
   branch: agent/WI-0095-model-download-retry
   blockers: []
   blocker_notes:
-  - Main workflow #1356 failed only in package verification because a governed model HTTP response ended prematurely; workflow #1360 later demonstrated the corrected package verification can pass before WI-0096 was split out.
-  evidence: []
+  - Main workflow #1356 failed only in package verification because a governed model HTTP response ended prematurely. The branch was rebased after WI-0096 merged, and workflow #1363 passed build, both integration shards, launcher verification and package verification together.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/226
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33554309892
