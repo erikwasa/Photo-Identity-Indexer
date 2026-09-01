@@ -71,3 +71,18 @@ Maintainer verification after PR #229 merged proved PostgreSQL was healthy insid
 2. Windows-host TCP reachability on the configured localhost port before xUnit starts.
 
 This prevents a WSL/Podman forwarding defect from being misreported as a PostgreSQL schema/bootstrap failure.
+
+
+## Corrective slice — WSL localhost-forwarding diagnostics
+
+The first port-mapping correction proved insufficient on the maintainer machine: Podman reported `0.0.0.0:5432` and PostgreSQL was healthy, but Windows still refused `127.0.0.1:5432`.
+
+The verifier now diagnoses the host boundary instead of assuming Compose is at fault:
+
+- reports the active WSL networking mode through the Podman machine;
+- reads relevant `.wslconfig` values when present;
+- checks whether Windows can reach the Podman-machine IPv4 address as a diagnostic only;
+- rejects a dynamic machine-IP connection as the production solution; and
+- gives targeted remediation for disabled localhost forwarding or a mirrored-networking setup that does not forward the published port.
+
+A stable Windows-localhost endpoint remains an acceptance requirement because the Photo Identity application runs on Windows and the PostgreSQL container address must survive WSL restarts without operator reconfiguration.
