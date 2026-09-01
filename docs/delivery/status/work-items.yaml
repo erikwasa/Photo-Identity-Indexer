@@ -1079,12 +1079,13 @@ work_items:
   document: ../work-items/WI-0097-postgresql-runtime-foundation.md
   started_at: 2026-09-01
   last_updated_at: 2026-09-01
-  branch: agent/WI-0097-local-npgsql-encryption
+  branch: agent/WI-0097-postgres-protocol-diagnostics
   blockers: []
   blocker_notes:
   - PostgreSQL is the accepted long-term authoritative catalogue per ADR-0009; comparative SQLite/PostgreSQL benchmarking is not required.
   - Maintainer verification after PR #229 found PostgreSQL healthy inside Podman but unreachable from Windows localhost. PR #230 removed the explicit VM-loopback bind; PR #231 added WSL-forwarding diagnostics and Windows localhost then became reachable.
   - Windows forwarding became reachable after PR #231, but Npgsql then timed out in encryption negotiation before authentication; the active slice explicitly disables SSL/GSS negotiation for the loopback-only local Podman runtime.
+  - After PR #232, localhost reached PostgreSQL authentication but the stream closed with EndOfStreamException. The active slice now proves authenticated SQL inside the container, PostgreSQL protocol response from Windows and a direct Podman-machine diagnostic path before recommending WSL user-mode networking.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/229
@@ -1100,6 +1101,10 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/231
   - type: merge_commit
     value: 1c63ada8da0b6b1ba19e518d91839e691a4aa6db
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/232
+  - type: merge_commit
+    value: 9f6c57921b512018c2cbc724ac76819b78f61a97
 - id: WI-0098
   title: Add database-neutral persistence boundary and foundational PostgreSQL schema
   milestone: M24
