@@ -85,6 +85,44 @@ function Test-PostgresProtocol {
     }
 }
 
+function Get-PodmanVersionInfo {
+    param([Parameter(Mandatory = $true)]$PodmanCommand)
+
+    $clientVersion = "unknown"
+    $serverVersion = "unknown"
+
+    try {
+        $clientOutput = @(& $PodmanCommand.Source version --format "{{.Client.Version}}" 2>$null)
+        if ($LASTEXITCODE -eq 0 -and $clientOutput.Count -gt 0) {
+            $clientVersion = (($clientOutput -join " ").Trim())
+        }
+    }
+    catch {
+    }
+
+    try {
+        $serverOutput = @(& $PodmanCommand.Source version --format "{{.Server.Version}}" 2>$null)
+        if ($LASTEXITCODE -eq 0 -and $serverOutput.Count -gt 0) {
+            $serverVersion = (($serverOutput -join " ").Trim())
+        }
+    }
+    catch {
+    }
+
+    return [pscustomobject]@{
+        Client = $clientVersion
+        Server = $serverVersion
+    }
+}
+
+function Test-KnownPodman6WindowsForwardingRegression {
+    param([Parameter(Mandatory = $true)]$VersionInfo)
+
+    return (
+        ([string]$VersionInfo.Client) -match '^6\.0\.' -or
+        ([string]$VersionInfo.Server) -match '^6\.0\.')
+}
+
 function Get-PodmanUserModeNetworking {
     param([Parameter(Mandatory = $true)]$PodmanCommand)
 
@@ -265,6 +303,11 @@ if ([string]$settings["PHOTOIDENTITY_POSTGRES_PASSWORD"] -eq
 
 $publishedPort = @()
 $podman = Get-Command podman -ErrorAction SilentlyContinue
+$podmanVersions = $null
+if ($null -ne $podman) {
+    $podmanVersions = Get-PodmanVersionInfo -PodmanCommand $podman
+    Write-Host "Podman versions: client=$($podmanVersions.Client), server=$($podmanVersions.Server)"
+}
 
 if (-not $SkipContainerStart) {
     if ($null -eq $podman) {
@@ -398,6 +441,10 @@ if (-not $localhostProtocol) {
 
     Write-Host "Windows localhost TCP port is open, but a PostgreSQL startup packet did not receive a valid PostgreSQL response."
     Write-Host "Podman user-mode networking: $userModeNetworking"
+
+    if ($null -ne $podmanVersions -and (Test-KnownPodman6WindowsForwardingRegression -VersionInfo $podmanVersions)) {
+        throw "PostgreSQL is authenticated and healthy inside the container, but Windows localhost is not carrying the PostgreSQL protocol. Podman client/server version is $($podmanVersions.Client)/$($podmanVersions.Server). This matches the open Podman 6.0.x Windows/WSL port-forwarding regression (Podman issue #29377; Microsoft WSL issue #41204). Do not change Photo Identity database code for this failure. Use the known-good Podman 5.8.5 WSL baseline (Podman Desktop 1.28.3 shipped 5.8.5) or wait for an upstream Podman fix, recreate the disposable local PostgreSQL runtime if needed, and rerun verification."
+    }
 
     if ($userModeNetworking -eq "false") {
         if ($null -ne $directProtocolAddress) {
