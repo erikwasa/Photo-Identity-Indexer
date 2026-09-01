@@ -3,7 +3,7 @@
   <Project Path="src/PhotoIdentity.Cli/PhotoIdentity.Cli.csproj" />
   <Project Path="src/PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
   <Project Path="src/PhotoIdentity.Imaging.OpenCv/PhotoIdentity.Imaging.OpenCv.csproj" />
-  <Project Path="src/PhotoIdentity.Persistence.Sqlite/PhotoIdentity.Persistence.Sqlite.csproj" />
+  <Project Path="src/PhotoIdentity.Persistence.Postgres/PhotoIdentity.Persistence.Postgres.csproj" />\n  <Project Path="src/PhotoIdentity.Persistence.Sqlite/PhotoIdentity.Persistence.Sqlite.csproj" />
   <Project Path="src/PhotoIdentity.Recognition.Onnx/PhotoIdentity.Recognition.Onnx.csproj" />
   <Project Path="src/PhotoIdentity.Source.Local/PhotoIdentity.Source.Local.csproj" />
   <Project Path="src/PhotoIdentity.Source.OneDriveSync/PhotoIdentity.Source.OneDriveSync.csproj" />
