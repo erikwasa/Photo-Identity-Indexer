@@ -6,32 +6,38 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**WI-0096 — Wait for slideshow preparation cancellation to quiesce** is the active M22 stabilization item.
+**WI-0095 — Retry transient governed-model download interruptions** is the active corrective M22 item on PR #226, rebased onto main after WI-0096 merged.
 
-While validating WI-0095, workflow #1360 reproduced the same WI-0093 integration failure twice. The no-progress/retry test completed its assertions, called Preparation.End, then Windows refused to delete its temporary catalogue.db because the preparation background RunTask still held the file.
+Main workflow #1356 failed only in Windows package verification while installing governed ONNX model files:
 
-The correction makes preparation end asynchronous. The service removes/releases the session, signals cancellation and awaits the existing background RunTask before completion. The HTTP DELETE endpoint and preparation integration tests await that same lifecycle operation. No test cleanup retries or arbitrary delays are added.
+    error: The response ended prematurely. (ResponseEnded)
 
-WI-0095 remains separately open on PR #226. Its key corrective evidence is already positive: package verification passed on workflow #1360, fixing the post-merge main #1356 ResponseEnded model-download failure. PR #226 remains red only because the WI-0093 cleanup race reproduced.
+The ModelInstaller correction retries only transient HTTP/stream failures up to three attempts. Integrity mismatch remains non-retryable, partial temporary files are deleted before retry, valid existing models still perform no network request, and cancellation is not converted into retry.
 
-WI-0082 through WI-0086 and WI-0092 through WI-0094 remain in review pending consolidated real-phone M22 acceptance after the corrective CI gates are green.
+Earlier workflow #1360 demonstrated that package verification passes with this correction. That run also exposed a separate deterministic WI-0093 preparation teardown race; WI-0096 corrected it by awaiting preparation background-task quiescence. PR #227 / workflow #1361 are green and merged, and WI-0096 is now recorded in_review.
+
+PR #226 has been rebuilt directly on the WI-0096 merge commit so final CI validates both corrections together without overwriting WI-0096 lifecycle/docs changes.
+
+WI-0082 through WI-0086 and WI-0092 through WI-0096 remain in review/in progress as appropriate pending the remaining corrective gate and consolidated real-phone M22 acceptance.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
 ## Next concrete step
 
-1. Run exact-head CI for WI-0096.
-2. If green, record evidence and move WI-0096 to in_review.
-3. Merge WI-0096 before returning to PR #226.
-4. Revalidate PR #226 against the updated main branch; package verification must remain green.
+1. Run exact-head CI for rebased PR #226.
+2. Require build-and-test, both integration shards, launcher verification and package verification to pass together.
+3. If green, record evidence and move WI-0095 to in_review.
+4. Merge PR #226 and require the post-merge main package verification to pass.
 5. Then perform consolidated real-phone M22 acceptance.
 
 ## Relevant files
 
+- docs/delivery/work-items/WI-0095-model-download-retry.md
+- src/PhotoIdentity.Recognition.Onnx/Models/ModelInstaller.cs
+- tests/PhotoIdentity.Recognition.Tests/ModelInstallerTests.cs
 - docs/delivery/work-items/WI-0096-slideshow-preparation-quiescence.md
 - src/PhotoIdentity.Api/SlideshowOriginalPreparationService.cs
 - src/PhotoIdentity.Api/SlideshowOriginalPreparationEndpoints.cs
-- tests/PhotoIdentity.Integration.Tests/SlideshowOriginalPreparationServiceTests.cs
 - docs/delivery/status/work-items.yaml
 - docs/delivery/status/milestones.yaml
 
