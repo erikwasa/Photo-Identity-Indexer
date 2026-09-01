@@ -113,4 +113,4 @@ podman machine set --user-mode-networking=true
 podman machine start
 ~~~
 
-Then rerun `./verify-postgres.ps1`. Podman documents user-mode networking as the Windows/WSL option that relays guest traffic through a host-side user-space process; the WSL backend otherwise defaults to the standard WSL network path.
+Then rerun `./verify-postgres.ps1`. Podman documents user-mode networking as the Windows/WSL option that relays guest traffic through a host-side user-space process; the WSL backend otherwise defaults to the standard WSL network path. Because WSL shares its kernel/networking across distributions, enabling this setting while the Podman machine is running can also affect other active WSL distributions; stop the Podman machine to restore the original WSL networking path.
