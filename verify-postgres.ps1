@@ -34,6 +34,113 @@ function Test-TcpPortOpen {
     }
 }
 
+function Test-PostgresProtocol {
+    param(
+        [Parameter(Mandatory = $true)][string]$HostName,
+        [Parameter(Mandatory = $true)][int]$Port,
+        [Parameter(Mandatory = $true)][string]$Username,
+        [Parameter(Mandatory = $true)][string]$Database
+    )
+
+    $client = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $connectTask = $client.ConnectAsync($HostName, $Port)
+        if (-not $connectTask.Wait(2000) -or -not $client.Connected) {
+            return $false
+        }
+
+        $separator = [char]0
+        $payloadText = "user" + $separator + $Username + $separator +
+            "database" + $separator + $Database + $separator + $separator
+        $stream = $client.GetStream()
+        $payload = [System.Text.Encoding]::UTF8.GetBytes($payloadText)
+        $length = 8 + $payload.Length
+        $lengthBytes = [System.BitConverter]::GetBytes(
+            [System.Net.IPAddress]::HostToNetworkOrder([int]$length))
+        $protocolBytes = [System.BitConverter]::GetBytes(
+            [System.Net.IPAddress]::HostToNetworkOrder([int]196608))
+
+        $stream.Write($lengthBytes, 0, $lengthBytes.Length)
+        $stream.Write($protocolBytes, 0, $protocolBytes.Length)
+        $stream.Write($payload, 0, $payload.Length)
+        $stream.Flush()
+
+        $first = New-Object byte[] 1
+        $readTask = $stream.ReadAsync($first, 0, 1)
+        if (-not $readTask.Wait(3000) -or $readTask.Result -ne 1) {
+            return $false
+        }
+
+        return $first[0] -in @(
+            [byte][char]'R',
+            [byte][char]'E',
+            [byte][char]'N'
+        )
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
+function Get-PodmanUserModeNetworking {
+    param([Parameter(Mandatory = $true)]$PodmanCommand)
+
+    try {
+        $output = @(& $PodmanCommand.Source machine inspect --format "{{.UserModeNetworking}}" 2>$null)
+        if ($LASTEXITCODE -eq 0 -and $output.Count -gt 0) {
+            return (($output -join " ").Trim().ToLowerInvariant())
+        }
+    }
+    catch {
+    }
+
+    return "unknown"
+}
+
+function New-PostgresConnectionString {
+    param(
+        [Parameter(Mandatory = $true)][string]$HostName,
+        [Parameter(Mandatory = $true)][int]$Port,
+        [Parameter(Mandatory = $true)]$Settings
+    )
+
+    return (
+        "Host=$HostName;" +
+        "Port=$Port;" +
+        "Database=$($Settings["PHOTOIDENTITY_POSTGRES_DATABASE"]);" +
+        "Username=$($Settings["PHOTOIDENTITY_POSTGRES_USER"]);" +
+        "Password=$($Settings["PHOTOIDENTITY_POSTGRES_PASSWORD"]);" +
+        "SSL Mode=Disable;GSS Encryption Mode=Disable;" +
+        "Pooling=false;Timeout=5;Command Timeout=10")
+}
+
+function Invoke-LivePostgresTest {
+    param([Parameter(Mandatory = $true)][string]$ConnectionString)
+
+    $previous = [Environment]::GetEnvironmentVariable(
+        "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING",
+        "Process")
+
+    try {
+        [Environment]::SetEnvironmentVariable(
+            "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING",
+            $ConnectionString,
+            "Process")
+
+        & dotnet test (Join-Path $PSScriptRoot "tests\PhotoIdentity.Persistence.Tests\PhotoIdentity.Persistence.Tests.csproj") --configuration Release --filter "FullyQualifiedName~PostgresCatalogueDatabaseTests.InitializeAsync_IsVersionedAndIdempotent_WhenLivePostgresIsConfigured"
+        return $LASTEXITCODE
+    }
+    finally {
+        [Environment]::SetEnvironmentVariable(
+            "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING",
+            $previous,
+            "Process")
+    }
+}
+
 function Get-PodmanWslNetworkingMode {
     param([Parameter(Mandatory = $true)]$PodmanCommand)
 
@@ -191,6 +298,13 @@ if (-not $SkipContainerStart) {
             throw "PostgreSQL did not report ready through pg_isready."
         }
 
+        $authCheck = @(& $podman.Source exec $containerId sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h 127.0.0.1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -tAc "SELECT 1"' 2>$null)
+        if ($LASTEXITCODE -ne 0 -or (($authCheck -join " ").Trim()) -ne "1") {
+            throw "PostgreSQL is ready, but an authenticated SELECT 1 failed inside the container. The persisted database credentials may not match deploy/postgres/.env. If the password was changed after the volume was initialized, either restore the original password or perform the documented destructive development reset before rerunning verification."
+        }
+
+        Write-Host "Authenticated PostgreSQL check inside container passed."
+
         $publishedPort = @(& $podman.Source port $containerId "5432/tcp" 2>$null)
         if ($LASTEXITCODE -ne 0 -or $publishedPort.Count -eq 0) {
             throw "Podman did not report a published PostgreSQL port for container port 5432/tcp."
@@ -255,35 +369,77 @@ if (-not (Test-TcpPortOpen -HostName "127.0.0.1" -Port $hostPort)) {
     throw "PostgreSQL is healthy inside Podman, but Windows cannot connect to 127.0.0.1:$hostPort. Podman reported mapping: $mappingDetail; WSL networking mode: $networkingMode. WSL normally forwards Linux-bound ports to Windows localhost. Run 'wsl --shutdown', restart the Podman machine, and rerun verification. If it still fails, check WSL Settings/.wslconfig for localhost forwarding and Windows/Hyper-V firewall policy."
 }
 
-$hostConnectionString =
-    "Host=127.0.0.1;" +
-    "Port=$($settings["PHOTOIDENTITY_POSTGRES_PORT"]);" +
-    "Database=$($settings["PHOTOIDENTITY_POSTGRES_DATABASE"]);" +
-    "Username=$($settings["PHOTOIDENTITY_POSTGRES_USER"]);" +
-    "Password=$($settings["PHOTOIDENTITY_POSTGRES_PASSWORD"]);" +
-    "SSL Mode=Disable;GSS Encryption Mode=Disable;" +
-    "Pooling=false;Timeout=5;Command Timeout=10"
+$hostPort = [int]$settings["PHOTOIDENTITY_POSTGRES_PORT"]
+$databaseName = [string]$settings["PHOTOIDENTITY_POSTGRES_DATABASE"]
+$userName = [string]$settings["PHOTOIDENTITY_POSTGRES_USER"]
 
-$previous = [Environment]::GetEnvironmentVariable(
-    "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING",
-    "Process")
-
-try {
-    [Environment]::SetEnvironmentVariable(
-        "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING",
-        $hostConnectionString,
-        "Process")
-
-    & dotnet test (Join-Path $PSScriptRoot "tests\PhotoIdentity.Persistence.Tests\PhotoIdentity.Persistence.Tests.csproj") --configuration Release --filter "FullyQualifiedName~PostgresCatalogueDatabaseTests.InitializeAsync_IsVersionedAndIdempotent_WhenLivePostgresIsConfigured"
-    if ($LASTEXITCODE -ne 0) {
-        throw "PostgreSQL verification test failed with code $LASTEXITCODE."
+$localhostProtocol = Test-PostgresProtocol -HostName "127.0.0.1" -Port $hostPort -Username $userName -Database $databaseName
+$machineAddresses = if ($null -ne $podman) {
+    Get-PodmanMachineIpv4Addresses -PodmanCommand $podman
+}
+else {
+    @()
+}
+$directProtocolAddress = $null
+foreach ($candidate in $machineAddresses) {
+    if (Test-PostgresProtocol -HostName $candidate -Port $hostPort -Username $userName -Database $databaseName) {
+        $directProtocolAddress = $candidate
+        break
     }
 }
-finally {
-    [Environment]::SetEnvironmentVariable(
-        "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING",
-        $previous,
-        "Process")
+
+if (-not $localhostProtocol) {
+    $userModeNetworking = if ($null -ne $podman) {
+        Get-PodmanUserModeNetworking -PodmanCommand $podman
+    }
+    else {
+        "unknown"
+    }
+
+    Write-Host "Windows localhost TCP port is open, but a PostgreSQL startup packet did not receive a valid PostgreSQL response."
+    Write-Host "Podman user-mode networking: $userModeNetworking"
+
+    if ($null -ne $directProtocolAddress) {
+        Write-Host "Direct Podman-machine PostgreSQL protocol check passed at $($directProtocolAddress):$hostPort."
+
+        if ($userModeNetworking -eq "false") {
+            throw "The PostgreSQL server and Podman port are healthy, but the default WSL localhost relay is not carrying the PostgreSQL protocol correctly. Enable Podman WSL user-mode networking with: podman machine stop; podman machine set --user-mode-networking=true; podman machine start. Then rerun verify-postgres.ps1."
+        }
+
+        throw "The PostgreSQL server is reachable through the Podman-machine address but not through Windows localhost. Restart the Podman machine and WSL networking, then rerun verification. If the problem persists with user-mode networking enabled, update Podman Desktop/Podman before continuing."
+    }
+
+    throw "The Windows localhost port accepts TCP, but neither localhost nor the Podman-machine addresses returned a valid PostgreSQL protocol response. Check Podman/WSL networking and firewall policy before continuing."
 }
 
-Write-Host "PostgreSQL runtime verification passed."
+Write-Host "Windows localhost PostgreSQL protocol check passed."
+
+$hostConnectionString = New-PostgresConnectionString -HostName "127.0.0.1" -Port $hostPort -Settings $settings
+$testExitCode = Invoke-LivePostgresTest -ConnectionString $hostConnectionString
+if ($testExitCode -eq 0) {
+    Write-Host "PostgreSQL runtime verification passed."
+    exit 0
+}
+
+if ($null -ne $directProtocolAddress) {
+    Write-Host "Localhost Npgsql verification failed. Retrying against Podman-machine address $($directProtocolAddress):$hostPort for diagnosis only."
+    $directConnectionString = New-PostgresConnectionString -HostName $directProtocolAddress -Port $hostPort -Settings $settings
+    $directExitCode = Invoke-LivePostgresTest -ConnectionString $directConnectionString
+
+    if ($directExitCode -eq 0) {
+        $userModeNetworking = if ($null -ne $podman) {
+            Get-PodmanUserModeNetworking -PodmanCommand $podman
+        }
+        else {
+            "unknown"
+        }
+
+        if ($userModeNetworking -eq "false") {
+            throw "The PostgreSQL migration test succeeds through the Podman-machine address but fails through Windows localhost. Enable Podman WSL user-mode networking with: podman machine stop; podman machine set --user-mode-networking=true; podman machine start. Then rerun verify-postgres.ps1. Do not use the dynamic Podman-machine IP as the permanent application connection string."
+        }
+
+        throw "The PostgreSQL migration test succeeds through the Podman-machine address but fails through Windows localhost even though Podman reports user-mode networking=$userModeNetworking. Restart/update Podman and rerun verification; do not use the dynamic machine IP as permanent configuration."
+    }
+}
+
+throw "PostgreSQL verification failed through Windows localhost and no working direct Podman-machine PostgreSQL path was found."
