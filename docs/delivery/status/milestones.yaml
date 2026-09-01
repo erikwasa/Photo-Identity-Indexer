@@ -218,7 +218,7 @@ milestones:
 
 - id: M24
   title: PostgreSQL catalogue migration and archive-scale operation
-  status: ready
+  status: in_progress
   document: ../milestones/M24-postgresql-catalogue-and-scale.md
   work_items:
   - WI-0097
