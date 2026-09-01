@@ -128,7 +128,12 @@ public sealed class PostgresCatalogueDatabaseTests
 
     private static string QuoteIdentifier(string identifier)
     {
-        string escaped = identifier.Replace(""", """", StringComparison.Ordinal);
-        return """ + escaped + """;
+        const char quote = (char)34;
+        string quoteString = quote.ToString();
+        string escaped = identifier.Replace(
+            quoteString,
+            quoteString + quoteString,
+            StringComparison.Ordinal);
+        return quoteString + escaped + quoteString;
     }
 }
