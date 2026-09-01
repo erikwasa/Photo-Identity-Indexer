@@ -82,6 +82,8 @@ if ([string]$settings["PHOTOIDENTITY_POSTGRES_PASSWORD"] -eq
     throw "Replace the placeholder PostgreSQL password in $EnvironmentPath before starting the service."
 }
 
+$publishedPort = @()
+
 if (-not $SkipContainerStart) {
     $podman = Get-Command podman -ErrorAction SilentlyContinue
     if ($null -eq $podman) {
