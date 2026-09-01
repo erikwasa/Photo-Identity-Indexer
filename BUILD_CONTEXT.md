@@ -6,37 +6,35 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**M24 — PostgreSQL catalogue migration and archive-scale operation** is planned and ready to start with WI-0097.
+**WI-0097 — Establish PostgreSQL runtime and migration foundation** is in progress on branch `agent/WI-0097-postgresql-runtime-foundation`.
 
-The maintainer selected PostgreSQL as the long-term authoritative catalogue after real-catalogue match regeneration produced severe SQLite contention and `ArchiveAdvancementHostedService` ultimately terminated the host on an unhandled `SQLite Error 6: database table is locked`.
+PostgreSQL remains the selected long-term authoritative catalogue under ADR-0009. This first implementation slice adds the migration target without changing current production semantics: SQLite remains authoritative and all existing catalogue reads/writes still use SQLite.
 
-The implementation goal is progress toward completing the entire existing archive and then operating on smaller daily updates. Comparative SQLite/PostgreSQL benchmark exercises are explicitly not required. Low-overhead application metrics are acceptable and planned.
+The branch adds a separate Npgsql persistence project, PostgreSQL 18 Podman Compose runtime, versioned migration-history bootstrap, optional `PhotoIdentity__Postgres__ConnectionString` configuration, PostgreSQL state in `/health`, and a Podman-backed isolated-database verification script.
 
-The primary local deployment target is PostgreSQL in a Podman-compatible container on the maintainer's existing WSL2/Podman Desktop environment.
+Comparative SQLite/PostgreSQL benchmarks are not required. The goal remains safe forward progress toward migrating the existing catalogue and completing the full archive.
 
-M22 remains a separate maintainer-verification stream and must not be folded into M24 acceptance. M23 remains ready but is not a prerequisite for the PostgreSQL migration.
+M22 maintainer verification remains separate. M23 is not a prerequisite for M24.
 
 ## Next concrete step
 
-1. Review and merge the M24 planning PR.
-2. Start **WI-0097 — Establish PostgreSQL runtime and migration foundation**.
-3. Keep the existing SQLite catalogue authoritative and untouched until WI-0102 performs the verified migration/cutover.
-4. Implement migration slices in dependency order; do not introduce new SQLite-only authoritative persistence.
+1. Run normal PR CI with PostgreSQL unconfigured; existing SQLite operation must remain green.
+2. Run `./verify-postgres.ps1` on the maintainer WSL2/Podman Desktop environment using a private `deploy/postgres/.env`.
+3. Start Photo Identity with `PhotoIdentity__Postgres__ConnectionString` supplied externally and verify `/health` reports `catalogueProvider=sqlite` plus PostgreSQL `ready` at schema version 1.
+4. Correct any portability/CI findings, then complete WI-0097 and begin WI-0098.
+
+Do not migrate or delete the real SQLite catalogue in WI-0097.
 
 ## Relevant files
 
 - docs/decisions/ADR-0009-postgresql-authoritative-catalogue.md
-- docs/delivery/milestones/M24-postgresql-catalogue-and-scale.md
 - docs/delivery/work-items/WI-0097-postgresql-runtime-foundation.md
-- docs/delivery/work-items/WI-0098-persistence-boundary-foundational-schema.md
-- docs/delivery/work-items/WI-0099-postgresql-archive-background-persistence.md
-- docs/delivery/work-items/WI-0100-postgresql-review-identity-persistence.md
-- docs/delivery/work-items/WI-0101-postgresql-library-remaining-persistence.md
-- docs/delivery/work-items/WI-0102-sqlite-postgresql-catalogue-migration.md
-- docs/delivery/work-items/WI-0103-scalable-match-regeneration.md
-- docs/delivery/work-items/WI-0104-operator-query-ui-performance.md
-- docs/delivery/work-items/WI-0105-operational-metrics-observability.md
-- docs/delivery/work-items/WI-0106-postgresql-operations-and-archive-catchup.md
+- src/PhotoIdentity.Persistence.Postgres/PostgresCatalogueDatabase.cs
+- src/PhotoIdentity.Persistence.Postgres/PostgresCatalogueHealth.cs
+- deploy/postgres/compose.yaml
+- deploy/postgres/.env.example
+- verify-postgres.ps1
+- docs/operations/postgresql-local-runtime.md
 - docs/delivery/status/work-items.yaml
 - docs/delivery/status/milestones.yaml
 
@@ -47,3 +45,7 @@ M22 remains a separate maintainer-verification stream and must not be folded int
     dotnet run --project tools/PhotoIdentity.Docs -- validate
     dotnet run --project tools/PhotoIdentity.Docs -- generate --check
     ./verify-review.ps1 -Mode Smoke -Configuration Release
+
+Podman-backed WI-0097 verification:
+
+    ./verify-postgres.ps1
