@@ -1079,11 +1079,11 @@ work_items:
   document: ../work-items/WI-0097-postgresql-runtime-foundation.md
   started_at: 2026-09-01
   last_updated_at: 2026-09-01
-  branch: agent/WI-0097-windows-port-forwarding
+  branch: agent/WI-0097-wsl-forwarding-diagnostics
   blockers: []
   blocker_notes:
   - PostgreSQL is the accepted long-term authoritative catalogue per ADR-0009; comparative SQLite/PostgreSQL benchmarking is not required.
-  - Maintainer verification after PR #229 found PostgreSQL healthy inside Podman but unreachable from Windows localhost; PR #230 corrects the WSL port-publishing boundary and adds a host TCP preflight.
+  - Maintainer verification after PR #229 found PostgreSQL healthy inside Podman but unreachable from Windows localhost. PR #230 removed the explicit VM-loopback bind, but verification still showed 0.0.0.0:5432 inside Podman with Windows localhost refusing the connection; the active slice diagnoses WSL localhost forwarding before changing architecture.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/229
@@ -1093,6 +1093,8 @@ work_items:
     value: 3e3c14e775de3dd0719e6df488dfd6524d7a67df
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/230
+  - type: merge_commit
+    value: d105500c4ce032cffb290efad8c7f40924b3994c
 - id: WI-0098
   title: Add database-neutral persistence boundary and foundational PostgreSQL schema
   milestone: M24
