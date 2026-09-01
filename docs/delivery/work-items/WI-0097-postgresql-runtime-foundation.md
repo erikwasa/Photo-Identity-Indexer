@@ -59,3 +59,15 @@ Copy-Item .\deploy\postgres\.env.example .\deploy\postgres\.env
 After that succeeds, set `PhotoIdentity__Postgres__ConnectionString` in the process environment and start Photo Identity. Confirm `/health` still reports `catalogueProvider: sqlite` and reports PostgreSQL `ready` with schema version 1.
 
 Do not point this slice at a replacement production catalogue or remove the existing SQLite file.
+
+
+## Corrective slice — Windows Podman port forwarding
+
+Maintainer verification after PR #229 merged proved PostgreSQL was healthy inside the container but Windows could not connect to `127.0.0.1:5432`. The initial Compose mapping explicitly bound `127.0.0.1` inside the Podman WSL machine. The corrective slice removes that VM-loopback bind so Podman's Windows port forwarding can expose the published port on Windows localhost.
+
+`verify-postgres.ps1` now verifies both boundaries separately:
+
+1. PostgreSQL readiness inside the container with `pg_isready`.
+2. Windows-host TCP reachability on the configured localhost port before xUnit starts.
+
+This prevents a WSL/Podman forwarding defect from being misreported as a PostgreSQL schema/bootstrap failure.
