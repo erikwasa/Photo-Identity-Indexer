@@ -6,47 +6,34 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**WI-0094 — Add a read-only slideshow library with standalone original preparation** is implemented and in review on PR #225.
+**WI-0096 — Wait for slideshow preparation cancellation to quiesce** is the active M22 stabilization item.
 
-The implementation adds a dedicated `/slideshows` page using a ConsumerLayout with no ordinary operator navigation. The page receives only a read-only collection projection containing Smart Collection ID and name; it does not receive or render collection filters and exposes no edit/delete/photo-mutation actions.
+While validating WI-0095, workflow #1360 reproduced the same WI-0093 integration failure twice. The no-progress/retry test completed its assertions, called Preparation.End, then Windows refused to delete its temporary catalogue.db because the preparation background RunTask still held the file.
 
-The fullscreen slideshow and the consumer page share one SlideshowSettingsEditor component and the existing browser-local SlideshowSettings storage key. Manual navigation, orientation, autoplay, timing, progress, end behavior, protected mode and Prepare originals therefore remain one global browser profile.
+The correction makes preparation end asynchronous. The service removes/releases the session, signals cancellation and awaits the existing background RunTask before completion. The HTTP DELETE endpoint and preparation integration tests await that same lifecycle operation. No test cleanup retries or arbitrary delays are added.
 
-Starting a slideshow from `/slideshows` passes that route as the return target. Slideshow return normalization accepts `/slideshows` in addition to the Smart Collections operator workspace.
+WI-0095 remains separately open on PR #226. Its key corrective evidence is already positive: package verification passed on workflow #1360, fixing the post-merge main #1356 ResponseEnded model-download failure. PR #226 remains red only because the WI-0093 cleanup race reproduced.
 
-Standalone Prepare originals creates the existing immutable slideshow snapshot and feeds its revision IDs to the WI-0093 preparation API without entering fullscreen or starting playback. Progress, no-progress Retry and Cancel reuse the WI-0093 contract.
-
-Active standalone preparation session IDs are stored browser-locally by collection. Navigating away cancels only client polling; it does not DELETE the server session, so preparation can continue in-process. Returning to the page reattaches to a still-live session where possible. When preparation becomes Ready, the page DELETEs the preparation session to release temporary slideshow protection while app-owned hydrated originals remain local under the normal managed LRU policy.
-
-Per-collection client guards prevent repeated taps from creating duplicate preparation work in the same consumer page session.
-
-The page is explicitly a read-only UI boundary, not authentication/authorization. Photo Identity remains unauthenticated on the trusted private network.
-
-Exact-head workflow #1353 passed all lanes: build-and-test, both integration shards, launcher verification and package verification.
+WI-0082 through WI-0086 and WI-0092 through WI-0094 remain in review pending consolidated real-phone M22 acceptance after the corrective CI gates are green.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
 ## Next concrete step
 
-1. Wait for lifecycle-only CI on the current PR #225 head to complete.
-2. If green and no review blockers exist, merge PR #225.
-3. Repeat focused real-phone M22 acceptance for WI-0092 through WI-0094.
-4. If that passes, record maintainer evidence and close WI-0082 through WI-0086 plus WI-0092 through WI-0094 and M22.
+1. Run exact-head CI for WI-0096.
+2. If green, record evidence and move WI-0096 to in_review.
+3. Merge WI-0096 before returning to PR #226.
+4. Revalidate PR #226 against the updated main branch; package verification must remain green.
+5. Then perform consolidated real-phone M22 acceptance.
 
 ## Relevant files
 
-- docs/delivery/work-items/WI-0094-read-only-slideshow-library.md
-- docs/product/slideshow.md
-- src/PhotoIdentity.Web/Layout/ConsumerLayout.razor
-- src/PhotoIdentity.Web/Pages/Slideshows.razor
-- src/PhotoIdentity.Web/Pages/Slideshows.razor.cs
-- src/PhotoIdentity.Web/Components/SlideshowSettingsEditor.razor
-- src/PhotoIdentity.Web/Pages/Slideshow.razor
-- src/PhotoIdentity.Web/Pages/Slideshow.razor.cs
-- src/PhotoIdentity.Web/SlideshowLibraryContracts.cs
-- src/PhotoIdentity.Api/SmartCollectionEndpoints.cs
-- tests/PhotoIdentity.Integration.Tests/SlideshowWebRouteTests.cs
+- docs/delivery/work-items/WI-0096-slideshow-preparation-quiescence.md
+- src/PhotoIdentity.Api/SlideshowOriginalPreparationService.cs
+- src/PhotoIdentity.Api/SlideshowOriginalPreparationEndpoints.cs
+- tests/PhotoIdentity.Integration.Tests/SlideshowOriginalPreparationServiceTests.cs
 - docs/delivery/status/work-items.yaml
+- docs/delivery/status/milestones.yaml
 
 ## Repository validation
 
