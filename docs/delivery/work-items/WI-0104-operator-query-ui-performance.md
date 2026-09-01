@@ -28,3 +28,7 @@ Correct the catalogue-size-dependent delays already identified in Face Review, F
 - [ ] Face Gallery page/scroll work is bounded to the requested page plus justified summary work.
 - [ ] Gallery images are not OpenCV-resized/re-encoded on every unchanged request.
 - [ ] Settings shell/configuration can render without waiting for full archive status aggregation.
+
+## Boundary with slideshow performance
+
+WI-0104 remains focused on Face Review, Face Gallery and Settings. The slideshow-library/start/playback latency observed during M22 acceptance is tracked separately by WI-0108 so it receives explicit investigation and acceptance rather than being implied by this operator-UI item.
