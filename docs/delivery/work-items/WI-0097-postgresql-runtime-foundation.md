@@ -134,3 +134,17 @@ podman machine start
 ```
 
 Afterward, rerun `./verify-postgres.ps1`. The dynamic machine IP remains diagnostic-only and is never accepted as the permanent Photo Identity endpoint.
+
+
+## Corrective slice — Podman 6.0.x upstream regression classification
+
+Maintainer verification with Podman user-mode networking enabled still produced the same protocol failure: authenticated SQL succeeded inside PostgreSQL, but Windows localhost did not carry the PostgreSQL startup protocol.
+
+Current upstream evidence now matches this failure closely:
+
+- Podman issue #29377 is open and triaged as a Windows machine regression after upgrading to Podman 6.0.2; Windows localhost port forwarding fails while the Podman-machine address works.
+- Microsoft WSL issue #41204 separately reports Podman 6 port forwarding failing from WSL to Windows while Podman 4.x/5.x worked.
+
+The verifier now prints Podman client/server versions and, when a 6.0.x runtime reaches this exact protocol-failure state, classifies it as the known upstream regression instead of recommending more Photo Identity or PostgreSQL changes.
+
+The known-good Windows/WSL fallback baseline for WI-0097 is Podman 5.8.5. Podman Desktop 1.28.3 shipped that version. Reverting the local container runtime is an environment workaround only; SQLite remains authoritative and no catalogue data is migrated.
