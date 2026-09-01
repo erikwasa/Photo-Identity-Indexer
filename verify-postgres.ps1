@@ -399,17 +399,20 @@ if (-not $localhostProtocol) {
     Write-Host "Windows localhost TCP port is open, but a PostgreSQL startup packet did not receive a valid PostgreSQL response."
     Write-Host "Podman user-mode networking: $userModeNetworking"
 
-    if ($null -ne $directProtocolAddress) {
-        Write-Host "Direct Podman-machine PostgreSQL protocol check passed at $($directProtocolAddress):$hostPort."
-
-        if ($userModeNetworking -eq "false") {
-            throw "The PostgreSQL server and Podman port are healthy, but the default WSL localhost relay is not carrying the PostgreSQL protocol correctly. Enable Podman WSL user-mode networking with: podman machine stop; podman machine set --user-mode-networking=true; podman machine start. Then rerun verify-postgres.ps1."
+    if ($userModeNetworking -eq "false") {
+        if ($null -ne $directProtocolAddress) {
+            Write-Host "Direct Podman-machine PostgreSQL protocol check passed at $($directProtocolAddress):$hostPort."
         }
 
-        throw "The PostgreSQL server is reachable through the Podman-machine address but not through Windows localhost. Restart the Podman machine and WSL networking, then rerun verification. If the problem persists with user-mode networking enabled, update Podman Desktop/Podman before continuing."
+        throw "PostgreSQL is authenticated and healthy inside the container, but the default Windows/WSL network path is not carrying the PostgreSQL protocol correctly. Podman user-mode networking is disabled. Run: podman machine stop; podman machine set --user-mode-networking=true; podman machine start. Then rerun verify-postgres.ps1."
     }
 
-    throw "The Windows localhost port accepts TCP, but neither localhost nor the Podman-machine addresses returned a valid PostgreSQL protocol response. Check Podman/WSL networking and firewall policy before continuing."
+    if ($null -ne $directProtocolAddress) {
+        Write-Host "Direct Podman-machine PostgreSQL protocol check passed at $($directProtocolAddress):$hostPort."
+        throw "The PostgreSQL server is reachable through the Podman-machine address but not through Windows localhost even though user-mode networking is enabled. Restart the Podman machine and rerun verification. If the problem persists, update Podman Desktop/Podman before continuing."
+    }
+
+    throw "The Windows localhost port accepts TCP, but no valid PostgreSQL protocol response was received. Podman user-mode networking is enabled or could not be determined. Restart/update Podman and check Windows/Hyper-V firewall policy before continuing."
 }
 
 Write-Host "Windows localhost PostgreSQL protocol check passed."
