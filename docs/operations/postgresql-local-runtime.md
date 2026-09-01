@@ -28,6 +28,8 @@ From the repository root:
 ./verify-postgres.ps1
 ~~~
 
+The Windows application requires a stable localhost endpoint for PostgreSQL. WSL normally forwards Linux-bound ports to Windows localhost. If the container is healthy but localhost is unreachable, the verifier now reports the active WSL networking mode, relevant `.wslconfig` settings and whether the Podman-machine IP itself is reachable. It does not silently use the machine IP because that address can change after WSL restart. For Photo Identity, a failing mirrored-networking setup should be changed to WSL NAT with `localhostForwarding=true`, followed by `wsl --shutdown` and a Podman-machine restart.
+
 The verification script:
 
 1. starts deploy/postgres/compose.yaml with Podman Compose;
