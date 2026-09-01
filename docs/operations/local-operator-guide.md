@@ -1,6 +1,6 @@
 # Local operator guide
 
-This is the authoritative local operating path for Photo Identity Indexer on Windows. It distinguishes the current permanent-archive workflow from retained pilot/evaluation tooling.
+This is the authoritative local operating path for Photo Identity Indexer on Windows. It distinguishes the current permanent-archive workflow from retained pilot/evaluation tooling.\n\nDuring M24 migration work, SQLite remains the authoritative catalogue until WI-0102 performs the controlled cutover. PostgreSQL may be started and health-checked in parallel as a migration target; see [PostgreSQL local runtime](postgresql-local-runtime.md). Do not delete or replace the existing SQLite catalogue during WI-0097 through WI-0101.
 
 Check the short [`BUILD_CONTEXT.md`](../../BUILD_CONTEXT.md) handoff and the canonical [work-item registry](../delivery/status/work-items.yaml) before treating a planned feature as available. Formal lifecycle status and completion evidence live in the registry; the build context identifies the current development or verification boundary.
 
