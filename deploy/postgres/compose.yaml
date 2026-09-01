@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     shm_size: 128mb
     ports:
-      - "127.0.0.1:${PHOTOIDENTITY_POSTGRES_PORT:-5432}:5432"
+      - "${PHOTOIDENTITY_POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: "${PHOTOIDENTITY_POSTGRES_DATABASE:-photoidentity}"
       POSTGRES_USER: "${PHOTOIDENTITY_POSTGRES_USER:-photoidentity}"

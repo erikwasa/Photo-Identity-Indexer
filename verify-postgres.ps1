@@ -11,6 +11,29 @@ $composeDirectory = Join-Path $PSScriptRoot "deploy\postgres"
 $composePath = Join-Path $composeDirectory "compose.yaml"
 $environmentExamplePath = Join-Path $composeDirectory ".env.example"
 
+function Test-TcpPortOpen {
+    param(
+        [Parameter(Mandatory = $true)][string]$HostName,
+        [Parameter(Mandatory = $true)][int]$Port
+    )
+
+    $client = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $task = $client.ConnectAsync($HostName, $Port)
+        if (-not $task.Wait(2000)) {
+            return $false
+        }
+
+        return $client.Connected
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Dispose()
+    }
+}
+
 function Read-DotEnv {
     param([Parameter(Mandatory = $true)][string]$Path)
 
@@ -59,6 +82,8 @@ if ([string]$settings["PHOTOIDENTITY_POSTGRES_PASSWORD"] -eq
     throw "Replace the placeholder PostgreSQL password in $EnvironmentPath before starting the service."
 }
 
+$publishedPort = @()
+
 if (-not $SkipContainerStart) {
     $podman = Get-Command podman -ErrorAction SilentlyContinue
     if ($null -eq $podman) {
@@ -91,10 +116,29 @@ if (-not $SkipContainerStart) {
         if (-not $ready) {
             throw "PostgreSQL did not report ready through pg_isready."
         }
+
+        $publishedPort = @(& $podman.Source port $containerId "5432/tcp" 2>$null)
+        if ($LASTEXITCODE -ne 0 -or $publishedPort.Count -eq 0) {
+            throw "Podman did not report a published PostgreSQL port for container port 5432/tcp."
+        }
+
+        Write-Host "Podman published PostgreSQL port: $($publishedPort -join ', ')"
     }
     finally {
         Pop-Location
     }
+}
+
+$hostPort = [int]$settings["PHOTOIDENTITY_POSTGRES_PORT"]
+if (-not (Test-TcpPortOpen -HostName "127.0.0.1" -Port $hostPort)) {
+    $mappingDetail = if ($null -ne $publishedPort -and $publishedPort.Count -gt 0) {
+        $publishedPort -join ", "
+    }
+    else {
+        "not available"
+    }
+
+    throw "PostgreSQL is ready inside the Podman container, but Windows cannot connect to 127.0.0.1:$hostPort. Podman reported mapping: $mappingDetail. This indicates a Podman/WSL port-forwarding problem rather than a PostgreSQL migration failure."
 }
 
 $hostConnectionString =

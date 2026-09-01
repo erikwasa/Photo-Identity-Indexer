@@ -18,7 +18,7 @@ Copy-Item .\deploy\postgres\.env.example .\deploy\postgres\.env
 
 Edit deploy/postgres/.env and replace the password placeholder. The repository-wide .gitignore excludes .env files.
 
-The compose definition uses PostgreSQL 18 and binds the database port to loopback only. PostgreSQL data is stored in the named photoidentity-postgres-data volume mounted at /var/lib/postgresql, which is the PostgreSQL 18+ official-image volume boundary.
+The compose definition uses PostgreSQL 18 and publishes the database port through the Podman machine. On Windows, Podman forwards published ports to Windows localhost. Do not add an explicit `127.0.0.1:` host address to the Compose port mapping: with the WSL machine provider that can bind only the Podman VM loopback and make Windows `127.0.0.1` refuse the connection even though PostgreSQL is healthy inside the container. PostgreSQL data is stored in the named photoidentity-postgres-data volume mounted at /var/lib/postgresql, which is the PostgreSQL 18+ official-image volume boundary.
 
 ## Start and verify
 
@@ -31,10 +31,11 @@ From the repository root:
 The verification script:
 
 1. starts deploy/postgres/compose.yaml with Podman Compose;
-2. waits for pg_isready;
-3. creates an isolated disposable PostgreSQL test database;
-4. runs the WI-0097 migration bootstrap twice to prove it is versioned and idempotent; and
-5. drops the disposable database while leaving the development PostgreSQL service and persistent volume intact.
+2. waits for pg_isready inside the container;
+3. confirms Windows can open the published `127.0.0.1:<port>` TCP endpoint before starting xUnit;
+4. creates an isolated disposable PostgreSQL test database;
+5. runs the WI-0097 migration bootstrap twice to prove it is versioned and idempotent; and
+6. drops the disposable database while leaving the development PostgreSQL service and persistent volume intact.
 
 The script does not print the configured PostgreSQL password or connection string.
 
