@@ -1070,3 +1070,114 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/226
   - type: workflow
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33554309892
+
+- id: WI-0097
+  title: Establish PostgreSQL runtime and migration foundation
+  milestone: M24
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0097-postgresql-runtime-foundation.md
+  blockers: []
+  blocker_notes:
+  - PostgreSQL is the accepted long-term authoritative catalogue per ADR-0009; comparative SQLite/PostgreSQL benchmarking is not required.
+  evidence: []
+- id: WI-0098
+  title: Add database-neutral persistence boundary and foundational PostgreSQL schema
+  milestone: M24
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0098-persistence-boundary-foundational-schema.md
+  blockers:
+  - WI-0097
+  blocker_notes: []
+  evidence: []
+- id: WI-0099
+  title: Migrate archive and background-processing persistence to PostgreSQL
+  milestone: M24
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0099-postgresql-archive-background-persistence.md
+  blockers:
+  - WI-0098
+  blocker_notes:
+  - Includes the 2026-09-01 hosted-service shutdown class where a SQLite table lock escaped ArchiveAdvancementHostedService recovery handling.
+  evidence: []
+- id: WI-0100
+  title: Migrate review and identity persistence to PostgreSQL
+  milestone: M24
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0100-postgresql-review-identity-persistence.md
+  blockers:
+  - WI-0098
+  blocker_notes: []
+  evidence: []
+- id: WI-0101
+  title: Migrate library and remaining authoritative persistence to PostgreSQL
+  milestone: M24
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0101-postgresql-library-remaining-persistence.md
+  blockers:
+  - WI-0098
+  blocker_notes: []
+  evidence: []
+- id: WI-0102
+  title: Migrate the existing SQLite catalogue and perform controlled PostgreSQL cutover
+  milestone: M24
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0102-sqlite-postgresql-catalogue-migration.md
+  blockers:
+  - WI-0099
+  - WI-0100
+  - WI-0101
+  blocker_notes: []
+  evidence: []
+- id: WI-0103
+  title: Make identity match regeneration scalable and bounded
+  milestone: M24
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0103-scalable-match-regeneration.md
+  blockers:
+  - WI-0100
+  blocker_notes:
+  - Preserve current exact scoring semantics first; pgvector/approximate nearest-neighbor work is optional follow-up, not a migration prerequisite.
+  evidence: []
+- id: WI-0104
+  title: Remove known operator query and UI scaling bottlenecks
+  milestone: M24
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0104-operator-query-ui-performance.md
+  blockers:
+  - WI-0100
+  - WI-0101
+  blocker_notes: []
+  evidence: []
+- id: WI-0105
+  title: Add low-overhead PostgreSQL and background-work observability
+  milestone: M24
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0105-operational-metrics-observability.md
+  blockers:
+  - WI-0099
+  blocker_notes:
+  - Metrics replace repeated manual A/B performance exercises; telemetry must remain aggregated, bounded and privacy-safe.
+  evidence: []
+- id: WI-0106
+  title: Operationalize PostgreSQL and resume full-archive catch-up
+  milestone: M24
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0106-postgresql-operations-and-archive-catchup.md
+  blockers:
+  - WI-0102
+  - WI-0103
+  - WI-0104
+  - WI-0105
+  blocker_notes:
+  - Final M24 acceptance is sustained real-archive catch-up followed by a small daily-style increment, not a comparative database benchmark.
+  evidence: []

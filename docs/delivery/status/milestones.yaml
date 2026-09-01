@@ -215,3 +215,19 @@ milestones:
   - WI-0089
   - WI-0090
   - WI-0091
+
+- id: M24
+  title: PostgreSQL catalogue migration and archive-scale operation
+  status: ready
+  document: ../milestones/M24-postgresql-catalogue-and-scale.md
+  work_items:
+  - WI-0097
+  - WI-0098
+  - WI-0099
+  - WI-0100
+  - WI-0101
+  - WI-0102
+  - WI-0103
+  - WI-0104
+  - WI-0105
+  - WI-0106
