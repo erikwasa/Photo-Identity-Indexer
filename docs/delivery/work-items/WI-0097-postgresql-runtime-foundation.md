@@ -99,3 +99,16 @@ SSL Mode=Disable;GSS Encryption Mode=Disable
 ```
 
 This is scoped to the loopback-only local PostgreSQL runtime. The persistence layer does not override security settings supplied by an external production PostgreSQL connection string; a future external/remote deployment can require TLS independently.
+
+
+## Corrective slice — protocol-level transport isolation
+
+The next maintainer run progressed beyond encryption negotiation but Windows localhost closed the stream during PostgreSQL authentication. This slice separates database state from transport state:
+
+- `pg_isready` remains the liveness check, but an authenticated `psql SELECT 1` inside the container now verifies the persisted credentials.
+- Windows sends a minimal PostgreSQL startup packet and requires a PostgreSQL response before xUnit runs.
+- The Podman-machine IPv4 address is tested only as a diagnostic path.
+- If the direct machine path succeeds while Windows localhost fails, the verifier identifies the WSL relay as the fault boundary and recommends Podman's supported WSL user-mode networking mode.
+- The dynamic Podman-machine IP is never accepted as the permanent Photo Identity connection endpoint.
+
+This is intentionally diagnostic and operational hardening; no catalogue data is migrated and SQLite remains authoritative.
