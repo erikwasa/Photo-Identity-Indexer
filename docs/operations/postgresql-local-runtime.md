@@ -34,10 +34,12 @@ The verification script:
 
 1. starts deploy/postgres/compose.yaml with Podman Compose;
 2. waits for pg_isready inside the container;
-3. confirms Windows can open the published `127.0.0.1:<port>` TCP endpoint before starting xUnit;
-4. creates an isolated disposable PostgreSQL test database;
-5. runs the WI-0097 migration bootstrap twice to prove it is versioned and idempotent; and
-6. drops the disposable database while leaving the development PostgreSQL service and persistent volume intact.
+3. performs an authenticated `SELECT 1` inside the container, because pg_isready does not prove that the configured password matches the persisted database;
+4. confirms Windows can open the published `127.0.0.1:<port>` TCP endpoint;
+5. sends a minimal PostgreSQL startup packet from Windows and requires a PostgreSQL protocol response;
+6. runs the Npgsql migration test through Windows localhost;
+7. if localhost fails, probes the Podman-machine address for diagnosis only and distinguishes a WSL relay failure from a PostgreSQL failure; and
+8. creates/drops an isolated disposable PostgreSQL test database while applying the migration bootstrap twice to prove it is versioned and idempotent.
 
 The script does not print the configured PostgreSQL password or connection string.
 
@@ -101,3 +103,14 @@ This removes the named PostgreSQL data volume.
 ## Current migration boundary
 
 WI-0097 does not move any source, asset, face, review or archive state out of SQLite. The PostgreSQL schema contains only the migration-history foundation. Foundational catalogue tables are introduced by WI-0098, and the real SQLite-to-PostgreSQL cutover is deferred to WI-0102.
+
+
+If the server works directly through the Podman-machine address but the Windows localhost relay corrupts or closes PostgreSQL sessions, do not configure Photo Identity with the dynamic machine IP. For a WSL-backed Podman machine whose `UserModeNetworking` value is false, the supported remediation is:
+
+~~~powershell
+podman machine stop
+podman machine set --user-mode-networking=true
+podman machine start
+~~~
+
+Then rerun `./verify-postgres.ps1`. Podman documents user-mode networking as the Windows/WSL option that relays guest traffic through a host-side user-space process; the WSL backend otherwise defaults to the standard WSL network path.

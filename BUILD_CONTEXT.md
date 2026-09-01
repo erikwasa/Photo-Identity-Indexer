@@ -8,26 +8,30 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 **WI-0097 — Establish PostgreSQL runtime and migration foundation** remains in progress.
 
-PR #229 established the PostgreSQL/Npgsql foundation. PRs #230 and #231 corrected and diagnosed Windows/WSL port forwarding. The latest maintainer verification now reaches the Windows localhost listener but Npgsql 10 times out in `NpgsqlConnector.SetupEncryption` before authentication.
+PRs #229–#232 are merged. The latest maintainer verification reaches PostgreSQL authentication through Windows localhost but the stream closes before authentication completes. The active branch is `agent/WI-0097-postgres-protocol-diagnostics`.
 
-The active slice `agent/WI-0097-local-npgsql-encryption` makes the local Podman boundary explicit: the repository's PostgreSQL container does not configure TLS or GSS transport, so the generated local/test connection string uses `SSL Mode=Disable;GSS Encryption Mode=Disable`. The persistence layer itself does not override security parameters supplied by external PostgreSQL configuration.
+The verifier now isolates four boundaries: PostgreSQL liveness, authenticated SQL inside the container, PostgreSQL protocol response through Windows localhost, and the full Npgsql migration test. It probes the Podman-machine address only for diagnosis. If the machine address works while localhost fails and Podman WSL user-mode networking is disabled, the verifier recommends enabling Podman's supported user-mode networking rather than using an unstable machine IP.
 
-SQLite remains authoritative and untouched. WI-0098 stays blocked until the live Podman migration bootstrap succeeds from Windows.
+SQLite remains authoritative and untouched. WI-0098 stays blocked until the Windows-host live migration test succeeds.
 
 ## Next concrete step
 
-1. Merge the local-Npgsql-encryption corrective PR after CI is green.
+1. Merge the protocol-diagnostic corrective PR after CI is green.
 2. Run `./verify-postgres.ps1` again.
-3. If the isolated database bootstrap passes, set `PhotoIdentity__Postgres__ConnectionString` using the documented local security parameters and verify `/health` reports `catalogueProvider=sqlite` plus PostgreSQL `ready` at schema version 1.
-4. Complete WI-0097 and begin WI-0098.
+3. Follow the exact remediation reported by the verifier. If it identifies a WSL relay failure with user-mode networking disabled, run:
+   `podman machine stop`
+   `podman machine set --user-mode-networking=true`
+   `podman machine start`
+4. Rerun verification until the isolated PostgreSQL database/bootstrap test passes through Windows localhost.
+5. Verify Photo Identity `/health` reports `catalogueProvider=sqlite` and PostgreSQL `ready` at schema version 1.
+6. Complete WI-0097 and begin WI-0098.
 
-Do not migrate or delete the real SQLite catalogue.
+Do not migrate or delete the real SQLite catalogue. Do not use the dynamic Podman-machine IP as permanent application configuration.
 
 ## Relevant files
 
 - docs/decisions/ADR-0009-postgresql-authoritative-catalogue.md
 - docs/delivery/work-items/WI-0097-postgresql-runtime-foundation.md
-- src/PhotoIdentity.Persistence.Postgres/PostgresCatalogueDatabase.cs
 - deploy/postgres/compose.yaml
 - verify-postgres.ps1
 - docs/operations/postgresql-local-runtime.md
