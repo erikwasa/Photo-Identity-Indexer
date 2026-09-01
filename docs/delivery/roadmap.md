@@ -28,6 +28,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M21 | Reliability and recognition quality | ready |
 | M22 | Protected Smart Collection slideshow | in_progress |
 | M23 | Source-copy lifecycle and privacy exclusion | ready |
+| M24 | PostgreSQL catalogue migration and archive-scale operation | ready |
 
 Expected evolution:
 
