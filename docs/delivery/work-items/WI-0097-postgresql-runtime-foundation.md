@@ -112,3 +112,25 @@ The next maintainer run progressed beyond encryption negotiation but Windows loc
 - The dynamic Podman-machine IP is never accepted as the permanent Photo Identity connection endpoint.
 
 This is intentionally diagnostic and operational hardening; no catalogue data is migrated and SQLite remains authoritative.
+
+
+## Corrective slice — user-mode networking remediation
+
+Maintainer verification proved:
+
+- authenticated `SELECT 1` succeeds inside the PostgreSQL container;
+- Podman publishes `0.0.0.0:5432`;
+- Windows can open `127.0.0.1:5432`; and
+- a PostgreSQL startup packet sent through Windows localhost does not receive a valid PostgreSQL response while Podman reports `UserModeNetworking=false`.
+
+That is sufficient to classify the failing boundary as the default Windows/WSL network path. The verifier now recommends Podman's supported WSL user-mode networking mode whenever this state is observed, even if the dynamic Podman-machine IP does not answer the diagnostic probe.
+
+The remediation is:
+
+```powershell
+podman machine stop
+podman machine set --user-mode-networking=true
+podman machine start
+```
+
+Afterward, rerun `./verify-postgres.ps1`. The dynamic machine IP remains diagnostic-only and is never accepted as the permanent Photo Identity endpoint.
