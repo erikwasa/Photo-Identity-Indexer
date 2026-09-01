@@ -1074,9 +1074,12 @@ work_items:
 - id: WI-0097
   title: Establish PostgreSQL runtime and migration foundation
   milestone: M24
-  status: ready
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0097-postgresql-runtime-foundation.md
+  started_at: 2026-09-01
+  last_updated_at: 2026-09-01
+  branch: agent/WI-0097-postgresql-runtime-foundation
   blockers: []
   blocker_notes:
   - PostgreSQL is the accepted long-term authoritative catalogue per ADR-0009; comparative SQLite/PostgreSQL benchmarking is not required.
