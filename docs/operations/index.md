@@ -6,7 +6,7 @@ Use this page to decide which runbook is current. Some files under `docs/operati
 
 - [Local operator guide](local-operator-guide.md) — authoritative day-to-day setup, application, permanent-archive and recovery path.
 - [Windows operator package](windows-package.md) — self-contained `win-x64` package build, installation, durable-data boundary and side-by-side upgrade procedure.
-- [SQLite persistence operations](sqlite-persistence.md) — current backup, restore, migration and locking policy.
+- [SQLite persistence operations](sqlite-persistence.md) — current authoritative-catalogue backup, restore, migration and locking policy until the M24 cutover.\n- [PostgreSQL local runtime](postgresql-local-runtime.md) — M24 migration-target setup and Podman verification while SQLite remains authoritative.
 - [Review-proxy serving and bounded originals](review-proxy-serving.md) — current archive storage/original-serving semantics.
 - [Bounded archive acceptance](bounded-archive-acceptance.md) — active human gate while WI-0042 remains incomplete; after completion it remains the acceptance record/runbook.
 

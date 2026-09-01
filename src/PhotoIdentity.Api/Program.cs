@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.EventLog;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Imaging.OpenCv;
+using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Source.OneDriveSync;
@@ -32,6 +33,8 @@ public partial class Program
         string defaultDetectorEvaluationRoot = Path.Combine(defaultApplicationRoot, "detector-evaluations");
         string defaultArchiveAnalysisRoot = Path.Combine(defaultApplicationRoot, "archive-analysis");
         string databasePath = builder.Configuration["PhotoIdentity:DatabasePath"] ?? defaultDatabasePath;
+        string? postgresConnectionString =
+            builder.Configuration["PhotoIdentity:Postgres:ConnectionString"];
         string detectorEvaluationRoot =
             builder.Configuration["PhotoIdentity:DetectorEvaluationRoot"] ?? defaultDetectorEvaluationRoot;
         string archiveAnalysisRoot =
@@ -52,6 +55,12 @@ public partial class Program
                 : GeoNamesReverseGeocodingConfiguration.DefaultMinimumRequestIntervalMilliseconds);
 
         builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
+        PostgresCatalogueDatabase? postgresCatalogueDatabase = null;
+        if (!string.IsNullOrWhiteSpace(postgresConnectionString))
+        {
+            postgresCatalogueDatabase = new PostgresCatalogueDatabase(postgresConnectionString);
+            builder.Services.AddSingleton(postgresCatalogueDatabase);
+        }
         builder.Services.AddSingleton<ArchiveThroughputMetrics>();
         builder.Services.AddSingleton(new ArchiveOperatorConfiguration(
             archiveAnalysisRoot,
@@ -163,6 +172,28 @@ public partial class Program
         await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(catalogueDatabase);
         await SqlitePhotoPlaceEnrichmentSchema.EnsureAsync(catalogueDatabase);
 
+        PostgresCatalogueHealth postgresHealth = PostgresCatalogueHealth.NotConfigured;
+        if (postgresCatalogueDatabase is not null)
+        {
+            PostgresInitializationResult postgresInitialization =
+                await postgresCatalogueDatabase.TryInitializeAsync();
+            postgresHealth = postgresInitialization.Health;
+
+            if (postgresInitialization.Error is null)
+            {
+                app.Logger.LogInformation(
+                    "PostgreSQL migration foundation is ready at schema version {SchemaVersion}; SQLite remains the authoritative catalogue.",
+                    postgresHealth.SchemaVersion);
+            }
+            else
+            {
+                app.Logger.LogWarning(
+                    postgresInitialization.Error,
+                    "PostgreSQL migration foundation status is {PostgresStatus}; SQLite remains the authoritative catalogue.",
+                    postgresHealth.Status);
+            }
+        }
+
         app.UseBlazorFrameworkFiles();
         app.UseStaticFiles();
         app.Use(async (context, next) =>
@@ -194,6 +225,8 @@ public partial class Program
         {
             status = "ok",
             schemaVersion = SqliteCatalogueDatabase.CurrentSchemaVersion,
+            catalogueProvider = "sqlite",
+            postgres = postgresHealth,
         }));
         app.MapReviewEndpoints();
         app.MapReviewSuggestionEndpoints();

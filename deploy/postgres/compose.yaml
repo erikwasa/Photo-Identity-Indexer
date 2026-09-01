@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: docker.io/library/postgres:18
+    restart: unless-stopped
+    shm_size: 128mb
+    ports:
+      - "127.0.0.1:${PHOTOIDENTITY_POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: "${PHOTOIDENTITY_POSTGRES_DATABASE:-photoidentity}"
+      POSTGRES_USER: "${PHOTOIDENTITY_POSTGRES_USER:-photoidentity}"
+      POSTGRES_PASSWORD: "${PHOTOIDENTITY_POSTGRES_PASSWORD:?Set PHOTOIDENTITY_POSTGRES_PASSWORD in deploy/postgres/.env}"
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - photoidentity-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+volumes:
+  photoidentity-postgres-data:
