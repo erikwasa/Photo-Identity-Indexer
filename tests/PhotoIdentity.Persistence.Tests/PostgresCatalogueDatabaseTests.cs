@@ -126,6 +126,9 @@ public sealed class PostgresCatalogueDatabaseTests
         }
     }
 
-    private static string QuoteIdentifier(string identifier) =>
-        $""{identifier.Replace(""", """", StringComparison.Ordinal)}"";
+    private static string QuoteIdentifier(string identifier)
+    {
+        string escaped = identifier.Replace(""", """", StringComparison.Ordinal);
+        return """ + escaped + """;
+    }
 }
