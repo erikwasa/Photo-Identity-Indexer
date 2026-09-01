@@ -34,6 +34,80 @@ function Test-TcpPortOpen {
     }
 }
 
+function Get-PodmanWslNetworkingMode {
+    param([Parameter(Mandatory = $true)]$PodmanCommand)
+
+    try {
+        $output = @(& $PodmanCommand.Source machine ssh wslinfo --networking-mode 2>$null)
+        if ($LASTEXITCODE -eq 0 -and $output.Count -gt 0) {
+            return (($output -join " ").Trim().ToLowerInvariant())
+        }
+    }
+    catch {
+    }
+
+    return "unknown"
+}
+
+function Get-WslConfigDiagnostics {
+    $path = if ([string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+        $null
+    }
+    else {
+        Join-Path $env:USERPROFILE ".wslconfig"
+    }
+
+    $networkingMode = $null
+    $localhostForwarding = $null
+
+    if ($null -ne $path -and (Test-Path -LiteralPath $path -PathType Leaf)) {
+        $raw = Get-Content -LiteralPath $path -Raw
+
+        $networkMatch = [regex]::Match(
+            $raw,
+            "(?im)^\s*networkingMode\s*=\s*([^#;\r\n]+)")
+        if ($networkMatch.Success) {
+            $networkingMode = $networkMatch.Groups[1].Value.Trim().ToLowerInvariant()
+        }
+
+        $localhostMatch = [regex]::Match(
+            $raw,
+            "(?im)^\s*localhostForwarding\s*=\s*([^#;\r\n]+)")
+        if ($localhostMatch.Success) {
+            $localhostForwarding = $localhostMatch.Groups[1].Value.Trim().ToLowerInvariant()
+        }
+    }
+
+    return [pscustomobject]@{
+        Path = $path
+        NetworkingMode = $networkingMode
+        LocalhostForwarding = $localhostForwarding
+    }
+}
+
+function Get-PodmanMachineIpv4Addresses {
+    param([Parameter(Mandatory = $true)]$PodmanCommand)
+
+    try {
+        $output = @(& $PodmanCommand.Source machine ssh hostname -I 2>$null)
+        if ($LASTEXITCODE -ne 0) {
+            return @()
+        }
+
+        $tokens = (($output -join " ") -split "\s+") |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+        return @($tokens | Where-Object {
+            [System.Net.IPAddress]$address = $null
+            [System.Net.IPAddress]::TryParse($_, [ref]$address) -and
+            $address.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork
+        })
+    }
+    catch {
+        return @()
+    }
+}
+
 function Read-DotEnv {
     param([Parameter(Mandatory = $true)][string]$Path)
 
@@ -83,9 +157,9 @@ if ([string]$settings["PHOTOIDENTITY_POSTGRES_PASSWORD"] -eq
 }
 
 $publishedPort = @()
+$podman = Get-Command podman -ErrorAction SilentlyContinue
 
 if (-not $SkipContainerStart) {
-    $podman = Get-Command podman -ErrorAction SilentlyContinue
     if ($null -eq $podman) {
         throw "Podman was not found on PATH."
     }
@@ -131,14 +205,54 @@ if (-not $SkipContainerStart) {
 
 $hostPort = [int]$settings["PHOTOIDENTITY_POSTGRES_PORT"]
 if (-not (Test-TcpPortOpen -HostName "127.0.0.1" -Port $hostPort)) {
-    $mappingDetail = if ($null -ne $publishedPort -and $publishedPort.Count -gt 0) {
+    $mappingDetail = if ($publishedPort.Count -gt 0) {
         $publishedPort -join ", "
     }
     else {
         "not available"
     }
 
-    throw "PostgreSQL is ready inside the Podman container, but Windows cannot connect to 127.0.0.1:$hostPort. Podman reported mapping: $mappingDetail. This indicates a Podman/WSL port-forwarding problem rather than a PostgreSQL migration failure."
+    $networkingMode = if ($null -ne $podman) {
+        Get-PodmanWslNetworkingMode -PodmanCommand $podman
+    }
+    else {
+        "unknown"
+    }
+    $wslConfig = Get-WslConfigDiagnostics
+
+    Write-Host "WSL networking mode reported by Podman machine: $networkingMode"
+    if ($null -ne $wslConfig.Path -and (Test-Path -LiteralPath $wslConfig.Path -PathType Leaf)) {
+        Write-Host "WSL config: $($wslConfig.Path)"
+        Write-Host "WSL config networkingMode: $($wslConfig.NetworkingMode ?? '<not set>')"
+        Write-Host "WSL config localhostForwarding: $($wslConfig.LocalhostForwarding ?? '<not set>')"
+    }
+    else {
+        Write-Host "WSL config: <not present>"
+    }
+
+    $reachableMachineAddress = $null
+    if ($null -ne $podman) {
+        foreach ($candidate in (Get-PodmanMachineIpv4Addresses -PodmanCommand $podman)) {
+            if (Test-TcpPortOpen -HostName $candidate -Port $hostPort) {
+                $reachableMachineAddress = $candidate
+                break
+            }
+        }
+    }
+
+    if ($null -ne $reachableMachineAddress) {
+        Write-Host "Windows can reach the PostgreSQL port through Podman machine address ${reachableMachineAddress}:$hostPort, but that address is not used as application configuration because it can change after WSL restart."
+    }
+
+    if ($wslConfig.LocalhostForwarding -eq "false" -and $networkingMode -ne "mirrored") {
+        throw "PostgreSQL is healthy, but WSL localhost forwarding is explicitly disabled. Podman reported mapping: $mappingDetail. Set localhostForwarding=true (or remove the false override) in $($wslConfig.Path), run 'wsl --shutdown', restart the Podman machine, and rerun this verification."
+    }
+
+    if ($networkingMode -eq "mirrored") {
+        throw "PostgreSQL is healthy, but Windows localhost is not receiving the Podman-published port while WSL networking mode is mirrored. Podman reported mapping: $mappingDetail. Photo Identity requires a stable Windows-localhost database endpoint. Use WSL NAT networking with localhostForwarding=true for this environment, then run 'wsl --shutdown', restart the Podman machine, and rerun this verification."
+    }
+
+    throw "PostgreSQL is healthy inside Podman, but Windows cannot connect to 127.0.0.1:$hostPort. Podman reported mapping: $mappingDetail; WSL networking mode: $networkingMode. WSL normally forwards Linux-bound ports to Windows localhost. Run 'wsl --shutdown', restart the Podman machine, and rerun verification. If it still fails, check WSL Settings/.wslconfig for localhost forwarding and Windows/Hyper-V firewall policy."
 }
 
 $hostConnectionString =

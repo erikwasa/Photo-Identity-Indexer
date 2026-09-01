@@ -6,37 +6,33 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**WI-0097 — Establish PostgreSQL runtime and migration foundation** is in progress on branch `agent/WI-0097-postgresql-runtime-foundation`.
+**WI-0097 — Establish PostgreSQL runtime and migration foundation** remains in progress.
 
-PostgreSQL remains the selected long-term authoritative catalogue under ADR-0009. This first implementation slice adds the migration target without changing current production semantics: SQLite remains authoritative and all existing catalogue reads/writes still use SQLite.
+PR #229 established the PostgreSQL 18/Npgsql migration foundation and merged green. PR #230 corrected the initial Compose port bind and also merged green, but maintainer verification still found PostgreSQL healthy inside Podman while Windows `127.0.0.1:5432` refused the connection.
 
-The branch adds a separate Npgsql persistence project, PostgreSQL 18 Podman Compose runtime, versioned migration-history bootstrap, optional `PhotoIdentity__Postgres__ConnectionString` configuration, PostgreSQL state in `/health`, and a Podman-backed isolated-database verification script.
+The active corrective slice is `agent/WI-0097-wsl-forwarding-diagnostics`. It treats this as a WSL host-forwarding issue rather than a PostgreSQL/schema failure: the verifier reports WSL networking mode, relevant `.wslconfig` settings and Podman-machine IP reachability before recommending a stable localhost fix.
 
-Comparative SQLite/PostgreSQL benchmarks are not required. The goal remains safe forward progress toward migrating the existing catalogue and completing the full archive.
-
-M22 maintainer verification remains separate. M23 is not a prerequisite for M24.
+SQLite remains authoritative and untouched. Do not begin WI-0098 until Windows can reliably reach PostgreSQL through a stable localhost endpoint and the migration bootstrap passes against the live container.
 
 ## Next concrete step
 
-1. Run normal PR CI with PostgreSQL unconfigured; existing SQLite operation must remain green.
-2. Run `./verify-postgres.ps1` on the maintainer WSL2/Podman Desktop environment using a private `deploy/postgres/.env`.
-3. Start Photo Identity with `PhotoIdentity__Postgres__ConnectionString` supplied externally and verify `/health` reports `catalogueProvider=sqlite` plus PostgreSQL `ready` at schema version 1.
-4. Correct any portability/CI findings, then complete WI-0097 and begin WI-0098.
+1. Merge the WSL-forwarding diagnostic PR after CI is green.
+2. Run `./verify-postgres.ps1` again on the maintainer machine.
+3. Apply the targeted WSL networking remediation reported by the script if localhost forwarding is disabled or mirrored networking is failing.
+4. Rerun verification until the disposable PostgreSQL database test passes.
+5. Then verify Photo Identity `/health` reports `catalogueProvider=sqlite` and PostgreSQL `ready` at schema version 1.
+6. Complete WI-0097 and begin WI-0098.
 
-Do not migrate or delete the real SQLite catalogue in WI-0097.
+Do not use the dynamic Podman-machine IP as the permanent application connection string; it may change after WSL restart.
 
 ## Relevant files
 
 - docs/decisions/ADR-0009-postgresql-authoritative-catalogue.md
 - docs/delivery/work-items/WI-0097-postgresql-runtime-foundation.md
-- src/PhotoIdentity.Persistence.Postgres/PostgresCatalogueDatabase.cs
-- src/PhotoIdentity.Persistence.Postgres/PostgresCatalogueHealth.cs
 - deploy/postgres/compose.yaml
-- deploy/postgres/.env.example
 - verify-postgres.ps1
 - docs/operations/postgresql-local-runtime.md
 - docs/delivery/status/work-items.yaml
-- docs/delivery/status/milestones.yaml
 
 ## Repository validation
 
