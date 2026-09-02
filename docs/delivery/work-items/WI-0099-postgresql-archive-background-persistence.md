@@ -224,3 +224,26 @@ Started 2026-09-02.
 - Extended live PostgreSQL verification for claim/touch, revision → source transfer, source → revision transfer, release-request transfer blocking, release completion and reclaim-after-release.
 
 After this slice, the largest remaining WI-0099 persistence surfaces are storage-policy accounting and automatic GeoNames enrichment operational state, plus a final verification-state/runtime-composition review before any provider cutover.
+
+
+### Maintainer verification — PostgreSQL schema version 9
+
+After corrective CI on PR #254, workflow #1470 passed and PR #254 merged on 2026-09-02. The maintainer then completed the PostgreSQL review/verification successfully.
+
+Schema version 9 and the managed hydration ownership semantics are accepted, including revision/source ownership transfer, release-request blocking and reclaim-after-release behavior.
+
+### Slice 9 — PostgreSQL storage-policy accounting
+
+Started 2026-09-02.
+
+- Added provider-neutral `IArchiveStorageAccountingRepository` for privacy-safe archive byte totals.
+- `SqliteArchiveStorageRepository` implements the neutral contract without changing existing aggregate semantics.
+- Added `PostgresArchiveStorageAccountingRepository` using already-migrated source-observation/revision and review-proxy tables; no schema migration is required, so PostgreSQL remains at schema version 9.
+- Preserved logical-source accounting precedence: current source observation size first, latest immutable revision size as fallback, zero if neither exists.
+- Preserved review-proxy accounting by selected profile and zero for null/blank or unknown profiles.
+- `ArchiveHydrationCapacityService` no longer owns a SQLite database handle. Its coverage, storage accounting and availability dependencies now use the existing neutral contracts.
+- Dependency injection still binds coverage, storage accounting, availability and hydration ownership to SQLite, so the runtime storage-policy decision path remains single-provider until controlled cutover.
+- Updated integration fixtures to supply the neutral SQLite implementations explicitly instead of retaining a SQLite-specific compatibility constructor in production.
+- Extended live PostgreSQL verification to assert logical source bytes and review-proxy bytes from durable PostgreSQL state.
+
+After this slice, automatic GeoNames enrichment operational state is the main named WI-0099 persistence surface remaining. A final source-verification/runtime-composition review is still required before declaring the archive/background domain ready for cutover.
