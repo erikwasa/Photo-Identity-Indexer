@@ -260,9 +260,9 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
         _dataSource = builder.Build();
     }
 
-    public Task<NpgsqlConnection> OpenConnectionAsync(
+    public async Task<NpgsqlConnection> OpenConnectionAsync(
         CancellationToken cancellationToken = default) =>
-        _dataSource.OpenConnectionAsync(cancellationToken).AsTask();
+        await _dataSource.OpenConnectionAsync(cancellationToken);
 
     public async Task<PostgresInitializationResult> TryInitializeAsync(
         CancellationToken cancellationToken = default)
