@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -296,6 +296,28 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 
             CREATE INDEX ix_asset_revision_analysis_profile
                 ON asset_revision_analysis (profile_hash, asset_revision_id);
+            """),
+        new(
+            4,
+            "archive-asset-availability",
+            """
+            CREATE TABLE archive_asset_availability (
+                asset_id uuid NOT NULL PRIMARY KEY,
+                availability text NOT NULL
+                    CHECK (availability IN (
+                        'local',
+                        'online-only',
+                        'downloading',
+                        'unavailable',
+                        'error')),
+                checked_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT fk_archive_asset_availability_asset
+                    FOREIGN KEY (asset_id)
+                    REFERENCES assets (id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX ix_archive_asset_availability_state
+                ON archive_asset_availability (availability, asset_id);
             """),
     ];
 
