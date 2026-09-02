@@ -3,6 +3,7 @@ using Xunit;
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Sources;
@@ -721,8 +722,8 @@ public sealed class PostgresCatalogueDatabaseTests
                         geoRevisionId));
             Assert.Equal(takenAtLocal, persistedGps.TakenAtLocal);
             Assert.Equal(TimeSpan.FromHours(2), persistedGps.UtcOffset);
-            Assert.Equal(59.3293, persistedGps.Latitude);
-            Assert.Equal(18.0686, persistedGps.Longitude);
+            Assert.Equal(59.3293, persistedGps.Latitude!.Value);
+            Assert.Equal(18.0686, persistedGps.Longitude!.Value);
 
             IPhotoPlaceEnrichmentStateRepository enrichmentState =
                 new PostgresPhotoPlaceEnrichmentStateRepository(
