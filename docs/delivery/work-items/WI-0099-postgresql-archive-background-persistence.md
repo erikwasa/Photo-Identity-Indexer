@@ -125,3 +125,24 @@ Started 2026-09-02.
 - Runtime archive endpoints, scanner, status, hydration and advancement services remain SQLite-authoritative. No dual writes or mixed-authority runtime reads are introduced.
 
 After this slice, durable processing execution remains the major persistence prerequisite before a controlled archive runtime cutover can be designed.
+
+
+### Maintainer verification — PostgreSQL schema version 6
+
+After PR #249 merged on 2026-09-02, the maintainer reran `verify-postgres.ps1`.
+
+Verification passed on the existing Podman 5.8.x PostgreSQL volume, accepting schema version 6 and the archive-coverage persistence behavior without resetting the volume.
+
+### Slice 5 — PostgreSQL durable processing execution
+
+Started 2026-09-02.
+
+- Added `PostgresProcessingRepository` implementing both existing Core boundaries: `IProcessingRunRepository` and `IProcessingExecutionRepository`.
+- Reused the foundational PostgreSQL `processing_runs` / `processing_jobs` schema introduced in schema version 2; no new migration is required for this slice.
+- Preserved pending-run/idempotent-job creation, cancellation and terminal run-finalization semantics.
+- Added atomic PostgreSQL job claiming with `FOR UPDATE ... SKIP LOCKED` so competing workers cannot lease the same job.
+- Preserved lease tokens, lease expiry, expired-running-job reclaim, checkpoint JSON, transient retry scheduling, permanent failure and stale-token rejection.
+- Added live PostgreSQL verification for repeated run creation, checkpoint persistence, stale lease rejection, retry/reclaim after a new repository instance, competing claims and cancellation.
+- Runtime archive orchestration remains SQLite-authoritative. This slice does not introduce dual writes or switch a running archive worker to PostgreSQL.
+
+After this repository is accepted, WI-0099 should reassess the remaining archive-specific persistence surfaces and then design one controlled PostgreSQL runtime composition change rather than introducing mixed authority incrementally.

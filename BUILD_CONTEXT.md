@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-archive-coverage`. PR #248 merged, workflow #1448 passed, and the maintainer live-verified PostgreSQL schema version 5 on the existing Podman volume. PR #249 is the active slice. It adds the neutral archive-coverage boundary plus PostgreSQL schema version 6 while leaving runtime archive authority on SQLite.
+In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-processing-execution`. PR #249 merged and the maintainer live-verified PostgreSQL schema version 6 on the existing Podman volume. PR #250 is the active slice. It implements the existing durable processing run/execution contracts in PostgreSQL, including SKIP LOCKED claiming, lease-token enforcement, checkpointing, retry and expired-lease reclaim, while runtime archive authority remains on SQLite.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge the archive-coverage slice after CI is green, then rerun `verify-postgres.ps1` to accept schema version 6. After that, migrate durable processing execution before designing any archive runtime cutover. Do not introduce dual writes or mixed-authority runtime behavior.
+For the M24 thread, review/merge the PostgreSQL durable-processing slice after CI is green, then rerun `verify-postgres.ps1` to live-verify the processing repository against schema version 6. After that, reassess the remaining WI-0099 archive-specific persistence surfaces and prepare a controlled runtime-composition cutover only when one provider can own the complete archive/background path. Do not introduce dual writes or mixed-authority runtime behavior.
 
 ## Relevant files
 
