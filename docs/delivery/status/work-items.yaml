@@ -1184,7 +1184,7 @@ work_items:
   document: ../work-items/WI-0099-postgresql-archive-background-persistence.md
   started_at: 2026-09-02
   last_updated_at: 2026-09-02
-  branch: agent/WI-0099-postgres-source-observations
+  branch: agent/WI-0099-source-observation-live-fix
   blockers:
   - WI-0098
   blocker_notes:
@@ -1192,6 +1192,7 @@ work_items:
   - Includes the 2026-09-01 hosted-service shutdown class where a SQLite table lock escaped ArchiveAdvancementHostedService recovery handling.
   - 'PR #245 merged and workflow #1437 passed. Maintainer live verification then passed on the existing Podman 5.8.x volume: authenticated container SQL, Windows localhost protocol, and the isolated PostgreSQL persistence test all succeeded with schema version 3.'
   - 'PR #246 merged at 740dfd9684dc83ac77728beec206dc5950fac49a and workflow #1441 passed. Maintainer live verification then passed again on the existing volume, accepting PostgreSQL schema version 4 and archive-availability persistence.'
+  - 'PR #247 merged and workflow #1444 passed, but maintainer live verification exposed an invalid test chronology: the isolated fixture seeded asset creation with the current clock and then used an earlier fixed source-observation timestamp, correctly violating the foundational last_seen_at_utc >= created_at_utc constraint. The corrective slice fixes only the fixture chronology; schema v5 is not yet maintainer-accepted.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/245
@@ -1207,6 +1208,12 @@ work_items:
     value: 740dfd9684dc83ac77728beec206dc5950fac49a
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/247
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33678935259
+  - type: merge_commit
+    value: 29c679e25c1e3bf460220d4fc5cb98b67f4c3fac
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/248
 - id: WI-0100
   title: Migrate review and identity persistence to PostgreSQL
   milestone: M24

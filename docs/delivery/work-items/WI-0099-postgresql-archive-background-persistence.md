@@ -92,3 +92,12 @@ Started 2026-09-02.
 - Runtime archive scanning, verification scheduling and status remain SQLite-authoritative. No dual writes or mixed-authority reads are introduced.
 
 After this slice, archive coverage and durable processing execution remain the major prerequisites before any archive runtime cutover.
+
+
+### Schema version 5 live-verification correction
+
+After PR #247 merged and workflow #1444 passed, the maintainer reran `verify-postgres.ps1`. PostgreSQL connectivity remained healthy, but the isolated live persistence test failed with PostgreSQL check-constraint error 23514 on `assets`.
+
+The failure was test-fixture chronology rather than a runtime persistence defect: the fixture seeded `assets.created_at_utc` with the current clock, then replayed a fixed earlier source-observation timestamp. The existing foundational constraint correctly rejects `last_seen_at_utc < created_at_utc`.
+
+The corrective slice keeps the production constraint unchanged and makes the live fixture use one fixed chronological baseline for source/asset/revision creation, availability checks and source observations. Schema version 5 remains pending maintainer acceptance until `verify-postgres.ps1` passes after the corrective PR.
