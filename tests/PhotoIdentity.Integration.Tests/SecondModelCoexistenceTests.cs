@@ -166,7 +166,8 @@ public sealed class SecondModelCoexistenceTests
         AssetRevisionId revisionId)
     {
         using LocalInspectionJobHandler handler = new(
-            database,
+            new SqliteLocalBatchRepository(database),
+            new SqliteFaceCatalogueRepository(database),
             configuration,
             new OpenCvImageDecoder(),
             encoder,
