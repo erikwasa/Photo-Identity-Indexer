@@ -493,4 +493,4 @@ if ($null -ne $directProtocolAddress) {
     }
 }
 
-throw "PostgreSQL verification failed through Windows localhost and no working direct Podman-machine PostgreSQL path was found."
+throw "Windows localhost PostgreSQL protocol verification passed, but the live PostgreSQL migration test failed. Review the dotnet test failure above; this is not classified as a Podman/WSL networking failure."
