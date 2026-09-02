@@ -257,7 +257,7 @@ The PostgreSQL storage-accounting adapter is accepted against schema version 9. 
 
 ### Slice 10 — PostgreSQL GeoNames operational state
 
-Started 2026-09-03.
+Started 2026-09-03. Active review: PR #256.
 
 - Added provider-neutral `IPhotoPlaceEnrichmentStateRepository` plus Core-owned candidate/cache DTOs for reverse-geocoding operational state.
 - `SqlitePhotoPlaceEnrichmentRepository` implements the neutral contract through compatibility adapters while retaining its existing SQLite API.
