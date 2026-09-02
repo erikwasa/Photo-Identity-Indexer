@@ -1041,6 +1041,24 @@ public sealed class PostgresCatalogueDatabaseTests
                 requestedProxy.ContentHash,
                 loadedProxy.ContentHash);
 
+            IArchiveStorageAccountingRepository storageAccounting =
+                new PostgresArchiveStorageAccountingRepository(database);
+            Assert.Equal(
+                2L,
+                await storageAccounting.GetCurrentLogicalSourceBytesAsync(
+                    SourceId.From(sourceId)));
+            Assert.Equal(
+                requestedProxy.EncodedByteLength,
+                await storageAccounting.GetReviewProxyBytesAsync(
+                    reviewProxyProfile.Id));
+            Assert.Equal(
+                0L,
+                await storageAccounting.GetReviewProxyBytesAsync(null));
+            Assert.Equal(
+                0L,
+                await storageAccounting.GetReviewProxyBytesAsync(
+                    "missing-proxy-profile"));
+
             IReadOnlyDictionary<AssetRevisionId, ArchiveReviewProxyMetadata>
                 loadedMany = await reviewProxies.GetManyAsync(
                     new[] { revision },
