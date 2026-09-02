@@ -148,3 +148,13 @@ Current upstream evidence now matches this failure closely:
 The verifier now prints Podman client/server versions and, when a 6.0.x runtime reaches this exact protocol-failure state, classifies it as the known upstream regression instead of recommending more Photo Identity or PostgreSQL changes.
 
 The known-good Windows/WSL fallback baseline for WI-0097 is Podman 5.8.5. Podman Desktop 1.28.3 shipped that version. Reverting the local container runtime is an environment workaround only; SQLite remains authoritative and no catalogue data is migrated.
+
+
+### Maintainer environment confirmation
+
+On 2026-09-02 the maintainer confirmed both sides of the active Podman machine are exactly **6.0.2**:
+
+- Windows client: Podman 6.0.2, commit `b28edb9ad70ce4317dc762ee9ce0a6d081d154e9`.
+- Linux server: Podman 6.0.2, the same commit.
+
+This is the same Podman release and commit family reported in upstream issue #29377. WI-0097 therefore treats the current localhost transport failure as an environment/runtime blocker, not a Photo Identity catalogue defect. The next verification should use the Podman 5.8.5 Windows/WSL baseline.
