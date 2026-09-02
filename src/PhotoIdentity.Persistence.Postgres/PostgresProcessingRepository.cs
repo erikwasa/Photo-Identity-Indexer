@@ -320,7 +320,7 @@ public sealed class PostgresProcessingRepository :
             savedAt,
             """
             UPDATE processing_jobs
-            SET checkpoint_json = @checkpoint_json::jsonb,
+            SET checkpoint_json = @checkpoint_json,
                 leased_until_utc = @leased_until_utc
             WHERE id = @id
               AND status = 'running'
