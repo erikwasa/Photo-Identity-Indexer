@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Tracks exact analysis profiles and successful immutable-revision completion.
 /// A successful row is deliberately independent of face count so zero-face images are complete.
 /// </summary>
-public sealed class SqliteArchiveAnalysisRepository
+public sealed class SqliteArchiveAnalysisRepository : IArchiveAnalysisStateRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 

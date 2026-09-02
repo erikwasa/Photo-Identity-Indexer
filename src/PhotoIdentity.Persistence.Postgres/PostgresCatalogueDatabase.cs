@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 2;
+    public const int CurrentSchemaVersion = 3;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -241,6 +241,62 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                     available_at_utc,
                     leased_until_utc);
             """),
+        new(
+            3,
+            "archive-analysis-state",
+            """
+            CREATE TABLE archive_analysis_profiles (
+                profile_hash text NOT NULL PRIMARY KEY
+                    CHECK (profile_hash ~ '^[0-9a-f]{64}$'),
+                detector_pipeline_hash text NOT NULL
+                    CHECK (detector_pipeline_hash ~ '^[0-9a-f]{64}$'),
+                detector_model_id text NOT NULL
+                    CHECK (btrim(detector_model_id) <> ''),
+                detector_model_hash text NOT NULL
+                    CHECK (detector_model_hash ~ '^[0-9a-f]{64}$'),
+                embedder_model_id text NOT NULL
+                    CHECK (btrim(embedder_model_id) <> ''),
+                embedder_model_hash text NOT NULL
+                    CHECK (embedder_model_hash ~ '^[0-9a-f]{64}$'),
+                alignment_protocol text NOT NULL
+                    CHECK (btrim(alignment_protocol) <> ''),
+                canonical_definition text NOT NULL
+                    CHECK (btrim(canonical_definition) <> ''),
+                recorded_at_utc timestamp with time zone NOT NULL
+            );
+
+            CREATE TABLE archive_analysis_runs (
+                processing_run_id uuid NOT NULL PRIMARY KEY,
+                profile_hash text NOT NULL,
+                registered_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT fk_archive_analysis_runs_processing_run
+                    FOREIGN KEY (processing_run_id)
+                    REFERENCES processing_runs (id) ON DELETE CASCADE,
+                CONSTRAINT fk_archive_analysis_runs_profile
+                    FOREIGN KEY (profile_hash)
+                    REFERENCES archive_analysis_profiles (profile_hash) ON DELETE RESTRICT
+            );
+
+            CREATE TABLE asset_revision_analysis (
+                asset_revision_id uuid NOT NULL,
+                profile_hash text NOT NULL,
+                processing_run_id uuid NOT NULL,
+                completed_at_utc timestamp with time zone NOT NULL,
+                PRIMARY KEY (asset_revision_id, profile_hash),
+                CONSTRAINT fk_asset_revision_analysis_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                CONSTRAINT fk_asset_revision_analysis_profile
+                    FOREIGN KEY (profile_hash)
+                    REFERENCES archive_analysis_profiles (profile_hash) ON DELETE RESTRICT,
+                CONSTRAINT fk_asset_revision_analysis_processing_run
+                    FOREIGN KEY (processing_run_id)
+                    REFERENCES processing_runs (id) ON DELETE RESTRICT
+            );
+
+            CREATE INDEX ix_asset_revision_analysis_profile
+                ON asset_revision_analysis (profile_hash, asset_revision_id);
+            """),
     ];
 
     private readonly NpgsqlDataSource _dataSource;
@@ -253,6 +309,10 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
         builder.ConnectionStringBuilder.ApplicationName = "PhotoIdentity";
         _dataSource = builder.Build();
     }
+
+    public async Task<NpgsqlConnection> OpenConnectionAsync(
+        CancellationToken cancellationToken = default) =>
+        await _dataSource.OpenConnectionAsync(cancellationToken);
 
     public async Task<PostgresInitializationResult> TryInitializeAsync(
         CancellationToken cancellationToken = default)

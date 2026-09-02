@@ -22,11 +22,11 @@ Stop application/domain code from depending directly on SQLite implementation ty
 - Add contract/integration tests that run the same behavioral expectations against both adapters where practical.
 
 ## Acceptance criteria
-- [ ] Foundational application paths depend on persistence contracts rather than `Sqlite*` concrete types.
-- [ ] PostgreSQL schema represents existing foundational entities without lossy type conversions.
-- [ ] Processing lease/idempotency/restart semantics remain intact.
-- [ ] Existing SQLite behavior stays green during the transition.
-- [ ] New authoritative persistence work follows the PostgreSQL-capable boundary.
+- [x] Foundational application paths depend on persistence contracts rather than `Sqlite*` concrete types.
+- [x] PostgreSQL schema represents existing foundational entities without lossy type conversions.
+- [x] Processing lease/idempotency/restart semantics remain intact.
+- [x] Existing SQLite behavior stays green during the transition.
+- [x] New authoritative persistence work follows the PostgreSQL-capable boundary.
 
 
 ## Implementation progress
@@ -152,3 +152,8 @@ The remaining direct SQLite dependencies are intentionally assigned to subsequen
 - detector rollout, library/metadata and remaining authoritative catalogue persistence: WI-0101.
 
 The PostgreSQL foundational schema was already maintainer-verified live after PR #239, and existing SQLite lease/idempotency/restart behavior remains covered by integration tests. Once this final boundary slice is green and merged, WI-0098 is ready for closeout rather than another implementation slice.
+
+
+### Completion
+
+Completed 2026-09-02 after PR #244 merged and workflow #1434 passed. The foundational PostgreSQL schema had already been maintainer-verified live after PR #239. Subsequent authoritative migration work proceeds in WI-0099 through WI-0102.
