@@ -168,8 +168,9 @@ function Invoke-LivePostgresTest {
             $ConnectionString,
             "Process")
 
-        & dotnet test (Join-Path $PSScriptRoot "tests\PhotoIdentity.Persistence.Tests\PhotoIdentity.Persistence.Tests.csproj") --configuration Release --filter "FullyQualifiedName~PostgresCatalogueDatabaseTests.InitializeAsync_IsVersionedAndIdempotent_WhenLivePostgresIsConfigured"
-        return $LASTEXITCODE
+        & dotnet test (Join-Path $PSScriptRoot "tests\PhotoIdentity.Persistence.Tests\PhotoIdentity.Persistence.Tests.csproj") --configuration Release --filter "FullyQualifiedName~PostgresCatalogueDatabaseTests.InitializeAsync_IsVersionedAndIdempotent_WhenLivePostgresIsConfigured" | Out-Host
+        $testExitCode = $LASTEXITCODE
+        return [int]$testExitCode
     }
     finally {
         [Environment]::SetEnvironmentVariable(
