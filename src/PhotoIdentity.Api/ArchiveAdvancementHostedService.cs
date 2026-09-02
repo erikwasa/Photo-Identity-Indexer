@@ -186,6 +186,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                         _timeProvider.GetUtcNow(),
                         cancellationToken),
                     stoppingToken);
+                await Task.Delay(IdleDelay, stoppingToken);
             }
         }
     }
