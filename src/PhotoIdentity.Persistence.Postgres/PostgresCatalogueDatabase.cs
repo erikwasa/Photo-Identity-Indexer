@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 8;
+    public const int CurrentSchemaVersion = 9;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -447,6 +447,55 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                 ON asset_revision_review_proxies (
                     profile_id,
                     asset_revision_id);
+            """),        new(
+            9,
+            "archive-managed-hydration-ownership",
+            """
+            CREATE TABLE asset_revision_managed_hydrations (
+                asset_revision_id uuid NOT NULL PRIMARY KEY,
+                requested_at_utc timestamp with time zone NOT NULL,
+                release_requested_at_utc timestamp with time zone NULL,
+                released_at_utc timestamp with time zone NULL,
+                CONSTRAINT fk_asset_revision_managed_hydrations_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX ix_asset_revision_managed_hydrations_active
+                ON asset_revision_managed_hydrations (
+                    released_at_utc,
+                    asset_revision_id);
+
+            CREATE TABLE asset_revision_managed_hydration_usage (
+                asset_revision_id uuid NOT NULL PRIMARY KEY,
+                last_needed_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT fk_asset_revision_managed_hydration_usage_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE archive_source_managed_hydrations (
+                asset_id uuid NOT NULL PRIMARY KEY,
+                requested_at_utc timestamp with time zone NOT NULL,
+                release_requested_at_utc timestamp with time zone NULL,
+                released_at_utc timestamp with time zone NULL,
+                CONSTRAINT fk_archive_source_managed_hydrations_asset
+                    FOREIGN KEY (asset_id)
+                    REFERENCES assets (id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX ix_archive_source_managed_hydrations_active
+                ON archive_source_managed_hydrations (
+                    released_at_utc,
+                    asset_id);
+
+            CREATE TABLE archive_source_managed_hydration_usage (
+                asset_id uuid NOT NULL PRIMARY KEY,
+                last_needed_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT fk_archive_source_managed_hydration_usage_asset
+                    FOREIGN KEY (asset_id)
+                    REFERENCES assets (id) ON DELETE CASCADE
+            );
             """),
     ];
 
