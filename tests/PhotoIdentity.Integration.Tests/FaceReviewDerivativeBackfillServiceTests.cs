@@ -88,10 +88,11 @@ public sealed class FaceReviewDerivativeBackfillServiceTests
             FakeFilesOnDemandPlatform platform = new();
             SqliteArchiveHydrationRepository hydrations = new(database);
             ArchiveHydrationCapacityService capacity = new(
-                database,
                 hydrations,
                 new SqliteArchiveSourceHydrationRepository(database),
+                new SqliteArchiveCoverageRepository(database),
                 new SqliteArchiveStorageRepository(database),
+                new SqliteArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(),
                 new ArchiveHydrationPolicyConfiguration(null, null, null),
