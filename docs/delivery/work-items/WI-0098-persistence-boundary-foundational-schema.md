@@ -113,3 +113,19 @@ Started 2026-09-02.
 - SQLite remains authoritative. This slice introduces no PostgreSQL processing reads/writes or dual writes.
 
 The remaining local-batch catalogue scan/source-registration dependency is still SQLite-specific and is a candidate for the next WI-0098 foundational boundary. Archive/background processing migration remains WI-0099 scope.
+
+
+### Slice 5 — local-batch catalogue boundary
+
+Started 2026-09-02.
+
+- Added provider-neutral `ICatalogueStoreInitializer` plus `ILocalBatchCatalogueRepository` in Core.
+- Added Core-owned local-batch source and scan-summary DTOs instead of moving the general SQLite-owned `CatalogueSource`, `CatalogueAsset` and `CatalogueAssetRevision` records across the persistence boundary.
+- Added `SqliteLocalBatchCatalogueRepository` as a compatibility facade over the existing SQLite local-source registration and source-scanner implementations.
+- `SqliteCatalogueDatabase` implements the neutral initialization contract.
+- `LocalBatchCoordinator` now depends only on Core persistence contracts for store readiness, source registration/cataloguing, current-revision selection, processing-run lifecycle and resumable execution. It no longer references `PhotoIdentity.Persistence.Sqlite`.
+- The batch CLI remains the composition root and constructs the SQLite adapters explicitly.
+- Focused integration coverage verifies stable source registration, scan persistence and current-revision replacement through the neutral local-batch contract.
+- Existing scanner/local-batch APIs remain available for migration-era archive/test callers. SQLite remains authoritative; no PostgreSQL writes or dual writes are introduced.
+
+This closes the direct SQLite persistence dependency in the foundational local-batch coordinator without pulling archive/background migration from WI-0099 into WI-0098.

@@ -1,4 +1,5 @@
 using System.Globalization;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Sqlite;
@@ -274,15 +275,33 @@ internal static class BatchCommandRunner
         SqliteCatalogueDatabase database = new(options.DatabasePath);
         await database.InitializeAsync(cancellationToken);
         SqliteProcessingRepository repository = new(database);
+        ICatalogueStoreInitializer store = database;
+        ILocalBatchCatalogueRepository catalogue = new SqliteLocalBatchCatalogueRepository(database);
         IProcessingRunRepository runs = repository;
         IProcessingExecutionRepository execution = repository;
 
         switch (options.Action)
         {
             case BatchCommandAction.Start:
-                return await StartAsync(options, database, runs, execution, output, cancellationToken);
+                return await StartAsync(
+                    options,
+                    database,
+                    store,
+                    catalogue,
+                    runs,
+                    execution,
+                    output,
+                    cancellationToken);
             case BatchCommandAction.Resume:
-                return await ResumeAsync(options, database, runs, execution, output, cancellationToken);
+                return await ResumeAsync(
+                    options,
+                    database,
+                    store,
+                    catalogue,
+                    runs,
+                    execution,
+                    output,
+                    cancellationToken);
             case BatchCommandAction.Cancel:
                 await runs.RequestCancellationAsync(
                     options.RunId!.Value,
@@ -306,6 +325,8 @@ internal static class BatchCommandRunner
     private static async Task<int> StartAsync(
         BatchCommandOptions options,
         SqliteCatalogueDatabase database,
+        ICatalogueStoreInitializer store,
+        ILocalBatchCatalogueRepository catalogue,
         IProcessingRunRepository runs,
         IProcessingExecutionRepository execution,
         TextWriter output,
@@ -331,7 +352,8 @@ internal static class BatchCommandRunner
             configuration,
             cancellationToken);
         LocalBatchCoordinator coordinator = new(
-            database,
+            store,
+            catalogue,
             runs,
             execution);
         LocalBatchStartResult result = await coordinator.StartAsync(
@@ -359,13 +381,16 @@ internal static class BatchCommandRunner
     private static async Task<int> ResumeAsync(
         BatchCommandOptions options,
         SqliteCatalogueDatabase database,
+        ICatalogueStoreInitializer store,
+        ILocalBatchCatalogueRepository catalogue,
         IProcessingRunRepository runs,
         IProcessingExecutionRepository execution,
         TextWriter output,
         CancellationToken cancellationToken)
     {
         LocalBatchCoordinator coordinator = new(
-            database,
+            store,
+            catalogue,
             runs,
             execution);
         LocalBatchConfiguration configuration = await coordinator.GetConfigurationAsync(

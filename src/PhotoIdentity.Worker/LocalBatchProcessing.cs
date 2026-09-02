@@ -1,8 +1,8 @@
 using System.Text.Json;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 
 namespace PhotoIdentity.Worker;
@@ -173,7 +173,7 @@ public sealed record LocalBatchConfiguration
 
 public sealed record LocalBatchStartResult(
     ProcessingRunId RunId,
-    SourceCatalogueScanSummary ScanSummary,
+    LocalBatchCatalogueScanSummary ScanSummary,
     int UnsupportedFileCount,
     ProcessingRunSummary ProcessingSummary);
 
@@ -182,21 +182,25 @@ public sealed record LocalBatchStartResult(
 /// </summary>
 public sealed class LocalBatchCoordinator
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly ICatalogueStoreInitializer _store;
+    private readonly ILocalBatchCatalogueRepository _catalogue;
     private readonly IProcessingRunRepository _runs;
     private readonly IProcessingExecutionRepository _execution;
     private readonly TimeProvider _timeProvider;
 
     public LocalBatchCoordinator(
-        SqliteCatalogueDatabase database,
+        ICatalogueStoreInitializer store,
+        ILocalBatchCatalogueRepository catalogue,
         IProcessingRunRepository runs,
         IProcessingExecutionRepository execution,
         TimeProvider? timeProvider = null)
     {
-        ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(catalogue);
         ArgumentNullException.ThrowIfNull(runs);
         ArgumentNullException.ThrowIfNull(execution);
-        _database = database;
+        _store = store;
+        _catalogue = catalogue;
         _runs = runs;
         _execution = execution;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -211,26 +215,24 @@ public sealed class LocalBatchCoordinator
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(handler);
 
-        await _database.InitializeAsync(cancellationToken);
+        await _store.InitializeAsync(cancellationToken);
         DateTimeOffset now = _timeProvider.GetUtcNow();
-        SqliteLocalBatchRepository batchRepository = new(_database);
-        CatalogueSource sourceRecord = await batchRepository.GetOrCreateLocalFolderSourceAsync(
+        LocalBatchCatalogueSource sourceRecord = await _catalogue.GetOrCreateLocalFolderSourceAsync(
             configuration.SourceRoot,
             now,
             cancellationToken);
-        LocalFolderAssetSource source = new(sourceRecord.Id, configuration.SourceRoot);
+        LocalFolderAssetSource source = new(sourceRecord.SourceId, configuration.SourceRoot);
         SourceScanOptions scanOptions = new(Recursive: configuration.Recursive);
         LocalFolderScanReport sourceReport = await source.ScanAsync(scanOptions, cancellationToken);
-        SqliteSourceCatalogueScanner scanner = new(_database);
-        SourceCatalogueScanSummary scanSummary = await scanner.ScanAsync(
+        LocalBatchCatalogueScanSummary scanSummary = await _catalogue.ScanAsync(
             source,
             sourceRecord,
             scanOptions,
             now,
             cancellationToken);
 
-        IReadOnlyList<AssetRevisionId> revisionIds = await batchRepository.GetCurrentRevisionIdsAsync(
-            sourceRecord.Id,
+        IReadOnlyList<AssetRevisionId> revisionIds = await _catalogue.GetCurrentRevisionIdsAsync(
+            sourceRecord.SourceId,
             cancellationToken);
         ProcessingRunId runId = ProcessingRunId.New();
         CatalogueProcessingRun run = new(
@@ -270,7 +272,7 @@ public sealed class LocalBatchCoordinator
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        await _database.InitializeAsync(cancellationToken);
+        await _store.InitializeAsync(cancellationToken);
         _ = await _runs.GetRunAsync(runId, cancellationToken)
             ?? throw new KeyNotFoundException($"Processing run {runId} was not found.");
         ResumableBatchProcessor processor = new(_execution, handler, _timeProvider);
@@ -284,7 +286,7 @@ public sealed class LocalBatchCoordinator
         ProcessingRunId runId,
         CancellationToken cancellationToken = default)
     {
-        await _database.InitializeAsync(cancellationToken);
+        await _store.InitializeAsync(cancellationToken);
         CatalogueProcessingRun run = await _runs.GetRunAsync(runId, cancellationToken)
             ?? throw new KeyNotFoundException($"Processing run {runId} was not found.");
         return LocalBatchConfiguration.FromJson(run.ConfigurationJson);

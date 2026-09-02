@@ -51,8 +51,10 @@ public sealed class LocalBatchInspectionTests
             LocalBatchConfiguration configuration = new(sourceRoot, outputRoot, directory);
             RecordingHandler handler = new();
             SqliteProcessingRepository processingRepository = new(database);
+            SqliteLocalBatchCatalogueRepository catalogueRepository = new(database);
             LocalBatchCoordinator coordinator = new(
                 database,
+                catalogueRepository,
                 processingRepository,
                 processingRepository);
 

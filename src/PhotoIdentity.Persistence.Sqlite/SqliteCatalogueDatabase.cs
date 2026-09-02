@@ -1,11 +1,12 @@
 using Microsoft.Data.Sqlite;
+using PhotoIdentity.Core.Catalogue;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
 /// Creates and opens the local catalogue database owned by the SQLite adapter.
 /// </summary>
-public sealed class SqliteCatalogueDatabase
+public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
 {
     public const int CurrentSchemaVersion = 16;
 
