@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 6;
+    public const int CurrentSchemaVersion = 7;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -380,6 +380,24 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                 included_at_utc timestamp with time zone NOT NULL,
                 PRIMARY KEY (source_id, relative_path),
                 CONSTRAINT fk_archive_included_folders_source
+                    FOREIGN KEY (source_id)
+                    REFERENCES sources (id) ON DELETE CASCADE
+            );
+            """),
+        new(
+            7,
+            "archive-advancement-control",
+            """
+            CREATE TABLE archive_advancement_control (
+                source_id uuid NOT NULL PRIMARY KEY,
+                desired_state text NOT NULL
+                    CHECK (desired_state IN ('running', 'paused')),
+                runtime_state text NOT NULL
+                    CHECK (btrim(runtime_state) <> ''),
+                sync_required boolean NOT NULL,
+                message text NULL,
+                updated_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT fk_archive_advancement_control_source
                     FOREIGN KEY (source_id)
                     REFERENCES sources (id) ON DELETE CASCADE
             );
