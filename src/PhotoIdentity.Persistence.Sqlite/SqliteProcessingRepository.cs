@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// <summary>
 /// Stores durable processing runs, leases work and guards worker transitions with lease tokens.
 /// </summary>
-public sealed class SqliteProcessingRepository
+public sealed class SqliteProcessingRepository : IProcessingExecutionRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -764,15 +764,4 @@ public sealed class SqliteProcessingRepository
                last_failure_kind
         FROM processing_jobs
         """;
-}
-
-public sealed class ProcessingLeaseLostException : InvalidOperationException
-{
-    public ProcessingLeaseLostException(ProcessingJobId jobId)
-        : base($"The lease for processing job {jobId} is no longer valid.")
-    {
-        JobId = jobId;
-    }
-
-    public ProcessingJobId JobId { get; }
 }
