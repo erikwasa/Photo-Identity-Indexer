@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 7;
+    public const int CurrentSchemaVersion = 8;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -401,6 +401,228 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                     FOREIGN KEY (source_id)
                     REFERENCES sources (id) ON DELETE CASCADE
             );
+            """),
+        new(
+            8,
+            "archive-review-proxies-and-post-analysis",
+            """
+            CREATE TABLE archive_review_proxy_profiles (
+                profile_id text NOT NULL PRIMARY KEY,
+                protocol_version text NOT NULL,
+                encoder text NOT NULL,
+                format text NOT NULL,
+                jpeg_quality integer NOT NULL
+                    CHECK (jpeg_quality BETWEEN 1 AND 100),
+                maximum_long_edge integer NOT NULL
+                    CHECK (maximum_long_edge > 0),
+                resize_policy text NOT NULL,
+                canonical_definition text NOT NULL,
+                recorded_at_utc timestamp with time zone NOT NULL
+            );
+
+            CREATE TABLE asset_revision_review_proxies (
+                asset_revision_id uuid NOT NULL,
+                profile_id text NOT NULL,
+                encoded_byte_length bigint NOT NULL
+                    CHECK (encoded_byte_length > 0),
+                content_sha256 text NOT NULL
+                    CHECK (content_sha256 ~ '^[0-9a-f]{64}
+
+    private readonly NpgsqlDataSource _dataSource;
+
+    public PostgresCatalogueDatabase(string connectionString)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+
+        NpgsqlDataSourceBuilder builder = new(connectionString);
+        builder.ConnectionStringBuilder.ApplicationName = "PhotoIdentity";
+        _dataSource = builder.Build();
+    }
+
+    public async Task<NpgsqlConnection> OpenConnectionAsync(
+        CancellationToken cancellationToken = default) =>
+        await _dataSource.OpenConnectionAsync(cancellationToken);
+
+    public async Task<PostgresInitializationResult> TryInitializeAsync(
+        CancellationToken cancellationToken = default)
+    {
+        NpgsqlConnection connection;
+        try
+        {
+            connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        }
+        catch (PostgresException exception) when (IsAuthenticationFailure(exception))
+        {
+            return new(
+                PostgresCatalogueHealth.AuthenticationFailed,
+                exception);
+        }
+        catch (Exception exception) when (IsConnectionUnavailable(exception))
+        {
+            return new(
+                PostgresCatalogueHealth.Unavailable,
+                exception);
+        }
+
+        await using (connection)
+        {
+            try
+            {
+                int schemaVersion = await InitializeAsync(connection, cancellationToken);
+                return new(
+                    PostgresCatalogueHealth.Ready(schemaVersion),
+                    null);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return new(
+                    PostgresCatalogueHealth.MigrationFailed,
+                    exception);
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _dataSource.DisposeAsync();
+    }
+
+    private static async Task<int> InitializeAsync(
+        NpgsqlConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using NpgsqlTransaction transaction =
+            await connection.BeginTransactionAsync(cancellationToken);
+
+        await using (NpgsqlCommand migrationLock = connection.CreateCommand())
+        {
+            migrationLock.Transaction = transaction;
+            migrationLock.CommandText =
+                "SELECT pg_advisory_xact_lock(@migration_lock_key);";
+            migrationLock.Parameters.AddWithValue(
+                "migration_lock_key",
+                MigrationAdvisoryLockKey);
+            await migrationLock.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (NpgsqlCommand ensureHistory = connection.CreateCommand())
+        {
+            ensureHistory.Transaction = transaction;
+            ensureHistory.CommandText =
+                """
+                CREATE TABLE IF NOT EXISTS photo_identity_schema_migrations (
+                    version integer NOT NULL PRIMARY KEY,
+                    name text NOT NULL,
+                    applied_at_utc timestamp with time zone NOT NULL
+                );
+                """;
+            await ensureHistory.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        HashSet<int> appliedVersions = [];
+        await using (NpgsqlCommand readHistory = connection.CreateCommand())
+        {
+            readHistory.Transaction = transaction;
+            readHistory.CommandText =
+                """
+                SELECT version
+                FROM photo_identity_schema_migrations
+                ORDER BY version;
+                """;
+
+            await using NpgsqlDataReader reader =
+                await readHistory.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                int version = reader.GetInt32(0);
+                if (version > CurrentSchemaVersion)
+                {
+                    throw new InvalidOperationException(
+                        $"PostgreSQL catalogue schema version {version} is newer than supported version {CurrentSchemaVersion}.");
+                }
+
+                appliedVersions.Add(version);
+            }
+        }
+
+        foreach (Migration migration in Migrations)
+        {
+            if (appliedVersions.Contains(migration.Version))
+            {
+                continue;
+            }
+
+            await using (NpgsqlCommand applyMigration = connection.CreateCommand())
+            {
+                applyMigration.Transaction = transaction;
+                applyMigration.CommandText = migration.Sql;
+                await applyMigration.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await using (NpgsqlCommand recordMigration = connection.CreateCommand())
+            {
+                recordMigration.Transaction = transaction;
+                recordMigration.CommandText =
+                    """
+                    INSERT INTO photo_identity_schema_migrations (
+                        version,
+                        name,
+                        applied_at_utc)
+                    VALUES (
+                        @version,
+                        @name,
+                        @applied_at_utc);
+                    """;
+                recordMigration.Parameters.AddWithValue(
+                    "version",
+                    migration.Version);
+                recordMigration.Parameters.AddWithValue(
+                    "name",
+                    migration.Name);
+                recordMigration.Parameters.AddWithValue(
+                    "applied_at_utc",
+                    DateTimeOffset.UtcNow);
+                await recordMigration.ExecuteNonQueryAsync(cancellationToken);
+            }
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return CurrentSchemaVersion;
+    }
+
+    private static bool IsAuthenticationFailure(PostgresException exception) =>
+        exception.SqlState.StartsWith("28", StringComparison.Ordinal);
+
+    private static bool IsConnectionUnavailable(Exception exception) =>
+        exception is NpgsqlException or TimeoutException;
+
+    private sealed record Migration(int Version, string Name, string Sql);
+}
+),
+                width integer NOT NULL CHECK (width > 0),
+                height integer NOT NULL CHECK (height > 0),
+                generated_at_utc timestamp with time zone NOT NULL,
+                relative_path text NOT NULL
+                    CHECK (btrim(relative_path) <> ''),
+                PRIMARY KEY (asset_revision_id, profile_id),
+                UNIQUE (relative_path),
+                CONSTRAINT fk_asset_revision_review_proxies_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                CONSTRAINT fk_asset_revision_review_proxies_profile
+                    FOREIGN KEY (profile_id)
+                    REFERENCES archive_review_proxy_profiles (profile_id)
+                    ON DELETE RESTRICT
+            );
+
+            CREATE INDEX ix_asset_revision_review_proxies_profile
+                ON asset_revision_review_proxies (
+                    profile_id,
+                    asset_revision_id);
             """),
     ];
 
