@@ -234,6 +234,26 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(2L, Convert.ToInt64(archiveProxyTableCount));
             }
 
+            await using (NpgsqlCommand readHydrationOwnershipTables =
+                         verificationConnection.CreateCommand())
+            {
+                readHydrationOwnershipTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'asset_revision_managed_hydrations',
+                          'asset_revision_managed_hydration_usage',
+                          'archive_source_managed_hydrations',
+                          'archive_source_managed_hydration_usage');
+                    """;
+
+                object? hydrationOwnershipTableCount =
+                    await readHydrationOwnershipTables.ExecuteScalarAsync();
+                Assert.Equal(4L, Convert.ToInt64(hydrationOwnershipTableCount));
+            }
+
             await using (NpgsqlCommand readColumnTypes =
                          verificationConnection.CreateCommand())
             {
@@ -541,6 +561,124 @@ public sealed class PostgresCatalogueDatabaseTests
             Assert.Equal(
                 ArchiveSourceObservationVerificationState.NeedsSourceVerification,
                 diverged.VerificationState);
+
+            IArchiveHydrationRepository revisionHydrations =
+                new PostgresArchiveHydrationRepository(database);
+            IArchiveSourceHydrationRepository sourceHydrations =
+                new PostgresArchiveSourceHydrationRepository(database);
+            IArchiveHydrationIdentityTransferRepository hydrationTransfers =
+                new PostgresArchiveHydrationIdentityTransferRepository(database);
+
+            AssetId hydrationAssetId = AssetId.From(assetId);
+            AssetRevisionId hydrationRevisionId =
+                AssetRevisionId.From(revisionId);
+            DateTimeOffset hydrationAt = seededAt.AddMinutes(50);
+
+            ArchiveManagedHydrationState claimedRevisionHydration =
+                await revisionHydrations.ClaimAsync(
+                    hydrationRevisionId,
+                    hydrationAt);
+            Assert.True(claimedRevisionHydration.IsActive);
+            Assert.False(claimedRevisionHydration.IsReleaseRequested);
+
+            await revisionHydrations.TouchAsync(
+                hydrationRevisionId,
+                hydrationAt.AddMinutes(1));
+            ArchiveManagedHydrationLeaseState revisionLease =
+                Assert.Single(
+                    await revisionHydrations.GetActiveLeasesAsync());
+            Assert.Equal(hydrationRevisionId, revisionLease.AssetRevisionId);
+            Assert.Equal(
+                hydrationAt.AddMinutes(1),
+                revisionLease.LastNeededAtUtc);
+
+            Assert.True(
+                await hydrationTransfers.MoveRevisionLeaseToSourceAsync(
+                    hydrationRevisionId,
+                    hydrationAssetId,
+                    hydrationAt.AddMinutes(2)));
+            ArchiveManagedHydrationState movedRevision =
+                Assert.IsType<ArchiveManagedHydrationState>(
+                    await revisionHydrations.GetAsync(
+                        hydrationRevisionId));
+            Assert.False(movedRevision.IsActive);
+
+            ArchiveManagedSourceHydrationState sourceOwnership =
+                Assert.IsType<ArchiveManagedSourceHydrationState>(
+                    await sourceHydrations.GetAsync(
+                        hydrationAssetId));
+            Assert.True(sourceOwnership.IsActive);
+            Assert.False(sourceOwnership.IsReleaseRequested);
+
+            ArchiveManagedSourceHydrationLeaseState sourceLease =
+                Assert.Single(
+                    await sourceHydrations.GetActiveLeasesAsync());
+            Assert.Equal(hydrationAssetId, sourceLease.AssetId);
+            Assert.Equal(2L, sourceLease.SizeBytes);
+            Assert.Equal(
+                hydrationAt.AddMinutes(1),
+                sourceLease.LastNeededAtUtc);
+
+            Assert.True(
+                await sourceHydrations.TransferToRevisionAsync(
+                    hydrationAssetId,
+                    hydrationRevisionId,
+                    hydrationAt.AddMinutes(3)));
+            ArchiveManagedSourceHydrationState transferredSource =
+                Assert.IsType<ArchiveManagedSourceHydrationState>(
+                    await sourceHydrations.GetAsync(
+                        hydrationAssetId));
+            Assert.False(transferredSource.IsActive);
+
+            ArchiveManagedHydrationState transferredRevision =
+                Assert.IsType<ArchiveManagedHydrationState>(
+                    await revisionHydrations.GetAsync(
+                        hydrationRevisionId));
+            Assert.True(transferredRevision.IsActive);
+
+            ArchiveManagedHydrationState releaseRequested =
+                await revisionHydrations.MarkReleaseRequestedAsync(
+                    hydrationRevisionId,
+                    hydrationAt.AddMinutes(4));
+            Assert.True(releaseRequested.IsReleaseRequested);
+            Assert.False(
+                await hydrationTransfers.MoveActiveRevisionLeaseToSourceAsync(
+                    hydrationAssetId,
+                    hydrationAt.AddMinutes(5)));
+
+            await revisionHydrations.MarkReleasedAsync(
+                hydrationRevisionId,
+                hydrationAt.AddMinutes(6));
+            Assert.Empty(
+                await revisionHydrations.GetActiveLeasesAsync());
+
+            ArchiveManagedSourceHydrationState claimedSource =
+                await sourceHydrations.ClaimAsync(
+                    hydrationAssetId,
+                    hydrationAt.AddMinutes(7));
+            Assert.True(claimedSource.IsActive);
+            await sourceHydrations.MarkReleaseRequestedAsync(
+                hydrationAssetId,
+                hydrationAt.AddMinutes(8));
+            Assert.False(
+                await sourceHydrations.TransferToRevisionAsync(
+                    hydrationAssetId,
+                    hydrationRevisionId,
+                    hydrationAt.AddMinutes(9)));
+            await sourceHydrations.MarkReleasedAsync(
+                hydrationAssetId,
+                hydrationAt.AddMinutes(10));
+            Assert.Empty(
+                await sourceHydrations.GetActiveLeasesAsync());
+
+            ArchiveManagedHydrationState reclaimedRevision =
+                await revisionHydrations.ClaimAsync(
+                    hydrationRevisionId,
+                    hydrationAt.AddMinutes(11));
+            Assert.True(reclaimedRevision.IsActive);
+            Assert.Equal(
+                hydrationAt.AddMinutes(11),
+                reclaimedRevision.RequestedAtUtc);
 
             PostgresProcessingRepository processingRepository = new(database);
             IProcessingRunRepository processingRuns = processingRepository;
