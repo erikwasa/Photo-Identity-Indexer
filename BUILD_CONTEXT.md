@@ -12,7 +12,7 @@ WI-0097 was maintainer-verified on 2026-09-02. On the accepted Podman 5.8.x Wind
 
 The active WI-0098 branch is `agent/WI-0098-persistence-boundary-foundational-schema`.
 
-Slice 1 introduces `IAssetCatalogueRepository`, places the SQLite asset adapter behind it for application DI, and moves `PhotoMetadataInspectionService` off the SQLite concrete type. PostgreSQL schema version 2 adds sources, assets, immutable revisions, face occurrences/observations/crops, embeddings and durable processing run/job tables with PostgreSQL-native constraints/types. Live bootstrap tests verify those tables and immutable revision behavior.
+Slice 1 introduces `IPhotoCaptureMetadataRepository`, places the SQLite capture-metadata operations behind it for application DI, and moves `PhotoMetadataInspectionService` off the SQLite concrete type. PostgreSQL schema version 2 adds sources, assets, immutable revisions, face occurrences/observations/crops, embeddings and durable processing run/job tables with PostgreSQL-native constraints/types. Live bootstrap tests verify those tables and immutable revision behavior.
 
 SQLite remains authoritative. There are no PostgreSQL authoritative writes or cutover behavior in WI-0098 slice 1.
 
@@ -26,7 +26,7 @@ SQLite remains authoritative. There are no PostgreSQL authoritative writes or cu
 ## Relevant files
 
 - docs/delivery/work-items/WI-0098-persistence-boundary-foundational-schema.md
-- src/PhotoIdentity.Core/Sources/IAssetCatalogueRepository.cs
+- src/PhotoIdentity.Core/Sources/IPhotoCaptureMetadataRepository.cs
 - src/PhotoIdentity.Persistence.Sqlite/SqliteAssetCatalogueRepository.cs
 - src/PhotoIdentity.Persistence.Postgres/PostgresCatalogueDatabase.cs
 - tests/PhotoIdentity.Persistence.Tests/PostgresCatalogueDatabaseTests.cs
