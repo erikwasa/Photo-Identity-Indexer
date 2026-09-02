@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-source-observations`. PR #246 merged, workflow #1441 passed, and the maintainer live-verified PostgreSQL schema version 4 on the existing Podman volume. PR #247 is the active slice. It adds the neutral source-observation/verification boundary plus PostgreSQL schema version 5 while leaving runtime archive authority on SQLite.
+In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-source-observation-live-fix`. PR #247 merged and workflow #1444 passed, but maintainer live verification exposed an invalid isolated-test chronology that correctly violated the foundational asset last-seen constraint. The corrective slice fixes only that fixture chronology; runtime archive authority remains on SQLite.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge the source-observation/verification slice after CI is green, then live-verify schema version 5 with `verify-postgres.ps1`. After that, migrate archive coverage and durable processing execution before switching any archive runtime path to PostgreSQL. Do not introduce dual writes or mixed-authority runtime behavior.
+For the M24 thread, merge the source-observation live-verification correction after CI is green, then rerun `verify-postgres.ps1` to accept schema version 5. After that, migrate archive coverage and durable processing execution before switching any archive runtime path to PostgreSQL. Do not introduce dual writes or mixed-authority runtime behavior.
 
 ## Relevant files
 
