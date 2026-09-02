@@ -201,3 +201,26 @@ Started 2026-09-02.
 - Extended live PostgreSQL verification to prove: analyzed revision is post-analysis pending → proxy profile registers → completion persists → pending state clears; conflicting profile settings or derivative metadata are rejected.
 
 Remaining substantial WI-0099 persistence surfaces are hydration/release ownership, storage-policy accounting and automatic GeoNames enrichment operational state. Runtime cutover remains deferred until these background writer domains can move coherently.
+
+
+### Maintainer verification — PostgreSQL schema version 8
+
+After PR #253 merged on 2026-09-02, the maintainer reran `verify-postgres.ps1`.
+
+Verification passed end-to-end on the existing PostgreSQL volume, accepting schema version 8 plus review-proxy profile/completion persistence and the post-analysis missing-proxy retry boundary.
+
+### Slice 8 — PostgreSQL managed hydration/release ownership
+
+Started 2026-09-02.
+
+- Added provider-neutral revision/source hydration ownership contracts plus Core-owned state/lease DTOs.
+- Added a provider-neutral hydration identity-transfer contract covering revision → source transfer before re-verification and source → revision transfer after verified immutable identity is established.
+- The existing SQLite revision hydration, source hydration and identity-transfer repositories implement the neutral contracts through compatibility adapters; current public SQLite APIs remain intact.
+- Added PostgreSQL schema version 9 with revision/source managed-hydration ownership rows plus last-needed usage state used by bounded storage eviction.
+- Added `PostgresArchiveHydrationRepository`, `PostgresArchiveSourceHydrationRepository` and `PostgresArchiveHydrationIdentityTransferRepository`.
+- Preserved fail-closed semantics: only Photo-Identity-claimed content is releasable; release requests remain durable across restart; released ownership can be claimed again later; identity transfer is refused once release has been requested.
+- Preserved atomic ownership movement across content-identity changes. Revision → source transfer carries requested/last-needed timestamps, explicitly clears stale source release intent, then closes revision ownership in one transaction. Source → revision transfer closes source ownership only after revision ownership/usage is durable.
+- `CollectionOriginalAccessService`, `ArchiveSourceVerificationService`, `ArchiveHydrationCapacityService` and `ArchiveAdvancementHostedService` now consume neutral hydration contracts, while dependency injection still binds them to SQLite. No live OneDrive ownership is split across providers.
+- Extended live PostgreSQL verification for claim/touch, revision → source transfer, source → revision transfer, release-request transfer blocking, release completion and reclaim-after-release.
+
+After this slice, the largest remaining WI-0099 persistence surfaces are storage-policy accounting and automatic GeoNames enrichment operational state, plus a final verification-state/runtime-composition review before any provider cutover.
