@@ -6,31 +6,30 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**WI-0097 — Establish PostgreSQL runtime and migration foundation** remains in progress.
+**WI-0098 — Add database-neutral persistence boundary and foundational PostgreSQL schema** is in progress.
 
-The maintainer is now on the accepted Podman 5.8.x Windows/WSL baseline: client 5.8.5 and server 5.8.6. On that runtime, PostgreSQL authentication succeeds inside the container and the Windows localhost PostgreSQL protocol preflight passes, confirming the Podman 6.0.x forwarding regression is avoided.
+WI-0097 was maintainer-verified on 2026-09-02. On the accepted Podman 5.8.x Windows/WSL baseline, `verify-postgres.ps1` passed end-to-end and current main `/health` reported the real SQLite catalogue as authoritative at schema version 16 plus PostgreSQL `ready` at schema version 1.
 
-The remaining failure is in `verify-postgres.ps1` itself. `Invoke-LivePostgresTest` emitted normal `dotnet test` output into the PowerShell pipeline and then returned `$LASTEXITCODE`; assigning the function result captured all of that as an array, so the caller did not receive a scalar integer exit code. The active branch `agent/WI-0097-verifier-exit-code` sends test output to the host and returns only the numeric exit code.
+The active WI-0098 branch is `agent/WI-0098-persistence-boundary-foundational-schema`.
 
-SQLite remains authoritative and untouched. WI-0098 stays blocked until the live migration bootstrap and application health check pass.
+Slice 1 introduces `IPhotoCaptureMetadataRepository`, places the SQLite capture-metadata operations behind it for application DI, and moves `PhotoMetadataInspectionService` off the SQLite concrete type. PostgreSQL schema version 2 adds sources, assets, immutable revisions, face occurrences/observations/crops, embeddings and durable processing run/job tables with PostgreSQL-native constraints/types. Live bootstrap tests verify those tables and immutable revision behavior.
+
+SQLite remains authoritative. There are no PostgreSQL authoritative writes or cutover behavior in WI-0098 slice 1.
 
 ## Next concrete step
 
-1. Merge the verifier-exit-code corrective PR after CI is green.
-2. Run `./verify-postgres.ps1` again on the existing Podman 5.8.x runtime.
-3. If xUnit passes and the script reports `PostgreSQL runtime verification passed.`, configure Photo Identity with the documented local PostgreSQL connection string.
-4. Verify `/health` reports `catalogueProvider=sqlite`, PostgreSQL `status=ready`, and `schemaVersion=1`.
-5. Complete WI-0097 and begin WI-0098.
-
-Do not migrate or delete the real SQLite catalogue.
+1. Merge the first WI-0098 slice after CI is green.
+2. Run `./verify-postgres.ps1` once against the existing Podman 5.8.x runtime to apply/verify PostgreSQL schema version 2.
+3. Continue WI-0098 by moving the durable processing lease/checkpoint/retry boundary behind a neutral contract and then other foundational application services.
+4. Preserve the existing SQLite behavior until controlled cutover in WI-0102.
 
 ## Relevant files
 
-- docs/decisions/ADR-0009-postgresql-authoritative-catalogue.md
-- docs/delivery/work-items/WI-0097-postgresql-runtime-foundation.md
-- deploy/postgres/compose.yaml
-- verify-postgres.ps1
-- docs/operations/postgresql-local-runtime.md
+- docs/delivery/work-items/WI-0098-persistence-boundary-foundational-schema.md
+- src/PhotoIdentity.Core/Sources/IPhotoCaptureMetadataRepository.cs
+- src/PhotoIdentity.Persistence.Sqlite/SqliteAssetCatalogueRepository.cs
+- src/PhotoIdentity.Persistence.Postgres/PostgresCatalogueDatabase.cs
+- tests/PhotoIdentity.Persistence.Tests/PostgresCatalogueDatabaseTests.cs
 - docs/delivery/status/work-items.yaml
 
 ## Repository validation
@@ -41,6 +40,6 @@ Do not migrate or delete the real SQLite catalogue.
     dotnet run --project tools/PhotoIdentity.Docs -- generate --check
     ./verify-review.ps1 -Mode Smoke -Configuration Release
 
-Podman-backed WI-0097 verification:
+Live PostgreSQL migration verification:
 
     ./verify-postgres.ps1

@@ -17,7 +17,7 @@ public sealed record PhotoMetadataBackfillCandidate(
 /// <summary>
 /// Stores source, asset and immutable revision records used by local catalogue scans.
 /// </summary>
-public sealed class SqliteAssetCatalogueRepository
+public sealed class SqliteAssetCatalogueRepository : IPhotoCaptureMetadataRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
