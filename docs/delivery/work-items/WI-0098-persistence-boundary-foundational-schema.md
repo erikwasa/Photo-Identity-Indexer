@@ -129,3 +129,26 @@ Started 2026-09-02.
 - Existing scanner/local-batch APIs remain available for migration-era archive/test callers. SQLite remains authoritative; no PostgreSQL writes or dual writes are introduced.
 
 This closes the direct SQLite persistence dependency in the foundational local-batch coordinator without pulling archive/background migration from WI-0099 into WI-0098.
+
+
+### Slice 6 — foundational face-inspection persistence boundary
+
+Started 2026-09-02.
+
+- Added Core-owned `FaceInspectionWrite` and `IFaceInspectionRepository` for the atomic occurrence/observation/crop/embedding write performed by the production inspection path.
+- `SqliteFaceCatalogueRepository` implements the neutral contract by mapping the Core request into its existing transactional persistence model; natural-key/idempotency behavior remains unchanged.
+- `LocalInspectionJobHandler` now depends on `IAssetRevisionLookupRepository` plus `IFaceInspectionRepository` and no longer references `PhotoIdentity.Persistence.Sqlite`.
+- The batch CLI and archive-analysis composition path construct the current SQLite adapters explicitly. Archive analysis itself remains SQLite-specific pending WI-0099.
+- Focused contract coverage verifies that the SQLite adapter persists the complete face inspection graph through the neutral interface.
+- Existing SQLite face records and concrete repository APIs remain intact for review/identity and migration-era callers; those broader domains remain WI-0100/WI-0101 scope.
+
+### Acceptance audit
+
+After this slice, WI-0098's foundational application paths are behind provider-neutral contracts: capture metadata, asset-revision lookup, local source scanning/current-revision selection, processing run lifecycle/execution, and production face-inspection persistence.
+
+The remaining direct SQLite dependencies are intentionally assigned to subsequent migration work:
+- archive/background orchestration and persistence: WI-0099;
+- review/people/identity state: WI-0100;
+- detector rollout, library/metadata and remaining authoritative catalogue persistence: WI-0101.
+
+The PostgreSQL foundational schema was already maintainer-verified live after PR #239, and existing SQLite lease/idempotency/restart behavior remains covered by integration tests. Once this final boundary slice is green and merged, WI-0098 is ready for closeout rather than another implementation slice.
