@@ -117,6 +117,8 @@ public partial class Program
         builder.Services.AddSingleton<SqlitePhotoTagRepository>();
         builder.Services.AddSingleton<SqlitePhotoPlaceRepository>();
         builder.Services.AddSingleton<SqlitePhotoPlaceEnrichmentRepository>();
+        builder.Services.AddSingleton<IPhotoPlaceEnrichmentStateRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePhotoPlaceEnrichmentRepository>());
         builder.Services.AddSingleton<SqliteAutomaticPhotoPlaceRepository>();
         builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
