@@ -241,7 +241,8 @@ public sealed class PostgresCatalogueDatabaseTests
 
             IArchiveAvailabilityRepository archiveAvailability =
                 new PostgresArchiveAvailabilityRepository(database);
-            DateTimeOffset firstAvailabilityCheck = DateTimeOffset.UtcNow;
+            DateTimeOffset firstAvailabilityCheck =
+                new(2026, 9, 2, 20, 0, 0, TimeSpan.Zero);
             await archiveAvailability.RecordAsync(
                 AssetId.From(assetId),
                 AssetAvailability.OnlineOnly,
