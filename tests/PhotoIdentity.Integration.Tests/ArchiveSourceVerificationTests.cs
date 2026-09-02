@@ -252,10 +252,11 @@ public sealed class ArchiveSourceVerificationTests
 
             FakeFilesOnDemandPlatform platform = new();
             ArchiveHydrationCapacityService capacity = new(
-                database,
                 new SqliteArchiveHydrationRepository(database),
                 new SqliteArchiveSourceHydrationRepository(database),
+                new SqliteArchiveCoverageRepository(database),
                 new SqliteArchiveStorageRepository(database),
+                new SqliteArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(100_000),
                 new ArchiveHydrationPolicyConfiguration(0, 500, 1),
