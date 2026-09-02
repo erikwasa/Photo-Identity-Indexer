@@ -651,9 +651,11 @@ public sealed class PostgresProcessingRepository :
             command.Parameters.AddWithValue(
                 "completed_at_utc",
                 completedAt);
-            command.Parameters.AddWithValue(
-                "error",
-                (object?)error ?? DBNull.Value);
+            NpgsqlParameter errorParameter =
+                command.Parameters.Add("error", NpgsqlDbType.Text);
+            errorParameter.Value = error is null
+                ? DBNull.Value
+                : error;
             command.Parameters.AddWithValue(
                 "run_id",
                 Guid.Parse(runId.ToString()));
@@ -698,24 +700,31 @@ public sealed class PostgresProcessingRepository :
         command.Parameters.AddWithValue(
             "transition_at_utc",
             transitionAtUtc.ToUniversalTime());
-        command.Parameters.AddWithValue(
-            "error",
-            (object?)error ?? DBNull.Value);
-        command.Parameters.AddWithValue(
-            "failure_kind",
-            failureKind is null
-                ? DBNull.Value
-                : Format(failureKind.Value));
-        command.Parameters.AddWithValue(
-            "retry_at_utc",
-            retryAtUtc is null
-                ? DBNull.Value
-                : retryAtUtc.Value.ToUniversalTime());
-        command.Parameters.AddWithValue(
-            "leased_until_utc",
-            leasedUntilUtc is null
-                ? DBNull.Value
-                : leasedUntilUtc.Value.ToUniversalTime());
+        NpgsqlParameter errorParameter =
+            command.Parameters.Add("error", NpgsqlDbType.Text);
+        errorParameter.Value = error is null ? DBNull.Value : error;
+
+        NpgsqlParameter failureKindParameter =
+            command.Parameters.Add("failure_kind", NpgsqlDbType.Text);
+        failureKindParameter.Value = failureKind is null
+            ? DBNull.Value
+            : Format(failureKind.Value);
+
+        NpgsqlParameter retryAtParameter =
+            command.Parameters.Add(
+                "retry_at_utc",
+                NpgsqlDbType.TimestampTz);
+        retryAtParameter.Value = retryAtUtc is null
+            ? DBNull.Value
+            : retryAtUtc.Value.ToUniversalTime();
+
+        NpgsqlParameter leasedUntilParameter =
+            command.Parameters.Add(
+                "leased_until_utc",
+                NpgsqlDbType.TimestampTz);
+        leasedUntilParameter.Value = leasedUntilUtc is null
+            ? DBNull.Value
+            : leasedUntilUtc.Value.ToUniversalTime();
 
         NpgsqlParameter checkpointParameter =
             command.Parameters.Add(
