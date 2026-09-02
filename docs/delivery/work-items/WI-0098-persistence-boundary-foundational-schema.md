@@ -35,11 +35,18 @@ Stop application/domain code from depending directly on SQLite implementation ty
 
 Started 2026-09-02.
 
-- Added `IAssetCatalogueRepository` in Core and placed the existing SQLite asset catalogue adapter behind that contract.
-- Changed `PhotoMetadataInspectionService` to depend on the neutral contract rather than `SqliteAssetCatalogueRepository`.
+- Added focused `IPhotoCaptureMetadataRepository` in Core and placed the existing SQLite capture-metadata operations behind that contract.
+- Changed `PhotoMetadataInspectionService` to depend on the neutral capture-metadata contract rather than `SqliteAssetCatalogueRepository`.
 - Added PostgreSQL schema version 2 for sources, assets, immutable revisions, face occurrences/observations/crops, embeddings, processing runs, and processing jobs.
 - PostgreSQL types preserve identifiers and data shape with `uuid`, `timestamptz`, `jsonb`, `bytea`, explicit checks, uniqueness constraints, foreign keys, and an immutable revision update guard.
 - Extended the live PostgreSQL bootstrap test to verify the foundational tables/types and immutable-revision behavior.
 - SQLite remains the active/authoritative adapter; this slice adds no dual writes or cutover behavior.
 
 Subsequent WI-0098 slices will move processing and additional foundational application paths behind neutral contracts and add same-behavior adapter tests where practical.
+
+
+### Corrective slice — neutral contract layering
+
+Workflow #1402 exposed that the first draft of the Core contract referenced `CatalogueSource`, `CatalogueAsset` and `CatalogueAssetRevision`, which still live in the SQLite adapter assembly. That violated the intended dependency direction and did not compile.
+
+The corrective change narrows slice 1 to the application capability actually being decoupled now: capture metadata persistence. `IPhotoCaptureMetadataRepository` depends only on Core-owned types (`AssetRevisionId` and `PhotoCaptureMetadata`). Broader catalogue records will move behind neutral contracts deliberately in later WI-0098 slices rather than being pulled across namespaces as an incidental compile fix.
