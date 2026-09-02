@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.EventLog;
 using PhotoIdentity.Core.Catalogue;
+using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Imaging.OpenCv;
