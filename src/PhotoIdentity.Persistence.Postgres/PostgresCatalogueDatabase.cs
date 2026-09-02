@@ -61,19 +61,24 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                 UNIQUE (asset_id, content_sha256)
             );
 
-            CREATE OR REPLACE FUNCTION photo_identity_reject_asset_revision_update()
+            CREATE OR REPLACE FUNCTION photo_identity_guard_asset_revision_identity()
             RETURNS trigger
             LANGUAGE plpgsql
-            AS $$
+            AS $
             BEGIN
-                RAISE EXCEPTION 'asset_revisions are immutable';
+                IF NEW.id <> OLD.id
+                   OR NEW.asset_id <> OLD.asset_id
+                   OR NEW.content_sha256 <> OLD.content_sha256 THEN
+                    RAISE EXCEPTION 'asset revision identity is immutable';
+                END IF;
+                RETURN NEW;
             END;
-            $$;
+            $;
 
-            CREATE TRIGGER trg_asset_revisions_immutable
+            CREATE TRIGGER trg_asset_revision_identity_immutable
                 BEFORE UPDATE ON asset_revisions
                 FOR EACH ROW
-                EXECUTE FUNCTION photo_identity_reject_asset_revision_update();
+                EXECUTE FUNCTION photo_identity_guard_asset_revision_identity();
 
             CREATE TABLE face_occurrences (
                 id uuid NOT NULL PRIMARY KEY,
