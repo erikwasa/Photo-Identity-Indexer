@@ -1138,7 +1138,7 @@ work_items:
   document: ../work-items/WI-0098-persistence-boundary-foundational-schema.md
   started_at: 2026-09-02
   last_updated_at: 2026-09-02
-  branch: agent/WI-0098-asset-revision-lookup-boundary
+  branch: agent/WI-0098-processing-run-lifecycle-boundary
   blockers:
   - WI-0097
   blocker_notes:
@@ -1162,6 +1162,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/240
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/241
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/242
 - id: WI-0099
   title: Migrate archive and background-processing persistence to PostgreSQL
   milestone: M24

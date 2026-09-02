@@ -50,7 +50,11 @@ public sealed class LocalBatchInspectionTests
             SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             LocalBatchConfiguration configuration = new(sourceRoot, outputRoot, directory);
             RecordingHandler handler = new();
-            LocalBatchCoordinator coordinator = new(database);
+            SqliteProcessingRepository processingRepository = new(database);
+            LocalBatchCoordinator coordinator = new(
+                database,
+                processingRepository,
+                processingRepository);
 
             LocalBatchStartResult started = await coordinator.StartAsync(
                 configuration,

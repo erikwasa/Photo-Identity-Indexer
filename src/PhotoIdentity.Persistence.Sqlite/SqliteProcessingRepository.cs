@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// <summary>
 /// Stores durable processing runs, leases work and guards worker transitions with lease tokens.
 /// </summary>
-public sealed class SqliteProcessingRepository : IProcessingExecutionRepository
+public sealed class SqliteProcessingRepository : IProcessingExecutionRepository, IProcessingRunRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 

@@ -274,15 +274,17 @@ internal static class BatchCommandRunner
         SqliteCatalogueDatabase database = new(options.DatabasePath);
         await database.InitializeAsync(cancellationToken);
         SqliteProcessingRepository repository = new(database);
+        IProcessingRunRepository runs = repository;
+        IProcessingExecutionRepository execution = repository;
 
         switch (options.Action)
         {
             case BatchCommandAction.Start:
-                return await StartAsync(options, database, output, cancellationToken);
+                return await StartAsync(options, database, runs, execution, output, cancellationToken);
             case BatchCommandAction.Resume:
-                return await ResumeAsync(options, database, output, cancellationToken);
+                return await ResumeAsync(options, database, runs, execution, output, cancellationToken);
             case BatchCommandAction.Cancel:
-                await repository.RequestCancellationAsync(
+                await runs.RequestCancellationAsync(
                     options.RunId!.Value,
                     DateTimeOffset.UtcNow,
                     cancellationToken);
@@ -293,17 +295,19 @@ internal static class BatchCommandRunner
                 throw new ArgumentOutOfRangeException(nameof(options));
         }
 
-        ProcessingRunSummary summary = await repository.GetRunSummaryAsync(
+        ProcessingRunSummary summary = await execution.GetRunSummaryAsync(
             options.RunId!.Value,
             cancellationToken);
         WriteSummary(summary, output);
-        await WriteFailureSummaryAsync(repository, summary, output, cancellationToken);
+        await WriteFailureSummaryAsync(runs, summary, output, cancellationToken);
         return summary.FailedJobs == 0 ? 0 : 1;
     }
 
     private static async Task<int> StartAsync(
         BatchCommandOptions options,
         SqliteCatalogueDatabase database,
+        IProcessingRunRepository runs,
+        IProcessingExecutionRepository execution,
         TextWriter output,
         CancellationToken cancellationToken)
     {
@@ -326,7 +330,10 @@ internal static class BatchCommandRunner
             database,
             configuration,
             cancellationToken);
-        LocalBatchCoordinator coordinator = new(database);
+        LocalBatchCoordinator coordinator = new(
+            database,
+            runs,
+            execution);
         LocalBatchStartResult result = await coordinator.StartAsync(
             configuration,
             handler,
@@ -342,7 +349,7 @@ internal static class BatchCommandRunner
         output.WriteLine($"scan-unsupported: {result.UnsupportedFileCount}");
         WriteSummary(result.ProcessingSummary, output);
         await WriteFailureSummaryAsync(
-            new SqliteProcessingRepository(database),
+            runs,
             result.ProcessingSummary,
             output,
             cancellationToken);
@@ -352,10 +359,15 @@ internal static class BatchCommandRunner
     private static async Task<int> ResumeAsync(
         BatchCommandOptions options,
         SqliteCatalogueDatabase database,
+        IProcessingRunRepository runs,
+        IProcessingExecutionRepository execution,
         TextWriter output,
         CancellationToken cancellationToken)
     {
-        LocalBatchCoordinator coordinator = new(database);
+        LocalBatchCoordinator coordinator = new(
+            database,
+            runs,
+            execution);
         LocalBatchConfiguration configuration = await coordinator.GetConfigurationAsync(
             options.RunId!.Value,
             cancellationToken);
@@ -372,7 +384,7 @@ internal static class BatchCommandRunner
         WriteConfiguration(configuration, output);
         WriteSummary(result.Summary, output);
         await WriteFailureSummaryAsync(
-            new SqliteProcessingRepository(database),
+            runs,
             result.Summary,
             output,
             cancellationToken);
@@ -380,7 +392,7 @@ internal static class BatchCommandRunner
     }
 
     private static async Task WriteFailureSummaryAsync(
-        SqliteProcessingRepository repository,
+        IProcessingRunRepository repository,
         ProcessingRunSummary summary,
         TextWriter output,
         CancellationToken cancellationToken)
