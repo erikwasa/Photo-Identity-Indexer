@@ -90,7 +90,7 @@ public sealed record PhotoPlaceEnrichmentWorkerCycleResult(
 
 /// <summary>
 /// Continuously drains the existing persisted-GPS enrichment queue one revision at a time.
-/// The queue is already durable in SQLite: successful/no-result/manual-protected revisions are
+/// The queue is durable behind the enrichment-state persistence boundary: successful/no-result/manual-protected revisions are
 /// terminal for the current provider contract, while failed/deferred/unattempted revisions remain
 /// eligible. Newly persisted GPS metadata therefore becomes eligible without an archive-specific hook.
 /// </summary>
