@@ -104,11 +104,11 @@ public sealed class DriveArchiveStorageProbe : IArchiveStorageProbe
 /// </summary>
 public sealed class ArchiveHydrationCapacityService
 {
-    private readonly SqliteCatalogueDatabase _database;
     private readonly IArchiveHydrationRepository _hydrations;
     private readonly IArchiveSourceHydrationRepository _sourceHydrations;
-    private readonly SqliteArchiveStorageRepository _storage;
-    private readonly SqliteArchiveAvailabilityRepository _availability;
+    private readonly IArchiveCoverageRepository _coverage;
+    private readonly IArchiveStorageAccountingRepository _storage;
+    private readonly IArchiveAvailabilityRepository _availability;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
     private readonly IArchiveStorageProbe _probe;
     private readonly ArchiveHydrationPolicyConfiguration _configuration;
@@ -119,10 +119,11 @@ public sealed class ArchiveHydrationCapacityService
     private readonly SemaphoreSlim? _largeOperationGate;
 
     public ArchiveHydrationCapacityService(
-        SqliteCatalogueDatabase database,
         IArchiveHydrationRepository hydrations,
         IArchiveSourceHydrationRepository sourceHydrations,
-        SqliteArchiveStorageRepository storage,
+        IArchiveCoverageRepository coverage,
+        IArchiveStorageAccountingRepository storage,
+        IArchiveAvailabilityRepository availability,
         IOneDriveFilesOnDemandPlatform platform,
         IArchiveStorageProbe probe,
         ArchiveHydrationPolicyConfiguration configuration,
@@ -130,20 +131,21 @@ public sealed class ArchiveHydrationCapacityService
         TimeProvider timeProvider,
         SlideshowOriginalLeaseRegistry? slideshowLeases = null)
     {
-        ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(hydrations);
         ArgumentNullException.ThrowIfNull(sourceHydrations);
+        ArgumentNullException.ThrowIfNull(coverage);
         ArgumentNullException.ThrowIfNull(storage);
+        ArgumentNullException.ThrowIfNull(availability);
         ArgumentNullException.ThrowIfNull(platform);
         ArgumentNullException.ThrowIfNull(probe);
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(proxyConfiguration);
         ArgumentNullException.ThrowIfNull(timeProvider);
-        _database = database;
         _hydrations = hydrations;
         _sourceHydrations = sourceHydrations;
+        _coverage = coverage;
         _storage = storage;
-        _availability = new SqliteArchiveAvailabilityRepository(database);
+        _availability = availability;
         _platform = platform;
         _probe = probe;
         _configuration = configuration;
@@ -355,8 +357,8 @@ public sealed class ArchiveHydrationCapacityService
     public async Task<ArchiveStorageSnapshot> GetStorageSnapshotAsync(
         CancellationToken cancellationToken = default)
     {
-        ArchiveCoverageConfiguration? coverage = await new SqliteArchiveCoverageRepository(_database)
-            .GetAsync(cancellationToken);
+        ArchiveCoverageState? coverage =
+            await _coverage.GetAsync(cancellationToken);
         IReadOnlyList<ObservedManagedLease> observed = await ObserveActiveLeasesAsync(cancellationToken);
         bool policyConfigured = _configuration.TryGetPolicy(out ArchiveHydrationPolicy? policy, out string? policyMessage);
 
@@ -378,7 +380,9 @@ public sealed class ArchiveHydrationCapacityService
 
         long logicalBytes = coverage is null
             ? 0L
-            : await _storage.GetCurrentLogicalSourceBytesAsync(coverage.Source.Id, cancellationToken);
+            : await _storage.GetCurrentLogicalSourceBytesAsync(
+                coverage.Source.SourceId,
+                cancellationToken);
         long proxyBytes = await _storage.GetReviewProxyBytesAsync(
             _proxyConfiguration.ProfileId,
             cancellationToken);
