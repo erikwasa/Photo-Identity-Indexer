@@ -101,3 +101,27 @@ After PR #247 merged and workflow #1444 passed, the maintainer reran `verify-pos
 The failure was test-fixture chronology rather than a runtime persistence defect: the fixture seeded `assets.created_at_utc` with the current clock, then replayed a fixed earlier source-observation timestamp. The existing foundational constraint correctly rejects `last_seen_at_utc < created_at_utc`.
 
 The corrective slice keeps the production constraint unchanged and makes the live fixture use one fixed chronological baseline for source/asset/revision creation, availability checks and source observations. Schema version 5 remains pending maintainer acceptance until `verify-postgres.ps1` passes after the corrective PR.
+
+
+### Maintainer verification — PostgreSQL schema version 5
+
+After corrective PR #248 merged on 2026-09-02, the maintainer reran `verify-postgres.ps1`.
+
+Verification passed end-to-end on the existing Podman 5.8.x volume:
+- authenticated PostgreSQL SQL inside the container passed;
+- the Windows localhost PostgreSQL protocol check passed;
+- the isolated live PostgreSQL persistence test passed;
+- schema version 5 and source-observation/verification semantics were accepted without resetting the volume.
+
+### Slice 4 — PostgreSQL archive coverage
+
+Started 2026-09-02.
+
+- Added provider-neutral `IArchiveCoverageRepository` and Core-owned `ArchiveCoverageState`.
+- `SqliteArchiveCoverageRepository` implements the new contract through explicit compatibility adapters while retaining its existing public APIs.
+- Added PostgreSQL schema version 6 with singleton `archive_configuration` and `archive_included_folders`, using UUID/timestamptz relationships to the foundational `sources` table.
+- Added `PostgresArchiveCoverageRepository` preserving the one-permanent-source rule and existing recursive-folder normalization/collapse behavior.
+- Extended the isolated live PostgreSQL test to cover initial configuration, additive includes, parent-folder collapse, replacement and persisted readback.
+- Runtime archive endpoints, scanner, status, hydration and advancement services remain SQLite-authoritative. No dual writes or mixed-authority runtime reads are introduced.
+
+After this slice, durable processing execution remains the major persistence prerequisite before a controlled archive runtime cutover can be designed.
