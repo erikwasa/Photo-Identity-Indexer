@@ -6,7 +6,7 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**M22 WI-0107 is the next slideshow implementation item. M24 WI-0098 continues in parallel.**
+**M22 WI-0107 is the next slideshow implementation item. M24 WI-0099 is now active in parallel.**
 
 Consolidated real-phone M22 acceptance passed the implemented slideshow behavior except for two functional gaps tracked by WI-0107:
 
@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0097 is maintainer-verified and completed. **WI-0098 — Add database-neutral persistence boundary and foundational PostgreSQL schema** is in progress on `agent/WI-0098-face-inspection-boundary`. PR #243 merged the local-batch catalogue boundary and workflow #1430 passed. PR #244 is the active final slice. It places production face-inspection persistence behind Core contracts; SQLite remains authoritative until the later migration items.
+In the separate M24 thread, WI-0098 is completed after PR #244 merged and workflow #1434 passed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-archive-analysis-state`. The first slice adds PostgreSQL schema version 3 and a PostgreSQL adapter for archive analysis profile/run/completion state while leaving runtime archive authority on SQLite until coverage/availability/processing are migrated.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge PR #244 (the final WI-0098 face-inspection boundary) after CI is green. Keep the slice contract-only: preserve current SQLite face-write/idempotency behavior and introduce no PostgreSQL authoritative writes or dual writes. After merge, close WI-0098 and begin WI-0099 archive/background PostgreSQL persistence.
+For the M24 thread, complete the first WI-0099 slice: validate PostgreSQL schema version 3 and the archive-analysis state adapter, then merge after CI is green. After that, migrate archive coverage/source observations/availability and durable processing execution before switching any archive runtime path to PostgreSQL. Do not introduce dual writes or mixed-authority runtime behavior.
 
 ## Relevant files
 
@@ -45,6 +45,7 @@ For the M24 thread, review/merge PR #244 (the final WI-0098 face-inspection boun
 - docs/delivery/work-items/WI-0108-slideshow-performance.md
 - docs/delivery/milestones/M24-postgresql-catalogue-and-scale.md
 - docs/delivery/work-items/WI-0098-persistence-boundary-foundational-schema.md
+- docs/delivery/work-items/WI-0099-postgresql-archive-background-persistence.md
 - docs/delivery/status/work-items.yaml
 - docs/delivery/status/milestones.yaml
 
