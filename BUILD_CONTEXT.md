@@ -8,20 +8,21 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 **WI-0098 — Add database-neutral persistence boundary and foundational PostgreSQL schema** is in progress.
 
-WI-0097 was maintainer-verified on 2026-09-02. On the accepted Podman 5.8.x Windows/WSL baseline, `verify-postgres.ps1` passed end-to-end and current main `/health` reported the real SQLite catalogue as authoritative at schema version 16 plus PostgreSQL `ready` at schema version 1.
+WI-0097 is maintainer-verified. PR #237 merged the first WI-0098 slice, including the focused `IPhotoCaptureMetadataRepository` boundary and PostgreSQL schema version 2.
 
-The active WI-0098 branch is `agent/WI-0098-persistence-boundary-foundational-schema`.
+Maintainer live verification of schema version 2 failed with PostgreSQL SQLSTATE `42601`. The merged trigger function contained invalid `AS $ ... $;` syntax. Because migrations run transactionally, the failed version-2 attempt rolled back and was not recorded as applied.
 
-Slice 1 introduces `IPhotoCaptureMetadataRepository`, places the SQLite capture-metadata operations behind it for application DI, and moves `PhotoMetadataInspectionService` off the SQLite concrete type. PostgreSQL schema version 2 adds sources, assets, immutable revisions, face occurrences/observations/crops, embeddings and durable processing run/job tables with PostgreSQL-native constraints/types. Live bootstrap tests verify those tables and immutable revision behavior.
+The active corrective branch is `agent/WI-0098-postgres-trigger-syntax`. It removes PostgreSQL dollar quoting from the trigger function and updates `verify-postgres.ps1` so live migration failures are no longer mislabeled as Podman/WSL networking failures.
 
-SQLite remains authoritative. There are no PostgreSQL authoritative writes or cutover behavior in WI-0098 slice 1.
+SQLite remains authoritative. No PostgreSQL cutover or authoritative writes are enabled.
 
 ## Next concrete step
 
-1. Merge the first WI-0098 slice after CI is green.
-2. Run `./verify-postgres.ps1` once against the existing Podman 5.8.x runtime to apply/verify PostgreSQL schema version 2.
-3. Continue WI-0098 by moving the durable processing lease/checkpoint/retry boundary behind a neutral contract and then other foundational application services.
-4. Preserve the existing SQLite behavior until controlled cutover in WI-0102.
+1. Merge the corrective WI-0098 PR after CI is green.
+2. Pull current main and run `./verify-postgres.ps1` on the existing Podman 5.8.x runtime. Do not reset the PostgreSQL volume.
+3. Confirm the live bootstrap passes and PostgreSQL schema version 2 is recorded.
+4. Continue WI-0098 with the durable processing lease/checkpoint/retry persistence boundary.
+5. Preserve SQLite authority until controlled cutover in WI-0102.
 
 ## Relevant files
 
@@ -30,6 +31,7 @@ SQLite remains authoritative. There are no PostgreSQL authoritative writes or cu
 - src/PhotoIdentity.Persistence.Sqlite/SqliteAssetCatalogueRepository.cs
 - src/PhotoIdentity.Persistence.Postgres/PostgresCatalogueDatabase.cs
 - tests/PhotoIdentity.Persistence.Tests/PostgresCatalogueDatabaseTests.cs
+- verify-postgres.ps1
 - docs/delivery/status/work-items.yaml
 
 ## Repository validation
