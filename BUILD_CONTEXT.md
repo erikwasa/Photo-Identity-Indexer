@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-archive-availability`. PR #245 merged, workflow #1437 passed, and the maintainer live-verified PostgreSQL schema version 3 on the existing Podman volume. PR #246 is the active slice. It adds the neutral archive-availability boundary plus PostgreSQL schema version 4 while leaving runtime archive authority on SQLite.
+In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-source-observations`. PR #246 merged, workflow #1441 passed, and the maintainer live-verified PostgreSQL schema version 4 on the existing Podman volume. The active slice adds the neutral source-observation/verification boundary plus PostgreSQL schema version 5 while leaving runtime archive authority on SQLite.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge the archive-availability slice after CI is green, then live-verify schema version 4 with `verify-postgres.ps1`. Next move lightweight source-observation/verification state behind a neutral PostgreSQL-capable boundary, followed by archive coverage and durable processing execution before switching any archive runtime path to PostgreSQL. Do not introduce dual writes or mixed-authority runtime behavior.
+For the M24 thread, review/merge the source-observation/verification slice after CI is green, then live-verify schema version 5 with `verify-postgres.ps1`. After that, migrate archive coverage and durable processing execution before switching any archive runtime path to PostgreSQL. Do not introduce dual writes or mixed-authority runtime behavior.
 
 ## Relevant files
 
