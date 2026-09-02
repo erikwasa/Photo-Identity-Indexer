@@ -497,7 +497,8 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                     FOREIGN KEY (asset_id)
                     REFERENCES assets (id) ON DELETE CASCADE
             );
-            """),        new(
+            """),
+        new(
             10,
             "capture-metadata-and-place-enrichment-state",
             """
