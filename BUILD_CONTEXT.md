@@ -6,33 +6,47 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**WI-0098 — Add database-neutral persistence boundary and foundational PostgreSQL schema** is in progress.
+**M22 WI-0107 is the next slideshow implementation item. M24 WI-0098 continues in parallel.**
 
-WI-0097 is maintainer-verified. PR #237 merged the first WI-0098 slice, including the focused `IPhotoCaptureMetadataRepository` boundary and PostgreSQL schema version 2.
+Consolidated real-phone M22 acceptance passed the implemented slideshow behavior except for two functional gaps tracked by WI-0107:
 
-Maintainer live verification of schema version 2 failed with PostgreSQL SQLSTATE `42601`. The merged trigger function contained invalid `AS $ ... $;` syntax. Because migrations run transactionally, the failed version-2 attempt rolled back and was not recorded as applied.
+1. **Start slideshow** from `/slideshows` must request fullscreen from the initiating tap/click and continue loading/preparation inside fullscreen without an intermediate application **Enter fullscreen** step when the browser accepts fullscreen.
+2. Successful standalone **Prepare originals** state must survive slideshow navigation/page recreation while the exact prepared snapshot remains reusable. The state is a revalidated path-free receipt, not a permanent offline pin.
 
-The active corrective branch is `agent/WI-0098-postgres-trigger-syntax`. It removes PostgreSQL dollar quoting from the trigger function and updates `verify-postgres.ps1` so live migration failures are no longer mislabeled as Podman/WSL networking failures.
+The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-SQLite remains authoritative. No PostgreSQL cutover or authoritative writes are enabled.
+In the separate M24 thread, WI-0097 is maintainer-verified and completed. **WI-0098 — Add database-neutral persistence boundary and foundational PostgreSQL schema** is now in progress on `agent/WI-0098-postgres-trigger-syntax`. PR #237 merged the first slice, but maintainer live verification exposed PostgreSQL SQLSTATE `42601` because the schema-v2 trigger function reached main with invalid `AS $ ... $;` syntax. The corrective branch removes dollar quoting entirely. The failed migration was transactional and rolled back, so schema version 2 remains unapplied and the PostgreSQL volume must not be reset. SQLite remains authoritative.
+
+WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
 ## Next concrete step
 
-1. Merge the corrective WI-0098 PR after CI is green.
-2. Pull current main and run `./verify-postgres.ps1` on the existing Podman 5.8.x runtime. Do not reset the PostgreSQL volume.
-3. Confirm the live bootstrap passes and PostgreSQL schema version 2 is recorded.
-4. Continue WI-0098 with the durable processing lease/checkpoint/retry persistence boundary.
-5. Preserve SQLite authority until controlled cutover in WI-0102.
+For the M22 thread:
+
+1. Merge this documentation/status PR after CI is green.
+2. Start WI-0107.
+3. Implement direct originating-gesture fullscreen launch from `/slideshows`.
+4. Implement path-free successful-preparation receipt persistence plus truthful revalidation across navigation.
+5. Run required CI.
+6. Re-test only those two remaining M22 scenarios on the real phone.
+7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
+
+For the M24 thread, merge the WI-0098 trigger-syntax correction after CI is green, then rerun `./verify-postgres.ps1` against the existing PostgreSQL volume. If schema version 2 verifies successfully, continue the processing persistence boundary. Preserve SQLite behavior until controlled cutover in WI-0102.
 
 ## Relevant files
 
+- docs/delivery/work-items/WI-0107-m22-slideshow-acceptance-gaps.md
+- docs/delivery/milestones/M22-protected-smart-collection-slideshow.md
+- docs/product/slideshow.md
+- src/PhotoIdentity.Web/Pages/Slideshows.razor
+- src/PhotoIdentity.Web/Pages/Slideshows.razor.cs
+- src/PhotoIdentity.Web/Pages/Slideshow.razor.cs
+- src/PhotoIdentity.Web/wwwroot/js/slideshow.js
+- docs/delivery/work-items/WI-0108-slideshow-performance.md
+- docs/delivery/milestones/M24-postgresql-catalogue-and-scale.md
 - docs/delivery/work-items/WI-0098-persistence-boundary-foundational-schema.md
-- src/PhotoIdentity.Core/Sources/IPhotoCaptureMetadataRepository.cs
-- src/PhotoIdentity.Persistence.Sqlite/SqliteAssetCatalogueRepository.cs
-- src/PhotoIdentity.Persistence.Postgres/PostgresCatalogueDatabase.cs
-- tests/PhotoIdentity.Persistence.Tests/PostgresCatalogueDatabaseTests.cs
-- verify-postgres.ps1
 - docs/delivery/status/work-items.yaml
+- docs/delivery/status/milestones.yaml
 
 ## Repository validation
 
@@ -42,6 +56,6 @@ SQLite remains authoritative. No PostgreSQL cutover or authoritative writes are 
     dotnet run --project tools/PhotoIdentity.Docs -- generate --check
     ./verify-review.ps1 -Mode Smoke -Configuration Release
 
-Live PostgreSQL migration verification:
+Live PostgreSQL migration verification for the M24 thread:
 
     ./verify-postgres.ps1
