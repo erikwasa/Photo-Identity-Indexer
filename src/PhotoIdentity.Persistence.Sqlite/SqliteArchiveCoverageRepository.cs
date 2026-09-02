@@ -13,7 +13,7 @@ public sealed record ArchiveCoverageConfiguration(
 /// <summary>
 /// Persists the single permanent local archive source and its recursively included folders.
 /// </summary>
-public sealed class SqliteArchiveCoverageRepository
+public sealed class SqliteArchiveCoverageRepository : IArchiveCoverageRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -21,6 +21,43 @@ public sealed class SqliteArchiveCoverageRepository
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+    }
+
+    async Task<ArchiveCoverageState?> IArchiveCoverageRepository.GetAsync(
+        CancellationToken cancellationToken)
+    {
+        ArchiveCoverageConfiguration? configured = await GetAsync(cancellationToken);
+        return configured is null ? null : ToCoreState(configured);
+    }
+
+    async Task<ArchiveCoverageState> IArchiveCoverageRepository.ConfigureAndIncludeAsync(
+        ArchiveCatalogueSource source,
+        string relativeFolder,
+        DateTimeOffset configuredAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ArchiveCoverageConfiguration configured = await ConfigureAndIncludeAsync(
+            new CatalogueSource(
+                source.SourceId,
+                source.Kind,
+                source.RootLocator,
+                source.CreatedAtUtc),
+            relativeFolder,
+            configuredAtUtc,
+            cancellationToken);
+        return ToCoreState(configured);
+    }
+
+    async Task<ArchiveCoverageState> IArchiveCoverageRepository.ReplaceIncludedFoldersAsync(
+        IEnumerable<string> relativeFolders,
+        DateTimeOffset configuredAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ArchiveCoverageConfiguration configured = await ReplaceIncludedFoldersAsync(
+            relativeFolders,
+            configuredAtUtc,
+            cancellationToken);
+        return ToCoreState(configured);
     }
 
     public async Task<ArchiveCoverageConfiguration?> GetAsync(
@@ -202,6 +239,15 @@ public sealed class SqliteArchiveCoverageRepository
 
         return folders;
     }
+
+    private static ArchiveCoverageState ToCoreState(
+        ArchiveCoverageConfiguration configured) => new(
+        new ArchiveCatalogueSource(
+            configured.Source.Id,
+            configured.Source.Kind,
+            configured.Source.RootLocator,
+            configured.Source.CreatedAtUtc),
+        configured.IncludedFolders);
 
     private static string Format(DateTimeOffset value) =>
         value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
