@@ -247,3 +247,25 @@ Started 2026-09-02. Active review: PR #255.
 - Extended live PostgreSQL verification to assert logical source bytes and review-proxy bytes from durable PostgreSQL state.
 
 After this slice, automatic GeoNames enrichment operational state is the main named WI-0099 persistence surface remaining. A final source-verification/runtime-composition review is still required before declaring the archive/background domain ready for cutover.
+
+
+### Maintainer verification — PostgreSQL storage accounting
+
+PR #255 merged on 2026-09-03 at `865cfe01ab6d67216d3719814f7b9ab0fe782ce4`; workflow #1475 passed and maintainer review/verification succeeded.
+
+The PostgreSQL storage-accounting adapter is accepted against schema version 9. No migration was required for that slice.
+
+### Slice 10 — PostgreSQL GeoNames operational state
+
+Started 2026-09-03. Active review: PR #256.
+
+- Added provider-neutral `IPhotoPlaceEnrichmentStateRepository` plus Core-owned candidate/cache DTOs for reverse-geocoding operational state.
+- `SqlitePhotoPlaceEnrichmentRepository` implements the neutral contract through compatibility adapters while retaining its existing SQLite API.
+- `PhotoPlaceEnrichmentService` now consumes the neutral operational-state contract. Its authoritative automatic `Places/…` writer intentionally remains `SqliteAutomaticPhotoPlaceRepository`; broader place/tag authority belongs to WI-0101.
+- Added PostgreSQL schema version 10 with the worker-required `photo_capture_metadata`, `photo_place_reverse_geocode_cache` and `photo_place_enrichment_attempts` tables.
+- Added `PostgresPhotoCaptureMetadataRepository` implementing the existing provider-neutral capture-metadata contract for the capture-time/GPS subset already stored by the SQLite catalogue repository.
+- Added `PostgresPhotoPlaceEnrichmentStateRepository` preserving candidate ordering, cache identity, attempt counts, succeeded/skipped/deferred/failed outcomes, refresh behavior and coordinate-change requeue semantics.
+- Runtime dependency injection still binds capture metadata and GeoNames operational state to SQLite. This slice introduces no dual writes and does not move authoritative Places assignment.
+- Extended live PostgreSQL verification to prove: persisted GPS becomes eligible → cache round-trips → deferred remains retryable → succeeded becomes terminal unless refresh is requested → changed coordinates requeue → skipped remains terminal even under refresh.
+
+After this slice is maintainer-verified, all named WI-0099 persistence surfaces have PostgreSQL implementations. The next step is a full archive/background runtime-composition audit to identify any remaining direct SQLite dependencies or cross-domain authority blockers before deciding whether WI-0099 can close or must hand a cutover dependency to WI-0101/WI-0102.

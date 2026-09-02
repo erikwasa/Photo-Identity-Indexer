@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-storage-accounting`. PR #254 merged, workflow #1470 passed, and the maintainer accepted PostgreSQL schema version 9 plus managed hydration ownership. PR #255 is the active slice. It adds provider-neutral storage accounting and a PostgreSQL implementation without a schema bump, and removes the remaining SQLite database handle from `ArchiveHydrationCapacityService` while runtime bindings stay on SQLite.
+In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-geonames-state`. PR #255 merged, workflow #1475 passed, and maintainer review/verification accepted PostgreSQL storage accounting against schema version 9. PR #256 is the active slice. It adds schema version 10 for worker-required capture/GPS metadata plus GeoNames cache/attempt state and moves the enrichment service behind a neutral operational-state contract while authoritative Places writes remain SQLite-owned for WI-0101.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge the storage-accounting slice after CI is green, then rerun `verify-postgres.ps1` to verify the PostgreSQL accounting adapter against schema version 9. After that, migrate automatic GeoNames enrichment operational state and perform a final archive/background runtime-composition review before any provider cutover.
+For the M24 thread, review/merge the GeoNames operational-state slice after CI is green, then rerun `verify-postgres.ps1` to accept schema version 10. If it passes, perform the final WI-0099 archive/background runtime-composition audit; do not switch providers until that audit confirms there is no mixed-authority path or identifies the explicit WI-0101/WI-0102 dependency.
 
 ## Relevant files
 

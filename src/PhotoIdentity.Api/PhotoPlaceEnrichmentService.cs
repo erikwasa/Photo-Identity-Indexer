@@ -34,13 +34,13 @@ public sealed class PhotoPlaceEnrichmentService
     private const string AutomaticActor = "automatic-place-enrichment";
 
     private readonly IReverseGeocoder _geocoder;
-    private readonly SqlitePhotoPlaceEnrichmentRepository _enrichment;
+    private readonly IPhotoPlaceEnrichmentStateRepository _enrichment;
     private readonly SqliteAutomaticPhotoPlaceRepository _automaticPlaces;
     private readonly SemaphoreSlim _executionGate = new(1, 1);
 
     public PhotoPlaceEnrichmentService(
         IReverseGeocoder geocoder,
-        SqlitePhotoPlaceEnrichmentRepository enrichment,
+        IPhotoPlaceEnrichmentStateRepository enrichment,
         SqliteAutomaticPhotoPlaceRepository automaticPlaces)
     {
         ArgumentNullException.ThrowIfNull(geocoder);
@@ -72,7 +72,7 @@ public sealed class PhotoPlaceEnrichmentService
         bool refresh,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<CataloguePlaceEnrichmentCandidate> candidates =
+        IReadOnlyList<PhotoPlaceEnrichmentCandidate> candidates =
             await _enrichment.GetCandidatesAsync(
                 _geocoder.ProviderName,
                 _geocoder.ContractKey,
@@ -94,7 +94,7 @@ public sealed class PhotoPlaceEnrichmentService
         string? stopReasonMessage = null;
         List<PhotoPlaceEnrichmentIssue> issues = [];
 
-        foreach (CataloguePlaceEnrichmentCandidate candidate in candidates)
+        foreach (PhotoPlaceEnrichmentCandidate candidate in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -117,7 +117,7 @@ public sealed class PhotoPlaceEnrichmentService
             ReverseGeocodePlace? resolvedPlace = null;
             if (!refresh)
             {
-                CatalogueReverseGeocodeCacheEntry? cachedEntry = await _enrichment.GetCachedAsync(
+                ReverseGeocodeCacheEntry? cachedEntry = await _enrichment.GetCachedAsync(
                     _geocoder.ProviderName,
                     _geocoder.ContractKey,
                     candidate.Latitude,
@@ -294,7 +294,7 @@ public sealed class PhotoPlaceEnrichmentService
     };
 
     private Task MarkSkippedAsync(
-        CataloguePlaceEnrichmentCandidate candidate,
+        PhotoPlaceEnrichmentCandidate candidate,
         string reasonCode,
         string reasonMessage,
         CancellationToken cancellationToken) =>

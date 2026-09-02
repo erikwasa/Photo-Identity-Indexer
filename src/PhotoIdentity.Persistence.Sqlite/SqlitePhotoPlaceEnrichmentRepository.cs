@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Places;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -15,7 +16,7 @@ public sealed record CatalogueReverseGeocodeCacheEntry(
     string? CountryCode,
     DateTimeOffset ResolvedAtUtc);
 
-public sealed class SqlitePhotoPlaceEnrichmentRepository
+public sealed class SqlitePhotoPlaceEnrichmentRepository : IPhotoPlaceEnrichmentStateRepository
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly TimeProvider _timeProvider;
@@ -29,6 +30,129 @@ public sealed class SqlitePhotoPlaceEnrichmentRepository
         _database = database;
         _timeProvider = timeProvider;
     }
+
+    async Task<IReadOnlyList<PhotoPlaceEnrichmentCandidate>>
+        IPhotoPlaceEnrichmentStateRepository.GetCandidatesAsync(
+            string provider,
+            string contractKey,
+            int limit,
+            bool refresh,
+            CancellationToken cancellationToken)
+    {
+        IReadOnlyList<CataloguePlaceEnrichmentCandidate> candidates =
+            await GetCandidatesAsync(
+                provider,
+                contractKey,
+                limit,
+                refresh,
+                cancellationToken);
+        return candidates
+            .Select(ToCoreCandidate)
+            .ToArray();
+    }
+
+    async Task<ReverseGeocodeCacheEntry?>
+        IPhotoPlaceEnrichmentStateRepository.GetCachedAsync(
+            string provider,
+            string contractKey,
+            double latitude,
+            double longitude,
+            CancellationToken cancellationToken)
+    {
+        CatalogueReverseGeocodeCacheEntry? cached =
+            await GetCachedAsync(
+                provider,
+                contractKey,
+                latitude,
+                longitude,
+                cancellationToken);
+        return cached is null
+            ? null
+            : new ReverseGeocodeCacheEntry(
+                cached.PlaceValue,
+                cached.ProviderResultId,
+                cached.CountryCode,
+                cached.ResolvedAtUtc);
+    }
+
+    Task IPhotoPlaceEnrichmentStateRepository.SaveCacheAsync(
+        string provider,
+        string contractKey,
+        PhotoPlaceEnrichmentCandidate candidate,
+        string placeValue,
+        string? providerResultId,
+        string? countryCode,
+        CancellationToken cancellationToken) =>
+        SaveCacheAsync(
+            provider,
+            contractKey,
+            ToSqliteCandidate(candidate),
+            placeValue,
+            providerResultId,
+            countryCode,
+            cancellationToken);
+
+    Task IPhotoPlaceEnrichmentStateRepository.MarkSucceededAsync(
+        string provider,
+        string contractKey,
+        PhotoPlaceEnrichmentCandidate candidate,
+        string placeValue,
+        string? providerResultId,
+        string? countryCode,
+        CancellationToken cancellationToken) =>
+        MarkSucceededAsync(
+            provider,
+            contractKey,
+            ToSqliteCandidate(candidate),
+            placeValue,
+            providerResultId,
+            countryCode,
+            cancellationToken);
+
+    Task IPhotoPlaceEnrichmentStateRepository.MarkSkippedAsync(
+        string provider,
+        string contractKey,
+        PhotoPlaceEnrichmentCandidate candidate,
+        string reasonCode,
+        string reasonMessage,
+        CancellationToken cancellationToken) =>
+        MarkSkippedAsync(
+            provider,
+            contractKey,
+            ToSqliteCandidate(candidate),
+            reasonCode,
+            reasonMessage,
+            cancellationToken);
+
+    Task IPhotoPlaceEnrichmentStateRepository.MarkDeferredAsync(
+        string provider,
+        string contractKey,
+        PhotoPlaceEnrichmentCandidate candidate,
+        string? errorCode,
+        string? errorMessage,
+        CancellationToken cancellationToken) =>
+        MarkDeferredAsync(
+            provider,
+            contractKey,
+            ToSqliteCandidate(candidate),
+            errorCode,
+            errorMessage,
+            cancellationToken);
+
+    Task IPhotoPlaceEnrichmentStateRepository.MarkFailedAsync(
+        string provider,
+        string contractKey,
+        PhotoPlaceEnrichmentCandidate candidate,
+        string? errorCode,
+        string? errorMessage,
+        CancellationToken cancellationToken) =>
+        MarkFailedAsync(
+            provider,
+            contractKey,
+            ToSqliteCandidate(candidate),
+            errorCode,
+            errorMessage,
+            cancellationToken);
 
     public async Task<IReadOnlyList<CataloguePlaceEnrichmentCandidate>> GetCandidatesAsync(
         string provider,
@@ -291,6 +415,18 @@ public sealed class SqlitePhotoPlaceEnrichmentRepository
         command.Parameters.AddWithValue("$completed_at_utc", completed ? now : DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    private static PhotoPlaceEnrichmentCandidate ToCoreCandidate(
+        CataloguePlaceEnrichmentCandidate candidate) => new(
+        candidate.RevisionId,
+        candidate.Latitude,
+        candidate.Longitude);
+
+    private static CataloguePlaceEnrichmentCandidate ToSqliteCandidate(
+        PhotoPlaceEnrichmentCandidate candidate) => new(
+        candidate.RevisionId,
+        candidate.Latitude,
+        candidate.Longitude);
 
     private static string NormalizeProvider(string provider)
     {
