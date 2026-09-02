@@ -59,6 +59,46 @@ public sealed class PostgresArchiveHydrationIdentityTransferRepository :
                 cancellationToken);
     }
 
+    private static async Task UpsertTransferredSourceLeaseAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        AssetId assetId,
+        DateTimeOffset requestedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        await using NpgsqlCommand command =
+            connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO archive_source_managed_hydrations (
+                asset_id,
+                requested_at_utc,
+                release_requested_at_utc,
+                released_at_utc)
+            VALUES (
+                @asset_id,
+                @requested_at_utc,
+                NULL,
+                NULL)
+            ON CONFLICT(asset_id) DO UPDATE SET
+                requested_at_utc = CASE
+                    WHEN archive_source_managed_hydrations.released_at_utc IS NULL
+                        THEN archive_source_managed_hydrations.requested_at_utc
+                    ELSE excluded.requested_at_utc
+                END,
+                release_requested_at_utc = NULL,
+                released_at_utc = NULL;
+            """;
+        command.Parameters.AddWithValue(
+            "asset_id",
+            Guid.Parse(assetId.ToString()));
+        command.Parameters.AddWithValue(
+            "requested_at_utc",
+            requestedAtUtc.ToUniversalTime());
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     public async Task<bool> MoveRevisionLeaseToSourceAsync(
         AssetRevisionId revisionId,
         AssetId assetId,
@@ -120,7 +160,7 @@ public sealed class PostgresArchiveHydrationIdentityTransferRepository :
             return false;
         }
 
-        await PostgresArchiveSourceHydrationRepository.UpsertActiveSourceLeaseAsync(
+        await UpsertTransferredSourceLeaseAsync(
             connection,
             transaction,
             assetId,
