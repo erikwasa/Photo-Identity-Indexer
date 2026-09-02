@@ -12,18 +12,16 @@ PRs #229–#234 are merged. Maintainer verification proves PostgreSQL is healthy
 
 Current upstream evidence matches a Podman 6.0.x Windows/WSL regression rather than a Photo Identity defect: Podman issue #29377 is open/triaged for Windows localhost port forwarding after upgrading to 6.0.2, and Microsoft WSL issue #41204 separately reports Podman 6 host forwarding broken while Podman 4.x/5.x worked.
 
-The active PR #235 now detects Podman client/server versions and classifies that failure signature explicitly. The known-good Windows/WSL fallback baseline for WI-0097 is Podman 5.8.5; Podman Desktop 1.28.3 shipped that version.
+The active PR #235 now detects Podman client/server versions and classifies that failure signature explicitly. The maintainer has moved to the accepted Podman 5.8.x baseline: Windows client 5.8.5 and Linux server 5.8.6.
 
 SQLite remains authoritative and untouched. WI-0098 stays blocked until the Windows-host live migration test succeeds.
 
 ## Next concrete step
 
-1. Maintainer version is confirmed: Podman client/server 6.0.2, matching the upstream Windows/WSL forwarding regression.
-2. Move the local Podman runtime to the known-good 5.8.5 baseline. Podman Desktop 1.28.3 shipped 5.8.5.
-3. If the engine downgrade requires a Podman-machine recreation, treat that machine/container/volume state as disposable for WI-0097. Do not touch the SQLite catalogue or any unrelated container workloads without backing them up first.
-4. Confirm `podman version` reports client/server 5.8.5, then run `./verify-postgres.ps1`.
-5. Verify Photo Identity `/health` reports `catalogueProvider=sqlite` and PostgreSQL `ready` at schema version 1.
-6. Complete WI-0097 and begin WI-0098.
+1. Podman downgrade/recreation is complete: client 5.8.5, server 5.8.6. This 5.8.x patch skew is accepted.
+2. Run `./verify-postgres.ps1` unchanged.
+3. If the isolated PostgreSQL bootstrap succeeds through Windows localhost, verify Photo Identity `/health` reports `catalogueProvider=sqlite` and PostgreSQL `ready` at schema version 1.
+4. Complete WI-0097 and begin WI-0098.
 
 Do not use the dynamic Podman-machine IP as permanent application configuration.
 
