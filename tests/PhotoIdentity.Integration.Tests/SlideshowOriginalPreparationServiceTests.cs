@@ -408,10 +408,11 @@ public sealed class SlideshowOriginalPreparationServiceTests
         SqliteArchiveHydrationRepository hydrations = new(database);
         SlideshowOriginalLeaseRegistry leases = new(time);
         ArchiveHydrationCapacityService capacity = new(
-            database,
             hydrations,
             new SqliteArchiveSourceHydrationRepository(database),
+            new SqliteArchiveCoverageRepository(database),
             new SqliteArchiveStorageRepository(database),
+            new SqliteArchiveAvailabilityRepository(database),
             platform,
             new FixedStorageProbe(100_000),
             policy,
