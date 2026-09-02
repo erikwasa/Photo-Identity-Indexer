@@ -1,8 +1,7 @@
 using System.Text.Json;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Core.Processing;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Core.Processing;
 
 public enum ProcessingRunStatus
 {

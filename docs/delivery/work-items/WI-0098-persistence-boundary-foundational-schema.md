@@ -59,3 +59,29 @@ Maintainer live verification after merging PR #237 reached PostgreSQL schema ver
 The migration runs inside the existing transaction, so the failed schema-version-2 attempt is rolled back and version 2 is not recorded as applied. No PostgreSQL reset is required.
 
 The corrective slice replaces dollar quoting entirely with an ordinary single-quoted PL/pgSQL function body and doubles the embedded exception-message quotes. The verifier's terminal failure message is also corrected so a live migration/test failure is no longer mislabeled as a Podman/WSL networking failure.
+
+
+### Maintainer verification — PostgreSQL schema version 2
+
+After PR #239 merged on 2026-09-02, the maintainer reran `verify-postgres.ps1` against the existing Podman 5.8.x PostgreSQL volume.
+
+Verification passed end-to-end:
+
+- authenticated SQL inside the container passed;
+- Windows localhost PostgreSQL protocol passed;
+- the isolated live migration test passed;
+- schema version 2 applied successfully without resetting the PostgreSQL volume.
+
+This verifies the foundational PostgreSQL schema and the corrected revision-identity trigger syntax.
+
+
+### Slice 2 — durable processing execution boundary
+
+Started 2026-09-02.
+
+- Moved durable processing run/job records and statuses from the SQLite assembly into `PhotoIdentity.Core.Processing`; they describe provider-neutral execution state rather than SQLite implementation details.
+- Moved `ProcessingLeaseLostException` into Core so lease invalidation is part of the persistence contract rather than an SQLite-specific exception.
+- Added `IProcessingExecutionRepository` for claim, summary, checkpoint, completion, failure/retry and run-finalization operations used by the resumable worker.
+- `SqliteProcessingRepository` implements the neutral contract with its existing transaction/lease semantics.
+- `ResumableBatchProcessor` now depends on `IProcessingExecutionRepository` and no longer references the SQLite persistence namespace.
+- Existing SQLite processing tests remain the behavior guard for lease, retry, checkpoint, idempotency and restart semantics. A PostgreSQL implementation remains for the later persistence-migration work item rather than introducing dual writes here.

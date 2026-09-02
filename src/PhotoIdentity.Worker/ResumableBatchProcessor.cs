@@ -1,6 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Worker;
 
@@ -38,12 +37,12 @@ public sealed record ResumableBatchProcessorResult(
 /// </summary>
 public sealed class ResumableBatchProcessor
 {
-    private readonly SqliteProcessingRepository _repository;
+    private readonly IProcessingExecutionRepository _repository;
     private readonly IProcessingJobHandler _handler;
     private readonly TimeProvider _timeProvider;
 
     public ResumableBatchProcessor(
-        SqliteProcessingRepository repository,
+        IProcessingExecutionRepository repository,
         IProcessingJobHandler handler,
         TimeProvider? timeProvider = null)
     {
@@ -168,14 +167,14 @@ public sealed class ResumableBatchProcessor
 
     private sealed class RepositoryCheckpointWriter : IProcessingCheckpointWriter
     {
-        private readonly SqliteProcessingRepository _repository;
+        private readonly IProcessingExecutionRepository _repository;
         private readonly ProcessingJobId _jobId;
         private readonly ProcessingLeaseToken _leaseToken;
         private readonly TimeSpan _leaseDuration;
         private readonly TimeProvider _timeProvider;
 
         public RepositoryCheckpointWriter(
-            SqliteProcessingRepository repository,
+            IProcessingExecutionRepository repository,
             ProcessingJobId jobId,
             ProcessingLeaseToken leaseToken,
             TimeSpan leaseDuration,
