@@ -105,8 +105,8 @@ public sealed class DriveArchiveStorageProbe : IArchiveStorageProbe
 public sealed class ArchiveHydrationCapacityService
 {
     private readonly SqliteCatalogueDatabase _database;
-    private readonly SqliteArchiveHydrationRepository _hydrations;
-    private readonly SqliteArchiveSourceHydrationRepository _sourceHydrations;
+    private readonly IArchiveHydrationRepository _hydrations;
+    private readonly IArchiveSourceHydrationRepository _sourceHydrations;
     private readonly SqliteArchiveStorageRepository _storage;
     private readonly SqliteArchiveAvailabilityRepository _availability;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
@@ -120,8 +120,8 @@ public sealed class ArchiveHydrationCapacityService
 
     public ArchiveHydrationCapacityService(
         SqliteCatalogueDatabase database,
-        SqliteArchiveHydrationRepository hydrations,
-        SqliteArchiveSourceHydrationRepository sourceHydrations,
+        IArchiveHydrationRepository hydrations,
+        IArchiveSourceHydrationRepository sourceHydrations,
         SqliteArchiveStorageRepository storage,
         IOneDriveFilesOnDemandPlatform platform,
         IArchiveStorageProbe probe,
@@ -480,11 +480,11 @@ public sealed class ArchiveHydrationCapacityService
     private async Task<IReadOnlyList<ObservedManagedLease>> ObserveActiveLeasesAsync(
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<ArchiveManagedHydrationLease> revisionLeases = await _hydrations.GetActiveLeasesAsync(cancellationToken);
-        IReadOnlyList<ArchiveManagedSourceHydrationLease> sourceLeases = await _sourceHydrations.GetActiveLeasesAsync(cancellationToken);
+        IReadOnlyList<ArchiveManagedHydrationLeaseState> revisionLeases = await _hydrations.GetActiveLeasesAsync(cancellationToken);
+        IReadOnlyList<ArchiveManagedSourceHydrationLeaseState> sourceLeases = await _sourceHydrations.GetActiveLeasesAsync(cancellationToken);
         List<ObservedManagedLease> observed = [];
 
-        foreach (ArchiveManagedHydrationLease lease in revisionLeases)
+        foreach (ArchiveManagedHydrationLeaseState lease in revisionLeases)
         {
             ManagedLease normalized = new(
                 RevisionKey(lease.AssetRevisionId),
@@ -501,7 +501,7 @@ public sealed class ArchiveHydrationCapacityService
             }
         }
 
-        foreach (ArchiveManagedSourceHydrationLease lease in sourceLeases)
+        foreach (ArchiveManagedSourceHydrationLeaseState lease in sourceLeases)
         {
             ManagedLease normalized = new(
                 SourceKey(lease.AssetId),
