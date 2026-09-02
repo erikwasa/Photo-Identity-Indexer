@@ -257,11 +257,12 @@ public sealed class PostgresArchiveSourceHydrationRepository :
             read.Parameters.AddWithValue(
                 "asset_id",
                 Guid.Parse(assetId.ToString()));
-            object? value =
-                await read.ExecuteScalarAsync(cancellationToken);
-            if (value is DateTimeOffset timestamp)
+            await using NpgsqlDataReader reader =
+                await read.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
             {
-                requestedAt = timestamp;
+                requestedAt =
+                    reader.GetFieldValue<DateTimeOffset>(0);
             }
         }
 
