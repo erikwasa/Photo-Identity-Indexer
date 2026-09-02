@@ -288,7 +288,8 @@ public sealed class ArchiveAnalysisCoordinator
         if (_inspectionSession is null)
         {
             using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
-                _database,
+                new SqliteLocalBatchRepository(_database),
+                new SqliteFaceCatalogueRepository(_database),
                 batchConfiguration,
                 cancellationToken,
                 _metrics);
@@ -350,7 +351,8 @@ public sealed class ArchiveAnalysisCoordinator
         if (_inspectionSession is null)
         {
             using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
-                _database,
+                new SqliteLocalBatchRepository(_database),
+                new SqliteFaceCatalogueRepository(_database),
                 batchConfiguration,
                 cancellationToken,
                 _metrics);
