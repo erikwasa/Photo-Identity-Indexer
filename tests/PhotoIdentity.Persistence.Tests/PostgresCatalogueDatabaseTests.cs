@@ -213,6 +213,8 @@ public sealed class PostgresCatalogueDatabaseTests
             Guid sourceId = Guid.NewGuid();
             Guid assetId = Guid.NewGuid();
             Guid revisionId = Guid.NewGuid();
+            DateTimeOffset seededAt =
+                new(2026, 9, 2, 20, 0, 0, TimeSpan.Zero);
             await using (NpgsqlCommand seedRevision =
                          verificationConnection.CreateCommand())
             {
@@ -251,14 +253,14 @@ public sealed class PostgresCatalogueDatabaseTests
                     new string('a', 64));
                 seedRevision.Parameters.AddWithValue(
                     "now",
-                    DateTimeOffset.UtcNow);
+                    seededAt);
                 await seedRevision.ExecuteNonQueryAsync();
             }
 
             IArchiveAvailabilityRepository archiveAvailability =
                 new PostgresArchiveAvailabilityRepository(database);
             DateTimeOffset firstAvailabilityCheck =
-                new(2026, 9, 2, 20, 0, 0, TimeSpan.Zero);
+                seededAt.AddMinutes(1);
             await archiveAvailability.RecordAsync(
                 AssetId.From(assetId),
                 AssetAvailability.OnlineOnly,
@@ -291,9 +293,9 @@ public sealed class PostgresCatalogueDatabaseTests
             IArchiveSourceObservationRepository sourceObservations =
                 new PostgresArchiveSourceObservationRepository(database);
             DateTimeOffset sourceObservedAt =
-                new(2026, 9, 2, 20, 10, 0, TimeSpan.Zero);
+                seededAt.AddMinutes(10);
             DateTimeOffset sourceLastWrite =
-                new(2026, 9, 2, 19, 55, 0, TimeSpan.Zero);
+                seededAt.AddMinutes(-5);
             ArchiveCatalogueSource archiveSource = new(
                 SourceId.From(sourceId),
                 "test",
