@@ -290,28 +290,28 @@ public sealed class PostgresCatalogueDatabaseTests
                     coverageSource,
                     "2026/03",
                     seededAt.AddMinutes(20));
-            Assert.Equal(["2026/03"], configuredCoverage.IncludedFolders);
+            Assert.Equal(new[] { "2026/03" }, configuredCoverage.IncludedFolders);
 
             configuredCoverage = await archiveCoverage.ConfigureAndIncludeAsync(
                 coverageSource,
                 "2026/04",
                 seededAt.AddMinutes(21));
             Assert.Equal(
-                ["2026/03", "2026/04"],
+                new[] { "2026/03", "2026/04" },
                 configuredCoverage.IncludedFolders);
 
             configuredCoverage = await archiveCoverage.ConfigureAndIncludeAsync(
                 coverageSource,
                 "2026",
                 seededAt.AddMinutes(22));
-            Assert.Equal(["2026"], configuredCoverage.IncludedFolders);
+            Assert.Equal(new[] { "2026" }, configuredCoverage.IncludedFolders);
 
             ArchiveCoverageState replacedCoverage =
                 await archiveCoverage.ReplaceIncludedFoldersAsync(
-                    ["1970/01", "1970", "2026/08"],
+                    new[] { "1970/01", "1970", "2026/08" },
                     seededAt.AddMinutes(23));
             Assert.Equal(
-                ["1970", "2026/08"],
+                new[] { "1970", "2026/08" },
                 replacedCoverage.IncludedFolders);
 
             ArchiveCoverageState persistedCoverage =
