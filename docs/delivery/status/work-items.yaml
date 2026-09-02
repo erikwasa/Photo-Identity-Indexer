@@ -1074,11 +1074,14 @@ work_items:
 - id: WI-0097
   title: Establish PostgreSQL runtime and migration foundation
   milestone: M24
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0097-postgresql-runtime-foundation.md
   started_at: 2026-09-01
-  last_updated_at: 2026-09-01
+  completed_at: 2026-09-02
+  verified_at: 2026-09-02
+  verified_by: maintainer
+  last_updated_at: 2026-09-02
   branch: agent/WI-0097-verifier-exit-code
   blockers: []
   blocker_notes:
@@ -1090,6 +1093,7 @@ work_items:
   - Upstream Podman issue #29377 and Microsoft WSL issue #41204 document current Podman 6.0.x Windows/WSL localhost port-forwarding regressions matching the observed behavior. The active slice detects Podman client/server versions and uses Podman 5.8.x as the known-good WSL fallback baseline rather than changing Photo Identity database code.
   - Maintainer confirmed both Windows client and Linux server were Podman 6.0.2 (commit b28edb9ad70ce4317dc762ee9ce0a6d081d154e9), matching the upstream regression report exactly. The runtime has now been downgraded/recreated to the accepted 5.8.x baseline: client 5.8.5 (6d48b6f12f793176f3f6bc808b5a440984c14eb2), server 5.8.6 (a859fc66702c23e869c282c63e92d9b6cd264229). Next step is rerun live verification.
   - On the 5.8.x baseline, authenticated in-container SQL and the Windows localhost PostgreSQL protocol preflight both pass. A verifier-only PowerShell bug then captured dotnet test output together with the exit code, causing a false generic failure; the active slice returns only the numeric test exit code.
+  - Final maintainer verification passed on 2026-09-02: verify-postgres.ps1 completed the isolated migration bootstrap successfully; current main /health reported catalogueProvider=sqlite and PostgreSQL configured=true, status=ready, schemaVersion=1 while the real SQLite catalogue remained at schemaVersion=16.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/229
@@ -1113,15 +1117,27 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/234
   - type: merge_commit
     value: 7f77ae769cfcb3ad5499c15df70047c5231dd593
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/235
+  - type: merge_commit
+    value: 75da3e7feacb29dacaf68e4205e7fe7f0dd142b9
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/236
+  - type: merge_commit
+    value: d0b3b1bad692893f8cb599d4482de268445ed9f0
 - id: WI-0098
   title: Add database-neutral persistence boundary and foundational PostgreSQL schema
   milestone: M24
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0098-persistence-boundary-foundational-schema.md
+  started_at: 2026-09-02
+  last_updated_at: 2026-09-02
+  branch: agent/WI-0098-persistence-boundary-foundational-schema
   blockers:
   - WI-0097
-  blocker_notes: []
+  blocker_notes:
+  - WI-0097 was maintainer-verified on 2026-09-02; SQLite remains authoritative while WI-0098 introduces neutral contracts and PostgreSQL schema additively.
   evidence: []
 - id: WI-0099
   title: Migrate archive and background-processing persistence to PostgreSQL
