@@ -24,7 +24,7 @@ The compose definition uses PostgreSQL 18 and publishes the database port throug
 
 As of 2026-09-02, Podman 6.0.x has an open, triaged Windows/WSL localhost port-forwarding regression where container ports are published in the Podman machine but do not carry traffic correctly through Windows localhost. This is tracked upstream as Podman issue #29377 and Microsoft WSL issue #41204.
 
-For WI-0097 Windows/WSL verification, the known-good fallback baseline is **Podman 5.8.5**. Podman Desktop 1.28.3 shipped Podman 5.8.5. Do not change PostgreSQL, Npgsql or Photo Identity catalogue code to compensate for the Podman 6.0.x forwarding regression. The verifier reports the Podman client/server versions and classifies the known failure signature explicitly.
+For WI-0097 Windows/WSL verification, the known-good fallback baseline is the **Podman 5.8.x** line. Podman Desktop 1.28.3 ships the 5.8.5 Windows client; a freshly initialized machine may report a newer 5.8.x Linux server image (for example 5.8.6). This client/server patch difference is acceptable for WI-0097 because the upstream regression is specific to the Podman 6 line, while the WSL report states that Podman 4.x/5.x work. Do not change PostgreSQL, Npgsql or Photo Identity catalogue code to compensate for the Podman 6.0.x forwarding regression. The verifier reports the Podman client/server versions and classifies the known failure signature explicitly.
 
 Podman WSL user-mode networking can still be useful for VPN/network compatibility, but maintainer verification showed that enabling it does not resolve this Podman 6.0.x localhost-forwarding regression.
 
