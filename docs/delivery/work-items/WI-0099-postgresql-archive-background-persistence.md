@@ -67,3 +67,28 @@ Started 2026-09-02.
 - Runtime archive scanning/status/hydration remains SQLite-authoritative; this slice adds no dual writes or mixed-authority runtime reads.
 
 The next slice should move the lightweight archive source-observation/verification state onto a provider-neutral boundary, reusing the availability table established here.
+
+
+### Maintainer verification — PostgreSQL schema version 4
+
+After PR #246 merged on 2026-09-02, the maintainer reran `verify-postgres.ps1` on main at merge commit `740dfd9684dc83ac77728beec206dc5950fac49a`.
+
+Verification passed end-to-end on the existing Podman 5.8.x volume:
+- authenticated PostgreSQL SQL inside the container passed;
+- the Windows localhost PostgreSQL protocol check passed;
+- the isolated live persistence test passed;
+- schema version 4 and archive-availability upsert behavior were accepted without resetting the volume.
+
+### Slice 3 — PostgreSQL source observation and verification baseline
+
+Started 2026-09-02.
+
+- Added provider-neutral `IArchiveSourceObservationRepository` plus Core-owned source/observation/result DTOs.
+- `SqliteArchiveSourceObservationRepository` implements the new contract through explicit compatibility adapters, leaving existing SQLite callers and record types unchanged.
+- Added PostgreSQL schema version 5 with `archive_source_observations`, verification-state constraints, optional verified-revision baseline metadata, foreign keys and the pending-verification index.
+- Added `PostgresArchiveSourceObservationRepository` preserving the current safety semantics: metadata divergence may require verification; metadata alone never establishes a new immutable revision; once verification is required, only verified content clears it.
+- The PostgreSQL adapter updates source, asset, availability, observation and optional verified revision in a single transaction matching the current SQLite write boundary.
+- Extended the isolated live PostgreSQL test through the transition sequence: existing revision without baseline → needs verification → verified content → unchanged metadata remains verified → changed metadata returns to needs verification.
+- Runtime archive scanning, verification scheduling and status remain SQLite-authoritative. No dual writes or mixed-authority reads are introduced.
+
+After this slice, archive coverage and durable processing execution remain the major prerequisites before any archive runtime cutover.

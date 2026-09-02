@@ -1184,13 +1184,14 @@ work_items:
   document: ../work-items/WI-0099-postgresql-archive-background-persistence.md
   started_at: 2026-09-02
   last_updated_at: 2026-09-02
-  branch: agent/WI-0099-postgres-archive-availability
+  branch: agent/WI-0099-postgres-source-observations
   blockers:
   - WI-0098
   blocker_notes:
   - WI-0098 completed on 2026-09-02; PostgreSQL foundational schema and neutral persistence contracts are available for migration slices.
   - Includes the 2026-09-01 hosted-service shutdown class where a SQLite table lock escaped ArchiveAdvancementHostedService recovery handling.
   - 'PR #245 merged and workflow #1437 passed. Maintainer live verification then passed on the existing Podman 5.8.x volume: authenticated container SQL, Windows localhost protocol, and the isolated PostgreSQL persistence test all succeeded with schema version 3.'
+  - 'PR #246 merged at 740dfd9684dc83ac77728beec206dc5950fac49a and workflow #1441 passed. Maintainer live verification then passed again on the existing volume, accepting PostgreSQL schema version 4 and archive-availability persistence.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/245
@@ -1200,6 +1201,12 @@ work_items:
     value: 5bd9354592f781aeb9e4d3d8fef48a5f763bdf27
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/246
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33677648598
+  - type: merge_commit
+    value: 740dfd9684dc83ac77728beec206dc5950fac49a
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/247
 - id: WI-0100
   title: Migrate review and identity persistence to PostgreSQL
   milestone: M24
