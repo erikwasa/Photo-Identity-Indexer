@@ -836,6 +836,102 @@ public sealed class PostgresCatalogueDatabaseTests
                     10,
                     refresh: true));
 
+            // WI-0099 acceptance: exercise independent archive/background writers
+            // concurrently against PostgreSQL. These operations previously shared
+            // SQLite's single-writer ceiling and could participate in host-stopping
+            // lock contention.
+            IArchiveAdvancementControlRepository concurrentAdvancement =
+                new PostgresArchiveAdvancementControlRepository(database);
+            IArchiveAvailabilityRepository concurrentAvailability =
+                new PostgresArchiveAvailabilityRepository(database);
+            IArchiveSourceObservationRepository concurrentObservations =
+                new PostgresArchiveSourceObservationRepository(database);
+            IPhotoPlaceEnrichmentStateRepository concurrentEnrichment =
+                new PostgresPhotoPlaceEnrichmentStateRepository(
+                    database,
+                    TimeProvider.System);
+            SourceId concurrentSourceId = SourceId.From(sourceId);
+            AssetId concurrentAssetId = AssetId.From(assetId);
+            const string concurrentContract = "concurrency-v1";
+            DateTimeOffset concurrencyAt = seededAt.AddHours(5);
+
+            await concurrentAdvancement.RequestRunAsync(
+                concurrentSourceId,
+                concurrencyAt);
+
+            List<Task> concurrentWrites = [];
+            for (int iteration = 0; iteration < 8; iteration++)
+            {
+                DateTimeOffset iterationAt =
+                    concurrencyAt.AddMilliseconds(iteration + 1);
+                concurrentWrites.Add(
+                    concurrentAdvancement.UpdateRuntimeAsync(
+                        concurrentSourceId,
+                        "running",
+                        syncRequired: iteration % 2 == 0,
+                        message: null,
+                        iterationAt));
+                concurrentWrites.Add(
+                    concurrentAvailability.RecordAsync(
+                        concurrentAssetId,
+                        iteration % 2 == 0
+                            ? AssetAvailability.Local
+                            : AssetAvailability.OnlineOnly,
+                        iterationAt));
+                concurrentWrites.Add(
+                    concurrentEnrichment.MarkDeferredAsync(
+                        geoProvider,
+                        concurrentContract,
+                        movedCandidate,
+                        "transient-test",
+                        "retryable concurrent writer test",
+                        cancellationToken: default));
+            }
+
+            await Task.WhenAll(concurrentWrites);
+
+            DateTimeOffset finalConcurrencyAt =
+                concurrencyAt.AddMinutes(1);
+            await concurrentAdvancement.UpdateRuntimeAsync(
+                concurrentSourceId,
+                "running",
+                syncRequired: false,
+                message: null,
+                finalConcurrencyAt);
+            await concurrentAvailability.RecordAsync(
+                concurrentAssetId,
+                AssetAvailability.Local,
+                finalConcurrencyAt);
+            await concurrentEnrichment.MarkDeferredAsync(
+                geoProvider,
+                concurrentContract,
+                movedCandidate,
+                "transient-test",
+                "retryable concurrent writer test");
+
+            ArchiveAdvancementControlState concurrentControlState =
+                Assert.IsType<ArchiveAdvancementControlState>(
+                    await concurrentAdvancement.GetAsync(
+                        concurrentSourceId));
+            Assert.True(concurrentControlState.IsRequested);
+            Assert.Equal("running", concurrentControlState.RuntimeState);
+            Assert.False(concurrentControlState.SyncRequired);
+
+            ArchiveSourceObservationSnapshot concurrentObservation =
+                Assert.IsType<ArchiveSourceObservationSnapshot>(
+                    await concurrentObservations.GetAsync(
+                        concurrentAssetId));
+            Assert.Equal(
+                AssetAvailability.Local,
+                concurrentObservation.Availability);
+            Assert.Contains(
+                await concurrentEnrichment.GetCandidatesAsync(
+                    geoProvider,
+                    concurrentContract,
+                    10,
+                    refresh: false),
+                candidate => candidate.RevisionId == movedCandidate.RevisionId);
+
             PostgresProcessingRepository processingRepository = new(database);
             IProcessingRunRepository processingRuns = processingRepository;
             IProcessingExecutionRepository processingExecution = processingRepository;
