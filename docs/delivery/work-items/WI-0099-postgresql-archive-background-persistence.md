@@ -178,3 +178,26 @@ Started 2026-09-02.
 - Fixed the original hosted-service recovery-write escape class: secondary failures while persisting waiting/blocked recovery state are logged and suppressed, and the loop backs off before retrying instead of allowing the recovery write to terminate the host or hot-spin.
 - Extended live PostgreSQL verification to cover advancement request → runtime update → complete, pause and block transitions.
 - Remaining SQLite-owned WI-0099 state still includes post-analysis, hydration/release ownership, storage-policy accounting and automatic GeoNames enrichment operational state. Runtime cutover remains deferred until those writer surfaces can move coherently.
+
+
+### Maintainer verification — PostgreSQL schema version 7
+
+After PR #252 merged on 2026-09-02, the maintainer reran `verify-postgres.ps1`.
+
+Verification passed end-to-end on the existing Podman PostgreSQL volume, accepting schema version 7 and the archive-advancement-control persistence lifecycle. The hosted-service recovery-write containment remains active while SQLite is still bound as the runtime control provider.
+
+### Slice 7 — PostgreSQL review-proxy completion and post-analysis retry state
+
+Started 2026-09-02.
+
+- Added provider-neutral `IArchiveReviewProxyRepository` plus Core-owned `ArchiveReviewProxyMetadata`.
+- Added provider-neutral `IArchivePostAnalysisRepository` for selecting analyzed current revisions whose selected review proxy is still missing.
+- `SqliteArchiveReviewProxyRepository` implements the neutral proxy contract through compatibility adapters while retaining its existing SQLite-owned record/API.
+- `SqliteArchivePostAnalysisRepository` implements the neutral post-analysis selector contract.
+- Added PostgreSQL schema version 8 with `archive_review_proxy_profiles` and `asset_revision_review_proxies`, preserving immutable profile identity, derivative metadata constraints, relative-path uniqueness and revision/profile relationships.
+- Added `PostgresArchiveReviewProxyRepository` with idempotent profile registration, profile mismatch rejection, derivative completion/readback, multi-read and pending-current-revision selection.
+- Added `PostgresArchivePostAnalysisRepository` preserving the retry boundary: only current revisions with durable governed analysis and no selected proxy are returned.
+- `ArchiveBoundedAnalysisService` and `ArchiveAdvancementHostedService` now consume neutral post-analysis/proxy metadata contracts, but dependency injection still binds those contracts to SQLite. The actual proxy writer also remains SQLite-backed in this slice, so no mixed-authority runtime path is introduced.
+- Extended live PostgreSQL verification to prove: analyzed revision is post-analysis pending → proxy profile registers → completion persists → pending state clears; conflicting profile settings or derivative metadata are rejected.
+
+Remaining substantial WI-0099 persistence surfaces are hydration/release ownership, storage-policy accounting and automatic GeoNames enrichment operational state. Runtime cutover remains deferred until these background writer domains can move coherently.

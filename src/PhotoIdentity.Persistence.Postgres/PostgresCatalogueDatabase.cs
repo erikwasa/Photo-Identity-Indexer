@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 7;
+    public const int CurrentSchemaVersion = 8;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -401,6 +401,52 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                     FOREIGN KEY (source_id)
                     REFERENCES sources (id) ON DELETE CASCADE
             );
+            """),
+        new(
+            8,
+            "archive-review-proxies-and-post-analysis",
+            """
+            CREATE TABLE archive_review_proxy_profiles (
+                profile_id text NOT NULL PRIMARY KEY,
+                protocol_version text NOT NULL,
+                encoder text NOT NULL,
+                format text NOT NULL,
+                jpeg_quality integer NOT NULL
+                    CHECK (jpeg_quality BETWEEN 1 AND 100),
+                maximum_long_edge integer NOT NULL
+                    CHECK (maximum_long_edge > 0),
+                resize_policy text NOT NULL,
+                canonical_definition text NOT NULL,
+                recorded_at_utc timestamp with time zone NOT NULL
+            );
+
+            CREATE TABLE asset_revision_review_proxies (
+                asset_revision_id uuid NOT NULL,
+                profile_id text NOT NULL,
+                encoded_byte_length bigint NOT NULL
+                    CHECK (encoded_byte_length > 0),
+                content_sha256 text NOT NULL
+                    CHECK (content_sha256 ~ '^[0-9a-f]{64}$'),
+                width integer NOT NULL CHECK (width > 0),
+                height integer NOT NULL CHECK (height > 0),
+                generated_at_utc timestamp with time zone NOT NULL,
+                relative_path text NOT NULL
+                    CHECK (btrim(relative_path) <> ''),
+                PRIMARY KEY (asset_revision_id, profile_id),
+                UNIQUE (relative_path),
+                CONSTRAINT fk_asset_revision_review_proxies_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                CONSTRAINT fk_asset_revision_review_proxies_profile
+                    FOREIGN KEY (profile_id)
+                    REFERENCES archive_review_proxy_profiles (profile_id)
+                    ON DELETE RESTRICT
+            );
+
+            CREATE INDEX ix_asset_revision_review_proxies_profile
+                ON asset_revision_review_proxies (
+                    profile_id,
+                    asset_revision_id);
             """),
     ];
 

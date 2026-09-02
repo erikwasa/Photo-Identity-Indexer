@@ -21,8 +21,8 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
     private readonly SqliteCatalogueDatabase _database;
     private readonly SqliteLocalBatchRepository _catalogue;
     private readonly SqliteArchiveAnalysisRepository _analysis;
-    private readonly SqliteArchivePostAnalysisRepository _postAnalysis;
-    private readonly SqliteArchiveReviewProxyRepository _proxies;
+    private readonly IArchivePostAnalysisRepository _postAnalysis;
+    private readonly IArchiveReviewProxyRepository _proxies;
     private readonly SqliteArchiveSourceVerificationStateRepository _sourceVerificationState;
     private readonly CollectionOriginalAccessService _originals;
     private readonly ArchiveSourceVerificationService _sourceVerification;
@@ -40,8 +40,8 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         SqliteCatalogueDatabase database,
         SqliteLocalBatchRepository catalogue,
         SqliteArchiveAnalysisRepository analysis,
-        SqliteArchivePostAnalysisRepository postAnalysis,
-        SqliteArchiveReviewProxyRepository proxies,
+        IArchivePostAnalysisRepository postAnalysis,
+        IArchiveReviewProxyRepository proxies,
         SqliteArchiveSourceVerificationStateRepository sourceVerificationState,
         CollectionOriginalAccessService originals,
         ArchiveSourceVerificationService sourceVerification,

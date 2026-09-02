@@ -2,6 +2,7 @@ using System.Text.Json;
 using Xunit;
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Sources;
@@ -213,6 +214,24 @@ public sealed class PostgresCatalogueDatabaseTests
                 object? archiveAdvancementTableCount =
                     await readArchiveAdvancementTable.ExecuteScalarAsync();
                 Assert.Equal(1L, Convert.ToInt64(archiveAdvancementTableCount));
+            }
+
+            await using (NpgsqlCommand readArchiveProxyTables =
+                         verificationConnection.CreateCommand())
+            {
+                readArchiveProxyTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'archive_review_proxy_profiles',
+                          'asset_revision_review_proxies');
+                    """;
+
+                object? archiveProxyTableCount =
+                    await readArchiveProxyTables.ExecuteScalarAsync();
+                Assert.Equal(2L, Convert.ToInt64(archiveProxyTableCount));
             }
 
             await using (NpgsqlCommand readColumnTypes =
@@ -819,6 +838,109 @@ public sealed class PostgresCatalogueDatabaseTests
 
             Assert.True(
                 await archiveAnalysis.IsCompletedAsync(revision, profileHash));
+
+            IArchivePostAnalysisRepository postAnalysis =
+                new PostgresArchivePostAnalysisRepository(database);
+            IArchiveReviewProxyRepository reviewProxies =
+                new PostgresArchiveReviewProxyRepository(database);
+            ReviewProxyProfile reviewProxyProfile = new(
+                "live-proxy-1600-q82",
+                1600,
+                82);
+
+            await reviewProxies.RegisterProfileAsync(
+                reviewProxyProfile,
+                seededAt.AddHours(3));
+            ReviewProxyProfile persistedProxyProfile =
+                Assert.IsType<ReviewProxyProfile>(
+                    await reviewProxies.GetProfileAsync(
+                        reviewProxyProfile.Id));
+            Assert.Equal(
+                reviewProxyProfile.ToCanonicalText(),
+                persistedProxyProfile.ToCanonicalText());
+
+            Assert.Equal(
+                revision,
+                await postAnalysis.GetNextMissingProxyRevisionAsync(
+                    SourceId.From(sourceId),
+                    profileHash,
+                    reviewProxyProfile.Id));
+
+            IReadOnlyList<AssetRevisionId> pendingProxyRevisions =
+                await reviewProxies.GetPendingCurrentRevisionIdsAsync(
+                    SourceId.From(sourceId),
+                    reviewProxyProfile.Id);
+            Assert.Contains(revision, pendingProxyRevisions);
+
+            ArchiveReviewProxyMetadata requestedProxy = new(
+                revision,
+                reviewProxyProfile.Id,
+                12345,
+                new Sha256Digest(new string('e', 64)),
+                1200,
+                800,
+                seededAt.AddHours(3).AddMinutes(1),
+                $"review-proxies/{reviewProxyProfile.Id}/{revision}.jpg");
+
+            ArchiveReviewProxyMetadata persistedProxy =
+                await reviewProxies.RecordCompletionAsync(requestedProxy);
+            Assert.Equal(
+                requestedProxy.AssetRevisionId,
+                persistedProxy.AssetRevisionId);
+            Assert.Equal(
+                requestedProxy.ContentHash,
+                persistedProxy.ContentHash);
+            Assert.Equal(
+                requestedProxy.RelativePath,
+                persistedProxy.RelativePath);
+
+            ArchiveReviewProxyMetadata loadedProxy =
+                Assert.IsType<ArchiveReviewProxyMetadata>(
+                    await reviewProxies.GetAsync(
+                        revision,
+                        reviewProxyProfile.Id));
+            Assert.Equal(
+                requestedProxy.ContentHash,
+                loadedProxy.ContentHash);
+
+            IReadOnlyDictionary<AssetRevisionId, ArchiveReviewProxyMetadata>
+                loadedMany = await reviewProxies.GetManyAsync(
+                    new[] { revision },
+                    reviewProxyProfile.Id);
+            Assert.True(loadedMany.ContainsKey(revision));
+
+            Assert.Null(
+                await postAnalysis.GetNextMissingProxyRevisionAsync(
+                    SourceId.From(sourceId),
+                    profileHash,
+                    reviewProxyProfile.Id));
+            Assert.DoesNotContain(
+                revision,
+                await reviewProxies.GetPendingCurrentRevisionIdsAsync(
+                    SourceId.From(sourceId),
+                    reviewProxyProfile.Id));
+
+            ArchiveReviewProxyMetadata conflictingProxy = new(
+                revision,
+                reviewProxyProfile.Id,
+                requestedProxy.EncodedByteLength + 1,
+                requestedProxy.ContentHash,
+                requestedProxy.Width,
+                requestedProxy.Height,
+                requestedProxy.GeneratedAtUtc.AddMinutes(1),
+                requestedProxy.RelativePath);
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => reviewProxies.RecordCompletionAsync(
+                    conflictingProxy));
+
+            ReviewProxyProfile conflictingProfile = new(
+                reviewProxyProfile.Id,
+                reviewProxyProfile.MaximumLongEdge,
+                reviewProxyProfile.JpegQuality - 1);
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => reviewProxies.RegisterProfileAsync(
+                    conflictingProfile,
+                    seededAt.AddHours(3).AddMinutes(2)));
 
             await using (NpgsqlCommand mutateRevision =
                          verificationConnection.CreateCommand())

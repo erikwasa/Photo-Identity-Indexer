@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -9,7 +10,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// proxy is still missing. This is the retry boundary that lets proxy failures resume without
 /// rerunning already-successful detector/embedder inference.
 /// </summary>
-public sealed class SqliteArchivePostAnalysisRepository
+public sealed class SqliteArchivePostAnalysisRepository : IArchivePostAnalysisRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 

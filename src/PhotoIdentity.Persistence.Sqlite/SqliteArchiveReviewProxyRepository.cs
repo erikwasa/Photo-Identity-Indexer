@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// <summary>
 /// Persists exact review-proxy profiles and completion independently from detector/embedder analysis state.
 /// </summary>
-public sealed class SqliteArchiveReviewProxyRepository
+public sealed class SqliteArchiveReviewProxyRepository : IArchiveReviewProxyRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -17,6 +17,41 @@ public sealed class SqliteArchiveReviewProxyRepository
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+    }
+
+    async Task<ArchiveReviewProxyMetadata> IArchiveReviewProxyRepository.RecordCompletionAsync(
+        ArchiveReviewProxyMetadata proxy,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(proxy);
+
+        ArchiveReviewProxyRecord persisted = await RecordCompletionAsync(
+            ToSqliteRecord(proxy),
+            cancellationToken);
+        return ToCoreMetadata(persisted);
+    }
+
+    async Task<ArchiveReviewProxyMetadata?> IArchiveReviewProxyRepository.GetAsync(
+        AssetRevisionId revisionId,
+        string profileId,
+        CancellationToken cancellationToken)
+    {
+        ArchiveReviewProxyRecord? persisted =
+            await GetAsync(revisionId, profileId, cancellationToken);
+        return persisted is null ? null : ToCoreMetadata(persisted);
+    }
+
+    async Task<IReadOnlyDictionary<AssetRevisionId, ArchiveReviewProxyMetadata>>
+        IArchiveReviewProxyRepository.GetManyAsync(
+            IReadOnlyCollection<AssetRevisionId> revisionIds,
+            string profileId,
+            CancellationToken cancellationToken)
+    {
+        IReadOnlyDictionary<AssetRevisionId, ArchiveReviewProxyRecord> persisted =
+            await GetManyAsync(revisionIds, profileId, cancellationToken);
+        return persisted.ToDictionary(
+            static pair => pair.Key,
+            static pair => ToCoreMetadata(pair.Value));
     }
 
     public async Task RegisterProfileAsync(
@@ -327,6 +362,28 @@ public sealed class SqliteArchiveReviewProxyRepository
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    private static ArchiveReviewProxyMetadata ToCoreMetadata(
+        ArchiveReviewProxyRecord proxy) => new(
+        proxy.AssetRevisionId,
+        proxy.ProfileId,
+        proxy.EncodedByteLength,
+        proxy.ContentHash,
+        proxy.Width,
+        proxy.Height,
+        proxy.GeneratedAtUtc,
+        proxy.RelativePath);
+
+    private static ArchiveReviewProxyRecord ToSqliteRecord(
+        ArchiveReviewProxyMetadata proxy) => new(
+        proxy.AssetRevisionId,
+        proxy.ProfileId,
+        proxy.EncodedByteLength,
+        proxy.ContentHash,
+        proxy.Width,
+        proxy.Height,
+        proxy.GeneratedAtUtc,
+        proxy.RelativePath);
 
     private static async Task<ArchiveReviewProxyRecord?> ReadAsync(
         SqliteConnection connection,
