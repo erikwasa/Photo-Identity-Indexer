@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.EventLog;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Imaging.OpenCv;
@@ -118,6 +119,8 @@ public partial class Program
         builder.Services.AddSingleton<SqliteAutomaticPhotoPlaceRepository>();
         builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
+        builder.Services.AddSingleton<IAssetRevisionLookupRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteLocalBatchRepository>());
         builder.Services.AddSingleton<SqliteProcessingRepository>();
         builder.Services.AddSingleton<SqliteDetectorRolloutReviewRepository>();
         builder.Services.AddSingleton<SqliteDetectorRolloutApplicationRepository>();
