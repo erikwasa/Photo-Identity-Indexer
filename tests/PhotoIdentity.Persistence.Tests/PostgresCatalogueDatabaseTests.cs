@@ -2,6 +2,7 @@ using Xunit;
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
 
 namespace PhotoIdentity.Persistence.Tests;
@@ -146,6 +147,22 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(3L, Convert.ToInt64(archiveAnalysisTableCount));
             }
 
+            await using (NpgsqlCommand readArchiveAvailabilityTable =
+                         verificationConnection.CreateCommand())
+            {
+                readArchiveAvailabilityTable.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name = 'archive_asset_availability';
+                    """;
+
+                object? archiveAvailabilityTableCount =
+                    await readArchiveAvailabilityTable.ExecuteScalarAsync();
+                Assert.Equal(1L, Convert.ToInt64(archiveAvailabilityTableCount));
+            }
+
             await using (NpgsqlCommand readColumnTypes =
                          verificationConnection.CreateCommand())
             {
@@ -220,6 +237,39 @@ public sealed class PostgresCatalogueDatabaseTests
                     "now",
                     DateTimeOffset.UtcNow);
                 await seedRevision.ExecuteNonQueryAsync();
+            }
+
+            IArchiveAvailabilityRepository archiveAvailability =
+                new PostgresArchiveAvailabilityRepository(database);
+            DateTimeOffset firstAvailabilityCheck =
+                new(2026, 9, 2, 20, 0, 0, TimeSpan.Zero);
+            await archiveAvailability.RecordAsync(
+                AssetId.From(assetId),
+                AssetAvailability.OnlineOnly,
+                firstAvailabilityCheck);
+            DateTimeOffset secondAvailabilityCheck = firstAvailabilityCheck.AddMinutes(1);
+            await archiveAvailability.RecordAsync(
+                AssetId.From(assetId),
+                AssetAvailability.Local,
+                secondAvailabilityCheck);
+
+            await using (NpgsqlCommand readAvailability =
+                         verificationConnection.CreateCommand())
+            {
+                readAvailability.CommandText =
+                    """
+                    SELECT availability, checked_at_utc
+                    FROM archive_asset_availability
+                    WHERE asset_id = @asset_id;
+                    """;
+                readAvailability.Parameters.AddWithValue("asset_id", assetId);
+                await using NpgsqlDataReader availabilityReader =
+                    await readAvailability.ExecuteReaderAsync();
+                Assert.True(await availabilityReader.ReadAsync());
+                Assert.Equal("local", availabilityReader.GetString(0));
+                Assert.Equal(
+                    secondAvailabilityCheck.ToUniversalTime(),
+                    availabilityReader.GetFieldValue<DateTimeOffset>(1));
             }
 
             Guid processingRunId = Guid.NewGuid();
