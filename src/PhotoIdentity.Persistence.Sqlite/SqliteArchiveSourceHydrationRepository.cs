@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -31,7 +32,7 @@ public sealed record ArchiveManagedSourceHydrationLease(
 /// immutable revision. Once SHA-256 verification establishes/reselects the revision, ownership can
 /// be transferred atomically to the revision-level hydration record used by normal analysis.
 /// </summary>
-public sealed class SqliteArchiveSourceHydrationRepository
+public sealed class SqliteArchiveSourceHydrationRepository : IArchiveSourceHydrationRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -40,6 +41,35 @@ public sealed class SqliteArchiveSourceHydrationRepository
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
     }
+
+    async Task<ArchiveManagedSourceHydrationState?>
+        IArchiveSourceHydrationRepository.GetAsync(
+            AssetId assetId,
+            CancellationToken cancellationToken)
+    {
+        ArchiveManagedSourceHydrationRecord? value =
+            await GetAsync(assetId, cancellationToken);
+        return value is null ? null : ToCoreState(value);
+    }
+
+    async Task<IReadOnlyList<ArchiveManagedSourceHydrationLeaseState>>
+        IArchiveSourceHydrationRepository.GetActiveLeasesAsync(
+            CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ArchiveManagedSourceHydrationLease> values =
+            await GetActiveLeasesAsync(cancellationToken);
+        return values.Select(ToCoreLease).ToArray();
+    }
+
+    async Task<ArchiveManagedSourceHydrationState>
+        IArchiveSourceHydrationRepository.ClaimAsync(
+            AssetId assetId,
+            DateTimeOffset requestedAtUtc,
+            CancellationToken cancellationToken) =>
+        ToCoreState(await ClaimAsync(
+            assetId,
+            requestedAtUtc,
+            cancellationToken));
 
     public async Task<ArchiveManagedSourceHydrationRecord?> GetAsync(
         AssetId assetId,
@@ -349,6 +379,23 @@ public sealed class SqliteArchiveSourceHydrationRepository
             reader.IsDBNull(2) ? null : Parse(reader.GetString(2)),
             reader.IsDBNull(3) ? null : Parse(reader.GetString(3)));
     }
+
+    private static ArchiveManagedSourceHydrationState ToCoreState(
+        ArchiveManagedSourceHydrationRecord value) => new(
+        value.AssetId,
+        value.RequestedAtUtc,
+        value.ReleaseRequestedAtUtc,
+        value.ReleasedAtUtc);
+
+    private static ArchiveManagedSourceHydrationLeaseState ToCoreLease(
+        ArchiveManagedSourceHydrationLease value) => new(
+        value.AssetId,
+        value.SizeBytes,
+        value.RootLocator,
+        value.SourceKey,
+        value.RequestedAtUtc,
+        value.LastNeededAtUtc,
+        value.ReleaseRequestedAtUtc);
 
     private static string Format(DateTimeOffset value) =>
         value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);

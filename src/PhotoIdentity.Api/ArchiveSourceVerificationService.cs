@@ -27,7 +27,7 @@ public sealed record ArchiveSourceVerificationAdvanceResult(
 public sealed class ArchiveSourceVerificationService
 {
     private readonly SqliteArchiveSourceObservationRepository _observations;
-    private readonly SqliteArchiveSourceHydrationRepository _sourceHydrations;
+    private readonly IArchiveSourceHydrationRepository _sourceHydrations;
     private readonly SqliteArchiveAvailabilityRepository _availability;
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
@@ -37,7 +37,7 @@ public sealed class ArchiveSourceVerificationService
 
     public ArchiveSourceVerificationService(
         SqliteArchiveSourceObservationRepository observations,
-        SqliteArchiveSourceHydrationRepository sourceHydrations,
+        IArchiveSourceHydrationRepository sourceHydrations,
         SqliteArchiveAvailabilityRepository availability,
         ArchiveHydrationCapacityService capacity,
         IOneDriveFilesOnDemandPlatform platform,
@@ -76,7 +76,7 @@ public sealed class ArchiveSourceVerificationService
         using IDisposable? verificationTiming = _metrics?.Measure(
             ArchiveThroughputMetricNames.SourceVerification);
         string path = ResolvePath(source);
-        ArchiveManagedSourceHydrationRecord? ownership = await _sourceHydrations.GetAsync(
+        ArchiveManagedSourceHydrationState? ownership = await _sourceHydrations.GetAsync(
             source.AssetId,
             cancellationToken);
         OneDriveFilesOnDemandState state = _platform.GetState(path);

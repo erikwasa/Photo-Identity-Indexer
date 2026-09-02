@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -33,7 +34,7 @@ public sealed record ArchiveManagedHydrationLease(
 /// A separate usage table retains the last time managed content was actually needed so bounded
 /// storage eviction can prefer the least-recently-needed managed originals.
 /// </summary>
-public sealed class SqliteArchiveHydrationRepository
+public sealed class SqliteArchiveHydrationRepository : IArchiveHydrationRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -42,6 +43,43 @@ public sealed class SqliteArchiveHydrationRepository
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
     }
+
+    async Task<ArchiveManagedHydrationState?> IArchiveHydrationRepository.GetAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken)
+    {
+        ArchiveManagedHydrationRecord? value =
+            await GetAsync(revisionId, cancellationToken);
+        return value is null ? null : ToCoreState(value);
+    }
+
+    async Task<IReadOnlyList<ArchiveManagedHydrationLeaseState>>
+        IArchiveHydrationRepository.GetActiveLeasesAsync(
+            CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ArchiveManagedHydrationLease> values =
+            await GetActiveLeasesAsync(cancellationToken);
+        return values.Select(ToCoreLease).ToArray();
+    }
+
+    async Task<ArchiveManagedHydrationState> IArchiveHydrationRepository.ClaimAsync(
+        AssetRevisionId revisionId,
+        DateTimeOffset requestedAtUtc,
+        CancellationToken cancellationToken) =>
+        ToCoreState(await ClaimAsync(
+            revisionId,
+            requestedAtUtc,
+            cancellationToken));
+
+    async Task<ArchiveManagedHydrationState>
+        IArchiveHydrationRepository.MarkReleaseRequestedAsync(
+            AssetRevisionId revisionId,
+            DateTimeOffset requestedAtUtc,
+            CancellationToken cancellationToken) =>
+        ToCoreState(await MarkReleaseRequestedAsync(
+            revisionId,
+            requestedAtUtc,
+            cancellationToken));
 
     public async Task<ArchiveManagedHydrationRecord?> GetAsync(
         AssetRevisionId revisionId,
@@ -286,6 +324,24 @@ public sealed class SqliteArchiveHydrationRepository
             reader.IsDBNull(2) ? null : Parse(reader.GetString(2)),
             reader.IsDBNull(3) ? null : Parse(reader.GetString(3)));
     }
+
+    private static ArchiveManagedHydrationState ToCoreState(
+        ArchiveManagedHydrationRecord value) => new(
+        value.AssetRevisionId,
+        value.RequestedAtUtc,
+        value.ReleaseRequestedAtUtc,
+        value.ReleasedAtUtc);
+
+    private static ArchiveManagedHydrationLeaseState ToCoreLease(
+        ArchiveManagedHydrationLease value) => new(
+        value.AssetRevisionId,
+        value.AssetId,
+        value.SizeBytes,
+        value.RootLocator,
+        value.SourceKey,
+        value.RequestedAtUtc,
+        value.LastNeededAtUtc,
+        value.ReleaseRequestedAtUtc);
 
     private static string Format(DateTimeOffset value) =>
         value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);

@@ -17,8 +17,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     private readonly SqliteArchiveSourceObservationRepository _observations;
     private readonly SqliteArchiveAnalysisRepository _analysis;
     private readonly IArchivePostAnalysisRepository _postAnalysis;
-    private readonly SqliteArchiveHydrationRepository _hydrations;
-    private readonly SqliteArchiveSourceHydrationRepository _sourceHydrations;
+    private readonly IArchiveHydrationRepository _hydrations;
+    private readonly IArchiveSourceHydrationRepository _sourceHydrations;
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly ArchiveBoundedAnalysisService _boundedAnalysis;
     private readonly CollectionOriginalAccessService _originals;
@@ -35,8 +35,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         SqliteArchiveSourceObservationRepository observations,
         SqliteArchiveAnalysisRepository analysis,
         IArchivePostAnalysisRepository postAnalysis,
-        SqliteArchiveHydrationRepository hydrations,
-        SqliteArchiveSourceHydrationRepository sourceHydrations,
+        IArchiveHydrationRepository hydrations,
+        IArchiveSourceHydrationRepository sourceHydrations,
         ArchiveHydrationCapacityService capacity,
         ArchiveBoundedAnalysisService boundedAnalysis,
         CollectionOriginalAccessService originals,
@@ -271,8 +271,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         // Observing the storage snapshot reconciles durable release ownership once OneDrive has
         // actually made a managed file online-only.
         ArchiveStorageSnapshot storage = await _capacity.GetStorageSnapshotAsync(cancellationToken);
-        IReadOnlyList<ArchiveManagedHydrationLease> revisionLeases = await _hydrations.GetActiveLeasesAsync(cancellationToken);
-        IReadOnlyList<ArchiveManagedSourceHydrationLease> sourceLeases = await _sourceHydrations.GetActiveLeasesAsync(cancellationToken);
+        IReadOnlyList<ArchiveManagedHydrationLeaseState> revisionLeases = await _hydrations.GetActiveLeasesAsync(cancellationToken);
+        IReadOnlyList<ArchiveManagedSourceHydrationLeaseState> sourceLeases = await _sourceHydrations.GetActiveLeasesAsync(cancellationToken);
         bool releasePending = revisionLeases.Any(value => value.IsReleaseRequested) ||
             sourceLeases.Any(value => value.IsReleaseRequested);
         bool hasOneDriveTransition = storage.HydrationsInProgress > 0 ||

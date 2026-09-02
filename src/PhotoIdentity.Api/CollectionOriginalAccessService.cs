@@ -34,7 +34,7 @@ public sealed class CollectionOriginalAccessService
     public const string ErrorState = "error";
 
     private readonly IAssetRevisionLookupRepository _catalogue;
-    private readonly SqliteArchiveHydrationRepository _hydrations;
+    private readonly IArchiveHydrationRepository _hydrations;
     private readonly SqliteArchiveAvailabilityRepository _availability;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
     private readonly ArchiveHydrationCapacityService _capacity;
@@ -44,7 +44,7 @@ public sealed class CollectionOriginalAccessService
 
     public CollectionOriginalAccessService(
         IAssetRevisionLookupRepository catalogue,
-        SqliteArchiveHydrationRepository hydrations,
+        IArchiveHydrationRepository hydrations,
         SqliteArchiveAvailabilityRepository availability,
         IOneDriveFilesOnDemandPlatform platform,
         ArchiveHydrationCapacityService capacity,
@@ -79,7 +79,7 @@ public sealed class CollectionOriginalAccessService
             return null;
         }
 
-        ArchiveManagedHydrationRecord? ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
+        ArchiveManagedHydrationState? ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
         OneDriveFilesOnDemandState platformState = await ObserveStateAsync(resolved, cancellationToken);
 
         if (ownership is { IsActive: true, IsReleaseRequested: true } &&
@@ -143,7 +143,7 @@ public sealed class CollectionOriginalAccessService
             return null;
         }
 
-        ArchiveManagedHydrationRecord? ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
+        ArchiveManagedHydrationState? ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
         if (ownership is { IsActive: true, IsReleaseRequested: true })
         {
             throw new InvalidOperationException(
@@ -207,7 +207,7 @@ public sealed class CollectionOriginalAccessService
             return null;
         }
 
-        ArchiveManagedHydrationRecord? ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
+        ArchiveManagedHydrationState? ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
         if (ownership is not { IsActive: true })
         {
             throw new InvalidOperationException(
@@ -260,7 +260,7 @@ public sealed class CollectionOriginalAccessService
             return null;
         }
 
-        ArchiveManagedHydrationRecord? ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
+        ArchiveManagedHydrationState? ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
         if (ownership is { IsActive: true, IsReleaseRequested: true })
         {
             return null;

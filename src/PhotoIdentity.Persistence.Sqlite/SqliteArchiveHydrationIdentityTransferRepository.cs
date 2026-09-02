@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -10,7 +11,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// same ownership to the revision established by SHA-256, so accounting/release responsibility is
 /// not lost when content identity changes under a managed local file.
 /// </summary>
-public sealed class SqliteArchiveHydrationIdentityTransferRepository
+public sealed class SqliteArchiveHydrationIdentityTransferRepository : IArchiveHydrationIdentityTransferRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
