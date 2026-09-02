@@ -12,7 +12,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// <summary>
 /// Persists complete face inspection results over the SQLite catalogue schema.
 /// </summary>
-public sealed class SqliteFaceCatalogueRepository
+public sealed class SqliteFaceCatalogueRepository : IFaceInspectionRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -20,6 +20,44 @@ public sealed class SqliteFaceCatalogueRepository
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+    }
+
+    public async Task SaveInspectionAsync(
+        FaceInspectionWrite inspection,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(inspection);
+
+        _ = await SaveInspectionAsync(
+            new CatalogueFaceOccurrence(
+                inspection.OccurrenceId,
+                inspection.AssetRevisionId,
+                inspection.Ordinal,
+                inspection.ObservedAtUtc),
+            new CatalogueFaceObservation(
+                inspection.OccurrenceId,
+                inspection.DetectorModelId,
+                inspection.DetectorModelHash,
+                inspection.Confidence,
+                inspection.BoundingBox,
+                inspection.Landmarks,
+                inspection.ObservedAtUtc),
+            new CatalogueFaceCrop(
+                inspection.CropId,
+                inspection.OccurrenceId,
+                inspection.CropProtocol,
+                inspection.CropContentHash,
+                inspection.CropStoragePath,
+                inspection.CropWidth,
+                inspection.CropHeight,
+                inspection.ObservedAtUtc),
+            new CatalogueFaceEmbedding(
+                inspection.CropId,
+                inspection.EmbeddingModelId,
+                inspection.EmbeddingModelHash,
+                inspection.Embedding,
+                inspection.ObservedAtUtc),
+            cancellationToken);
     }
 
     /// <summary>
