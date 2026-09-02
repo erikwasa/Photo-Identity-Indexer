@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-checkpoint-json-test`. PR #250 merged and workflow #1454 passed, but maintainer live verification found that the new checkpoint test compared PostgreSQL jsonb text byte-for-byte. The corrective slice changes only the test to compare JSON structurally; production processing code and schema remain unchanged.
+In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-checkpoint-json-test`. PR #250 merged and workflow #1454 passed, but maintainer live verification found that the new checkpoint test compared PostgreSQL jsonb text byte-for-byte. PR #251 is the corrective slice. It changes only the test to compare JSON structurally; production processing code and schema remain unchanged.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
