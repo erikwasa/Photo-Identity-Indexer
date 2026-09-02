@@ -184,3 +184,16 @@ but the verifier immediately fell through to its generic failure without showing
 The cause is PowerShell pipeline semantics in `Invoke-LivePostgresTest`: assigning the function result to `$testExitCode` captured both the native `dotnet test` standard output and the explicit `$LASTEXITCODE`, so the caller received an array rather than a single integer. The corrective slice routes test output to the host and returns only the numeric exit code.
 
 This is a verifier-only defect. The successful protocol preflight means the Podman 5.8.x Windows localhost transport is working.
+
+
+## Maintainer verification — completed 2026-09-02
+
+WI-0097 is accepted.
+
+- The local Windows/WSL runtime was moved from the affected Podman 6.0.2 line to the accepted Podman 5.8.x baseline (client 5.8.5, server 5.8.6).
+- `verify-postgres.ps1` passed end-to-end, including authenticated PostgreSQL access, Windows localhost protocol transport, isolated database creation, and versioned/idempotent migration bootstrap.
+- Current main was then published and started with PostgreSQL configured externally.
+- `/health` reported the real SQLite catalogue at schema version 16 with `catalogueProvider=sqlite`, while PostgreSQL reported `configured=true`, `status=ready`, and `schemaVersion=1`.
+- No SQLite catalogue data was migrated, replaced, or deleted.
+
+This satisfies the WI-0097 runtime, configuration, migration-bootstrap, health, and non-destructive transition requirements. WI-0098 may proceed.

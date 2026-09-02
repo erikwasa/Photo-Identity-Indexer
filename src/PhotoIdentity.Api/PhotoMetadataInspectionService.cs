@@ -12,14 +12,14 @@ namespace PhotoIdentity.Api;
 /// </summary>
 public sealed class PhotoMetadataInspectionService
 {
-    private readonly SqliteAssetCatalogueRepository _catalogue;
+    private readonly IPhotoCaptureMetadataRepository _catalogue;
     private readonly SqliteExtendedPhotoMetadataRepository _extendedMetadata;
     private readonly SqlitePhotoMetadataInspectionRepository _inspections;
     private readonly IPhotoMetadataReader _reader;
     private readonly TimeProvider _timeProvider;
 
     public PhotoMetadataInspectionService(
-        SqliteAssetCatalogueRepository catalogue,
+        IPhotoCaptureMetadataRepository catalogue,
         SqliteExtendedPhotoMetadataRepository extendedMetadata,
         SqlitePhotoMetadataInspectionRepository inspections,
         IPhotoMetadataReader reader,
