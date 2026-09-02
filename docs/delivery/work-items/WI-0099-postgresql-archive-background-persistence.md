@@ -269,3 +269,31 @@ Started 2026-09-03. Active review: PR #256.
 - Extended live PostgreSQL verification to prove: persisted GPS becomes eligible → cache round-trips → deferred remains retryable → succeeded becomes terminal unless refresh is requested → changed coordinates requeue → skipped remains terminal even under refresh.
 
 After this slice is maintainer-verified, all named WI-0099 persistence surfaces have PostgreSQL implementations. The next step is a full archive/background runtime-composition audit to identify any remaining direct SQLite dependencies or cross-domain authority blockers before deciding whether WI-0099 can close or must hand a cutover dependency to WI-0101/WI-0102.
+
+
+### Maintainer verification — PostgreSQL schema version 10
+
+PR #256 merged on 2026-09-03 at `c77fc49eddd636fe54e02745a73441bdb4939d96`; workflow #1479 passed and maintainer review/verification succeeded.
+
+Schema version 10 is accepted, including worker-required capture/GPS metadata plus GeoNames cache/attempt state and retry/refresh/coordinate-change semantics.
+
+### Final runtime-composition audit
+
+Performed 2026-09-03 after schema version 10 acceptance.
+
+The audit distinguishes WI-0099 persistence completion from the later application-wide authority switch:
+
+- Every persistence surface explicitly owned by WI-0099 now has a PostgreSQL implementation: archive coverage, source observations/verification baseline, availability, analysis/post-analysis, durable processing, review-proxy completion needed by post-analysis, managed hydration/release ownership, storage accounting, advancement control and GeoNames operational state.
+- The prior hosted-service recovery-write escape class is contained independently of provider choice.
+- The default application remains SQLite-authoritative by design. No dual writes or mixed-authority runtime mode were introduced.
+- Direct SQLite construction still exists in normal archive/API/worker paths (for example scanner/composition helpers, general catalogue lookup/inspection composition, status/query endpoints and the automatic authoritative Places writer).
+- Those remaining normal-runtime SQLite dependencies are not unowned gaps: WI-0101 explicitly owns elimination of direct SQLite use from normal API/worker runtime and remaining authoritative library/Places/catalogue persistence; WI-0100 owns review/identity persistence; WI-0102 owns migration, single-authority provider selection, cutover and rollback.
+- Therefore WI-0099 must not introduce a partial provider switch merely to remove those references. Doing so before WI-0100/WI-0101 would recreate the split-authority risk prohibited by M24.
+
+### Final acceptance slice — concurrent PostgreSQL background writers
+
+This slice adds no schema change.
+
+The live PostgreSQL verifier now runs archive advancement-control writes, GeoNames attempt-state writes and archive availability writes concurrently against the same isolated catalogue, repeatedly, then asserts deterministic final state through the provider-neutral repositories.
+
+This directly exercises the concurrent-writer condition behind the original SQLite single-writer/table-lock failure class. WI-0099 remains in progress until this final live verifier passes after merge. If it passes, the work item can close and hand normal-runtime SQLite elimination/cutover forward to WI-0101/WI-0102.
