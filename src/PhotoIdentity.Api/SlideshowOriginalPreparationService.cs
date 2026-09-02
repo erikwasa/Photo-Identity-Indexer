@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
@@ -36,7 +36,7 @@ public sealed class SlideshowOriginalPreparationService
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(500);
     public static TimeSpan NoProgressWarningThreshold { get; } = TimeSpan.FromMinutes(2);
 
-    private readonly SqliteLocalBatchRepository _catalogue;
+    private readonly IAssetRevisionLookupRepository _catalogue;
     private readonly CollectionOriginalAccessService _originals;
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly ArchiveHydrationPolicyConfiguration _policyConfiguration;
@@ -45,7 +45,7 @@ public sealed class SlideshowOriginalPreparationService
     private readonly ConcurrentDictionary<Guid, Session> _sessions = new();
 
     public SlideshowOriginalPreparationService(
-        SqliteLocalBatchRepository catalogue,
+        IAssetRevisionLookupRepository catalogue,
         CollectionOriginalAccessService originals,
         ArchiveHydrationCapacityService capacity,
         ArchiveHydrationPolicyConfiguration policyConfiguration,
@@ -75,10 +75,10 @@ public sealed class SlideshowOriginalPreparationService
         CleanupTerminalSessions();
 
         AssetRevisionId[] requested = revisionIds.Distinct().ToArray();
-        List<CatalogueProcessingAssetRevision> revisions = new(requested.Length);
+        List<AssetRevisionLookup> revisions = new(requested.Length);
         foreach (AssetRevisionId revisionId in requested)
         {
-            CatalogueProcessingAssetRevision? revision = await _catalogue.GetAssetRevisionAsync(
+            AssetRevisionLookup? revision = await _catalogue.GetRevisionAsync(
                 revisionId,
                 cancellationToken);
             if (revision is null)
@@ -272,9 +272,9 @@ public sealed class SlideshowOriginalPreparationService
                 int downloading = 0;
                 int managedDownloading = 0;
                 int waitingForRelease = 0;
-                List<CatalogueProcessingAssetRevision> onlineOnly = [];
+                List<AssetRevisionLookup> onlineOnly = [];
 
-                foreach (CatalogueProcessingAssetRevision revision in session.Revisions)
+                foreach (AssetRevisionLookup revision in session.Revisions)
                 {
                     if (ready.Contains(revision.RevisionId))
                     {
@@ -354,7 +354,7 @@ public sealed class SlideshowOriginalPreparationService
                     _timeProvider.GetUtcNow());
 
                 int slots = Math.Max(0, maximumConcurrent - managedDownloading);
-                foreach (CatalogueProcessingAssetRevision revision in onlineOnly.Take(slots))
+                foreach (AssetRevisionLookup revision in onlineOnly.Take(slots))
                 {
                     try
                     {
@@ -511,7 +511,7 @@ public sealed class SlideshowOriginalPreparationService
 
         public Session(
             Guid id,
-            IReadOnlyList<CatalogueProcessingAssetRevision> revisions,
+            IReadOnlyList<AssetRevisionLookup> revisions,
             CancellationTokenSource cancellation,
             DateTimeOffset createdAtUtc)
         {
@@ -523,7 +523,7 @@ public sealed class SlideshowOriginalPreparationService
         }
 
         public Guid Id { get; }
-        public IReadOnlyList<CatalogueProcessingAssetRevision> Revisions { get; }
+        public IReadOnlyList<AssetRevisionLookup> Revisions { get; }
         public CancellationTokenSource Cancellation { get; }
         public Task? RunTask { get; set; }
 
