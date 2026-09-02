@@ -43,3 +43,27 @@ Started 2026-09-02.
 - Runtime archive selection/coverage/availability and processing execution remain on SQLite in this slice. No dual writes or mixed-authority runtime path are introduced.
 
 The next WI-0099 slices can migrate archive coverage/source observations/availability and durable processing execution before switching the archive runtime to PostgreSQL.
+
+
+### Maintainer verification — PostgreSQL schema version 3
+
+After PR #245 merged on 2026-09-02, the maintainer reran `verify-postgres.ps1` against the existing Podman 5.8.x PostgreSQL volume.
+
+Verification passed end-to-end:
+- authenticated SQL inside the container passed;
+- Windows localhost PostgreSQL protocol passed;
+- the isolated live PostgreSQL persistence test passed;
+- schema version 3 and the archive-analysis register → lookup → completion behavior were accepted without resetting the volume.
+
+### Slice 2 — PostgreSQL archive-asset availability
+
+Started 2026-09-02.
+
+- Added provider-neutral `IArchiveAvailabilityRepository` in Core for the per-asset last-observed availability write.
+- `SqliteArchiveAvailabilityRepository` now implements the same contract without changing existing SQLite behavior.
+- Added PostgreSQL schema version 4 with `archive_asset_availability`, PostgreSQL-native UUID/timestamptz types, allowed-state checks, asset foreign key and availability index.
+- Added `PostgresArchiveAvailabilityRepository` with idempotent upsert behavior matching the existing SQLite semantics.
+- Extended the isolated live PostgreSQL test to prove schema version 4 and availability overwrite behavior.
+- Runtime archive scanning/status/hydration remains SQLite-authoritative; this slice adds no dual writes or mixed-authority runtime reads.
+
+The next slice should move the lightweight archive source-observation/verification state onto a provider-neutral boundary, reusing the availability table established here.
