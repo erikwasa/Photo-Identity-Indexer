@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0097 is maintainer-verified and completed. **WI-0098 — Add database-neutral persistence boundary and foundational PostgreSQL schema** is now in progress on `agent/WI-0098-postgres-trigger-syntax-v2`. PR #237 merged the first slice, but maintainer live verification exposed PostgreSQL SQLSTATE `42601` because the schema-v2 trigger function reached main with invalid `AS $ ... $;` syntax. The corrective branch removes dollar quoting entirely. The failed migration was transactional and rolled back, so schema version 2 remains unapplied and the PostgreSQL volume must not be reset. SQLite remains authoritative.
+In the separate M24 thread, WI-0097 is maintainer-verified and completed. **WI-0098 — Add database-neutral persistence boundary and foundational PostgreSQL schema** is in progress on `agent/WI-0098-processing-persistence-boundary`. PR #239 corrected the schema-v2 trigger syntax and the maintainer has now verified schema version 2 successfully on the existing PostgreSQL volume. The active slice moves durable processing records/lease semantics into Core and places `ResumableBatchProcessor` behind `IProcessingExecutionRepository`. SQLite remains authoritative.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, merge the WI-0098 trigger-syntax correction after CI is green, then rerun `./verify-postgres.ps1` against the existing PostgreSQL volume. If schema version 2 verifies successfully, continue the processing persistence boundary. Preserve SQLite behavior until controlled cutover in WI-0102.
+For the M24 thread, review/merge the WI-0098 processing-boundary slice after CI is green. The slice is contract-only: preserve current SQLite lease/checkpoint/retry behavior and do not introduce PostgreSQL authoritative writes or dual writes yet. Preserve SQLite behavior until controlled cutover in WI-0102.
 
 ## Relevant files
 
