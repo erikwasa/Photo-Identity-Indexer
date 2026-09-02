@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 
@@ -14,12 +15,12 @@ public sealed record CatalogueProcessingAssetRevision(
     string SourceKey,
     Sha256Digest ContentHash,
     long SizeBytes,
-    string? MediaType);
+    string? MediaType) : IAssetRevisionStorageDescriptor;
 
 /// <summary>
 /// Resolves local source configuration and immutable revisions for durable batch processing.
 /// </summary>
-public sealed class SqliteLocalBatchRepository
+public sealed class SqliteLocalBatchRepository : IAssetRevisionLookupRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -112,6 +113,17 @@ public sealed class SqliteLocalBatchRepository
         return revisions;
     }
 
+    public async Task<AssetRevisionLookup?> GetRevisionAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken = default) =>
+        ToLookup(await GetAssetRevisionAsync(revisionId, cancellationToken));
+
+    public async Task<AssetRevisionLookup?> FindRevisionAsync(
+        string sourceKey,
+        Sha256Digest contentHash,
+        CancellationToken cancellationToken = default) =>
+        ToLookup(await FindAssetRevisionAsync(sourceKey, contentHash, cancellationToken));
+
     public async Task<CatalogueProcessingAssetRevision?> GetAssetRevisionAsync(
         AssetRevisionId revisionId,
         CancellationToken cancellationToken = default)
@@ -142,6 +154,20 @@ public sealed class SqliteLocalBatchRepository
         command.Parameters.AddWithValue("$content_sha256", contentHash.ToString());
         return await ReadAssetRevisionAsync(command, cancellationToken);
     }
+
+    private static AssetRevisionLookup? ToLookup(CatalogueProcessingAssetRevision? revision) =>
+        revision is null
+            ? null
+            : new AssetRevisionLookup(
+                revision.RevisionId,
+                revision.AssetId,
+                revision.SourceId,
+                revision.SourceKind,
+                revision.RootLocator,
+                revision.SourceKey,
+                revision.ContentHash,
+                revision.SizeBytes,
+                revision.MediaType);
 
     private const string AssetRevisionSelect = """
         SELECT
