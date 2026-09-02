@@ -292,7 +292,7 @@ The audit distinguishes WI-0099 persistence completion from the later applicatio
 
 ### Final acceptance slice — concurrent PostgreSQL background writers
 
-This slice adds no schema change.
+Active review: PR #257. This slice adds no schema change.
 
 The live PostgreSQL verifier now runs archive advancement-control writes, GeoNames attempt-state writes and archive availability writes concurrently against the same isolated catalogue, repeatedly, then asserts deterministic final state through the provider-neutral repositories.
 
