@@ -146,3 +146,12 @@ Started 2026-09-02.
 - Runtime archive orchestration remains SQLite-authoritative. This slice does not introduce dual writes or switch a running archive worker to PostgreSQL.
 
 After this repository is accepted, WI-0099 should reassess the remaining archive-specific persistence surfaces and then design one controlled PostgreSQL runtime composition change rather than introducing mixed authority incrementally.
+
+
+### PostgreSQL processing live-verification correction
+
+After PR #250 merged at `0085146e1b3981c240c2b3aa7d85feb6e990e4fb`, workflow #1454 was green. The maintainer then ran `verify-postgres.ps1` against updated main.
+
+Connectivity and schema initialization passed, but the isolated live test failed because it compared checkpoint JSON text byte-for-byte. PostgreSQL `jsonb` legitimately normalized `{"stage":1}` to `{"stage": 1}`.
+
+The corrective slice leaves the processing repository, lease/retry semantics and schema unchanged. It updates the live test to assert checkpoint JSON structurally instead of depending on whitespace-preserving serialization. The PostgreSQL processing repository remains pending maintainer acceptance until the verifier passes after this correction.

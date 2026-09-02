@@ -1184,7 +1184,7 @@ work_items:
   document: ../work-items/WI-0099-postgresql-archive-background-persistence.md
   started_at: 2026-09-02
   last_updated_at: 2026-09-02
-  branch: agent/WI-0099-postgres-processing-execution
+  branch: agent/WI-0099-postgres-checkpoint-json-test
   blockers:
   - WI-0098
   blocker_notes:
@@ -1195,6 +1195,7 @@ work_items:
   - 'PR #247 merged and workflow #1444 passed, but maintainer live verification exposed an invalid test chronology: the isolated fixture seeded asset creation with the current clock and then used an earlier fixed source-observation timestamp, correctly violating the foundational last_seen_at_utc >= created_at_utc constraint.'
   - 'PR #248 corrected only the live-test chronology. Workflow #1448 passed and maintainer live verification then passed end-to-end on the existing Podman volume, accepting PostgreSQL schema version 5 and source-observation/verification persistence.'
   - 'PR #249 merged at b8c598d3a3a6aa8e48cae89cb99a7f2e12b59845. Maintainer live verification then passed on the existing Podman volume, accepting PostgreSQL schema version 6 and archive-coverage persistence.'
+  - 'PR #250 merged at 0085146e1b3981c240c2b3aa7d85feb6e990e4fb and workflow #1454 passed. Maintainer live verification then exposed only a test expectation mismatch: PostgreSQL jsonb normalized checkpoint JSON whitespace. The corrective slice changes structural test assertions only; production processing code and schema are unchanged.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/245
@@ -1226,6 +1227,12 @@ work_items:
     value: b8c598d3a3a6aa8e48cae89cb99a7f2e12b59845
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/250
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33681953442
+  - type: merge_commit
+    value: 0085146e1b3981c240c2b3aa7d85feb6e990e4fb
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/251
 - id: WI-0100
   title: Migrate review and identity persistence to PostgreSQL
   milestone: M24
