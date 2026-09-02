@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 is completed after PR #244 merged and workflow #1434 passed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-archive-analysis-state`. The first slice adds PostgreSQL schema version 3 and a PostgreSQL adapter for archive analysis profile/run/completion state while leaving runtime archive authority on SQLite until coverage/availability/processing are migrated.
+In the separate M24 thread, WI-0098 is completed after PR #244 merged and workflow #1434 passed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-archive-analysis-state`. PR #245 is the active first slice. It adds PostgreSQL schema version 3 and a PostgreSQL adapter for archive analysis profile/run/completion state while leaving runtime archive authority on SQLite until coverage/availability/processing are migrated.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
