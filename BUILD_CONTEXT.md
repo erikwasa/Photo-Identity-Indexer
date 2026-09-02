@@ -18,10 +18,10 @@ SQLite remains authoritative and untouched. WI-0098 stays blocked until the Wind
 
 ## Next concrete step
 
-1. Confirm the maintainer Podman version using `podman version` (the updated verifier also prints it).
-2. If it is Podman 6.0.x and the same localhost protocol failure occurs, use the known-good Podman 5.8.5 WSL runtime baseline rather than changing PostgreSQL/Npgsql.
-3. Recreate only the disposable local PostgreSQL runtime if the Podman machine/runtime downgrade requires it; do not touch the SQLite catalogue.
-4. Run `./verify-postgres.ps1` until the isolated PostgreSQL bootstrap succeeds through Windows localhost.
+1. Maintainer version is confirmed: Podman client/server 6.0.2, matching the upstream Windows/WSL forwarding regression.
+2. Move the local Podman runtime to the known-good 5.8.5 baseline. Podman Desktop 1.28.3 shipped 5.8.5.
+3. If the engine downgrade requires a Podman-machine recreation, treat that machine/container/volume state as disposable for WI-0097. Do not touch the SQLite catalogue or any unrelated container workloads without backing them up first.
+4. Confirm `podman version` reports client/server 5.8.5, then run `./verify-postgres.ps1`.
 5. Verify Photo Identity `/health` reports `catalogueProvider=sqlite` and PostgreSQL `ready` at schema version 1.
 6. Complete WI-0097 and begin WI-0098.
 
