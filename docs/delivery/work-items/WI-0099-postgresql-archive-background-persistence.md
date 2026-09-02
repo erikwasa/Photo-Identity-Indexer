@@ -27,3 +27,19 @@ Move the high-concurrency archive/background writer domains to PostgreSQL and re
 - [ ] A transient database exception cannot terminate Photo Identity through an escaping recovery write.
 - [ ] Durable run/lease/retry state survives application restart.
 - [ ] No personal paths/content are emitted by new diagnostics beyond existing privacy-safe conventions.
+
+
+## Implementation progress
+
+### Slice 1 — PostgreSQL archive-analysis state
+
+Started 2026-09-02.
+
+- Added provider-neutral `IArchiveAnalysisStateRepository` for exact analysis-profile registration, run/profile lookup and successful immutable-revision completion state.
+- `SqliteArchiveAnalysisRepository` implements the state contract while retaining its existing pending/current-revision selection API for the still-authoritative SQLite runtime.
+- Added PostgreSQL schema version 3 with `archive_analysis_profiles`, `archive_analysis_runs` and `asset_revision_analysis`, preserving the existing profile hash, processing-run and immutable-revision relationships with PostgreSQL-native UUID/timestamp constraints.
+- Added `PostgresArchiveAnalysisStateRepository` implementing profile registration, profile lookup, completion lookup and idempotent completion recording.
+- Extended the existing live PostgreSQL verification to prove schema version 3 plus register → lookup → completion behavior.
+- Runtime archive selection/coverage/availability and processing execution remain on SQLite in this slice. No dual writes or mixed-authority runtime path are introduced.
+
+The next WI-0099 slices can migrate archive coverage/source observations/availability and durable processing execution before switching the archive runtime to PostgreSQL.
