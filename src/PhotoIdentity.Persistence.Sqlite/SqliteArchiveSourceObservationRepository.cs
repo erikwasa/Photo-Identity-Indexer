@@ -42,7 +42,7 @@ public sealed record ArchiveSourceVerificationWriteResult(
 /// Metadata divergence can require verification, but only a local SHA-256 read may establish or
 /// change the current immutable revision.
 /// </summary>
-public sealed class SqliteArchiveSourceObservationRepository
+public sealed class SqliteArchiveSourceObservationRepository : IArchiveSourceObservationRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -50,6 +50,73 @@ public sealed class SqliteArchiveSourceObservationRepository
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+    }
+
+    async Task<ArchiveSourceObservationPersistenceResult> IArchiveSourceObservationRepository.RecordScanObservationAsync(
+        ArchiveCatalogueSource source,
+        SourceAsset sourceAsset,
+        Sha256Digest? verifiedContentHash,
+        DateTimeOffset scannedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        ArchiveSourceObservationWriteResult result = await RecordScanObservationAsync(
+            new CatalogueSource(
+                source.SourceId,
+                source.Kind,
+                source.RootLocator,
+                source.CreatedAtUtc),
+            sourceAsset,
+            verifiedContentHash,
+            scannedAtUtc,
+            cancellationToken);
+
+        return new ArchiveSourceObservationPersistenceResult(
+            result.AssetId,
+            result.RevisionId,
+            result.NewRevision,
+            ToCoreState(result.VerificationState));
+    }
+
+    async Task<ArchiveSourceObservationSnapshot?> IArchiveSourceObservationRepository.GetNextPendingAsync(
+        SourceId sourceId,
+        CancellationToken cancellationToken)
+    {
+        ArchiveSourceObservation? observation =
+            await GetNextPendingAsync(sourceId, cancellationToken);
+        return observation is null ? null : ToCoreObservation(observation);
+    }
+
+    async Task<ArchiveSourceObservationSnapshot?> IArchiveSourceObservationRepository.GetAsync(
+        AssetId assetId,
+        CancellationToken cancellationToken)
+    {
+        ArchiveSourceObservation? observation =
+            await GetAsync(assetId, cancellationToken);
+        return observation is null ? null : ToCoreObservation(observation);
+    }
+
+    async Task<ArchiveSourceVerificationPersistenceResult> IArchiveSourceObservationRepository.RecordVerifiedContentAsync(
+        AssetId assetId,
+        Sha256Digest contentHash,
+        long sizeBytes,
+        DateTimeOffset lastWriteTimeUtc,
+        string mediaType,
+        DateTimeOffset verifiedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ArchiveSourceVerificationWriteResult result = await RecordVerifiedContentAsync(
+            assetId,
+            contentHash,
+            sizeBytes,
+            lastWriteTimeUtc,
+            mediaType,
+            verifiedAtUtc,
+            cancellationToken);
+        return new ArchiveSourceVerificationPersistenceResult(
+            result.RevisionId,
+            result.NewRevision);
     }
 
     public async Task EnsureSchemaAsync(CancellationToken cancellationToken = default)
@@ -617,6 +684,33 @@ public sealed class SqliteArchiveSourceObservationRepository
         command.Parameters.AddWithValue("$verified_at_utc", (object?)(verifiedAt is null ? null : Format(verifiedAt.Value)) ?? DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    private static ArchiveSourceObservationSnapshot ToCoreObservation(
+        ArchiveSourceObservation observation) => new(
+        observation.AssetId,
+        observation.SourceId,
+        observation.RootLocator,
+        observation.SourceKey,
+        observation.ObservedSizeBytes,
+        observation.ObservedLastWriteTimeUtc,
+        observation.MediaType,
+        observation.ObservedAtUtc,
+        observation.Availability,
+        ToCoreState(observation.VerificationState),
+        observation.VerifiedRevisionId,
+        observation.VerifiedAtUtc);
+
+    private static ArchiveSourceObservationVerificationState ToCoreState(
+        ArchiveSourceVerificationState state) => state switch
+    {
+        ArchiveSourceVerificationState.Verified =>
+            ArchiveSourceObservationVerificationState.Verified,
+        ArchiveSourceVerificationState.NeedsSourceVerification =>
+            ArchiveSourceObservationVerificationState.NeedsSourceVerification,
+        ArchiveSourceVerificationState.Unverified =>
+            ArchiveSourceObservationVerificationState.Unverified,
+        _ => throw new ArgumentOutOfRangeException(nameof(state)),
+    };
 
     public static string ToStorageValue(ArchiveSourceVerificationState state) => state switch
     {
