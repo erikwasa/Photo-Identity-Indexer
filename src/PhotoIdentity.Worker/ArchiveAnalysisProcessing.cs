@@ -164,7 +164,8 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
         ArchiveThroughputMetrics? metrics,
         CancellationToken cancellationToken) =>
         await LocalInspectionJobHandler.CreateAsync(
-            database,
+            new SqliteLocalBatchRepository(database),
+            new SqliteFaceCatalogueRepository(database),
             configuration,
             cancellationToken,
             metrics);
