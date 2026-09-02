@@ -183,14 +183,22 @@ public sealed record LocalBatchStartResult(
 public sealed class LocalBatchCoordinator
 {
     private readonly SqliteCatalogueDatabase _database;
+    private readonly IProcessingRunRepository _runs;
+    private readonly IProcessingExecutionRepository _execution;
     private readonly TimeProvider _timeProvider;
 
     public LocalBatchCoordinator(
         SqliteCatalogueDatabase database,
+        IProcessingRunRepository runs,
+        IProcessingExecutionRepository execution,
         TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(runs);
+        ArgumentNullException.ThrowIfNull(execution);
         _database = database;
+        _runs = runs;
+        _execution = execution;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
@@ -241,9 +249,8 @@ public sealed class LocalBatchCoordinator
                 idempotencyKey: $"local-inspect:{runId}:{revisionId}"))
             .ToArray();
 
-        SqliteProcessingRepository processingRepository = new(_database);
-        await processingRepository.CreateRunAsync(run, jobs, cancellationToken);
-        ResumableBatchProcessor processor = new(processingRepository, handler, _timeProvider);
+        await _runs.CreateRunAsync(run, jobs, cancellationToken);
+        ResumableBatchProcessor processor = new(_execution, handler, _timeProvider);
         ResumableBatchProcessorResult result = await processor.RunUntilIdleAsync(
             runId,
             processorOptions,
@@ -264,10 +271,9 @@ public sealed class LocalBatchCoordinator
     {
         ArgumentNullException.ThrowIfNull(handler);
         await _database.InitializeAsync(cancellationToken);
-        SqliteProcessingRepository repository = new(_database);
-        _ = await repository.GetRunAsync(runId, cancellationToken)
+        _ = await _runs.GetRunAsync(runId, cancellationToken)
             ?? throw new KeyNotFoundException($"Processing run {runId} was not found.");
-        ResumableBatchProcessor processor = new(repository, handler, _timeProvider);
+        ResumableBatchProcessor processor = new(_execution, handler, _timeProvider);
         return await processor.RunUntilIdleAsync(
             runId,
             processorOptions,
@@ -279,8 +285,7 @@ public sealed class LocalBatchCoordinator
         CancellationToken cancellationToken = default)
     {
         await _database.InitializeAsync(cancellationToken);
-        CatalogueProcessingRun run = await new SqliteProcessingRepository(_database)
-            .GetRunAsync(runId, cancellationToken)
+        CatalogueProcessingRun run = await _runs.GetRunAsync(runId, cancellationToken)
             ?? throw new KeyNotFoundException($"Processing run {runId} was not found.");
         return LocalBatchConfiguration.FromJson(run.ConfigurationJson);
     }
