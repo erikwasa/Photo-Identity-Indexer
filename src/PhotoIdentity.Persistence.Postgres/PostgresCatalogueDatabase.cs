@@ -447,7 +447,8 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                 ON asset_revision_review_proxies (
                     profile_id,
                     asset_revision_id);
-            """),        new(
+            """),
+        new(
             9,
             "archive-managed-hydration-ownership",
             """
