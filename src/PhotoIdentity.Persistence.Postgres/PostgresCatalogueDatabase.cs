@@ -64,16 +64,16 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
             CREATE OR REPLACE FUNCTION photo_identity_guard_asset_revision_identity()
             RETURNS trigger
             LANGUAGE plpgsql
-            AS $
+            AS '
             BEGIN
                 IF NEW.id <> OLD.id
                    OR NEW.asset_id <> OLD.asset_id
                    OR NEW.content_sha256 <> OLD.content_sha256 THEN
-                    RAISE EXCEPTION 'asset revision identity is immutable';
+                    RAISE EXCEPTION ''asset revision identity is immutable'';
                 END IF;
                 RETURN NEW;
             END;
-            $;
+            ';
 
             CREATE TRIGGER trg_asset_revision_identity_immutable
                 BEFORE UPDATE ON asset_revisions
