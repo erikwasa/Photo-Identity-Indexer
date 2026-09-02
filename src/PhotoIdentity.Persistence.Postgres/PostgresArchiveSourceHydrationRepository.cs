@@ -111,7 +111,7 @@ public sealed class PostgresArchiveSourceHydrationRepository :
             assetId,
             requestedAt,
             preferLatest: false,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         ArchiveManagedSourceHydrationState persisted =
             await ReadAsync(
