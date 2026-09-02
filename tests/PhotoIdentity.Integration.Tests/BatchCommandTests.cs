@@ -1,4 +1,5 @@
 using PhotoIdentity.Cli;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
