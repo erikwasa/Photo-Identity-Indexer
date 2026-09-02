@@ -164,7 +164,8 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
         ArchiveThroughputMetrics? metrics,
         CancellationToken cancellationToken) =>
         await LocalInspectionJobHandler.CreateAsync(
-            database,
+            new SqliteLocalBatchRepository(database),
+            new SqliteFaceCatalogueRepository(database),
             configuration,
             cancellationToken,
             metrics);
@@ -287,7 +288,8 @@ public sealed class ArchiveAnalysisCoordinator
         if (_inspectionSession is null)
         {
             using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
-                _database,
+                new SqliteLocalBatchRepository(_database),
+                new SqliteFaceCatalogueRepository(_database),
                 batchConfiguration,
                 cancellationToken,
                 _metrics);
@@ -349,7 +351,8 @@ public sealed class ArchiveAnalysisCoordinator
         if (_inspectionSession is null)
         {
             using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
-                _database,
+                new SqliteLocalBatchRepository(_database),
+                new SqliteFaceCatalogueRepository(_database),
                 batchConfiguration,
                 cancellationToken,
                 _metrics);

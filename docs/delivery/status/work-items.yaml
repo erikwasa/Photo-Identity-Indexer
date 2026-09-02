@@ -1138,13 +1138,14 @@ work_items:
   document: ../work-items/WI-0098-persistence-boundary-foundational-schema.md
   started_at: 2026-09-02
   last_updated_at: 2026-09-02
-  branch: agent/WI-0098-local-batch-catalogue-boundary
+  branch: agent/WI-0098-face-inspection-boundary
   blockers:
   - WI-0097
   blocker_notes:
   - WI-0097 was maintainer-verified on 2026-09-02; SQLite remains authoritative while WI-0098 introduces neutral contracts and PostgreSQL schema additively.
   - 'PR #237 merged the first WI-0098 slice. Maintainer live verification then exposed PostgreSQL SQLSTATE 42601 in the schema-v2 trigger function because merged main contained AS $ instead of a valid function delimiter. The transactional migration rolled back; the corrective slice removes dollar quoting and keeps schema version 2 unapplied until verification succeeds.'
   - 'PR #239 corrected the trigger syntax. Schema version 2 was then maintainer-verified on the existing PostgreSQL volume: authenticated SQL, Windows localhost protocol and the isolated live migration test all passed without a volume reset.'
+  - 'PR #243 merged the local-batch catalogue boundary and workflow #1430 passed. The final WI-0098 implementation slice moves production face-inspection persistence behind Core contracts; remaining direct SQLite domains are assigned to WI-0099/WI-0100/WI-0101.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/237
@@ -1166,6 +1167,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/242
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/243
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/244
 - id: WI-0099
   title: Migrate archive and background-processing persistence to PostgreSQL
   milestone: M24

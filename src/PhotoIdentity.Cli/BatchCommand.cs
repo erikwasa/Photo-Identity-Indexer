@@ -348,7 +348,8 @@ internal static class BatchCommandRunner
             options.TileOverlap,
             options.MergeNmsThreshold);
         using LocalInspectionJobHandler handler = await LocalInspectionJobHandler.CreateAsync(
-            database,
+            new SqliteLocalBatchRepository(database),
+            new SqliteFaceCatalogueRepository(database),
             configuration,
             cancellationToken);
         LocalBatchCoordinator coordinator = new(
@@ -397,7 +398,8 @@ internal static class BatchCommandRunner
             options.RunId!.Value,
             cancellationToken);
         using LocalInspectionJobHandler handler = await LocalInspectionJobHandler.CreateAsync(
-            database,
+            new SqliteLocalBatchRepository(database),
+            new SqliteFaceCatalogueRepository(database),
             configuration,
             cancellationToken);
         ResumableBatchProcessorResult result = await coordinator.ResumeAsync(
