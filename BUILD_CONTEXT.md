@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-geonames-state`. PR #255 merged, workflow #1475 passed, and maintainer review/verification accepted PostgreSQL storage accounting against schema version 9. PR #256 is the active slice. It adds schema version 10 for worker-required capture/GPS metadata plus GeoNames cache/attempt state and moves the enrichment service behind a neutral operational-state contract while authoritative Places writes remain SQLite-owned for WI-0101.
+In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is in its final acceptance slice on `agent/WI-0099-final-acceptance`. PR #256 merged, workflow #1479 passed, and maintainer review/verification accepted PostgreSQL schema version 10. The runtime-composition audit found all WI-0099-owned persistence surfaces implemented in PostgreSQL; remaining direct SQLite normal-runtime composition is explicitly handed to WI-0101, while WI-0102 owns the eventual single-authority migration/cutover. The final slice adds concurrent PostgreSQL advancement/enrichment/availability writer verification.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge the GeoNames operational-state slice after CI is green, then rerun `verify-postgres.ps1` to accept schema version 10. If it passes, perform the final WI-0099 archive/background runtime-composition audit; do not switch providers until that audit confirms there is no mixed-authority path or identifies the explicit WI-0101/WI-0102 dependency.
+For the M24 thread, review/merge the WI-0099 final concurrent-writer acceptance slice after CI is green, then rerun `verify-postgres.ps1`. If it passes, close WI-0099 and proceed to WI-0100/WI-0101 without switching the authoritative provider; WI-0102 remains the only controlled SQLite→PostgreSQL migration/cutover step.
 
 ## Relevant files
 
