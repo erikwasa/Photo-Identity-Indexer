@@ -132,7 +132,7 @@ public sealed class PostgresArchiveHydrationIdentityTransferRepository :
             assetId,
             lastNeededAt.Value,
             preferLatest: true,
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         await using (NpgsqlCommand close = connection.CreateCommand())
         {
