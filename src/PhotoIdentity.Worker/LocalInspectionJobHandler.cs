@@ -1,12 +1,12 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text.Json;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Recognition.Onnx.CenterFace;
 using PhotoIdentity.Recognition.Onnx.Models;
 using PhotoIdentity.Recognition.Onnx.SFace;
@@ -25,8 +25,8 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         WriteIndented = true,
     };
 
-    private readonly SqliteLocalBatchRepository _assetRepository;
-    private readonly SqliteFaceCatalogueRepository _faceRepository;
+    private readonly IAssetRevisionLookupRepository _assetRepository;
+    private readonly IFaceInspectionRepository _faceRepository;
     private readonly LocalBatchConfiguration _configuration;
     private readonly IImageDecoder _decoder;
     private readonly OpenCvPngEncoder _encoder;
@@ -39,7 +39,8 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
     private bool _disposed;
 
     public LocalInspectionJobHandler(
-        SqliteCatalogueDatabase database,
+        IAssetRevisionLookupRepository assetRepository,
+        IFaceInspectionRepository faceRepository,
         LocalBatchConfiguration configuration,
         IImageDecoder decoder,
         OpenCvPngEncoder encoder,
@@ -49,7 +50,8 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         TimeProvider? timeProvider = null,
         ArchiveThroughputMetrics? metrics = null)
     {
-        ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(assetRepository);
+        ArgumentNullException.ThrowIfNull(faceRepository);
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(decoder);
         ArgumentNullException.ThrowIfNull(encoder);
@@ -57,8 +59,8 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         ArgumentNullException.ThrowIfNull(aligner);
         ArgumentNullException.ThrowIfNull(embedder);
 
-        _assetRepository = new SqliteLocalBatchRepository(database);
-        _faceRepository = new SqliteFaceCatalogueRepository(database);
+        _assetRepository = assetRepository;
+        _faceRepository = faceRepository;
         _configuration = configuration;
         _decoder = decoder;
         _encoder = encoder;
@@ -71,7 +73,8 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
     }
 
     public static async Task<LocalInspectionJobHandler> CreateAsync(
-        SqliteCatalogueDatabase database,
+        IAssetRevisionLookupRepository assetRepository,
+        IFaceInspectionRepository faceRepository,
         LocalBatchConfiguration configuration,
         CancellationToken cancellationToken = default,
         ArchiveThroughputMetrics? metrics = null)
@@ -99,7 +102,8 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         {
             SFaceFaceEmbedder embedder = new(embedderManifest, embedderPath);
             LocalInspectionJobHandler handler = new(
-                database,
+                assetRepository,
+                faceRepository,
                 configuration,
                 new OpenCvImageDecoder(),
                 new OpenCvPngEncoder(),
@@ -133,7 +137,7 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
         try
         {
             _metrics?.RecordCounter(ArchiveThroughputMetricNames.AnalysisAttempts);
-            CatalogueProcessingAssetRevision asset = await _assetRepository.GetAssetRevisionAsync(
+            AssetRevisionLookup asset = await _assetRepository.GetRevisionAsync(
                 context.AssetRevisionId,
                 cancellationToken)
                 ?? throw Permanent($"Asset revision {context.AssetRevisionId} was not found.");
@@ -234,34 +238,25 @@ public sealed class LocalInspectionJobHandler : IProcessingJobHandler, IDisposab
                     FaceOccurrenceId occurrenceId = FaceOccurrenceId.New();
                     FaceCropId cropId = FaceCropId.New();
                     await _faceRepository.SaveInspectionAsync(
-                        new CatalogueFaceOccurrence(
+                        new FaceInspectionWrite(
                             occurrenceId,
                             context.AssetRevisionId,
                             index,
-                            observedAt),
-                        new CatalogueFaceObservation(
-                            occurrenceId,
+                            observedAt,
                             _detector.Descriptor.Id,
                             _detector.Descriptor.ModelHash,
                             face.Confidence,
                             face.BoundingBox,
                             face.Landmarks,
-                            observedAt),
-                        new CatalogueFaceCrop(
                             cropId,
-                            occurrenceId,
                             protocol,
                             cropHash,
                             relativeStoragePath,
                             aligned.Image.Size.Width,
                             aligned.Image.Size.Height,
-                            observedAt),
-                        new CatalogueFaceEmbedding(
-                            cropId,
                             _embedder.Descriptor.Id,
                             _embedder.Descriptor.ModelHash,
-                            embedding,
-                            observedAt),
+                            embedding),
                         cancellationToken);
 
                     await checkpointWriter.WriteAsync(
