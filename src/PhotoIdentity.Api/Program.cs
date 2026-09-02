@@ -107,7 +107,7 @@ public partial class Program
         builder.Services.AddSingleton<SqliteSmartCollectionQueryRepository>();
         builder.Services.AddSingleton<SqliteSmartCollectionRepository>();
         builder.Services.AddSingleton<SqliteAssetCatalogueRepository>();
-        builder.Services.AddSingleton<IAssetCatalogueRepository>(serviceProvider =>
+        builder.Services.AddSingleton<IPhotoCaptureMetadataRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteAssetCatalogueRepository>());
         builder.Services.AddSingleton<SqlitePhotoMetadataBackfillRepository>();
         builder.Services.AddSingleton<SqliteExtendedPhotoMetadataRepository>();
