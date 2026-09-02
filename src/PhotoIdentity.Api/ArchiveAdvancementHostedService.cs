@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Worker;
