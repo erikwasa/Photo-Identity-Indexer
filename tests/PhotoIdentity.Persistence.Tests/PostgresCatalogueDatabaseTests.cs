@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Xunit;
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
@@ -491,7 +492,7 @@ public sealed class PostgresCatalogueDatabaseTests
                     "{\"stage\":1}",
                     processingAt.AddMinutes(1),
                     TimeSpan.FromMinutes(5));
-            Assert.Equal("{\"stage\":1}", checkpointed.CheckpointJson);
+            AssertStageCheckpoint(checkpointed.CheckpointJson);
 
             await Assert.ThrowsAsync<ProcessingLeaseLostException>(
                 () => processingExecution.CompleteJobAsync(
@@ -511,7 +512,7 @@ public sealed class PostgresCatalogueDatabaseTests
             Assert.Equal(
                 ProcessingFailureKind.Transient,
                 retryQueued.LastFailureKind);
-            Assert.Equal("{\"stage\":1}", retryQueued.CheckpointJson);
+            AssertStageCheckpoint(retryQueued.CheckpointJson);
             Assert.Null(
                 await processingExecution.ClaimNextJobAsync(
                     durableRunId,
@@ -525,7 +526,7 @@ public sealed class PostgresCatalogueDatabaseTests
                         processingAt.AddMinutes(10),
                         TimeSpan.FromMinutes(5)));
             Assert.Equal(2, retryClaim.AttemptCount);
-            Assert.Equal("{\"stage\":1}", retryClaim.CheckpointJson);
+            AssertStageCheckpoint(retryClaim.CheckpointJson);
 
             CatalogueProcessingJob succeeded =
                 await processingExecution.CompleteJobAsync(
@@ -554,7 +555,7 @@ public sealed class PostgresCatalogueDatabaseTests
                     await restartedProcessing.GetJobsAsync(durableRunId));
             Assert.Equal(ProcessingRunStatus.Completed, persistedRun.Status);
             Assert.Equal(ProcessingJobStatus.Succeeded, persistedJob.Status);
-            Assert.Equal("{\"stage\":1}", persistedJob.CheckpointJson);
+            AssertStageCheckpoint(persistedJob.CheckpointJson);
 
             ProcessingRunId reclaimedRunId = ProcessingRunId.New();
             CatalogueProcessingRun reclaimedRun = new(
@@ -788,6 +789,16 @@ public sealed class PostgresCatalogueDatabaseTests
                 $"DROP DATABASE IF EXISTS {quotedDatabaseName};";
             await dropDatabase.ExecuteNonQueryAsync();
         }
+    }
+
+    private static void AssertStageCheckpoint(string? checkpointJson)
+    {
+        Assert.NotNull(checkpointJson);
+        using JsonDocument checkpoint = JsonDocument.Parse(checkpointJson);
+        JsonElement root = checkpoint.RootElement;
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        Assert.Equal(1, root.GetProperty("stage").GetInt32());
+        Assert.Single(root.EnumerateObject());
     }
 
     private static string QuoteIdentifier(string identifier)
