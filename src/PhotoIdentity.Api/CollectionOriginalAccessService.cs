@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
@@ -32,7 +33,7 @@ public sealed class CollectionOriginalAccessService
     public const string UnavailableState = "unavailable";
     public const string ErrorState = "error";
 
-    private readonly SqliteLocalBatchRepository _catalogue;
+    private readonly IAssetRevisionLookupRepository _catalogue;
     private readonly SqliteArchiveHydrationRepository _hydrations;
     private readonly SqliteArchiveAvailabilityRepository _availability;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
@@ -42,7 +43,7 @@ public sealed class CollectionOriginalAccessService
     private readonly StringComparison _pathComparison;
 
     public CollectionOriginalAccessService(
-        SqliteLocalBatchRepository catalogue,
+        IAssetRevisionLookupRepository catalogue,
         SqliteArchiveHydrationRepository hydrations,
         SqliteArchiveAvailabilityRepository availability,
         IOneDriveFilesOnDemandPlatform platform,
@@ -416,7 +417,7 @@ public sealed class CollectionOriginalAccessService
         AssetRevisionId revisionId,
         CancellationToken cancellationToken)
     {
-        CatalogueProcessingAssetRevision? revision = await _catalogue.GetAssetRevisionAsync(
+        AssetRevisionLookup? revision = await _catalogue.GetRevisionAsync(
             revisionId,
             cancellationToken);
         if (revision is null ||
@@ -460,6 +461,6 @@ public sealed class CollectionOriginalAccessService
         new(revisionId, state, managed, pinned, canHydrate, canView, canRelease, message);
 
     private sealed record ResolvedOriginal(
-        CatalogueProcessingAssetRevision Revision,
+        AssetRevisionLookup Revision,
         string Path);
 }
