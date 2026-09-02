@@ -2,6 +2,7 @@ using Xunit;
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
 
@@ -440,6 +441,245 @@ public sealed class PostgresCatalogueDatabaseTests
             Assert.Equal(
                 ArchiveSourceObservationVerificationState.NeedsSourceVerification,
                 diverged.VerificationState);
+
+            PostgresProcessingRepository processingRepository = new(database);
+            IProcessingRunRepository processingRuns = processingRepository;
+            IProcessingExecutionRepository processingExecution = processingRepository;
+            DateTimeOffset processingAt = seededAt.AddHours(1);
+
+            ProcessingRunId durableRunId = ProcessingRunId.New();
+            ProcessingJobId durableJobId = ProcessingJobId.New();
+            CatalogueProcessingRun durableRun = new(
+                durableRunId,
+                ProcessingRunStatus.Pending,
+                "{\"mode\":\"archive-live-test\"}",
+                processingAt);
+            CatalogueProcessingJob durableJob = new(
+                durableJobId,
+                durableRunId,
+                AssetRevisionId.From(revisionId),
+                ProcessingJobStatus.Queued,
+                0,
+                processingAt,
+                idempotencyKey: $"live:{durableRunId}:{revisionId}");
+
+            CatalogueProcessingBatch firstBatch =
+                await processingRuns.CreateRunAsync(
+                    durableRun,
+                    new[] { durableJob });
+            CatalogueProcessingBatch repeatedBatch =
+                await processingRuns.CreateRunAsync(
+                    durableRun,
+                    new[] { durableJob });
+            Assert.Equal(ProcessingRunStatus.Pending, firstBatch.Run.Status);
+            Assert.Single(firstBatch.Jobs);
+            Assert.Single(repeatedBatch.Jobs);
+
+            CatalogueProcessingJob firstClaim =
+                Assert.IsType<CatalogueProcessingJob>(
+                    await processingExecution.ClaimNextJobAsync(
+                        durableRunId,
+                        processingAt,
+                        TimeSpan.FromMinutes(5)));
+            Assert.Equal(1, firstClaim.AttemptCount);
+            Assert.NotNull(firstClaim.LeaseToken);
+
+            CatalogueProcessingJob checkpointed =
+                await processingExecution.SaveCheckpointAsync(
+                    durableJobId,
+                    firstClaim.LeaseToken!.Value,
+                    "{\"stage\":1}",
+                    processingAt.AddMinutes(1),
+                    TimeSpan.FromMinutes(5));
+            Assert.Equal("{\"stage\":1}", checkpointed.CheckpointJson);
+
+            await Assert.ThrowsAsync<ProcessingLeaseLostException>(
+                () => processingExecution.CompleteJobAsync(
+                    durableJobId,
+                    ProcessingLeaseToken.New(),
+                    processingAt.AddMinutes(2)));
+
+            CatalogueProcessingJob retryQueued =
+                await processingExecution.FailJobAsync(
+                    durableJobId,
+                    checkpointed.LeaseToken!.Value,
+                    ProcessingFailureKind.Transient,
+                    "temporary",
+                    processingAt.AddMinutes(2),
+                    processingAt.AddMinutes(10));
+            Assert.Equal(ProcessingJobStatus.Queued, retryQueued.Status);
+            Assert.Equal(
+                ProcessingFailureKind.Transient,
+                retryQueued.LastFailureKind);
+            Assert.Equal("{\"stage\":1}", retryQueued.CheckpointJson);
+            Assert.Null(
+                await processingExecution.ClaimNextJobAsync(
+                    durableRunId,
+                    processingAt.AddMinutes(9),
+                    TimeSpan.FromMinutes(5)));
+
+            CatalogueProcessingJob retryClaim =
+                Assert.IsType<CatalogueProcessingJob>(
+                    await processingExecution.ClaimNextJobAsync(
+                        durableRunId,
+                        processingAt.AddMinutes(10),
+                        TimeSpan.FromMinutes(5)));
+            Assert.Equal(2, retryClaim.AttemptCount);
+            Assert.Equal("{\"stage\":1}", retryClaim.CheckpointJson);
+
+            CatalogueProcessingJob succeeded =
+                await processingExecution.CompleteJobAsync(
+                    durableJobId,
+                    retryClaim.LeaseToken!.Value,
+                    processingAt.AddMinutes(11));
+            Assert.Equal(ProcessingJobStatus.Succeeded, succeeded.Status);
+
+            ProcessingRunSummary completedSummary =
+                await processingExecution.GetRunSummaryAsync(durableRunId);
+            Assert.Equal(1, completedSummary.SucceededJobs);
+            Assert.Equal(2, completedSummary.AttemptCount);
+
+            CatalogueProcessingRun completedRun =
+                await processingExecution.CompleteRunAsync(
+                    durableRunId,
+                    processingAt.AddMinutes(12));
+            Assert.Equal(ProcessingRunStatus.Completed, completedRun.Status);
+
+            PostgresProcessingRepository restartedProcessing = new(database);
+            CatalogueProcessingRun persistedRun =
+                Assert.IsType<CatalogueProcessingRun>(
+                    await restartedProcessing.GetRunAsync(durableRunId));
+            CatalogueProcessingJob persistedJob =
+                Assert.Single(
+                    await restartedProcessing.GetJobsAsync(durableRunId));
+            Assert.Equal(ProcessingRunStatus.Completed, persistedRun.Status);
+            Assert.Equal(ProcessingJobStatus.Succeeded, persistedJob.Status);
+            Assert.Equal("{\"stage\":1}", persistedJob.CheckpointJson);
+
+            ProcessingRunId reclaimedRunId = ProcessingRunId.New();
+            CatalogueProcessingRun reclaimedRun = new(
+                reclaimedRunId,
+                ProcessingRunStatus.Pending,
+                "{\"mode\":\"lease-reclaim\"}",
+                processingAt.AddMinutes(20));
+            CatalogueProcessingJob reclaimedSeed = new(
+                ProcessingJobId.New(),
+                reclaimedRunId,
+                AssetRevisionId.From(revisionId),
+                ProcessingJobStatus.Queued,
+                0,
+                processingAt.AddMinutes(20),
+                idempotencyKey: $"reclaim:{reclaimedRunId}:{revisionId}");
+            await processingRuns.CreateRunAsync(
+                reclaimedRun,
+                new[] { reclaimedSeed });
+
+            CatalogueProcessingJob originalLease =
+                Assert.IsType<CatalogueProcessingJob>(
+                    await processingExecution.ClaimNextJobAsync(
+                        reclaimedRunId,
+                        processingAt.AddMinutes(20),
+                        TimeSpan.FromMinutes(2)));
+            CatalogueProcessingJob reclaimedLease =
+                Assert.IsType<CatalogueProcessingJob>(
+                    await restartedProcessing.ClaimNextJobAsync(
+                        reclaimedRunId,
+                        processingAt.AddMinutes(23),
+                        TimeSpan.FromMinutes(2)));
+            Assert.Equal(originalLease.Id, reclaimedLease.Id);
+            Assert.Equal(2, reclaimedLease.AttemptCount);
+            Assert.NotEqual(
+                originalLease.LeaseToken,
+                reclaimedLease.LeaseToken);
+            Assert.Equal(
+                ProcessingFailureKind.Transient,
+                reclaimedLease.LastFailureKind);
+            await restartedProcessing.CompleteJobAsync(
+                reclaimedLease.Id,
+                reclaimedLease.LeaseToken!.Value,
+                processingAt.AddMinutes(24));
+            Assert.Equal(
+                ProcessingRunStatus.Completed,
+                (await restartedProcessing.CompleteRunAsync(
+                    reclaimedRunId,
+                    processingAt.AddMinutes(25))).Status);
+
+            ProcessingRunId competingRunId = ProcessingRunId.New();
+            CatalogueProcessingRun competingRun = new(
+                competingRunId,
+                ProcessingRunStatus.Pending,
+                "{\"mode\":\"competing-claim\"}",
+                processingAt.AddMinutes(30));
+            CatalogueProcessingJob competingSeed = new(
+                ProcessingJobId.New(),
+                competingRunId,
+                AssetRevisionId.From(revisionId),
+                ProcessingJobStatus.Queued,
+                0,
+                processingAt.AddMinutes(30),
+                idempotencyKey: $"compete:{competingRunId}:{revisionId}");
+            await processingRuns.CreateRunAsync(
+                competingRun,
+                new[] { competingSeed });
+
+            PostgresProcessingRepository competingA = new(database);
+            PostgresProcessingRepository competingB = new(database);
+            CatalogueProcessingJob?[] competingClaims =
+                await Task.WhenAll(
+                    competingA.ClaimNextJobAsync(
+                        competingRunId,
+                        processingAt.AddMinutes(30),
+                        TimeSpan.FromMinutes(5)),
+                    competingB.ClaimNextJobAsync(
+                        competingRunId,
+                        processingAt.AddMinutes(30),
+                        TimeSpan.FromMinutes(5)));
+            CatalogueProcessingJob competingClaim =
+                Assert.Single(
+                    competingClaims
+                        .Where(static job => job is not null)
+                        .Select(static job => job!));
+            await competingA.CompleteJobAsync(
+                competingClaim.Id,
+                competingClaim.LeaseToken!.Value,
+                processingAt.AddMinutes(31));
+            Assert.Equal(
+                ProcessingRunStatus.Completed,
+                (await competingA.CompleteRunAsync(
+                    competingRunId,
+                    processingAt.AddMinutes(32))).Status);
+
+            ProcessingRunId cancelledRunId = ProcessingRunId.New();
+            CatalogueProcessingRun cancelledSeedRun = new(
+                cancelledRunId,
+                ProcessingRunStatus.Pending,
+                "{\"mode\":\"cancel\"}",
+                processingAt.AddMinutes(40));
+            CatalogueProcessingJob cancelledSeedJob = new(
+                ProcessingJobId.New(),
+                cancelledRunId,
+                AssetRevisionId.From(revisionId),
+                ProcessingJobStatus.Queued,
+                0,
+                processingAt.AddMinutes(40),
+                idempotencyKey: $"cancel:{cancelledRunId}:{revisionId}");
+            await processingRuns.CreateRunAsync(
+                cancelledSeedRun,
+                new[] { cancelledSeedJob });
+            CatalogueProcessingRun cancelledRun =
+                await processingRuns.RequestCancellationAsync(
+                    cancelledRunId,
+                    processingAt.AddMinutes(41));
+            Assert.Equal(ProcessingRunStatus.Cancelled, cancelledRun.Status);
+            CatalogueProcessingJob cancelledJob =
+                Assert.Single(
+                    await processingRuns.GetJobsAsync(cancelledRunId));
+            Assert.Equal(ProcessingJobStatus.Cancelled, cancelledJob.Status);
+            Assert.Null(
+                await processingExecution.ClaimNextJobAsync(
+                    cancelledRunId,
+                    processingAt.AddMinutes(42),
+                    TimeSpan.FromMinutes(5)));
 
             Guid processingRunId = Guid.NewGuid();
             await using (NpgsqlCommand seedProcessingRun =
