@@ -147,7 +147,7 @@ Current upstream evidence now matches this failure closely:
 
 The verifier now prints Podman client/server versions and, when a 6.0.x runtime reaches this exact protocol-failure state, classifies it as the known upstream regression instead of recommending more Photo Identity or PostgreSQL changes.
 
-The known-good Windows/WSL fallback baseline for WI-0097 is Podman 5.8.5. Podman Desktop 1.28.3 shipped that version. Reverting the local container runtime is an environment workaround only; SQLite remains authoritative and no catalogue data is migrated.
+The known-good Windows/WSL fallback baseline for WI-0097 is Podman 5.8.x. Podman Desktop 1.28.3 ships the 5.8.5 Windows client; the Podman machine may legitimately report a newer 5.8.x Linux server image. Reverting the local container runtime is an environment workaround only; SQLite remains authoritative and no catalogue data is migrated.
 
 
 ### Maintainer environment confirmation
@@ -157,4 +157,14 @@ On 2026-09-02 the maintainer confirmed both sides of the active Podman machine a
 - Windows client: Podman 6.0.2, commit `b28edb9ad70ce4317dc762ee9ce0a6d081d154e9`.
 - Linux server: Podman 6.0.2, the same commit.
 
-This is the same Podman release and commit family reported in upstream issue #29377. WI-0097 therefore treats the current localhost transport failure as an environment/runtime blocker, not a Photo Identity catalogue defect. The next verification should use the Podman 5.8.5 Windows/WSL baseline.
+This is the same Podman release and commit family reported in upstream issue #29377. WI-0097 therefore treats the current localhost transport failure as an environment/runtime blocker, not a Photo Identity catalogue defect. The next verification should use the Podman 5.8.x Windows/WSL baseline.
+
+
+### Maintainer 5.8.x baseline confirmation
+
+After recreating/downgrading the runtime on 2026-09-02, the maintainer confirmed:
+
+- Windows client: Podman 5.8.5, commit `6d48b6f12f793176f3f6bc808b5a440984c14eb2`.
+- Linux server: Podman 5.8.6, commit `a859fc66702c23e869c282c63e92d9b6cd264229`.
+
+This is accepted as the WI-0097 5.8.x baseline. The next step is to rerun `./verify-postgres.ps1` unchanged and observe whether Windows localhost now carries the PostgreSQL protocol correctly.
