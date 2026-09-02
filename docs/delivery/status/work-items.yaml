@@ -1138,7 +1138,7 @@ work_items:
   document: ../work-items/WI-0098-persistence-boundary-foundational-schema.md
   started_at: 2026-09-02
   last_updated_at: 2026-09-02
-  branch: agent/WI-0098-processing-run-lifecycle-boundary
+  branch: agent/WI-0098-local-batch-catalogue-boundary
   blockers:
   - WI-0097
   blocker_notes:
