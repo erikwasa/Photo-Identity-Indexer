@@ -99,3 +99,17 @@ Started 2026-09-02.
 - Focused integration tests verify SQLite lookup-by-id, lookup-by-source/hash and missing-revision behavior through the Core contract.
 
 Later WI-0098 slices may move the broader source/asset catalogue records behind neutral contracts. Archive/background writes, review/identity persistence and library persistence remain owned by WI-0099, WI-0100 and WI-0101 respectively.
+
+
+### Slice 4 — processing run lifecycle boundary
+
+Started 2026-09-02.
+
+- Added `IProcessingRunRepository` in Core for durable run creation, run lookup, queued-job inspection and cancellation.
+- `SqliteProcessingRepository` implements both `IProcessingRunRepository` and `IProcessingExecutionRepository`; the existing SQLite transactions and lease invalidation behavior are unchanged.
+- `LocalBatchCoordinator` now receives the run-lifecycle and execution contracts instead of constructing `SqliteProcessingRepository` internally.
+- The batch CLI remains the composition root: it constructs the SQLite adapter once, then passes it through the neutral lifecycle/execution interfaces for start, resume, status, cancellation and failure reporting.
+- Added focused integration coverage that exercises run creation, lookup, queued-job retrieval and cancellation through `IProcessingRunRepository`.
+- SQLite remains authoritative. This slice introduces no PostgreSQL processing reads/writes or dual writes.
+
+The remaining local-batch catalogue scan/source-registration dependency is still SQLite-specific and is a candidate for the next WI-0098 foundational boundary. Archive/background processing migration remains WI-0099 scope.
