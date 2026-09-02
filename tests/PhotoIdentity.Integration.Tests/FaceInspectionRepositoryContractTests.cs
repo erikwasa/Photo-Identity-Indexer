@@ -51,11 +51,11 @@ public sealed class FaceInspectionRepositoryContractTests
             FaceInspectionWrite inspection = new(
                 occurrenceId,
                 persistedRevision.Id,
-                ordinal: 0,
-                observedAtUtc: now.AddMinutes(1),
+                0,
+                now.AddMinutes(1),
                 detectorModelId,
                 detectorHash,
-                confidence: 0.95,
+                0.95,
                 new NormalizedBoundingBox(0.1, 0.2, 0.3, 0.4),
                 new NormalizedFaceLandmarks(
                     LeftEye: new NormalizedPoint(0.2, 0.3),
@@ -67,8 +67,8 @@ public sealed class FaceInspectionRepositoryContractTests
                 protocol,
                 cropHash,
                 "runs/test/faces/face-001/aligned.png",
-                cropWidth: 112,
-                cropHeight: 112,
+                112,
+                112,
                 embeddingModelId,
                 embeddingHash,
                 vector);
