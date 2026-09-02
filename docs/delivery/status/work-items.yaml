@@ -1183,8 +1183,8 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0099-postgresql-archive-background-persistence.md
   started_at: 2026-09-02
-  last_updated_at: 2026-09-02
-  branch: agent/WI-0099-postgres-storage-accounting
+  last_updated_at: 2026-09-03
+  branch: agent/WI-0099-postgres-geonames-state
   blockers:
   - WI-0098
   blocker_notes:
@@ -1200,6 +1200,7 @@ work_items:
   - 'PR #252 merged at 8b503dade560ca3a4356e06a36a4c51c6ea65378 and workflow #1462 passed. Maintainer live verification then passed, accepting PostgreSQL schema version 7 and archive advancement-control persistence.'
   - 'PR #253 merged at 034670377f12439531cb15b6382c2d09d619b4d4 and workflow #1465 passed. Maintainer live verification then passed, accepting PostgreSQL schema version 8 plus review-proxy completion and post-analysis retry persistence.'
   - 'PR #254 initially failed workflow #1469 on one C# local-variable scoping error. The corrective commit changed only local names; workflow #1470 passed, PR #254 merged at 65347049842db70cbed9a12f4637b582e819a4ac, and maintainer PostgreSQL review/verification succeeded, accepting schema version 9 and managed hydration ownership semantics.'
+  - 'PR #255 merged at 865cfe01ab6d67216d3719814f7b9ab0fe782ce4 and workflow #1475 passed. Maintainer review/verification succeeded, accepting the PostgreSQL storage-accounting adapter against schema version 9.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/245
@@ -1261,6 +1262,10 @@ work_items:
     value: 65347049842db70cbed9a12f4637b582e819a4ac
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/255
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33690505968
+  - type: merge_commit
+    value: 865cfe01ab6d67216d3719814f7b9ab0fe782ce4
 - id: WI-0100
   title: Migrate review and identity persistence to PostgreSQL
   milestone: M24
