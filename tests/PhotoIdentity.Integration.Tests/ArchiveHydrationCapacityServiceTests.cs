@@ -401,10 +401,11 @@ public sealed class ArchiveHydrationCapacityServiceTests
         ArchiveHydrationPolicyConfiguration configuration,
         SlideshowOriginalLeaseRegistry? slideshowLeases = null) =>
         new(
-            database,
             new SqliteArchiveHydrationRepository(database),
             new SqliteArchiveSourceHydrationRepository(database),
+            new SqliteArchiveCoverageRepository(database),
             new SqliteArchiveStorageRepository(database),
+            new SqliteArchiveAvailabilityRepository(database),
             platform,
             probe,
             configuration,
