@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -15,7 +16,7 @@ public sealed record ArchiveAdvancementState(
     public bool IsRequested => string.Equals(DesiredState, "running", StringComparison.Ordinal);
 }
 
-public sealed class SqliteArchiveAdvancementRepository
+public sealed class SqliteArchiveAdvancementRepository : IArchiveAdvancementControlRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -23,6 +24,22 @@ public sealed class SqliteArchiveAdvancementRepository
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+    }
+
+    async Task<ArchiveAdvancementControlState?> IArchiveAdvancementControlRepository.GetAsync(
+        SourceId sourceId,
+        CancellationToken cancellationToken)
+    {
+        ArchiveAdvancementState? state = await GetAsync(sourceId, cancellationToken);
+        return state is null
+            ? null
+            : new ArchiveAdvancementControlState(
+                state.SourceId,
+                state.DesiredState,
+                state.RuntimeState,
+                state.SyncRequired,
+                state.Message,
+                state.UpdatedAtUtc);
     }
 
     public async Task EnsureSchemaAsync(CancellationToken cancellationToken = default)

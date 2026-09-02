@@ -155,3 +155,26 @@ After PR #250 merged at `0085146e1b3981c240c2b3aa7d85feb6e990e4fb`, workflow #14
 Connectivity and schema initialization passed, but the isolated live test failed because it compared checkpoint JSON text byte-for-byte. PostgreSQL `jsonb` legitimately normalized `{"stage":1}` to `{"stage": 1}`.
 
 The corrective slice leaves the processing repository, lease/retry semantics and schema unchanged. It updates the live test to assert checkpoint JSON structurally instead of depending on whitespace-preserving serialization. The PostgreSQL processing repository remains pending maintainer acceptance until the verifier passes after this correction.
+
+
+### Maintainer verification — PostgreSQL durable processing
+
+After corrective PR #251 merged on 2026-09-02, the maintainer reran `verify-postgres.ps1` against updated main.
+
+Verification passed end-to-end:
+- PostgreSQL connectivity and schema initialization passed;
+- the live processing repository test passed with structural checkpoint-JSON assertions;
+- durable run creation, lease-token enforcement, retry scheduling, expired-lease reclaim, cancellation and competing claims were accepted against PostgreSQL schema version 6.
+
+### Slice 6 — PostgreSQL archive advancement control and recovery-write containment
+
+Started 2026-09-02.
+
+- Added provider-neutral `IArchiveAdvancementControlRepository` and Core-owned `ArchiveAdvancementControlState`.
+- `SqliteArchiveAdvancementRepository` implements the neutral contract while retaining its existing SQLite-specific API for current callers/tests.
+- Added PostgreSQL schema version 7 with `archive_advancement_control`, preserving one control row per archive source, operator desired state, runtime state, sync-required flag, message and update timestamp.
+- Added `PostgresArchiveAdvancementControlRepository` implementing request, pause, runtime update, complete and block transitions.
+- Archive start/pause endpoints and `ArchiveAdvancementHostedService` now depend on the provider-neutral control contract; dependency injection still binds that contract to SQLite, so runtime authority does not switch in this slice.
+- Fixed the original hosted-service recovery-write escape class: secondary failures while persisting waiting/blocked recovery state are logged and suppressed, and the loop backs off before retrying instead of allowing the recovery write to terminate the host or hot-spin.
+- Extended live PostgreSQL verification to cover advancement request → runtime update → complete, pause and block transitions.
+- Remaining SQLite-owned WI-0099 state still includes post-analysis, hydration/release ownership, storage-policy accounting and automatic GeoNames enrichment operational state. Runtime cutover remains deferred until those writer surfaces can move coherently.

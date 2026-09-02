@@ -199,6 +199,22 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(2L, Convert.ToInt64(archiveCoverageTableCount));
             }
 
+            await using (NpgsqlCommand readArchiveAdvancementTable =
+                         verificationConnection.CreateCommand())
+            {
+                readArchiveAdvancementTable.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name = 'archive_advancement_control';
+                    """;
+
+                object? archiveAdvancementTableCount =
+                    await readArchiveAdvancementTable.ExecuteScalarAsync();
+                Assert.Equal(1L, Convert.ToInt64(archiveAdvancementTableCount));
+            }
+
             await using (NpgsqlCommand readColumnTypes =
                          verificationConnection.CreateCommand())
             {
@@ -323,6 +339,70 @@ public sealed class PostgresCatalogueDatabaseTests
             Assert.Equal(
                 replacedCoverage.IncludedFolders,
                 persistedCoverage.IncludedFolders);
+
+            IArchiveAdvancementControlRepository advancementControl =
+                new PostgresArchiveAdvancementControlRepository(database);
+            SourceId advancementSourceId = SourceId.From(sourceId);
+            DateTimeOffset advancementAt = seededAt.AddMinutes(30);
+
+            Assert.Null(await advancementControl.GetAsync(advancementSourceId));
+
+            await advancementControl.RequestRunAsync(
+                advancementSourceId,
+                advancementAt);
+            ArchiveAdvancementControlState requested =
+                Assert.IsType<ArchiveAdvancementControlState>(
+                    await advancementControl.GetAsync(advancementSourceId));
+            Assert.True(requested.IsRequested);
+            Assert.Equal("queued", requested.RuntimeState);
+            Assert.True(requested.SyncRequired);
+            Assert.Null(requested.Message);
+
+            await advancementControl.UpdateRuntimeAsync(
+                advancementSourceId,
+                "running",
+                syncRequired: false,
+                "Archive synchronization completed; processing is continuing.",
+                advancementAt.AddMinutes(1));
+            ArchiveAdvancementControlState running =
+                Assert.IsType<ArchiveAdvancementControlState>(
+                    await advancementControl.GetAsync(advancementSourceId));
+            Assert.True(running.IsRequested);
+            Assert.Equal("running", running.RuntimeState);
+            Assert.False(running.SyncRequired);
+
+            await advancementControl.CompleteAsync(
+                advancementSourceId,
+                advancementAt.AddMinutes(2));
+            ArchiveAdvancementControlState completed =
+                Assert.IsType<ArchiveAdvancementControlState>(
+                    await advancementControl.GetAsync(advancementSourceId));
+            Assert.False(completed.IsRequested);
+            Assert.Equal("complete", completed.RuntimeState);
+            Assert.False(completed.SyncRequired);
+
+            await advancementControl.RequestRunAsync(
+                advancementSourceId,
+                advancementAt.AddMinutes(3));
+            await advancementControl.PauseAsync(
+                advancementSourceId,
+                advancementAt.AddMinutes(4));
+            ArchiveAdvancementControlState paused =
+                Assert.IsType<ArchiveAdvancementControlState>(
+                    await advancementControl.GetAsync(advancementSourceId));
+            Assert.False(paused.IsRequested);
+            Assert.Equal("paused", paused.RuntimeState);
+
+            await advancementControl.BlockAsync(
+                advancementSourceId,
+                "operator-action-required",
+                advancementAt.AddMinutes(5));
+            ArchiveAdvancementControlState blocked =
+                Assert.IsType<ArchiveAdvancementControlState>(
+                    await advancementControl.GetAsync(advancementSourceId));
+            Assert.False(blocked.IsRequested);
+            Assert.Equal("blocked", blocked.RuntimeState);
+            Assert.Equal("operator-action-required", blocked.Message);
 
             IArchiveAvailabilityRepository archiveAvailability =
                 new PostgresArchiveAvailabilityRepository(database);

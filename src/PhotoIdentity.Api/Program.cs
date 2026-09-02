@@ -134,6 +134,8 @@ public partial class Program
         builder.Services.AddSingleton<SqliteArchiveAvailabilityRepository>();
         builder.Services.AddSingleton<SqliteArchiveStorageRepository>();
         builder.Services.AddSingleton<SqliteArchiveAdvancementRepository>();
+        builder.Services.AddSingleton<IArchiveAdvancementControlRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteArchiveAdvancementRepository>());
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton<DetectorRolloutCropFileResolver>();
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();

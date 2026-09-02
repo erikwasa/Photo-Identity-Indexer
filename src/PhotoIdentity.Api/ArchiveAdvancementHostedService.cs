@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Worker;
@@ -12,7 +13,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     private static readonly TimeSpan ActiveDelay = TimeSpan.FromMilliseconds(500);
 
     private readonly SqliteCatalogueDatabase _database;
-    private readonly SqliteArchiveAdvancementRepository _control;
+    private readonly IArchiveAdvancementControlRepository _control;
     private readonly SqliteArchiveSourceObservationRepository _observations;
     private readonly SqliteArchiveAnalysisRepository _analysis;
     private readonly SqliteArchivePostAnalysisRepository _postAnalysis;
@@ -30,7 +31,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
 
     public ArchiveAdvancementHostedService(
         SqliteCatalogueDatabase database,
-        SqliteArchiveAdvancementRepository control,
+        IArchiveAdvancementControlRepository control,
         SqliteArchiveSourceObservationRepository observations,
         SqliteArchiveAnalysisRepository analysis,
         SqliteArchivePostAnalysisRepository postAnalysis,
@@ -87,7 +88,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                     continue;
                 }
 
-                ArchiveAdvancementState? control = await _control.GetAsync(coverage.Source.Id, stoppingToken);
+                ArchiveAdvancementControlState? control = await _control.GetAsync(coverage.Source.Id, stoppingToken);
                 if (control?.IsRequested != true)
                 {
                     await Task.Delay(IdleDelay, stoppingToken);
@@ -163,22 +164,29 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
 
                 if (IsRetryableTransition(exception))
                 {
-                    await _control.UpdateRuntimeAsync(
-                        coverage.Source.Id,
+                    await TryPersistRecoveryStateAsync(
                         "waiting",
-                        syncRequired: null,
-                        exception.Message,
-                        _timeProvider.GetUtcNow(),
+                        cancellationToken => _control.UpdateRuntimeAsync(
+                            coverage.Source.Id,
+                            "waiting",
+                            syncRequired: null,
+                            exception.Message,
+                            _timeProvider.GetUtcNow(),
+                            cancellationToken),
                         stoppingToken);
                     await Task.Delay(IdleDelay, stoppingToken);
                     continue;
                 }
 
-                await _control.BlockAsync(
-                    coverage.Source.Id,
-                    exception.Message,
-                    _timeProvider.GetUtcNow(),
+                await TryPersistRecoveryStateAsync(
+                    "blocked",
+                    cancellationToken => _control.BlockAsync(
+                        coverage.Source.Id,
+                        exception.Message,
+                        _timeProvider.GetUtcNow(),
+                        cancellationToken),
                     stoppingToken);
+                await Task.Delay(IdleDelay, stoppingToken);
             }
         }
     }
@@ -275,6 +283,28 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             hasRunnableWork,
             hasOneDriveTransition,
             faceReviewBlockedOnOneDrive);
+    }
+
+    private async Task TryPersistRecoveryStateAsync(
+        string recoveryState,
+        Func<CancellationToken, Task> persistAsync,
+        CancellationToken stoppingToken)
+    {
+        try
+        {
+            await persistAsync(stoppingToken);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            // Host shutdown owns cancellation; recovery persistence must never turn it into a fault.
+        }
+        catch (Exception recoveryException)
+        {
+            _logger.LogError(
+                recoveryException,
+                "Archive advancement failed to persist recovery state {RecoveryState}; the worker will continue.",
+                recoveryState);
+        }
     }
 
     private static bool IsRetryableTransition(Exception exception)

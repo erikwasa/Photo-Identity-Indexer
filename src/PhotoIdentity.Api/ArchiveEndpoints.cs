@@ -273,6 +273,7 @@ public static class ArchiveEndpoints
 
     private static async Task<IResult> StartAdvancementAsync(
         SqliteCatalogueDatabase database,
+        IArchiveAdvancementControlRepository advancementControl,
         ArchiveOperatorConfiguration operatorConfiguration,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -282,7 +283,7 @@ public static class ArchiveEndpoints
             ArchiveCoverageConfiguration configured = await new SqliteArchiveCoverageRepository(database)
                 .GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
-            await new SqliteArchiveAdvancementRepository(database).RequestRunAsync(
+            await advancementControl.RequestRunAsync(
                 configured.Source.Id,
                 timeProvider.GetUtcNow(),
                 cancellationToken);
@@ -296,6 +297,7 @@ public static class ArchiveEndpoints
 
     private static async Task<IResult> PauseAdvancementAsync(
         SqliteCatalogueDatabase database,
+        IArchiveAdvancementControlRepository advancementControl,
         ArchiveOperatorConfiguration operatorConfiguration,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -305,7 +307,7 @@ public static class ArchiveEndpoints
             ArchiveCoverageConfiguration configured = await new SqliteArchiveCoverageRepository(database)
                 .GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
-            await new SqliteArchiveAdvancementRepository(database).PauseAsync(
+            await advancementControl.PauseAsync(
                 configured.Source.Id,
                 timeProvider.GetUtcNow(),
                 cancellationToken);
