@@ -207,18 +207,21 @@ public sealed class PostgresCatalogueDatabaseTests
                 mutateRevision.CommandText =
                     """
                     UPDATE asset_revisions
-                    SET size_bytes = 2
+                    SET content_sha256 = @replacement_content_sha256
                     WHERE id = @revision_id;
                     """;
                 mutateRevision.Parameters.AddWithValue(
                     "revision_id",
                     revisionId);
+                mutateRevision.Parameters.AddWithValue(
+                    "replacement_content_sha256",
+                    new string('b', 64));
 
                 PostgresException immutable =
                     await Assert.ThrowsAsync<PostgresException>(
                         () => mutateRevision.ExecuteNonQueryAsync());
                 Assert.Contains(
-                    "asset_revisions are immutable",
+                    "asset revision identity is immutable",
                     immutable.MessageText,
                     StringComparison.Ordinal);
             }
