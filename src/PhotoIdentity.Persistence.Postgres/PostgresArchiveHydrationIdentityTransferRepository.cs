@@ -44,16 +44,16 @@ public sealed class PostgresArchiveHydrationIdentityTransferRepository :
             command.Parameters.AddWithValue(
                 "asset_id",
                 Guid.Parse(assetId.ToString()));
-            object? value =
+            object? revisionValue =
                 await command.ExecuteScalarAsync(cancellationToken);
-            revisionId = value is Guid id
+            revisionId = revisionValue is Guid id
                 ? AssetRevisionId.From(id)
                 : null;
         }
 
-        return revisionId is AssetRevisionId value &&
+        return revisionId is AssetRevisionId activeRevisionId &&
             await MoveRevisionLeaseToSourceAsync(
-                value,
+                activeRevisionId,
                 assetId,
                 transferredAtUtc,
                 cancellationToken);
