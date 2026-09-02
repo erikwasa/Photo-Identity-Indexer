@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -7,7 +8,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Privacy-safe aggregate storage queries for the permanent archive. No source paths or filenames
 /// are returned from this repository.
 /// </summary>
-public sealed class SqliteArchiveStorageRepository
+public sealed class SqliteArchiveStorageRepository : IArchiveStorageAccountingRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 

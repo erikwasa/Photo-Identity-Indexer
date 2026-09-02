@@ -61,10 +61,11 @@ public sealed class ArchiveVerificationRevisionChangeTests
             LocalFilesOnDemandPlatform platform = new();
             SqliteArchiveSourceHydrationRepository sourceHydrations = new(database);
             ArchiveHydrationCapacityService capacity = new(
-                database,
                 new SqliteArchiveHydrationRepository(database),
                 sourceHydrations,
+                new SqliteArchiveCoverageRepository(database),
                 new SqliteArchiveStorageRepository(database),
+                new SqliteArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(100_000),
                 new ArchiveHydrationPolicyConfiguration(0, 1_000, 1),

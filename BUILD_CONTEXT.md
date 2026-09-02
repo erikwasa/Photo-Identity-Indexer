@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-hydration-ownership`. PR #253 merged, workflow #1465 passed, and the maintainer live-verified PostgreSQL schema version 8. PR #254 is the active slice. It adds schema version 9 plus neutral revision/source hydration ownership and atomic identity-transfer contracts, while runtime bindings remain on SQLite.
+In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-storage-accounting`. PR #254 merged, workflow #1470 passed, and the maintainer accepted PostgreSQL schema version 9 plus managed hydration ownership. PR #255 is the active slice. It adds provider-neutral storage accounting and a PostgreSQL implementation without a schema bump, and removes the remaining SQLite database handle from `ArchiveHydrationCapacityService` while runtime bindings stay on SQLite.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge the hydration-ownership slice after CI is green, then rerun `verify-postgres.ps1` to accept schema version 9. After that, continue with storage-policy accounting and automatic GeoNames enrichment operational state, then reassess the remaining verification/runtime-composition blockers before any provider cutover.
+For the M24 thread, review/merge the storage-accounting slice after CI is green, then rerun `verify-postgres.ps1` to verify the PostgreSQL accounting adapter against schema version 9. After that, migrate automatic GeoNames enrichment operational state and perform a final archive/background runtime-composition review before any provider cutover.
 
 ## Relevant files
 

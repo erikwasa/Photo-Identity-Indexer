@@ -32,10 +32,11 @@ public sealed class BoundedHydrationWorkingSetTests
             SqliteArchiveHydrationRepository hydrations = new(database);
             ImmediateFilesOnDemandPlatform platform = new();
             ArchiveHydrationCapacityService capacity = new(
-                database,
                 hydrations,
                 new SqliteArchiveSourceHydrationRepository(database),
+                new SqliteArchiveCoverageRepository(database),
                 new SqliteArchiveStorageRepository(database),
+                new SqliteArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(100_000),
                 new ArchiveHydrationPolicyConfiguration(0, managedBudget, 1),
