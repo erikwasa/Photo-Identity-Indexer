@@ -10,7 +10,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Availability is intentionally independent of immutable revisions so OneDrive placeholders
 /// can remain catalogued without opening them or creating a content revision.
 /// </summary>
-public sealed class SqliteArchiveAvailabilityRepository
+public sealed class SqliteArchiveAvailabilityRepository : IArchiveAvailabilityRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
