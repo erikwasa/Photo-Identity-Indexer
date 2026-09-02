@@ -99,6 +99,129 @@ public sealed class PostgresCatalogueDatabaseTests
 
             object? count = await readMigration.ExecuteScalarAsync();
             Assert.Equal(1L, Convert.ToInt64(count));
+
+            await using (NpgsqlCommand readFoundationalTables =
+                         verificationConnection.CreateCommand())
+            {
+                readFoundationalTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'sources',
+                          'assets',
+                          'asset_revisions',
+                          'face_occurrences',
+                          'face_observations',
+                          'face_crops',
+                          'embeddings',
+                          'processing_runs',
+                          'processing_jobs');
+                    """;
+
+                object? tableCount =
+                    await readFoundationalTables.ExecuteScalarAsync();
+                Assert.Equal(9L, Convert.ToInt64(tableCount));
+            }
+
+            await using (NpgsqlCommand readColumnTypes =
+                         verificationConnection.CreateCommand())
+            {
+                readColumnTypes.CommandText =
+                    """
+                    SELECT
+                        (SELECT data_type
+                         FROM information_schema.columns
+                         WHERE table_schema = 'public'
+                           AND table_name = 'sources'
+                           AND column_name = 'id'),
+                        (SELECT data_type
+                         FROM information_schema.columns
+                         WHERE table_schema = 'public'
+                           AND table_name = 'processing_runs'
+                           AND column_name = 'configuration_json'),
+                        (SELECT data_type
+                         FROM information_schema.columns
+                         WHERE table_schema = 'public'
+                           AND table_name = 'embeddings'
+                           AND column_name = 'vector_blob');
+                    """;
+
+                await using NpgsqlDataReader typeReader =
+                    await readColumnTypes.ExecuteReaderAsync();
+                Assert.True(await typeReader.ReadAsync());
+                Assert.Equal("uuid", typeReader.GetString(0));
+                Assert.Equal("jsonb", typeReader.GetString(1));
+                Assert.Equal("bytea", typeReader.GetString(2));
+            }
+
+            Guid sourceId = Guid.NewGuid();
+            Guid assetId = Guid.NewGuid();
+            Guid revisionId = Guid.NewGuid();
+            await using (NpgsqlCommand seedRevision =
+                         verificationConnection.CreateCommand())
+            {
+                seedRevision.CommandText =
+                    """
+                    INSERT INTO sources (
+                        id, kind, root_locator, created_at_utc)
+                    VALUES (
+                        @source_id, 'test', 'test-root', @now);
+
+                    INSERT INTO assets (
+                        id, source_id, source_key, created_at_utc)
+                    VALUES (
+                        @asset_id, @source_id, 'photo.jpg', @now);
+
+                    INSERT INTO asset_revisions (
+                        id, asset_id, content_sha256, size_bytes, observed_at_utc)
+                    VALUES (
+                        @revision_id,
+                        @asset_id,
+                        @content_sha256,
+                        1,
+                        @now);
+                    """;
+                seedRevision.Parameters.AddWithValue(
+                    "source_id",
+                    sourceId);
+                seedRevision.Parameters.AddWithValue(
+                    "asset_id",
+                    assetId);
+                seedRevision.Parameters.AddWithValue(
+                    "revision_id",
+                    revisionId);
+                seedRevision.Parameters.AddWithValue(
+                    "content_sha256",
+                    new string('a', 64));
+                seedRevision.Parameters.AddWithValue(
+                    "now",
+                    DateTimeOffset.UtcNow);
+                await seedRevision.ExecuteNonQueryAsync();
+            }
+
+            await using (NpgsqlCommand mutateRevision =
+                         verificationConnection.CreateCommand())
+            {
+                mutateRevision.CommandText =
+                    """
+                    UPDATE asset_revisions
+                    SET size_bytes = 2
+                    WHERE id = @revision_id;
+                    """;
+                mutateRevision.Parameters.AddWithValue(
+                    "revision_id",
+                    revisionId);
+
+                PostgresException immutable =
+                    await Assert.ThrowsAsync<PostgresException>(
+                        () => mutateRevision.ExecuteNonQueryAsync());
+                Assert.Contains(
+                    "asset_revisions are immutable",
+                    immutable.MessageText,
+                    StringComparison.Ordinal);
+            }
         }
         finally
         {
