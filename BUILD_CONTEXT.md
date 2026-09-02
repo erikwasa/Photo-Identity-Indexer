@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0097 is maintainer-verified and completed. **WI-0098 — Add database-neutral persistence boundary and foundational PostgreSQL schema** is in progress on `agent/WI-0098-processing-run-lifecycle-boundary`. PR #241 merged the asset-revision lookup boundary. The active slice adds a Core processing-run lifecycle contract and removes `LocalBatchCoordinator`'s direct construction of `SqliteProcessingRepository`; SQLite remains authoritative.
+In the separate M24 thread, WI-0097 is maintainer-verified and completed. **WI-0098 — Add database-neutral persistence boundary and foundational PostgreSQL schema** is in progress on `agent/WI-0098-processing-run-lifecycle-boundary`. PR #241 merged the asset-revision lookup boundary. PR #242 is the active slice. It adds a Core processing-run lifecycle contract and removes `LocalBatchCoordinator`'s direct construction of `SqliteProcessingRepository`; SQLite remains authoritative.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge the WI-0098 processing-run lifecycle boundary after CI is green. Keep the slice contract-only: preserve current SQLite run creation/cancellation/execution behavior and do not introduce PostgreSQL authoritative reads/writes or dual writes yet. The next likely WI-0098 seam is local source registration/catalogue scanning.
+For the M24 thread, review/merge PR #242 (the WI-0098 processing-run lifecycle boundary) after CI is green. Keep the slice contract-only: preserve current SQLite run creation/cancellation/execution behavior and do not introduce PostgreSQL authoritative reads/writes or dual writes yet. The next likely WI-0098 seam is local source registration/catalogue scanning.
 
 ## Relevant files
 
