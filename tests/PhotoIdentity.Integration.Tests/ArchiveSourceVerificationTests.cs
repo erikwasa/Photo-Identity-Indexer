@@ -110,10 +110,11 @@ public sealed class ArchiveSourceVerificationTests
             platform.Set(fullPath, AssetAvailability.OnlineOnly);
             SqliteArchiveSourceHydrationRepository sourceHydrations = new(database);
             ArchiveHydrationCapacityService capacity = new(
-                database,
                 new SqliteArchiveHydrationRepository(database),
                 sourceHydrations,
+                new SqliteArchiveCoverageRepository(database),
                 new SqliteArchiveStorageRepository(database),
+                new SqliteArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(100_000),
                 new ArchiveHydrationPolicyConfiguration(0, 1_000, 1),
@@ -196,10 +197,11 @@ public sealed class ArchiveSourceVerificationTests
             platform.Set(fullPath, AssetAvailability.Unavailable);
             SqliteArchiveSourceHydrationRepository sourceHydrations = new(database);
             ArchiveHydrationCapacityService capacity = new(
-                database,
                 new SqliteArchiveHydrationRepository(database),
                 sourceHydrations,
+                new SqliteArchiveCoverageRepository(database),
                 new SqliteArchiveStorageRepository(database),
+                new SqliteArchiveAvailabilityRepository(database),
                 platform,
                 new FixedStorageProbe(100_000),
                 new ArchiveHydrationPolicyConfiguration(0, 1_000, 1),
