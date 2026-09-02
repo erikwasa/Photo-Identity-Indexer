@@ -254,6 +254,25 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(4L, Convert.ToInt64(hydrationOwnershipTableCount));
             }
 
+            await using (NpgsqlCommand readPlaceEnrichmentTables =
+                         verificationConnection.CreateCommand())
+            {
+                readPlaceEnrichmentTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'photo_capture_metadata',
+                          'photo_place_reverse_geocode_cache',
+                          'photo_place_enrichment_attempts');
+                    """;
+
+                object? placeEnrichmentTableCount =
+                    await readPlaceEnrichmentTables.ExecuteScalarAsync();
+                Assert.Equal(3L, Convert.ToInt64(placeEnrichmentTableCount));
+            }
+
             await using (NpgsqlCommand readColumnTypes =
                          verificationConnection.CreateCommand())
             {
@@ -679,6 +698,142 @@ public sealed class PostgresCatalogueDatabaseTests
             Assert.Equal(
                 hydrationAt.AddMinutes(11),
                 reclaimedRevision.RequestedAtUtc);
+
+            IPhotoCaptureMetadataRepository captureMetadata =
+                new PostgresPhotoCaptureMetadataRepository(database);
+            AssetRevisionId geoRevisionId =
+                AssetRevisionId.From(revisionId);
+            DateTime takenAtLocal =
+                new(2026, 9, 2, 21, 15, 0, DateTimeKind.Unspecified);
+            PhotoCaptureMetadata gpsMetadata = new(
+                takenAtLocal,
+                TimeSpan.FromHours(2),
+                59.3293,
+                18.0686);
+            await captureMetadata.SavePhotoMetadataAsync(
+                geoRevisionId,
+                gpsMetadata,
+                seededAt.AddHours(4));
+
+            PhotoCaptureMetadata persistedGps =
+                Assert.IsType<PhotoCaptureMetadata>(
+                    await captureMetadata.GetPhotoMetadataAsync(
+                        geoRevisionId));
+            Assert.Equal(takenAtLocal, persistedGps.TakenAtLocal);
+            Assert.Equal(TimeSpan.FromHours(2), persistedGps.UtcOffset);
+            Assert.Equal(59.3293, persistedGps.Latitude);
+            Assert.Equal(18.0686, persistedGps.Longitude);
+
+            IPhotoPlaceEnrichmentStateRepository enrichmentState =
+                new PostgresPhotoPlaceEnrichmentStateRepository(
+                    database,
+                    TimeProvider.System);
+            const string geoProvider = "geonames";
+            const string geoContract = "nearby-place-v1";
+
+            PhotoPlaceEnrichmentCandidate geoCandidate =
+                Assert.Single(
+                    await enrichmentState.GetCandidatesAsync(
+                        geoProvider,
+                        geoContract,
+                        10,
+                        refresh: false));
+            Assert.Equal(geoRevisionId, geoCandidate.RevisionId);
+
+            Assert.Null(
+                await enrichmentState.GetCachedAsync(
+                    geoProvider,
+                    geoContract,
+                    geoCandidate.Latitude,
+                    geoCandidate.Longitude));
+            await enrichmentState.SaveCacheAsync(
+                geoProvider,
+                geoContract,
+                geoCandidate,
+                "Sweden/Stockholm",
+                "2673730",
+                "SE");
+            ReverseGeocodeCacheEntry cachedPlace =
+                Assert.IsType<ReverseGeocodeCacheEntry>(
+                    await enrichmentState.GetCachedAsync(
+                        geoProvider,
+                        geoContract,
+                        geoCandidate.Latitude,
+                        geoCandidate.Longitude));
+            Assert.Equal("Sweden/Stockholm", cachedPlace.PlaceValue);
+            Assert.Equal("2673730", cachedPlace.ProviderResultId);
+            Assert.Equal("SE", cachedPlace.CountryCode);
+
+            await enrichmentState.MarkDeferredAsync(
+                geoProvider,
+                geoContract,
+                geoCandidate,
+                "transport",
+                "temporary network failure");
+            Assert.Single(
+                await enrichmentState.GetCandidatesAsync(
+                    geoProvider,
+                    geoContract,
+                    10,
+                    refresh: false));
+
+            await enrichmentState.MarkSucceededAsync(
+                geoProvider,
+                geoContract,
+                geoCandidate,
+                "Sweden/Stockholm",
+                "2673730",
+                "SE");
+            Assert.Empty(
+                await enrichmentState.GetCandidatesAsync(
+                    geoProvider,
+                    geoContract,
+                    10,
+                    refresh: false));
+            Assert.Single(
+                await enrichmentState.GetCandidatesAsync(
+                    geoProvider,
+                    geoContract,
+                    10,
+                    refresh: true));
+
+            PhotoCaptureMetadata movedGps = new(
+                takenAtLocal,
+                TimeSpan.FromHours(2),
+                59.3300,
+                18.0700);
+            await captureMetadata.SavePhotoMetadataAsync(
+                geoRevisionId,
+                movedGps,
+                seededAt.AddHours(4).AddMinutes(1));
+            PhotoPlaceEnrichmentCandidate movedCandidate =
+                Assert.Single(
+                    await enrichmentState.GetCandidatesAsync(
+                        geoProvider,
+                        geoContract,
+                        10,
+                        refresh: false));
+            Assert.Equal(59.3300, movedCandidate.Latitude);
+            Assert.Equal(18.0700, movedCandidate.Longitude);
+
+            await enrichmentState.MarkSkippedAsync(
+                geoProvider,
+                geoContract,
+                movedCandidate,
+                "no-result",
+                "no nearby populated place");
+            Assert.Empty(
+                await enrichmentState.GetCandidatesAsync(
+                    geoProvider,
+                    geoContract,
+                    10,
+                    refresh: false));
+            Assert.Empty(
+                await enrichmentState.GetCandidatesAsync(
+                    geoProvider,
+                    geoContract,
+                    10,
+                    refresh: true));
 
             PostgresProcessingRepository processingRepository = new(database);
             IProcessingRunRepository processingRuns = processingRepository;
