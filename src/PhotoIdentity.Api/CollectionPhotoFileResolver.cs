@@ -1,6 +1,6 @@
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
@@ -14,9 +14,9 @@ public sealed class CollectionPhotoFileResolver
 {
     private const string LocalFolderSourceKind = "local-folder";
 
-    private readonly SqliteLocalBatchRepository _repository;
+    private readonly IAssetRevisionLookupRepository _repository;
 
-    public CollectionPhotoFileResolver(SqliteLocalBatchRepository repository)
+    public CollectionPhotoFileResolver(IAssetRevisionLookupRepository repository)
     {
         ArgumentNullException.ThrowIfNull(repository);
         _repository = repository;
@@ -26,7 +26,7 @@ public sealed class CollectionPhotoFileResolver
         AssetRevisionId revisionId,
         CancellationToken cancellationToken = default)
     {
-        CatalogueProcessingAssetRevision? revision = await _repository.GetAssetRevisionAsync(
+        AssetRevisionLookup? revision = await _repository.GetRevisionAsync(
             revisionId,
             cancellationToken);
         return Resolve(revision);
@@ -37,14 +37,14 @@ public sealed class CollectionPhotoFileResolver
         Sha256Digest contentHash,
         CancellationToken cancellationToken = default)
     {
-        CatalogueProcessingAssetRevision? revision = await _repository.FindAssetRevisionAsync(
+        AssetRevisionLookup? revision = await _repository.FindRevisionAsync(
             sourceKey,
             contentHash,
             cancellationToken);
         return Resolve(revision);
     }
 
-    private static CollectionPhotoFile? Resolve(CatalogueProcessingAssetRevision? revision)
+    private static CollectionPhotoFile? Resolve(AssetRevisionLookup? revision)
     {
         if (revision is null ||
             !string.Equals(revision.SourceKind, LocalFolderSourceKind, StringComparison.Ordinal) ||

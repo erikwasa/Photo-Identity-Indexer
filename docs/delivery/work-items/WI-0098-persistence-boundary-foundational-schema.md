@@ -85,3 +85,17 @@ Started 2026-09-02.
 - `SqliteProcessingRepository` implements the neutral contract with its existing transaction/lease semantics.
 - `ResumableBatchProcessor` now depends on `IProcessingExecutionRepository` and no longer references the SQLite persistence namespace.
 - Existing SQLite processing tests remain the behavior guard for lease, retry, checkpoint, idempotency and restart semantics. A PostgreSQL implementation remains for the later persistence-migration work item rather than introducing dual writes here.
+
+
+### Slice 3 — application asset-revision lookup boundary
+
+Started 2026-09-02.
+
+- Added Core-owned `AssetRevisionLookup`, `IAssetRevisionStorageDescriptor` and `IAssetRevisionLookupRepository` so application services can resolve immutable revisions and their source locations without depending on SQLite types.
+- `SqliteLocalBatchRepository` now implements the neutral lookup contract by projecting its existing revision read model; its established concrete API remains available for migration-era callers.
+- `CollectionPhotoFileResolver`, `CollectionOriginalAccessService` and `SlideshowOriginalPreparationService` now depend on the neutral lookup contract.
+- Hydration admission accepts the Core storage descriptor so both the new neutral projection and existing migration-era SQLite revision records preserve the same byte-budget behavior.
+- API dependency injection binds `IAssetRevisionLookupRepository` to the existing SQLite singleton. SQLite remains authoritative; this slice adds no PostgreSQL reads, writes or dual-write behavior.
+- Focused integration tests verify SQLite lookup-by-id, lookup-by-source/hash and missing-revision behavior through the Core contract.
+
+Later WI-0098 slices may move the broader source/asset catalogue records behind neutral contracts. Archive/background writes, review/identity persistence and library persistence remain owned by WI-0099, WI-0100 and WI-0101 respectively.

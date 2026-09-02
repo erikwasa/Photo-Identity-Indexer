@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0097 is maintainer-verified and completed. **WI-0098 — Add database-neutral persistence boundary and foundational PostgreSQL schema** is in progress on `agent/WI-0098-processing-persistence-boundary`. PR #239 corrected the schema-v2 trigger syntax and the maintainer has now verified schema version 2 successfully on the existing PostgreSQL volume. The active slice moves durable processing records/lease semantics into Core and places `ResumableBatchProcessor` behind `IProcessingExecutionRepository`. SQLite remains authoritative.
+In the separate M24 thread, WI-0097 is maintainer-verified and completed. **WI-0098 — Add database-neutral persistence boundary and foundational PostgreSQL schema** is in progress on `agent/WI-0098-asset-revision-lookup-boundary`. PR #240 merged the durable processing execution boundary. PR #241 is the active slice. It adds a Core-owned asset-revision lookup contract and moves collection photo/original/slideshow lookup paths off the concrete `SqliteLocalBatchRepository` type while SQLite remains authoritative.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge the WI-0098 processing-boundary slice after CI is green. The slice is contract-only: preserve current SQLite lease/checkpoint/retry behavior and do not introduce PostgreSQL authoritative writes or dual writes yet. Preserve SQLite behavior until controlled cutover in WI-0102.
+For the M24 thread, review/merge PR #241 (the WI-0098 asset-revision lookup boundary) after CI is green. Keep this slice contract-only: preserve current SQLite lookup and hydration behavior and do not introduce PostgreSQL authoritative reads/writes or dual writes yet. Preserve SQLite behavior until controlled cutover in WI-0102.
 
 ## Relevant files
 

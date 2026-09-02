@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
@@ -156,7 +157,7 @@ public sealed class ArchiveHydrationCapacityService
     }
 
     public Task<ArchiveHydrationAdmission> ExecuteHydrationAdmissionAsync(
-        CatalogueProcessingAssetRevision revision,
+        IAssetRevisionStorageDescriptor revision,
         Func<Task> acceptedAction,
         CancellationToken cancellationToken = default)
     {
@@ -212,7 +213,7 @@ public sealed class ArchiveHydrationCapacityService
         _sourceHydrations.TouchAsync(assetId, _timeProvider.GetUtcNow(), cancellationToken);
 
     public async Task<ArchiveHydrationSetAdmission> PreflightHydrationSetAsync(
-        IReadOnlyCollection<CatalogueProcessingAssetRevision> revisions,
+        IReadOnlyCollection<IAssetRevisionStorageDescriptor> revisions,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(revisions);
@@ -230,7 +231,7 @@ public sealed class ArchiveHydrationCapacityService
                 0);
         }
 
-        CatalogueProcessingAssetRevision[] requested = revisions
+        IAssetRevisionStorageDescriptor[] requested = revisions
             .DistinctBy(revision => revision.RevisionId)
             .ToArray();
         if (requested.Length == 0)
@@ -255,7 +256,7 @@ public sealed class ArchiveHydrationCapacityService
 
             long additionalBytes = 0L;
             string? storageRoot = null;
-            foreach (CatalogueProcessingAssetRevision revision in requested)
+            foreach (IAssetRevisionStorageDescriptor revision in requested)
             {
                 string? path = TryResolvePath(revision.RootLocator, revision.SourceKey);
                 OneDriveFilesOnDemandState state = path is null
