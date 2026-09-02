@@ -163,6 +163,22 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(1L, Convert.ToInt64(archiveAvailabilityTableCount));
             }
 
+            await using (NpgsqlCommand readArchiveObservationTable =
+                         verificationConnection.CreateCommand())
+            {
+                readArchiveObservationTable.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name = 'archive_source_observations';
+                    """;
+
+                object? archiveObservationTableCount =
+                    await readArchiveObservationTable.ExecuteScalarAsync();
+                Assert.Equal(1L, Convert.ToInt64(archiveObservationTableCount));
+            }
+
             await using (NpgsqlCommand readColumnTypes =
                          verificationConnection.CreateCommand())
             {
@@ -271,6 +287,92 @@ public sealed class PostgresCatalogueDatabaseTests
                     secondAvailabilityCheck.ToUniversalTime(),
                     availabilityReader.GetFieldValue<DateTimeOffset>(1));
             }
+
+            IArchiveSourceObservationRepository sourceObservations =
+                new PostgresArchiveSourceObservationRepository(database);
+            DateTimeOffset sourceObservedAt =
+                new(2026, 9, 2, 20, 10, 0, TimeSpan.Zero);
+            DateTimeOffset sourceLastWrite =
+                new(2026, 9, 2, 19, 55, 0, TimeSpan.Zero);
+            ArchiveCatalogueSource archiveSource = new(
+                SourceId.From(sourceId),
+                "test",
+                "test-root",
+                sourceObservedAt.AddHours(-1));
+            SourceAsset sourceAsset = new(
+                new SourceAssetReference(
+                    SourceId.From(sourceId),
+                    "photo.jpg"),
+                "photo.jpg",
+                "image/jpeg",
+                1,
+                sourceLastWrite,
+                AssetAvailability.OnlineOnly);
+
+            ArchiveSourceObservationPersistenceResult unverified =
+                await sourceObservations.RecordScanObservationAsync(
+                    archiveSource,
+                    sourceAsset,
+                    verifiedContentHash: null,
+                    sourceObservedAt);
+            Assert.Equal(
+                ArchiveSourceObservationVerificationState.NeedsSourceVerification,
+                unverified.VerificationState);
+            Assert.Equal(AssetRevisionId.From(revisionId), unverified.RevisionId);
+
+            ArchiveSourceVerificationPersistenceResult verified =
+                await sourceObservations.RecordVerifiedContentAsync(
+                    AssetId.From(assetId),
+                    new Sha256Digest(new string('a', 64)),
+                    1,
+                    sourceLastWrite,
+                    "image/jpeg",
+                    sourceObservedAt.AddMinutes(1));
+            Assert.Equal(AssetRevisionId.From(revisionId), verified.RevisionId);
+            Assert.False(verified.NewRevision);
+
+            ArchiveSourceObservationSnapshot persistedObservation =
+                Assert.IsType<ArchiveSourceObservationSnapshot>(
+                    await sourceObservations.GetAsync(AssetId.From(assetId)));
+            Assert.Equal(
+                ArchiveSourceObservationVerificationState.Verified,
+                persistedObservation.VerificationState);
+            Assert.Equal(AssetAvailability.Local, persistedObservation.Availability);
+            Assert.Equal(
+                AssetRevisionId.From(revisionId),
+                persistedObservation.VerifiedRevisionId);
+
+            ArchiveSourceObservationPersistenceResult unchanged =
+                await sourceObservations.RecordScanObservationAsync(
+                    archiveSource,
+                    new SourceAsset(
+                        sourceAsset.Reference,
+                        sourceAsset.RelativePath,
+                        sourceAsset.MediaType,
+                        sourceAsset.SizeBytes,
+                        sourceAsset.LastWriteTimeUtc,
+                        AssetAvailability.Local),
+                    verifiedContentHash: null,
+                    sourceObservedAt.AddMinutes(2));
+            Assert.Equal(
+                ArchiveSourceObservationVerificationState.Verified,
+                unchanged.VerificationState);
+
+            ArchiveSourceObservationPersistenceResult diverged =
+                await sourceObservations.RecordScanObservationAsync(
+                    archiveSource,
+                    new SourceAsset(
+                        sourceAsset.Reference,
+                        sourceAsset.RelativePath,
+                        sourceAsset.MediaType,
+                        2,
+                        sourceAsset.LastWriteTimeUtc,
+                        AssetAvailability.OnlineOnly),
+                    verifiedContentHash: null,
+                    sourceObservedAt.AddMinutes(3));
+            Assert.Equal(
+                ArchiveSourceObservationVerificationState.NeedsSourceVerification,
+                diverged.VerificationState);
 
             Guid processingRunId = Guid.NewGuid();
             await using (NpgsqlCommand seedProcessingRun =
