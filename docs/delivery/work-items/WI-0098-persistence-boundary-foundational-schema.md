@@ -50,3 +50,12 @@ Subsequent WI-0098 slices will move processing and additional foundational appli
 Workflow #1402 exposed that the first draft of the Core contract referenced `CatalogueSource`, `CatalogueAsset` and `CatalogueAssetRevision`, which still live in the SQLite adapter assembly. That violated the intended dependency direction and did not compile.
 
 The corrective change narrows slice 1 to the application capability actually being decoupled now: capture metadata persistence. `IPhotoCaptureMetadataRepository` depends only on Core-owned types (`AssetRevisionId` and `PhotoCaptureMetadata`). Broader catalogue records will move behind neutral contracts deliberately in later WI-0098 slices rather than being pulled across namespaces as an incidental compile fix.
+
+
+### Corrective slice — PostgreSQL trigger syntax
+
+Maintainer live verification after merging PR #237 reached PostgreSQL schema version 2 migration execution, but PostgreSQL rejected the revision-identity trigger function with SQLSTATE `42601` because merged main contained an invalid single-dollar delimiter (`AS $ ... $;`).
+
+The migration runs inside the existing transaction, so the failed schema-version-2 attempt is rolled back and version 2 is not recorded as applied. No PostgreSQL reset is required.
+
+The corrective slice replaces dollar quoting entirely with an ordinary single-quoted PL/pgSQL function body and doubles the embedded exception-message quotes. The verifier's terminal failure message is also corrected so a live migration/test failure is no longer mislabeled as a Podman/WSL networking failure.
