@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-hydration-ownership`. PR #253 merged, workflow #1465 passed, and the maintainer live-verified PostgreSQL schema version 8. The active slice adds schema version 9 plus neutral revision/source hydration ownership and atomic identity-transfer contracts, while runtime bindings remain on SQLite.
+In the separate M24 thread, WI-0098 is completed. **WI-0099 — Migrate archive and background-processing persistence to PostgreSQL** is active on `agent/WI-0099-postgres-hydration-ownership`. PR #253 merged, workflow #1465 passed, and the maintainer live-verified PostgreSQL schema version 8. PR #254 is the active slice. It adds schema version 9 plus neutral revision/source hydration ownership and atomic identity-transfer contracts, while runtime bindings remain on SQLite.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
