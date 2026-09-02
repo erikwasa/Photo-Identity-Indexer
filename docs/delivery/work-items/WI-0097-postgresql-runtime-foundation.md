@@ -112,3 +112,59 @@ The next maintainer run progressed beyond encryption negotiation but Windows loc
 - The dynamic Podman-machine IP is never accepted as the permanent Photo Identity connection endpoint.
 
 This is intentionally diagnostic and operational hardening; no catalogue data is migrated and SQLite remains authoritative.
+
+
+## Corrective slice — user-mode networking remediation
+
+Maintainer verification proved:
+
+- authenticated `SELECT 1` succeeds inside the PostgreSQL container;
+- Podman publishes `0.0.0.0:5432`;
+- Windows can open `127.0.0.1:5432`; and
+- a PostgreSQL startup packet sent through Windows localhost does not receive a valid PostgreSQL response while Podman reports `UserModeNetworking=false`.
+
+That is sufficient to classify the failing boundary as the default Windows/WSL network path. The verifier now recommends Podman's supported WSL user-mode networking mode whenever this state is observed, even if the dynamic Podman-machine IP does not answer the diagnostic probe.
+
+The remediation is:
+
+```powershell
+podman machine stop
+podman machine set --user-mode-networking=true
+podman machine start
+```
+
+Afterward, rerun `./verify-postgres.ps1`. The dynamic machine IP remains diagnostic-only and is never accepted as the permanent Photo Identity endpoint.
+
+
+## Corrective slice — Podman 6.0.x upstream regression classification
+
+Maintainer verification with Podman user-mode networking enabled still produced the same protocol failure: authenticated SQL succeeded inside PostgreSQL, but Windows localhost did not carry the PostgreSQL startup protocol.
+
+Current upstream evidence now matches this failure closely:
+
+- Podman issue #29377 is open and triaged as a Windows machine regression after upgrading to Podman 6.0.2; Windows localhost port forwarding fails while the Podman-machine address works.
+- Microsoft WSL issue #41204 separately reports Podman 6 port forwarding failing from WSL to Windows while Podman 4.x/5.x worked.
+
+The verifier now prints Podman client/server versions and, when a 6.0.x runtime reaches this exact protocol-failure state, classifies it as the known upstream regression instead of recommending more Photo Identity or PostgreSQL changes.
+
+The known-good Windows/WSL fallback baseline for WI-0097 is Podman 5.8.x. Podman Desktop 1.28.3 ships the 5.8.5 Windows client; the Podman machine may legitimately report a newer 5.8.x Linux server image. Reverting the local container runtime is an environment workaround only; SQLite remains authoritative and no catalogue data is migrated.
+
+
+### Maintainer environment confirmation
+
+On 2026-09-02 the maintainer confirmed both sides of the active Podman machine are exactly **6.0.2**:
+
+- Windows client: Podman 6.0.2, commit `b28edb9ad70ce4317dc762ee9ce0a6d081d154e9`.
+- Linux server: Podman 6.0.2, the same commit.
+
+This is the same Podman release and commit family reported in upstream issue #29377. WI-0097 therefore treats the current localhost transport failure as an environment/runtime blocker, not a Photo Identity catalogue defect. The next verification should use the Podman 5.8.x Windows/WSL baseline.
+
+
+### Maintainer 5.8.x baseline confirmation
+
+After recreating/downgrading the runtime on 2026-09-02, the maintainer confirmed:
+
+- Windows client: Podman 5.8.5, commit `6d48b6f12f793176f3f6bc808b5a440984c14eb2`.
+- Linux server: Podman 5.8.6, commit `a859fc66702c23e869c282c63e92d9b6cd264229`.
+
+This is accepted as the WI-0097 5.8.x baseline. The next step is to rerun `./verify-postgres.ps1` unchanged and observe whether Windows localhost now carries the PostgreSQL protocol correctly.

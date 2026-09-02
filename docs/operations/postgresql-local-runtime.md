@@ -20,6 +20,14 @@ Edit deploy/postgres/.env and replace the password placeholder. The repository-w
 
 The compose definition uses PostgreSQL 18 and publishes the database port through the Podman machine. On Windows, Podman forwards published ports to Windows localhost. Do not add an explicit `127.0.0.1:` host address to the Compose port mapping: with the WSL machine provider that can bind only the Podman VM loopback and make Windows `127.0.0.1` refuse the connection even though PostgreSQL is healthy inside the container. PostgreSQL data is stored in the named photoidentity-postgres-data volume mounted at /var/lib/postgresql, which is the PostgreSQL 18+ official-image volume boundary.
 
+## Supported Podman baseline on Windows/WSL
+
+As of 2026-09-02, Podman 6.0.x has an open, triaged Windows/WSL localhost port-forwarding regression where container ports are published in the Podman machine but do not carry traffic correctly through Windows localhost. This is tracked upstream as Podman issue #29377 and Microsoft WSL issue #41204.
+
+For WI-0097 Windows/WSL verification, the known-good fallback baseline is the **Podman 5.8.x** line. Podman Desktop 1.28.3 ships the 5.8.5 Windows client; a freshly initialized machine may report a newer 5.8.x Linux server image (for example 5.8.6). This client/server patch difference is acceptable for WI-0097 because the upstream regression is specific to the Podman 6 line, while the WSL report states that Podman 4.x/5.x work. Do not change PostgreSQL, Npgsql or Photo Identity catalogue code to compensate for the Podman 6.0.x forwarding regression. The verifier reports the Podman client/server versions and classifies the known failure signature explicitly.
+
+Podman WSL user-mode networking can still be useful for VPN/network compatibility, but maintainer verification showed that enabling it does not resolve this Podman 6.0.x localhost-forwarding regression.
+
 ## Start and verify
 
 From the repository root:
@@ -113,4 +121,4 @@ podman machine set --user-mode-networking=true
 podman machine start
 ~~~
 
-Then rerun `./verify-postgres.ps1`. Podman documents user-mode networking as the Windows/WSL option that relays guest traffic through a host-side user-space process; the WSL backend otherwise defaults to the standard WSL network path.
+Then rerun `./verify-postgres.ps1`. Podman documents user-mode networking as the Windows/WSL option that relays guest traffic through a host-side user-space process; the WSL backend otherwise defaults to the standard WSL network path. Because WSL shares its kernel/networking across distributions, enabling this setting while the Podman machine is running can also affect other active WSL distributions; stop the Podman machine to restore the original WSL networking path.
