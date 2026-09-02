@@ -1,5 +1,7 @@
 using Xunit;
 using Npgsql;
+using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Postgres;
 
 namespace PhotoIdentity.Persistence.Tests;
@@ -125,6 +127,25 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(9L, Convert.ToInt64(tableCount));
             }
 
+            await using (NpgsqlCommand readArchiveAnalysisTables =
+                         verificationConnection.CreateCommand())
+            {
+                readArchiveAnalysisTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'archive_analysis_profiles',
+                          'archive_analysis_runs',
+                          'asset_revision_analysis');
+                    """;
+
+                object? archiveAnalysisTableCount =
+                    await readArchiveAnalysisTables.ExecuteScalarAsync();
+                Assert.Equal(3L, Convert.ToInt64(archiveAnalysisTableCount));
+            }
+
             await using (NpgsqlCommand readColumnTypes =
                          verificationConnection.CreateCommand())
             {
@@ -200,6 +221,64 @@ public sealed class PostgresCatalogueDatabaseTests
                     DateTimeOffset.UtcNow);
                 await seedRevision.ExecuteNonQueryAsync();
             }
+
+            Guid processingRunId = Guid.NewGuid();
+            await using (NpgsqlCommand seedProcessingRun =
+                         verificationConnection.CreateCommand())
+            {
+                seedProcessingRun.CommandText =
+                    """
+                    INSERT INTO processing_runs (
+                        id,
+                        status,
+                        configuration_json,
+                        started_at_utc)
+                    VALUES (
+                        @processing_run_id,
+                        'pending',
+                        '{}'::jsonb,
+                        @now);
+                    """;
+                seedProcessingRun.Parameters.AddWithValue(
+                    "processing_run_id",
+                    processingRunId);
+                seedProcessingRun.Parameters.AddWithValue(
+                    "now",
+                    DateTimeOffset.UtcNow);
+                await seedProcessingRun.ExecuteNonQueryAsync();
+            }
+
+            AnalysisProfileDefinition profile = new(
+                new Sha256Digest(new string('b', 64)),
+                new ModelId("test-detector"),
+                new Sha256Digest(new string('c', 64)),
+                new ModelId("test-embedder"),
+                new Sha256Digest(new string('d', 64)),
+                new AlignmentProtocolId("test-alignment"));
+            Sha256Digest profileHash = profile.ComputeHash();
+            ProcessingRunId runId = ProcessingRunId.From(processingRunId);
+            AssetRevisionId revision = AssetRevisionId.From(revisionId);
+            IArchiveAnalysisStateRepository archiveAnalysis =
+                new PostgresArchiveAnalysisStateRepository(database);
+
+            await archiveAnalysis.RegisterRunAsync(
+                runId,
+                profile,
+                DateTimeOffset.UtcNow);
+            Assert.Equal(
+                profileHash,
+                await archiveAnalysis.GetRunProfileHashAsync(runId));
+            Assert.False(
+                await archiveAnalysis.IsCompletedAsync(revision, profileHash));
+
+            await archiveAnalysis.RecordCompletionAsync(
+                runId,
+                revision,
+                profileHash,
+                DateTimeOffset.UtcNow);
+
+            Assert.True(
+                await archiveAnalysis.IsCompletedAsync(revision, profileHash));
 
             await using (NpgsqlCommand mutateRevision =
                          verificationConnection.CreateCommand())
