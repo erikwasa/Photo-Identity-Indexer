@@ -1084,11 +1084,17 @@ work_items:
   document: ../work-items/WI-0097-postgresql-runtime-foundation.md
   started_at: 2026-09-01
   last_updated_at: 2026-09-01
-  branch: agent/WI-0097-wsl-forwarding-diagnostics
+  branch: agent/WI-0097-verifier-exit-code
   blockers: []
   blocker_notes:
   - PostgreSQL is the accepted long-term authoritative catalogue per ADR-0009; comparative SQLite/PostgreSQL benchmarking is not required.
-  - Maintainer verification after PR #229 found PostgreSQL healthy inside Podman but unreachable from Windows localhost. PR #230 removed the explicit VM-loopback bind, but verification still showed 0.0.0.0:5432 inside Podman with Windows localhost refusing the connection; the active slice diagnoses WSL localhost forwarding before changing architecture.
+  - Maintainer verification after PR #229 found PostgreSQL healthy inside Podman but unreachable from Windows localhost. PR #230 removed the explicit VM-loopback bind; PR #231 added WSL-forwarding diagnostics and Windows localhost then became reachable.
+  - Windows forwarding became reachable after PR #231, but Npgsql then timed out in encryption negotiation before authentication; the active slice explicitly disables SSL/GSS negotiation for the loopback-only local Podman runtime.
+  - After PR #232, localhost reached PostgreSQL authentication but the stream closed with EndOfStreamException. The active slice now proves authenticated SQL inside the container, PostgreSQL protocol response from Windows and a direct Podman-machine diagnostic path before recommending WSL user-mode networking.
+  - Maintainer verification after PR #234 proved authenticated SQL succeeds inside the container while Windows localhost fails the PostgreSQL startup protocol. Enabling Podman WSL user-mode networking did not correct the failure.
+  - Upstream Podman issue #29377 and Microsoft WSL issue #41204 document current Podman 6.0.x Windows/WSL localhost port-forwarding regressions matching the observed behavior. The active slice detects Podman client/server versions and uses Podman 5.8.x as the known-good WSL fallback baseline rather than changing Photo Identity database code.
+  - Maintainer confirmed both Windows client and Linux server were Podman 6.0.2 (commit b28edb9ad70ce4317dc762ee9ce0a6d081d154e9), matching the upstream regression report exactly. The runtime has now been downgraded/recreated to the accepted 5.8.x baseline: client 5.8.5 (6d48b6f12f793176f3f6bc808b5a440984c14eb2), server 5.8.6 (a859fc66702c23e869c282c63e92d9b6cd264229). Next step is rerun live verification.
+  - On the 5.8.x baseline, authenticated in-container SQL and the Windows localhost PostgreSQL protocol preflight both pass. A verifier-only PowerShell bug then captured dotnet test output together with the exit code, causing a false generic failure; the active slice returns only the numeric test exit code.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/229
@@ -1100,6 +1106,18 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/230
   - type: merge_commit
     value: d105500c4ce032cffb290efad8c7f40924b3994c
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/231
+  - type: merge_commit
+    value: 1c63ada8da0b6b1ba19e518d91839e691a4aa6db
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/232
+  - type: merge_commit
+    value: 9f6c57921b512018c2cbc724ac76819b78f61a97
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/234
+  - type: merge_commit
+    value: 7f77ae769cfcb3ad5499c15df70047c5231dd593
 - id: WI-0098
   title: Add database-neutral persistence boundary and foundational PostgreSQL schema
   milestone: M24
