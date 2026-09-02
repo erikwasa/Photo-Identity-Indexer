@@ -1238,6 +1238,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33682862214
   - type: merge_commit
     value: 579e9e800199e9b95d3fa812a976db16dedfdd22
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/252
 - id: WI-0100
   title: Migrate review and identity persistence to PostgreSQL
   milestone: M24
