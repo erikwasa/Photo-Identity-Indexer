@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -318,6 +318,48 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 
             CREATE INDEX ix_archive_asset_availability_state
                 ON archive_asset_availability (availability, asset_id);
+            """),
+        new(
+            5,
+            "archive-source-observations",
+            """
+            CREATE TABLE archive_source_observations (
+                asset_id uuid NOT NULL PRIMARY KEY,
+                observed_size_bytes bigint NOT NULL CHECK (observed_size_bytes >= 0),
+                observed_last_write_utc timestamp with time zone NOT NULL,
+                observed_media_type text NOT NULL CHECK (btrim(observed_media_type) <> ''),
+                observed_at_utc timestamp with time zone NOT NULL,
+                verification_state text NOT NULL
+                    CHECK (verification_state IN (
+                        'verified',
+                        'needs-source-verification',
+                        'unverified')),
+                verified_revision_id uuid NULL,
+                verified_size_bytes bigint NULL
+                    CHECK (verified_size_bytes IS NULL OR verified_size_bytes >= 0),
+                verified_last_write_utc timestamp with time zone NULL,
+                verified_media_type text NULL,
+                verified_at_utc timestamp with time zone NULL,
+                CONSTRAINT fk_archive_source_observations_asset
+                    FOREIGN KEY (asset_id)
+                    REFERENCES assets (id) ON DELETE CASCADE,
+                CONSTRAINT fk_archive_source_observations_revision
+                    FOREIGN KEY (verified_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE SET NULL,
+                CHECK (
+                    verified_revision_id IS NOT NULL
+                    OR (
+                        verified_size_bytes IS NULL
+                        AND verified_last_write_utc IS NULL
+                        AND verified_media_type IS NULL
+                        AND verified_at_utc IS NULL))
+            );
+
+            CREATE INDEX ix_archive_source_observations_verification
+                ON archive_source_observations (
+                    verification_state,
+                    observed_at_utc,
+                    asset_id);
             """),
     ];
 
