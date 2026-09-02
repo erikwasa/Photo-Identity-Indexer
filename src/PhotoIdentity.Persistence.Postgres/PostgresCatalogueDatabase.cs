@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 9;
+    public const int CurrentSchemaVersion = 10;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -497,6 +497,115 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                     FOREIGN KEY (asset_id)
                     REFERENCES assets (id) ON DELETE CASCADE
             );
+            """),        new(
+            10,
+            "capture-metadata-and-place-enrichment-state",
+            """
+            CREATE TABLE photo_capture_metadata (
+                asset_revision_id uuid NOT NULL PRIMARY KEY,
+                taken_at_local timestamp without time zone NULL,
+                utc_offset_minutes smallint NULL
+                    CHECK (
+                        utc_offset_minutes IS NULL
+                        OR utc_offset_minutes BETWEEN -840 AND 840),
+                latitude double precision NULL
+                    CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
+                longitude double precision NULL
+                    CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180),
+                extracted_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT fk_photo_capture_metadata_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                CHECK ((latitude IS NULL) = (longitude IS NULL)),
+                CHECK (
+                    utc_offset_minutes IS NULL
+                    OR taken_at_local IS NOT NULL)
+            );
+
+            CREATE INDEX ix_photo_capture_metadata_taken
+                ON photo_capture_metadata (
+                    taken_at_local,
+                    asset_revision_id);
+            CREATE INDEX ix_photo_capture_metadata_location
+                ON photo_capture_metadata (
+                    latitude,
+                    longitude,
+                    asset_revision_id);
+
+            CREATE TABLE photo_place_reverse_geocode_cache (
+                provider text NOT NULL
+                    CHECK (char_length(provider) BETWEEN 1 AND 80),
+                contract_key text NOT NULL
+                    CHECK (char_length(contract_key) BETWEEN 1 AND 500),
+                latitude double precision NOT NULL
+                    CHECK (latitude BETWEEN -90 AND 90),
+                longitude double precision NOT NULL
+                    CHECK (longitude BETWEEN -180 AND 180),
+                place_value text NOT NULL
+                    CHECK (char_length(place_value) BETWEEN 1 AND 500),
+                provider_result_id text NULL,
+                country_code text NULL,
+                resolved_at_utc timestamp with time zone NOT NULL,
+                PRIMARY KEY (
+                    provider,
+                    contract_key,
+                    latitude,
+                    longitude)
+            );
+
+            CREATE TABLE photo_place_enrichment_attempts (
+                asset_revision_id uuid NOT NULL,
+                provider text NOT NULL
+                    CHECK (char_length(provider) BETWEEN 1 AND 80),
+                contract_key text NOT NULL
+                    CHECK (char_length(contract_key) BETWEEN 1 AND 500),
+                latitude double precision NOT NULL
+                    CHECK (latitude BETWEEN -90 AND 90),
+                longitude double precision NOT NULL
+                    CHECK (longitude BETWEEN -180 AND 180),
+                status text NOT NULL
+                    CHECK (
+                        status IN (
+                            'succeeded',
+                            'skipped',
+                            'deferred',
+                            'failed')),
+                attempt_count integer NOT NULL DEFAULT 0
+                    CHECK (attempt_count >= 0),
+                place_value text NULL
+                    CHECK (
+                        place_value IS NULL
+                        OR char_length(place_value) BETWEEN 1 AND 500),
+                provider_result_id text NULL,
+                country_code text NULL,
+                last_error_code text NULL,
+                last_error_message text NULL,
+                last_attempted_at_utc timestamp with time zone NOT NULL,
+                completed_at_utc timestamp with time zone NULL,
+                PRIMARY KEY (
+                    asset_revision_id,
+                    provider,
+                    contract_key),
+                CONSTRAINT fk_photo_place_enrichment_attempts_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                CHECK (
+                    (status = 'succeeded'
+                        AND completed_at_utc IS NOT NULL
+                        AND place_value IS NOT NULL)
+                    OR (status = 'skipped'
+                        AND completed_at_utc IS NOT NULL
+                        AND place_value IS NULL)
+                    OR status IN ('deferred', 'failed'))
+            );
+
+            CREATE INDEX ix_photo_place_enrichment_attempts_resume
+                ON photo_place_enrichment_attempts (
+                    provider,
+                    contract_key,
+                    status,
+                    last_attempted_at_utc,
+                    asset_revision_id);
             """),
     ];
 
