@@ -234,7 +234,7 @@ Schema version 9 and the managed hydration ownership semantics are accepted, inc
 
 ### Slice 9 — PostgreSQL storage-policy accounting
 
-Started 2026-09-02.
+Started 2026-09-02. Active review: PR #255.
 
 - Added provider-neutral `IArchiveStorageAccountingRepository` for privacy-safe archive byte totals.
 - `SqliteArchiveStorageRepository` implements the neutral contract without changing existing aggregate semantics.
