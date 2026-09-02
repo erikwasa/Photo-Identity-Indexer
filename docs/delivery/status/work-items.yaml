@@ -1138,7 +1138,9 @@ work_items:
   - WI-0097
   blocker_notes:
   - WI-0097 was maintainer-verified on 2026-09-02; SQLite remains authoritative while WI-0098 introduces neutral contracts and PostgreSQL schema additively.
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/237
 - id: WI-0099
   title: Migrate archive and background-processing persistence to PostgreSQL
   milestone: M24
