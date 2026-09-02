@@ -8,22 +8,21 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 **WI-0097 — Establish PostgreSQL runtime and migration foundation** remains in progress.
 
-PRs #229–#234 are merged. Maintainer verification proves PostgreSQL is healthy and authenticated inside the container, while Windows localhost accepts TCP but fails the PostgreSQL startup protocol. Enabling Podman WSL user-mode networking did not fix the failure.
+The maintainer is now on the accepted Podman 5.8.x Windows/WSL baseline: client 5.8.5 and server 5.8.6. On that runtime, PostgreSQL authentication succeeds inside the container and the Windows localhost PostgreSQL protocol preflight passes, confirming the Podman 6.0.x forwarding regression is avoided.
 
-Current upstream evidence matches a Podman 6.0.x Windows/WSL regression rather than a Photo Identity defect: Podman issue #29377 is open/triaged for Windows localhost port forwarding after upgrading to 6.0.2, and Microsoft WSL issue #41204 separately reports Podman 6 host forwarding broken while Podman 4.x/5.x worked.
+The remaining failure is in `verify-postgres.ps1` itself. `Invoke-LivePostgresTest` emitted normal `dotnet test` output into the PowerShell pipeline and then returned `$LASTEXITCODE`; assigning the function result captured all of that as an array, so the caller did not receive a scalar integer exit code. The active branch `agent/WI-0097-verifier-exit-code` sends test output to the host and returns only the numeric exit code.
 
-The active PR #235 now detects Podman client/server versions and classifies that failure signature explicitly. The maintainer has moved to the accepted Podman 5.8.x baseline: Windows client 5.8.5 and Linux server 5.8.6.
-
-SQLite remains authoritative and untouched. WI-0098 stays blocked until the Windows-host live migration test succeeds.
+SQLite remains authoritative and untouched. WI-0098 stays blocked until the live migration bootstrap and application health check pass.
 
 ## Next concrete step
 
-1. Podman downgrade/recreation is complete: client 5.8.5, server 5.8.6. This 5.8.x patch skew is accepted.
-2. Run `./verify-postgres.ps1` unchanged.
-3. If the isolated PostgreSQL bootstrap succeeds through Windows localhost, verify Photo Identity `/health` reports `catalogueProvider=sqlite` and PostgreSQL `ready` at schema version 1.
-4. Complete WI-0097 and begin WI-0098.
+1. Merge the verifier-exit-code corrective PR after CI is green.
+2. Run `./verify-postgres.ps1` again on the existing Podman 5.8.x runtime.
+3. If xUnit passes and the script reports `PostgreSQL runtime verification passed.`, configure Photo Identity with the documented local PostgreSQL connection string.
+4. Verify `/health` reports `catalogueProvider=sqlite`, PostgreSQL `status=ready`, and `schemaVersion=1`.
+5. Complete WI-0097 and begin WI-0098.
 
-Do not use the dynamic Podman-machine IP as permanent application configuration.
+Do not migrate or delete the real SQLite catalogue.
 
 ## Relevant files
 

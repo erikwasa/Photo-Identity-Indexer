@@ -168,3 +168,19 @@ After recreating/downgrading the runtime on 2026-09-02, the maintainer confirmed
 - Linux server: Podman 5.8.6, commit `a859fc66702c23e869c282c63e92d9b6cd264229`.
 
 This is accepted as the WI-0097 5.8.x baseline. The next step is to rerun `./verify-postgres.ps1` unchanged and observe whether Windows localhost now carries the PostgreSQL protocol correctly.
+
+
+## Corrective slice — verifier exit-code handling
+
+After moving to the accepted Podman 5.8.x baseline, the maintainer reached:
+
+```text
+Authenticated PostgreSQL check inside container passed.
+Windows localhost PostgreSQL protocol check passed.
+```
+
+but the verifier immediately fell through to its generic failure without showing any xUnit output.
+
+The cause is PowerShell pipeline semantics in `Invoke-LivePostgresTest`: assigning the function result to `$testExitCode` captured both the native `dotnet test` standard output and the explicit `$LASTEXITCODE`, so the caller received an array rather than a single integer. The corrective slice routes test output to the host and returns only the numeric exit code.
+
+This is a verifier-only defect. The successful protocol preflight means the Podman 5.8.x Windows localhost transport is working.
