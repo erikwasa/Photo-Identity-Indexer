@@ -119,7 +119,8 @@ public sealed class LocalBatchInspectionTests
 
             LocalBatchConfiguration configuration = new(sourceRoot, outputRoot, directory);
             using LocalInspectionJobHandler handler = new(
-                database,
+                batchRepository,
+                new SqliteFaceCatalogueRepository(database),
                 configuration,
                 new OpenCvImageDecoder(),
                 encoder,
