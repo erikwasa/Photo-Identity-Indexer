@@ -179,6 +179,24 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(1L, Convert.ToInt64(archiveObservationTableCount));
             }
 
+            await using (NpgsqlCommand readArchiveCoverageTables =
+                         verificationConnection.CreateCommand())
+            {
+                readArchiveCoverageTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'archive_configuration',
+                          'archive_included_folders');
+                    """;
+
+                object? archiveCoverageTableCount =
+                    await readArchiveCoverageTables.ExecuteScalarAsync();
+                Assert.Equal(2L, Convert.ToInt64(archiveCoverageTableCount));
+            }
+
             await using (NpgsqlCommand readColumnTypes =
                          verificationConnection.CreateCommand())
             {
@@ -256,6 +274,53 @@ public sealed class PostgresCatalogueDatabaseTests
                     seededAt);
                 await seedRevision.ExecuteNonQueryAsync();
             }
+
+            IArchiveCoverageRepository archiveCoverage =
+                new PostgresArchiveCoverageRepository(database);
+            ArchiveCatalogueSource coverageSource = new(
+                SourceId.From(sourceId),
+                "test",
+                "test-root",
+                seededAt);
+
+            Assert.Null(await archiveCoverage.GetAsync());
+
+            ArchiveCoverageState configuredCoverage =
+                await archiveCoverage.ConfigureAndIncludeAsync(
+                    coverageSource,
+                    "2026/03",
+                    seededAt.AddMinutes(20));
+            Assert.Equal(new[] { "2026/03" }, configuredCoverage.IncludedFolders);
+
+            configuredCoverage = await archiveCoverage.ConfigureAndIncludeAsync(
+                coverageSource,
+                "2026/04",
+                seededAt.AddMinutes(21));
+            Assert.Equal(
+                new[] { "2026/03", "2026/04" },
+                configuredCoverage.IncludedFolders);
+
+            configuredCoverage = await archiveCoverage.ConfigureAndIncludeAsync(
+                coverageSource,
+                "2026",
+                seededAt.AddMinutes(22));
+            Assert.Equal(new[] { "2026" }, configuredCoverage.IncludedFolders);
+
+            ArchiveCoverageState replacedCoverage =
+                await archiveCoverage.ReplaceIncludedFoldersAsync(
+                    new[] { "1970/01", "1970", "2026/08" },
+                    seededAt.AddMinutes(23));
+            Assert.Equal(
+                new[] { "1970", "2026/08" },
+                replacedCoverage.IncludedFolders);
+
+            ArchiveCoverageState persistedCoverage =
+                Assert.IsType<ArchiveCoverageState>(
+                    await archiveCoverage.GetAsync());
+            Assert.Equal(coverageSource, persistedCoverage.Source);
+            Assert.Equal(
+                replacedCoverage.IncludedFolders,
+                persistedCoverage.IncludedFolders);
 
             IArchiveAvailabilityRepository archiveAvailability =
                 new PostgresArchiveAvailabilityRepository(database);
