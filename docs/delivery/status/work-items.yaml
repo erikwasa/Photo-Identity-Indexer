@@ -1027,6 +1027,7 @@ work_items:
   - WI-0093
   blocker_notes:
   - Dependencies are implemented/merged; WI-0083 and WI-0093 remain in_review only because M22 maintainer acceptance is consolidated. The consumer surface reuses the finalized slideshow settings and preparation contracts and remains a UI boundary rather than authentication/authorization.
+  - Consolidated real-phone acceptance on 2026-09-02 found two final consumer-surface gaps. Start slideshow must acquire fullscreen from the initiating tap without an intermediate application step, and successful prepared-original state must survive navigation while remaining truthful. Follow-up WI-0107 owns both corrections.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/225
@@ -1045,7 +1046,7 @@ work_items:
   blockers:
   - WI-0093
   blocker_notes:
-  - WI-0093 is implemented/merged. The corrective implementation is merged; post-merge main verification remains part of the M22 acceptance sequence.
+  - 'WI-0093 is implemented/merged. PR #227 and post-merge main workflow #1362 are green; the item remains in_review only as part of consolidated M22 closeout.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/227
@@ -1064,12 +1065,16 @@ work_items:
   branch: agent/WI-0095-model-download-retry
   blockers: []
   blocker_notes:
-  - Main workflow #1356 failed only in package verification because a governed model HTTP response ended prematurely. The branch was rebased after WI-0096 merged, and workflow #1363 passed build, both integration shards, launcher verification and package verification together.
+  - 'Main workflow #1356 failed only in package verification because a governed model HTTP response ended prematurely. PR #226 was rebased after WI-0096, passed combined PR validation, merged, and post-merge main workflow #1366 passed. The item remains in_review only as part of consolidated M22 closeout.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/226
   - type: workflow
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33554309892
+  - type: merge_commit
+    value: e1944e3003c8d234a65ce2eab17f9ef9fa9aa754
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33555903485
 
 - id: WI-0097
   title: Establish PostgreSQL runtime and migration foundation
@@ -1228,6 +1233,31 @@ work_items:
   - WI-0103
   - WI-0104
   - WI-0105
+  - WI-0108
   blocker_notes:
   - Final M24 acceptance is sustained real-archive catch-up followed by a small daily-style increment, not a comparative database benchmark.
+  - WI-0108 must also close the slideshow-library/start/playback latency carried forward from M22 acceptance.
+  evidence: []
+- id: WI-0107
+  title: Close final M22 slideshow launch and prepared-state acceptance gaps
+  milestone: M22
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0107-m22-slideshow-acceptance-gaps.md
+  blockers: []
+  blocker_notes:
+  - Consolidated real-phone M22 acceptance passed the remaining slideshow behavior but found two functional gaps. Start slideshow shows an intermediate fullscreen recovery step, and successful standalone prepared-original state disappears after slideshow navigation even when the originals remain reusable.
+  - Performance observations from the same acceptance are intentionally tracked in M24 WI-0108 and do not expand this corrective M22 slice.
+  evidence: []
+- id: WI-0108
+  title: Remove slideshow library, startup and playback latency bottlenecks
+  milestone: M24
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0108-slideshow-performance.md
+  blockers:
+  - WI-0101
+  blocker_notes:
+  - Real-phone M22 acceptance observed slow saved-collection loading, roughly 20-second startup for an already-prepared one-photo slideshow, and slow image-to-image transitions that appeared to worsen through playback.
+  - PostgreSQL migration may improve some query costs, but WI-0108 explicitly owns both database and database-independent slideshow latency so these findings are not assumed fixed by cutover alone.
   evidence: []

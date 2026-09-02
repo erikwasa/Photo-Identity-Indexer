@@ -3,7 +3,7 @@ id: WI-0106
 title: Operationalize PostgreSQL and resume full-archive catch-up
 milestone: M24
 status_source: ../status/work-items.yaml
-depends_on: [WI-0102, WI-0103, WI-0104, WI-0105]
+depends_on: [WI-0102, WI-0103, WI-0104, WI-0105, WI-0108]
 related_adrs: [ADR-0009]
 affected_modules: [PhotoIdentity.Api, launcher, packaging, operations, documentation]
 ---
@@ -21,6 +21,10 @@ Make PostgreSQL routine to operate on the maintainer machine, then use the migra
 - Resume archive advancement on the real migrated catalogue and use application metrics to identify any remaining blocker rather than requiring comparative benchmark runs.
 - Verify ongoing synchronization/analyze/enrich/review behavior with a small new-photo increment after catch-up operation is stable.
 - Update full-archive delivery status/operating docs to reflect PostgreSQL as the production catalogue.
+
+## Dependency note
+
+M24 operational acceptance occurs after WI-0108 has addressed the slideshow-library/start/playback latency carried forward from M22 acceptance. PostgreSQL operations are not considered fully accepted while those known scale-path delays remain unresolved.
 
 ## Acceptance criteria
 - [ ] Normal operator startup makes PostgreSQL readiness/failure understandable.
