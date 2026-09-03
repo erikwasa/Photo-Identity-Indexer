@@ -99,7 +99,7 @@ Bulk face review and grouped rank-one suggestion acceptance are accepted against
 
 ## Slice 4 — canonical person maintenance and merge audit
 
-Started 2026-09-03.
+Started 2026-09-03. Active review: PR #261.
 
 - Added provider-neutral `IPersonMaintenanceRepository` plus Core-owned person-maintenance person/action records.
 - `SqlitePersonMaintenanceRepository` implements the neutral contract through compatibility mappings while retaining its existing public API.
