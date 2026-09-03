@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.EventLog;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Places;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Postgres;
@@ -91,6 +92,8 @@ public partial class Program
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:AutomaticIdlePollIntervalMilliseconds")));
         builder.Services.AddSingleton<PhotoPlaceEnrichmentWorkerState>();
         builder.Services.AddSingleton<SqliteReviewRepository>();
+        builder.Services.AddSingleton<IReviewActionRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteReviewRepository>());
         builder.Services.AddSingleton<SqliteReviewFilterRepository>();
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
         builder.Services.AddSingleton<SqliteSuggestionGalleryRepository>();

@@ -5,6 +5,7 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
@@ -274,6 +275,27 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(3L, Convert.ToInt64(placeEnrichmentTableCount));
             }
 
+            await using (NpgsqlCommand readReviewTables =
+                         verificationConnection.CreateCommand())
+            {
+                readReviewTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'people',
+                          'person_labels',
+                          'identity_suggestions',
+                          'review_actions',
+                          'identity_suggestion_review_actions');
+                    """;
+
+                object? reviewTableCount =
+                    await readReviewTables.ExecuteScalarAsync();
+                Assert.Equal(5L, Convert.ToInt64(reviewTableCount));
+            }
+
             await using (NpgsqlCommand readColumnTypes =
                          verificationConnection.CreateCommand())
             {
@@ -308,6 +330,7 @@ public sealed class PostgresCatalogueDatabaseTests
             Guid sourceId = Guid.NewGuid();
             Guid assetId = Guid.NewGuid();
             Guid revisionId = Guid.NewGuid();
+            Guid faceOccurrenceId = Guid.NewGuid();
             DateTimeOffset seededAt =
                 new(2026, 9, 2, 20, 0, 0, TimeSpan.Zero);
             await using (NpgsqlCommand seedRevision =
@@ -333,6 +356,17 @@ public sealed class PostgresCatalogueDatabaseTests
                         @content_sha256,
                         1,
                         @now);
+
+                    INSERT INTO face_occurrences (
+                        id,
+                        asset_revision_id,
+                        ordinal,
+                        created_at_utc)
+                    VALUES (
+                        @face_occurrence_id,
+                        @revision_id,
+                        0,
+                        @now);
                     """;
                 seedRevision.Parameters.AddWithValue(
                     "source_id",
@@ -344,6 +378,9 @@ public sealed class PostgresCatalogueDatabaseTests
                     "revision_id",
                     revisionId);
                 seedRevision.Parameters.AddWithValue(
+                    "face_occurrence_id",
+                    faceOccurrenceId);
+                seedRevision.Parameters.AddWithValue(
                     "content_sha256",
                     new string('a', 64));
                 seedRevision.Parameters.AddWithValue(
@@ -351,6 +388,158 @@ public sealed class PostgresCatalogueDatabaseTests
                     seededAt);
                 await seedRevision.ExecuteNonQueryAsync();
             }
+
+            IReviewActionRepository reviewActions =
+                new PostgresReviewActionRepository(database);
+            FaceOccurrenceId reviewFaceId =
+                FaceOccurrenceId.From(faceOccurrenceId);
+            DateTimeOffset reviewAt = seededAt.AddMinutes(10);
+
+            ReviewPerson reviewPerson =
+                await reviewActions.CreatePersonAsync(
+                    "Ada Example",
+                    reviewAt);
+            ReviewAction assigned =
+                await reviewActions.AssignAsync(
+                    reviewFaceId,
+                    reviewPerson.Id,
+                    "maintainer",
+                    reviewAt.AddMinutes(1),
+                    "manual assignment");
+            Assert.Equal(ReviewActionKinds.Assign, assigned.Kind);
+            Assert.Equal(reviewPerson.Id, assigned.PersonId);
+            Assert.NotNull(assigned.PersonLabelId);
+
+            long acceptedSuggestionId;
+            await using (NpgsqlCommand seedAcceptedSuggestion =
+                         verificationConnection.CreateCommand())
+            {
+                seedAcceptedSuggestion.CommandText =
+                    """
+                    INSERT INTO identity_suggestions (
+                        face_occurrence_id,
+                        suggested_person_id,
+                        model_id,
+                        model_hash,
+                        score,
+                        status,
+                        created_at_utc)
+                    VALUES (
+                        @face_occurrence_id,
+                        @person_id,
+                        'test-identity',
+                        @model_hash,
+                        0.9,
+                        'accepted',
+                        @created_at_utc)
+                    RETURNING id;
+                    """;
+                seedAcceptedSuggestion.Parameters.AddWithValue(
+                    "face_occurrence_id",
+                    faceOccurrenceId);
+                seedAcceptedSuggestion.Parameters.AddWithValue(
+                    "person_id",
+                    Guid.Parse(reviewPerson.Id.ToString()));
+                seedAcceptedSuggestion.Parameters.AddWithValue(
+                    "model_hash",
+                    new string('f', 64));
+                seedAcceptedSuggestion.Parameters.AddWithValue(
+                    "created_at_utc",
+                    reviewAt.AddMinutes(1));
+                acceptedSuggestionId = Convert.ToInt64(
+                    await seedAcceptedSuggestion.ExecuteScalarAsync());
+            }
+
+            await using (NpgsqlCommand linkAcceptedSuggestion =
+                         verificationConnection.CreateCommand())
+            {
+                linkAcceptedSuggestion.CommandText =
+                    """
+                    INSERT INTO identity_suggestion_review_actions (
+                        suggestion_id,
+                        action_kind,
+                        review_action_id,
+                        actor,
+                        note,
+                        created_at_utc)
+                    VALUES (
+                        @suggestion_id,
+                        'accept',
+                        @review_action_id,
+                        'maintainer',
+                        NULL,
+                        @created_at_utc);
+                    """;
+                linkAcceptedSuggestion.Parameters.AddWithValue(
+                    "suggestion_id",
+                    acceptedSuggestionId);
+                linkAcceptedSuggestion.Parameters.AddWithValue(
+                    "review_action_id",
+                    assigned.Id);
+                linkAcceptedSuggestion.Parameters.AddWithValue(
+                    "created_at_utc",
+                    reviewAt.AddMinutes(1));
+                await linkAcceptedSuggestion.ExecuteNonQueryAsync();
+            }
+
+            ReviewAction assignmentUndo =
+                Assert.IsType<ReviewAction>(
+                    await reviewActions.UndoLatestAsync(
+                        reviewFaceId,
+                        "maintainer",
+                        reviewAt.AddMinutes(2),
+                        "undo accepted suggestion"));
+            Assert.Equal(ReviewActionKinds.Undo, assignmentUndo.Kind);
+            Assert.Equal(assigned.Id, assignmentUndo.ReversesActionId);
+
+            await using (NpgsqlCommand readSuggestionStatus =
+                         verificationConnection.CreateCommand())
+            {
+                readSuggestionStatus.CommandText =
+                    """
+                    SELECT status
+                    FROM identity_suggestions
+                    WHERE id = @id;
+                    """;
+                readSuggestionStatus.Parameters.AddWithValue(
+                    "id",
+                    acceptedSuggestionId);
+                Assert.Equal(
+                    "pending",
+                    await readSuggestionStatus.ExecuteScalarAsync());
+            }
+
+            ReviewAction unknown =
+                await reviewActions.MarkUnknownAsync(
+                    reviewFaceId,
+                    "maintainer",
+                    reviewAt.AddMinutes(3));
+            ReviewAction rejected =
+                await reviewActions.RejectAsync(
+                    reviewFaceId,
+                    "maintainer",
+                    reviewAt.AddMinutes(4));
+            ReviewAction rejectUndo =
+                Assert.IsType<ReviewAction>(
+                    await reviewActions.UndoLatestAsync(
+                        reviewFaceId,
+                        "maintainer",
+                        reviewAt.AddMinutes(5)));
+            Assert.Equal(rejected.Id, rejectUndo.ReversesActionId);
+
+            PostgresReviewActionRepository restartedReview =
+                new(database);
+            IReadOnlyList<ReviewAction> reviewHistory =
+                await restartedReview.GetActionsAsync(reviewFaceId);
+            Assert.Equal(5, reviewHistory.Count);
+            Assert.Equal(ReviewActionKinds.Undo, reviewHistory[0].Kind);
+            Assert.Equal(ReviewActionKinds.Reject, reviewHistory[1].Kind);
+            Assert.NotNull(reviewHistory[1].ReversedAtUtc);
+            Assert.Equal(ReviewActionKinds.Unknown, reviewHistory[2].Kind);
+            Assert.Null(reviewHistory[2].ReversedAtUtc);
+            Assert.Equal(ReviewActionKinds.Undo, reviewHistory[3].Kind);
+            Assert.Equal(ReviewActionKinds.Assign, reviewHistory[4].Kind);
+            Assert.NotNull(reviewHistory[4].ReversedAtUtc);
 
             IArchiveCoverageRepository archiveCoverage =
                 new PostgresArchiveCoverageRepository(database);

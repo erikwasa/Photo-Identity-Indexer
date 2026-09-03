@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -9,7 +10,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Provides review-oriented queries and append-only, reversible human actions.
 /// Current face state is derived from the newest unreversed assignment, Unknown decision or rejection.
 /// </summary>
-public sealed class SqliteReviewRepository
+public sealed class SqliteReviewRepository : IReviewActionRepository
 {
     private const string ReviewFaceSelect = """
         WITH latest_action AS (
@@ -79,6 +80,91 @@ public sealed class SqliteReviewRepository
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+    }
+
+    async Task<ReviewPerson> IReviewActionRepository.CreatePersonAsync(
+        string displayName,
+        DateTimeOffset createdAtUtc,
+        CancellationToken cancellationToken)
+    {
+        CatalogueReviewPerson person =
+            await CreatePersonAsync(
+                displayName,
+                createdAtUtc,
+                cancellationToken);
+        return new ReviewPerson(person.Id, person.DisplayName);
+    }
+
+    async Task<ReviewAction> IReviewActionRepository.AssignAsync(
+        FaceOccurrenceId faceOccurrenceId,
+        PersonId personId,
+        string actor,
+        DateTimeOffset createdAtUtc,
+        string? note,
+        CancellationToken cancellationToken) =>
+        ToCoreAction(
+            await AssignAsync(
+                faceOccurrenceId,
+                personId,
+                actor,
+                createdAtUtc,
+                note,
+                cancellationToken));
+
+    async Task<ReviewAction> IReviewActionRepository.MarkUnknownAsync(
+        FaceOccurrenceId faceOccurrenceId,
+        string actor,
+        DateTimeOffset createdAtUtc,
+        string? note,
+        CancellationToken cancellationToken) =>
+        ToCoreAction(
+            await MarkUnknownAsync(
+                faceOccurrenceId,
+                actor,
+                createdAtUtc,
+                note,
+                cancellationToken));
+
+    async Task<ReviewAction> IReviewActionRepository.RejectAsync(
+        FaceOccurrenceId faceOccurrenceId,
+        string actor,
+        DateTimeOffset createdAtUtc,
+        string? note,
+        CancellationToken cancellationToken) =>
+        ToCoreAction(
+            await RejectAsync(
+                faceOccurrenceId,
+                actor,
+                createdAtUtc,
+                note,
+                cancellationToken));
+
+    async Task<ReviewAction?> IReviewActionRepository.UndoLatestAsync(
+        FaceOccurrenceId faceOccurrenceId,
+        string actor,
+        DateTimeOffset createdAtUtc,
+        string? note,
+        CancellationToken cancellationToken)
+    {
+        CatalogueReviewAction? action =
+            await UndoLatestAsync(
+                faceOccurrenceId,
+                actor,
+                createdAtUtc,
+                note,
+                cancellationToken);
+        return action is null ? null : ToCoreAction(action);
+    }
+
+    async Task<IReadOnlyList<ReviewAction>> IReviewActionRepository.GetActionsAsync(
+        FaceOccurrenceId faceOccurrenceId,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<CatalogueReviewAction> actions =
+            await GetActionsAsync(
+                faceOccurrenceId,
+                cancellationToken);
+        return actions.Select(ToCoreAction).ToArray();
     }
 
     public async Task<CatalogueReviewFacePage> GetFacesAsync(
@@ -661,6 +747,20 @@ public sealed class SqliteReviewRepository
 
     private static string NormalizeState(string value) =>
         string.IsNullOrWhiteSpace(value) ? CatalogueReviewStates.Unreviewed : value.Trim().ToLowerInvariant();
+
+    private static ReviewAction ToCoreAction(
+        CatalogueReviewAction action) => new(
+        action.Id,
+        action.FaceOccurrenceId,
+        action.Kind,
+        action.PersonId,
+        action.PersonDisplayName,
+        action.PersonLabelId,
+        action.Actor,
+        action.Note,
+        action.CreatedAtUtc,
+        action.ReversedAtUtc,
+        action.ReversesActionId);
 
     private static string Required(string value, string parameterName)
     {
