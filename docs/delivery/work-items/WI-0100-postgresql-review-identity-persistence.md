@@ -52,7 +52,7 @@ Schema version 11 and canonical person/manual-label/review-action persistence ar
 
 ## Slice 2 — ranked suggestion review decisions
 
-Started 2026-09-03.
+Started 2026-09-03. Active review: PR #259.
 
 - Added provider-neutral ranked suggestion and suggestion-decision records plus `IReviewSuggestionRepository`.
 - `SqliteReviewSuggestionRepository` implements the neutral contract through compatibility mappings while retaining its existing public API.
