@@ -1292,13 +1292,14 @@ work_items:
   document: ../work-items/WI-0100-postgresql-review-identity-persistence.md
   started_at: 2026-09-03
   last_updated_at: 2026-09-03
-  branch: agent/WI-0100-postgres-bulk-review
+  branch: agent/WI-0100-postgres-person-maintenance
   blockers:
   - WI-0098
   blocker_notes:
   - WI-0098 is completed.
   - 'PR #258 merged at 384f74057b3fb80ec5895012f96787604c450ee7, workflow #1489 passed, and maintainer live PostgreSQL verification accepted schema version 11 and canonical review history.'
   - 'PR #259 merged at 679f69929e8b556b0700ab294b5391431b1a3141, workflow #1494 passed, and maintainer live PostgreSQL verification accepted schema version 12 and ranked suggestion accept/reject persistence.'
+  - 'PR #260 merged at 07dddf3d0120d41859cf5a5816c251135d21159a, workflow #1497 passed, and maintainer live PostgreSQL verification accepted bulk face review and grouped suggestion acceptance against schema version 12.'
   - Runtime review authority remains SQLite; PostgreSQL review slices add equivalent persistence before any controlled cutover.
   evidence:
   - type: pull_request
@@ -1315,6 +1316,10 @@ work_items:
     value: 679f69929e8b556b0700ab294b5391431b1a3141
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/260
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33804140852
+  - type: merge_commit
+    value: 07dddf3d0120d41859cf5a5816c251135d21159a
 - id: WI-0101
   title: Migrate library and remaining authoritative persistence to PostgreSQL
   milestone: M24
