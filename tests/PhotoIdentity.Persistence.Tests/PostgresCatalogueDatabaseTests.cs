@@ -790,6 +790,407 @@ public sealed class PostgresCatalogueDatabaseTests
                 ReviewSuggestionActionKinds.Reject,
                 persistedRejected.LatestAction?.Kind);
 
+            Guid bulkFaceOneId = Guid.NewGuid();
+            Guid bulkFaceTwoId = Guid.NewGuid();
+            Guid staleBulkFaceId = Guid.NewGuid();
+            Guid bulkSuggestionFaceOneId = Guid.NewGuid();
+            Guid bulkSuggestionFaceTwoId = Guid.NewGuid();
+            Guid bulkSuggestionSkippedFaceId = Guid.NewGuid();
+
+            await using (NpgsqlCommand seedBulkFaces =
+                         verificationConnection.CreateCommand())
+            {
+                seedBulkFaces.CommandText =
+                    """
+                    INSERT INTO face_occurrences (
+                        id,
+                        asset_revision_id,
+                        ordinal,
+                        created_at_utc)
+                    VALUES
+                        (@bulk_face_one_id, @revision_id, 3, @created_at_utc),
+                        (@bulk_face_two_id, @revision_id, 4, @created_at_utc),
+                        (@stale_bulk_face_id, @revision_id, 5, @created_at_utc),
+                        (@bulk_suggestion_face_one_id, @revision_id, 6, @created_at_utc),
+                        (@bulk_suggestion_face_two_id, @revision_id, 7, @created_at_utc),
+                        (@bulk_suggestion_skipped_face_id, @revision_id, 8, @created_at_utc);
+                    """;
+                seedBulkFaces.Parameters.AddWithValue(
+                    "bulk_face_one_id",
+                    bulkFaceOneId);
+                seedBulkFaces.Parameters.AddWithValue(
+                    "bulk_face_two_id",
+                    bulkFaceTwoId);
+                seedBulkFaces.Parameters.AddWithValue(
+                    "stale_bulk_face_id",
+                    staleBulkFaceId);
+                seedBulkFaces.Parameters.AddWithValue(
+                    "bulk_suggestion_face_one_id",
+                    bulkSuggestionFaceOneId);
+                seedBulkFaces.Parameters.AddWithValue(
+                    "bulk_suggestion_face_two_id",
+                    bulkSuggestionFaceTwoId);
+                seedBulkFaces.Parameters.AddWithValue(
+                    "bulk_suggestion_skipped_face_id",
+                    bulkSuggestionSkippedFaceId);
+                seedBulkFaces.Parameters.AddWithValue(
+                    "revision_id",
+                    revisionId);
+                seedBulkFaces.Parameters.AddWithValue(
+                    "created_at_utc",
+                    reviewAt.AddMinutes(10));
+                await seedBulkFaces.ExecuteNonQueryAsync();
+            }
+
+            IBulkReviewRepository bulkReview =
+                new PostgresBulkReviewRepository(database);
+            FaceOccurrenceId bulkFaceOne =
+                FaceOccurrenceId.From(bulkFaceOneId);
+            FaceOccurrenceId bulkFaceTwo =
+                FaceOccurrenceId.From(bulkFaceTwoId);
+
+            BulkReviewPreview bulkAssignPreview =
+                await bulkReview.PreviewAsync(
+                    new[] { bulkFaceOne, bulkFaceTwo },
+                    BulkReviewActionKinds.Assign,
+                    reviewPerson.Id);
+            Assert.Equal(2, bulkAssignPreview.RequestedCount);
+            Assert.Equal(2, bulkAssignPreview.AffectedCount);
+            Assert.Equal(0, bulkAssignPreview.SkippedCount);
+            Assert.Equal(
+                reviewPerson.Id,
+                bulkAssignPreview.Person?.Id);
+
+            BulkReviewResult bulkAssignResult =
+                await bulkReview.CommitAsync(
+                    new[] { bulkFaceOne, bulkFaceTwo },
+                    BulkReviewActionKinds.Assign,
+                    reviewPerson.Id,
+                    bulkAssignPreview.AffectedCount,
+                    bulkAssignPreview.PreviewToken,
+                    "maintainer",
+                    reviewAt.AddMinutes(11),
+                    "bulk assign");
+            Assert.Equal(2, bulkAssignResult.AffectedCount);
+            Assert.Equal(
+                ReviewActionKinds.Assign,
+                Assert.Single(
+                    await reviewActions.GetActionsAsync(
+                        bulkFaceOne)).Kind);
+            Assert.Equal(
+                ReviewActionKinds.Assign,
+                Assert.Single(
+                    await reviewActions.GetActionsAsync(
+                        bulkFaceTwo)).Kind);
+
+            FaceOccurrenceId staleBulkFace =
+                FaceOccurrenceId.From(staleBulkFaceId);
+            BulkReviewPreview stalePreview =
+                await bulkReview.PreviewAsync(
+                    new[] { staleBulkFace },
+                    BulkReviewActionKinds.Unknown,
+                    personId: null);
+            Assert.Equal(1, stalePreview.AffectedCount);
+
+            await reviewActions.MarkUnknownAsync(
+                staleBulkFace,
+                "maintainer",
+                reviewAt.AddMinutes(12));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => bulkReview.CommitAsync(
+                    new[] { staleBulkFace },
+                    BulkReviewActionKinds.Unknown,
+                    personId: null,
+                    stalePreview.AffectedCount,
+                    stalePreview.PreviewToken,
+                    "maintainer",
+                    reviewAt.AddMinutes(13)));
+
+            const string bulkSuggestionModel = "bulk-suggestion";
+            string bulkSuggestionHash = new('c', 64);
+            long bulkSuggestionOneId;
+            long bulkSuggestionTwoId;
+            long bulkSuggestionSkippedId;
+
+            await using (NpgsqlCommand seedBulkSuggestions =
+                         verificationConnection.CreateCommand())
+            {
+                seedBulkSuggestions.CommandText =
+                    """
+                    WITH first_seed AS (
+                        INSERT INTO identity_suggestions (
+                            face_occurrence_id,
+                            suggested_person_id,
+                            model_id,
+                            model_hash,
+                            score,
+                            status,
+                            created_at_utc)
+                        VALUES (
+                            @face_one_id,
+                            @person_id,
+                            @model_id,
+                            @model_hash,
+                            0.96,
+                            'pending',
+                            @created_at_utc)
+                        RETURNING id
+                    ),
+                    second_seed AS (
+                        INSERT INTO identity_suggestions (
+                            face_occurrence_id,
+                            suggested_person_id,
+                            model_id,
+                            model_hash,
+                            score,
+                            status,
+                            created_at_utc)
+                        VALUES (
+                            @face_two_id,
+                            @person_id,
+                            @model_id,
+                            @model_hash,
+                            0.94,
+                            'pending',
+                            @created_at_utc)
+                        RETURNING id
+                    ),
+                    skipped_seed AS (
+                        INSERT INTO identity_suggestions (
+                            face_occurrence_id,
+                            suggested_person_id,
+                            model_id,
+                            model_hash,
+                            score,
+                            status,
+                            created_at_utc)
+                        VALUES (
+                            @skipped_face_id,
+                            @person_id,
+                            @model_id,
+                            @model_hash,
+                            0.92,
+                            'pending',
+                            @created_at_utc)
+                        RETURNING id
+                    )
+                    SELECT
+                        (SELECT id FROM first_seed),
+                        (SELECT id FROM second_seed),
+                        (SELECT id FROM skipped_seed);
+                    """;
+                seedBulkSuggestions.Parameters.AddWithValue(
+                    "face_one_id",
+                    bulkSuggestionFaceOneId);
+                seedBulkSuggestions.Parameters.AddWithValue(
+                    "face_two_id",
+                    bulkSuggestionFaceTwoId);
+                seedBulkSuggestions.Parameters.AddWithValue(
+                    "skipped_face_id",
+                    bulkSuggestionSkippedFaceId);
+                seedBulkSuggestions.Parameters.AddWithValue(
+                    "person_id",
+                    Guid.Parse(reviewPerson.Id.ToString()));
+                seedBulkSuggestions.Parameters.AddWithValue(
+                    "model_id",
+                    bulkSuggestionModel);
+                seedBulkSuggestions.Parameters.AddWithValue(
+                    "model_hash",
+                    bulkSuggestionHash);
+                seedBulkSuggestions.Parameters.AddWithValue(
+                    "created_at_utc",
+                    reviewAt.AddMinutes(14));
+
+                await using NpgsqlDataReader seededBulkSuggestions =
+                    await seedBulkSuggestions.ExecuteReaderAsync();
+                Assert.True(await seededBulkSuggestions.ReadAsync());
+                bulkSuggestionOneId =
+                    seededBulkSuggestions.GetInt64(0);
+                bulkSuggestionTwoId =
+                    seededBulkSuggestions.GetInt64(1);
+                bulkSuggestionSkippedId =
+                    seededBulkSuggestions.GetInt64(2);
+            }
+
+            await using (NpgsqlCommand seedBulkSuggestionRankings =
+                         verificationConnection.CreateCommand())
+            {
+                seedBulkSuggestionRankings.CommandText =
+                    """
+                    INSERT INTO identity_suggestion_rankings (
+                        face_occurrence_id,
+                        model_id,
+                        model_hash,
+                        rank,
+                        suggestion_id,
+                        score_margin,
+                        generated_at_utc)
+                    VALUES
+                        (
+                            @face_one_id,
+                            @model_id,
+                            @model_hash,
+                            1,
+                            @suggestion_one_id,
+                            0.35,
+                            @generated_at_utc),
+                        (
+                            @face_two_id,
+                            @model_id,
+                            @model_hash,
+                            1,
+                            @suggestion_two_id,
+                            0.31,
+                            @generated_at_utc),
+                        (
+                            @skipped_face_id,
+                            @model_id,
+                            @model_hash,
+                            1,
+                            @skipped_suggestion_id,
+                            0.28,
+                            @generated_at_utc);
+                    """;
+                seedBulkSuggestionRankings.Parameters.AddWithValue(
+                    "face_one_id",
+                    bulkSuggestionFaceOneId);
+                seedBulkSuggestionRankings.Parameters.AddWithValue(
+                    "face_two_id",
+                    bulkSuggestionFaceTwoId);
+                seedBulkSuggestionRankings.Parameters.AddWithValue(
+                    "skipped_face_id",
+                    bulkSuggestionSkippedFaceId);
+                seedBulkSuggestionRankings.Parameters.AddWithValue(
+                    "model_id",
+                    bulkSuggestionModel);
+                seedBulkSuggestionRankings.Parameters.AddWithValue(
+                    "model_hash",
+                    bulkSuggestionHash);
+                seedBulkSuggestionRankings.Parameters.AddWithValue(
+                    "suggestion_one_id",
+                    bulkSuggestionOneId);
+                seedBulkSuggestionRankings.Parameters.AddWithValue(
+                    "suggestion_two_id",
+                    bulkSuggestionTwoId);
+                seedBulkSuggestionRankings.Parameters.AddWithValue(
+                    "skipped_suggestion_id",
+                    bulkSuggestionSkippedId);
+                seedBulkSuggestionRankings.Parameters.AddWithValue(
+                    "generated_at_utc",
+                    reviewAt.AddMinutes(14));
+                await seedBulkSuggestionRankings.ExecuteNonQueryAsync();
+            }
+
+            FaceOccurrenceId bulkSuggestionSkippedFace =
+                FaceOccurrenceId.From(
+                    bulkSuggestionSkippedFaceId);
+            await reviewActions.MarkUnknownAsync(
+                bulkSuggestionSkippedFace,
+                "maintainer",
+                reviewAt.AddMinutes(15));
+
+            IBulkSuggestionReviewRepository bulkSuggestions =
+                new PostgresBulkSuggestionReviewRepository(database);
+            ModelId bulkModelId =
+                new(bulkSuggestionModel);
+            Sha256Digest bulkModelHash =
+                new(bulkSuggestionHash);
+
+            BulkSuggestionPreview groupedPreview =
+                await bulkSuggestions.PreviewAsync(
+                    new[]
+                    {
+                        bulkSuggestionOneId,
+                        bulkSuggestionTwoId,
+                        bulkSuggestionSkippedId,
+                    },
+                    bulkModelId,
+                    bulkModelHash);
+            Assert.Equal(3, groupedPreview.RequestedCount);
+            Assert.Equal(2, groupedPreview.AffectedCount);
+            Assert.Equal(1, groupedPreview.SkippedCount);
+            Assert.Equal(
+                reviewPerson.Id,
+                groupedPreview.Person.Id);
+
+            BulkSuggestionResult groupedResult =
+                await bulkSuggestions.CommitAsync(
+                    new[]
+                    {
+                        bulkSuggestionOneId,
+                        bulkSuggestionTwoId,
+                        bulkSuggestionSkippedId,
+                    },
+                    bulkModelId,
+                    bulkModelHash,
+                    groupedPreview.AffectedCount,
+                    groupedPreview.PreviewToken,
+                    "maintainer",
+                    reviewAt.AddMinutes(16),
+                    "bulk accept");
+            Assert.Equal(2, groupedResult.AffectedCount);
+
+            FaceOccurrenceId bulkSuggestionFaceOne =
+                FaceOccurrenceId.From(
+                    bulkSuggestionFaceOneId);
+            FaceOccurrenceId bulkSuggestionFaceTwo =
+                FaceOccurrenceId.From(
+                    bulkSuggestionFaceTwoId);
+            Assert.Equal(
+                ReviewActionKinds.Assign,
+                Assert.Single(
+                    await reviewActions.GetActionsAsync(
+                        bulkSuggestionFaceOne)).Kind);
+            Assert.Equal(
+                ReviewActionKinds.Assign,
+                Assert.Single(
+                    await reviewActions.GetActionsAsync(
+                        bulkSuggestionFaceTwo)).Kind);
+
+            await using (NpgsqlCommand readBulkStatuses =
+                         verificationConnection.CreateCommand())
+            {
+                readBulkStatuses.CommandText =
+                    """
+                    SELECT id, status
+                    FROM identity_suggestions
+                    WHERE id IN (
+                        @suggestion_one_id,
+                        @suggestion_two_id,
+                        @skipped_suggestion_id)
+                    ORDER BY id;
+                    """;
+                readBulkStatuses.Parameters.AddWithValue(
+                    "suggestion_one_id",
+                    bulkSuggestionOneId);
+                readBulkStatuses.Parameters.AddWithValue(
+                    "suggestion_two_id",
+                    bulkSuggestionTwoId);
+                readBulkStatuses.Parameters.AddWithValue(
+                    "skipped_suggestion_id",
+                    bulkSuggestionSkippedId);
+
+                Dictionary<long, string> statuses = [];
+                await using NpgsqlDataReader statusReader =
+                    await readBulkStatuses.ExecuteReaderAsync();
+                while (await statusReader.ReadAsync())
+                {
+                    statuses[statusReader.GetInt64(0)] =
+                        statusReader.GetString(1);
+                }
+
+                Assert.Equal(
+                    ReviewSuggestionStatuses.Accepted,
+                    statuses[bulkSuggestionOneId]);
+                Assert.Equal(
+                    ReviewSuggestionStatuses.Accepted,
+                    statuses[bulkSuggestionTwoId]);
+                Assert.Equal(
+                    ReviewSuggestionStatuses.Pending,
+                    statuses[bulkSuggestionSkippedId]);
+            }
+
             IArchiveCoverageRepository archiveCoverage =
                 new PostgresArchiveCoverageRepository(database);
             ArchiveCatalogueSource coverageSource = new(
