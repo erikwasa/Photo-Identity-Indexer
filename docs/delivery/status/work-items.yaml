@@ -1306,6 +1306,8 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33722374771
   - type: merge_commit
     value: 384f74057b3fb80ec5895012f96787604c450ee7
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/259
 - id: WI-0101
   title: Migrate library and remaining authoritative persistence to PostgreSQL
   milestone: M24
