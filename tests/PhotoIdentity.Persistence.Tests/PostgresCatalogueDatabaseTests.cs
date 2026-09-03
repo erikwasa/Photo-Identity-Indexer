@@ -712,7 +712,7 @@ public sealed class PostgresCatalogueDatabaseTests
                 ReviewSuggestionStatuses.Pending,
                 pendingAccept.Status);
             Assert.Equal(1, pendingAccept.Rank);
-            Assert.Equal(0.30, pendingAccept.ScoreMargin);
+            Assert.Equal(0.30, pendingAccept.ScoreMargin!.Value);
 
             ReviewIdentitySuggestion acceptedSuggestion =
                 await reviewSuggestions.AcceptAsync(
