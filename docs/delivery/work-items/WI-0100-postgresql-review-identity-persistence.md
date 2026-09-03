@@ -30,7 +30,7 @@ Implement PostgreSQL-backed review, people, suggestion, policy and identity-matc
 
 ## Slice 1 — canonical people and review actions
 
-Started 2026-09-03.
+Started 2026-09-03. Active review: PR #258.
 
 - Added Core-owned `ReviewPerson`, `ReviewAction`, `ReviewActionKinds` and provider-neutral `IReviewActionRepository`.
 - `SqliteReviewRepository` implements the neutral contract through explicit compatibility mappings; its existing SQLite public API remains intact.
