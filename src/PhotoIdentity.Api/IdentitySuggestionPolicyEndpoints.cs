@@ -1,6 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -16,7 +16,7 @@ public static class IdentitySuggestionPolicyEndpoints
     }
 
     private static async Task<IResult> GetAsync(
-        SqliteIdentitySuggestionPolicyRepository repository,
+        IIdentitySuggestionPolicyRepository repository,
         string? modelId,
         string? modelHash,
         CancellationToken cancellationToken)
@@ -26,7 +26,7 @@ public static class IdentitySuggestionPolicyEndpoints
             return BadRequest("An exact suggestion model revision is required.");
         }
 
-        IdentitySuggestionPolicy policy = await repository.GetAsync(
+        ReviewIdentitySuggestionPolicy policy = await repository.GetAsync(
             parsedModelId,
             parsedModelHash,
             cancellationToken);
@@ -35,7 +35,7 @@ public static class IdentitySuggestionPolicyEndpoints
 
     private static async Task<IResult> UpdateAsync(
         UpdateIdentitySuggestionPolicyRequest request,
-        SqliteIdentitySuggestionPolicyRepository repository,
+        IIdentitySuggestionPolicyRepository repository,
         string? modelId,
         string? modelHash,
         CancellationToken cancellationToken)
@@ -52,7 +52,7 @@ public static class IdentitySuggestionPolicyEndpoints
 
         try
         {
-            IdentitySuggestionPolicy policy = await repository.UpdateAsync(
+            ReviewIdentitySuggestionPolicy policy = await repository.UpdateAsync(
                 parsedModelId,
                 parsedModelHash,
                 request.AutoAssignEnabled,
@@ -72,7 +72,7 @@ public static class IdentitySuggestionPolicyEndpoints
     private static IdentitySuggestionPolicyResponse ToResponse(
         ModelId modelId,
         Sha256Digest modelHash,
-        IdentitySuggestionPolicy policy) =>
+        ReviewIdentitySuggestionPolicy policy) =>
         new(
             modelId.ToString(),
             modelHash.ToString(),
