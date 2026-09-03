@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 11;
+    public const int CurrentSchemaVersion = 12;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -750,6 +750,216 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                 ON identity_suggestion_review_actions (
                     suggestion_id,
                     id DESC);
+            """),
+        new(
+            12,
+            "identity-suggestion-rankings",
+            """
+            CREATE TABLE identity_suggestion_rankings (
+                face_occurrence_id uuid NOT NULL,
+                model_id text NOT NULL
+                    CHECK (btrim(model_id) <> ''),
+                model_hash text NOT NULL
+                    CHECK (model_hash ~ '^[0-9a-f]{64}
+
+    private readonly NpgsqlDataSource _dataSource;
+
+    public PostgresCatalogueDatabase(string connectionString)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+
+        NpgsqlDataSourceBuilder builder = new(connectionString);
+        builder.ConnectionStringBuilder.ApplicationName = "PhotoIdentity";
+        _dataSource = builder.Build();
+    }
+
+    public async Task<NpgsqlConnection> OpenConnectionAsync(
+        CancellationToken cancellationToken = default) =>
+        await _dataSource.OpenConnectionAsync(cancellationToken);
+
+    public async Task<PostgresInitializationResult> TryInitializeAsync(
+        CancellationToken cancellationToken = default)
+    {
+        NpgsqlConnection connection;
+        try
+        {
+            connection = await _dataSource.OpenConnectionAsync(cancellationToken);
+        }
+        catch (PostgresException exception) when (IsAuthenticationFailure(exception))
+        {
+            return new(
+                PostgresCatalogueHealth.AuthenticationFailed,
+                exception);
+        }
+        catch (Exception exception) when (IsConnectionUnavailable(exception))
+        {
+            return new(
+                PostgresCatalogueHealth.Unavailable,
+                exception);
+        }
+
+        await using (connection)
+        {
+            try
+            {
+                int schemaVersion = await InitializeAsync(connection, cancellationToken);
+                return new(
+                    PostgresCatalogueHealth.Ready(schemaVersion),
+                    null);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return new(
+                    PostgresCatalogueHealth.MigrationFailed,
+                    exception);
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _dataSource.DisposeAsync();
+    }
+
+    private static async Task<int> InitializeAsync(
+        NpgsqlConnection connection,
+        CancellationToken cancellationToken)
+    {
+        await using NpgsqlTransaction transaction =
+            await connection.BeginTransactionAsync(cancellationToken);
+
+        await using (NpgsqlCommand migrationLock = connection.CreateCommand())
+        {
+            migrationLock.Transaction = transaction;
+            migrationLock.CommandText =
+                "SELECT pg_advisory_xact_lock(@migration_lock_key);";
+            migrationLock.Parameters.AddWithValue(
+                "migration_lock_key",
+                MigrationAdvisoryLockKey);
+            await migrationLock.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using (NpgsqlCommand ensureHistory = connection.CreateCommand())
+        {
+            ensureHistory.Transaction = transaction;
+            ensureHistory.CommandText =
+                """
+                CREATE TABLE IF NOT EXISTS photo_identity_schema_migrations (
+                    version integer NOT NULL PRIMARY KEY,
+                    name text NOT NULL,
+                    applied_at_utc timestamp with time zone NOT NULL
+                );
+                """;
+            await ensureHistory.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        HashSet<int> appliedVersions = [];
+        await using (NpgsqlCommand readHistory = connection.CreateCommand())
+        {
+            readHistory.Transaction = transaction;
+            readHistory.CommandText =
+                """
+                SELECT version
+                FROM photo_identity_schema_migrations
+                ORDER BY version;
+                """;
+
+            await using NpgsqlDataReader reader =
+                await readHistory.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                int version = reader.GetInt32(0);
+                if (version > CurrentSchemaVersion)
+                {
+                    throw new InvalidOperationException(
+                        $"PostgreSQL catalogue schema version {version} is newer than supported version {CurrentSchemaVersion}.");
+                }
+
+                appliedVersions.Add(version);
+            }
+        }
+
+        foreach (Migration migration in Migrations)
+        {
+            if (appliedVersions.Contains(migration.Version))
+            {
+                continue;
+            }
+
+            await using (NpgsqlCommand applyMigration = connection.CreateCommand())
+            {
+                applyMigration.Transaction = transaction;
+                applyMigration.CommandText = migration.Sql;
+                await applyMigration.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await using (NpgsqlCommand recordMigration = connection.CreateCommand())
+            {
+                recordMigration.Transaction = transaction;
+                recordMigration.CommandText =
+                    """
+                    INSERT INTO photo_identity_schema_migrations (
+                        version,
+                        name,
+                        applied_at_utc)
+                    VALUES (
+                        @version,
+                        @name,
+                        @applied_at_utc);
+                    """;
+                recordMigration.Parameters.AddWithValue(
+                    "version",
+                    migration.Version);
+                recordMigration.Parameters.AddWithValue(
+                    "name",
+                    migration.Name);
+                recordMigration.Parameters.AddWithValue(
+                    "applied_at_utc",
+                    DateTimeOffset.UtcNow);
+                await recordMigration.ExecuteNonQueryAsync(cancellationToken);
+            }
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return CurrentSchemaVersion;
+    }
+
+    private static bool IsAuthenticationFailure(PostgresException exception) =>
+        exception.SqlState.StartsWith("28", StringComparison.Ordinal);
+
+    private static bool IsConnectionUnavailable(Exception exception) =>
+        exception is NpgsqlException or TimeoutException;
+
+    private sealed record Migration(int Version, string Name, string Sql);
+}
+),
+                rank integer NOT NULL
+                    CHECK (rank IN (1, 2)),
+                suggestion_id bigint NOT NULL UNIQUE,
+                score_margin double precision NULL
+                    CHECK (score_margin IS NULL OR score_margin >= 0),
+                generated_at_utc timestamp with time zone NOT NULL,
+                PRIMARY KEY (
+                    face_occurrence_id,
+                    model_id,
+                    model_hash,
+                    rank),
+                CONSTRAINT fk_identity_suggestion_rankings_face
+                    FOREIGN KEY (face_occurrence_id)
+                    REFERENCES face_occurrences (id) ON DELETE CASCADE,
+                CONSTRAINT fk_identity_suggestion_rankings_suggestion
+                    FOREIGN KEY (suggestion_id)
+                    REFERENCES identity_suggestions (id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX ix_identity_suggestion_rankings_model
+                ON identity_suggestion_rankings (
+                    model_id,
+                    model_hash);
             """),
     ];
 
