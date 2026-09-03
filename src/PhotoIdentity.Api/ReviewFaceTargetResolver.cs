@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -40,6 +41,18 @@ public sealed class ReviewFaceTargetResolver
 
     public Task<IReadOnlyDictionary<FaceOccurrenceId, ReviewFaceTargetResponse>> ResolveAsync(
         IReadOnlyList<CatalogueSuggestionGalleryFace> faces,
+        CancellationToken cancellationToken = default) =>
+        ResolveAsync(
+            faces.Select(face => new TargetSource(
+                face.Id,
+                face.RevisionId,
+                face.BoundingBoxJson,
+                face.PhotoWidth,
+                face.PhotoHeight)).ToArray(),
+            cancellationToken);
+
+    public Task<IReadOnlyDictionary<FaceOccurrenceId, ReviewFaceTargetResponse>> ResolveAsync(
+        IReadOnlyList<ReviewSuggestionGalleryFace> faces,
         CancellationToken cancellationToken = default) =>
         ResolveAsync(
             faces.Select(face => new TargetSource(
