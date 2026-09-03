@@ -75,7 +75,7 @@ Schema version 12 and ranked suggestion read/accept/reject persistence are accep
 
 ## Slice 3 — bulk face and grouped-suggestion review
 
-Started 2026-09-03.
+Started 2026-09-03. Active review: PR #260.
 
 - Added provider-neutral bulk face-review and grouped-suggestion preview/commit contracts plus Core-owned preview/result DTOs.
 - `SqliteBulkReviewRepository` and `SqliteBulkSuggestionReviewRepository` implement the neutral contracts through compatibility mappings; existing public SQLite APIs remain intact.
