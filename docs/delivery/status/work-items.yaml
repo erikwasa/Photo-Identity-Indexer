@@ -1179,10 +1179,13 @@ work_items:
 - id: WI-0099
   title: Migrate archive and background-processing persistence to PostgreSQL
   milestone: M24
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0099-postgresql-archive-background-persistence.md
   started_at: 2026-09-02
+  completed_at: 2026-09-03
+  verified_at: 2026-09-03
+  verified_by: maintainer
   last_updated_at: 2026-09-03
   branch: agent/WI-0099-final-acceptance
   blockers:
@@ -1202,7 +1205,8 @@ work_items:
   - 'PR #254 initially failed workflow #1469 on one C# local-variable scoping error. The corrective commit changed only local names; workflow #1470 passed, PR #254 merged at 65347049842db70cbed9a12f4637b582e819a4ac, and maintainer PostgreSQL review/verification succeeded, accepting schema version 9 and managed hydration ownership semantics.'
   - 'PR #255 merged at 865cfe01ab6d67216d3719814f7b9ab0fe782ce4 and workflow #1475 passed. Maintainer review/verification succeeded, accepting the PostgreSQL storage-accounting adapter against schema version 9.'
   - 'PR #256 merged at c77fc49eddd636fe54e02745a73441bdb4939d96 and workflow #1479 passed. Maintainer review/verification succeeded, accepting PostgreSQL schema version 10 plus capture/GPS and GeoNames operational state.'
-  - 'Final WI-0099 audit found no remaining unimplemented persistence surface owned by WI-0099. Remaining direct SQLite runtime composition belongs to WI-0101 normal-runtime SQLite elimination and WI-0102 controlled provider cutover. The final acceptance slice adds concurrent PostgreSQL advancement/enrichment/availability writer verification before closing WI-0099.'
+  - 'Final WI-0099 audit found no remaining unimplemented persistence surface owned by WI-0099. Remaining direct SQLite runtime composition belongs to WI-0101 normal-runtime SQLite elimination and WI-0102 controlled provider cutover.'
+  - 'PR #257 merged at 3431cf8ed3f2dff435d6f7d7a452c219d5c53708, workflow #1484 passed, and the maintainer post-merge verify-postgres.ps1 run succeeded. Concurrent advancement/enrichment/availability writes are accepted and WI-0099 is complete.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/245
@@ -1276,6 +1280,10 @@ work_items:
     value: c77fc49eddd636fe54e02745a73441bdb4939d96
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/257
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33693647605
+  - type: merge_commit
+    value: 3431cf8ed3f2dff435d6f7d7a452c219d5c53708
 - id: WI-0100
   title: Migrate review and identity persistence to PostgreSQL
   milestone: M24
@@ -1284,15 +1292,22 @@ work_items:
   document: ../work-items/WI-0100-postgresql-review-identity-persistence.md
   started_at: 2026-09-03
   last_updated_at: 2026-09-03
-  branch: agent/WI-0100-postgres-review-actions
+  branch: agent/WI-0100-postgres-review-suggestions
   blockers:
   - WI-0098
   blocker_notes:
-  - WI-0098 is completed, so WI-0100 may proceed independently while WI-0099 awaits its final post-merge live verification.
+  - WI-0098 is completed.
+  - 'PR #258 merged at 384f74057b3fb80ec5895012f96787604c450ee7, workflow #1489 passed, and maintainer live PostgreSQL verification accepted schema version 11 and canonical review history.'
   - Runtime review authority remains SQLite; PostgreSQL review slices add equivalent persistence before any controlled cutover.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/258
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33722374771
+  - type: merge_commit
+    value: 384f74057b3fb80ec5895012f96787604c450ee7
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/259
 - id: WI-0101
   title: Migrate library and remaining authoritative persistence to PostgreSQL
   milestone: M24

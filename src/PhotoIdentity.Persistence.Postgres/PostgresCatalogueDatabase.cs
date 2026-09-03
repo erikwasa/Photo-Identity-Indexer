@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 11;
+    public const int CurrentSchemaVersion = 12;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -750,6 +750,40 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                 ON identity_suggestion_review_actions (
                     suggestion_id,
                     id DESC);
+            """),
+        new(
+            12,
+            "identity-suggestion-rankings",
+            """
+            CREATE TABLE identity_suggestion_rankings (
+                face_occurrence_id uuid NOT NULL,
+                model_id text NOT NULL
+                    CHECK (btrim(model_id) <> ''),
+                model_hash text NOT NULL
+                    CHECK (model_hash ~ '^[0-9a-f]{64}$'),
+                rank integer NOT NULL
+                    CHECK (rank IN (1, 2)),
+                suggestion_id bigint NOT NULL UNIQUE,
+                score_margin double precision NULL
+                    CHECK (score_margin IS NULL OR score_margin >= 0),
+                generated_at_utc timestamp with time zone NOT NULL,
+                PRIMARY KEY (
+                    face_occurrence_id,
+                    model_id,
+                    model_hash,
+                    rank),
+                CONSTRAINT fk_identity_suggestion_rankings_face
+                    FOREIGN KEY (face_occurrence_id)
+                    REFERENCES face_occurrences (id) ON DELETE CASCADE,
+                CONSTRAINT fk_identity_suggestion_rankings_suggestion
+                    FOREIGN KEY (suggestion_id)
+                    REFERENCES identity_suggestions (id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX ix_identity_suggestion_rankings_model
+                ON identity_suggestion_rankings (
+                    model_id,
+                    model_hash);
             """),
     ];
 

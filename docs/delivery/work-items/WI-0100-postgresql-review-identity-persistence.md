@@ -42,3 +42,26 @@ Started 2026-09-03. Active review: PR #258.
 - Extended live PostgreSQL verification to cover person creation, assignment/manual label persistence, accepted-suggestion restoration on undo, Unknown/reject/undo ordering, reversal timestamps and history durability after repository recreation.
 
 This slice does not perform runtime cutover and does not claim bulk review, suggestion workflows, person maintenance or identity regeneration acceptance.
+
+
+### Maintainer verification — PostgreSQL schema version 11
+
+PR #258 merged on 2026-09-03 at `384f74057b3fb80ec5895012f96787604c450ee7`; workflow #1489 passed and maintainer `verify-postgres.ps1` verification succeeded.
+
+Schema version 11 and canonical person/manual-label/review-action persistence are accepted, including accepted-suggestion restoration on undo.
+
+## Slice 2 — ranked suggestion review decisions
+
+Started 2026-09-03. Active review: PR #259.
+
+- Added provider-neutral ranked suggestion and suggestion-decision records plus `IReviewSuggestionRepository`.
+- `SqliteReviewSuggestionRepository` implements the neutral contract through compatibility mappings while retaining its existing public API.
+- Added PostgreSQL schema version 12 with `identity_suggestion_rankings`; v11 already owns the base suggestions and suggestion-review history tables.
+- Added `PostgresReviewSuggestionRepository` for ranked suggestion reads and explicit accept/reject decisions.
+- PostgreSQL accept/reject locks the face occurrence row before decision processing, preserving one active human decision per face under concurrent reviewers.
+- Accept atomically upserts the manual person label, appends the canonical assignment action, changes the suggestion to accepted and records its linked accept decision.
+- Reject changes only the suggestion to rejected and records suggestion-decision history; it does not reject the face itself.
+- Runtime DI exposes the neutral suggestion contract but still resolves it to SQLite. Endpoint authority is unchanged.
+- Live PostgreSQL verification covers pending reads, accept → canonical assignment, repeated-decision rejection, suggestion-only rejection and restart persistence.
+
+Bulk suggestion review, suggestion gallery/policy, person maintenance and identity regeneration remain later WI-0100 slices.

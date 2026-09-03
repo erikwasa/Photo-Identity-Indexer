@@ -96,6 +96,8 @@ public partial class Program
             serviceProvider.GetRequiredService<SqliteReviewRepository>());
         builder.Services.AddSingleton<SqliteReviewFilterRepository>();
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
+        builder.Services.AddSingleton<IReviewSuggestionRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteReviewSuggestionRepository>());
         builder.Services.AddSingleton<SqliteSuggestionGalleryRepository>();
         builder.Services.AddSingleton<SqliteIdentitySuggestionPolicyRepository>();
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationModelRepository>();
