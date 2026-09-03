@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -10,7 +11,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Accepting a suggestion creates a normal append-only face assignment; rejecting one
 /// records a durable face-person exclusion without rejecting the face itself.
 /// </summary>
-public sealed class SqliteReviewSuggestionRepository
+public sealed class SqliteReviewSuggestionRepository : IReviewSuggestionRepository
 {
     private const string PendingStatus = "pending";
     private const string AcceptedStatus = "accepted";
@@ -61,6 +62,44 @@ public sealed class SqliteReviewSuggestionRepository
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
     }
+
+    async Task<IReadOnlyList<ReviewIdentitySuggestion>>
+        IReviewSuggestionRepository.GetSuggestionsAsync(
+            FaceOccurrenceId faceOccurrenceId,
+            CancellationToken cancellationToken) =>
+        (await GetSuggestionsAsync(faceOccurrenceId, cancellationToken))
+            .Select(ToCoreSuggestion)
+            .ToArray();
+
+    async Task<ReviewIdentitySuggestion> IReviewSuggestionRepository.AcceptAsync(
+        FaceOccurrenceId faceOccurrenceId,
+        long suggestionId,
+        string actor,
+        DateTimeOffset createdAtUtc,
+        string? note,
+        CancellationToken cancellationToken) =>
+        ToCoreSuggestion(await AcceptAsync(
+            faceOccurrenceId,
+            suggestionId,
+            actor,
+            createdAtUtc,
+            note,
+            cancellationToken));
+
+    async Task<ReviewIdentitySuggestion> IReviewSuggestionRepository.RejectAsync(
+        FaceOccurrenceId faceOccurrenceId,
+        long suggestionId,
+        string actor,
+        DateTimeOffset createdAtUtc,
+        string? note,
+        CancellationToken cancellationToken) =>
+        ToCoreSuggestion(await RejectAsync(
+            faceOccurrenceId,
+            suggestionId,
+            actor,
+            createdAtUtc,
+            note,
+            cancellationToken));
 
     public async Task<IReadOnlyList<CatalogueReviewIdentitySuggestion>> GetSuggestionsAsync(
         FaceOccurrenceId faceOccurrenceId,
@@ -469,6 +508,27 @@ public sealed class SqliteReviewSuggestionRepository
             Parse(reader.GetString(9)),
             latestAction);
     }
+
+    private static ReviewIdentitySuggestion ToCoreSuggestion(
+        CatalogueReviewIdentitySuggestion suggestion) => new(
+        suggestion.Id,
+        new ReviewPerson(suggestion.Person.Id, suggestion.Person.DisplayName),
+        suggestion.ModelId,
+        suggestion.ModelHash,
+        suggestion.Rank,
+        suggestion.Score,
+        suggestion.ScoreMargin,
+        suggestion.Status,
+        suggestion.GeneratedAtUtc,
+        suggestion.LatestAction is null
+            ? null
+            : new ReviewSuggestionAction(
+                suggestion.LatestAction.Id,
+                suggestion.LatestAction.Kind,
+                suggestion.LatestAction.Actor,
+                suggestion.LatestAction.Note,
+                suggestion.LatestAction.CreatedAtUtc,
+                suggestion.LatestAction.ReviewActionId));
 
     private static string Required(string value, string parameterName)
     {
