@@ -1290,7 +1290,9 @@ work_items:
   blocker_notes:
   - WI-0098 is completed, so WI-0100 may proceed independently while WI-0099 awaits its final post-merge live verification.
   - Runtime review authority remains SQLite; PostgreSQL review slices add equivalent persistence before any controlled cutover.
-  evidence: []
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/258
 - id: WI-0101
   title: Migrate library and remaining authoritative persistence to PostgreSQL
   milestone: M24
