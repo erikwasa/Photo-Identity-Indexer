@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 is completed. **WI-0099** final acceptance PR #257 merged at `3431cf8ed3f2dff435d6f7d7a452c219d5c53708` and workflow #1484 passed; WI-0099 remains formally open only until the maintainer reruns `verify-postgres.ps1` against merged main. **WI-0100 — Migrate review and identity persistence to PostgreSQL** is now active in parallel on `agent/WI-0100-postgres-review-actions`. Its first slice adds PostgreSQL schema version 11 plus the neutral canonical person/review-action boundary; runtime review authority remains SQLite.
+In the separate M24 thread, WI-0098 is completed. **WI-0099** final acceptance PR #257 merged at `3431cf8ed3f2dff435d6f7d7a452c219d5c53708` and workflow #1484 passed; WI-0099 remains formally open only until the maintainer reruns `verify-postgres.ps1` against merged main. **WI-0100 — Migrate review and identity persistence to PostgreSQL** is now active in parallel on `agent/WI-0100-postgres-review-actions`. PR #258 is its first slice. It adds PostgreSQL schema version 11 plus the neutral canonical person/review-action boundary; runtime review authority remains SQLite.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
