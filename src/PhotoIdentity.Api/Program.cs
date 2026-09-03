@@ -107,6 +107,8 @@ public partial class Program
         builder.Services.AddSingleton<SqliteIdentityAutoAssignmentService>();
         builder.Services.AddSingleton<SqlitePersonAuditRepository>();
         builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
+        builder.Services.AddSingleton<IPersonMaintenanceRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePersonMaintenanceRepository>());
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();
         builder.Services.AddSingleton<IBulkReviewRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteBulkReviewRepository>());
