@@ -288,12 +288,13 @@ public sealed class PostgresCatalogueDatabaseTests
                           'person_labels',
                           'identity_suggestions',
                           'review_actions',
-                          'identity_suggestion_review_actions');
+                          'identity_suggestion_review_actions',
+                          'identity_suggestion_rankings');
                     """;
 
                 object? reviewTableCount =
                     await readReviewTables.ExecuteScalarAsync();
-                Assert.Equal(5L, Convert.ToInt64(reviewTableCount));
+                Assert.Equal(6L, Convert.ToInt64(reviewTableCount));
             }
 
             await using (NpgsqlCommand readColumnTypes =
@@ -540,6 +541,254 @@ public sealed class PostgresCatalogueDatabaseTests
             Assert.Equal(ReviewActionKinds.Undo, reviewHistory[3].Kind);
             Assert.Equal(ReviewActionKinds.Assign, reviewHistory[4].Kind);
             Assert.NotNull(reviewHistory[4].ReversedAtUtc);
+
+            Guid acceptFaceId = Guid.NewGuid();
+            Guid rejectFaceId = Guid.NewGuid();
+            await using (NpgsqlCommand seedSuggestionFaces =
+                         verificationConnection.CreateCommand())
+            {
+                seedSuggestionFaces.CommandText =
+                    """
+                    INSERT INTO face_occurrences (
+                        id,
+                        asset_revision_id,
+                        ordinal,
+                        created_at_utc)
+                    VALUES
+                        (@accept_face_id, @revision_id, 1, @created_at_utc),
+                        (@reject_face_id, @revision_id, 2, @created_at_utc);
+                    """;
+                seedSuggestionFaces.Parameters.AddWithValue(
+                    "accept_face_id",
+                    acceptFaceId);
+                seedSuggestionFaces.Parameters.AddWithValue(
+                    "reject_face_id",
+                    rejectFaceId);
+                seedSuggestionFaces.Parameters.AddWithValue(
+                    "revision_id",
+                    revisionId);
+                seedSuggestionFaces.Parameters.AddWithValue(
+                    "created_at_utc",
+                    reviewAt.AddMinutes(6));
+                await seedSuggestionFaces.ExecuteNonQueryAsync();
+            }
+
+            long acceptSuggestionId;
+            long rejectSuggestionId;
+            await using (NpgsqlCommand seedRankedSuggestions =
+                         verificationConnection.CreateCommand())
+            {
+                seedRankedSuggestions.CommandText =
+                    """
+                    WITH accepted_seed AS (
+                        INSERT INTO identity_suggestions (
+                            face_occurrence_id,
+                            suggested_person_id,
+                            model_id,
+                            model_hash,
+                            score,
+                            status,
+                            created_at_utc)
+                        VALUES (
+                            @accept_face_id,
+                            @person_id,
+                            'test-suggestion',
+                            @model_hash,
+                            0.95,
+                            'pending',
+                            @created_at_utc)
+                        RETURNING id
+                    ),
+                    rejected_seed AS (
+                        INSERT INTO identity_suggestions (
+                            face_occurrence_id,
+                            suggested_person_id,
+                            model_id,
+                            model_hash,
+                            score,
+                            status,
+                            created_at_utc)
+                        VALUES (
+                            @reject_face_id,
+                            @person_id,
+                            'test-suggestion',
+                            @model_hash,
+                            0.70,
+                            'pending',
+                            @created_at_utc)
+                        RETURNING id
+                    )
+                    SELECT
+                        (SELECT id FROM accepted_seed),
+                        (SELECT id FROM rejected_seed);
+                    """;
+                seedRankedSuggestions.Parameters.AddWithValue(
+                    "accept_face_id",
+                    acceptFaceId);
+                seedRankedSuggestions.Parameters.AddWithValue(
+                    "reject_face_id",
+                    rejectFaceId);
+                seedRankedSuggestions.Parameters.AddWithValue(
+                    "person_id",
+                    Guid.Parse(reviewPerson.Id.ToString()));
+                seedRankedSuggestions.Parameters.AddWithValue(
+                    "model_hash",
+                    new string('b', 64));
+                seedRankedSuggestions.Parameters.AddWithValue(
+                    "created_at_utc",
+                    reviewAt.AddMinutes(6));
+
+                await using NpgsqlDataReader seededSuggestions =
+                    await seedRankedSuggestions.ExecuteReaderAsync();
+                Assert.True(await seededSuggestions.ReadAsync());
+                acceptSuggestionId = seededSuggestions.GetInt64(0);
+                rejectSuggestionId = seededSuggestions.GetInt64(1);
+            }
+
+            await using (NpgsqlCommand seedRankings =
+                         verificationConnection.CreateCommand())
+            {
+                seedRankings.CommandText =
+                    """
+                    INSERT INTO identity_suggestion_rankings (
+                        face_occurrence_id,
+                        model_id,
+                        model_hash,
+                        rank,
+                        suggestion_id,
+                        score_margin,
+                        generated_at_utc)
+                    VALUES
+                        (
+                            @accept_face_id,
+                            'test-suggestion',
+                            @model_hash,
+                            1,
+                            @accept_suggestion_id,
+                            0.30,
+                            @generated_at_utc),
+                        (
+                            @reject_face_id,
+                            'test-suggestion',
+                            @model_hash,
+                            1,
+                            @reject_suggestion_id,
+                            0.10,
+                            @generated_at_utc);
+                    """;
+                seedRankings.Parameters.AddWithValue(
+                    "accept_face_id",
+                    acceptFaceId);
+                seedRankings.Parameters.AddWithValue(
+                    "reject_face_id",
+                    rejectFaceId);
+                seedRankings.Parameters.AddWithValue(
+                    "model_hash",
+                    new string('b', 64));
+                seedRankings.Parameters.AddWithValue(
+                    "accept_suggestion_id",
+                    acceptSuggestionId);
+                seedRankings.Parameters.AddWithValue(
+                    "reject_suggestion_id",
+                    rejectSuggestionId);
+                seedRankings.Parameters.AddWithValue(
+                    "generated_at_utc",
+                    reviewAt.AddMinutes(6));
+                await seedRankings.ExecuteNonQueryAsync();
+            }
+
+            IReviewSuggestionRepository reviewSuggestions =
+                new PostgresReviewSuggestionRepository(database);
+            FaceOccurrenceId acceptFace =
+                FaceOccurrenceId.From(acceptFaceId);
+            FaceOccurrenceId rejectFace =
+                FaceOccurrenceId.From(rejectFaceId);
+
+            ReviewIdentitySuggestion pendingAccept =
+                Assert.Single(
+                    await reviewSuggestions.GetSuggestionsAsync(
+                        acceptFace));
+            Assert.Equal(
+                ReviewSuggestionStatuses.Pending,
+                pendingAccept.Status);
+            Assert.Equal(1, pendingAccept.Rank);
+            Assert.Equal(0.30, pendingAccept.ScoreMargin);
+
+            ReviewIdentitySuggestion acceptedSuggestion =
+                await reviewSuggestions.AcceptAsync(
+                    acceptFace,
+                    acceptSuggestionId,
+                    "maintainer",
+                    reviewAt.AddMinutes(7),
+                    "accept suggestion");
+            Assert.Equal(
+                ReviewSuggestionStatuses.Accepted,
+                acceptedSuggestion.Status);
+            Assert.Equal(
+                ReviewSuggestionActionKinds.Accept,
+                acceptedSuggestion.LatestAction?.Kind);
+            Assert.NotNull(
+                acceptedSuggestion.LatestAction?.ReviewActionId);
+
+            IReadOnlyList<ReviewAction> acceptedFaceHistory =
+                await reviewActions.GetActionsAsync(acceptFace);
+            ReviewAction acceptedFaceAssignment =
+                Assert.Single(acceptedFaceHistory);
+            Assert.Equal(
+                ReviewActionKinds.Assign,
+                acceptedFaceAssignment.Kind);
+            Assert.Equal(
+                reviewPerson.Id,
+                acceptedFaceAssignment.PersonId);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => reviewSuggestions.AcceptAsync(
+                    acceptFace,
+                    acceptSuggestionId,
+                    "maintainer",
+                    reviewAt.AddMinutes(8)));
+
+            ReviewIdentitySuggestion rejectedSuggestion =
+                await reviewSuggestions.RejectAsync(
+                    rejectFace,
+                    rejectSuggestionId,
+                    "maintainer",
+                    reviewAt.AddMinutes(9),
+                    "reject suggestion");
+            Assert.Equal(
+                ReviewSuggestionStatuses.Rejected,
+                rejectedSuggestion.Status);
+            Assert.Equal(
+                ReviewSuggestionActionKinds.Reject,
+                rejectedSuggestion.LatestAction?.Kind);
+            Assert.Null(
+                rejectedSuggestion.LatestAction?.ReviewActionId);
+            Assert.Empty(
+                await reviewActions.GetActionsAsync(rejectFace));
+
+            PostgresReviewSuggestionRepository restartedSuggestions =
+                new(database);
+            ReviewIdentitySuggestion persistedAccepted =
+                Assert.Single(
+                    await restartedSuggestions.GetSuggestionsAsync(
+                        acceptFace));
+            Assert.Equal(
+                ReviewSuggestionStatuses.Accepted,
+                persistedAccepted.Status);
+            Assert.Equal(
+                ReviewSuggestionActionKinds.Accept,
+                persistedAccepted.LatestAction?.Kind);
+
+            ReviewIdentitySuggestion persistedRejected =
+                Assert.Single(
+                    await restartedSuggestions.GetSuggestionsAsync(
+                        rejectFace));
+            Assert.Equal(
+                ReviewSuggestionStatuses.Rejected,
+                persistedRejected.Status);
+            Assert.Equal(
+                ReviewSuggestionActionKinds.Reject,
+                persistedRejected.LatestAction?.Kind);
 
             IArchiveCoverageRepository archiveCoverage =
                 new PostgresArchiveCoverageRepository(database);
