@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -18,7 +19,7 @@ public static class SuggestionGalleryEndpoints
     }
 
     private static async Task<IResult> GetFacesAsync(
-        SqliteSuggestionGalleryRepository repository,
+        ISuggestionGalleryRepository repository,
         ReviewFaceTargetResolver targetResolver,
         string? modelId,
         string? modelHash,
@@ -40,7 +41,7 @@ public static class SuggestionGalleryEndpoints
 
         try
         {
-            CatalogueSuggestionGalleryPage page = await repository.GetFacesAsync(
+            ReviewSuggestionGalleryPage page = await repository.GetFacesAsync(
                 parsedModelId,
                 parsedModelHash,
                 offset,
@@ -72,7 +73,7 @@ public static class SuggestionGalleryEndpoints
     private static async Task<IResult> GetFaceAsync(
         string id,
         SqliteReviewRepository reviewRepository,
-        SqliteSuggestionGalleryRepository suggestionRepository,
+        ISuggestionGalleryRepository suggestionRepository,
         ReviewFaceTargetResolver targetResolver,
         string? modelId,
         string? modelHash,
@@ -102,7 +103,7 @@ public static class SuggestionGalleryEndpoints
             IReadOnlyList<CatalogueReviewAction> actions = await reviewRepository.GetActionsAsync(
                 faceOccurrenceId,
                 cancellationToken);
-            CatalogueReviewFaceNavigation? navigation = await suggestionRepository.GetNavigationAsync(
+            ReviewSuggestionGalleryNavigation? navigation = await suggestionRepository.GetNavigationAsync(
                 faceOccurrenceId,
                 parsedModelId,
                 parsedModelHash,
@@ -139,7 +140,7 @@ public static class SuggestionGalleryEndpoints
     }
 
     private static ReviewFaceResponse ToResponse(
-        CatalogueSuggestionGalleryFace face,
+        ReviewSuggestionGalleryFace face,
         ReviewFaceTargetResponse? target) => new(
         face.Id.ToString(),
         $"/api/review/faces/{face.Id}/image",
@@ -167,7 +168,7 @@ public static class SuggestionGalleryEndpoints
         TargetBox: target);
 
     private static ReviewTopSuggestionResponse ToResponse(
-        CatalogueSuggestionGalleryTopSuggestion suggestion) => new(
+        ReviewSuggestionGalleryTopSuggestion suggestion) => new(
         suggestion.Id,
         ToResponse(suggestion.Person),
         suggestion.ModelId.ToString(),
@@ -178,6 +179,9 @@ public static class SuggestionGalleryEndpoints
         suggestion.Status,
         suggestion.GeneratedAtUtc,
         suggestion.ConfidenceGroup);
+
+    private static ReviewPersonResponse ToResponse(ReviewSuggestionGalleryPerson person) =>
+        new(person.Id.ToString(), person.DisplayName);
 
     private static ReviewPersonResponse ToResponse(CatalogueReviewPerson person) =>
         new(person.Id.ToString(), person.DisplayName);
