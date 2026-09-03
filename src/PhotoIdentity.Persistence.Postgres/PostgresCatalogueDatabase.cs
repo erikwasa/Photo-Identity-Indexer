@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 13;
+    public const int CurrentSchemaVersion = 14;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -832,6 +832,31 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                 ON person_maintenance_actions (id DESC);
             CREATE INDEX ix_person_maintenance_person
                 ON person_maintenance_actions (person_id, id DESC);
+            """),
+        new(
+            14,
+            "identity-suggestion-policy",
+            """
+            CREATE TABLE identity_suggestion_policies (
+                model_id text NOT NULL
+                    CHECK (btrim(model_id) <> ''),
+                model_hash text NOT NULL
+                    CHECK (model_hash ~ '^[0-9a-f]{64}$'),
+                policy_version integer NOT NULL
+                    CHECK (policy_version >= 1),
+                auto_assign_enabled boolean NOT NULL,
+                high_score_threshold double precision NOT NULL
+                    CHECK (high_score_threshold BETWEEN 0 AND 1),
+                high_margin_threshold double precision NOT NULL
+                    CHECK (high_margin_threshold BETWEEN 0 AND 2),
+                medium_score_threshold double precision NOT NULL
+                    CHECK (medium_score_threshold BETWEEN 0 AND 1),
+                updated_by text NOT NULL
+                    CHECK (btrim(updated_by) <> ''),
+                updated_at_utc timestamp with time zone NOT NULL,
+                PRIMARY KEY (model_id, model_hash),
+                CHECK (medium_score_threshold <= high_score_threshold)
+            );
             """),
     ];
 

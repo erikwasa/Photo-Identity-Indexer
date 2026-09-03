@@ -112,3 +112,47 @@ Started 2026-09-03. Active review: PR #261.
 - Live PostgreSQL verification covers rename history, explicit irreversible-merge confirmation, duplicate label remapping, review-action person/label transfer, duplicate suggestion consolidation, ranking/history transfer, favorite carryover, merged-person exclusion from active listing and maintenance-history durability after repository recreation.
 
 The richer read-only person audit view, suggestion gallery/policy/evidence state and identity regeneration run/target state remain later WI-0100 slices.
+
+## Slice 5 — read-only person audit view
+
+Started 2026-09-03. Reviewed in PR #262.
+
+- Added provider-neutral `IPersonAuditRepository`, a SQLite compatibility adapter and `PostgresPersonAuditRepository` over schema version 13.
+- PostgreSQL audit queries preserve active-assignment history, exact-model top-suggestion comparison, disagreement counting/filtering, accepted sort semantics, crop/observation metadata, pagination and merged-person exclusion.
+- No schema migration or runtime provider switch was required.
+- Focused live PostgreSQL coverage verifies agreement/disagreement semantics and validation.
+
+### Maintainer verification — person audit on schema version 13
+
+PR #262 merged on 2026-09-03 at `c22131c868667138d100a90be6a3517ee33b2321`; maintainer `verify-postgres.ps1` verification succeeded.
+
+The PostgreSQL person-audit view is accepted.
+
+## Slice 6 — identity evidence-version reader
+
+Started 2026-09-03. Reviewed in PR #263.
+
+- Added provider-neutral `IIdentityMatchEvidenceVersionReader` and Core-owned evidence-version state.
+- Added a SQLite compatibility adapter over the existing accepted reader and `PostgresIdentityMatchEvidenceVersionReader` over existing schema version 13 tables.
+- PostgreSQL preserves catalogue-wide review-action, suggestion-decision and person-merge counters while scoping embedding evidence to the exact model revision.
+- The automatic-assignment expected-counter adjustment is provider-neutral.
+- Runtime regeneration composition remains SQLite-backed.
+- Focused live PostgreSQL coverage verifies empty state, all four counters, exact-model embedding isolation and expected automatic-assignment adjustment.
+
+### Maintainer verification — identity evidence on schema version 13
+
+PR #263 merged on 2026-09-03 at `fb7d47bafcc13df87d57eff5cc9ea6bdbb50b1db`; maintainer `verify-postgres.ps1` verification succeeded.
+
+The PostgreSQL identity evidence-version reader is accepted.
+
+## Slice 7 — exact-model suggestion policy persistence
+
+Started 2026-09-03.
+
+- Added Core-owned `ReviewIdentitySuggestionPolicy` and provider-neutral `IIdentitySuggestionPolicyRepository` with the accepted confidence classification and validation semantics.
+- Added `SqliteIdentitySuggestionPolicyAdapter`; the suggestion-policy HTTP endpoint now depends on the neutral contract while runtime DI still resolves it to SQLite.
+- Added PostgreSQL schema version 14 with exact-model `identity_suggestion_policies`, monotonic policy versioning fields and database-level score/margin/model validation.
+- Added `PostgresIdentitySuggestionPolicyRepository` preserving default initialization, no-op updates, exact-model isolation and durable versioned changes. Updates lock the exact policy row before incrementing the version.
+- Focused live PostgreSQL coverage verifies defaults, exact-model isolation, changed/no-op updates, restart durability and invalid-policy rejection.
+
+Suggestion gallery persistence and identity regeneration run/target durability remain later WI-0100 slices. Runtime review/identity authority remains SQLite until controlled cutover.
