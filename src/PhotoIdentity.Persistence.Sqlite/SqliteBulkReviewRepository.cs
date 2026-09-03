@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -10,7 +11,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Previews and commits bounded bulk assignment, Unknown or face rejection operations.
 /// A commit must present the exact token produced by a preview of the same eligible face set.
 /// </summary>
-public sealed class SqliteBulkReviewRepository
+public sealed class SqliteBulkReviewRepository : IBulkReviewRepository
 {
     public const int MaximumFacesPerRequest = 200;
 
@@ -20,6 +21,46 @@ public sealed class SqliteBulkReviewRepository
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+    }
+
+    async Task<BulkReviewPreview> IBulkReviewRepository.PreviewAsync(
+        IReadOnlyCollection<FaceOccurrenceId> faceOccurrenceIds,
+        string action,
+        PersonId? personId,
+        CancellationToken cancellationToken)
+    {
+        CatalogueBulkReviewPreview preview =
+            await PreviewAsync(
+                faceOccurrenceIds,
+                action,
+                personId,
+                cancellationToken);
+        return ToCorePreview(preview);
+    }
+
+    async Task<BulkReviewResult> IBulkReviewRepository.CommitAsync(
+        IReadOnlyCollection<FaceOccurrenceId> faceOccurrenceIds,
+        string action,
+        PersonId? personId,
+        int expectedAffectedCount,
+        string previewToken,
+        string actor,
+        DateTimeOffset createdAtUtc,
+        string? note,
+        CancellationToken cancellationToken)
+    {
+        CatalogueBulkReviewResult result =
+            await CommitAsync(
+                faceOccurrenceIds,
+                action,
+                personId,
+                expectedAffectedCount,
+                previewToken,
+                actor,
+                createdAtUtc,
+                note,
+                cancellationToken);
+        return ToCoreResult(result);
     }
 
     public async Task<CatalogueBulkReviewPreview> PreviewAsync(
@@ -144,6 +185,31 @@ public sealed class SqliteBulkReviewRepository
             person,
             createdAtUtc.ToUniversalTime());
     }
+
+    private static BulkReviewPreview ToCorePreview(
+        CatalogueBulkReviewPreview preview) => new(
+        preview.Action,
+        preview.RequestedCount,
+        preview.AffectedCount,
+        preview.SkippedCount,
+        preview.PreviewToken,
+        preview.Person is null
+            ? null
+            : new ReviewPerson(
+                preview.Person.Id,
+                preview.Person.DisplayName));
+
+    private static BulkReviewResult ToCoreResult(
+        CatalogueBulkReviewResult result) => new(
+        result.Action,
+        result.RequestedCount,
+        result.AffectedCount,
+        result.Person is null
+            ? null
+            : new ReviewPerson(
+                result.Person.Id,
+                result.Person.DisplayName),
+        result.CreatedAtUtc);
 
     private static FaceOccurrenceId[] NormalizeFaceIds(
         IReadOnlyCollection<FaceOccurrenceId> faceOccurrenceIds)
