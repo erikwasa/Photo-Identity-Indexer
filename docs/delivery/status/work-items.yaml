@@ -1279,12 +1279,17 @@ work_items:
 - id: WI-0100
   title: Migrate review and identity persistence to PostgreSQL
   milestone: M24
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0100-postgresql-review-identity-persistence.md
+  started_at: 2026-09-03
+  last_updated_at: 2026-09-03
+  branch: agent/WI-0100-postgres-review-actions
   blockers:
   - WI-0098
-  blocker_notes: []
+  blocker_notes:
+  - WI-0098 is completed, so WI-0100 may proceed independently while WI-0099 awaits its final post-merge live verification.
+  - Runtime review authority remains SQLite; PostgreSQL review slices add equivalent persistence before any controlled cutover.
   evidence: []
 - id: WI-0101
   title: Migrate library and remaining authoritative persistence to PostgreSQL
