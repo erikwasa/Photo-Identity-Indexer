@@ -297,6 +297,24 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(6L, Convert.ToInt64(reviewTableCount));
             }
 
+            await using (NpgsqlCommand readPersonMaintenanceTables =
+                         verificationConnection.CreateCommand())
+            {
+                readPersonMaintenanceTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'person_favorites',
+                          'person_maintenance_actions');
+                    """;
+
+                object? maintenanceTableCount =
+                    await readPersonMaintenanceTables.ExecuteScalarAsync();
+                Assert.Equal(2L, Convert.ToInt64(maintenanceTableCount));
+            }
+
             await using (NpgsqlCommand readColumnTypes =
                          verificationConnection.CreateCommand())
             {
@@ -1190,6 +1208,416 @@ public sealed class PostgresCatalogueDatabaseTests
                     ReviewSuggestionStatuses.Pending,
                     statuses[bulkSuggestionSkippedId]);
             }
+
+            Guid maintenanceFaceId = Guid.NewGuid();
+            await using (NpgsqlCommand seedMaintenanceFace =
+                         verificationConnection.CreateCommand())
+            {
+                seedMaintenanceFace.CommandText =
+                    """
+                    INSERT INTO face_occurrences (
+                        id,
+                        asset_revision_id,
+                        ordinal,
+                        created_at_utc)
+                    VALUES (
+                        @face_id,
+                        @revision_id,
+                        9,
+                        @created_at_utc);
+                    """;
+                seedMaintenanceFace.Parameters.AddWithValue(
+                    "face_id",
+                    maintenanceFaceId);
+                seedMaintenanceFace.Parameters.AddWithValue(
+                    "revision_id",
+                    revisionId);
+                seedMaintenanceFace.Parameters.AddWithValue(
+                    "created_at_utc",
+                    reviewAt.AddMinutes(17));
+                await seedMaintenanceFace.ExecuteNonQueryAsync();
+            }
+
+            ReviewPerson mergeSource =
+                await reviewActions.CreatePersonAsync(
+                    "Merge Source",
+                    reviewAt.AddMinutes(17));
+            FaceOccurrenceId maintenanceFace =
+                FaceOccurrenceId.From(maintenanceFaceId);
+            ReviewAction sourceAssignment =
+                await reviewActions.AssignAsync(
+                    maintenanceFace,
+                    mergeSource.Id,
+                    "maintainer",
+                    reviewAt.AddMinutes(18),
+                    "source assignment before merge");
+
+            long targetDuplicateLabelId;
+            await using (NpgsqlCommand seedTargetDuplicateLabel =
+                         verificationConnection.CreateCommand())
+            {
+                seedTargetDuplicateLabel.CommandText =
+                    """
+                    INSERT INTO person_labels (
+                        person_id,
+                        face_occurrence_id,
+                        label_kind,
+                        assigned_by,
+                        assigned_at_utc,
+                        note)
+                    VALUES (
+                        @target_person_id,
+                        @face_id,
+                        'manual',
+                        'maintainer',
+                        @assigned_at_utc,
+                        'target duplicate label')
+                    RETURNING id;
+                    """;
+                seedTargetDuplicateLabel.Parameters.AddWithValue(
+                    "target_person_id",
+                    Guid.Parse(reviewPerson.Id.ToString()));
+                seedTargetDuplicateLabel.Parameters.AddWithValue(
+                    "face_id",
+                    maintenanceFaceId);
+                seedTargetDuplicateLabel.Parameters.AddWithValue(
+                    "assigned_at_utc",
+                    reviewAt.AddMinutes(18));
+                targetDuplicateLabelId = Convert.ToInt64(
+                    await seedTargetDuplicateLabel.ExecuteScalarAsync());
+            }
+
+            long sourceMergeSuggestionId;
+            long targetMergeSuggestionId;
+            const string maintenanceSuggestionModel = "merge-suggestion";
+            string maintenanceSuggestionHash = new('d', 64);
+            await using (NpgsqlCommand seedMergeSuggestions =
+                         verificationConnection.CreateCommand())
+            {
+                seedMergeSuggestions.CommandText =
+                    """
+                    WITH source_seed AS (
+                        INSERT INTO identity_suggestions (
+                            face_occurrence_id,
+                            suggested_person_id,
+                            model_id,
+                            model_hash,
+                            score,
+                            status,
+                            created_at_utc)
+                        VALUES (
+                            @face_id,
+                            @source_person_id,
+                            @model_id,
+                            @model_hash,
+                            0.80,
+                            'rejected',
+                            @created_at_utc)
+                        RETURNING id
+                    ),
+                    target_seed AS (
+                        INSERT INTO identity_suggestions (
+                            face_occurrence_id,
+                            suggested_person_id,
+                            model_id,
+                            model_hash,
+                            score,
+                            status,
+                            created_at_utc)
+                        VALUES (
+                            @face_id,
+                            @target_person_id,
+                            @model_id,
+                            @model_hash,
+                            0.75,
+                            'pending',
+                            @created_at_utc)
+                        RETURNING id
+                    )
+                    SELECT
+                        (SELECT id FROM source_seed),
+                        (SELECT id FROM target_seed);
+                    """;
+                seedMergeSuggestions.Parameters.AddWithValue(
+                    "face_id",
+                    maintenanceFaceId);
+                seedMergeSuggestions.Parameters.AddWithValue(
+                    "source_person_id",
+                    Guid.Parse(mergeSource.Id.ToString()));
+                seedMergeSuggestions.Parameters.AddWithValue(
+                    "target_person_id",
+                    Guid.Parse(reviewPerson.Id.ToString()));
+                seedMergeSuggestions.Parameters.AddWithValue(
+                    "model_id",
+                    maintenanceSuggestionModel);
+                seedMergeSuggestions.Parameters.AddWithValue(
+                    "model_hash",
+                    maintenanceSuggestionHash);
+                seedMergeSuggestions.Parameters.AddWithValue(
+                    "created_at_utc",
+                    reviewAt.AddMinutes(19));
+
+                await using NpgsqlDataReader mergeSuggestionReader =
+                    await seedMergeSuggestions.ExecuteReaderAsync();
+                Assert.True(await mergeSuggestionReader.ReadAsync());
+                sourceMergeSuggestionId =
+                    mergeSuggestionReader.GetInt64(0);
+                targetMergeSuggestionId =
+                    mergeSuggestionReader.GetInt64(1);
+            }
+
+            await using (NpgsqlCommand seedMergeSuggestionState =
+                         verificationConnection.CreateCommand())
+            {
+                seedMergeSuggestionState.CommandText =
+                    """
+                    INSERT INTO identity_suggestion_rankings (
+                        face_occurrence_id,
+                        model_id,
+                        model_hash,
+                        rank,
+                        suggestion_id,
+                        score_margin,
+                        generated_at_utc)
+                    VALUES (
+                        @face_id,
+                        @model_id,
+                        @model_hash,
+                        1,
+                        @source_suggestion_id,
+                        0.12,
+                        @generated_at_utc);
+
+                    INSERT INTO identity_suggestion_review_actions (
+                        suggestion_id,
+                        action_kind,
+                        review_action_id,
+                        actor,
+                        note,
+                        created_at_utc)
+                    VALUES (
+                        @source_suggestion_id,
+                        'reject',
+                        NULL,
+                        'maintainer',
+                        'source rejection history',
+                        @generated_at_utc);
+
+                    INSERT INTO person_favorites (
+                        person_id,
+                        favorited_at_utc)
+                    VALUES (
+                        @source_person_id,
+                        @generated_at_utc);
+                    """;
+                seedMergeSuggestionState.Parameters.AddWithValue(
+                    "face_id",
+                    maintenanceFaceId);
+                seedMergeSuggestionState.Parameters.AddWithValue(
+                    "model_id",
+                    maintenanceSuggestionModel);
+                seedMergeSuggestionState.Parameters.AddWithValue(
+                    "model_hash",
+                    maintenanceSuggestionHash);
+                seedMergeSuggestionState.Parameters.AddWithValue(
+                    "source_suggestion_id",
+                    sourceMergeSuggestionId);
+                seedMergeSuggestionState.Parameters.AddWithValue(
+                    "source_person_id",
+                    Guid.Parse(mergeSource.Id.ToString()));
+                seedMergeSuggestionState.Parameters.AddWithValue(
+                    "generated_at_utc",
+                    reviewAt.AddMinutes(19));
+                await seedMergeSuggestionState.ExecuteNonQueryAsync();
+            }
+
+            IPersonMaintenanceRepository maintenance =
+                new PostgresPersonMaintenanceRepository(database);
+
+            PersonMaintenanceAction renameAction =
+                await maintenance.RenameAsync(
+                    mergeSource.Id,
+                    "Merge Source Renamed",
+                    "maintainer",
+                    reviewAt.AddMinutes(20),
+                    "rename before merge");
+            Assert.Equal(
+                PersonMaintenanceActionKinds.Rename,
+                renameAction.Kind);
+            Assert.True(renameAction.Reversible);
+            Assert.Equal(
+                "Merge Source",
+                renameAction.PreviousDisplayName);
+            Assert.Equal(
+                "Merge Source Renamed",
+                renameAction.NewDisplayName);
+
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => maintenance.MergeAsync(
+                    mergeSource.Id,
+                    reviewPerson.Id,
+                    confirmIrreversible: false,
+                    "maintainer",
+                    reviewAt.AddMinutes(21)));
+
+            PersonMaintenanceAction mergeAction =
+                await maintenance.MergeAsync(
+                    mergeSource.Id,
+                    reviewPerson.Id,
+                    confirmIrreversible: true,
+                    "maintainer",
+                    reviewAt.AddMinutes(22),
+                    "irreversible merge");
+            Assert.Equal(
+                PersonMaintenanceActionKinds.Merge,
+                mergeAction.Kind);
+            Assert.False(mergeAction.Reversible);
+            Assert.Equal(
+                mergeSource.Id,
+                mergeAction.PersonId);
+            Assert.Equal(
+                reviewPerson.Id,
+                mergeAction.TargetPersonId);
+            Assert.Equal(
+                "Merge Source Renamed",
+                mergeAction.PreviousDisplayName);
+            Assert.Equal(
+                reviewPerson.DisplayName,
+                mergeAction.NewDisplayName);
+
+            IReadOnlyList<PersonMaintenancePerson> activePeople =
+                await maintenance.GetPeopleAsync();
+            Assert.DoesNotContain(
+                activePeople,
+                person => person.Id == mergeSource.Id);
+            Assert.Contains(
+                activePeople,
+                person => person.Id == reviewPerson.Id);
+
+            await using (NpgsqlCommand verifyMergedPerson =
+                         verificationConnection.CreateCommand())
+            {
+                verifyMergedPerson.CommandText =
+                    """
+                    SELECT merged_into_person_id
+                    FROM people
+                    WHERE id = @source_person_id;
+                    """;
+                verifyMergedPerson.Parameters.AddWithValue(
+                    "source_person_id",
+                    Guid.Parse(mergeSource.Id.ToString()));
+                Assert.Equal(
+                    Guid.Parse(reviewPerson.Id.ToString()),
+                    await verifyMergedPerson.ExecuteScalarAsync());
+            }
+
+            ReviewAction mergedAssignment =
+                Assert.Single(
+                    await reviewActions.GetActionsAsync(
+                        maintenanceFace));
+            Assert.Equal(
+                reviewPerson.Id,
+                mergedAssignment.PersonId);
+            Assert.Equal(
+                targetDuplicateLabelId,
+                mergedAssignment.PersonLabelId);
+            Assert.NotEqual(
+                sourceAssignment.PersonLabelId,
+                mergedAssignment.PersonLabelId);
+
+            await using (NpgsqlCommand verifyMergedSuggestion =
+                         verificationConnection.CreateCommand())
+            {
+                verifyMergedSuggestion.CommandText =
+                    """
+                    SELECT
+                        suggestion.status,
+                        ranking.suggestion_id,
+                        (
+                            SELECT COUNT(*)
+                            FROM identity_suggestions
+                            WHERE id = @source_suggestion_id
+                        ),
+                        (
+                            SELECT COUNT(*)
+                            FROM identity_suggestion_review_actions
+                            WHERE suggestion_id = @target_suggestion_id
+                              AND action_kind = 'reject'
+                        )
+                    FROM identity_suggestions AS suggestion
+                    LEFT JOIN identity_suggestion_rankings AS ranking
+                        ON ranking.face_occurrence_id = suggestion.face_occurrence_id
+                       AND ranking.model_id = suggestion.model_id
+                       AND ranking.model_hash = suggestion.model_hash
+                       AND ranking.rank = 1
+                    WHERE suggestion.id = @target_suggestion_id;
+                    """;
+                verifyMergedSuggestion.Parameters.AddWithValue(
+                    "source_suggestion_id",
+                    sourceMergeSuggestionId);
+                verifyMergedSuggestion.Parameters.AddWithValue(
+                    "target_suggestion_id",
+                    targetMergeSuggestionId);
+
+                await using NpgsqlDataReader mergedSuggestionReader =
+                    await verifyMergedSuggestion.ExecuteReaderAsync();
+                Assert.True(await mergedSuggestionReader.ReadAsync());
+                Assert.Equal(
+                    ReviewSuggestionStatuses.Rejected,
+                    mergedSuggestionReader.GetString(0));
+                Assert.Equal(
+                    targetMergeSuggestionId,
+                    mergedSuggestionReader.GetInt64(1));
+                Assert.Equal(
+                    0L,
+                    mergedSuggestionReader.GetInt64(2));
+                Assert.Equal(
+                    1L,
+                    mergedSuggestionReader.GetInt64(3));
+            }
+
+            await using (NpgsqlCommand verifyFavoriteCarryover =
+                         verificationConnection.CreateCommand())
+            {
+                verifyFavoriteCarryover.CommandText =
+                    """
+                    SELECT
+                        EXISTS (
+                            SELECT 1
+                            FROM person_favorites
+                            WHERE person_id = @target_person_id),
+                        EXISTS (
+                            SELECT 1
+                            FROM person_favorites
+                            WHERE person_id = @source_person_id);
+                    """;
+                verifyFavoriteCarryover.Parameters.AddWithValue(
+                    "target_person_id",
+                    Guid.Parse(reviewPerson.Id.ToString()));
+                verifyFavoriteCarryover.Parameters.AddWithValue(
+                    "source_person_id",
+                    Guid.Parse(mergeSource.Id.ToString()));
+
+                await using NpgsqlDataReader favoriteReader =
+                    await verifyFavoriteCarryover.ExecuteReaderAsync();
+                Assert.True(await favoriteReader.ReadAsync());
+                Assert.True(favoriteReader.GetBoolean(0));
+                Assert.False(favoriteReader.GetBoolean(1));
+            }
+
+            PostgresPersonMaintenanceRepository restartedMaintenance =
+                new(database);
+            IReadOnlyList<PersonMaintenanceAction> maintenanceHistory =
+                await restartedMaintenance.GetHistoryAsync();
+            Assert.True(maintenanceHistory.Count >= 2);
+            Assert.Equal(
+                PersonMaintenanceActionKinds.Merge,
+                maintenanceHistory[0].Kind);
+            Assert.False(maintenanceHistory[0].Reversible);
+            Assert.Equal(
+                PersonMaintenanceActionKinds.Rename,
+                maintenanceHistory[1].Kind);
+            Assert.True(maintenanceHistory[1].Reversible);
 
             IArchiveCoverageRepository archiveCoverage =
                 new PostgresArchiveCoverageRepository(database);

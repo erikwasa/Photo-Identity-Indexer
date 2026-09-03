@@ -89,3 +89,26 @@ Started 2026-09-03. Active review: PR #260.
 - Live PostgreSQL verification covers successful two-face assignment, stale-preview conflict after an intervening review, grouped rank-one acceptance, skipped already-reviewed suggestion behavior, canonical assignment history and durable suggestion statuses.
 
 Next WI-0100 persistence layers are person maintenance/audit, suggestion gallery/policy/evidence state and identity regeneration run/target state.
+
+
+### Maintainer verification — bulk review on schema version 12
+
+PR #260 merged on 2026-09-03 at `07dddf3d0120d41859cf5a5816c251135d21159a`; workflow #1497 passed and maintainer `verify-postgres.ps1` verification succeeded.
+
+Bulk face review and grouped rank-one suggestion acceptance are accepted against schema version 12.
+
+## Slice 4 — canonical person maintenance and merge audit
+
+Started 2026-09-03. Active review: PR #261.
+
+- Added provider-neutral `IPersonMaintenanceRepository` plus Core-owned person-maintenance person/action records.
+- `SqlitePersonMaintenanceRepository` implements the neutral contract through compatibility mappings while retaining its existing public API.
+- Added PostgreSQL schema version 13 with `person_favorites` and append-only `person_maintenance_actions`. The favorites table is a narrow prerequisite because person merge must preserve favorite status.
+- Added `PostgresPersonMaintenanceRepository` for active-person listing, maintenance history, audited rename and explicitly confirmed irreversible merge.
+- PostgreSQL rename row-locks the active person, changes the display name and appends a reversible maintenance action in one transaction.
+- PostgreSQL merge deterministically row-locks source/target people, consolidates duplicate/manual labels and canonical review-action references, consolidates suggestions/review history/ranking references using the same accepted > rejected > pending status precedence as SQLite, carries favorite state to the target, marks the source merged and appends the irreversible audit record in one transaction.
+- The maintenance API rename/merge/list/history repository dependency is now provider-neutral. Adjacent favorite/featured-face/smart-collection-visibility helper endpoints remain SQLite-specific and are outside this authoritative maintenance slice.
+- Runtime DI still resolves the neutral maintenance contract to SQLite; no provider switch is introduced.
+- Live PostgreSQL verification covers rename history, explicit irreversible-merge confirmation, duplicate label remapping, review-action person/label transfer, duplicate suggestion consolidation, ranking/history transfer, favorite carryover, merged-person exclusion from active listing and maintenance-history durability after repository recreation.
+
+The richer read-only person audit view, suggestion gallery/policy/evidence state and identity regeneration run/target state remain later WI-0100 slices.

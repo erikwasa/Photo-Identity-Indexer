@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -23,11 +24,11 @@ public static class PersonMaintenanceEndpoints
     }
 
     private static async Task<IResult> GetPeopleAsync(
-        SqlitePersonMaintenanceRepository repository,
+        IPersonMaintenanceRepository repository,
         SqliteCatalogueDatabase database,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<CataloguePersonMaintenancePerson> people =
+        IReadOnlyList<PersonMaintenancePerson> people =
             await repository.GetPeopleAsync(cancellationToken);
         IReadOnlyDictionary<PersonId, int> photoCounts =
             await new SqlitePersonPhotoCountRepository(database).GetActivePhotoCountsAsync(cancellationToken);
@@ -48,13 +49,13 @@ public static class PersonMaintenanceEndpoints
     }
 
     private static async Task<IResult> GetHistoryAsync(
-        SqlitePersonMaintenanceRepository repository,
+        IPersonMaintenanceRepository repository,
         int limit = 100,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            IReadOnlyList<CataloguePersonMaintenanceAction> actions =
+            IReadOnlyList<PersonMaintenanceAction> actions =
                 await repository.GetHistoryAsync(limit, cancellationToken);
             return Results.Ok(actions.Select(ToResponse).ToArray());
         }
@@ -193,7 +194,7 @@ public static class PersonMaintenanceEndpoints
     private static async Task<IResult> RenameAsync(
         string id,
         RenamePersonRequest request,
-        SqlitePersonMaintenanceRepository repository,
+        IPersonMaintenanceRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -204,7 +205,7 @@ public static class PersonMaintenanceEndpoints
 
         try
         {
-            CataloguePersonMaintenanceAction action = await repository.RenameAsync(
+            PersonMaintenanceAction action = await repository.RenameAsync(
                 personId,
                 request.DisplayName,
                 request.Actor,
@@ -230,7 +231,7 @@ public static class PersonMaintenanceEndpoints
     private static async Task<IResult> MergeAsync(
         string id,
         MergePersonRequest request,
-        SqlitePersonMaintenanceRepository repository,
+        IPersonMaintenanceRepository repository,
         SqliteCatalogueDatabase database,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -244,7 +245,7 @@ public static class PersonMaintenanceEndpoints
         try
         {
             await SqlitePersonFeaturedFaceSchema.EnsureAsync(database, cancellationToken);
-            CataloguePersonMaintenanceAction action = await repository.MergeAsync(
+            PersonMaintenanceAction action = await repository.MergeAsync(
                 sourcePersonId,
                 targetPersonId,
                 request.ConfirmIrreversible,
@@ -269,7 +270,7 @@ public static class PersonMaintenanceEndpoints
     }
 
     private static PersonMaintenancePersonResponse ToResponse(
-        CataloguePersonMaintenancePerson person,
+        PersonMaintenancePerson person,
         int photoCount,
         bool isFavorite,
         bool hiddenFromSmartCollections) => new(
@@ -291,7 +292,7 @@ public static class PersonMaintenanceEndpoints
             representative?.IsExplicit ?? false);
 
     private static PersonMaintenanceActionResponse ToResponse(
-        CataloguePersonMaintenanceAction action) => new(
+        PersonMaintenanceAction action) => new(
             action.Id,
             action.Kind,
             action.PersonId.ToString(),

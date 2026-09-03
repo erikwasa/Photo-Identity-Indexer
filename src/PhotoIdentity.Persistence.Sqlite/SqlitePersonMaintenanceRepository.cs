@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -8,7 +9,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Maintains canonical people with append-only audit history.
 /// Renames are reversible by applying another audited rename. Merges are explicitly irreversible.
 /// </summary>
-public sealed class SqlitePersonMaintenanceRepository
+public sealed class SqlitePersonMaintenanceRepository : IPersonMaintenanceRepository
 {
     private const string RenameAction = "rename";
     private const string MergeAction = "merge";
@@ -20,6 +21,55 @@ public sealed class SqlitePersonMaintenanceRepository
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
     }
+
+    async Task<IReadOnlyList<PersonMaintenancePerson>>
+        IPersonMaintenanceRepository.GetPeopleAsync(
+            CancellationToken cancellationToken) =>
+        (await GetPeopleAsync(cancellationToken))
+            .Select(ToCorePerson)
+            .ToArray();
+
+    async Task<IReadOnlyList<PersonMaintenanceAction>>
+        IPersonMaintenanceRepository.GetHistoryAsync(
+            int limit,
+            CancellationToken cancellationToken) =>
+        (await GetHistoryAsync(limit, cancellationToken))
+            .Select(ToCoreAction)
+            .ToArray();
+
+    async Task<PersonMaintenanceAction>
+        IPersonMaintenanceRepository.RenameAsync(
+            PersonId personId,
+            string displayName,
+            string actor,
+            DateTimeOffset createdAtUtc,
+            string? note,
+            CancellationToken cancellationToken) =>
+        ToCoreAction(await RenameAsync(
+            personId,
+            displayName,
+            actor,
+            createdAtUtc,
+            note,
+            cancellationToken));
+
+    async Task<PersonMaintenanceAction>
+        IPersonMaintenanceRepository.MergeAsync(
+            PersonId sourcePersonId,
+            PersonId targetPersonId,
+            bool confirmIrreversible,
+            string actor,
+            DateTimeOffset createdAtUtc,
+            string? note,
+            CancellationToken cancellationToken) =>
+        ToCoreAction(await MergeAsync(
+            sourcePersonId,
+            targetPersonId,
+            confirmIrreversible,
+            actor,
+            createdAtUtc,
+            note,
+            cancellationToken));
 
     public async Task<IReadOnlyList<CataloguePersonMaintenancePerson>> GetPeopleAsync(
         CancellationToken cancellationToken = default)
@@ -538,6 +588,26 @@ public sealed class SqlitePersonMaintenanceRepository
         reader.IsDBNull(7) ? null : reader.GetString(7),
         Parse(reader.GetString(8)),
         reader.GetInt64(9) == 1);
+
+    private static PersonMaintenancePerson ToCorePerson(
+        CataloguePersonMaintenancePerson person) => new(
+        person.Id,
+        person.DisplayName,
+        person.LabelCount,
+        person.SuggestionCount);
+
+    private static PersonMaintenanceAction ToCoreAction(
+        CataloguePersonMaintenanceAction action) => new(
+        action.Id,
+        action.Kind,
+        action.PersonId,
+        action.PreviousDisplayName,
+        action.TargetPersonId,
+        action.NewDisplayName,
+        action.Actor,
+        action.Note,
+        action.CreatedAtUtc,
+        action.Reversible);
 
     private static string MergeStatus(string targetStatus, string sourceStatus)
     {
