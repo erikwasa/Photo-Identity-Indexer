@@ -26,3 +26,19 @@ Implement PostgreSQL-backed review, people, suggestion, policy and identity-matc
 - [ ] Existing IDs/history and accepted/rejected suggestion semantics map losslessly.
 - [ ] Regeneration run state remains durable/resumable; algorithmic scaling is deferred to WI-0103.
 - [ ] Review/audit behavior matches current accepted semantics.
+
+
+## Slice 1 — canonical people and review actions
+
+Started 2026-09-03.
+
+- Added Core-owned `ReviewPerson`, `ReviewAction`, `ReviewActionKinds` and provider-neutral `IReviewActionRepository`.
+- `SqliteReviewRepository` implements the neutral contract through explicit compatibility mappings; its existing SQLite public API remains intact.
+- Added PostgreSQL schema version 11 with `people`, `person_labels`, `review_actions`, base `identity_suggestions` and `identity_suggestion_review_actions`.
+- The suggestion/junction tables are included here only because canonical undo must restore an accepted suggestion to `pending`; ranking, policy, gallery and regeneration persistence remain later WI-0100 slices.
+- Added `PostgresReviewActionRepository` for person creation, manual assignment, Unknown, rejection, undo and append-only history reads.
+- PostgreSQL undo row-locks the latest active review action, reverses it atomically, restores linked accepted suggestions to `pending`, and appends the explicit undo history row.
+- Runtime dependency injection exposes the neutral review-action contract but still resolves it to `SqliteReviewRepository`; endpoints have not switched providers.
+- Extended live PostgreSQL verification to cover person creation, assignment/manual label persistence, accepted-suggestion restoration on undo, Unknown/reject/undo ordering, reversal timestamps and history durability after repository recreation.
+
+This slice does not perform runtime cutover and does not claim bulk review, suggestion workflows, person maintenance or identity regeneration acceptance.
