@@ -297,3 +297,10 @@ Active review: PR #257. This slice adds no schema change.
 The live PostgreSQL verifier now runs archive advancement-control writes, GeoNames attempt-state writes and archive availability writes concurrently against the same isolated catalogue, repeatedly, then asserts deterministic final state through the provider-neutral repositories.
 
 This directly exercises the concurrent-writer condition behind the original SQLite single-writer/table-lock failure class. WI-0099 remains in progress until this final live verifier passes after merge. If it passes, the work item can close and hand normal-runtime SQLite elimination/cutover forward to WI-0101/WI-0102.
+
+
+### Final maintainer acceptance
+
+PR #257 merged on 2026-09-03 at `3431cf8ed3f2dff435d6f7d7a452c219d5c53708`; workflow #1484 passed. The maintainer then reran `verify-postgres.ps1` against merged main and verification succeeded.
+
+WI-0099 is complete. All archive/background-owned persistence surfaces have PostgreSQL implementations, concurrent background-writer acceptance passed, and the prior recovery-write host-shutdown class is contained. SQLite remains the authoritative runtime provider until the later WI-0101/WI-0102 composition and controlled cutover work.
