@@ -65,3 +65,27 @@ Started 2026-09-03. Active review: PR #259.
 - Live PostgreSQL verification covers pending reads, accept → canonical assignment, repeated-decision rejection, suggestion-only rejection and restart persistence.
 
 Bulk suggestion review, suggestion gallery/policy, person maintenance and identity regeneration remain later WI-0100 slices.
+
+
+### Maintainer verification — PostgreSQL schema version 12
+
+PR #259 merged on 2026-09-03 at `679f69929e8b556b0700ab294b5391431b1a3141`; workflow #1494 passed and maintainer `verify-postgres.ps1` verification succeeded.
+
+Schema version 12 and ranked suggestion read/accept/reject persistence are accepted.
+
+## Slice 3 — bulk face and grouped-suggestion review
+
+Started 2026-09-03.
+
+- Added provider-neutral bulk face-review and grouped-suggestion preview/commit contracts plus Core-owned preview/result DTOs.
+- `SqliteBulkReviewRepository` and `SqliteBulkSuggestionReviewRepository` implement the neutral contracts through compatibility mappings; existing public SQLite APIs remain intact.
+- Added `PostgresBulkReviewRepository` and `PostgresBulkSuggestionReviewRepository`. No schema migration is required; the slice uses schema version 12.
+- PostgreSQL preview tokens use the same deterministic payload as SQLite: action/model/person + requested IDs + currently eligible IDs.
+- Bulk commits lock selected face rows, re-read eligibility and recompute the preview token before any write. Stale previews fail closed rather than partially applying.
+- Grouped suggestion commit additionally locks the selected suggestion rows, requires exact rank-one matches for one active person/model revision, and accepts only currently pending suggestions whose faces remain unreviewed.
+- General bulk assignment writes the same manual labels and canonical review actions as single-face review; Unknown/reject remain canonical personless review actions.
+- Grouped suggestion acceptance writes the same manual label, canonical assignment and linked suggestion accept history as single-suggestion acceptance.
+- The bulk HTTP endpoints now depend on neutral contracts, while DI still resolves them to SQLite. Runtime review authority is unchanged.
+- Live PostgreSQL verification covers successful two-face assignment, stale-preview conflict after an intervening review, grouped rank-one acceptance, skipped already-reviewed suggestion behavior, canonical assignment history and durable suggestion statuses.
+
+Next WI-0100 persistence layers are person maintenance/audit, suggestion gallery/policy/evidence state and identity regeneration run/target state.
