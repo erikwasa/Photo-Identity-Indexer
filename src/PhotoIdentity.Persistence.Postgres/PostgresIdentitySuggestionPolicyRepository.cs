@@ -126,8 +126,15 @@ public sealed class PostgresIdentitySuggestionPolicyRepository :
                 "The exact-model identity suggestion policy could not be updated.");
         }
 
+        ReviewIdentitySuggestionPolicy persisted = await ReadAsync(
+            connection,
+            transaction,
+            modelId,
+            modelHash,
+            forUpdate: false,
+            cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return updated;
+        return persisted;
     }
 
     private async Task EnsureDefaultAsync(
