@@ -1,6 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -17,7 +17,7 @@ public static class BulkSuggestionReviewEndpoints
 
     private static async Task<IResult> PreviewAsync(
         BulkSuggestionPreviewRequest request,
-        SqliteBulkSuggestionReviewRepository repository,
+        IBulkSuggestionReviewRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryModelRevision(request.ModelId, request.ModelHash, out ModelId modelId, out Sha256Digest modelHash))
@@ -27,7 +27,7 @@ public static class BulkSuggestionReviewEndpoints
 
         try
         {
-            CatalogueBulkSuggestionPreview preview = await repository.PreviewAsync(
+            BulkSuggestionPreview preview = await repository.PreviewAsync(
                 request.SuggestionIds,
                 modelId,
                 modelHash,
@@ -50,7 +50,7 @@ public static class BulkSuggestionReviewEndpoints
 
     private static async Task<IResult> CommitAsync(
         BulkSuggestionCommitRequest request,
-        SqliteBulkSuggestionReviewRepository repository,
+        IBulkSuggestionReviewRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -66,7 +66,7 @@ public static class BulkSuggestionReviewEndpoints
 
         try
         {
-            CatalogueBulkSuggestionResult result = await repository.CommitAsync(
+            BulkSuggestionResult result = await repository.CommitAsync(
                 request.SuggestionIds,
                 modelId,
                 modelHash,
@@ -92,7 +92,7 @@ public static class BulkSuggestionReviewEndpoints
         }
     }
 
-    private static BulkSuggestionPreviewResponse ToResponse(CatalogueBulkSuggestionPreview preview) => new(
+    private static BulkSuggestionPreviewResponse ToResponse(BulkSuggestionPreview preview) => new(
         preview.RequestedCount,
         preview.AffectedCount,
         preview.SkippedCount,
@@ -101,7 +101,7 @@ public static class BulkSuggestionReviewEndpoints
         preview.ModelId.ToString(),
         preview.ModelHash.ToString());
 
-    private static BulkSuggestionCommitResponse ToResponse(CatalogueBulkSuggestionResult result) => new(
+    private static BulkSuggestionCommitResponse ToResponse(BulkSuggestionResult result) => new(
         result.RequestedCount,
         result.AffectedCount,
         ToResponse(result.Person),
@@ -109,7 +109,7 @@ public static class BulkSuggestionReviewEndpoints
         result.ModelHash.ToString(),
         result.CreatedAtUtc);
 
-    private static ReviewPersonResponse ToResponse(CatalogueReviewPerson person) =>
+    private static ReviewPersonResponse ToResponse(ReviewPerson person) =>
         new(person.Id.ToString(), person.DisplayName);
 
     private static bool TryModelRevision(
