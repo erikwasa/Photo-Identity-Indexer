@@ -1,5 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -16,7 +16,7 @@ public static class BulkReviewEndpoints
 
     private static async Task<IResult> PreviewAsync(
         BulkReviewPreviewRequest request,
-        SqliteBulkReviewRepository repository,
+        IBulkReviewRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryFaceOccurrenceIds(request.FaceIds, out FaceOccurrenceId[] faceOccurrenceIds) ||
@@ -27,7 +27,7 @@ public static class BulkReviewEndpoints
 
         try
         {
-            CatalogueBulkReviewPreview preview = await repository.PreviewAsync(
+            BulkReviewPreview preview = await repository.PreviewAsync(
                 faceOccurrenceIds,
                 request.Action,
                 personId,
@@ -46,7 +46,7 @@ public static class BulkReviewEndpoints
 
     private static async Task<IResult> CommitAsync(
         BulkReviewCommitRequest request,
-        SqliteBulkReviewRepository repository,
+        IBulkReviewRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -63,7 +63,7 @@ public static class BulkReviewEndpoints
 
         try
         {
-            CatalogueBulkReviewResult result = await repository.CommitAsync(
+            BulkReviewResult result = await repository.CommitAsync(
                 faceOccurrenceIds,
                 request.Action,
                 personId,
@@ -89,7 +89,7 @@ public static class BulkReviewEndpoints
         }
     }
 
-    private static BulkReviewPreviewResponse ToResponse(CatalogueBulkReviewPreview preview) => new(
+    private static BulkReviewPreviewResponse ToResponse(BulkReviewPreview preview) => new(
         preview.Action,
         preview.RequestedCount,
         preview.AffectedCount,
@@ -97,14 +97,14 @@ public static class BulkReviewEndpoints
         preview.PreviewToken,
         preview.Person is null ? null : ToResponse(preview.Person));
 
-    private static BulkReviewCommitResponse ToResponse(CatalogueBulkReviewResult result) => new(
+    private static BulkReviewCommitResponse ToResponse(BulkReviewResult result) => new(
         result.Action,
         result.RequestedCount,
         result.AffectedCount,
         result.Person is null ? null : ToResponse(result.Person),
         result.CreatedAtUtc);
 
-    private static ReviewPersonResponse ToResponse(CatalogueReviewPerson person) =>
+    private static ReviewPersonResponse ToResponse(ReviewPerson person) =>
         new(person.Id.ToString(), person.DisplayName);
 
     private static IResult BadRequest(string message) => Results.BadRequest(new { error = message });

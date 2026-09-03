@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 and **WI-0099 are completed**. PR #257/workflow #1484 plus maintainer post-merge verification closed WI-0099. **WI-0100 — Migrate review and identity persistence to PostgreSQL** is active on `agent/WI-0100-postgres-review-suggestions`. PR #258 merged, workflow #1489 passed, and maintainer verification accepted schema version 11. PR #259 is the active slice. It adds schema version 12 for ranked suggestion review decisions while runtime review authority remains SQLite.
+In the separate M24 thread, WI-0098 and **WI-0099 are completed**. PR #257/workflow #1484 plus maintainer post-merge verification closed WI-0099. **WI-0100 — Migrate review and identity persistence to PostgreSQL** is active on `agent/WI-0100-postgres-bulk-review`. PR #259 merged, workflow #1494 passed, and maintainer verification accepted schema version 12. PR #260 is the active slice. It migrates bulk face review and grouped suggestion acceptance to provider-neutral contracts plus PostgreSQL implementations without a schema bump; runtime review authority remains SQLite.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge the WI-0100 ranked-suggestion slice after CI is green, then rerun `verify-postgres.ps1` to accept schema version 12. Continue with bulk suggestion/review, person maintenance/audit, policy/evidence and regeneration persistence without switching runtime authority. WI-0102 remains the only controlled SQLite→PostgreSQL migration/cutover step.
+For the M24 thread, review/merge the WI-0100 bulk-review slice after CI is green, then rerun `verify-postgres.ps1` against schema version 12. Continue with person maintenance/audit, suggestion gallery/policy/evidence and regeneration persistence without switching runtime authority. WI-0102 remains the only controlled SQLite→PostgreSQL migration/cutover step.
 
 ## Relevant files
 

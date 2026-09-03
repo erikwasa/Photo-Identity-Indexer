@@ -4,6 +4,7 @@ using System.Text;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -11,7 +12,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Previews and commits explicit acceptance of one same-person group of rank-one suggestions.
 /// Every accepted suggestion creates both a normal assignment action and a linked suggestion action.
 /// </summary>
-public sealed class SqliteBulkSuggestionReviewRepository
+public sealed class SqliteBulkSuggestionReviewRepository : IBulkSuggestionReviewRepository
 {
     public const int MaximumSuggestionsPerRequest = 200;
 
@@ -25,6 +26,48 @@ public sealed class SqliteBulkSuggestionReviewRepository
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+    }
+
+    async Task<BulkSuggestionPreview>
+        IBulkSuggestionReviewRepository.PreviewAsync(
+            IReadOnlyCollection<long> suggestionIds,
+            ModelId modelId,
+            Sha256Digest modelHash,
+            CancellationToken cancellationToken)
+    {
+        CatalogueBulkSuggestionPreview preview =
+            await PreviewAsync(
+                suggestionIds,
+                modelId,
+                modelHash,
+                cancellationToken);
+        return ToCorePreview(preview);
+    }
+
+    async Task<BulkSuggestionResult>
+        IBulkSuggestionReviewRepository.CommitAsync(
+            IReadOnlyCollection<long> suggestionIds,
+            ModelId modelId,
+            Sha256Digest modelHash,
+            int expectedAffectedCount,
+            string previewToken,
+            string actor,
+            DateTimeOffset createdAtUtc,
+            string? note,
+            CancellationToken cancellationToken)
+    {
+        CatalogueBulkSuggestionResult result =
+            await CommitAsync(
+                suggestionIds,
+                modelId,
+                modelHash,
+                expectedAffectedCount,
+                previewToken,
+                actor,
+                createdAtUtc,
+                note,
+                cancellationToken);
+        return ToCoreResult(result);
     }
 
     public async Task<CatalogueBulkSuggestionPreview> PreviewAsync(
@@ -147,6 +190,29 @@ public sealed class SqliteBulkSuggestionReviewRepository
             modelHash,
             createdAtUtc.ToUniversalTime());
     }
+
+    private static BulkSuggestionPreview ToCorePreview(
+        CatalogueBulkSuggestionPreview preview) => new(
+        preview.RequestedCount,
+        preview.AffectedCount,
+        preview.SkippedCount,
+        preview.PreviewToken,
+        new ReviewPerson(
+            preview.Person.Id,
+            preview.Person.DisplayName),
+        preview.ModelId,
+        preview.ModelHash);
+
+    private static BulkSuggestionResult ToCoreResult(
+        CatalogueBulkSuggestionResult result) => new(
+        result.RequestedCount,
+        result.AffectedCount,
+        new ReviewPerson(
+            result.Person.Id,
+            result.Person.DisplayName),
+        result.ModelId,
+        result.ModelHash,
+        result.CreatedAtUtc);
 
     private static long[] NormalizeSuggestionIds(IReadOnlyCollection<long> suggestionIds)
     {
