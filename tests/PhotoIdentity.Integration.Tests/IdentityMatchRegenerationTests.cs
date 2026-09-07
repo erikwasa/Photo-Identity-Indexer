@@ -99,8 +99,7 @@ public sealed class IdentityMatchRegenerationTests
                     new SqliteIdentitySuggestionPolicyRepository(database, clock)),
                 new SqliteIdentityAutoAssignmentAdapter(
                     new SqliteIdentityAutoAssignmentService(database, clock)),
-                new SqliteIdentityMatchEvidenceVersionAdapter(
-                    new SqliteIdentityMatchEvidenceVersionReader(database)),
+                new SqliteIdentityMatchEvidenceVersionAdapter(database),
                 clock);
 
             Assert.True(await worker.AdvanceOnceAsync());
@@ -170,8 +169,7 @@ public sealed class IdentityMatchRegenerationTests
                 new SqliteIdentitySuggestionPolicyAdapter(policies),
                 new SqliteIdentityAutoAssignmentAdapter(
                     new SqliteIdentityAutoAssignmentService(database, clock)),
-                new SqliteIdentityMatchEvidenceVersionAdapter(
-                    new SqliteIdentityMatchEvidenceVersionReader(database)),
+                new SqliteIdentityMatchEvidenceVersionAdapter(database),
                 clock);
 
             Assert.True(await worker.AdvanceOnceAsync());
