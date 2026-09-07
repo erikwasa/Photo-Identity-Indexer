@@ -1,4 +1,4 @@
-using PhotoIdentity.Core.Review;
+using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
@@ -12,27 +12,21 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
     private static readonly TimeSpan IdleDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan ActiveDelay = TimeSpan.FromMilliseconds(25);
 
-    private readonly IIdentityMatchRegenerationRepository _runs;
-    private readonly IIdentityMatchRegenerationScorer _scorer;
-    private readonly IIdentitySuggestionPolicyRepository _policies;
-    private readonly IIdentityAutoAssignmentService _autoAssignment;
-    private readonly IIdentityMatchEvidenceVersionReader _evidence;
+    private readonly SqliteIdentityMatchRegenerationRepository _runs;
+    private readonly SqliteIdentityMatchRegenerationScorer _scorer;
+    private readonly SqliteIdentitySuggestionPolicyRepository _policies;
+    private readonly SqliteIdentityAutoAssignmentService _autoAssignment;
+    private readonly SqliteIdentityMatchEvidenceVersionReader _evidence;
     private readonly TimeProvider _timeProvider;
 
     public IdentityMatchRegenerationHostedService(
-        IIdentityMatchRegenerationRepository runs,
-        IIdentityMatchRegenerationScorer scorer,
-        IIdentitySuggestionPolicyRepository policies,
-        IIdentityAutoAssignmentService autoAssignment,
-        IIdentityMatchEvidenceVersionReader evidence,
+        SqliteIdentityMatchRegenerationRepository runs,
+        SqliteIdentityMatchRegenerationScorer scorer,
+        SqliteIdentitySuggestionPolicyRepository policies,
+        SqliteIdentityAutoAssignmentService autoAssignment,
+        SqliteIdentityMatchEvidenceVersionReader evidence,
         TimeProvider timeProvider)
     {
-        ArgumentNullException.ThrowIfNull(runs);
-        ArgumentNullException.ThrowIfNull(scorer);
-        ArgumentNullException.ThrowIfNull(policies);
-        ArgumentNullException.ThrowIfNull(autoAssignment);
-        ArgumentNullException.ThrowIfNull(evidence);
-        ArgumentNullException.ThrowIfNull(timeProvider);
         _runs = runs;
         _scorer = scorer;
         _policies = policies;
@@ -61,14 +55,13 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
 
     public async Task<bool> AdvanceOnceAsync(CancellationToken cancellationToken = default)
     {
-        ReviewIdentityMatchRegenerationRun? run =
-            await _runs.GetNextActiveAsync(cancellationToken);
+        CatalogueIdentityMatchRegenerationRun? run = await _runs.GetNextActiveAsync(cancellationToken);
         if (run is null)
         {
             return false;
         }
 
-        ReviewIdentityMatchRegenerationTarget? target = await _runs.ClaimNextTargetAsync(
+        CatalogueIdentityMatchRegenerationTarget? target = await _runs.ClaimNextTargetAsync(
             run.Id,
             _timeProvider.GetUtcNow(),
             cancellationToken);
@@ -105,7 +98,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
             return true;
         }
 
-        ReviewIdentityMatchRegenerationRun? latest = await _runs.GetLatestAsync(
+        CatalogueIdentityMatchRegenerationRun? latest = await _runs.GetLatestAsync(
             run.ModelId,
             run.ModelHash,
             cancellationToken);
@@ -116,6 +109,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
 
         if (!await _runs.EvidenceStillMatchesAsync(latest, cancellationToken))
         {
+            // ClaimNextTargetAsync normally detects this. This check closes the window after the
+            // final target and before automatic assignment/finalization.
             await _runs.MarkFailedAsync(
                 run.Id,
                 "Identity evidence changed after the final target was scored. Start a new regeneration from the current catalogue state.",
@@ -124,7 +119,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
             return true;
         }
 
-        ReviewIdentitySuggestionPolicy policy = await _policies.GetAsync(
+        IdentitySuggestionPolicy policy = await _policies.GetAsync(
             run.ModelId,
             run.ModelHash,
             cancellationToken);
@@ -145,18 +140,18 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 run.ModelHash,
                 run.Id,
                 cancellationToken);
-            ReviewIdentityAutoAssignmentSummary auto = await _autoAssignment.ApplyAsync(
+            IdentityAutoAssignmentSummary auto = await _autoAssignment.ApplyAsync(
                 run.ModelId,
                 run.ModelHash,
                 policy,
                 cancellationToken);
 
-            ReviewIdentityMatchEvidenceVersion currentEvidence = await _evidence.ReadAsync(
+            IdentityMatchEvidenceVersion currentEvidence = await _evidence.ReadAsync(
                 run.ModelId,
                 run.ModelHash,
                 cancellationToken);
-            ReviewIdentityMatchEvidenceVersion expectedEvidence =
-                ReviewIdentityMatchEvidenceVersions.ExpectedAfterAutomaticAssignments(
+            IdentityMatchEvidenceVersion expectedEvidence =
+                SqliteIdentityMatchEvidenceVersionReader.ExpectedAfterAutomaticAssignments(
                     run.EvidenceVersion,
                     auto.AssignedCount);
             if (currentEvidence != expectedEvidence)
