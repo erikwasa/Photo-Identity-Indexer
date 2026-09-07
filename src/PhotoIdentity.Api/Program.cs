@@ -107,10 +107,25 @@ public partial class Program
         builder.Services.AddSingleton<IIdentitySuggestionPolicyRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteIdentitySuggestionPolicyAdapter>());
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationModelRepository>();
+        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationModelAdapter>();
+        builder.Services.AddSingleton<IIdentityMatchRegenerationModelRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteIdentityMatchRegenerationModelAdapter>());
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationRepository>();
+        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationAdapter>();
+        builder.Services.AddSingleton<IIdentityMatchRegenerationRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteIdentityMatchRegenerationAdapter>());
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationScorer>();
+        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationScorerAdapter>();
+        builder.Services.AddSingleton<IIdentityMatchRegenerationScorer>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteIdentityMatchRegenerationScorerAdapter>());
         builder.Services.AddSingleton<SqliteIdentityMatchEvidenceVersionReader>();
+        builder.Services.AddSingleton<SqliteIdentityMatchEvidenceVersionAdapter>();
+        builder.Services.AddSingleton<IIdentityMatchEvidenceVersionReader>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteIdentityMatchEvidenceVersionAdapter>());
         builder.Services.AddSingleton<SqliteIdentityAutoAssignmentService>();
+        builder.Services.AddSingleton<SqliteIdentityAutoAssignmentAdapter>();
+        builder.Services.AddSingleton<IIdentityAutoAssignmentService>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteIdentityAutoAssignmentAdapter>());
         builder.Services.AddSingleton<SqlitePersonAuditRepository>();
         builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
         builder.Services.AddSingleton<IPersonMaintenanceRepository>(serviceProvider =>
