@@ -1,4 +1,4 @@
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Api;
 
@@ -12,19 +12,19 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
     private static readonly TimeSpan IdleDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan ActiveDelay = TimeSpan.FromMilliseconds(25);
 
-    private readonly SqliteIdentityMatchRegenerationRepository _runs;
-    private readonly SqliteIdentityMatchRegenerationScorer _scorer;
-    private readonly SqliteIdentitySuggestionPolicyRepository _policies;
-    private readonly SqliteIdentityAutoAssignmentService _autoAssignment;
-    private readonly SqliteIdentityMatchEvidenceVersionReader _evidence;
+    private readonly IIdentityMatchRegenerationRepository _runs;
+    private readonly IIdentityMatchRegenerationScorer _scorer;
+    private readonly IIdentitySuggestionPolicyRepository _policies;
+    private readonly IIdentityAutoAssignmentService _autoAssignment;
+    private readonly IIdentityMatchEvidenceVersionReader _evidence;
     private readonly TimeProvider _timeProvider;
 
     public IdentityMatchRegenerationHostedService(
-        SqliteIdentityMatchRegenerationRepository runs,
-        SqliteIdentityMatchRegenerationScorer scorer,
-        SqliteIdentitySuggestionPolicyRepository policies,
-        SqliteIdentityAutoAssignmentService autoAssignment,
-        SqliteIdentityMatchEvidenceVersionReader evidence,
+        IIdentityMatchRegenerationRepository runs,
+        IIdentityMatchRegenerationScorer scorer,
+        IIdentitySuggestionPolicyRepository policies,
+        IIdentityAutoAssignmentService autoAssignment,
+        IIdentityMatchEvidenceVersionReader evidence,
         TimeProvider timeProvider)
     {
         _runs = runs;
@@ -55,13 +55,13 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
 
     public async Task<bool> AdvanceOnceAsync(CancellationToken cancellationToken = default)
     {
-        CatalogueIdentityMatchRegenerationRun? run = await _runs.GetNextActiveAsync(cancellationToken);
+        ReviewIdentityMatchRegenerationRun? run = await _runs.GetNextActiveAsync(cancellationToken);
         if (run is null)
         {
             return false;
         }
 
-        CatalogueIdentityMatchRegenerationTarget? target = await _runs.ClaimNextTargetAsync(
+        ReviewIdentityMatchRegenerationTarget? target = await _runs.ClaimNextTargetAsync(
             run.Id,
             _timeProvider.GetUtcNow(),
             cancellationToken);
@@ -98,7 +98,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
             return true;
         }
 
-        CatalogueIdentityMatchRegenerationRun? latest = await _runs.GetLatestAsync(
+        ReviewIdentityMatchRegenerationRun? latest = await _runs.GetLatestAsync(
             run.ModelId,
             run.ModelHash,
             cancellationToken);
@@ -119,7 +119,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
             return true;
         }
 
-        IdentitySuggestionPolicy policy = await _policies.GetAsync(
+        ReviewIdentitySuggestionPolicy policy = await _policies.GetAsync(
             run.ModelId,
             run.ModelHash,
             cancellationToken);
@@ -140,18 +140,18 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 run.ModelHash,
                 run.Id,
                 cancellationToken);
-            IdentityAutoAssignmentSummary auto = await _autoAssignment.ApplyAsync(
+            ReviewIdentityAutoAssignmentSummary auto = await _autoAssignment.ApplyAsync(
                 run.ModelId,
                 run.ModelHash,
                 policy,
                 cancellationToken);
 
-            IdentityMatchEvidenceVersion currentEvidence = await _evidence.ReadAsync(
+            ReviewIdentityMatchEvidenceVersion currentEvidence = await _evidence.ReadAsync(
                 run.ModelId,
                 run.ModelHash,
                 cancellationToken);
-            IdentityMatchEvidenceVersion expectedEvidence =
-                SqliteIdentityMatchEvidenceVersionReader.ExpectedAfterAutomaticAssignments(
+            ReviewIdentityMatchEvidenceVersion expectedEvidence =
+                ReviewIdentityMatchEvidenceVersions.ExpectedAfterAutomaticAssignments(
                     run.EvidenceVersion,
                     auto.AssignedCount);
             if (currentEvidence != expectedEvidence)
