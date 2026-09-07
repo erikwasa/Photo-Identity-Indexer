@@ -984,7 +984,7 @@ public sealed class PostgresIdentityMatchRegenerationRepository :
             updated_at_utc,
             error
         FROM identity_match_regeneration_runs
-        """;
+        """ + "\n";
 
     private static void AddRunIdentityParameters(
         NpgsqlCommand command,
