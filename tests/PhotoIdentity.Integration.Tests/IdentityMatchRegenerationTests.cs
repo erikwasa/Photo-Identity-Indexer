@@ -92,11 +92,15 @@ public sealed class IdentityMatchRegenerationTests
                 clock.GetUtcNow());
 
             IdentityMatchRegenerationHostedService worker = new(
-                repository,
-                new SqliteIdentityMatchRegenerationScorer(database, clock),
-                new SqliteIdentitySuggestionPolicyRepository(database, clock),
-                new SqliteIdentityAutoAssignmentService(database, clock),
-                new SqliteIdentityMatchEvidenceVersionReader(database),
+                new SqliteIdentityMatchRegenerationAdapter(repository),
+                new SqliteIdentityMatchRegenerationScorerAdapter(
+                    new SqliteIdentityMatchRegenerationScorer(database, clock)),
+                new SqliteIdentitySuggestionPolicyAdapter(
+                    new SqliteIdentitySuggestionPolicyRepository(database, clock)),
+                new SqliteIdentityAutoAssignmentAdapter(
+                    new SqliteIdentityAutoAssignmentService(database, clock)),
+                new SqliteIdentityMatchEvidenceVersionAdapter(
+                    new SqliteIdentityMatchEvidenceVersionReader(database)),
                 clock);
 
             Assert.True(await worker.AdvanceOnceAsync());
@@ -160,11 +164,14 @@ public sealed class IdentityMatchRegenerationTests
                 "test:auto-worker",
                 clock.GetUtcNow());
             IdentityMatchRegenerationHostedService worker = new(
-                repository,
-                new SqliteIdentityMatchRegenerationScorer(database, clock),
-                policies,
-                new SqliteIdentityAutoAssignmentService(database, clock),
-                new SqliteIdentityMatchEvidenceVersionReader(database),
+                new SqliteIdentityMatchRegenerationAdapter(repository),
+                new SqliteIdentityMatchRegenerationScorerAdapter(
+                    new SqliteIdentityMatchRegenerationScorer(database, clock)),
+                new SqliteIdentitySuggestionPolicyAdapter(policies),
+                new SqliteIdentityAutoAssignmentAdapter(
+                    new SqliteIdentityAutoAssignmentService(database, clock)),
+                new SqliteIdentityMatchEvidenceVersionAdapter(
+                    new SqliteIdentityMatchEvidenceVersionReader(database)),
                 clock);
 
             Assert.True(await worker.AdvanceOnceAsync());
