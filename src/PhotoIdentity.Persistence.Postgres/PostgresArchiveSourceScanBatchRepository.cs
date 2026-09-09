@@ -1,37 +1,25 @@
 using System.Globalization;
-using Microsoft.Data.Sqlite;
+using Npgsql;
+using NpgsqlTypes;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
 /// Scan-specific persistence path for permanent archive synchronization. The scanner loads
 /// lightweight verification baselines once, decides which local originals actually require
-/// SHA-256 reads, then persists one included-folder batch in a single SQLite transaction.
+/// SHA-256 reads, then persists one included-folder batch in a single PostgreSQL transaction.
 /// </summary>
-public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanPersistence
+public sealed class PostgresArchiveSourceScanBatchRepository : IArchiveSourceScanPersistence
 {
-    async Task<IReadOnlyList<ArchiveSourceObservationPersistenceResult>> IArchiveSourceScanPersistence.RecordBatchAsync(
-        ArchiveCatalogueSource source, IReadOnlyList<ArchiveSourceScanWrite> writes,
-        IReadOnlyDictionary<string, ArchiveSourceScanBaseline> baselines, DateTimeOffset scannedAtUtc,
-        CancellationToken cancellationToken)
-    {
-        IReadOnlyList<ArchiveSourceObservationWriteResult> results = await RecordBatchAsync(
-            new CatalogueSource(source.SourceId, source.Kind, source.RootLocator, source.CreatedAtUtc),
-            writes, baselines, scannedAtUtc, cancellationToken);
-        return results.Select(value => new ArchiveSourceObservationPersistenceResult(value.AssetId, value.RevisionId,
-            value.NewRevision, (ArchiveSourceObservationVerificationState)value.VerificationState)).ToArray();
-    }
-    private readonly SqliteCatalogueDatabase _database;
-    private readonly SqliteArchiveSourceObservationRepository _observations;
+    private readonly PostgresCatalogueDatabase _database;
 
-    public SqliteArchiveSourceScanBatchRepository(SqliteCatalogueDatabase database)
+    public PostgresArchiveSourceScanBatchRepository(PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
-        _observations = new SqliteArchiveSourceObservationRepository(database);
     }
 
     public async Task<IReadOnlyDictionary<string, ArchiveSourceScanBaseline>> GetBaselinesAsync(
@@ -39,10 +27,16 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
         string? relativeRoot,
         CancellationToken cancellationToken = default)
     {
-        await _observations.EnsureSchemaAsync(cancellationToken);
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        return await ReadBaselinesAsync(connection, sourceId, relativeRoot, cancellationToken);
+    }
+
+    private static async Task<IReadOnlyDictionary<string, ArchiveSourceScanBaseline>> ReadBaselinesAsync(
+        NpgsqlConnection connection, SourceId sourceId, string? relativeRoot, CancellationToken cancellationToken,
+        string[]? keys = null)
+    {
         string scope = ArchiveCoverage.NormalizeRelativeFolder(relativeRoot ?? string.Empty);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = scope.Length == 0
             ? """
               SELECT
@@ -60,10 +54,10 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
                       WHERE revision.asset_id = asset.id
                       ORDER BY revision.observed_at_utc DESC, revision.id DESC
                       LIMIT 1
-                  ) AS latest_revision_id
+                  ) AS latest_revision_id, observation.verified_last_write_ticks
               FROM assets AS asset
               LEFT JOIN archive_source_observations AS observation ON observation.asset_id = asset.id
-              WHERE asset.source_id = $source_id;
+              WHERE asset.source_id = @source_id;
               """
             : """
               SELECT
@@ -81,42 +75,47 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
                       WHERE revision.asset_id = asset.id
                       ORDER BY revision.observed_at_utc DESC, revision.id DESC
                       LIMIT 1
-                  ) AS latest_revision_id
+                  ) AS latest_revision_id, observation.verified_last_write_ticks
               FROM assets AS asset
               LEFT JOIN archive_source_observations AS observation ON observation.asset_id = asset.id
-              WHERE asset.source_id = $source_id
-                AND substr(asset.source_key, 1, length($scope_prefix)) = $scope_prefix;
+              WHERE asset.source_id = @source_id
+                AND substr(asset.source_key, 1, length(@scope_prefix)) = @scope_prefix;
               """;
-        command.Parameters.AddWithValue("$source_id", sourceId.ToString());
+        if (keys is not null)
+        {
+            command.CommandText = command.CommandText.TrimEnd().TrimEnd(';') + " AND asset.source_key = ANY(@keys);";
+            command.Parameters.AddWithValue("keys", NpgsqlDbType.Array | NpgsqlDbType.Text, keys);
+        }
+        command.Parameters.AddWithValue("@source_id", Guid.Parse(sourceId.ToString()));
         if (scope.Length > 0)
         {
-            command.Parameters.AddWithValue("$scope_prefix", scope + "/");
+            command.Parameters.AddWithValue("@scope_prefix", scope + "/");
         }
 
         Dictionary<string, ArchiveSourceScanBaseline> baselines = new(StringComparer.Ordinal);
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
             string sourceKey = reader.GetString(0);
             baselines[sourceKey] = new ArchiveSourceScanBaseline(
                 sourceKey,
-                reader.GetInt64(1) != 0,
+                reader.GetInt32(1) != 0,
                 reader.IsDBNull(2)
                     ? null
-                    : (ArchiveSourceObservationVerificationState)SqliteArchiveSourceObservationRepository.ParseVerificationState(reader.GetString(2)),
-                reader.IsDBNull(3) ? null : AssetRevisionId.From(Guid.Parse(reader.GetString(3))),
+                    : (ArchiveSourceObservationVerificationState)ParseVerificationState(reader.GetString(2)),
+                reader.IsDBNull(3) ? null : AssetRevisionId.From(reader.GetGuid(3)),
                 reader.IsDBNull(4) ? null : reader.GetInt64(4),
-                reader.IsDBNull(5) ? null : Parse(reader.GetString(5)),
+                reader.IsDBNull(5) ? null : reader.IsDBNull(9) ? reader.GetFieldValue<DateTimeOffset>(5) : new DateTimeOffset(reader.GetInt64(9), TimeSpan.Zero),
                 reader.IsDBNull(6) ? null : reader.GetString(6),
-                reader.IsDBNull(7) ? null : Parse(reader.GetString(7)),
-                reader.IsDBNull(8) ? null : AssetRevisionId.From(Guid.Parse(reader.GetString(8))));
+                reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7),
+                reader.IsDBNull(8) ? null : AssetRevisionId.From(reader.GetGuid(8)));
         }
 
         return baselines;
     }
 
-    public async Task<IReadOnlyList<ArchiveSourceObservationWriteResult>> RecordBatchAsync(
-        CatalogueSource source,
+    public async Task<IReadOnlyList<ArchiveSourceObservationPersistenceResult>> RecordBatchAsync(
+        ArchiveCatalogueSource source,
         IReadOnlyList<ArchiveSourceScanWrite> writes,
         IReadOnlyDictionary<string, ArchiveSourceScanBaseline> baselines,
         DateTimeOffset scannedAtUtc,
@@ -130,13 +129,15 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
             return [];
         }
 
-        await _observations.EnsureSchemaAsync(cancellationToken);
         DateTimeOffset scannedAt = scannedAtUtc.ToUniversalTime();
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteTransaction transaction = connection.BeginTransaction();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
         await UpsertSourceAsync(connection, transaction, source, cancellationToken);
+        // Refresh baselines inside the write snapshot; concurrent verification cannot be silently overwritten.
+        baselines = await ReadBaselinesAsync(connection, source.SourceId, null, cancellationToken,
+            writes.Select(write => write.SourceAsset.Reference.ItemKey).Distinct(StringComparer.Ordinal).ToArray());
 
-        List<ArchiveSourceObservationWriteResult> results = new(writes.Count);
+        List<ArchiveSourceObservationPersistenceResult> results = new(writes.Count);
         foreach (ArchiveSourceScanWrite write in writes)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -160,7 +161,7 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
             baselines.TryGetValue(sourceAsset.Reference.ItemKey, out ArchiveSourceScanBaseline? baseline);
             bool newRevision = false;
             AssetRevisionId? revisionId = null;
-            ArchiveSourceVerificationState verificationState;
+            ArchiveSourceObservationVerificationState verificationState;
             AssetRevisionId? verifiedRevisionId = baseline?.VerifiedRevisionId ?? baseline?.LatestRevisionId;
             long? verifiedSize = baseline?.VerifiedSizeBytes;
             DateTimeOffset? verifiedWrite = baseline?.VerifiedLastWriteTimeUtc;
@@ -178,7 +179,7 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
                     sourceAsset.MediaType,
                     scannedAt,
                     cancellationToken);
-                verificationState = ArchiveSourceVerificationState.Verified;
+                verificationState = ArchiveSourceObservationVerificationState.Verified;
                 verifiedRevisionId = revisionId;
                 verifiedSize = sourceAsset.SizeBytes;
                 verifiedWrite = observedWrite;
@@ -187,11 +188,11 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
             }
             else if (baseline?.WasDeleted == true && baseline.LatestRevisionId is not null)
             {
-                verificationState = ArchiveSourceVerificationState.NeedsSourceVerification;
+                verificationState = ArchiveSourceObservationVerificationState.NeedsSourceVerification;
             }
             else if (baseline?.VerificationState == ArchiveSourceObservationVerificationState.NeedsSourceVerification)
             {
-                verificationState = ArchiveSourceVerificationState.NeedsSourceVerification;
+                verificationState = ArchiveSourceObservationVerificationState.NeedsSourceVerification;
             }
             else if (baseline is not null &&
                 baseline.VerifiedRevisionId is not null &&
@@ -203,16 +204,16 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
                     baselineWrite == observedWrite &&
                     string.Equals(baselineMedia, sourceAsset.MediaType, StringComparison.Ordinal);
                 verificationState = metadataMatches
-                    ? ArchiveSourceVerificationState.Verified
-                    : ArchiveSourceVerificationState.NeedsSourceVerification;
+                    ? ArchiveSourceObservationVerificationState.Verified
+                    : ArchiveSourceObservationVerificationState.NeedsSourceVerification;
             }
             else if (baseline?.LatestRevisionId is not null)
             {
-                verificationState = ArchiveSourceVerificationState.NeedsSourceVerification;
+                verificationState = ArchiveSourceObservationVerificationState.NeedsSourceVerification;
             }
             else
             {
-                verificationState = ArchiveSourceVerificationState.Unverified;
+                verificationState = ArchiveSourceObservationVerificationState.Unverified;
             }
 
             await UpsertObservationAsync(
@@ -231,95 +232,95 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
                 verifiedAt,
                 cancellationToken);
 
-            results.Add(new ArchiveSourceObservationWriteResult(
+            results.Add(new ArchiveSourceObservationPersistenceResult(
                 assetId,
                 revisionId ?? verifiedRevisionId,
                 newRevision,
                 verificationState));
         }
 
-        transaction.Commit();
+        await transaction.CommitAsync(cancellationToken);
         return results;
     }
 
     private static async Task UpsertSourceAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        CatalogueSource source,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ArchiveCatalogueSource source,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
-            VALUES ($id, $kind, $root_locator, $created_at_utc)
+            VALUES (@id, @kind, @root_locator, @created_at_utc)
             ON CONFLICT(id) DO UPDATE SET
                 kind = excluded.kind,
                 root_locator = excluded.root_locator;
             """;
-        command.Parameters.AddWithValue("$id", source.Id.ToString());
-        command.Parameters.AddWithValue("$kind", source.Kind);
-        command.Parameters.AddWithValue("$root_locator", source.RootLocator);
-        command.Parameters.AddWithValue("$created_at_utc", Format(source.CreatedAtUtc));
+        command.Parameters.AddWithValue("@id", Guid.Parse(source.SourceId.ToString()));
+        command.Parameters.AddWithValue("@kind", source.Kind);
+        command.Parameters.AddWithValue("@root_locator", source.RootLocator);
+        command.Parameters.AddWithValue("@created_at_utc", Format(source.CreatedAtUtc));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<AssetId> UpsertAssetAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
-        CatalogueSource source,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ArchiveCatalogueSource source,
         string sourceKey,
         DateTimeOffset observedAtUtc,
         CancellationToken cancellationToken)
     {
         AssetId proposed = AssetId.New();
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO assets (id, source_id, source_key, created_at_utc, last_seen_at_utc, deleted_at_utc)
-            VALUES ($id, $source_id, $source_key, $created_at_utc, $last_seen_at_utc, NULL)
+            VALUES (@id, @source_id, @source_key, @created_at_utc, @last_seen_at_utc, NULL)
             ON CONFLICT(source_id, source_key) DO UPDATE SET
                 last_seen_at_utc = excluded.last_seen_at_utc,
                 deleted_at_utc = NULL
             RETURNING id;
             """;
-        command.Parameters.AddWithValue("$id", proposed.ToString());
-        command.Parameters.AddWithValue("$source_id", source.Id.ToString());
-        command.Parameters.AddWithValue("$source_key", sourceKey);
-        command.Parameters.AddWithValue("$created_at_utc", Format(observedAtUtc));
-        command.Parameters.AddWithValue("$last_seen_at_utc", Format(observedAtUtc));
+        command.Parameters.AddWithValue("@id", Guid.Parse(proposed.ToString()));
+        command.Parameters.AddWithValue("@source_id", Guid.Parse(source.SourceId.ToString()));
+        command.Parameters.AddWithValue("@source_key", sourceKey);
+        command.Parameters.AddWithValue("@created_at_utc", Format(observedAtUtc));
+        command.Parameters.AddWithValue("@last_seen_at_utc", Format(observedAtUtc));
         object? value = await command.ExecuteScalarAsync(cancellationToken);
-        return value is string id
-            ? AssetId.From(Guid.Parse(id))
+        return value is Guid id
+            ? AssetId.From(id)
             : throw new InvalidOperationException("Archive asset was unavailable after batched persistence.");
     }
 
     private static async Task UpsertAvailabilityAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
         AssetId assetId,
         AssetAvailability availability,
         DateTimeOffset checkedAtUtc,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO archive_asset_availability (asset_id, availability, checked_at_utc)
-            VALUES ($asset_id, $availability, $checked_at_utc)
+            VALUES (@asset_id, @availability, @checked_at_utc)
             ON CONFLICT(asset_id) DO UPDATE SET
                 availability = excluded.availability,
                 checked_at_utc = excluded.checked_at_utc;
             """;
-        command.Parameters.AddWithValue("$asset_id", assetId.ToString());
-        command.Parameters.AddWithValue("$availability", SqliteArchiveAvailabilityRepository.ToStorageValue(availability));
-        command.Parameters.AddWithValue("$checked_at_utc", Format(checkedAtUtc));
+        command.Parameters.AddWithValue("@asset_id", Guid.Parse(assetId.ToString()));
+        command.Parameters.AddWithValue("@availability", ToStorageValue(availability));
+        command.Parameters.AddWithValue("@checked_at_utc", Format(checkedAtUtc));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<(AssetRevisionId RevisionId, bool NewRevision)> UpsertRevisionAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
         AssetId assetId,
         Sha256Digest contentHash,
         long sizeBytes,
@@ -328,53 +329,53 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
         CancellationToken cancellationToken)
     {
         AssetRevisionId proposed = AssetRevisionId.New();
-        using (SqliteCommand command = connection.CreateCommand())
+        using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;
             command.CommandText = """
                 INSERT INTO asset_revisions (
                     id, asset_id, content_sha256, size_bytes, observed_at_utc, media_type, width, height)
                 VALUES (
-                    $id, $asset_id, $content_sha256, $size_bytes, $observed_at_utc, $media_type, NULL, NULL)
+                    @id, @asset_id, @content_sha256, @size_bytes, @observed_at_utc, @media_type, NULL, NULL)
                 ON CONFLICT(asset_id, content_sha256) DO UPDATE SET
                     size_bytes = excluded.size_bytes,
                     observed_at_utc = excluded.observed_at_utc,
                     media_type = excluded.media_type;
                 """;
-            command.Parameters.AddWithValue("$id", proposed.ToString());
-            command.Parameters.AddWithValue("$asset_id", assetId.ToString());
-            command.Parameters.AddWithValue("$content_sha256", contentHash.ToString());
-            command.Parameters.AddWithValue("$size_bytes", sizeBytes);
-            command.Parameters.AddWithValue("$observed_at_utc", Format(observedAtUtc));
-            command.Parameters.AddWithValue("$media_type", mediaType);
+            command.Parameters.AddWithValue("@id", Guid.Parse(proposed.ToString()));
+            command.Parameters.AddWithValue("@asset_id", Guid.Parse(assetId.ToString()));
+            command.Parameters.AddWithValue("@content_sha256", contentHash.ToString());
+            command.Parameters.AddWithValue("@size_bytes", sizeBytes);
+            command.Parameters.AddWithValue("@observed_at_utc", Format(observedAtUtc));
+            command.Parameters.AddWithValue("@media_type", mediaType);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        using SqliteCommand read = connection.CreateCommand();
+        using NpgsqlCommand read = connection.CreateCommand();
         read.Transaction = transaction;
         read.CommandText = """
             SELECT id
             FROM asset_revisions
-            WHERE asset_id = $asset_id AND content_sha256 = $content_sha256;
+            WHERE asset_id = @asset_id AND content_sha256 = @content_sha256;
             """;
-        read.Parameters.AddWithValue("$asset_id", assetId.ToString());
-        read.Parameters.AddWithValue("$content_sha256", contentHash.ToString());
+        read.Parameters.AddWithValue("@asset_id", Guid.Parse(assetId.ToString()));
+        read.Parameters.AddWithValue("@content_sha256", contentHash.ToString());
         object? value = await read.ExecuteScalarAsync(cancellationToken);
-        AssetRevisionId revisionId = value is string id
-            ? AssetRevisionId.From(Guid.Parse(id))
+        AssetRevisionId revisionId = value is Guid id
+            ? AssetRevisionId.From(id)
             : throw new InvalidOperationException("Archive revision was unavailable after verification.");
         return (revisionId, revisionId == proposed);
     }
 
     private static async Task UpsertObservationAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
         AssetId assetId,
         long observedSize,
         DateTimeOffset observedWrite,
         string observedMedia,
         DateTimeOffset observedAt,
-        ArchiveSourceVerificationState verificationState,
+        ArchiveSourceObservationVerificationState verificationState,
         AssetRevisionId? verifiedRevisionId,
         long? verifiedSize,
         DateTimeOffset? verifiedWrite,
@@ -382,7 +383,7 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
         DateTimeOffset? verifiedAt,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             INSERT INTO archive_source_observations (
@@ -396,19 +397,19 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
                 verified_size_bytes,
                 verified_last_write_utc,
                 verified_media_type,
-                verified_at_utc)
+                verified_at_utc, observed_last_write_ticks, verified_last_write_ticks)
             VALUES (
-                $asset_id,
-                $observed_size_bytes,
-                $observed_last_write_utc,
-                $observed_media_type,
-                $observed_at_utc,
-                $verification_state,
-                $verified_revision_id,
-                $verified_size_bytes,
-                $verified_last_write_utc,
-                $verified_media_type,
-                $verified_at_utc)
+                @asset_id,
+                @observed_size_bytes,
+                @observed_last_write_utc,
+                @observed_media_type,
+                @observed_at_utc,
+                @verification_state,
+                @verified_revision_id,
+                @verified_size_bytes,
+                @verified_last_write_utc,
+                @verified_media_type,
+                @verified_at_utc, @observed_last_write_ticks, @verified_last_write_ticks)
             ON CONFLICT(asset_id) DO UPDATE SET
                 observed_size_bytes = excluded.observed_size_bytes,
                 observed_last_write_utc = excluded.observed_last_write_utc,
@@ -419,19 +420,23 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
                 verified_size_bytes = excluded.verified_size_bytes,
                 verified_last_write_utc = excluded.verified_last_write_utc,
                 verified_media_type = excluded.verified_media_type,
-                verified_at_utc = excluded.verified_at_utc;
+                verified_at_utc = excluded.verified_at_utc,
+                observed_last_write_ticks = excluded.observed_last_write_ticks,
+                verified_last_write_ticks = excluded.verified_last_write_ticks;
             """;
-        command.Parameters.AddWithValue("$asset_id", assetId.ToString());
-        command.Parameters.AddWithValue("$observed_size_bytes", observedSize);
-        command.Parameters.AddWithValue("$observed_last_write_utc", Format(observedWrite));
-        command.Parameters.AddWithValue("$observed_media_type", observedMedia);
-        command.Parameters.AddWithValue("$observed_at_utc", Format(observedAt));
-        command.Parameters.AddWithValue("$verification_state", SqliteArchiveSourceObservationRepository.ToStorageValue(verificationState));
-        command.Parameters.AddWithValue("$verified_revision_id", (object?)verifiedRevisionId?.ToString() ?? DBNull.Value);
-        command.Parameters.AddWithValue("$verified_size_bytes", (object?)verifiedSize ?? DBNull.Value);
-        command.Parameters.AddWithValue("$verified_last_write_utc", (object?)(verifiedWrite is null ? null : Format(verifiedWrite.Value)) ?? DBNull.Value);
-        command.Parameters.AddWithValue("$verified_media_type", (object?)verifiedMedia ?? DBNull.Value);
-        command.Parameters.AddWithValue("$verified_at_utc", (object?)(verifiedAt is null ? null : Format(verifiedAt.Value)) ?? DBNull.Value);
+        command.Parameters.AddWithValue("@asset_id", Guid.Parse(assetId.ToString()));
+        command.Parameters.AddWithValue("@observed_size_bytes", observedSize);
+        command.Parameters.AddWithValue("@observed_last_write_utc", Format(observedWrite));
+        command.Parameters.AddWithValue("@observed_media_type", observedMedia);
+        command.Parameters.AddWithValue("@observed_at_utc", Format(observedAt));
+        command.Parameters.AddWithValue("@verification_state", ToStorageValue(verificationState));
+        command.Parameters.AddWithValue("@verified_revision_id", NpgsqlDbType.Uuid, verifiedRevisionId is AssetRevisionId revision ? Guid.Parse(revision.ToString()) : DBNull.Value);
+        command.Parameters.AddWithValue("@verified_size_bytes", NpgsqlDbType.Bigint, (object?)verifiedSize ?? DBNull.Value);
+        command.Parameters.AddWithValue("@verified_last_write_utc", NpgsqlDbType.TimestampTz, (object?)(verifiedWrite is null ? null : Format(verifiedWrite.Value)) ?? DBNull.Value);
+        command.Parameters.AddWithValue("@verified_media_type", NpgsqlDbType.Text, (object?)verifiedMedia ?? DBNull.Value);
+        command.Parameters.AddWithValue("@verified_at_utc", NpgsqlDbType.TimestampTz, (object?)(verifiedAt is null ? null : Format(verifiedAt.Value)) ?? DBNull.Value);
+        command.Parameters.AddWithValue("observed_last_write_ticks", observedWrite.UtcTicks);
+        command.Parameters.AddWithValue("verified_last_write_ticks", NpgsqlTypes.NpgsqlDbType.Bigint, (object?)verifiedWrite?.UtcTicks ?? DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -442,41 +447,64 @@ public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanP
         CancellationToken cancellationToken)
     {
         string scope = ArchiveCoverage.NormalizeRelativeFolder(relativeRoot ?? string.Empty);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteTransaction transaction = connection.BeginTransaction();
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = scope.Length == 0
             ? """
               UPDATE assets
-              SET deleted_at_utc = COALESCE(deleted_at_utc, $scanned_at_utc)
-              WHERE source_id = $source_id
-                AND (last_seen_at_utc IS NULL OR last_seen_at_utc <> $scanned_at_utc)
+              SET deleted_at_utc = COALESCE(deleted_at_utc, @scanned_at_utc)
+              WHERE source_id = @source_id
+                AND (last_seen_at_utc IS NULL OR last_seen_at_utc <> @scanned_at_utc)
                 AND deleted_at_utc IS NULL;
               """
             : """
               UPDATE assets
-              SET deleted_at_utc = COALESCE(deleted_at_utc, $scanned_at_utc)
-              WHERE source_id = $source_id
-                AND substr(source_key, 1, length($scope_prefix)) = $scope_prefix
-                AND (last_seen_at_utc IS NULL OR last_seen_at_utc <> $scanned_at_utc)
+              SET deleted_at_utc = COALESCE(deleted_at_utc, @scanned_at_utc)
+              WHERE source_id = @source_id
+                AND substr(source_key, 1, length(@scope_prefix)) = @scope_prefix
+                AND (last_seen_at_utc IS NULL OR last_seen_at_utc <> @scanned_at_utc)
                 AND deleted_at_utc IS NULL;
               """;
-        command.Parameters.AddWithValue("$source_id", sourceId.ToString());
-        command.Parameters.AddWithValue("$scanned_at_utc", Format(scannedAtUtc));
+        command.Parameters.AddWithValue("@source_id", Guid.Parse(sourceId.ToString()));
+        command.Parameters.AddWithValue("@scanned_at_utc", Format(scannedAtUtc));
         if (scope.Length > 0)
         {
-            command.Parameters.AddWithValue("$scope_prefix", scope + "/");
+            command.Parameters.AddWithValue("@scope_prefix", scope + "/");
         }
 
         int updated = await command.ExecuteNonQueryAsync(cancellationToken);
-        transaction.Commit();
+        await transaction.CommitAsync(cancellationToken);
         return updated;
     }
 
-    private static string Format(DateTimeOffset value) =>
-        value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+    private static DateTimeOffset Format(DateTimeOffset value) => value.ToUniversalTime();
 
-    private static DateTimeOffset Parse(string value) =>
-        DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+
+    private static ArchiveSourceObservationVerificationState ParseVerificationState(string value) => value switch
+    {
+        "verified" => ArchiveSourceObservationVerificationState.Verified,
+        "needs-source-verification" => ArchiveSourceObservationVerificationState.NeedsSourceVerification,
+        "unverified" => ArchiveSourceObservationVerificationState.Unverified,
+        _ => throw new InvalidDataException("Unknown source verification state."),
+    };
+
+    private static string ToStorageValue(ArchiveSourceObservationVerificationState value) => value switch
+    {
+        ArchiveSourceObservationVerificationState.Verified => "verified",
+        ArchiveSourceObservationVerificationState.NeedsSourceVerification => "needs-source-verification",
+        ArchiveSourceObservationVerificationState.Unverified => "unverified",
+        _ => throw new ArgumentOutOfRangeException(nameof(value)),
+    };
+
+    private static string ToStorageValue(AssetAvailability value) => value switch
+    {
+        AssetAvailability.Local => "local",
+        AssetAvailability.OnlineOnly => "online-only",
+        AssetAvailability.Downloading => "downloading",
+        AssetAvailability.Unavailable => "unavailable",
+        AssetAvailability.Error => "error",
+        _ => throw new ArgumentOutOfRangeException(nameof(value)),
+    };
 }

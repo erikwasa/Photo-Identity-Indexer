@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 22;
+    public const int CurrentSchemaVersion = 23;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1090,6 +1090,11 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
             """),
         new(21, "detector-rollout-reconciliation", DetectorRolloutSchema),
         new(22, "face-review-derivatives", FaceReviewSchema),
+        new(23, "archive-source-file-timestamp-precision", """
+            ALTER TABLE archive_source_observations
+                ADD COLUMN observed_last_write_ticks bigint NULL CHECK (observed_last_write_ticks BETWEEN 0 AND 3155378975999999999),
+                ADD COLUMN verified_last_write_ticks bigint NULL CHECK (verified_last_write_ticks BETWEEN 0 AND 3155378975999999999);
+            """),
     ];
 
     private readonly NpgsqlDataSource _dataSource;

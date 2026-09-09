@@ -63,7 +63,8 @@ public sealed class PostgresFaceReviewDerivativeRepositoryTests
             {
                 previousSchema.CommandText = """
                     DROP TABLE face_review_derivatives, asset_revision_face_review_completions;
-                    DELETE FROM photo_identity_schema_migrations WHERE version = 22;
+                    ALTER TABLE archive_source_observations DROP COLUMN observed_last_write_ticks, DROP COLUMN verified_last_write_ticks;
+                    DELETE FROM photo_identity_schema_migrations WHERE version >= 22;
                     """;
                 await previousSchema.ExecuteNonQueryAsync();
             }
