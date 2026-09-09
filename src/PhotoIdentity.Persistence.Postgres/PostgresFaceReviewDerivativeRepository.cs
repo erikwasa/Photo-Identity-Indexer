@@ -1,62 +1,25 @@
 using PhotoIdentity.Core.Imaging;
-using System.Globalization;
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
+using Npgsql;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
 /// Persists durable high-resolution contextual face-review derivatives independently from the
 /// recognition crop and records revision-level completion so already-analyzed photos can be
 /// backfilled without rerunning detector/embedder inference.
 /// </summary>
-public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivativeRepository
+public sealed class PostgresFaceReviewDerivativeRepository : IFaceReviewDerivativeRepository
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly PostgresCatalogueDatabase _database;
 
-    public SqliteFaceReviewDerivativeRepository(SqliteCatalogueDatabase database)
+    public PostgresFaceReviewDerivativeRepository(PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
-    }
-
-    public async Task EnsureSchemaAsync(CancellationToken cancellationToken = default)
-    {
-        await _database.InitializeAsync(cancellationToken);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            CREATE TABLE IF NOT EXISTS face_review_derivatives (
-                face_occurrence_id TEXT NOT NULL,
-                profile_id TEXT NOT NULL,
-                encoded_byte_length INTEGER NOT NULL CHECK (encoded_byte_length > 0),
-                content_sha256 TEXT NOT NULL,
-                width INTEGER NOT NULL CHECK (width > 0),
-                height INTEGER NOT NULL CHECK (height > 0),
-                generated_at_utc TEXT NOT NULL,
-                relative_path TEXT NOT NULL,
-                PRIMARY KEY (face_occurrence_id, profile_id),
-                UNIQUE (relative_path),
-                FOREIGN KEY (face_occurrence_id) REFERENCES face_occurrences (id) ON DELETE CASCADE
-            );
-
-            CREATE TABLE IF NOT EXISTS asset_revision_face_review_completions (
-                asset_revision_id TEXT NOT NULL,
-                profile_id TEXT NOT NULL,
-                completed_at_utc TEXT NOT NULL,
-                PRIMARY KEY (asset_revision_id, profile_id),
-                FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE
-            );
-
-            CREATE INDEX IF NOT EXISTS ix_face_review_derivatives_profile
-                ON face_review_derivatives (profile_id, face_occurrence_id);
-            CREATE INDEX IF NOT EXISTS ix_face_review_completions_profile
-                ON asset_revision_face_review_completions (profile_id, asset_revision_id);
-            """;
-        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     public async Task<FaceReviewDerivativeRecord?> GetAsync(
@@ -65,20 +28,19 @@ public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivative
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
-        await EnsureSchemaAsync(cancellationToken);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT face_occurrence_id, profile_id, encoded_byte_length, content_sha256,
                    width, height, generated_at_utc, relative_path
             FROM face_review_derivatives
-            WHERE face_occurrence_id = $face_occurrence_id
-              AND profile_id = $profile_id;
+            WHERE face_occurrence_id = @face_occurrence_id
+              AND profile_id = @profile_id;
             """;
-        command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
-        command.Parameters.AddWithValue("$profile_id", profileId.Trim());
+        command.Parameters.AddWithValue("@face_occurrence_id", Guid.Parse(faceOccurrenceId.ToString()));
+        command.Parameters.AddWithValue("@profile_id", profileId.Trim());
 
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
             ? ReadDerivative(reader)
             : null;
@@ -90,18 +52,17 @@ public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivative
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
-        await EnsureSchemaAsync(cancellationToken);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT 1
             FROM asset_revision_face_review_completions
-            WHERE asset_revision_id = $asset_revision_id
-              AND profile_id = $profile_id
+            WHERE asset_revision_id = @asset_revision_id
+              AND profile_id = @profile_id
             LIMIT 1;
             """;
-        command.Parameters.AddWithValue("$asset_revision_id", revisionId.ToString());
-        command.Parameters.AddWithValue("$profile_id", profileId.Trim());
+        command.Parameters.AddWithValue("@asset_revision_id", Guid.Parse(revisionId.ToString()));
+        command.Parameters.AddWithValue("@profile_id", profileId.Trim());
         return await command.ExecuteScalarAsync(cancellationToken) is not null;
     }
 
@@ -109,9 +70,8 @@ public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivative
         AssetRevisionId revisionId,
         CancellationToken cancellationToken = default)
     {
-        await EnsureSchemaAsync(cancellationToken);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             WITH latest_observation AS (
                 SELECT
@@ -132,19 +92,19 @@ public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivative
             LEFT JOIN latest_observation AS observation
                 ON observation.face_occurrence_id = occurrence.id
                AND observation.row_number = 1
-            WHERE occurrence.asset_revision_id = $asset_revision_id
+            WHERE occurrence.asset_revision_id = @asset_revision_id
             ORDER BY occurrence.ordinal, occurrence.id;
             """;
-        command.Parameters.AddWithValue("$asset_revision_id", revisionId.ToString());
+        command.Parameters.AddWithValue("@asset_revision_id", Guid.Parse(revisionId.ToString()));
 
         List<FaceReviewGeometry> faces = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
             if (reader.IsDBNull(1))
             {
                 throw new InvalidDataException(
-                    $"Face {reader.GetString(0)} has no observation geometry for review derivative generation.");
+                    $"Face {reader.GetGuid(0)} has no observation geometry for review derivative generation.");
             }
 
             int? photoWidth = reader.IsDBNull(2) ? null : reader.GetInt32(2);
@@ -152,11 +112,11 @@ public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivative
             if (!TryParseBoundingBox(reader.GetString(1), photoWidth, photoHeight, out NormalizedBoundingBox boundingBox))
             {
                 throw new InvalidDataException(
-                    $"Face {reader.GetString(0)} has invalid observation geometry for review derivative generation.");
+                    $"Face {reader.GetGuid(0)} has invalid observation geometry for review derivative generation.");
             }
 
             faces.Add(new FaceReviewGeometry(
-                FaceOccurrenceId.From(Guid.Parse(reader.GetString(0))),
+                FaceOccurrenceId.From(reader.GetGuid(0)),
                 boundingBox));
         }
 
@@ -172,10 +132,17 @@ public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivative
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
         ArgumentNullException.ThrowIfNull(derivatives);
-        await EnsureSchemaAsync(cancellationToken);
 
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteTransaction transaction = connection.BeginTransaction();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
+        // Serialize competing completion writers for the same immutable revision.
+        await using (NpgsqlCommand guard = connection.CreateCommand())
+        {
+            guard.CommandText = "SELECT id FROM asset_revisions WHERE id = @id FOR UPDATE;";
+            guard.Parameters.AddWithValue("id", Guid.Parse(revisionId.ToString()));
+            if (await guard.ExecuteScalarAsync(cancellationToken) is null)
+                throw new KeyNotFoundException("The derivative revision was not found.");
+        }
         foreach (FaceReviewDerivativeRecord derivative in derivatives)
         {
             if (!string.Equals(derivative.ProfileId, profileId.Trim(), StringComparison.Ordinal))
@@ -183,7 +150,7 @@ public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivative
                 throw new ArgumentException("All derivative records must use the requested profile.", nameof(derivatives));
             }
 
-            using SqliteCommand command = connection.CreateCommand();
+            using NpgsqlCommand command = connection.CreateCommand();
             command.Transaction = transaction;
             command.CommandText = """
                 INSERT INTO face_review_derivatives (
@@ -196,15 +163,15 @@ public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivative
                     generated_at_utc,
                     relative_path)
                 SELECT
-                    $face_occurrence_id,
-                    $profile_id,
-                    $encoded_byte_length,
-                    $content_sha256,
-                    $width,
-                    $height,
-                    $generated_at_utc,
-                    $relative_path
-                WHERE EXISTS (SELECT 1 FROM face_occurrences WHERE id = $face_occurrence_id AND asset_revision_id = $revision_id)
+                    @face_occurrence_id,
+                    @profile_id,
+                    @encoded_byte_length,
+                    @content_sha256,
+                    @width,
+                    @height,
+                    @generated_at_utc,
+                    @relative_path
+                WHERE EXISTS (SELECT 1 FROM face_occurrences WHERE id = @face_occurrence_id AND asset_revision_id = @revision_id)
                 ON CONFLICT(face_occurrence_id, profile_id) DO UPDATE SET
                     encoded_byte_length = excluded.encoded_byte_length,
                     content_sha256 = excluded.content_sha256,
@@ -213,20 +180,20 @@ public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivative
                     generated_at_utc = excluded.generated_at_utc,
                     relative_path = excluded.relative_path;
                 """;
-            command.Parameters.AddWithValue("$face_occurrence_id", derivative.FaceOccurrenceId.ToString());
-            command.Parameters.AddWithValue("$profile_id", derivative.ProfileId);
-            command.Parameters.AddWithValue("$encoded_byte_length", derivative.EncodedByteLength);
-            command.Parameters.AddWithValue("$content_sha256", derivative.ContentHash.ToString());
-            command.Parameters.AddWithValue("$width", derivative.Width);
-            command.Parameters.AddWithValue("$height", derivative.Height);
-            command.Parameters.AddWithValue("$generated_at_utc", Format(derivative.GeneratedAtUtc));
-            command.Parameters.AddWithValue("$relative_path", derivative.RelativePath);
-            command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
+            command.Parameters.AddWithValue("@face_occurrence_id", Guid.Parse(derivative.FaceOccurrenceId.ToString()));
+            command.Parameters.AddWithValue("@profile_id", derivative.ProfileId);
+            command.Parameters.AddWithValue("@encoded_byte_length", derivative.EncodedByteLength);
+            command.Parameters.AddWithValue("@content_sha256", derivative.ContentHash.ToString());
+            command.Parameters.AddWithValue("@width", derivative.Width);
+            command.Parameters.AddWithValue("@height", derivative.Height);
+            command.Parameters.AddWithValue("@generated_at_utc", derivative.GeneratedAtUtc);
+            command.Parameters.AddWithValue("@relative_path", derivative.RelativePath);
+            command.Parameters.AddWithValue("revision_id", Guid.Parse(revisionId.ToString()));
             if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
                 throw new ArgumentException("A derivative face does not belong to the requested revision.", nameof(derivatives));
         }
 
-        using (SqliteCommand command = connection.CreateCommand())
+        using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;
             command.CommandText = """
@@ -234,27 +201,27 @@ public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivative
                     asset_revision_id,
                     profile_id,
                     completed_at_utc)
-                VALUES ($asset_revision_id, $profile_id, $completed_at_utc)
+                VALUES (@asset_revision_id, @profile_id, @completed_at_utc)
                 ON CONFLICT(asset_revision_id, profile_id) DO UPDATE SET
                     completed_at_utc = excluded.completed_at_utc;
                 """;
-            command.Parameters.AddWithValue("$asset_revision_id", revisionId.ToString());
-            command.Parameters.AddWithValue("$profile_id", profileId.Trim());
-            command.Parameters.AddWithValue("$completed_at_utc", Format(completedAtUtc));
+            command.Parameters.AddWithValue("@asset_revision_id", Guid.Parse(revisionId.ToString()));
+            command.Parameters.AddWithValue("@profile_id", profileId.Trim());
+            command.Parameters.AddWithValue("@completed_at_utc", completedAtUtc.ToUniversalTime());
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        transaction.Commit();
+        await transaction.CommitAsync(cancellationToken);
     }
 
-    private static FaceReviewDerivativeRecord ReadDerivative(SqliteDataReader reader) => new(
-        FaceOccurrenceId.From(Guid.Parse(reader.GetString(0))),
+    private static FaceReviewDerivativeRecord ReadDerivative(NpgsqlDataReader reader) => new(
+        FaceOccurrenceId.From(reader.GetGuid(0)),
         reader.GetString(1),
         reader.GetInt64(2),
         new Sha256Digest(reader.GetString(3)),
         reader.GetInt32(4),
         reader.GetInt32(5),
-        Parse(reader.GetString(6)),
+        reader.GetFieldValue<DateTimeOffset>(6),
         reader.GetString(7));
 
     private static bool TryParseBoundingBox(
@@ -339,9 +306,5 @@ public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivative
                property.TryGetDouble(out value);
     }
 
-    private static string Format(DateTimeOffset value) =>
-        value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
 
-    private static DateTimeOffset Parse(string value) =>
-        DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
 }

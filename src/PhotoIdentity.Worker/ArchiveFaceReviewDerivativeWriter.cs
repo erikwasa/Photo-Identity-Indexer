@@ -1,8 +1,8 @@
+using PhotoIdentity.Core.Imaging;
 using System.Security.Cryptography;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Worker;
 
@@ -15,16 +15,16 @@ public sealed class ArchiveFaceReviewDerivativeWriter
     public const string ProfileId = "face-review-v1-context2.2-max960-q90";
     public const int MaximumLongEdge = 960;
 
-    private readonly SqliteFaceReviewDerivativeRepository _repository;
+    private readonly IFaceReviewDerivativeRepository _repository;
     private readonly OpenCvReviewFaceRenderer _renderer;
 
-    public ArchiveFaceReviewDerivativeWriter(SqliteCatalogueDatabase database)
-        : this(new SqliteFaceReviewDerivativeRepository(database), new OpenCvReviewFaceRenderer())
+    public ArchiveFaceReviewDerivativeWriter(IFaceReviewDerivativeRepository repository)
+        : this(repository, new OpenCvReviewFaceRenderer())
     {
     }
 
     public ArchiveFaceReviewDerivativeWriter(
-        SqliteFaceReviewDerivativeRepository repository,
+        IFaceReviewDerivativeRepository repository,
         OpenCvReviewFaceRenderer renderer)
     {
         ArgumentNullException.ThrowIfNull(repository);

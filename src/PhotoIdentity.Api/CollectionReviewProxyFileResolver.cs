@@ -1,6 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
@@ -20,25 +19,25 @@ public sealed record ReviewProxyServingConfiguration(
 public sealed class CollectionReviewProxyFileResolver
 {
     private readonly IArchiveReviewProxyRepository _repository;
-    private readonly SqliteCatalogueDatabase? _database;
+    private readonly IFaceReviewDerivativeRepository? _derivatives;
     private readonly ReviewProxyServingConfiguration _configuration;
 
     public CollectionReviewProxyFileResolver(
         IArchiveReviewProxyRepository repository,
         ReviewProxyServingConfiguration configuration)
-        : this(repository, database: null, configuration)
+        : this(repository, derivatives: null, configuration)
     {
     }
 
     public CollectionReviewProxyFileResolver(
         IArchiveReviewProxyRepository repository,
-        SqliteCatalogueDatabase? database,
+        IFaceReviewDerivativeRepository? derivatives,
         ReviewProxyServingConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(configuration);
         _repository = repository;
-        _database = database;
+        _derivatives = derivatives;
         _configuration = configuration;
     }
 
@@ -68,12 +67,12 @@ public sealed class CollectionReviewProxyFileResolver
         FaceOccurrenceId faceOccurrenceId,
         CancellationToken cancellationToken = default)
     {
-        if (_database is null)
+        if (_derivatives is null)
         {
             return Task.FromResult<FaceReviewDerivativeFile?>(null);
         }
 
-        return new FaceReviewDerivativeFileResolver(_database, _configuration)
+        return new FaceReviewDerivativeFileResolver(_derivatives, _configuration)
             .ResolveAsync(faceOccurrenceId, cancellationToken);
     }
 

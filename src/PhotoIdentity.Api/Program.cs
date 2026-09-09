@@ -201,6 +201,8 @@ public partial class Program
         builder.Services.AddSingleton<IDetectorRolloutApplicationRepository, SqliteDetectorRolloutApplicationRepository>();
         builder.Services.AddSingleton<SqliteArchiveAnalysisRepository>();
         builder.Services.AddSingleton<SqliteArchiveReviewProxyRepository>();
+        builder.Services.AddSingleton<IFaceReviewDerivativeRepository, SqliteFaceReviewDerivativeRepository>();
+        builder.Services.AddSingleton<IFaceReviewDerivativeBackfillRepository, SqliteFaceReviewDerivativeBackfillRepository>();
         builder.Services.AddSingleton<IArchiveReviewProxyRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteArchiveReviewProxyRepository>());
         builder.Services.AddSingleton<SqliteArchivePostAnalysisRepository>();

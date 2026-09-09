@@ -107,7 +107,8 @@ public sealed class FaceReviewDerivativeBackfillServiceTests
                 TimeProvider.System);
 
             FaceReviewDerivativeBackfillService service = new(
-                database,
+                new SqliteFaceReviewDerivativeRepository(database),
+                new SqliteFaceReviewDerivativeBackfillRepository(database),
                 new SqliteLocalBatchRepository(database),
                 originals,
                 new ReviewProxyGenerationConfiguration(

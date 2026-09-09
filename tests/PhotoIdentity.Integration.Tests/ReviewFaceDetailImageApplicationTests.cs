@@ -28,7 +28,7 @@ public sealed class ReviewFaceDetailImageApplicationTests
         {
             SeededFace seeded = await SeedAsync(directory);
             SqliteCatalogueDatabase database = new(seeded.DatabasePath);
-            _ = await new ArchiveFaceReviewDerivativeWriter(database).GenerateAsync(
+            _ = await new ArchiveFaceReviewDerivativeWriter(new SqliteFaceReviewDerivativeRepository(database)).GenerateAsync(
                 seeded.RevisionId,
                 seeded.SourcePath,
                 seeded.SourceRoot,
@@ -97,7 +97,7 @@ public sealed class ReviewFaceDetailImageApplicationTests
         {
             SeededFace seeded = await SeedAsync(directory, includeRevisionDimensions: false);
             SqliteCatalogueDatabase database = new(seeded.DatabasePath);
-            _ = await new ArchiveFaceReviewDerivativeWriter(database).GenerateAsync(
+            _ = await new ArchiveFaceReviewDerivativeWriter(new SqliteFaceReviewDerivativeRepository(database)).GenerateAsync(
                 seeded.RevisionId,
                 seeded.SourcePath,
                 seeded.SourceRoot,
@@ -149,7 +149,7 @@ public sealed class ReviewFaceDetailImageApplicationTests
         {
             SeededFace seeded = await SeedAsync(directory);
             SqliteCatalogueDatabase database = new(seeded.DatabasePath);
-            _ = await new ArchiveFaceReviewDerivativeWriter(database).GenerateAsync(
+            _ = await new ArchiveFaceReviewDerivativeWriter(new SqliteFaceReviewDerivativeRepository(database)).GenerateAsync(
                 seeded.RevisionId,
                 seeded.SourcePath,
                 seeded.SourceRoot,

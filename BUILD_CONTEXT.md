@@ -17,7 +17,7 @@ The same acceptance session found slideshow performance problems. M24 WI-0108 ow
 
 In the separate M24 thread, WI-0098, WI-0099, WI-0100 and WI-0105 are completed. Runtime authority remains SQLite until WI-0101 and WI-0102 complete provider composition and controlled cutover.
 
-WI-0101 progress and verification details are recorded in its work-item document. PostgreSQL schema version 21 now includes detector rollout state, and its review, pipeline/plan and atomic candidate-application repositories passed live PostgreSQL verification. Detector rollout review/application contracts and records belong to Core, with API bindings still backed by SQLite. Detector coordinator/job-handler persistence now uses Core contracts. Explicit PostgreSQL CLI provider selection, shared review queries and crop configuration reads are verified. The evaluation-store audit retains portable private JSON evidence across isolated catalogues. Face-review derivative persistence and remaining archive/runtime composition are next.
+WI-0101 progress and verification details are recorded in its work-item document. PostgreSQL schema version 22 includes detector rollout and face-review derivative state, and its review, pipeline/plan and atomic candidate-application repositories passed live PostgreSQL verification. Detector rollout review/application contracts and records belong to Core, with API bindings still backed by SQLite. Detector coordinator/job-handler persistence now uses Core contracts. Explicit PostgreSQL CLI provider selection, shared review queries and crop configuration reads are verified. The evaluation-store audit retains portable private JSON evidence across isolated catalogues. Face-review derivative persistence, writer/backfill and file resolver contracts are verified. Whole-photo proxy writer and remaining archive/runtime composition are next.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -33,7 +33,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, continue WI-0101 by neutralizing the remaining SQLite-only normal-runtime dependencies, next completing face-review derivative persistence and migrating remaining archive worker/query surfaces. Existing archive source observation, availability, hydration, coverage, storage and status/query contracts are now useful seams; keep normal DI on SQLite until WI-0102 and do not create dual writes.
+For the M24 thread, continue WI-0101 by neutralizing the remaining SQLite-only normal-runtime dependencies, next migrating the whole-photo proxy writer and remaining archive worker/query surfaces. Existing archive source observation, availability, hydration, coverage, storage and status/query contracts are now useful seams; keep normal DI on SQLite until WI-0102 and do not create dual writes.
 
 ## Relevant files
 

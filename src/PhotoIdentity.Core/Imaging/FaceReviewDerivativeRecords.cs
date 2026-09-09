@@ -2,7 +2,7 @@ using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Core.Imaging;
 
 public sealed record FaceReviewDerivativeRecord
 {

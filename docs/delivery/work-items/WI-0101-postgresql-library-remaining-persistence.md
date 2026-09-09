@@ -37,7 +37,7 @@ WI-0101 is a persistence migration item, not acceptance of slideshow responsiven
 
 ## Remaining work checklist
 
-Current as of 2026-09-09, including the verified detector application slice. This is the current implementation checklist; the slice notes below retain historical evidence. Update these checkboxes as each task is implemented and verified, with supporting evidence in the work-item registry. Formal lifecycle status remains in the registry.
+Current as of 2026-09-10, including verified detector, review-query and face-review derivative slices. This is the current implementation checklist; the slice notes below retain historical evidence. Update these checkboxes as each task is implemented and verified, with supporting evidence in the work-item registry. Formal lifecycle status remains in the registry.
 
 Many PostgreSQL repositories already exist. An unchecked integration task does not necessarily require a new repository: reuse the existing Core contract and PostgreSQL implementation where available. A completed repository slice does not establish that normal runtime is free of SQLite dependencies.
 
@@ -59,7 +59,8 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 
 - [ ] Migrate source scanning/sync and current-revision/general catalogue lookup composition, including `LocalArchiveSyncCoordinator.cs`.
 - [ ] Remove remaining concrete SQLite analysis/run/job collaborators from `ArchiveAnalysisProcessing.cs`, `ArchiveBoundedAnalysisService.cs`, `ArchiveEndpoints.cs` and archive advancement flow.
-- [ ] Migrate review-proxy and face-review-derivative writers, backfill and file resolvers to provider-neutral persistence. Complete any missing PostgreSQL derivative persistence.
+- [x] Add PostgreSQL face-review derivative metadata/completion and backfill persistence; move derivative writer, backfill service and file resolvers to Core contracts.
+- [ ] Migrate the whole-photo review-proxy writer and remove remaining SQLite construction of derivative collaborators in archive orchestration.
 - [ ] Audit `PortableBundleExportCoordinator.cs` and other production catalogue lookup paths; migrate runtime dependencies while explicitly identifying legitimate import/export compatibility boundaries.
 - [ ] Verify archive coverage, status/filter paging, availability, hydration, verification, storage accounting and post-analysis operate together through PostgreSQL-backed contracts. Existing individual repositories are not sufficient evidence for this end-to-end composition.
 
@@ -67,7 +68,7 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 
 - [x] Replace concrete SQLite face/filter/navigation queries in review, suggestion and gallery endpoints with Core contracts and PostgreSQL queries.
 - [x] Move review crop configuration and face-preview geometry reads to Core contracts, preserving historical run configuration compatibility.
-- [ ] Complete face-review derivative and collection revision resolver dependencies; whole-photo proxy and review-target reads already use Core contracts.
+- [x] Complete face-review derivative and collection revision resolver contracts and PostgreSQL implementations; whole-photo proxy and review-target reads also use Core contracts. Whole-runtime provider selection remains outstanding.
 - [ ] Connect identity-match regeneration runtime to provider-neutral scoring, evidence-version and automatic-assignment implementations; remove remaining SQLite model/policy conversion and composition dependencies.
 
 ### 4. Remaining library and feature-state coverage
@@ -96,6 +97,14 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 Existing-catalogue import, production cutover and rollback acceptance belong to WI-0102. Match-regeneration scaling belongs to WI-0103; operator UI/query performance to WI-0104; slideshow latency fixes to WI-0108; operational backup/recovery and real-archive catch-up acceptance to WI-0106. WI-0101 must provide the complete persistence/runtime boundary those items depend on.
 
 ## Handoff from WI-0099 runtime-composition audit
+
+### Face-review derivative persistence (2026-09-10)
+
+Schema v22 adds durable face-review metadata and revision/profile completion markers with foreign keys, path uniqueness and profile indexes. `PostgresFaceReviewDerivativeRepository` and `PostgresFaceReviewDerivativeBackfillRepository` implement Core contracts. Completion and metadata commit together; a revision lock serializes competing PostgreSQL writers. Both providers now reject a derivative whose face belongs to another revision. Geometry reads preserve normalized-object and legacy pixel-array formats. Backfill selects only current, nondeleted source revisions with faces and without the requested completion profile; zero-face completion remains supported.
+
+The face-review writer, backfill service and file resolvers now consume Core contracts, including revision lookup. Runtime archive orchestrators still explicitly construct SQLite collaborators until their remaining dependencies are migrated. No PostgreSQL repository performs per-query schema ensure calls; startup applies v22.
+
+Live tests passed for clean/idempotent initialization, a reconstructed v21 database retaining synthetic catalogue rows upgraded to v22, rollback after a path collision, wrong-revision rejection, concurrent replay, geometry, zero-face completion, current-revision backfill scope and cancellation. Five focused derivative/backfill/image-serving integration tests passed in 3 seconds. Tests add repository-level PostgreSQL coverage without new HTTP hosts or required CI gates.
 
 ### Review query and artifact boundary (2026-09-09)
 

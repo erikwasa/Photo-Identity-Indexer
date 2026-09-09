@@ -1,24 +1,22 @@
 using PhotoIdentity.Core.Imaging;
-using Microsoft.Data.Sqlite;
+using Npgsql;
 using PhotoIdentity.Core.Identifiers;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
 /// Finds current archive revisions that already contain detected faces but have not yet completed
 /// the durable face-review derivative profile. This is intentionally independent of the detector
 /// profile so existing analyzed catalogues can be backfilled without rerunning inference.
 /// </summary>
-public sealed class SqliteFaceReviewDerivativeBackfillRepository : IFaceReviewDerivativeBackfillRepository
+public sealed class PostgresFaceReviewDerivativeBackfillRepository : IFaceReviewDerivativeBackfillRepository
 {
-    private readonly SqliteCatalogueDatabase _database;
-    private readonly SqliteFaceReviewDerivativeRepository _derivatives;
+    private readonly PostgresCatalogueDatabase _database;
 
-    public SqliteFaceReviewDerivativeBackfillRepository(SqliteCatalogueDatabase database)
+    public PostgresFaceReviewDerivativeBackfillRepository(PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
-        _derivatives = new SqliteFaceReviewDerivativeRepository(database);
     }
 
     public async Task<AssetRevisionId?> GetNextPendingCurrentRevisionAsync(
@@ -27,9 +25,8 @@ public sealed class SqliteFaceReviewDerivativeBackfillRepository : IFaceReviewDe
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
-        await _derivatives.EnsureSchemaAsync(cancellationToken);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT revision.id
             FROM assets AS asset
@@ -42,8 +39,8 @@ public sealed class SqliteFaceReviewDerivativeBackfillRepository : IFaceReviewDe
                     LIMIT 1)
             LEFT JOIN asset_revision_face_review_completions AS completion
                 ON completion.asset_revision_id = revision.id
-               AND completion.profile_id = $profile_id
-            WHERE asset.source_id = $source_id
+               AND completion.profile_id = @profile_id
+            WHERE asset.source_id = @source_id
               AND asset.deleted_at_utc IS NULL
               AND completion.asset_revision_id IS NULL
               AND EXISTS (
@@ -54,11 +51,11 @@ public sealed class SqliteFaceReviewDerivativeBackfillRepository : IFaceReviewDe
             ORDER BY asset.source_key
             LIMIT 1;
             """;
-        command.Parameters.AddWithValue("$source_id", sourceId.ToString());
-        command.Parameters.AddWithValue("$profile_id", profileId.Trim());
+        command.Parameters.AddWithValue("@source_id", Guid.Parse(sourceId.ToString()));
+        command.Parameters.AddWithValue("@profile_id", profileId.Trim());
         object? value = await command.ExecuteScalarAsync(cancellationToken);
-        return value is string id
-            ? AssetRevisionId.From(Guid.Parse(id))
+        return value is Guid id
+            ? AssetRevisionId.From(id)
             : null;
     }
 }

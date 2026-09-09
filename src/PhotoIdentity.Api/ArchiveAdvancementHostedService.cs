@@ -61,7 +61,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         _originals = originals;
         ArgumentNullException.ThrowIfNull(metrics);
         _faceReviewBackfill = new FaceReviewDerivativeBackfillService(
-            database,
+            new SqliteFaceReviewDerivativeRepository(database),
+            new SqliteFaceReviewDerivativeBackfillRepository(database),
             new SqliteLocalBatchRepository(database),
             originals,
             proxyConfiguration,

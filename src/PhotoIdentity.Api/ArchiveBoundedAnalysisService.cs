@@ -79,7 +79,8 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         _sourceVerification = sourceVerification;
         _metadataInspection = metadataInspection;
         _faceReviewBackfill = new FaceReviewDerivativeBackfillService(
-            database,
+            new SqliteFaceReviewDerivativeRepository(database),
+            new SqliteFaceReviewDerivativeBackfillRepository(database),
             catalogue,
             originals,
             proxyConfiguration,

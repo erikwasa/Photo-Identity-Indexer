@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 21;
+    public const int CurrentSchemaVersion = 22;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1089,6 +1089,7 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
                 EXECUTE FUNCTION photo_identity_move_featured_face_after_merge();
             """),
         new(21, "detector-rollout-reconciliation", DetectorRolloutSchema),
+        new(22, "face-review-derivatives", FaceReviewSchema),
     ];
 
     private readonly NpgsqlDataSource _dataSource;

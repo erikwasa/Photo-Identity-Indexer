@@ -1,6 +1,7 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
@@ -11,34 +12,35 @@ namespace PhotoIdentity.Api;
 /// </summary>
 public sealed class FaceReviewDerivativeBackfillService
 {
-    private readonly SqliteCatalogueDatabase _database;
-    private readonly SqliteLocalBatchRepository _catalogue;
+    private readonly IFaceReviewDerivativeRepository _derivatives;
+    private readonly IAssetRevisionLookupRepository _catalogue;
     private readonly CollectionOriginalAccessService _originals;
     private readonly ReviewProxyGenerationConfiguration _configuration;
     private readonly TimeProvider _timeProvider;
     private readonly ArchiveThroughputMetrics? _metrics;
-    private readonly SqliteFaceReviewDerivativeBackfillRepository _pending;
+    private readonly IFaceReviewDerivativeBackfillRepository _pending;
 
     public FaceReviewDerivativeBackfillService(
-        SqliteCatalogueDatabase database,
-        SqliteLocalBatchRepository catalogue,
+        IFaceReviewDerivativeRepository derivatives,
+        IFaceReviewDerivativeBackfillRepository pending,
+        IAssetRevisionLookupRepository catalogue,
         CollectionOriginalAccessService originals,
         ReviewProxyGenerationConfiguration configuration,
         TimeProvider timeProvider,
         ArchiveThroughputMetrics? metrics = null)
     {
-        ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(derivatives);
         ArgumentNullException.ThrowIfNull(catalogue);
         ArgumentNullException.ThrowIfNull(originals);
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(timeProvider);
-        _database = database;
+        _derivatives = derivatives;
         _catalogue = catalogue;
         _originals = originals;
         _configuration = configuration;
         _timeProvider = timeProvider;
         _metrics = metrics;
-        _pending = new SqliteFaceReviewDerivativeBackfillRepository(database);
+        _pending = pending ?? throw new ArgumentNullException(nameof(pending));
     }
 
     public async Task<bool> AdvanceAsync(
@@ -130,13 +132,13 @@ public sealed class FaceReviewDerivativeBackfillService
         string derivativeRoot,
         CancellationToken cancellationToken)
     {
-        CatalogueProcessingAssetRevision revision = await _catalogue.GetAssetRevisionAsync(
+        AssetRevisionLookup revision = await _catalogue.GetRevisionAsync(
             revisionId,
             cancellationToken)
             ?? throw new InvalidOperationException(
                 "The analyzed archive revision disappeared before face review derivative generation.");
         string sourcePath = ResolveSourcePath(revision.RootLocator, revision.SourceKey);
-        ArchiveFaceReviewDerivativeWriter writer = new(_database);
+        ArchiveFaceReviewDerivativeWriter writer = new(_derivatives);
         int generated;
         using (IDisposable? derivativeTiming = _metrics?.Measure(
                    ArchiveThroughputMetricNames.FaceReviewDerivativeGeneration))
