@@ -6,9 +6,9 @@ namespace PhotoIdentity.Api;
 
 public sealed class DetectorRolloutCropFileResolver
 {
-    private readonly IProcessingRunRepository _runs;
+    private readonly IProcessingRunConfigurationReader _runs;
 
-    public DetectorRolloutCropFileResolver(IProcessingRunRepository runs)
+    public DetectorRolloutCropFileResolver(IProcessingRunConfigurationReader runs)
     {
         ArgumentNullException.ThrowIfNull(runs);
         _runs = runs;
@@ -67,15 +67,15 @@ public sealed class DetectorRolloutCropFileResolver
         ProcessingRunId runId,
         CancellationToken cancellationToken)
     {
-        CatalogueProcessingRun? run = await _runs.GetRunAsync(runId, cancellationToken);
-        if (run is null)
+        string? configurationJson = await _runs.GetRunConfigurationAsync(runId, cancellationToken);
+        if (configurationJson is null)
         {
             return null;
         }
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(run.ConfigurationJson);
+            using JsonDocument document = JsonDocument.Parse(configurationJson);
             foreach (JsonProperty property in document.RootElement.EnumerateObject())
             {
                 if (string.Equals(property.Name, "outputRoot", StringComparison.OrdinalIgnoreCase) &&

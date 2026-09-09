@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Review;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;

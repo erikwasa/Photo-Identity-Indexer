@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Review;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using PhotoIdentity.Core.Geometry;

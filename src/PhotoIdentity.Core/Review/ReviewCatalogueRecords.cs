@@ -1,7 +1,7 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Core.Review;
 
 public static class CatalogueReviewStates
 {

@@ -100,6 +100,8 @@ public partial class Program
         builder.Services.AddSingleton<IReviewActionRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteReviewRepository>());
         builder.Services.AddSingleton<SqliteReviewFilterRepository>();
+        builder.Services.AddSingleton<IReviewFaceRepository>(services => services.GetRequiredService<SqliteReviewRepository>());
+        builder.Services.AddSingleton<IReviewFilterRepository>(services => services.GetRequiredService<SqliteReviewFilterRepository>());
         builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
         builder.Services.AddSingleton<IReviewSuggestionRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteReviewSuggestionRepository>());
@@ -190,6 +192,7 @@ public partial class Program
         builder.Services.AddSingleton<IAssetRevisionLookupRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteLocalBatchRepository>());
         builder.Services.AddSingleton<SqliteProcessingRepository>();
+        builder.Services.AddSingleton<IProcessingRunConfigurationReader>(services => services.GetRequiredService<SqliteProcessingRepository>());
         builder.Services.AddSingleton<IProcessingRunRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteProcessingRepository>());
         builder.Services.AddSingleton<IProcessingExecutionRepository>(serviceProvider =>

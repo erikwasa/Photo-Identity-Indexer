@@ -1,15 +1,15 @@
 using PhotoIdentity.Core.Review;
 using System.Globalization;
-using Microsoft.Data.Sqlite;
+using Npgsql;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
 /// Provides review gallery queries scoped by processing run and ranked suggestion model revision.
 /// </summary>
-public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
+public sealed class PostgresReviewQueryRepository : IReviewFilterRepository, IReviewFaceRepository
 {
     private const string ReviewFaceCtes = """
         WITH latest_action AS (
@@ -78,9 +78,9 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
             ON people.id = latest_action.person_id
         """;
 
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly PostgresCatalogueDatabase _database;
 
-    public SqliteReviewFilterRepository(SqliteCatalogueDatabase database)
+    public PostgresReviewQueryRepository(PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
@@ -106,8 +106,9 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
         string orderBy = SortExpression(sort);
         string predicate = BuildPredicate(state, processingRunId, modelId, modelHash);
 
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction snapshot = await connection.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = $"""
             {ReviewFaceCtes}
             SELECT
@@ -115,14 +116,14 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
             {ReviewFaceFrom}
             WHERE {predicate}
             ORDER BY {orderBy}
-            LIMIT $limit OFFSET $offset;
+            LIMIT @limit OFFSET @offset;
             """;
         AddScopeParameters(command, processingRunId, modelId, modelHash);
-        command.Parameters.AddWithValue("$limit", limit);
-        command.Parameters.AddWithValue("$offset", offset);
+        command.Parameters.AddWithValue("@limit", limit);
+        command.Parameters.AddWithValue("@offset", offset);
 
         List<CatalogueReviewFace> items = [];
-        await using (SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
+        await using (NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
         {
             while (await reader.ReadAsync(cancellationToken))
             {
@@ -130,7 +131,7 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
             }
         }
 
-        using SqliteCommand countCommand = connection.CreateCommand();
+        using NpgsqlCommand countCommand = connection.CreateCommand();
         countCommand.CommandText = $"""
             {ReviewFaceCtes}
             SELECT COUNT(*)
@@ -160,8 +161,8 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
         string orderBy = SortExpression(normalizedSort);
         string predicate = BuildPredicate(state, processingRunId, modelId, modelHash);
 
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = $"""
             {ReviewFaceCtes},
             scoped_faces AS (
@@ -176,12 +177,12 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
             )
             SELECT previous_face_id, next_face_id, position, total
             FROM scoped_faces
-            WHERE id = $face_occurrence_id;
+            WHERE id = @face_occurrence_id;
             """;
         AddScopeParameters(command, processingRunId, modelId, modelHash);
-        command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
+        command.Parameters.AddWithValue("@face_occurrence_id", Guid.Parse(faceOccurrenceId.ToString()));
 
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
             return null;
@@ -189,10 +190,10 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
 
         FaceOccurrenceId? previous = reader.IsDBNull(0)
             ? null
-            : FaceOccurrenceId.From(Guid.Parse(reader.GetString(0)));
+            : FaceOccurrenceId.From(reader.GetGuid(0));
         FaceOccurrenceId? next = reader.IsDBNull(1)
             ? null
-            : FaceOccurrenceId.From(Guid.Parse(reader.GetString(1)));
+            : FaceOccurrenceId.From(reader.GetGuid(1));
         return new CatalogueReviewFaceNavigation(
             previous,
             next,
@@ -204,9 +205,10 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
     public async Task<CatalogueReviewFilterOptions> GetOptionsAsync(
         CancellationToken cancellationToken = default)
     {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction snapshot = await connection.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, cancellationToken);
         List<CatalogueReviewProcessingRun> runs = [];
-        using (SqliteCommand command = connection.CreateCommand())
+        using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.CommandText = """
                 SELECT
@@ -227,20 +229,20 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
                     processing_runs.completed_at_utc
                 ORDER BY processing_runs.started_at_utc DESC, processing_runs.id;
                 """;
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
                 runs.Add(new CatalogueReviewProcessingRun(
-                    ProcessingRunId.From(Guid.Parse(reader.GetString(0))),
+                    ProcessingRunId.From(reader.GetGuid(0)),
                     reader.GetString(1),
-                    Parse(reader.GetString(2)),
-                    reader.IsDBNull(3) ? null : Parse(reader.GetString(3)),
-                    reader.GetInt32(4)));
+                    reader.GetFieldValue<DateTimeOffset>(2),
+                    reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTimeOffset>(3),
+                    checked((int)reader.GetInt64(4))));
             }
         }
 
         List<CatalogueReviewModelRevision> models = [];
-        using (SqliteCommand command = connection.CreateCommand())
+        using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.CommandText = """
                 SELECT
@@ -252,18 +254,52 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
                 GROUP BY model_id, model_hash
                 ORDER BY MAX(generated_at_utc) DESC, model_id, model_hash;
                 """;
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
                 models.Add(new CatalogueReviewModelRevision(
                     new ModelId(reader.GetString(0)),
                     new Sha256Digest(reader.GetString(1)),
-                    Parse(reader.GetString(2)),
-                    reader.GetInt32(3)));
+                    reader.GetFieldValue<DateTimeOffset>(2),
+                    checked((int)reader.GetInt64(3))));
             }
         }
 
         return new CatalogueReviewFilterOptions(runs, models);
+    }
+
+    public async Task<CatalogueReviewFace?> GetFaceAsync(
+        FaceOccurrenceId id, CancellationToken cancellationToken = default)
+    {
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = $"""
+            {ReviewFaceCtes}
+            SELECT {ReviewFaceColumns}
+            {ReviewFaceFrom}
+            WHERE face_occurrences.id = @id;
+            """;
+        command.Parameters.AddWithValue("id", Guid.Parse(id.ToString()));
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadFace(reader) : null;
+    }
+
+    public async Task<IReadOnlyList<CatalogueReviewPerson>> GetPeopleAsync(CancellationToken cancellationToken = default)
+    {
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT id, display_name FROM people
+            WHERE merged_into_person_id IS NULL AND display_name IS NOT NULL
+            ORDER BY lower(display_name), id;
+            """;
+        List<CatalogueReviewPerson> people = [];
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            people.Add(new(PersonId.From(reader.GetGuid(0)), reader.GetString(1)));
+        }
+        return people;
     }
 
     private static string BuildPredicate(
@@ -280,7 +316,7 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
                     SELECT 1
                     FROM processing_jobs
                     WHERE processing_jobs.asset_revision_id = face_occurrences.asset_revision_id
-                      AND processing_jobs.processing_run_id = $processing_run_id)
+                      AND processing_jobs.processing_run_id = @processing_run_id)
                 """);
         }
 
@@ -291,8 +327,8 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
                     SELECT 1
                     FROM identity_suggestion_rankings
                     WHERE identity_suggestion_rankings.face_occurrence_id = face_occurrences.id
-                      AND identity_suggestion_rankings.model_id = $model_id
-                      AND identity_suggestion_rankings.model_hash = $model_hash)
+                      AND identity_suggestion_rankings.model_id = @model_id
+                      AND identity_suggestion_rankings.model_hash = @model_hash)
                 """);
         }
 
@@ -308,20 +344,20 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
     }
 
     private static void AddScopeParameters(
-        SqliteCommand command,
+        NpgsqlCommand command,
         ProcessingRunId? processingRunId,
         ModelId? modelId,
         Sha256Digest? modelHash)
     {
         if (processingRunId is ProcessingRunId runId)
         {
-            command.Parameters.AddWithValue("$processing_run_id", runId.ToString());
+            command.Parameters.AddWithValue("@processing_run_id", Guid.Parse(runId.ToString()));
         }
 
         if (modelId is ModelId selectedModelId && modelHash is Sha256Digest selectedModelHash)
         {
-            command.Parameters.AddWithValue("$model_id", selectedModelId.ToString());
-            command.Parameters.AddWithValue("$model_hash", selectedModelHash.ToString());
+            command.Parameters.AddWithValue("@model_id", selectedModelId.ToString());
+            command.Parameters.AddWithValue("@model_hash", selectedModelHash.ToString());
         }
     }
 
@@ -360,7 +396,7 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
         _ => throw new ArgumentOutOfRangeException(nameof(sort)),
     };
 
-    private static CatalogueReviewFace ReadFace(SqliteDataReader reader)
+    private static CatalogueReviewFace ReadFace(NpgsqlDataReader reader)
     {
         string sourceKey = reader.GetString(3).Replace('\\', '/');
         string photoName = Path.GetFileName(sourceKey);
@@ -368,7 +404,7 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
         string? actionKind = reader.IsDBNull(11) ? null : reader.GetString(11);
         PersonId? personId = reader.IsDBNull(12)
             ? null
-            : PersonId.From(Guid.Parse(reader.GetString(12)));
+            : PersonId.From(reader.GetGuid(12));
         string? personName = reader.IsDBNull(13) ? null : reader.GetString(13);
         CatalogueReviewPerson? person = personId is PersonId id && personName is not null
             ? new CatalogueReviewPerson(id, personName)
@@ -382,9 +418,9 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
         };
 
         return new CatalogueReviewFace(
-            FaceOccurrenceId.From(Guid.Parse(reader.GetString(0))),
+            FaceOccurrenceId.From(reader.GetGuid(0)),
             reader.GetInt32(1),
-            Parse(reader.GetString(2)),
+            reader.GetFieldValue<DateTimeOffset>(2),
             string.IsNullOrWhiteSpace(photoName) ? "Photo" : photoName,
             reader.GetString(4),
             reader.IsDBNull(5) ? null : reader.GetInt32(5),
@@ -395,13 +431,9 @@ public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
             reviewState,
             person,
             activeActionId,
-            AssetRevisionId.From(Guid.Parse(reader.GetString(15))),
+            AssetRevisionId.From(reader.GetGuid(15)),
             reader.IsDBNull(14) ? null : reader.GetString(14));
     }
 
-    private static DateTimeOffset Parse(string value) =>
-        DateTimeOffset.Parse(
-            value,
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.RoundtripKind).ToUniversalTime();
+
 }

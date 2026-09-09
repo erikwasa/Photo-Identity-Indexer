@@ -1,10 +1,9 @@
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Imaging.OpenCv;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
@@ -16,21 +15,21 @@ namespace PhotoIdentity.Api;
 /// </summary>
 public sealed class ReviewFacePreviewResolver
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly IReviewFaceRepository _repository;
     private readonly CollectionReviewProxyFileResolver _proxyFileResolver;
     private readonly OpenCvReviewFaceRenderer _renderer;
 
     public ReviewFacePreviewResolver(
-        SqliteCatalogueDatabase database,
+        IReviewFaceRepository repository,
         CollectionReviewProxyFileResolver proxyFileResolver,
         CollectionOriginalAccessService originalAccessService,
         OpenCvReviewFaceRenderer renderer)
     {
-        ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(proxyFileResolver);
         ArgumentNullException.ThrowIfNull(originalAccessService);
         ArgumentNullException.ThrowIfNull(renderer);
-        _database = database;
+        _repository = repository;
         _proxyFileResolver = proxyFileResolver;
         _renderer = renderer;
     }
@@ -129,53 +128,14 @@ public sealed class ReviewFacePreviewResolver
         FaceOccurrenceId faceOccurrenceId,
         CancellationToken cancellationToken)
     {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            WITH latest_observation AS (
-                SELECT
-                    face_observations.*,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY face_occurrence_id
-                        ORDER BY observed_at_utc DESC, detector_model_id, detector_model_hash) AS row_number
-                FROM face_observations
-            )
-            SELECT
-                face_occurrences.asset_revision_id,
-                latest_observation.bounding_box_json,
-                asset_revisions.width,
-                asset_revisions.height
-            FROM face_occurrences
-            INNER JOIN asset_revisions
-                ON asset_revisions.id = face_occurrences.asset_revision_id
-            LEFT JOIN latest_observation
-                ON latest_observation.face_occurrence_id = face_occurrences.id
-               AND latest_observation.row_number = 1
-            WHERE face_occurrences.id = $face_occurrence_id;
-            """;
-        command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
-
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken) || reader.IsDBNull(1))
+        CatalogueReviewFace? face = await _repository.GetFaceAsync(faceOccurrenceId, cancellationToken);
+        if (face?.BoundingBoxJson is not string geometry ||
+            !TryParseBoundingBox(geometry, face.PhotoWidth, face.PhotoHeight, out NormalizedBoundingBox boundingBox))
         {
             return null;
         }
-
-        if (!Guid.TryParse(reader.GetString(0), out Guid revisionGuid) || revisionGuid == Guid.Empty)
-        {
-            return null;
-        }
-
-        int? photoWidth = reader.IsDBNull(2) ? null : reader.GetInt32(2);
-        int? photoHeight = reader.IsDBNull(3) ? null : reader.GetInt32(3);
-        if (!TryParseBoundingBox(reader.GetString(1), photoWidth, photoHeight, out NormalizedBoundingBox boundingBox))
-        {
-            return null;
-        }
-
-        return new ReviewFaceGeometry(AssetRevisionId.From(revisionGuid), boundingBox);
+        return new ReviewFaceGeometry(face.RevisionId, boundingBox);
     }
-
     internal static NormalizedBoundingBox? CalculateTargetBoundingBox(
         string? value,
         int? photoWidth,

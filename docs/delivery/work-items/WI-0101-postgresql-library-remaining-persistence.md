@@ -51,9 +51,9 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 - [x] Implement remaining `IDetectorRolloutApplicationRepository` queries: existing/occurrence anchors, pipeline lookup, rollout counts and pending-review reads.
 - [x] Move detector coordinator/job-handler persistence and rollout crop-file resolution to Core contracts; provide PostgreSQL revision lookup and store initialization.
 - [x] Complete explicit PostgreSQL rollout CLI provider selection for start/resume/status/apply, with a live PostgreSQL command test.
-- [ ] Replace the pending-review face lookup with a provider-neutral contract and PostgreSQL implementation.
+- [x] Replace the pending-review face lookup with a provider-neutral contract and PostgreSQL implementation.
 - [x] Move remaining detector-evaluation session/review catalogue parameters to `IDetectorEvaluationCatalogueRepository`.
-- [ ] Audit detector-evaluation session, comparison and ground-truth stores to distinguish authoritative state from portable evaluation artifacts and migrate authoritative persistence where required.
+- [x] Audit detector-evaluation session, comparison and ground-truth stores: these are portable private evaluation artifacts, intentionally shared across isolated catalogues; retain their existing file persistence (see audit below).
 
 ### 2. Archive, processing and file access
 
@@ -65,8 +65,9 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 
 ### 3. Review, gallery and identity runtime
 
-- [ ] Replace remaining concrete SQLite face/filter/navigation queries in review, suggestion and gallery endpoints, including `SqliteReviewRepository` and `SqliteReviewFilterRepository` dependencies.
-- [ ] Complete provider-neutral crop, face-preview, target and revision resolver dependencies used by review and collections.
+- [x] Replace concrete SQLite face/filter/navigation queries in review, suggestion and gallery endpoints with Core contracts and PostgreSQL queries.
+- [x] Move review crop configuration and face-preview geometry reads to Core contracts, preserving historical run configuration compatibility.
+- [ ] Complete face-review derivative and collection revision resolver dependencies; whole-photo proxy and review-target reads already use Core contracts.
 - [ ] Connect identity-match regeneration runtime to provider-neutral scoring, evidence-version and automatic-assignment implementations; remove remaining SQLite model/policy conversion and composition dependencies.
 
 ### 4. Remaining library and feature-state coverage
@@ -95,6 +96,16 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 Existing-catalogue import, production cutover and rollback acceptance belong to WI-0102. Match-regeneration scaling belongs to WI-0103; operator UI/query performance to WI-0104; slideshow latency fixes to WI-0108; operational backup/recovery and real-archive catch-up acceptance to WI-0106. WI-0101 must provide the complete persistence/runtime boundary those items depend on.
 
 ## Handoff from WI-0099 runtime-composition audit
+
+### Review query and artifact boundary (2026-09-09)
+
+Core owns the shared review records, filter options and `IReviewFaceRepository` / `IReviewFilterRepository`. `PostgresReviewQueryRepository` provides current review state, active people, scoped paging, previous/next navigation and run/model filter options. Latest unreversed actions, crops and observations retain the existing ordering rules; page/count and filter-option reads use a repeatable-read snapshot. API review, suggestion, gallery and detector pending-review endpoints use the contracts while default DI remains SQLite pending whole-runtime composition.
+
+Face previews read geometry through the face-query contract. Crop paths use `IProcessingRunConfigurationReader` with both providers, deliberately reading configuration without constructing a lifecycle-validated run. Regression tests caught and verified compatibility with historical terminal rows missing completion metadata; lifecycle validation remains unchanged. Full derivative file resolution still needs migration.
+
+The live PostgreSQL repository test covers state transitions and undo, active person/action evidence, absent faces, page counts/order/navigation, exact model and run scopes, option counts, latest crop/observation selection, invalid filters and cancellation. Existing focused API/resolver/rollout coverage passed 83 tests in 33 seconds. The new test runs at repository level and adds no HTTP host or required CI check.
+
+`DetectorEvaluationSessionStore`, `DetectorEvaluationComparisonStore` and `DetectorEvaluationGroundTruthStore` persist private JSON evaluation evidence under the configured evaluation root. These stores do not use SQLite. Their cross-catalogue portability is an existing requirement in WI-0039/WI-0040: frozen source hashes and manual corrections must remain available after switching between baseline and isolated candidate catalogues. Keep these files outside the authoritative catalogue and preserve their atomic file writes and schema compatibility. They are durable private artifacts, not disposable cache; operational backup must include the evaluation root. Canonical detections, processing, rollout plans, resolutions and application evidence are PostgreSQL-owned in PostgreSQL mode. This exception does not permit catalogue writes to SQLite.
 
 ### Rollout CLI verification (2026-09-09)
 

@@ -9,8 +9,16 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// <summary>
 /// Stores durable processing runs, leases work and guards worker transitions with lease tokens.
 /// </summary>
-public sealed class SqliteProcessingRepository : IProcessingExecutionRepository, IProcessingRunRepository
+public sealed class SqliteProcessingRepository : IProcessingExecutionRepository, IProcessingRunRepository, IProcessingRunConfigurationReader
 {
+    public async Task<string?> GetRunConfigurationAsync(ProcessingRunId id, CancellationToken cancellationToken = default)
+    {
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT configuration_json FROM processing_runs WHERE id = @id;";
+        command.Parameters.AddWithValue("@id", id.ToString());
+        return await command.ExecuteScalarAsync(cancellationToken) as string;
+    }
     private readonly SqliteCatalogueDatabase _database;
 
     public SqliteProcessingRepository(SqliteCatalogueDatabase database)

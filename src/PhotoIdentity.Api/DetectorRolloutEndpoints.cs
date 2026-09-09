@@ -1,8 +1,8 @@
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -69,7 +69,7 @@ public static class DetectorRolloutEndpoints
     private static async Task<IResult> GetPendingAsync(
         string runId,
         IDetectorRolloutApplicationRepository rolloutRepository,
-        SqliteReviewRepository reviewRepository,
+        IReviewFaceRepository reviewRepository,
         CancellationToken cancellationToken)
     {
         if (!TryRunId(runId, out ProcessingRunId parsedRunId))

@@ -12,8 +12,16 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresProcessingRepository :
     IProcessingExecutionRepository,
-    IProcessingRunRepository
+    IProcessingRunRepository, IProcessingRunConfigurationReader
 {
+    public async Task<string?> GetRunConfigurationAsync(ProcessingRunId id, CancellationToken cancellationToken = default)
+    {
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT configuration_json FROM processing_runs WHERE id = @id;";
+        command.Parameters.AddWithValue("@id", Guid.Parse(id.ToString()));
+        return await command.ExecuteScalarAsync(cancellationToken) as string;
+    }
     private readonly PostgresCatalogueDatabase _database;
 
     public PostgresProcessingRepository(PostgresCatalogueDatabase database)

@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Review;
 using System.Net;
 using System.Net.Http.Json;
 using PhotoIdentity.Core.Recognition;

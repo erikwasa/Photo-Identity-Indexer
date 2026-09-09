@@ -1,7 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -72,7 +71,7 @@ public static class SuggestionGalleryEndpoints
 
     private static async Task<IResult> GetFaceAsync(
         string id,
-        SqliteReviewRepository reviewRepository,
+        IReviewFaceRepository reviewRepository,
         IReviewActionRepository actionRepository,
         ISuggestionGalleryRepository suggestionRepository,
         ReviewFaceTargetResolver targetResolver,
