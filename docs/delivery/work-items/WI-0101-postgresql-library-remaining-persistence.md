@@ -68,4 +68,5 @@ Started 2026-09-09 on the M24 PostgreSQL catalogue branch.
 - Converted main review create-person/assign/unknown/reject/undo action paths to the Core-owned `IReviewActionRepository` contract while leaving still-SQLite face/filter/image query paths unchanged.
 - Converted suggestion-gallery detail action history to the Core-owned `IReviewActionRepository` contract while leaving still-SQLite face/navigation query paths unchanged.
 - Converted review face target fallback resolution to the Core-owned `IArchiveReviewProxyRepository` contract while leaving still-SQLite face query inputs unchanged.
+- Converted collection review-proxy file resolution to the Core-owned `IArchiveReviewProxyRepository` contract while leaving the face-review derivative resolver on its still-SQLite implementation.
 - Kept normal runtime binding on SQLite for these newly neutralized surfaces until WI-0102 performs controlled migration/cutover; no dual writes are introduced.
