@@ -1342,6 +1342,8 @@ work_items:
     value: '2026-09-09 detector rollout Core contract slice: API build passed with zero warnings/errors; dotnet test tests/PhotoIdentity.Integration.Tests --no-restore --filter FullyQualifiedName~DetectorRollout passed 18/18 tests (3 seconds). PostgreSQL detector persistence remains pending.'
   - type: test
     value: '2026-09-09 PostgreSQL detector review slice: schema v21 and review/concurrent-replay tests passed against live PostgreSQL (2/2, 3 seconds); build.ps1 passed with zero warnings/errors; test.ps1 passed 533 tests, including 402 integration tests (1 minute 39 seconds). Comprehensive published-app smoke verification passed with verify-review.ps1 -Mode Smoke -Configuration Release -SkipBuild. Runtime authority remains SQLite; pipeline/plan persistence and candidate application remain pending.'
+  - type: test
+    value: '2026-09-09 detector pipeline/plan slice: two live PostgreSQL detector tests passed (859 ms); 19 focused detector rollout tests passed (4 seconds); test.ps1 rebuilt Release and passed 535 tests, including 403 integration tests (1 minute 40 seconds). Documentation validation, generated-output check and diff check passed. Candidate application and worker composition remain pending.'
 - id: WI-0102
   title: Migrate the existing SQLite catalogue and perform controlled PostgreSQL cutover
   milestone: M24

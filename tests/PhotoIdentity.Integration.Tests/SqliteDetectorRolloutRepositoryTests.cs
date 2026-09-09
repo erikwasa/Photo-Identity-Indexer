@@ -9,6 +9,34 @@ namespace PhotoIdentity.Integration.Tests;
 public sealed class SqliteDetectorRolloutRepositoryTests
 {
     [Fact]
+    public async Task Plan_replay_cannot_append_candidates_to_immutable_evidence()
+    {
+        string databasePath = TemporaryDatabasePath();
+        try
+        {
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            Seed seed = await SeedAsync(database, existingOrdinals: [0]);
+            IDetectorReconciliationPlanRepository repository = new SqliteDetectorRolloutRepository(database);
+            CatalogueDetectorPipelineRegistration pipeline = await repository.RegisterPipelineAsync(seed.RunId, Pipeline(), seed.Now);
+            CandidateFaceDetectionAnchor candidate = new(0, Box(0.1, 0.1), Landmarks(0.1, 0.1));
+            FaceDetectionReconciliationPlan plan = new([new(0, FaceDetectionReconciliationDisposition.NewOccurrence, null, [])], []);
+            await repository.SavePlanAsync(seed.RunId, seed.RevisionId, pipeline.PipelineHash, [candidate], plan, seed.Now);
+            CandidateFaceDetectionAnchor extra = candidate with { CandidateIndex = 1 };
+            FaceDetectionReconciliationPlan expanded = new([.. plan.CandidateDecisions,
+                new(1, FaceDetectionReconciliationDisposition.NewOccurrence, null, [])], []);
+            await Assert.ThrowsAsync<InvalidOperationException>(() => repository.SavePlanAsync(
+                seed.RunId, seed.RevisionId, pipeline.PipelineHash, [candidate, extra], expanded, seed.Now));
+            Assert.Single((await repository.GetPlanAsync(seed.RunId, seed.RevisionId))!.Candidates);
+            Assert.Single((await repository.SavePlanAsync(seed.RunId, seed.RevisionId, pipeline.PipelineHash, [candidate], plan, seed.Now)).Candidates);
+        }
+        finally
+        {
+            DeleteDatabase(databasePath);
+        }
+    }
+
+    [Fact]
     public async Task Initialize_upgrades_version_seven_catalogue_with_rollout_schema()
     {
         string databasePath = TemporaryDatabasePath();

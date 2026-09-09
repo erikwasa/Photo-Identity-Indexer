@@ -13,7 +13,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Persistence boundary for detector replacement. Unlike the ordinary inspection writer,
 /// this repository never uses a candidate ordinal as evidence that two detections are the same face.
 /// </summary>
-public sealed class SqliteDetectorRolloutRepository
+public sealed class SqliteDetectorRolloutRepository : IDetectorReconciliationPlanRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -132,6 +132,8 @@ public sealed class SqliteDetectorRolloutRepository
         }
 
         DateTimeOffset plannedAt = plannedAtUtc.ToUniversalTime();
+        CatalogueDetectorReconciliationPlan expected = ToCataloguePlan(
+            processingRunId, assetRevisionId, pipelineHash, plannedAt, anchors, plan);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
 
@@ -148,6 +150,7 @@ public sealed class SqliteDetectorRolloutRepository
                 $"Reconciliation plan pipeline {pipelineHash} does not match run pipeline {linkedHash}.");
         }
 
+        bool inserted;
         using (SqliteCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;
@@ -164,7 +167,22 @@ public sealed class SqliteDetectorRolloutRepository
             command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
             command.Parameters.AddWithValue("$pipeline_hash", pipelineHash.ToString());
             command.Parameters.AddWithValue("$planned_at_utc", Format(plannedAt));
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            inserted = await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+        }
+
+        if (!inserted)
+        {
+            CatalogueDetectorReconciliationPlan existing = await ReadPlanAsync(
+                connection, transaction, processingRunId, assetRevisionId, cancellationToken)
+                ?? throw new DataException("The persisted reconciliation plan disappeared during replay.");
+            if (!PlansEquivalent(expected, existing))
+            {
+                throw new InvalidOperationException(
+                    "A different reconciliation plan is already persisted for this processing run and asset revision.");
+            }
+
+            transaction.Commit();
+            return existing;
         }
 
         foreach (FaceDetectionReconciliationDecision decision in plan.CandidateDecisions)
@@ -247,13 +265,6 @@ public sealed class SqliteDetectorRolloutRepository
             cancellationToken)
             ?? throw new InvalidOperationException("The reconciliation plan was unavailable after persistence.");
 
-        CatalogueDetectorReconciliationPlan expected = ToCataloguePlan(
-            processingRunId,
-            assetRevisionId,
-            pipelineHash,
-            plannedAt,
-            anchors,
-            plan);
         if (!PlansEquivalent(expected, persisted))
         {
             throw new InvalidOperationException(
