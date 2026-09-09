@@ -1,59 +1,14 @@
 using System.Globalization;
-using Microsoft.Data.Sqlite;
+using Npgsql;
+using NpgsqlTypes;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.People;
 using PhotoIdentity.Core.Recognition;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Persistence.Postgres;
 
-public static class CatalogueCollectionMatchModes
-{
-    public const string Any = "any";
-    public const string All = "all";
-}
-
-public static class CatalogueCollectionReviewStates
-{
-    public const string Assigned = CatalogueReviewStates.Assigned;
-    public const string Unreviewed = CatalogueReviewStates.Unreviewed;
-    public const string All = "all";
-}
-
-public sealed record CatalogueCollectionSuggestionPolicy(
-    ModelId ModelId,
-    Sha256Digest ModelHash,
-    double MinimumScore);
-
-public sealed record CatalogueCollectionPersonMatch(
-    PersonId PersonId,
-    string DisplayName,
-    int ConfirmedFaceCount,
-    int SuggestedFaceCount,
-    double? MaximumSuggestionScore);
-
-public sealed record CatalogueCollectionPhoto(
-    AssetRevisionId RevisionId,
-    AssetId AssetId,
-    DateTimeOffset ObservedAtUtc,
-    string? MediaType,
-    int? Width,
-    int? Height,
-    IReadOnlyList<CatalogueCollectionPersonMatch> People);
-
-public sealed record CatalogueCollectionPhotoPage(
-    IReadOnlyList<CatalogueCollectionPhoto> Items,
-    int Offset,
-    int Limit,
-    int Total,
-    string MatchMode,
-    string ReviewState,
-    CatalogueCollectionSuggestionPolicy? SuggestionPolicy);
-
-/// <summary>
-/// Queries path-free photo manifests from active confirmed assignments and, only when explicitly enabled,
-/// top-ranked pending suggestions from one exact model revision. Unknown faces are excluded from both paths.
-/// </summary>
-public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
+public sealed class PostgresCollectionQueryRepository : ICollectionQueryRepository
 {
     private const string MatchingFaceCtes = """
         WITH latest_action AS (
@@ -88,8 +43,8 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
                AND suggested_people.merged_into_person_id IS NULL
             WHERE rankings.rank = 1
               AND suggestions.status = 'pending'
-              AND rankings.model_id = $suggestion_model_id
-              AND rankings.model_hash = $suggestion_model_hash
+              AND rankings.model_id = @suggestion_model_id
+              AND rankings.model_hash = @suggestion_model_hash
         ),
         matched_faces AS (
             SELECT
@@ -104,7 +59,7 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
                 confirmed_people.display_name,
                 1 AS confirmed_evidence,
                 0 AS suggested_evidence,
-                NULL AS suggestion_score
+                NULL::double precision AS suggestion_score
             FROM asset_revisions
             INNER JOIN face_occurrences
                 ON face_occurrences.asset_revision_id = asset_revisions.id
@@ -118,11 +73,11 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
             LEFT JOIN latest_observation
                 ON latest_observation.face_occurrence_id = face_occurrences.id
                AND latest_observation.row_number = 1
-            WHERE $include_assigned = 1
+            WHERE @include_assigned
               AND latest_action.person_id IN ({0})
-              AND ($from_utc IS NULL OR asset_revisions.observed_at_utc >= $from_utc)
-              AND ($to_utc IS NULL OR asset_revisions.observed_at_utc <= $to_utc)
-              AND ($min_confidence IS NULL OR latest_observation.confidence >= $min_confidence)
+              AND (@from_utc IS NULL OR asset_revisions.observed_at_utc >= @from_utc)
+              AND (@to_utc IS NULL OR asset_revisions.observed_at_utc <= @to_utc)
+              AND (@min_confidence IS NULL OR latest_observation.confidence >= @min_confidence)
 
             UNION ALL
 
@@ -150,13 +105,13 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
             LEFT JOIN latest_observation
                 ON latest_observation.face_occurrence_id = face_occurrences.id
                AND latest_observation.row_number = 1
-            WHERE $include_unreviewed = 1
+            WHERE @include_unreviewed
               AND latest_action.id IS NULL
               AND top_suggestion.suggested_person_id IN ({0})
-              AND top_suggestion.score >= $min_suggestion_score
-              AND ($from_utc IS NULL OR asset_revisions.observed_at_utc >= $from_utc)
-              AND ($to_utc IS NULL OR asset_revisions.observed_at_utc <= $to_utc)
-              AND ($min_confidence IS NULL OR latest_observation.confidence >= $min_confidence)
+              AND top_suggestion.score >= @min_suggestion_score
+              AND (@from_utc IS NULL OR asset_revisions.observed_at_utc >= @from_utc)
+              AND (@to_utc IS NULL OR asset_revisions.observed_at_utc <= @to_utc)
+              AND (@min_confidence IS NULL OR latest_observation.confidence >= @min_confidence)
         ),
         matched_revisions AS (
             SELECT
@@ -178,39 +133,18 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
         )
         """;
 
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly PostgresCatalogueDatabase _database;
 
-    public SqliteCollectionQueryRepository(SqliteCatalogueDatabase database)
+    public PostgresCollectionQueryRepository(PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
     }
 
-    public Task<CatalogueCollectionPhotoPage> QueryConfirmedPhotosAsync(
+    public async Task<CollectionPhotoPage> QueryPhotosAsync(
         IReadOnlyCollection<PersonId> personIds,
-        string matchMode = CatalogueCollectionMatchModes.All,
-        DateTimeOffset? fromUtc = null,
-        DateTimeOffset? toUtc = null,
-        double? minimumConfidence = null,
-        int offset = 0,
-        int limit = 40,
-        CancellationToken cancellationToken = default) =>
-        QueryPhotosAsync(
-            personIds,
-            matchMode,
-            suggestionPolicy: null,
-            reviewState: CatalogueCollectionReviewStates.Assigned,
-            fromUtc: fromUtc,
-            toUtc: toUtc,
-            minimumConfidence: minimumConfidence,
-            offset: offset,
-            limit: limit,
-            cancellationToken: cancellationToken);
-
-    public async Task<CatalogueCollectionPhotoPage> QueryPhotosAsync(
-        IReadOnlyCollection<PersonId> personIds,
-        string matchMode = CatalogueCollectionMatchModes.All,
-        CatalogueCollectionSuggestionPolicy? suggestionPolicy = null,
+        string matchMode = CollectionMatchModes.All,
+        CollectionSuggestionPolicy? suggestionPolicy = null,
         string? reviewState = null,
         DateTimeOffset? fromUtc = null,
         DateTimeOffset? toUtc = null,
@@ -257,10 +191,10 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
 
         string normalizedReviewState = NormalizeReviewState(reviewState, suggestionPolicy);
         string[] personParameters = distinctPeople
-            .Select((_, index) => $"$person_{index}")
+            .Select((_, index) => $"@person_{index}")
             .ToArray();
-        string having = normalizedMatchMode == CatalogueCollectionMatchModes.All
-            ? "COUNT(DISTINCT person_id) = $person_count"
+        string having = normalizedMatchMode == CollectionMatchModes.All
+            ? "COUNT(DISTINCT person_id) = @person_count"
             : "COUNT(DISTINCT person_id) >= 1";
         string ctes = string.Format(
             CultureInfo.InvariantCulture,
@@ -268,10 +202,11 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
             string.Join(", ", personParameters),
             having);
 
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
 
         int total;
-        using (SqliteCommand countCommand = connection.CreateCommand())
+        await using (NpgsqlCommand countCommand = connection.CreateCommand())
         {
             countCommand.CommandText = $"""
                 {ctes}
@@ -291,14 +226,14 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
                 CultureInfo.InvariantCulture);
         }
 
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = $"""
             {ctes},
             paged_revisions AS (
                 SELECT *
                 FROM matched_revisions
                 ORDER BY observed_at_utc DESC, revision_id
-                LIMIT $limit OFFSET $offset
+                LIMIT @limit OFFSET @offset
             )
             SELECT
                 paged_revisions.revision_id,
@@ -327,7 +262,7 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
             ORDER BY
                 paged_revisions.observed_at_utc DESC,
                 paged_revisions.revision_id,
-                matched_faces.display_name,
+                lower(matched_faces.display_name),
                 matched_faces.person_id;
             """;
         AddParameters(
@@ -338,15 +273,16 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
             fromUtc,
             toUtc,
             minimumConfidence);
-        command.Parameters.AddWithValue("$limit", limit);
-        command.Parameters.AddWithValue("$offset", offset);
+        command.Parameters.AddWithValue("limit", limit);
+        command.Parameters.AddWithValue("offset", offset);
 
-        List<CatalogueCollectionPhoto> items = [];
-        CatalogueCollectionPhotoBuilder? current = null;
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        List<CollectionPhoto> items = [];
+        CollectionPhotoBuilder? current = null;
+        await using NpgsqlDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            AssetRevisionId revisionId = AssetRevisionId.From(Guid.Parse(reader.GetString(0)));
+            AssetRevisionId revisionId = AssetRevisionId.From(reader.GetGuid(0));
             if (current is null || current.RevisionId != revisionId)
             {
                 if (current is not null)
@@ -354,17 +290,17 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
                     items.Add(current.Build());
                 }
 
-                current = new CatalogueCollectionPhotoBuilder(
+                current = new CollectionPhotoBuilder(
                     revisionId,
-                    AssetId.From(Guid.Parse(reader.GetString(1))),
-                    Parse(reader.GetString(2)),
+                    AssetId.From(reader.GetGuid(1)),
+                    reader.GetFieldValue<DateTimeOffset>(2),
                     reader.IsDBNull(3) ? null : reader.GetString(3),
                     reader.IsDBNull(4) ? null : reader.GetInt32(4),
                     reader.IsDBNull(5) ? null : reader.GetInt32(5));
             }
 
-            current.People.Add(new CatalogueCollectionPersonMatch(
-                PersonId.From(Guid.Parse(reader.GetString(6))),
+            current.People.Add(new CollectionPersonMatch(
+                PersonId.From(reader.GetGuid(6)),
                 reader.GetString(7),
                 checked((int)reader.GetInt64(8)),
                 checked((int)reader.GetInt64(9)),
@@ -376,7 +312,7 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
             items.Add(current.Build());
         }
 
-        return new CatalogueCollectionPhotoPage(
+        return new CollectionPhotoPage(
             items,
             offset,
             limit,
@@ -386,72 +322,10 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
             suggestionPolicy);
     }
 
-    async Task<CollectionPhotoPage> ICollectionQueryRepository.QueryPhotosAsync(
-        IReadOnlyCollection<PersonId> personIds,
-        string matchMode,
-        CollectionSuggestionPolicy? suggestionPolicy,
-        string? reviewState,
-        DateTimeOffset? fromUtc,
-        DateTimeOffset? toUtc,
-        double? minimumConfidence,
-        int offset,
-        int limit,
-        CancellationToken cancellationToken)
-    {
-        CatalogueCollectionPhotoPage page = await QueryPhotosAsync(
-            personIds,
-            matchMode,
-            suggestionPolicy is null
-                ? null
-                : new CatalogueCollectionSuggestionPolicy(
-                    suggestionPolicy.ModelId,
-                    suggestionPolicy.ModelHash,
-                    suggestionPolicy.MinimumScore),
-            reviewState,
-            fromUtc,
-            toUtc,
-            minimumConfidence,
-            offset,
-            limit,
-            cancellationToken);
-        return ToCorePage(page);
-    }
-
-    private static CollectionPhotoPage ToCorePage(CatalogueCollectionPhotoPage page) =>
-        new(
-            page.Items
-                .Select(photo => new CollectionPhoto(
-                    photo.RevisionId,
-                    photo.AssetId,
-                    photo.ObservedAtUtc,
-                    photo.MediaType,
-                    photo.Width,
-                    photo.Height,
-                    photo.People
-                        .Select(person => new CollectionPersonMatch(
-                            person.PersonId,
-                            person.DisplayName,
-                            person.ConfirmedFaceCount,
-                            person.SuggestedFaceCount,
-                            person.MaximumSuggestionScore))
-                        .ToArray()))
-                .ToArray(),
-            page.Offset,
-            page.Limit,
-            page.Total,
-            page.MatchMode,
-            page.ReviewState,
-            page.SuggestionPolicy is null
-                ? null
-                : new CollectionSuggestionPolicy(
-                    page.SuggestionPolicy.ModelId,
-                    page.SuggestionPolicy.ModelHash,
-                    page.SuggestionPolicy.MinimumScore));
-
     private static void AddParameters(
-        SqliteCommand command,
+        NpgsqlCommand command,
         IReadOnlyList<PersonId> personIds,
-        CatalogueCollectionSuggestionPolicy? suggestionPolicy,
+        CollectionSuggestionPolicy? suggestionPolicy,
         string reviewState,
         DateTimeOffset? fromUtc,
         DateTimeOffset? toUtc,
@@ -459,45 +333,42 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
     {
         for (int index = 0; index < personIds.Count; index++)
         {
-            command.Parameters.AddWithValue($"$person_{index}", personIds[index].ToString());
+            command.Parameters.AddWithValue($"person_{index}", NpgsqlDbType.Uuid, Guid.Parse(personIds[index].ToString()));
         }
 
-        command.Parameters.AddWithValue("$person_count", personIds.Count);
+        command.Parameters.AddWithValue("person_count", NpgsqlDbType.Integer, personIds.Count);
         command.Parameters.AddWithValue(
-            "$include_assigned",
-            reviewState is CatalogueCollectionReviewStates.Assigned or CatalogueCollectionReviewStates.All ? 1 : 0);
+            "include_assigned",
+            NpgsqlDbType.Boolean,
+            reviewState is CollectionReviewStates.Assigned or CollectionReviewStates.All);
         command.Parameters.AddWithValue(
-            "$include_unreviewed",
-            reviewState is CatalogueCollectionReviewStates.Unreviewed or CatalogueCollectionReviewStates.All ? 1 : 0);
-        command.Parameters.AddWithValue(
-            "$suggestion_model_id",
-            suggestionPolicy is null ? DBNull.Value : suggestionPolicy.ModelId.ToString());
-        command.Parameters.AddWithValue(
-            "$suggestion_model_hash",
-            suggestionPolicy is null ? DBNull.Value : suggestionPolicy.ModelHash.ToString());
-        command.Parameters.AddWithValue(
-            "$min_suggestion_score",
-            suggestionPolicy is null ? DBNull.Value : suggestionPolicy.MinimumScore);
-        command.Parameters.AddWithValue(
-            "$from_utc",
-            fromUtc is null ? DBNull.Value : fromUtc.Value.ToUniversalTime().ToString("O"));
-        command.Parameters.AddWithValue(
-            "$to_utc",
-            toUtc is null ? DBNull.Value : toUtc.Value.ToUniversalTime().ToString("O"));
-        command.Parameters.AddWithValue(
-            "$min_confidence",
-            minimumConfidence is null ? DBNull.Value : minimumConfidence.Value);
+            "include_unreviewed",
+            NpgsqlDbType.Boolean,
+            reviewState is CollectionReviewStates.Unreviewed or CollectionReviewStates.All);
+
+        NpgsqlParameter modelId = command.Parameters.Add("suggestion_model_id", NpgsqlDbType.Text);
+        modelId.Value = suggestionPolicy is null ? DBNull.Value : suggestionPolicy.ModelId.ToString();
+        NpgsqlParameter modelHash = command.Parameters.Add("suggestion_model_hash", NpgsqlDbType.Text);
+        modelHash.Value = suggestionPolicy is null ? DBNull.Value : suggestionPolicy.ModelHash.ToString();
+        NpgsqlParameter suggestionScore = command.Parameters.Add("min_suggestion_score", NpgsqlDbType.Double);
+        suggestionScore.Value = suggestionPolicy is null ? DBNull.Value : suggestionPolicy.MinimumScore;
+        NpgsqlParameter from = command.Parameters.Add("from_utc", NpgsqlDbType.TimestampTz);
+        from.Value = fromUtc is null ? DBNull.Value : fromUtc.Value.ToUniversalTime();
+        NpgsqlParameter to = command.Parameters.Add("to_utc", NpgsqlDbType.TimestampTz);
+        to.Value = toUtc is null ? DBNull.Value : toUtc.Value.ToUniversalTime();
+        NpgsqlParameter confidence = command.Parameters.Add("min_confidence", NpgsqlDbType.Double);
+        confidence.Value = minimumConfidence is null ? DBNull.Value : minimumConfidence.Value;
     }
 
     private static string NormalizeMatchMode(string matchMode)
     {
         string normalized = string.IsNullOrWhiteSpace(matchMode)
-            ? CatalogueCollectionMatchModes.All
+            ? CollectionMatchModes.All
             : matchMode.Trim().ToLowerInvariant();
         return normalized switch
         {
-            CatalogueCollectionMatchModes.Any => normalized,
-            CatalogueCollectionMatchModes.All => normalized,
+            CollectionMatchModes.Any => normalized,
+            CollectionMatchModes.All => normalized,
             _ => throw new ArgumentException(
                 $"Unsupported collection match mode '{matchMode}'. Use 'any' or 'all'.",
                 nameof(matchMode)),
@@ -506,25 +377,25 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
 
     private static string NormalizeReviewState(
         string? reviewState,
-        CatalogueCollectionSuggestionPolicy? suggestionPolicy)
+        CollectionSuggestionPolicy? suggestionPolicy)
     {
         string normalized = string.IsNullOrWhiteSpace(reviewState)
             ? suggestionPolicy is null
-                ? CatalogueCollectionReviewStates.Assigned
-                : CatalogueCollectionReviewStates.All
+                ? CollectionReviewStates.Assigned
+                : CollectionReviewStates.All
             : reviewState.Trim().ToLowerInvariant();
 
         if (normalized is not (
-            CatalogueCollectionReviewStates.Assigned or
-            CatalogueCollectionReviewStates.Unreviewed or
-            CatalogueCollectionReviewStates.All))
+            CollectionReviewStates.Assigned or
+            CollectionReviewStates.Unreviewed or
+            CollectionReviewStates.All))
         {
             throw new ArgumentException(
                 $"Unsupported collection review state '{reviewState}'. Use 'assigned', 'unreviewed' or 'all'.",
                 nameof(reviewState));
         }
 
-        if (normalized == CatalogueCollectionReviewStates.Assigned && suggestionPolicy is not null)
+        if (normalized == CollectionReviewStates.Assigned && suggestionPolicy is not null)
         {
             throw new ArgumentException(
                 "The 'assigned' review state cannot be combined with suggestion parameters. " +
@@ -532,7 +403,7 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
                 nameof(reviewState));
         }
 
-        if (normalized != CatalogueCollectionReviewStates.Assigned && suggestionPolicy is null)
+        if (normalized != CollectionReviewStates.Assigned && suggestionPolicy is null)
         {
             throw new ArgumentException(
                 $"The '{normalized}' review state requires includeSuggestions=true with exact model and threshold parameters.",
@@ -542,14 +413,9 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
         return normalized;
     }
 
-    private static DateTimeOffset Parse(string value) => DateTimeOffset.Parse(
-        value,
-        CultureInfo.InvariantCulture,
-        DateTimeStyles.RoundtripKind);
-
-    private sealed class CatalogueCollectionPhotoBuilder
+    private sealed class CollectionPhotoBuilder
     {
-        public CatalogueCollectionPhotoBuilder(
+        public CollectionPhotoBuilder(
             AssetRevisionId revisionId,
             AssetId assetId,
             DateTimeOffset observedAtUtc,
@@ -571,9 +437,9 @@ public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
         public string? MediaType { get; }
         public int? Width { get; }
         public int? Height { get; }
-        public List<CatalogueCollectionPersonMatch> People { get; } = [];
+        public List<CollectionPersonMatch> People { get; } = [];
 
-        public CatalogueCollectionPhoto Build() => new(
+        public CollectionPhoto Build() => new(
             RevisionId,
             AssetId,
             ObservedAtUtc,
