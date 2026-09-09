@@ -7,6 +7,15 @@ namespace PhotoIdentity.Core.Recognition;
 /// </summary>
 public interface IArchiveAnalysisStateRepository
 {
+    Task<IReadOnlyList<AssetRevisionId>> GetPendingCurrentRevisionIdsAsync(
+        SourceId sourceId, Sha256Digest profileHash, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AssetRevisionId>> GetPendingCurrentRevisionIdsAsync(
+        SourceId sourceId, Sha256Digest profileHash, bool includeHydratable, CancellationToken cancellationToken = default);
+
+    Task<int> CountCompletedCurrentRevisionsAsync(
+        SourceId sourceId, Sha256Digest profileHash, CancellationToken cancellationToken = default);
+
     Task RegisterRunAsync(
         ProcessingRunId runId,
         AnalysisProfileDefinition profile,

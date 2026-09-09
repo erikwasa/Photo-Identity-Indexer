@@ -200,6 +200,15 @@ public partial class Program
         builder.Services.AddSingleton<IDetectorRolloutReviewRepository, SqliteDetectorRolloutReviewRepository>();
         builder.Services.AddSingleton<IDetectorRolloutApplicationRepository, SqliteDetectorRolloutApplicationRepository>();
         builder.Services.AddSingleton<SqliteArchiveAnalysisRepository>();
+        builder.Services.AddSingleton<IArchiveAnalysisStateRepository>(services => services.GetRequiredService<SqliteArchiveAnalysisRepository>());
+        builder.Services.AddSingleton<IFaceInspectionRepository, SqliteFaceCatalogueRepository>();
+        builder.Services.AddSingleton<ICatalogueStoreInitializer>(services => services.GetRequiredService<SqliteCatalogueDatabase>());
+        builder.Services.AddSingleton<ArchiveAnalysisPersistence>(services => new(
+            services.GetRequiredService<ICatalogueStoreInitializer>(), services.GetRequiredService<IArchiveCoverageRepository>(),
+            services.GetRequiredService<IAssetRevisionLookupRepository>(), services.GetRequiredService<IFaceInspectionRepository>(),
+            services.GetRequiredService<IProcessingRunRepository>(), services.GetRequiredService<IProcessingExecutionRepository>(),
+            services.GetRequiredService<IArchiveAnalysisStateRepository>()));
+        builder.Services.AddSingleton<FaceReviewDerivativeBackfillService>();
         builder.Services.AddSingleton<SqliteArchiveReviewProxyRepository>();
         builder.Services.AddSingleton<IFaceReviewDerivativeRepository, SqliteFaceReviewDerivativeRepository>();
         builder.Services.AddSingleton<IFaceReviewDerivativeBackfillRepository, SqliteFaceReviewDerivativeBackfillRepository>();
@@ -221,6 +230,7 @@ public partial class Program
         builder.Services.AddSingleton<IArchiveSourceObservationRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteArchiveSourceObservationRepository>());
         builder.Services.AddSingleton<SqliteArchiveSourceVerificationStateRepository>();
+        builder.Services.AddSingleton<IArchiveSourceVerificationStateRepository>(services => services.GetRequiredService<SqliteArchiveSourceVerificationStateRepository>());
         builder.Services.AddSingleton<SqliteArchiveAvailabilityRepository>();
         builder.Services.AddSingleton<IArchiveAvailabilityRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteArchiveAvailabilityRepository>());

@@ -3,7 +3,7 @@ using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
@@ -18,14 +18,15 @@ public sealed record ArchiveBoundedAnalysisAdvanceResult(bool StartedNewRun);
 /// </summary>
 public sealed class ArchiveBoundedAnalysisService : IDisposable
 {
-    private readonly SqliteCatalogueDatabase _database;
-    private readonly SqliteLocalBatchRepository _catalogue;
-    private readonly SqliteArchiveAnalysisRepository _analysis;
+    private readonly ArchiveAnalysisPersistence _persistence;
+    private readonly IArchiveStatusRepository _status;
+    private readonly IAssetRevisionLookupRepository _catalogue;
+    private readonly IArchiveAnalysisStateRepository _analysis;
     private readonly IArchiveCoverageRepository _coverage;
     private readonly IArchivePostAnalysisRepository _postAnalysis;
     private readonly IArchiveReviewProxyRepository _proxies;
     private readonly IArchiveAvailabilityRepository _availability;
-    private readonly SqliteArchiveSourceVerificationStateRepository _sourceVerificationState;
+    private readonly IArchiveSourceVerificationStateRepository _sourceVerificationState;
     private readonly CollectionOriginalAccessService _originals;
     private readonly ArchiveSourceVerificationService _sourceVerification;
     private readonly PhotoMetadataInspectionService _metadataInspection;
@@ -39,14 +40,14 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
     private bool _disposed;
 
     public ArchiveBoundedAnalysisService(
-        SqliteCatalogueDatabase database,
-        SqliteLocalBatchRepository catalogue,
-        SqliteArchiveAnalysisRepository analysis,
+        ArchiveAnalysisPersistence persistence,
+        IArchiveStatusRepository status,
+        FaceReviewDerivativeBackfillService faceReviewBackfill,
         IArchiveCoverageRepository coverage,
         IArchivePostAnalysisRepository postAnalysis,
         IArchiveReviewProxyRepository proxies,
         IArchiveAvailabilityRepository availability,
-        SqliteArchiveSourceVerificationStateRepository sourceVerificationState,
+        IArchiveSourceVerificationStateRepository sourceVerificationState,
         CollectionOriginalAccessService originals,
         ArchiveSourceVerificationService sourceVerification,
         PhotoMetadataInspectionService metadataInspection,
@@ -54,9 +55,9 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         TimeProvider timeProvider,
         ArchiveThroughputMetrics? metrics = null)
     {
-        ArgumentNullException.ThrowIfNull(database);
-        ArgumentNullException.ThrowIfNull(catalogue);
-        ArgumentNullException.ThrowIfNull(analysis);
+        ArgumentNullException.ThrowIfNull(persistence);
+        ArgumentNullException.ThrowIfNull(status);
+        ArgumentNullException.ThrowIfNull(faceReviewBackfill);
         ArgumentNullException.ThrowIfNull(coverage);
         ArgumentNullException.ThrowIfNull(postAnalysis);
         ArgumentNullException.ThrowIfNull(proxies);
@@ -67,9 +68,10 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         ArgumentNullException.ThrowIfNull(metadataInspection);
         ArgumentNullException.ThrowIfNull(proxyConfiguration);
         ArgumentNullException.ThrowIfNull(timeProvider);
-        _database = database;
-        _catalogue = catalogue;
-        _analysis = analysis;
+        _persistence = persistence;
+        _status = status;
+        _catalogue = persistence.Assets;
+        _analysis = persistence.Analysis;
         _coverage = coverage;
         _postAnalysis = postAnalysis;
         _proxies = proxies;
@@ -78,20 +80,13 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         _originals = originals;
         _sourceVerification = sourceVerification;
         _metadataInspection = metadataInspection;
-        _faceReviewBackfill = new FaceReviewDerivativeBackfillService(
-            new SqliteFaceReviewDerivativeRepository(database),
-            new SqliteFaceReviewDerivativeBackfillRepository(database),
-            catalogue,
-            originals,
-            proxyConfiguration,
-            timeProvider,
-            metrics);
+        _faceReviewBackfill = faceReviewBackfill;
         _proxyConfiguration = proxyConfiguration;
         _timeProvider = timeProvider;
         _metrics = metrics;
-        _inspectionSession = new ArchiveAnalysisInspectionSession(database, metrics);
+        _inspectionSession = new ArchiveAnalysisInspectionSession(persistence.Assets, persistence.Faces, metrics);
         _analysisCoordinator = new ArchiveAnalysisCoordinator(
-            database,
+            persistence,
             timeProvider,
             metrics,
             _inspectionSession);
@@ -156,15 +151,15 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
             cancellationToken);
         Sha256Digest analysisProfileHash = analysisProfile.ComputeHash();
 
-        SqliteArchiveStatusRepository statusRepository = new(_database);
-        SqliteProcessingRepository processingRepository = new(_database);
+        IArchiveStatusRepository statusRepository = _status;
+        IProcessingRunRepository processingRepository = _persistence.Runs;
         CatalogueArchiveRunStatus? latest = await statusRepository.GetLatestRunAsync(
             analysisProfileHash,
             cancellationToken);
 
         if (latest is not null)
         {
-            ProcessingRunSummary durable = await processingRepository.GetRunSummaryAsync(
+            ProcessingRunSummary durable = await _persistence.Execution.GetRunSummaryAsync(
                 latest.RunId,
                 cancellationToken);
             if (!durable.IsTerminal)
@@ -202,7 +197,7 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
             } &&
             latest is not null)
         {
-            ProcessingRunSummary durable = await processingRepository.GetRunSummaryAsync(
+            ProcessingRunSummary durable = await _persistence.Execution.GetRunSummaryAsync(
                 latest.RunId,
                 cancellationToken);
             if (!durable.IsTerminal)
@@ -269,7 +264,7 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         ArchiveAnalysisCoordinator coordinator = _analysisCoordinator;
         if (latest is not null)
         {
-            ProcessingRunSummary durable = await processingRepository.GetRunSummaryAsync(
+            ProcessingRunSummary durable = await _persistence.Execution.GetRunSummaryAsync(
                 latest.RunId,
                 cancellationToken);
             if (!durable.IsTerminal)
@@ -352,7 +347,7 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
     }
 
     private async Task<bool> EnsureNextDueJobReadyAsync(
-        SqliteProcessingRepository processing,
+        IProcessingRunRepository processing,
         ProcessingRunId runId,
         CancellationToken cancellationToken)
     {
@@ -493,10 +488,10 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
             return true;
         }
         await RecordAvailabilityAsync(revisionId, AssetAvailability.Local, cancellationToken);
-        CatalogueProcessingAssetRevision revision = await _catalogue.GetAssetRevisionAsync(revisionId, cancellationToken)
+        AssetRevisionLookup revision = await _catalogue.GetRevisionAsync(revisionId, cancellationToken)
             ?? throw new InvalidOperationException("The analyzed archive revision disappeared before proxy generation.");
         string sourcePath = ResolveSourcePath(revision.RootLocator, revision.SourceKey);
-        ArchiveReviewProxyWriter writer = new(_database);
+        ArchiveReviewProxyWriter writer = new(_proxies);
         using (IDisposable? proxyTiming = _metrics?.Measure(ArchiveThroughputMetricNames.ReviewProxyGeneration))
         {
             _ = await writer.GenerateAsync(
@@ -559,7 +554,7 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         AssetRevisionId revisionId,
         CancellationToken cancellationToken)
     {
-        CatalogueProcessingAssetRevision? revision = await _catalogue.GetAssetRevisionAsync(
+        AssetRevisionLookup? revision = await _catalogue.GetRevisionAsync(
             revisionId,
             cancellationToken);
         if (revision is null)
@@ -578,7 +573,7 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         AssetAvailability availability,
         CancellationToken cancellationToken)
     {
-        CatalogueProcessingAssetRevision? revision = await _catalogue.GetAssetRevisionAsync(revisionId, cancellationToken);
+        AssetRevisionLookup? revision = await _catalogue.GetRevisionAsync(revisionId, cancellationToken);
         if (revision is null)
         {
             return;

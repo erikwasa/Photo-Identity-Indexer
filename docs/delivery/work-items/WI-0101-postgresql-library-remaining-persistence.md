@@ -58,9 +58,11 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 ### 2. Archive, processing and file access
 
 - [ ] Migrate source scanning/sync and current-revision/general catalogue lookup composition, including `LocalArchiveSyncCoordinator.cs`.
-- [ ] Remove remaining concrete SQLite analysis/run/job collaborators from `ArchiveAnalysisProcessing.cs`, `ArchiveBoundedAnalysisService.cs`, `ArchiveEndpoints.cs` and archive advancement flow.
+- [x] Remove concrete SQLite persistence from `ArchiveAnalysisProcessing.cs` and `ArchiveBoundedAnalysisService.cs`; add PostgreSQL pending/completed revision queries and mismatch re-verification state handling.
+- [ ] Remove remaining concrete SQLite collaborators from `ArchiveEndpoints.cs` and the hosted archive advancement flow.
 - [x] Add PostgreSQL face-review derivative metadata/completion and backfill persistence; move derivative writer, backfill service and file resolvers to Core contracts.
-- [ ] Migrate the whole-photo review-proxy writer and remove remaining SQLite construction of derivative collaborators in archive orchestration.
+- [x] Migrate the whole-photo review-proxy writer to the existing Core contract and PostgreSQL implementation.
+- [ ] Remove remaining SQLite construction of derivative collaborators in hosted archive advancement; bounded analysis now uses injected contracts.
 - [ ] Audit `PortableBundleExportCoordinator.cs` and other production catalogue lookup paths; migrate runtime dependencies while explicitly identifying legitimate import/export compatibility boundaries.
 - [ ] Verify archive coverage, status/filter paging, availability, hydration, verification, storage accounting and post-analysis operate together through PostgreSQL-backed contracts. Existing individual repositories are not sufficient evidence for this end-to-end composition.
 
@@ -97,6 +99,14 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 Existing-catalogue import, production cutover and rollback acceptance belong to WI-0102. Match-regeneration scaling belongs to WI-0103; operator UI/query performance to WI-0104; slideshow latency fixes to WI-0108; operational backup/recovery and real-archive catch-up acceptance to WI-0106. WI-0101 must provide the complete persistence/runtime boundary those items depend on.
 
 ## Handoff from WI-0099 runtime-composition audit
+
+### Archive analysis composition (2026-09-10)
+
+`ArchiveAnalysisPersistence` groups the initializer, coverage, revision lookup, face inspection, run lifecycle/execution and analysis-state contracts. The coordinator, reusable inspection session and tracking job handler no longer reference SQLite. Bounded analysis receives the same composition, status queries, derivative backfill and source-verification contracts through DI. The whole-photo proxy writer now uses `IArchiveReviewProxyRepository`; CLI archive callers explicitly compose the still-current SQLite provider at their boundary.
+
+`IArchiveAnalysisStateRepository` now includes pending/current revision selection and completion counts. PostgreSQL preserves verified-source gating, local-only versus optionally hydratable availability, source scoping, soft deletion and exact-profile/current-revision semantics. `IArchiveSourceVerificationStateRepository` preserves mismatch handling, transferring active revision hydration ownership back to source identity before marking re-verification. Missing observation errors remain explicit and repeat calls preserve the transferred ownership.
+
+The live PostgreSQL query/verification test passed (997 ms), including availability transitions, source verification, current-revision replacement, soft deletion, completion, cancellation and replayed hydration transfer. Fifty-nine focused archive/derivative tests passed in 13 seconds. Added coverage stays at repository level; required CI gates are unchanged. Source scanning, hosted advancement and coherent PostgreSQL startup still remain.
 
 ### Face-review derivative persistence (2026-09-10)
 

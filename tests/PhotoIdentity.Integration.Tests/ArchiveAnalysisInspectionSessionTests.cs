@@ -1,6 +1,5 @@
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
 using Xunit;
 
@@ -14,12 +13,10 @@ public sealed class ArchiveAnalysisInspectionSessionTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             ArchiveThroughputMetrics metrics = new();
             List<FakeHandler> created = [];
 
             using ArchiveAnalysisInspectionSession session = new(
-                database,
                 metrics,
                 (configuration, cancellationToken) =>
                 {
@@ -94,9 +91,7 @@ public sealed class ArchiveAnalysisInspectionSessionTests
         string directory = CreateTemporaryDirectory();
         try
         {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
             using ArchiveAnalysisInspectionSession session = new(
-                database,
                 metrics: null,
                 (configuration, cancellationToken) =>
                     Task.FromResult<IProcessingJobHandler>(new FakeHandler()));

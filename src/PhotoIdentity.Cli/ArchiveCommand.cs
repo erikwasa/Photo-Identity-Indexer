@@ -248,6 +248,13 @@ internal static class ArchiveCommandRunner
         };
     }
 
+    private static ArchiveAnalysisCoordinator CreateAnalysisCoordinator(SqliteCatalogueDatabase database)
+    {
+        SqliteProcessingRepository processing = new(database);
+        return new(new ArchiveAnalysisPersistence(database, new SqliteArchiveCoverageRepository(database),
+            new SqliteLocalBatchRepository(database), new SqliteFaceCatalogueRepository(database),
+            processing, processing, new SqliteArchiveAnalysisRepository(database)));
+    }
     private static async Task<int> IncludeAsync(
         ArchiveCommandOptions options,
         SqliteCatalogueDatabase database,
@@ -342,7 +349,7 @@ internal static class ArchiveCommandRunner
             options.OutputRoot!,
             RepositoryRootLocator.Resolve(options.RepositoryRoot),
             options.ModelDirectory);
-        ArchiveAnalysisStartResult result = await new ArchiveAnalysisCoordinator(database).StartAsync(
+        ArchiveAnalysisStartResult result = await CreateAnalysisCoordinator(database).StartAsync(
             configuration,
             new ResumableBatchProcessorOptions(
                 maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
@@ -368,7 +375,7 @@ internal static class ArchiveCommandRunner
         TextWriter output,
         CancellationToken cancellationToken)
     {
-        ArchiveAnalysisResumeResult result = await new ArchiveAnalysisCoordinator(database).ResumeAsync(
+        ArchiveAnalysisResumeResult result = await CreateAnalysisCoordinator(database).ResumeAsync(
             options.RunId!.Value,
             new ResumableBatchProcessorOptions(
                 maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),

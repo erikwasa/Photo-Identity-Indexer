@@ -1,9 +1,8 @@
-using System.Globalization;
-using Microsoft.Data.Sqlite;
+using Npgsql;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
 /// Applies explicit verification-state transitions discovered outside a normal source scan, such
@@ -11,11 +10,11 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// If any revision for the source asset owns managed hydration, ownership is first moved back to
 /// the source asset so re-verification can transfer it to whichever revision SHA-256 establishes.
 /// </summary>
-public sealed class SqliteArchiveSourceVerificationStateRepository : IArchiveSourceVerificationStateRepository
+public sealed class PostgresArchiveSourceVerificationStateRepository : IArchiveSourceVerificationStateRepository
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly PostgresCatalogueDatabase _database;
 
-    public SqliteArchiveSourceVerificationStateRepository(SqliteCatalogueDatabase database)
+    public PostgresArchiveSourceVerificationStateRepository(PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
@@ -26,13 +25,12 @@ public sealed class SqliteArchiveSourceVerificationStateRepository : IArchiveSou
         DateTimeOffset observedAtUtc,
         CancellationToken cancellationToken = default)
     {
-        await new SqliteArchiveSourceObservationRepository(_database).EnsureSchemaAsync(cancellationToken);
 
-        await using (SqliteConnection readConnection = await _database.OpenConnectionAsync(cancellationToken))
+        await using (NpgsqlConnection readConnection = await _database.OpenConnectionAsync(cancellationToken))
         {
-            using SqliteCommand read = readConnection.CreateCommand();
-            read.CommandText = "SELECT COUNT(*) FROM archive_source_observations WHERE asset_id = $asset_id;";
-            read.Parameters.AddWithValue("$asset_id", assetId.ToString());
+            using NpgsqlCommand read = readConnection.CreateCommand();
+            read.CommandText = "SELECT COUNT(*) FROM archive_source_observations WHERE asset_id = @asset_id;";
+            read.Parameters.AddWithValue("@asset_id", Guid.Parse(assetId.ToString()));
             long count = (long)(await read.ExecuteScalarAsync(cancellationToken) ?? 0L);
             if (count == 0)
             {
@@ -41,24 +39,24 @@ public sealed class SqliteArchiveSourceVerificationStateRepository : IArchiveSou
             }
         }
 
-        _ = await new SqliteArchiveHydrationIdentityTransferRepository(_database)
+        _ = await new PostgresArchiveHydrationIdentityTransferRepository(_database)
             .MoveActiveRevisionLeaseToSourceAsync(
                 assetId,
                 observedAtUtc,
                 cancellationToken);
 
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             UPDATE archive_source_observations
             SET verification_state = 'needs-source-verification',
-                observed_at_utc = $observed_at_utc
-            WHERE asset_id = $asset_id;
+                observed_at_utc = @observed_at_utc
+            WHERE asset_id = @asset_id;
             """;
-        command.Parameters.AddWithValue("$asset_id", assetId.ToString());
+        command.Parameters.AddWithValue("@asset_id", Guid.Parse(assetId.ToString()));
         command.Parameters.AddWithValue(
-            "$observed_at_utc",
-            observedAtUtc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture));
+            "@observed_at_utc",
+            observedAtUtc.ToUniversalTime());
         if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
         {
             throw new InvalidOperationException(

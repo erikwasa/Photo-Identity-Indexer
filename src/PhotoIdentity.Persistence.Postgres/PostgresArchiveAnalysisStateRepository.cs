@@ -7,7 +7,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// <summary>
 /// Persists exact archive-analysis profile registration and successful immutable-revision completion in PostgreSQL.
 /// </summary>
-public sealed class PostgresArchiveAnalysisStateRepository : IArchiveAnalysisStateRepository
+public sealed partial class PostgresArchiveAnalysisStateRepository : IArchiveAnalysisStateRepository
 {
     private readonly PostgresCatalogueDatabase _database;
 
