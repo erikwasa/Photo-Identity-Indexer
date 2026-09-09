@@ -229,6 +229,9 @@ public static class Program
             review at /detector-rollout/{RUN_ID}; rollout apply persists reviewed choices
             from the saved payload without re-running detector inference. The ordinary
             batch command is not a detector-migration mechanism.
+            For every rollout action, replace --database PATH with
+            --postgres-connection-env NAME to use the PostgreSQL connection string in
+            that environment variable. Exactly one provider must be selected.
 
             Bundle export verifies a canonical immutable revision and writes a portable
             full-image, reduced-image or aligned face-crop job. Face-crop exports require

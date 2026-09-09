@@ -50,7 +50,8 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 - [x] Implement PostgreSQL application of human-reviewed candidates, preserving explicit existing/new/deferred decisions and replay safety.
 - [x] Implement remaining `IDetectorRolloutApplicationRepository` queries: existing/occurrence anchors, pipeline lookup, rollout counts and pending-review reads.
 - [x] Move detector coordinator/job-handler persistence and rollout crop-file resolution to Core contracts; provide PostgreSQL revision lookup and store initialization.
-- [ ] Complete PostgreSQL rollout CLI provider selection and replace the pending-review face lookup; the CLI still explicitly composes SQLite.
+- [x] Complete explicit PostgreSQL rollout CLI provider selection for start/resume/status/apply, with a live PostgreSQL command test.
+- [ ] Replace the pending-review face lookup with a provider-neutral contract and PostgreSQL implementation.
 - [x] Move remaining detector-evaluation session/review catalogue parameters to `IDetectorEvaluationCatalogueRepository`.
 - [ ] Audit detector-evaluation session, comparison and ground-truth stores to distinguish authoritative state from portable evaluation artifacts and migrate authoritative persistence where required.
 
@@ -94,6 +95,10 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 Existing-catalogue import, production cutover and rollback acceptance belong to WI-0102. Match-regeneration scaling belongs to WI-0103; operator UI/query performance to WI-0104; slideshow latency fixes to WI-0108; operational backup/recovery and real-archive catch-up acceptance to WI-0106. WI-0101 must provide the complete persistence/runtime boundary those items depend on.
 
 ## Handoff from WI-0099 runtime-composition audit
+
+### Rollout CLI verification (2026-09-09)
+
+All rollout actions accept exactly one of `--database PATH` and `--postgres-connection-env NAME`. PostgreSQL composition supplies the store initializer, revision lookup, processing, reconciliation, review and application repositories to the same worker; credentials stay in the named environment variable. The CLI build passed without warnings or errors. Six focused command tests passed with live PostgreSQL explicitly configured (761 ms), including status/apply against a disposable PostgreSQL catalogue and rejection of absent/conflicting provider selection. The API provider composition and pending-review face lookup remain unfinished. These command tests do not add HTTP hosts or change the required CI gate.
 
 The 2026-09-03 WI-0099 audit confirmed that archive/background-owned PostgreSQL state is implemented, but normal API/worker runtime still contains direct SQLite composition and query dependencies. This is intentionally handed here rather than solved through a partial archive-only provider switch.
 

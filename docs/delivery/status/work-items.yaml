@@ -1346,6 +1346,8 @@ work_items:
     value: '2026-09-09 detector pipeline/plan slice: two live PostgreSQL detector tests passed (859 ms); 19 focused detector rollout tests passed (4 seconds); test.ps1 rebuilt Release and passed 535 tests, including 403 integration tests (1 minute 40 seconds). Documentation validation, generated-output check and diff check passed. Candidate application and worker composition remain pending.'
   - type: test
     value: '2026-09-09 detector application/worker slice: seven live PostgreSQL detector tests passed (2 seconds); test.ps1 rebuilt Release and passed 539 tests, including 403 integration tests (1 minute 37 seconds). Comprehensive published-app smoke, documentation validation, generated-output check and diff check passed. CLI provider selection and remaining runtime integration are still pending.'
+  - type: test
+    value: '2026-09-09 rollout CLI provider selection: CLI build passed without warnings/errors; six focused command tests passed with live PostgreSQL explicitly configured (761 ms), including disposable PostgreSQL status/apply and provider validation. No HTTP hosts or required CI gate changes. Remaining WI-0101 runtime composition is unfinished.'
 - id: WI-0102
   title: Migrate the existing SQLite catalogue and perform controlled PostgreSQL cutover
   milestone: M24
