@@ -1,21 +1,16 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.People;
 
 namespace PhotoIdentity.Persistence.Sqlite;
-
-public sealed record CatalogueManualPhotoPerson(
-    PersonId PersonId,
-    string DisplayName,
-    string AssignedBy,
-    DateTimeOffset AssignedAtUtc);
 
 /// <summary>
 /// Stores maintainer-owned person-presence statements for an immutable photo revision.
 /// These actions are intentionally separate from face occurrences, crops, embeddings,
 /// review actions and identity suggestions.
 /// </summary>
-public sealed class SqlitePhotoPersonRepository
+public sealed class SqlitePhotoPersonRepository : IPhotoPersonRepository
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly TimeProvider _timeProvider;
