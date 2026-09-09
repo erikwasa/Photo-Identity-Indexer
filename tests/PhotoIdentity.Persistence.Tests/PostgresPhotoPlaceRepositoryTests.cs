@@ -47,7 +47,17 @@ public sealed class PostgresPhotoPlaceRepositoryTests
             Assert.Equal(PostgresCatalogueDatabase.CurrentSchemaVersion, initialization.Health.SchemaVersion);
 
             AssetRevisionId revisionId = AssetRevisionId.From(Guid.NewGuid());
-            await SeedRevisionAsync(testBuilder.ConnectionString, Guid.Parse(revisionId.ToString()));
+            AssetRevisionId automaticRevisionId = AssetRevisionId.From(Guid.NewGuid());
+            await SeedRevisionAsync(
+                testBuilder.ConnectionString,
+                Guid.Parse(revisionId.ToString()),
+                contentHash: new string('a', 64),
+                sourceKey: "places/manual-photo.jpg");
+            await SeedRevisionAsync(
+                testBuilder.ConnectionString,
+                Guid.Parse(automaticRevisionId.ToString()),
+                contentHash: new string('b', 64),
+                sourceKey: "places/automatic-photo.jpg");
 
             PostgresPhotoPlaceRepository repository = new(database, TimeProvider.System);
             IPhotoPlaceRepository places = repository;
@@ -59,7 +69,7 @@ public sealed class PostgresPhotoPlaceRepositoryTests
                 "maintainer");
 
             Assert.NotNull(manual.Place);
-            Assert.Equal("Places/Sweden/Stockholm", manual.Place.Value);
+            Assert.Equal("Sweden/Stockholm", manual.Place.Value);
             Assert.Equal("manual", manual.Place.SourceKind);
 
             AutomaticPhotoPlaceEligibility eligibility =
@@ -75,33 +85,46 @@ public sealed class PostgresPhotoPlaceRepositoryTests
                 "automatic-place-enrichment");
             Assert.False(blocked.Applied);
             Assert.True(blocked.BlockedByManual);
-            Assert.Equal("Places/Sweden/Stockholm", blocked.State.Place?.Value);
+            Assert.Equal("Sweden/Stockholm", blocked.State.Place?.Value);
 
             PhotoPlaceState cleared = await places.ClearManualPlaceAsync(revisionId, "maintainer");
             Assert.Null(cleared.Place);
 
-            AutomaticPhotoPlaceWriteResult applied = await automatic.TrySetAsync(
+            AutomaticPhotoPlaceEligibility clearedEligibility =
+                await automatic.GetEligibilityAsync(revisionId);
+            Assert.False(clearedEligibility.Allowed);
+            Assert.True(clearedEligibility.BlockedByManual);
+
+            AutomaticPhotoPlaceWriteResult stillBlocked = await automatic.TrySetAsync(
                 revisionId,
+                "Norway/Oslo",
+                "GeoNames",
+                "automatic-place-enrichment");
+            Assert.False(stillBlocked.Applied);
+            Assert.True(stillBlocked.BlockedByManual);
+
+            AutomaticPhotoPlaceWriteResult applied = await automatic.TrySetAsync(
+                automaticRevisionId,
                 "Norway/Oslo",
                 "GeoNames",
                 "automatic-place-enrichment");
             Assert.True(applied.Applied);
             Assert.False(applied.BlockedByManual);
             Assert.Equal("automatic", applied.State.Place?.SourceKind);
-            Assert.Equal("Places/Norway/Oslo", applied.State.Place?.Value);
+            Assert.Equal("Norway/Oslo", applied.State.Place?.Value);
 
             AutomaticPhotoPlaceWriteResult unchanged = await automatic.TrySetAsync(
-                revisionId,
+                automaticRevisionId,
                 "Norway/Oslo",
                 "geonames",
                 "automatic-place-enrichment");
             Assert.False(unchanged.Applied);
-            Assert.Equal("Places/Norway/Oslo", unchanged.State.Place?.Value);
+            Assert.Equal("Norway/Oslo", unchanged.State.Place?.Value);
 
             IReadOnlyList<PhotoPlaceDefinition> definitions =
                 await places.GetDefinitionsAsync();
-            Assert.Contains(definitions, place => place.Value == "Places/Sweden/Stockholm");
-            Assert.Contains(definitions, place => place.Value == "Places/Norway/Oslo");
+            Assert.Contains(definitions, place => place.Value == "Sweden/Stockholm");
+            Assert.Contains(definitions, place => place.Value == "Norway/Oslo");
         }
         finally
         {
@@ -112,7 +135,11 @@ public sealed class PostgresPhotoPlaceRepositoryTests
         }
     }
 
-    private static async Task SeedRevisionAsync(string connectionString, Guid revisionId)
+    private static async Task SeedRevisionAsync(
+        string connectionString,
+        Guid revisionId,
+        string contentHash,
+        string sourceKey)
     {
         Guid sourceId = Guid.NewGuid();
         Guid assetId = Guid.NewGuid();
@@ -124,10 +151,10 @@ public sealed class PostgresPhotoPlaceRepositoryTests
         seed.CommandText =
             """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
-            VALUES (@source_id, 'test', 'places-root', @now);
+            VALUES (@source_id, 'test', @root_locator, @now);
 
             INSERT INTO assets (id, source_id, source_key, created_at_utc)
-            VALUES (@asset_id, @source_id, 'places/photo.jpg', @now);
+            VALUES (@asset_id, @source_id, @source_key, @now);
 
             INSERT INTO asset_revisions (
                 id,
@@ -149,9 +176,11 @@ public sealed class PostgresPhotoPlaceRepositoryTests
                 768);
             """;
         seed.Parameters.AddWithValue("source_id", sourceId);
+        seed.Parameters.AddWithValue("root_locator", $"places-root-{sourceId:N}");
         seed.Parameters.AddWithValue("asset_id", assetId);
         seed.Parameters.AddWithValue("revision_id", revisionId);
-        seed.Parameters.AddWithValue("content_sha256", new string('a', 64));
+        seed.Parameters.AddWithValue("content_sha256", contentHash);
+        seed.Parameters.AddWithValue("source_key", sourceKey);
         seed.Parameters.AddWithValue("now", now);
         await seed.ExecuteNonQueryAsync();
     }

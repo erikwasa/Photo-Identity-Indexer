@@ -34,7 +34,7 @@ public sealed record PhotoMetadataRefreshCandidate(
 /// Pages revisions that are missing metadata or were inspected using an older extraction contract.
 /// Paging lets the executor move beyond deferred online-only placeholders without marking them current.
 /// </summary>
-public sealed class SqlitePhotoMetadataBackfillRepository
+public sealed class SqlitePhotoMetadataBackfillRepository : IPhotoMetadataBackfillRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -131,6 +131,25 @@ public sealed class SqlitePhotoMetadataBackfillRepository
 
         return candidates;
     }
+
+    async Task<IReadOnlyList<PhotoMetadataBackfillRefreshCandidate>>
+        IPhotoMetadataBackfillRepository.GetRefreshCandidatesAsync(
+            int limit,
+            int offset,
+            int currentVersion,
+            bool force,
+            CancellationToken cancellationToken) =>
+        (await GetRefreshCandidatesAsync(limit, offset, currentVersion, force, cancellationToken))
+            .Select(candidate => new PhotoMetadataBackfillRefreshCandidate(
+                candidate.RevisionId,
+                candidate.ContentHash,
+                candidate.SizeBytes,
+                candidate.RootLocator,
+                candidate.SourceKey,
+                candidate.MediaType,
+                candidate.HasCaptureMetadata,
+                candidate.ExtractionContractVersion))
+            .ToArray();
 
     private static async Task EnsurePhotoMetadataSchemaAsync(
         SqliteConnection connection,

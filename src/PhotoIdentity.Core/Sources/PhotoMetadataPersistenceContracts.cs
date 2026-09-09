@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.Core.Sources;
 
@@ -47,5 +48,32 @@ public interface IPhotoMetadataInspectionRepository
         AssetRevisionId revisionId,
         int extractionContractVersion,
         DateTimeOffset inspectedAtUtc,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record PhotoMetadataBackfillRefreshCandidate(
+    AssetRevisionId RevisionId,
+    Sha256Digest ContentHash,
+    long SizeBytes,
+    string RootLocator,
+    string SourceKey,
+    string? MediaType,
+    bool HasCaptureMetadata,
+    int? ExtractionContractVersion)
+{
+    public bool IsNew => !HasCaptureMetadata;
+
+    public bool IsStale(int currentVersion) =>
+        HasCaptureMetadata &&
+        (ExtractionContractVersion ?? PhotoMetadataExtractionContract.LegacyVersion) < currentVersion;
+}
+
+public interface IPhotoMetadataBackfillRepository
+{
+    Task<IReadOnlyList<PhotoMetadataBackfillRefreshCandidate>> GetRefreshCandidatesAsync(
+        int limit,
+        int offset,
+        int currentVersion,
+        bool force,
         CancellationToken cancellationToken = default);
 }

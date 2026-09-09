@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 
 namespace PhotoIdentity.Api;
@@ -25,12 +24,12 @@ public sealed record PhotoMetadataBackfillReport(
 /// </summary>
 public sealed class PhotoMetadataBackfillService
 {
-    private readonly SqlitePhotoMetadataBackfillRepository _backfill;
+    private readonly IPhotoMetadataBackfillRepository _backfill;
     private readonly IOneDriveFilesOnDemandPlatform _filesOnDemand;
     private readonly PhotoMetadataInspectionService _inspection;
 
     public PhotoMetadataBackfillService(
-        SqlitePhotoMetadataBackfillRepository backfill,
+        IPhotoMetadataBackfillRepository backfill,
         IOneDriveFilesOnDemandPlatform filesOnDemand,
         PhotoMetadataInspectionService inspection)
     {
@@ -49,7 +48,7 @@ public sealed class PhotoMetadataBackfillService
         CancellationToken cancellationToken = default)
     {
         int currentVersion = PhotoMetadataExtractionContract.CurrentVersion;
-        IReadOnlyList<PhotoMetadataRefreshCandidate> candidates =
+        IReadOnlyList<PhotoMetadataBackfillRefreshCandidate> candidates =
             await _backfill.GetRefreshCandidatesAsync(
                 limit,
                 offset,
@@ -65,7 +64,7 @@ public sealed class PhotoMetadataBackfillService
         int deferredChanged = 0;
         int deferredUnavailable = 0;
 
-        foreach (PhotoMetadataRefreshCandidate candidate in candidates)
+        foreach (PhotoMetadataBackfillRefreshCandidate candidate in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
