@@ -194,6 +194,14 @@ internal static class DetectorRolloutCommandRunner
         }
     }
 
+    private static DetectorRolloutCoordinator CreateCoordinator(SqliteCatalogueDatabase database)
+    {
+        SqliteProcessingRepository processing = new(database);
+        return new DetectorRolloutCoordinator(
+            database, new SqliteLocalBatchRepository(database), processing, processing,
+            new SqliteDetectorRolloutRepository(database), new SqliteDetectorRolloutReviewRepository(database),
+            new SqliteDetectorRolloutApplicationRepository(database));
+    }
     private static async Task<int> StartAsync(
         DetectorRolloutCommandOptions options,
         SqliteCatalogueDatabase database,
@@ -211,7 +219,7 @@ internal static class DetectorRolloutCommandRunner
             options.OutputRoot!,
             repositoryRoot,
             options.ModelDirectory);
-        DetectorRolloutStartResult result = await new DetectorRolloutCoordinator(database).StartAsync(
+        DetectorRolloutStartResult result = await CreateCoordinator(database).StartAsync(
             configuration,
             revisions,
             new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
@@ -230,7 +238,7 @@ internal static class DetectorRolloutCommandRunner
         CancellationToken cancellationToken)
     {
         await RequireRolloutConfigurationAsync(database, options.RunId!.Value, cancellationToken);
-        DetectorRolloutResumeResult result = await new DetectorRolloutCoordinator(database).ResumeAsync(
+        DetectorRolloutResumeResult result = await CreateCoordinator(database).ResumeAsync(
             options.RunId.Value,
             new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
             cancellationToken);

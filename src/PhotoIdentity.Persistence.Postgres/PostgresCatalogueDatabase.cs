@@ -1,4 +1,5 @@
 using Npgsql;
+using PhotoIdentity.Core.Catalogue;
 
 namespace PhotoIdentity.Persistence.Postgres;
 
@@ -6,7 +7,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// Owns the PostgreSQL connection pool and versioned migration bootstrap while
 /// PostgreSQL is introduced alongside the still-authoritative SQLite catalogue.
 /// </summary>
-public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable
+public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
     public const int CurrentSchemaVersion = 21;
 
@@ -1104,6 +1105,15 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable
     public async Task<NpgsqlConnection> OpenConnectionAsync(
         CancellationToken cancellationToken = default) =>
         await _dataSource.OpenConnectionAsync(cancellationToken);
+
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        PostgresInitializationResult result = await TryInitializeAsync(cancellationToken);
+        if (result.Error is not null)
+        {
+            throw new InvalidOperationException("PostgreSQL catalogue initialization failed.", result.Error);
+        }
+    }
 
     public async Task<PostgresInitializationResult> TryInitializeAsync(
         CancellationToken cancellationToken = default)

@@ -37,7 +37,7 @@ WI-0101 is a persistence migration item, not acceptance of slideshow responsiven
 
 ## Remaining work checklist
 
-Current as of 2026-09-09, after local commit `7bcde03`. This is the current implementation checklist; the slice notes below retain historical evidence. Update these checkboxes as each task is implemented and verified, with supporting evidence in the work-item registry. Formal lifecycle status remains in the registry.
+Current as of 2026-09-09, including the verified detector application slice. This is the current implementation checklist; the slice notes below retain historical evidence. Update these checkboxes as each task is implemented and verified, with supporting evidence in the work-item registry. Formal lifecycle status remains in the registry.
 
 Many PostgreSQL repositories already exist. An unchecked integration task does not necessarily require a new repository: reuse the existing Core contract and PostgreSQL implementation where available. A completed repository slice does not establish that normal runtime is free of SQLite dependencies.
 
@@ -46,11 +46,13 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 - [x] Move detector review/application records and contracts into Core.
 - [x] Add PostgreSQL detector schema, durable inspection payloads and human-resolution history.
 - [x] Add PostgreSQL pipeline registration and immutable reconciliation-plan persistence, with live concurrency/replay tests.
-- [ ] Implement PostgreSQL unambiguous candidate application, atomically persisting face occurrence, observation, crop, embedding and applied-state evidence without changing person identity assignments.
-- [ ] Implement PostgreSQL application of human-reviewed candidates, preserving explicit existing/new/deferred decisions and replay safety.
-- [ ] Implement remaining `IDetectorRolloutApplicationRepository` queries: existing/occurrence anchors, pipeline lookup, rollout counts and pending-review reads.
-- [ ] Remove concrete SQLite dependencies from `DetectorRolloutProcessing.cs`, rollout CLI composition, pending-review face lookups and crop/file resolution.
-- [ ] Finish detector-evaluation session/review catalogue dependencies, including remaining concrete `SqliteDetectorEvaluationRepository` parameters. Audit session, comparison and ground-truth stores to distinguish authoritative state from portable evaluation artifacts and migrate authoritative persistence where required.
+- [x] Implement PostgreSQL unambiguous candidate application, atomically persisting face occurrence, observation, crop, embedding and applied-state evidence without changing person identity assignments.
+- [x] Implement PostgreSQL application of human-reviewed candidates, preserving explicit existing/new/deferred decisions and replay safety.
+- [x] Implement remaining `IDetectorRolloutApplicationRepository` queries: existing/occurrence anchors, pipeline lookup, rollout counts and pending-review reads.
+- [x] Move detector coordinator/job-handler persistence and rollout crop-file resolution to Core contracts; provide PostgreSQL revision lookup and store initialization.
+- [ ] Complete PostgreSQL rollout CLI provider selection and replace the pending-review face lookup; the CLI still explicitly composes SQLite.
+- [x] Move remaining detector-evaluation session/review catalogue parameters to `IDetectorEvaluationCatalogueRepository`.
+- [ ] Audit detector-evaluation session, comparison and ground-truth stores to distinguish authoritative state from portable evaluation artifacts and migrate authoritative persistence where required.
 
 ### 2. Archive, processing and file access
 
@@ -163,3 +165,12 @@ Started 2026-09-09 on the M24 PostgreSQL catalogue branch.
 - Added repository-layer tests for changed-plan rollback, exact provenance, concurrent replay, all three candidate dispositions, geometry/options/unmatched evidence, cancellation and applied-state rejection. The two detector PostgreSQL tests passed against isolated live databases (859 ms), and all 19 detector rollout integration/repository tests passed (4 seconds). No new HTTP-host tests or required CI gates were added.
 - Remaining detector work is unambiguous/reviewed candidate application, application queries and worker/CLI composition. SQLite remains the authoritative runtime pending WI-0102.
 - Final local verification: `./test.ps1` rebuilt the Release solution and passed 535 tests, including 403 integration tests in 1 minute 40 seconds. `PhotoIdentity.Docs validate`, `generate --check` and `git diff --check` passed.
+
+## PostgreSQL detector application slice (2026-09-09)
+
+- Added `PostgresDetectorRolloutApplicationRepository` for unambiguous and human-reviewed application, pipeline/anchor lookups, summary counts, pending reviews and resolved-batch application. Face occurrence, observation, crop, embedding and candidate applied state commit atomically. Revision/candidate locks serialize ordinal allocation and concurrent retries; deferred or invalid resolutions cannot mutate the catalogue. Imported legacy partial reviewed applications can recover their existing occurrence.
+- Extended the Core application contract with an unambiguous application method returning the stable face identifier. SQLite delegates this method to its existing rollout writer. The detector coordinator/job handler now accepts only provider-neutral persistence; the CLI currently supplies SQLite at its explicit composition boundary.
+- Added `PostgresAssetRevisionLookupRepository` and made PostgreSQL initialization implement `ICatalogueStoreInitializer`. Converted remaining detector-evaluation session catalogue parameters and rollout crop-file run lookups to existing Core contracts.
+- Added four repository-level live PostgreSQL cases covering existing/new and reviewed/unambiguous application, concurrent replay, resolution states, anchors/counts, unchanged person labels, cancellation and forced mid-transaction rollback. All seven live detector tests passed (2 seconds), including lookup and initializer assertions. No HTTP-host tests or required CI gates were added.
+- Remaining detector work is CLI provider selection, pending-review face lookup and the evaluation-store audit. The broader archive/review/runtime composition and acceptance checklist remains open.
+- Final local verification: Release rebuild and all 539 tests passed, including 403 integration tests in 1 minute 37 seconds. Comprehensive published-app smoke, documentation validation, generated-output and diff checks passed.

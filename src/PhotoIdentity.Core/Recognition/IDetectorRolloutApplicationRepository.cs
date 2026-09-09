@@ -7,6 +7,13 @@ namespace PhotoIdentity.Core.Recognition;
 /// </summary>
 public interface IDetectorRolloutApplicationRepository
 {
+    Task<FaceOccurrenceId> ApplyUnambiguousInspectionAsync(
+        ProcessingRunId processingRunId,
+        AssetRevisionId assetRevisionId,
+        int candidateIndex,
+        CatalogueDetectorCandidateInspection inspection,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<ExistingFaceDetectionAnchor>> GetExistingAnchorsAsync(
         AssetRevisionId assetRevisionId,
         Sha256Digest currentPipelineHash,

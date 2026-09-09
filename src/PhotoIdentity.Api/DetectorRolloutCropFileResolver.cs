@@ -1,18 +1,17 @@
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Processing;
 
 namespace PhotoIdentity.Api;
 
 public sealed class DetectorRolloutCropFileResolver
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly IProcessingRunRepository _runs;
 
-    public DetectorRolloutCropFileResolver(SqliteCatalogueDatabase database)
+    public DetectorRolloutCropFileResolver(IProcessingRunRepository runs)
     {
-        ArgumentNullException.ThrowIfNull(database);
-        _database = database;
+        ArgumentNullException.ThrowIfNull(runs);
+        _runs = runs;
     }
 
     public async Task<string?> ResolveAsync(
@@ -68,19 +67,15 @@ public sealed class DetectorRolloutCropFileResolver
         ProcessingRunId runId,
         CancellationToken cancellationToken)
     {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "SELECT configuration_json FROM processing_runs WHERE id = $run_id;";
-        command.Parameters.AddWithValue("$run_id", runId.ToString());
-        object? value = await command.ExecuteScalarAsync(cancellationToken);
-        if (value is not string configurationJson)
+        CatalogueProcessingRun? run = await _runs.GetRunAsync(runId, cancellationToken);
+        if (run is null)
         {
             return null;
         }
 
         try
         {
-            using JsonDocument document = JsonDocument.Parse(configurationJson);
+            using JsonDocument document = JsonDocument.Parse(run.ConfigurationJson);
             foreach (JsonProperty property in document.RootElement.EnumerateObject())
             {
                 if (string.Equals(property.Name, "outputRoot", StringComparison.OrdinalIgnoreCase) &&

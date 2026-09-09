@@ -17,7 +17,7 @@ The same acceptance session found slideshow performance problems. M24 WI-0108 ow
 
 In the separate M24 thread, WI-0098, WI-0099, WI-0100 and WI-0105 are completed. Runtime authority remains SQLite until WI-0101 and WI-0102 complete provider composition and controlled cutover.
 
-WI-0101 progress and verification details are recorded in its work-item document. PostgreSQL schema version 21 now includes detector rollout state, and its review and pipeline/plan repositories passed live PostgreSQL verification. Detector rollout review/application contracts and records belong to Core, with API bindings still backed by SQLite. Candidate application, application queries and worker composition remain unfinished.
+WI-0101 progress and verification details are recorded in its work-item document. PostgreSQL schema version 21 now includes detector rollout state, and its review, pipeline/plan and atomic candidate-application repositories passed live PostgreSQL verification. Detector rollout review/application contracts and records belong to Core, with API bindings still backed by SQLite. Detector coordinator/job-handler persistence now uses Core contracts. CLI provider selection, pending-review face lookup and evaluation-store audit remain unfinished.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -33,7 +33,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, continue WI-0101 by neutralizing the remaining SQLite-only normal-runtime dependencies, next implementing PostgreSQL detector candidate application and application queries behind the Core contracts, then migrating detector worker composition and remaining archive worker/query surfaces. Existing archive source observation, availability, hydration, coverage, storage and status/query contracts are now useful seams; keep normal DI on SQLite until WI-0102 and do not create dual writes.
+For the M24 thread, continue WI-0101 by neutralizing the remaining SQLite-only normal-runtime dependencies, next completing detector CLI provider selection, pending-review face lookup and evaluation-store audit, then migrating remaining archive worker/query surfaces. Existing archive source observation, availability, hydration, coverage, storage and status/query contracts are now useful seams; keep normal DI on SQLite until WI-0102 and do not create dual writes.
 
 ## Relevant files
 

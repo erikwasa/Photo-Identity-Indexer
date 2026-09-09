@@ -190,6 +190,8 @@ public partial class Program
         builder.Services.AddSingleton<IAssetRevisionLookupRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteLocalBatchRepository>());
         builder.Services.AddSingleton<SqliteProcessingRepository>();
+        builder.Services.AddSingleton<IProcessingRunRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteProcessingRepository>());
         builder.Services.AddSingleton<IProcessingExecutionRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteProcessingRepository>());
         builder.Services.AddSingleton<IDetectorRolloutReviewRepository, SqliteDetectorRolloutReviewRepository>();

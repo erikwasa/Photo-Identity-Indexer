@@ -333,6 +333,17 @@ public sealed class PostgresDetectorRolloutReviewRepository : IDetectorRolloutRe
     {
         ArgumentOutOfRangeException.ThrowIfNegative(candidateIndex);
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        return await ReadReviewAsync(connection, null, processingRunId, assetRevisionId, candidateIndex, cancellationToken);
+    }
+
+    internal static async Task<CatalogueDetectorReconciliationReview?> ReadReviewAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        ProcessingRunId processingRunId,
+        AssetRevisionId assetRevisionId,
+        int candidateIndex,
+        CancellationToken cancellationToken)
+    {
         CatalogueDetectorReconciliationCandidate? candidate = await ReadCandidateAsync(
             connection,
             processingRunId,
@@ -346,14 +357,14 @@ public sealed class PostgresDetectorRolloutReviewRepository : IDetectorRolloutRe
 
         CatalogueDetectorCandidateInspection? inspection = await ReadInspectionAsync(
             connection,
-            transaction: null,
+            transaction,
             processingRunId,
             assetRevisionId,
             candidateIndex,
             cancellationToken);
         CatalogueDetectorReconciliationResolution? resolution = await ReadLatestResolutionAsync(
             connection,
-            transaction: null,
+            transaction,
             processingRunId,
             assetRevisionId,
             candidateIndex,

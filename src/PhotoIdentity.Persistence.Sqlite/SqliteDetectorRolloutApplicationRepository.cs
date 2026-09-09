@@ -64,6 +64,15 @@ public sealed class SqliteDetectorRolloutApplicationRepository : IDetectorRollou
         return anchors;
     }
 
+    public async Task<FaceOccurrenceId> ApplyUnambiguousInspectionAsync(
+        ProcessingRunId processingRunId,
+        AssetRevisionId assetRevisionId,
+        int candidateIndex,
+        CatalogueDetectorCandidateInspection inspection,
+        CancellationToken cancellationToken = default) =>
+        (await new SqliteDetectorRolloutRepository(_database).ApplyUnambiguousInspectionAsync(
+            processingRunId, assetRevisionId, candidateIndex, inspection, cancellationToken)).Occurrence.Id;
+
     public async Task<CatalogueDetectorRolloutOccurrenceAnchor?> GetOccurrenceAnchorAsync(
         FaceOccurrenceId faceOccurrenceId,
         CancellationToken cancellationToken = default)

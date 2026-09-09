@@ -6,7 +6,7 @@ using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Recognition.Onnx.CenterFace;
 using PhotoIdentity.Recognition.Onnx.Models;
 using PhotoIdentity.Recognition.Onnx.SFace;
@@ -72,16 +72,41 @@ public sealed record DetectorRolloutResumeResult(
 
 public sealed class DetectorRolloutCoordinator
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly ICatalogueStoreInitializer _store;
+    private readonly IAssetRevisionLookupRepository _assets;
+    private readonly IProcessingRunRepository _runs;
+    private readonly IProcessingExecutionRepository _execution;
+    private readonly IDetectorReconciliationPlanRepository _plans;
+    private readonly IDetectorRolloutReviewRepository _reviews;
+    private readonly IDetectorRolloutApplicationRepository _application;
     private readonly TimeProvider _timeProvider;
 
-    public DetectorRolloutCoordinator(SqliteCatalogueDatabase database, TimeProvider? timeProvider = null)
+    public DetectorRolloutCoordinator(
+        ICatalogueStoreInitializer store,
+        IAssetRevisionLookupRepository assets,
+        IProcessingRunRepository runs,
+        IProcessingExecutionRepository execution,
+        IDetectorReconciliationPlanRepository plans,
+        IDetectorRolloutReviewRepository reviews,
+        IDetectorRolloutApplicationRepository application,
+        TimeProvider? timeProvider = null)
     {
-        ArgumentNullException.ThrowIfNull(database);
-        _database = database;
+        ArgumentNullException.ThrowIfNull(store);
+        ArgumentNullException.ThrowIfNull(assets);
+        ArgumentNullException.ThrowIfNull(runs);
+        ArgumentNullException.ThrowIfNull(execution);
+        ArgumentNullException.ThrowIfNull(plans);
+        ArgumentNullException.ThrowIfNull(reviews);
+        ArgumentNullException.ThrowIfNull(application);
+        _store = store;
+        _assets = assets;
+        _runs = runs;
+        _execution = execution;
+        _plans = plans;
+        _reviews = reviews;
+        _application = application;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
-
     public async Task<DetectorRolloutStartResult> StartAsync(
         DetectorRolloutConfiguration configuration,
         IReadOnlyCollection<AssetRevisionId> revisionIds,
@@ -99,11 +124,11 @@ public sealed class DetectorRolloutCoordinator
             throw new ArgumentException("At least one immutable asset revision is required.", nameof(revisionIds));
         }
 
-        await _database.InitializeAsync(cancellationToken);
-        SqliteLocalBatchRepository assetRepository = new(_database);
+        await _store.InitializeAsync(cancellationToken);
+
         foreach (AssetRevisionId revisionId in revisions)
         {
-            CatalogueProcessingAssetRevision revision = await assetRepository.GetAssetRevisionAsync(
+            AssetRevisionLookup revision = await _assets.GetRevisionAsync(
                 revisionId,
                 cancellationToken)
                 ?? throw new KeyNotFoundException($"Asset revision {revisionId} was not found.");
@@ -132,24 +157,24 @@ public sealed class DetectorRolloutCoordinator
                 idempotencyKey: $"detector-rollout:{runId}:{revisionId}"))
             .ToArray();
 
-        SqliteProcessingRepository processingRepository = new(_database);
-        await processingRepository.CreateRunAsync(run, jobs, cancellationToken);
+
+        await _runs.CreateRunAsync(run, jobs, cancellationToken);
         using DetectorRolloutJobHandler handler = await DetectorRolloutJobHandler.CreateAsync(
-            _database,
+            _assets, _plans, _reviews, _application,
             configuration,
             _timeProvider,
             cancellationToken);
-        await new SqliteDetectorRolloutRepository(_database).RegisterPipelineAsync(
+        await _plans.RegisterPipelineAsync(
             runId,
             handler.PipelineDefinition,
             now,
             cancellationToken);
         ResumableBatchProcessorResult result = await new ResumableBatchProcessor(
-                processingRepository,
+                _execution,
                 handler,
                 _timeProvider)
             .RunUntilIdleAsync(runId, processorOptions, cancellationToken);
-        CatalogueDetectorRolloutSummary rolloutSummary = await new SqliteDetectorRolloutApplicationRepository(_database)
+        CatalogueDetectorRolloutSummary rolloutSummary = await _application
             .GetSummaryAsync(runId, cancellationToken);
         return new DetectorRolloutStartResult(runId, result.Summary, rolloutSummary);
     }
@@ -159,27 +184,27 @@ public sealed class DetectorRolloutCoordinator
         ResumableBatchProcessorOptions? processorOptions = null,
         CancellationToken cancellationToken = default)
     {
-        await _database.InitializeAsync(cancellationToken);
-        SqliteProcessingRepository processingRepository = new(_database);
-        CatalogueProcessingRun run = await processingRepository.GetRunAsync(runId, cancellationToken)
+        await _store.InitializeAsync(cancellationToken);
+
+        CatalogueProcessingRun run = await _runs.GetRunAsync(runId, cancellationToken)
             ?? throw new KeyNotFoundException($"Processing run {runId} was not found.");
         DetectorRolloutConfiguration configuration = DetectorRolloutConfiguration.FromJson(run.ConfigurationJson);
         using DetectorRolloutJobHandler handler = await DetectorRolloutJobHandler.CreateAsync(
-            _database,
+            _assets, _plans, _reviews, _application,
             configuration,
             _timeProvider,
             cancellationToken);
-        await new SqliteDetectorRolloutRepository(_database).RegisterPipelineAsync(
+        await _plans.RegisterPipelineAsync(
             runId,
             handler.PipelineDefinition,
             _timeProvider.GetUtcNow(),
             cancellationToken);
         ResumableBatchProcessorResult result = await new ResumableBatchProcessor(
-                processingRepository,
+                _execution,
                 handler,
                 _timeProvider)
             .RunUntilIdleAsync(runId, processorOptions, cancellationToken);
-        CatalogueDetectorRolloutSummary rolloutSummary = await new SqliteDetectorRolloutApplicationRepository(_database)
+        CatalogueDetectorRolloutSummary rolloutSummary = await _application
             .GetSummaryAsync(runId, cancellationToken);
         return new DetectorRolloutResumeResult(result.Summary, rolloutSummary);
     }
@@ -194,10 +219,10 @@ public sealed class DetectorRolloutJobHandler : IProcessingJobHandler, IDisposab
     private const double DetectorNmsThreshold = 0.30;
     private const int DetectorTopK = 5000;
 
-    private readonly SqliteLocalBatchRepository _assetRepository;
-    private readonly SqliteDetectorRolloutRepository _rolloutRepository;
-    private readonly SqliteDetectorRolloutReviewRepository _reviewRepository;
-    private readonly SqliteDetectorRolloutApplicationRepository _applicationRepository;
+    private readonly IAssetRevisionLookupRepository _assetRepository;
+    private readonly IDetectorReconciliationPlanRepository _rolloutRepository;
+    private readonly IDetectorRolloutReviewRepository _reviewRepository;
+    private readonly IDetectorRolloutApplicationRepository _applicationRepository;
     private readonly DetectorRolloutConfiguration _configuration;
     private readonly IImageDecoder _decoder;
     private readonly OpenCvPngEncoder _encoder;
@@ -208,7 +233,10 @@ public sealed class DetectorRolloutJobHandler : IProcessingJobHandler, IDisposab
     private bool _disposed;
 
     public DetectorRolloutJobHandler(
-        SqliteCatalogueDatabase database,
+        IAssetRevisionLookupRepository assets,
+        IDetectorReconciliationPlanRepository plans,
+        IDetectorRolloutReviewRepository reviews,
+        IDetectorRolloutApplicationRepository application,
         DetectorRolloutConfiguration configuration,
         IImageDecoder decoder,
         OpenCvPngEncoder encoder,
@@ -218,7 +246,10 @@ public sealed class DetectorRolloutJobHandler : IProcessingJobHandler, IDisposab
         DetectorPipelineDefinition pipelineDefinition,
         TimeProvider? timeProvider = null)
     {
-        ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(assets);
+        ArgumentNullException.ThrowIfNull(plans);
+        ArgumentNullException.ThrowIfNull(reviews);
+        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(configuration);
         ArgumentNullException.ThrowIfNull(decoder);
         ArgumentNullException.ThrowIfNull(encoder);
@@ -226,10 +257,10 @@ public sealed class DetectorRolloutJobHandler : IProcessingJobHandler, IDisposab
         ArgumentNullException.ThrowIfNull(aligner);
         ArgumentNullException.ThrowIfNull(embedder);
         ArgumentNullException.ThrowIfNull(pipelineDefinition);
-        _assetRepository = new SqliteLocalBatchRepository(database);
-        _rolloutRepository = new SqliteDetectorRolloutRepository(database);
-        _reviewRepository = new SqliteDetectorRolloutReviewRepository(database);
-        _applicationRepository = new SqliteDetectorRolloutApplicationRepository(database);
+        _assetRepository = assets;
+        _rolloutRepository = plans;
+        _reviewRepository = reviews;
+        _applicationRepository = application;
         _configuration = configuration;
         _decoder = decoder;
         _encoder = encoder;
@@ -243,7 +274,10 @@ public sealed class DetectorRolloutJobHandler : IProcessingJobHandler, IDisposab
     public DetectorPipelineDefinition PipelineDefinition { get; }
 
     public static async Task<DetectorRolloutJobHandler> CreateAsync(
-        SqliteCatalogueDatabase database,
+        IAssetRevisionLookupRepository assets,
+        IDetectorReconciliationPlanRepository plans,
+        IDetectorRolloutReviewRepository reviews,
+        IDetectorRolloutApplicationRepository application,
         DetectorRolloutConfiguration configuration,
         TimeProvider? timeProvider = null,
         CancellationToken cancellationToken = default)
@@ -264,7 +298,7 @@ public sealed class DetectorRolloutJobHandler : IProcessingJobHandler, IDisposab
             SFaceFaceEmbedder embedder = new(embedderManifest, embedderPath);
             DetectorPipelineDefinition definition = CreatePipelineDefinition(detectorManifest);
             return new DetectorRolloutJobHandler(
-                database,
+                assets, plans, reviews, application,
                 configuration,
                 new OpenCvImageDecoder(),
                 new OpenCvPngEncoder(),
@@ -290,7 +324,7 @@ public sealed class DetectorRolloutJobHandler : IProcessingJobHandler, IDisposab
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(checkpointWriter);
 
-        CatalogueProcessingAssetRevision asset = await _assetRepository.GetAssetRevisionAsync(
+        AssetRevisionLookup asset = await _assetRepository.GetRevisionAsync(
             context.AssetRevisionId,
             cancellationToken)
             ?? throw Permanent($"Asset revision {context.AssetRevisionId} was not found.");
@@ -430,7 +464,7 @@ public sealed class DetectorRolloutJobHandler : IProcessingJobHandler, IDisposab
                 continue;
             }
 
-            _ = await _rolloutRepository.ApplyUnambiguousInspectionAsync(
+            _ = await _applicationRepository.ApplyUnambiguousInspectionAsync(
                 context.RunId,
                 context.AssetRevisionId,
                 candidate.CandidateIndex,
