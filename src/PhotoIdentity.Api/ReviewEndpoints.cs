@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
@@ -100,6 +101,7 @@ public static class ReviewEndpoints
     private static async Task<IResult> GetFaceAsync(
         string id,
         SqliteReviewRepository repository,
+        IReviewActionRepository actionRepository,
         SqliteReviewFilterRepository filterRepository,
         ReviewFaceTargetResolver targetResolver,
         string state = "all",
@@ -128,7 +130,7 @@ public static class ReviewEndpoints
 
         try
         {
-            IReadOnlyList<CatalogueReviewAction> actions = await repository.GetActionsAsync(
+            IReadOnlyList<ReviewAction> actions = await actionRepository.GetActionsAsync(
                 faceOccurrenceId,
                 cancellationToken);
             CatalogueReviewFaceNavigation? navigation = await filterRepository.GetNavigationAsync(
@@ -258,13 +260,13 @@ public static class ReviewEndpoints
 
     private static async Task<IResult> CreatePersonAsync(
         CreatePersonRequest request,
-        SqliteReviewRepository repository,
+        IReviewActionRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         try
         {
-            CatalogueReviewPerson person = await repository.CreatePersonAsync(
+            ReviewPerson person = await repository.CreatePersonAsync(
                 request.DisplayName,
                 timeProvider.GetUtcNow(),
                 cancellationToken);
@@ -279,7 +281,7 @@ public static class ReviewEndpoints
     private static async Task<IResult> AssignAsync(
         string id,
         AssignFaceRequest request,
-        SqliteReviewRepository repository,
+        IReviewActionRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -291,7 +293,7 @@ public static class ReviewEndpoints
 
         try
         {
-            CatalogueReviewAction action = await repository.AssignAsync(
+            ReviewAction action = await repository.AssignAsync(
                 faceOccurrenceId,
                 personId,
                 request.Actor,
@@ -313,7 +315,7 @@ public static class ReviewEndpoints
     private static Task<IResult> MarkUnknownAsync(
         string id,
         ReviewFaceActionRequest request,
-        SqliteReviewRepository repository,
+        IReviewActionRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken) =>
         RecordPersonlessDecisionAsync(
@@ -326,7 +328,7 @@ public static class ReviewEndpoints
     private static Task<IResult> RejectAsync(
         string id,
         ReviewFaceActionRequest request,
-        SqliteReviewRepository repository,
+        IReviewActionRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken) =>
         RecordPersonlessDecisionAsync(
@@ -339,7 +341,7 @@ public static class ReviewEndpoints
     private static async Task<IResult> RecordPersonlessDecisionAsync(
         string id,
         ReviewFaceActionRequest request,
-        Func<FaceOccurrenceId, string, DateTimeOffset, string?, CancellationToken, Task<CatalogueReviewAction>> action,
+        Func<FaceOccurrenceId, string, DateTimeOffset, string?, CancellationToken, Task<ReviewAction>> action,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -350,7 +352,7 @@ public static class ReviewEndpoints
 
         try
         {
-            CatalogueReviewAction result = await action(
+            ReviewAction result = await action(
                 faceOccurrenceId,
                 request.Actor,
                 timeProvider.GetUtcNow(),
@@ -371,7 +373,7 @@ public static class ReviewEndpoints
     private static async Task<IResult> UndoAsync(
         string id,
         ReviewFaceActionRequest request,
-        SqliteReviewRepository repository,
+        IReviewActionRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -382,7 +384,7 @@ public static class ReviewEndpoints
 
         try
         {
-            CatalogueReviewAction? action = await repository.UndoLatestAsync(
+            ReviewAction? action = await repository.UndoLatestAsync(
                 faceOccurrenceId,
                 request.Actor,
                 timeProvider.GetUtcNow(),
@@ -438,7 +440,10 @@ public static class ReviewEndpoints
                 : $"/api/review/faces/{representative.FaceId}/image?size={GalleryImageSize}",
             representative?.IsExplicit ?? false);
 
-    private static ReviewActionResponse ToResponse(CatalogueReviewAction action) => new(
+    private static ReviewPersonResponse ToResponse(ReviewPerson person) =>
+        new(person.Id.ToString(), person.DisplayName);
+
+    private static ReviewActionResponse ToResponse(ReviewAction action) => new(
         action.Id,
         action.Kind,
         action.PersonId is PersonId personId && action.PersonDisplayName is string displayName
