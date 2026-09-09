@@ -230,17 +230,18 @@ public static class ReviewEndpoints
 
     private static async Task<IResult> GetPeopleAsync(
         SqliteReviewRepository repository,
-        SqliteCatalogueDatabase database,
+        IFavoritePeopleRepository favoritePeopleRepository,
+        IPersonSmartCollectionVisibilityRepository visibilityRepository,
+        IPersonFeaturedFaceRepository featuredFaceRepository,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<CatalogueReviewPerson> people = await repository.GetPeopleAsync(cancellationToken);
-        IReadOnlySet<PersonId> favorites = await new SqliteFavoritePeopleRepository(database)
-            .GetFavoritePersonIdsAsync(cancellationToken);
+        IReadOnlySet<PersonId> favorites =
+            await favoritePeopleRepository.GetFavoritePersonIdsAsync(cancellationToken);
         IReadOnlySet<PersonId> hiddenFromSmartCollections =
-            await new SqlitePersonSmartCollectionVisibilityRepository(database)
-                .GetHiddenPersonIdsAsync(cancellationToken);
+            await visibilityRepository.GetHiddenPersonIdsAsync(cancellationToken);
         IReadOnlyDictionary<PersonId, CataloguePersonRepresentativeFace> representatives =
-            await new SqlitePersonFeaturedFaceRepository(database).ResolveAllAsync(cancellationToken);
+            await featuredFaceRepository.ResolveAllAsync(cancellationToken);
 
         return Results.Ok(people
             .OrderByDescending(person => favorites.Contains(person.Id))

@@ -155,6 +155,7 @@ public sealed class SqlitePersonMaintenanceRepository : IPersonMaintenanceReposi
         string normalizedActor = Required(actor, nameof(actor));
         string? normalizedNote = Optional(note);
 
+        await SqlitePersonFeaturedFaceSchema.EnsureAsync(_database, cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteTransaction transaction = connection.BeginTransaction();
         string previousName = await RequireActivePersonAsync(

@@ -125,6 +125,18 @@ public partial class Program
         builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
         builder.Services.AddSingleton<IPersonMaintenanceRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqlitePersonMaintenanceRepository>());
+        builder.Services.AddSingleton<SqlitePersonPhotoCountRepository>();
+        builder.Services.AddSingleton<IPersonPhotoCountRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePersonPhotoCountRepository>());
+        builder.Services.AddSingleton<SqliteFavoritePeopleRepository>();
+        builder.Services.AddSingleton<IFavoritePeopleRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteFavoritePeopleRepository>());
+        builder.Services.AddSingleton<SqlitePersonSmartCollectionVisibilityRepository>();
+        builder.Services.AddSingleton<IPersonSmartCollectionVisibilityRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePersonSmartCollectionVisibilityRepository>());
+        builder.Services.AddSingleton<SqlitePersonFeaturedFaceRepository>();
+        builder.Services.AddSingleton<IPersonFeaturedFaceRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePersonFeaturedFaceRepository>());
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();
         builder.Services.AddSingleton<IBulkReviewRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteBulkReviewRepository>());

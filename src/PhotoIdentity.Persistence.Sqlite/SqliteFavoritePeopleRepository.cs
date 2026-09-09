@@ -1,12 +1,13 @@
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
 /// Persists local favorite-person preferences independently from identity evidence and model scoring.
 /// </summary>
-public sealed class SqliteFavoritePeopleRepository
+public sealed class SqliteFavoritePeopleRepository : IFavoritePeopleRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 

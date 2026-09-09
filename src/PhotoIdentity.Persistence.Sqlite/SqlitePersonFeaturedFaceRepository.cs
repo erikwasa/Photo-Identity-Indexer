@@ -1,13 +1,14 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
 /// Persists an optional explicit representative face and resolves a safe deterministic fallback.
 /// </summary>
-public sealed class SqlitePersonFeaturedFaceRepository
+public sealed class SqlitePersonFeaturedFaceRepository : IPersonFeaturedFaceRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 

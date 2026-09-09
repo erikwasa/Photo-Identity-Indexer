@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 19;
+    public const int CurrentSchemaVersion = 20;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1005,6 +1005,87 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 
             CREATE INDEX ix_smart_collections_name
                 ON smart_collections (normalized_name, id);
+            """),
+        new(
+            20,
+            "person-presentation-preferences",
+            """
+            CREATE TABLE person_smart_collection_visibility (
+                person_id uuid NOT NULL PRIMARY KEY,
+                hidden_from_smart_collections boolean NOT NULL,
+                changed_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT fk_person_smart_collection_visibility_person
+                    FOREIGN KEY (person_id)
+                    REFERENCES people (id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX ix_person_smart_collection_visibility_hidden
+                ON person_smart_collection_visibility (
+                    hidden_from_smart_collections,
+                    person_id);
+
+            CREATE TABLE person_featured_faces (
+                person_id uuid NOT NULL PRIMARY KEY,
+                face_occurrence_id uuid NOT NULL,
+                changed_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT fk_person_featured_faces_person
+                    FOREIGN KEY (person_id)
+                    REFERENCES people (id) ON DELETE CASCADE,
+                CONSTRAINT fk_person_featured_faces_face
+                    FOREIGN KEY (face_occurrence_id)
+                    REFERENCES face_occurrences (id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX ix_person_featured_faces_face
+                ON person_featured_faces (face_occurrence_id, person_id);
+
+            CREATE OR REPLACE FUNCTION photo_identity_move_featured_face_after_merge()
+            RETURNS trigger
+            LANGUAGE plpgsql
+            AS '
+            BEGIN
+                INSERT INTO person_featured_faces (
+                    person_id,
+                    face_occurrence_id,
+                    changed_at_utc)
+                SELECT
+                    NEW.merged_into_person_id,
+                    source.face_occurrence_id,
+                    source.changed_at_utc
+                FROM person_featured_faces AS source
+                WHERE source.person_id = NEW.id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM person_featured_faces AS target
+                      WHERE target.person_id = NEW.merged_into_person_id)
+                  AND EXISTS (
+                      SELECT 1
+                      FROM review_actions AS latest
+                      WHERE latest.id = (
+                          SELECT candidate.id
+                          FROM review_actions AS candidate
+                          WHERE candidate.face_occurrence_id = source.face_occurrence_id
+                            AND candidate.action_kind IN (''assign'', ''unknown'', ''reject'')
+                            AND candidate.reversed_at_utc IS NULL
+                          ORDER BY candidate.id DESC
+                          LIMIT 1)
+                        AND latest.action_kind = ''assign''
+                        AND latest.person_id = NEW.merged_into_person_id);
+
+                DELETE FROM person_featured_faces
+                WHERE person_id = NEW.id;
+
+                RETURN NEW;
+            END;
+            ';
+
+            CREATE TRIGGER trg_person_featured_faces_after_merge
+                AFTER UPDATE OF merged_into_person_id ON people
+                FOR EACH ROW
+                WHEN (
+                    OLD.merged_into_person_id IS NULL
+                    AND NEW.merged_into_person_id IS NOT NULL)
+                EXECUTE FUNCTION photo_identity_move_featured_face_after_merge();
             """),
     ];
 

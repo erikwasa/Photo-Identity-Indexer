@@ -1,13 +1,14 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
 /// Persists the presentation-only preference that removes a person from normal Smart Collection discovery.
 /// </summary>
-public sealed class SqlitePersonSmartCollectionVisibilityRepository
+public sealed class SqlitePersonSmartCollectionVisibilityRepository : IPersonSmartCollectionVisibilityRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 

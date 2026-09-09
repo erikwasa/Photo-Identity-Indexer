@@ -349,6 +349,24 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(2L, Convert.ToInt64(maintenanceTableCount));
             }
 
+            await using (NpgsqlCommand readPersonPresentationTables =
+                         verificationConnection.CreateCommand())
+            {
+                readPersonPresentationTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'person_smart_collection_visibility',
+                          'person_featured_faces');
+                    """;
+
+                object? presentationTableCount =
+                    await readPersonPresentationTables.ExecuteScalarAsync();
+                Assert.Equal(2L, Convert.ToInt64(presentationTableCount));
+            }
+
             await using (NpgsqlCommand readColumnTypes =
                          verificationConnection.CreateCommand())
             {
