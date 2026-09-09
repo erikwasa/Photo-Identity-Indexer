@@ -56,4 +56,5 @@ Started 2026-09-09 on the M24 PostgreSQL catalogue branch.
 - Added PostgreSQL repositories for manual photo tags, manual photo people, capture metadata, extended metadata and metadata inspection.
 - Fixed the PostgreSQL schema marker so a clean database initializes idempotently through schema version 17.
 - Converted the photo-tag API endpoint and metadata-inspection service constructor to Core-owned persistence contracts instead of concrete SQLite repositories.
+- Converted manual photo-people mutations on the photo-details API to the Core-owned `IPhotoPersonRepository` contract instead of endpoint-local SQLite repository construction.
 - Kept normal runtime binding on SQLite for these newly neutralized surfaces until WI-0102 performs controlled migration/cutover; no dual writes are introduced.

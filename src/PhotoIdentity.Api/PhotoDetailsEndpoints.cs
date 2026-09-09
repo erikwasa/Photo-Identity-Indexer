@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.People;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
@@ -39,8 +40,7 @@ public static class PhotoDetailsEndpoints
     private static async Task<IResult> AddManualPersonAsync(
         string revisionId,
         PhotoPersonMutationRequest request,
-        SqliteCatalogueDatabase database,
-        TimeProvider timeProvider,
+        IPhotoPersonRepository repository,
         SqlitePhotoDetailsRepository detailsRepository,
         CancellationToken cancellationToken)
     {
@@ -54,7 +54,6 @@ public static class PhotoDetailsEndpoints
             return Results.BadRequest(new PhotoPersonErrorResponse("The person identifier is invalid."));
         }
 
-        SqlitePhotoPersonRepository repository = new(database, timeProvider);
         try
         {
             await repository.AddManualPersonAsync(
@@ -83,8 +82,7 @@ public static class PhotoDetailsEndpoints
     private static async Task<IResult> RemoveManualPersonAsync(
         string revisionId,
         string personId,
-        SqliteCatalogueDatabase database,
-        TimeProvider timeProvider,
+        IPhotoPersonRepository repository,
         SqlitePhotoDetailsRepository detailsRepository,
         CancellationToken cancellationToken)
     {
@@ -98,7 +96,6 @@ public static class PhotoDetailsEndpoints
             return Results.BadRequest(new PhotoPersonErrorResponse("The person identifier is invalid."));
         }
 
-        SqlitePhotoPersonRepository repository = new(database, timeProvider);
         try
         {
             await repository.RemoveManualPersonAsync(

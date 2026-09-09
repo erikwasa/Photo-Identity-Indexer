@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.EventLog;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.People;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Sources;
@@ -139,6 +140,9 @@ public partial class Program
         builder.Services.AddSingleton<SqlitePhotoTagRepository>();
         builder.Services.AddSingleton<IPhotoTagRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqlitePhotoTagRepository>());
+        builder.Services.AddSingleton<SqlitePhotoPersonRepository>();
+        builder.Services.AddSingleton<IPhotoPersonRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePhotoPersonRepository>());
         builder.Services.AddSingleton<SqlitePhotoPlaceRepository>();
         builder.Services.AddSingleton<SqlitePhotoPlaceEnrichmentRepository>();
         builder.Services.AddSingleton<IPhotoPlaceEnrichmentStateRepository>(serviceProvider =>
