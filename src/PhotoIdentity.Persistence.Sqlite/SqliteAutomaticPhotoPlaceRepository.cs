@@ -22,7 +22,7 @@ public sealed record CatalogueAutomaticPlaceWriteResult(
 /// authoritative. The write transaction re-checks manual precedence and migration conflicts before
 /// appending an automatic set action.
 /// </summary>
-public sealed class SqliteAutomaticPhotoPlaceRepository
+public sealed class SqliteAutomaticPhotoPlaceRepository : IAutomaticPhotoPlaceRepository
 {
     private const string AutomaticSource = "automatic";
     private const string ManualSource = "manual";
@@ -131,6 +131,53 @@ public sealed class SqliteAutomaticPhotoPlaceRepository
             BlockedByManual: false,
             BlockedByConflict: false);
     }
+
+    async Task<AutomaticPhotoPlaceEligibility> IAutomaticPhotoPlaceRepository.GetEligibilityAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken)
+    {
+        CatalogueAutomaticPlaceEligibility eligibility =
+            await GetEligibilityAsync(revisionId, cancellationToken);
+        return new AutomaticPhotoPlaceEligibility(
+            eligibility.Allowed,
+            eligibility.BlockedByManual,
+            eligibility.BlockedByConflict);
+    }
+
+    async Task<AutomaticPhotoPlaceWriteResult> IAutomaticPhotoPlaceRepository.TrySetAsync(
+        AssetRevisionId revisionId,
+        string placeValue,
+        string provider,
+        string actor,
+        CancellationToken cancellationToken)
+    {
+        CatalogueAutomaticPlaceWriteResult result =
+            await TrySetAsync(revisionId, placeValue, provider, actor, cancellationToken);
+        return new AutomaticPhotoPlaceWriteResult(
+            ToCoreState(result.State),
+            result.Applied,
+            result.BlockedByManual,
+            result.BlockedByConflict);
+    }
+
+    private static PhotoPlaceState ToCoreState(CataloguePhotoPlaceState state) =>
+        new(
+            state.RevisionId,
+            state.Place is null
+                ? null
+                : new PhotoPlaceAssignment(
+                    state.Place.TagId,
+                    state.Place.Value,
+                    state.Place.Name,
+                    state.Place.SourceKind,
+                    state.Place.AssignedBy,
+                    state.Place.AssignedAtUtc),
+            state.MigrationConflict is null
+                ? null
+                : new PhotoPlaceMigrationConflict(
+                    state.MigrationConflict.RevisionId,
+                    state.MigrationConflict.CandidateValues,
+                    state.MigrationConflict.DetectedAtUtc));
 
     private static async Task<CanonicalPlaceRow> EnsureCanonicalPlacePathAsync(
         SqliteConnection connection,

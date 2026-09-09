@@ -35,7 +35,7 @@ public sealed record CataloguePhotoPlaceState(
 /// Stores one effective hierarchical place per immutable photo revision. Place actions are
 /// append-only and reuse canonical photo_tags vocabulary under the reserved Places/ root.
 /// </summary>
-public sealed class SqlitePhotoPlaceRepository
+public sealed class SqlitePhotoPlaceRepository : IPhotoPlaceRepository
 {
     private const string ManualSource = "manual";
 
@@ -210,6 +210,52 @@ public sealed class SqlitePhotoPlaceRepository
         transaction.Commit();
         return await GetStateAsync(revisionId, cancellationToken);
     }
+
+    async Task<IReadOnlyList<PhotoPlaceDefinition>> IPhotoPlaceRepository.GetDefinitionsAsync(
+        CancellationToken cancellationToken) =>
+        (await GetDefinitionsAsync(cancellationToken)).Select(ToCoreDefinition).ToArray();
+
+    async Task<PhotoPlaceState> IPhotoPlaceRepository.GetStateAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken) =>
+        ToCoreState(await GetStateAsync(revisionId, cancellationToken));
+
+    async Task<IReadOnlyList<PhotoPlaceMigrationConflict>> IPhotoPlaceRepository.GetMigrationConflictsAsync(
+        CancellationToken cancellationToken) =>
+        (await GetMigrationConflictsAsync(cancellationToken)).Select(ToCoreConflict).ToArray();
+
+    async Task<PhotoPlaceState> IPhotoPlaceRepository.SetManualPlaceAsync(
+        AssetRevisionId revisionId,
+        string placeValue,
+        string actor,
+        CancellationToken cancellationToken) =>
+        ToCoreState(await SetManualPlaceAsync(revisionId, placeValue, actor, cancellationToken));
+
+    async Task<PhotoPlaceState> IPhotoPlaceRepository.ClearManualPlaceAsync(
+        AssetRevisionId revisionId,
+        string actor,
+        CancellationToken cancellationToken) =>
+        ToCoreState(await ClearManualPlaceAsync(revisionId, actor, cancellationToken));
+
+    private static PhotoPlaceDefinition ToCoreDefinition(CataloguePlaceDefinition place) =>
+        new(place.TagId, place.Value, place.Name, place.ParentTagId, place.ParentValue);
+
+    private static PhotoPlaceState ToCoreState(CataloguePhotoPlaceState state) =>
+        new(
+            state.RevisionId,
+            state.Place is null
+                ? null
+                : new PhotoPlaceAssignment(
+                    state.Place.TagId,
+                    state.Place.Value,
+                    state.Place.Name,
+                    state.Place.SourceKind,
+                    state.Place.AssignedBy,
+                    state.Place.AssignedAtUtc),
+            state.MigrationConflict is null ? null : ToCoreConflict(state.MigrationConflict));
+
+    private static PhotoPlaceMigrationConflict ToCoreConflict(CataloguePlaceMigrationConflict conflict) =>
+        new(conflict.RevisionId, conflict.CandidateValues, conflict.DetectedAtUtc);
 
     private static async Task<CanonicalPlaceRow> EnsureCanonicalPlacePathAsync(
         SqliteConnection connection,

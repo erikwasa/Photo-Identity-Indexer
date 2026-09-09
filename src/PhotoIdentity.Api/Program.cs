@@ -150,10 +150,14 @@ public partial class Program
         builder.Services.AddSingleton<IPhotoPersonRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqlitePhotoPersonRepository>());
         builder.Services.AddSingleton<SqlitePhotoPlaceRepository>();
+        builder.Services.AddSingleton<IPhotoPlaceRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePhotoPlaceRepository>());
         builder.Services.AddSingleton<SqlitePhotoPlaceEnrichmentRepository>();
         builder.Services.AddSingleton<IPhotoPlaceEnrichmentStateRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqlitePhotoPlaceEnrichmentRepository>());
         builder.Services.AddSingleton<SqliteAutomaticPhotoPlaceRepository>();
+        builder.Services.AddSingleton<IAutomaticPhotoPlaceRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteAutomaticPhotoPlaceRepository>());
         builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
         builder.Services.AddSingleton<IAssetRevisionLookupRepository>(serviceProvider =>
