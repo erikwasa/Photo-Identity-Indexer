@@ -19,6 +19,13 @@ GET  /api/archive/diagnostics/throughput
 POST /api/archive/diagnostics/throughput/reset
 ```
 
+They also expose bounded operational aggregates for API request families and background
+regeneration/place-enrichment cycles. These counters and timers are process-local; they do not
+write to the catalogue. Request measurements use a fixed family (archive, collection, metadata,
+place, review, slideshow, detector or other) and success/failure totals, never a request path,
+query, identifier, filename, image, hash or embedding. Diagnostic endpoint requests themselves
+are excluded so collecting a snapshot does not affect it.
+
 The report contains only:
 
 - reset/capture timestamps and an in-process generation number;

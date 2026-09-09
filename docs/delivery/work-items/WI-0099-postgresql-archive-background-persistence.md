@@ -22,11 +22,13 @@ Move the high-concurrency archive/background writer domains to PostgreSQL and re
 - Add concurrency-focused integration tests with archive advancement, enrichment and another writer active together.
 
 ## Acceptance criteria
-- [ ] Archive/background state can run entirely against PostgreSQL.
-- [ ] Concurrent background writes do not produce the prior SQLite table-lock shutdown class.
-- [ ] A transient database exception cannot terminate Photo Identity through an escaping recovery write.
-- [ ] Durable run/lease/retry state survives application restart.
-- [ ] No personal paths/content are emitted by new diagnostics beyond existing privacy-safe conventions.
+- [x] Archive/background state can run entirely against PostgreSQL.
+- [x] Concurrent background writes do not produce the prior SQLite table-lock shutdown class.
+- [x] A transient database exception cannot terminate Photo Identity through an escaping recovery write.
+- [x] Durable run/lease/retry state survives application restart.
+- [x] No personal paths/content are emitted by new diagnostics beyond existing privacy-safe conventions.
+
+Completed 2026-09-03 and maintainer-verified in the canonical work-item registry. Runtime provider cutover and remaining normal-runtime SQLite composition are intentionally owned by WI-0101/WI-0102 rather than this archive/background persistence item.
 
 
 ## Implementation progress

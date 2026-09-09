@@ -275,6 +275,40 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(3L, Convert.ToInt64(placeEnrichmentTableCount));
             }
 
+            await using (NpgsqlCommand readPlaceTables =
+                         verificationConnection.CreateCommand())
+            {
+                readPlaceTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'photo_place_actions',
+                          'photo_place_migration_conflicts');
+                    """;
+
+                object? placeTableCount =
+                    await readPlaceTables.ExecuteScalarAsync();
+                Assert.Equal(2L, Convert.ToInt64(placeTableCount));
+            }
+
+            await using (NpgsqlCommand readSmartCollectionTables =
+                         verificationConnection.CreateCommand())
+            {
+                readSmartCollectionTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name = 'smart_collections';
+                    """;
+
+                object? smartCollectionTableCount =
+                    await readSmartCollectionTables.ExecuteScalarAsync();
+                Assert.Equal(1L, Convert.ToInt64(smartCollectionTableCount));
+            }
+
             await using (NpgsqlCommand readReviewTables =
                          verificationConnection.CreateCommand())
             {
@@ -313,6 +347,24 @@ public sealed class PostgresCatalogueDatabaseTests
                 object? maintenanceTableCount =
                     await readPersonMaintenanceTables.ExecuteScalarAsync();
                 Assert.Equal(2L, Convert.ToInt64(maintenanceTableCount));
+            }
+
+            await using (NpgsqlCommand readPersonPresentationTables =
+                         verificationConnection.CreateCommand())
+            {
+                readPersonPresentationTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'person_smart_collection_visibility',
+                          'person_featured_faces');
+                    """;
+
+                object? presentationTableCount =
+                    await readPersonPresentationTables.ExecuteScalarAsync();
+                Assert.Equal(2L, Convert.ToInt64(presentationTableCount));
             }
 
             await using (NpgsqlCommand readColumnTypes =

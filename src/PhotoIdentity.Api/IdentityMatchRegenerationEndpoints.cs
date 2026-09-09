@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
@@ -29,8 +30,8 @@ public static class IdentityMatchRegenerationEndpoints
     }
 
     private static async Task<IResult> GetAsync(
-        SqliteIdentityMatchRegenerationRepository repository,
-        SqliteIdentitySuggestionPolicyRepository policyRepository,
+        IIdentityMatchRegenerationRepository repository,
+        IIdentitySuggestionPolicyRepository policyRepository,
         SqliteIdentityMatchEvidenceVersionReader evidenceReader,
         string? modelId,
         string? modelHash,
@@ -41,11 +42,11 @@ public static class IdentityMatchRegenerationEndpoints
             return BadRequest("An exact suggestion model revision is required.");
         }
 
-        IdentitySuggestionPolicy policy = await policyRepository.GetAsync(
+        ReviewIdentitySuggestionPolicy policy = await policyRepository.GetAsync(
             parsedModelId,
             parsedModelHash,
             cancellationToken);
-        CatalogueIdentityMatchRegenerationRun? run = await repository.GetLatestAsync(
+        ReviewIdentityMatchRegenerationRun? run = await repository.GetLatestAsync(
             parsedModelId,
             parsedModelHash,
             cancellationToken);
@@ -78,14 +79,14 @@ public static class IdentityMatchRegenerationEndpoints
             parsedModelHash,
             cancellationToken);
         IdentityMatchEvidenceVersion expectedEvidence =
-            string.Equals(run.Status, IdentityMatchRegenerationStatuses.Completed, StringComparison.Ordinal)
+            string.Equals(run.Status, ReviewIdentityMatchRegenerationStatuses.Completed, StringComparison.Ordinal)
                 ? SqliteIdentityMatchEvidenceVersionReader.ExpectedAfterAutomaticAssignments(
-                    run.EvidenceVersion,
+                    ToSqliteEvidenceVersion(run.EvidenceVersion),
                     run.AutomaticallyAssignedCount)
-                : run.EvidenceVersion;
+                : ToSqliteEvidenceVersion(run.EvidenceVersion);
         bool evidenceMatches = currentEvidence == expectedEvidence;
-        bool stale = string.Equals(run.Status, IdentityMatchRegenerationStatuses.Stale, StringComparison.Ordinal)
-            || string.Equals(run.Status, IdentityMatchRegenerationStatuses.Failed, StringComparison.Ordinal)
+        bool stale = string.Equals(run.Status, ReviewIdentityMatchRegenerationStatuses.Stale, StringComparison.Ordinal)
+            || string.Equals(run.Status, ReviewIdentityMatchRegenerationStatuses.Failed, StringComparison.Ordinal)
             || !evidenceMatches
             || (!run.IsActive && run.PolicyVersion != policy.Version);
 
@@ -94,8 +95,8 @@ public static class IdentityMatchRegenerationEndpoints
 
     private static async Task<IResult> StartAsync(
         StartIdentityMatchRegenerationRequest request,
-        SqliteIdentityMatchRegenerationRepository repository,
-        SqliteIdentitySuggestionPolicyRepository policyRepository,
+        IIdentityMatchRegenerationRepository repository,
+        IIdentitySuggestionPolicyRepository policyRepository,
         TimeProvider timeProvider,
         string? modelId,
         string? modelHash,
@@ -111,14 +112,14 @@ public static class IdentityMatchRegenerationEndpoints
             return BadRequest("A regeneration actor is required.");
         }
 
-        IdentitySuggestionPolicy policy = await policyRepository.GetAsync(
+        ReviewIdentitySuggestionPolicy policy = await policyRepository.GetAsync(
             parsedModelId,
             parsedModelHash,
             cancellationToken);
 
         try
         {
-            CatalogueIdentityMatchRegenerationRun run = await repository.StartAsync(
+            ReviewIdentityMatchRegenerationRun run = await repository.StartAsync(
                 parsedModelId,
                 parsedModelHash,
                 policy.Version,
@@ -138,7 +139,7 @@ public static class IdentityMatchRegenerationEndpoints
         }
     }
 
-    private static object ToResponse(CatalogueIdentityMatchRegenerationRun run, bool stale) => new
+    private static object ToResponse(ReviewIdentityMatchRegenerationRun run, bool stale) => new
     {
         RunId = run.Id,
         ModelId = run.ModelId.ToString(),
@@ -159,6 +160,14 @@ public static class IdentityMatchRegenerationEndpoints
         run.UpdatedAtUtc,
         run.Error,
     };
+
+    private static IdentityMatchEvidenceVersion ToSqliteEvidenceVersion(
+        ReviewIdentityMatchEvidenceVersion value) =>
+        new(
+            value.ReviewActionId,
+            value.SuggestionReviewActionId,
+            value.PersonMergeActionId,
+            value.EmbeddingId);
 
     private static bool TryModelRevision(
         string? modelId,

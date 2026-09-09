@@ -2,7 +2,6 @@ using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Tags;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
@@ -106,7 +105,7 @@ public static class SmartCollectionEndpoints
 
     private static async Task<IResult> CreateAsync(
         SmartCollectionDefinitionRequest request,
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         try
@@ -130,7 +129,7 @@ public static class SmartCollectionEndpoints
     }
 
     private static async Task<IResult> ListAsync(
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<SmartCollectionDefinition> definitions =
@@ -139,7 +138,7 @@ public static class SmartCollectionEndpoints
     }
 
     private static async Task<IResult> ListSlideshowCollectionsAsync(
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<SmartCollectionDefinition> definitions =
@@ -153,7 +152,7 @@ public static class SmartCollectionEndpoints
 
     private static async Task<IResult> GetAsync(
         Guid id,
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
@@ -170,7 +169,7 @@ public static class SmartCollectionEndpoints
     private static async Task<IResult> UpdateAsync(
         Guid id,
         SmartCollectionDefinitionRequest request,
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
@@ -210,7 +209,7 @@ public static class SmartCollectionEndpoints
 
     private static async Task<IResult> DeleteAsync(
         Guid id,
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
@@ -225,7 +224,7 @@ public static class SmartCollectionEndpoints
 
     private static async Task<IResult> CreateSlideshowSnapshotAsync(
         Guid id,
-        SqliteSmartCollectionQueryRepository query,
+        ISmartCollectionQueryRepository query,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
@@ -256,8 +255,8 @@ public static class SmartCollectionEndpoints
         Guid id,
         int? offset,
         int? limit,
-        SqliteSmartCollectionRepository definitions,
-        SqliteSmartCollectionQueryRepository query,
+        ISmartCollectionRepository definitions,
+        ISmartCollectionQueryRepository query,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
@@ -288,7 +287,7 @@ public static class SmartCollectionEndpoints
 
     private static async Task<IResult> QueryAsync(
         SmartCollectionQueryRequest request,
-        SqliteSmartCollectionQueryRepository repository,
+        ISmartCollectionQueryRepository repository,
         CancellationToken cancellationToken)
     {
         try

@@ -22,10 +22,12 @@ Implement PostgreSQL-backed review, people, suggestion, policy and identity-matc
 - Add PostgreSQL integration coverage for representative single, bulk and restart/recovery workflows.
 
 ## Acceptance criteria
-- [ ] Face review and identity workflows execute against PostgreSQL without SQLite authoritative writes.
-- [ ] Existing IDs/history and accepted/rejected suggestion semantics map losslessly.
-- [ ] Regeneration run state remains durable/resumable; algorithmic scaling is deferred to WI-0103.
-- [ ] Review/audit behavior matches current accepted semantics.
+- [x] Face review and identity workflows execute against PostgreSQL without SQLite authoritative writes.
+- [x] Existing IDs/history and accepted/rejected suggestion semantics map losslessly.
+- [x] Regeneration run state remains durable/resumable; algorithmic scaling is deferred to WI-0103.
+- [x] Review/audit behavior matches current accepted semantics.
+
+Completed 2026-09-09 and maintainer-verified in the canonical work-item registry. Normal application runtime remains bound to SQLite until the WI-0101/WI-0102 provider-composition and controlled-cutover work; that deferred runtime binding does not reopen WI-0100's scoped persistence acceptance.
 
 
 ## Slice 1 — canonical people and review actions
@@ -155,4 +157,14 @@ Started 2026-09-03.
 - Added `PostgresIdentitySuggestionPolicyRepository` preserving default initialization, no-op updates, exact-model isolation and durable versioned changes. Updates lock the exact policy row before incrementing the version.
 - Focused live PostgreSQL coverage verifies defaults, exact-model isolation, changed/no-op updates, restart durability and invalid-policy rejection.
 
-Suggestion gallery persistence and identity regeneration run/target durability remain later WI-0100 slices. Runtime review/identity authority remains SQLite until controlled cutover.
+## Slice 8 — suggestion gallery and regeneration persistence
+
+Started 2026-09-03.
+
+- Added provider-neutral suggestion-gallery and regeneration execution contracts with SQLite compatibility adapters.
+- Added PostgreSQL suggestion-gallery persistence over the existing ranked-suggestion schema, preserving filtering, pagination, exact-model selection and deterministic ordering.
+- Added PostgreSQL regeneration run/target persistence, scorer and automatic-assignment adapters, including durable claims, checkpoints, retries and evidence-version handling.
+- Added focused PostgreSQL coverage for gallery queries, run/target lifecycle, restart/resume behavior and execution persistence.
+- Kept runtime regeneration composition SQLite-backed until the controlled provider selection and cutover work owned by WI-0101/WI-0102.
+
+All persistence surfaces named by WI-0100 now have provider-neutral contracts and PostgreSQL implementations. Runtime review/identity authority remains SQLite until controlled cutover.

@@ -553,7 +553,7 @@ work_items:
   blockers:
   - WI-0004
   blocker_notes:
-  - Verified by successful workflow #1075 after PR #169 merged; the mixed-media checkpoint reused prior validation and completed its media checks in seconds without rerunning the integration suite.
+  - Verified by successful workflow
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/169
@@ -573,7 +573,7 @@ work_items:
   blockers:
   - WI-0069
   blocker_notes:
-  - Slice 1 merged through PR #176 and workflow #1093 established timing evidence and the shared generic API test host. Slice 2 is active in PR #177; transient API-host failures are temporarily isolated into a visible diagnostic lane and stabilization is tracked by WI-0071.
+  - Slice 1 merged through PR
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/176
@@ -699,7 +699,7 @@ work_items:
   - WI-0042
   - WI-0072
   blocker_notes:
-  - Metrics baseline PR #210 and derivative-liveness PR #211 are merged. The clean 155-image online-only validation completed in 39m32s at 235.20 images/hour with 155 hydrations/releases and zero failures, while model initialization still consumed 1533.91 seconds total across 155 sessions. The active session-reuse slice currentizes PR #200's safe concept on current main: exact profile/config keyed reuse, serialized access, deterministic host disposal, no added concurrency. PR #200 remains unmerged as historical reference and will be superseded by the new PR.
+  - Metrics baseline PR
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/210
@@ -778,7 +778,7 @@ work_items:
   blockers:
   - WI-0041
   blocker_notes:
-  - Strategy 2 verified on the real catalogue after workflow #1259: repeat no-change sync fell from 37.83 s to 0.988 s with 620 metadata-stable local files reused and zero files re-hashed. PR #208 merged.
+  - Strategy 2 verified on the real catalogue after workflow
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/208
@@ -802,7 +802,7 @@ work_items:
   - WI-0038
   - WI-0058
   blocker_notes:
-  - Final 2026-08-28 maintainer real-catalogue verification passed after PR #213 corrected null-dimension compatibility. The Target overlay now works as expected without re-analysis or derivative regeneration.
+  - Final 2026-08-28 maintainer real-catalogue verification passed after PR
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/209
@@ -1033,7 +1033,6 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/225
   - type: workflow
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33391511779
-
 - id: WI-0096
   title: Wait for slideshow preparation cancellation to quiesce
   milestone: M22
@@ -1075,7 +1074,6 @@ work_items:
     value: e1944e3003c8d234a65ce2eab17f9ef9fa9aa754
   - type: workflow
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33555903485
-
 - id: WI-0097
   title: Establish PostgreSQL runtime and migration foundation
   milestone: M24
@@ -1091,11 +1089,11 @@ work_items:
   blockers: []
   blocker_notes:
   - PostgreSQL is the accepted long-term authoritative catalogue per ADR-0009; comparative SQLite/PostgreSQL benchmarking is not required.
-  - Maintainer verification after PR #229 found PostgreSQL healthy inside Podman but unreachable from Windows localhost. PR #230 removed the explicit VM-loopback bind; PR #231 added WSL-forwarding diagnostics and Windows localhost then became reachable.
-  - Windows forwarding became reachable after PR #231, but Npgsql then timed out in encryption negotiation before authentication; the active slice explicitly disables SSL/GSS negotiation for the loopback-only local Podman runtime.
-  - After PR #232, localhost reached PostgreSQL authentication but the stream closed with EndOfStreamException. The active slice now proves authenticated SQL inside the container, PostgreSQL protocol response from Windows and a direct Podman-machine diagnostic path before recommending WSL user-mode networking.
-  - Maintainer verification after PR #234 proved authenticated SQL succeeds inside the container while Windows localhost fails the PostgreSQL startup protocol. Enabling Podman WSL user-mode networking did not correct the failure.
-  - Upstream Podman issue #29377 and Microsoft WSL issue #41204 document current Podman 6.0.x Windows/WSL localhost port-forwarding regressions matching the observed behavior. The active slice detects Podman client/server versions and uses Podman 5.8.x as the known-good WSL fallback baseline rather than changing Photo Identity database code.
+  - Maintainer verification after PR
+  - Windows forwarding became reachable after PR
+  - After PR
+  - Maintainer verification after PR
+  - Upstream Podman issue
   - 'Maintainer confirmed both Windows client and Linux server were Podman 6.0.2 (commit b28edb9ad70ce4317dc762ee9ce0a6d081d154e9), matching the upstream regression report exactly. The runtime has now been downgraded/recreated to the accepted 5.8.x baseline: client 5.8.5 (6d48b6f12f793176f3f6bc808b5a440984c14eb2), server 5.8.6 (a859fc66702c23e869c282c63e92d9b6cd264229). Next step is rerun live verification.'
   - On the 5.8.x baseline, authenticated in-container SQL and the Windows localhost PostgreSQL protocol preflight both pass. A verifier-only PowerShell bug then captured dotnet test output together with the exit code, causing a false generic failure; the active slice returns only the numeric test exit code.
   - 'Final maintainer verification passed on 2026-09-02: verify-postgres.ps1 completed the isolated migration bootstrap successfully; current main /health reported catalogueProvider=sqlite and PostgreSQL configured=true, status=ready, schemaVersion=1 while the real SQLite catalogue remained at schemaVersion=16.'
@@ -1205,7 +1203,7 @@ work_items:
   - 'PR #254 initially failed workflow #1469 on one C# local-variable scoping error. The corrective commit changed only local names; workflow #1470 passed, PR #254 merged at 65347049842db70cbed9a12f4637b582e819a4ac, and maintainer PostgreSQL review/verification succeeded, accepting schema version 9 and managed hydration ownership semantics.'
   - 'PR #255 merged at 865cfe01ab6d67216d3719814f7b9ab0fe782ce4 and workflow #1475 passed. Maintainer review/verification succeeded, accepting the PostgreSQL storage-accounting adapter against schema version 9.'
   - 'PR #256 merged at c77fc49eddd636fe54e02745a73441bdb4939d96 and workflow #1479 passed. Maintainer review/verification succeeded, accepting PostgreSQL schema version 10 plus capture/GPS and GeoNames operational state.'
-  - 'Final WI-0099 audit found no remaining unimplemented persistence surface owned by WI-0099. Remaining direct SQLite runtime composition belongs to WI-0101 normal-runtime SQLite elimination and WI-0102 controlled provider cutover.'
+  - Final WI-0099 audit found no remaining unimplemented persistence surface owned by WI-0099. Remaining direct SQLite runtime composition belongs to WI-0101 normal-runtime SQLite elimination and WI-0102 controlled provider cutover.
   - 'PR #257 merged at 3431cf8ed3f2dff435d6f7d7a452c219d5c53708, workflow #1484 passed, and the maintainer post-merge verify-postgres.ps1 run succeeded. Concurrent advancement/enrichment/availability writes are accepted and WI-0099 is complete.'
   evidence:
   - type: pull_request
@@ -1287,11 +1285,14 @@ work_items:
 - id: WI-0100
   title: Migrate review and identity persistence to PostgreSQL
   milestone: M24
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0100-postgresql-review-identity-persistence.md
   started_at: 2026-09-03
-  last_updated_at: 2026-09-03
+  completed_at: 2026-09-09
+  verified_at: 2026-09-09
+  verified_by: maintainer
+  last_updated_at: 2026-09-09
   branch: agent/WI-0100-postgres-person-maintenance
   blockers:
   - WI-0098
@@ -1322,12 +1323,17 @@ work_items:
     value: 07dddf3d0120d41859cf5a5816c251135d21159a
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/261
+  - type: verification
+    value: '2026-09-09 maintainer live PostgreSQL verification passed: verify-postgres.ps1 and WI-0100 focused live persistence tests on autopilot/m24 schema 17'
 - id: WI-0101
   title: Migrate library and remaining authoritative persistence to PostgreSQL
   milestone: M24
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0101-postgresql-library-remaining-persistence.md
+  started_at: 2026-09-09
+  last_updated_at: 2026-09-09
+  branch: erik-wahlstrom-folksam1-m24-postgresql-catalogue-scale
   blockers:
   - WI-0098
   blocker_notes: []
@@ -1369,14 +1375,22 @@ work_items:
 - id: WI-0105
   title: Add low-overhead PostgreSQL and background-work observability
   milestone: M24
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0105-operational-metrics-observability.md
+  started_at: 2026-09-09
+  completed_at: 2026-09-09
+  verified_at: 2026-09-09
+  verified_by: ai-agent
+  last_updated_at: 2026-09-09
+  branch: autopilot/m24
   blockers:
   - WI-0099
   blocker_notes:
   - Metrics replace repeated manual A/B performance exercises; telemetry must remain aggregated, bounded and privacy-safe.
-  evidence: []
+  evidence:
+  - type: verification
+    value: 2026-09-09 local build, full test suite, Docs validate and generate --check passed for aggregate operational diagnostics
 - id: WI-0106
   title: Operationalize PostgreSQL and resume full-archive catch-up
   milestone: M24

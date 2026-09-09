@@ -2,7 +2,6 @@ using System.Globalization;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Tags;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
@@ -15,7 +14,7 @@ public static class PhotoTagEndpoints
     {
         endpoints.MapGet(
             "/api/tags",
-            async (SqlitePhotoTagRepository repository, CancellationToken cancellationToken) =>
+            async (IPhotoTagRepository repository, CancellationToken cancellationToken) =>
             {
                 IReadOnlyList<CataloguePhotoTagDefinition> tags =
                     await repository.GetCanonicalTagsAsync(cancellationToken);
@@ -27,7 +26,7 @@ public static class PhotoTagEndpoints
 
         endpoints.MapGet(
             "/api/collections/photos/{revisionId}/tags",
-            async (string revisionId, SqlitePhotoTagRepository repository, CancellationToken cancellationToken) =>
+            async (string revisionId, IPhotoTagRepository repository, CancellationToken cancellationToken) =>
             {
                 if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
                 {
@@ -48,7 +47,7 @@ public static class PhotoTagEndpoints
 
         endpoints.MapPost(
             "/api/collections/photos/{revisionId}/tags",
-            async (string revisionId, PhotoTagMutationRequest request, SqlitePhotoTagRepository repository, CancellationToken cancellationToken) =>
+            async (string revisionId, PhotoTagMutationRequest request, IPhotoTagRepository repository, CancellationToken cancellationToken) =>
             {
                 if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
                 {
@@ -81,7 +80,7 @@ public static class PhotoTagEndpoints
 
         endpoints.MapDelete(
             "/api/collections/photos/{revisionId}/tags",
-            async (string revisionId, string name, SqlitePhotoTagRepository repository, CancellationToken cancellationToken) =>
+            async (string revisionId, string name, IPhotoTagRepository repository, CancellationToken cancellationToken) =>
             {
                 if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
                 {

@@ -5,30 +5,6 @@ using PhotoIdentity.Core.Identifiers;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
-public sealed record SmartCollectionPhoto(
-    AssetRevisionId RevisionId,
-    AssetId AssetId,
-    DateTimeOffset ObservedAtUtc,
-    string? MediaType,
-    int? Width,
-    int? Height,
-    DateTime? TakenAtLocal,
-    double? Latitude,
-    double? Longitude);
-
-public sealed record SmartCollectionPhotoPage(
-    IReadOnlyList<SmartCollectionPhoto> Items,
-    int Offset,
-    int Limit,
-    int Total,
-    SmartCollectionFilter Filter);
-
-public sealed record SmartCollectionSlideshowSnapshot(
-    SmartCollectionId CollectionId,
-    string CollectionName,
-    DateTimeOffset CreatedAtUtc,
-    IReadOnlyList<AssetRevisionId> RevisionIds);
-
 /// <summary>
 /// Evaluates reusable smart-collection filters against current immutable revisions.
 /// Populated dimensions combine with AND semantics; people and tags independently support all/any.
@@ -37,7 +13,7 @@ public sealed record SmartCollectionSlideshowSnapshot(
 /// uses canonical hierarchy ancestry rather than global leaf-name matching.
 /// Missing capture metadata cannot satisfy GPS or taken-date predicates.
 /// </summary>
-public sealed class SqliteSmartCollectionQueryRepository
+public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQueryRepository
 {
     private const string CommonCtes = """
         WITH latest_review_action AS (

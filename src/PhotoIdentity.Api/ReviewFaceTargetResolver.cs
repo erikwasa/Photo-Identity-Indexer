@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
@@ -14,11 +15,11 @@ namespace PhotoIdentity.Api;
 /// </summary>
 public sealed class ReviewFaceTargetResolver
 {
-    private readonly SqliteArchiveReviewProxyRepository _proxyRepository;
+    private readonly IArchiveReviewProxyRepository _proxyRepository;
     private readonly ReviewProxyServingConfiguration _configuration;
 
     public ReviewFaceTargetResolver(
-        SqliteArchiveReviewProxyRepository proxyRepository,
+        IArchiveReviewProxyRepository proxyRepository,
         ReviewProxyServingConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(proxyRepository);
@@ -94,7 +95,7 @@ public sealed class ReviewFaceTargetResolver
             return targets;
         }
 
-        IReadOnlyDictionary<AssetRevisionId, ArchiveReviewProxyRecord> proxies =
+        IReadOnlyDictionary<AssetRevisionId, ArchiveReviewProxyMetadata> proxies =
             await _proxyRepository.GetManyAsync(
                 fallback.Select(face => face.RevisionId).Distinct().ToArray(),
                 _configuration.ProfileId!,
@@ -102,7 +103,7 @@ public sealed class ReviewFaceTargetResolver
 
         foreach (TargetSource face in fallback)
         {
-            if (!proxies.TryGetValue(face.RevisionId, out ArchiveReviewProxyRecord? proxy))
+            if (!proxies.TryGetValue(face.RevisionId, out ArchiveReviewProxyMetadata? proxy))
             {
                 continue;
             }

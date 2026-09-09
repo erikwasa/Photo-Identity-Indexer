@@ -73,6 +73,7 @@ public static class SuggestionGalleryEndpoints
     private static async Task<IResult> GetFaceAsync(
         string id,
         SqliteReviewRepository reviewRepository,
+        IReviewActionRepository actionRepository,
         ISuggestionGalleryRepository suggestionRepository,
         ReviewFaceTargetResolver targetResolver,
         string? modelId,
@@ -100,7 +101,7 @@ public static class SuggestionGalleryEndpoints
 
         try
         {
-            IReadOnlyList<CatalogueReviewAction> actions = await reviewRepository.GetActionsAsync(
+            IReadOnlyList<ReviewAction> actions = await actionRepository.GetActionsAsync(
                 faceOccurrenceId,
                 cancellationToken);
             ReviewSuggestionGalleryNavigation? navigation = await suggestionRepository.GetNavigationAsync(
@@ -186,7 +187,7 @@ public static class SuggestionGalleryEndpoints
     private static ReviewPersonResponse ToResponse(CatalogueReviewPerson person) =>
         new(person.Id.ToString(), person.DisplayName);
 
-    private static ReviewActionResponse ToResponse(CatalogueReviewAction action) => new(
+    private static ReviewActionResponse ToResponse(ReviewAction action) => new(
         action.Id,
         action.Kind,
         action.PersonId is PersonId personId && action.PersonDisplayName is string displayName

@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -21,7 +22,7 @@ public static class ReviewSuggestionEndpoints
     private static async Task<IResult> GetSuggestionsAsync(
         string id,
         SqliteReviewRepository reviewRepository,
-        SqliteReviewSuggestionRepository suggestionRepository,
+        IReviewSuggestionRepository suggestionRepository,
         CancellationToken cancellationToken)
     {
         if (!TryFaceOccurrenceId(id, out FaceOccurrenceId faceOccurrenceId))
@@ -37,7 +38,7 @@ public static class ReviewSuggestionEndpoints
             return Results.NotFound();
         }
 
-        IReadOnlyList<CatalogueReviewIdentitySuggestion> suggestions =
+        IReadOnlyList<ReviewIdentitySuggestion> suggestions =
             await suggestionRepository.GetSuggestionsAsync(faceOccurrenceId, cancellationToken);
         return Results.Ok(suggestions.Select(ToResponse).ToArray());
     }
@@ -46,7 +47,7 @@ public static class ReviewSuggestionEndpoints
         string id,
         long suggestionId,
         ReviewSuggestionActionRequest request,
-        SqliteReviewSuggestionRepository repository,
+        IReviewSuggestionRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -57,7 +58,7 @@ public static class ReviewSuggestionEndpoints
 
         try
         {
-            CatalogueReviewIdentitySuggestion suggestion = await repository.AcceptAsync(
+            ReviewIdentitySuggestion suggestion = await repository.AcceptAsync(
                 faceOccurrenceId,
                 suggestionId,
                 request.Actor,
@@ -84,7 +85,7 @@ public static class ReviewSuggestionEndpoints
         string id,
         long suggestionId,
         ReviewSuggestionActionRequest request,
-        SqliteReviewSuggestionRepository repository,
+        IReviewSuggestionRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -95,7 +96,7 @@ public static class ReviewSuggestionEndpoints
 
         try
         {
-            CatalogueReviewIdentitySuggestion suggestion = await repository.RejectAsync(
+            ReviewIdentitySuggestion suggestion = await repository.RejectAsync(
                 faceOccurrenceId,
                 suggestionId,
                 request.Actor,
@@ -119,7 +120,7 @@ public static class ReviewSuggestionEndpoints
     }
 
     private static ReviewIdentitySuggestionResponse ToResponse(
-        CatalogueReviewIdentitySuggestion suggestion) => new(
+        ReviewIdentitySuggestion suggestion) => new(
             suggestion.Id,
             new ReviewPersonResponse(
                 suggestion.Person.Id.ToString(),

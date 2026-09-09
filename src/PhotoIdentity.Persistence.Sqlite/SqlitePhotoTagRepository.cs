@@ -5,33 +5,13 @@ using PhotoIdentity.Core.Tags;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
-public sealed record CatalogueManualPhotoTag(
-    long TagId,
-    string NormalizedValue,
-    string Value,
-    string Name,
-    long? ParentTagId,
-    string? ParentValue,
-    string? Color,
-    string AssignedBy,
-    DateTimeOffset AssignedAtUtc);
-
-public sealed record CataloguePhotoTagDefinition(
-    long TagId,
-    string NormalizedValue,
-    string Value,
-    string Name,
-    long? ParentTagId,
-    string? ParentValue,
-    string? Color);
-
 /// <summary>
 /// Stores maintainer-owned photo tags independently from future model-produced tag evidence.
 /// Manual state is derived from append-only add/remove actions for one immutable asset revision.
 /// Canonical tag rows form an Immich-compatible slash-separated hierarchy while SQLite remains
 /// Photo Identity's source of truth.
 /// </summary>
-public sealed class SqlitePhotoTagRepository
+public sealed class SqlitePhotoTagRepository : IPhotoTagRepository
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly TimeProvider _timeProvider;

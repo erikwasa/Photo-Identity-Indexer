@@ -1,6 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -15,13 +15,13 @@ public static class PersonAuditEndpoints
 
     private static async Task<IResult> GetFacesAsync(
         string id,
-        SqlitePersonAuditRepository repository,
+        IPersonAuditRepository repository,
         string? modelId = null,
         string? modelHash = null,
         int offset = 0,
         int limit = 40,
         bool disagreementsOnly = false,
-        string sort = CataloguePersonAuditSorts.AssignedDescending,
+        string sort = PersonAuditSorts.AssignedDescending,
         CancellationToken cancellationToken = default)
     {
         if (!TryPersonId(id, out PersonId personId) ||
@@ -32,7 +32,7 @@ public static class PersonAuditEndpoints
 
         try
         {
-            CataloguePersonAuditPage? page = await repository.GetFacesAsync(
+            PersonAuditPage? page = await repository.GetFacesAsync(
                 personId,
                 parsedModelId,
                 parsedModelHash,
@@ -61,7 +61,7 @@ public static class PersonAuditEndpoints
         }
     }
 
-    private static PersonAuditFaceResponse ToResponse(CataloguePersonAuditFace face) => new(
+    private static PersonAuditFaceResponse ToResponse(PersonAuditFace face) => new(
         face.Id.ToString(),
         $"/api/review/faces/{face.Id}/image",
         face.PhotoName,
@@ -75,7 +75,7 @@ public static class PersonAuditEndpoints
         face.SuggestionDisagrees);
 
     private static ReviewTopSuggestionResponse ToResponse(
-        CatalogueSuggestionGalleryTopSuggestion suggestion) => new(
+        PersonAuditTopSuggestion suggestion) => new(
         suggestion.Id,
         ToResponse(suggestion.Person),
         suggestion.ModelId.ToString(),
@@ -86,7 +86,7 @@ public static class PersonAuditEndpoints
         suggestion.Status,
         suggestion.GeneratedAtUtc);
 
-    private static ReviewPersonResponse ToResponse(CatalogueReviewPerson person) =>
+    private static ReviewPersonResponse ToResponse(ReviewPerson person) =>
         new(person.Id.ToString(), person.DisplayName);
 
     private static bool TryPersonId(string value, out PersonId id)

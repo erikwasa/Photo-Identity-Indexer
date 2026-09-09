@@ -1,6 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Review;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -25,17 +24,19 @@ public static class PersonMaintenanceEndpoints
 
     private static async Task<IResult> GetPeopleAsync(
         IPersonMaintenanceRepository repository,
-        SqliteCatalogueDatabase database,
+        IPersonPhotoCountRepository photoCountsRepository,
+        IFavoritePeopleRepository favoritePeopleRepository,
+        IPersonSmartCollectionVisibilityRepository visibilityRepository,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<PersonMaintenancePerson> people =
             await repository.GetPeopleAsync(cancellationToken);
         IReadOnlyDictionary<PersonId, int> photoCounts =
-            await new SqlitePersonPhotoCountRepository(database).GetActivePhotoCountsAsync(cancellationToken);
-        IReadOnlySet<PersonId> favorites = await new SqliteFavoritePeopleRepository(database)
-            .GetFavoritePersonIdsAsync(cancellationToken);
-        IReadOnlySet<PersonId> hiddenPeople = await new SqlitePersonSmartCollectionVisibilityRepository(database)
-            .GetHiddenPersonIdsAsync(cancellationToken);
+            await photoCountsRepository.GetActivePhotoCountsAsync(cancellationToken);
+        IReadOnlySet<PersonId> favorites =
+            await favoritePeopleRepository.GetFavoritePersonIdsAsync(cancellationToken);
+        IReadOnlySet<PersonId> hiddenPeople =
+            await visibilityRepository.GetHiddenPersonIdsAsync(cancellationToken);
         return Results.Ok(people
             .OrderByDescending(person => favorites.Contains(person.Id))
             .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
@@ -67,7 +68,7 @@ public static class PersonMaintenanceEndpoints
 
     private static async Task<IResult> GetRepresentativeFaceAsync(
         string id,
-        SqliteCatalogueDatabase database,
+        IPersonFeaturedFaceRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryPersonId(id, out PersonId personId))
@@ -78,9 +79,7 @@ public static class PersonMaintenanceEndpoints
         try
         {
             CataloguePersonRepresentativeFace? representative =
-                await new SqlitePersonFeaturedFaceRepository(database).ResolveAsync(
-                    personId,
-                    cancellationToken);
+                await repository.ResolveAsync(personId, cancellationToken);
             return Results.Ok(ToResponse(personId, representative));
         }
         catch (KeyNotFoundException)
@@ -92,7 +91,7 @@ public static class PersonMaintenanceEndpoints
     private static async Task<IResult> SetFavoriteAsync(
         string id,
         SetPersonFavoriteRequest request,
-        SqliteCatalogueDatabase database,
+        IFavoritePeopleRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -103,7 +102,7 @@ public static class PersonMaintenanceEndpoints
 
         try
         {
-            await new SqliteFavoritePeopleRepository(database).SetFavoriteAsync(
+            await repository.SetFavoriteAsync(
                 personId,
                 request.IsFavorite,
                 timeProvider.GetUtcNow(),
@@ -119,7 +118,7 @@ public static class PersonMaintenanceEndpoints
     private static async Task<IResult> SetSmartCollectionVisibilityAsync(
         string id,
         SetPersonSmartCollectionVisibilityRequest request,
-        SqliteCatalogueDatabase database,
+        IPersonSmartCollectionVisibilityRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -130,7 +129,7 @@ public static class PersonMaintenanceEndpoints
 
         try
         {
-            await new SqlitePersonSmartCollectionVisibilityRepository(database).SetHiddenAsync(
+            await repository.SetHiddenAsync(
                 personId,
                 request.HiddenFromSmartCollections,
                 timeProvider.GetUtcNow(),
@@ -146,7 +145,7 @@ public static class PersonMaintenanceEndpoints
     private static async Task<IResult> SetFeaturedFaceAsync(
         string id,
         SetPersonFeaturedFaceRequest request,
-        SqliteCatalogueDatabase database,
+        IPersonFeaturedFaceRepository repository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -155,7 +154,6 @@ public static class PersonMaintenanceEndpoints
             return BadRequest("The person identifier is invalid.");
         }
 
-        SqlitePersonFeaturedFaceRepository repository = new(database);
         try
         {
             if (string.IsNullOrWhiteSpace(request.FaceId))
@@ -232,7 +230,6 @@ public static class PersonMaintenanceEndpoints
         string id,
         MergePersonRequest request,
         IPersonMaintenanceRepository repository,
-        SqliteCatalogueDatabase database,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -244,7 +241,6 @@ public static class PersonMaintenanceEndpoints
 
         try
         {
-            await SqlitePersonFeaturedFaceSchema.EnsureAsync(database, cancellationToken);
             PersonMaintenanceAction action = await repository.MergeAsync(
                 sourcePersonId,
                 targetPersonId,

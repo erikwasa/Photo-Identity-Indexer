@@ -4,6 +4,7 @@ using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Worker;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -92,12 +93,13 @@ public sealed class IdentityMatchRegenerationTests
                 clock.GetUtcNow());
 
             IdentityMatchRegenerationHostedService worker = new(
-                repository,
+                new SqliteIdentityMatchRegenerationAdapter(repository),
                 new SqliteIdentityMatchRegenerationScorer(database, clock),
-                new SqliteIdentitySuggestionPolicyRepository(database, clock),
+                new SqliteIdentitySuggestionPolicyAdapter(new SqliteIdentitySuggestionPolicyRepository(database, clock)),
                 new SqliteIdentityAutoAssignmentService(database, clock),
                 new SqliteIdentityMatchEvidenceVersionReader(database),
-                clock);
+                clock,
+                new ArchiveThroughputMetrics(clock));
 
             Assert.True(await worker.AdvanceOnceAsync());
             CatalogueIdentityMatchRegenerationRun progressed = Assert.IsType<CatalogueIdentityMatchRegenerationRun>(
@@ -160,12 +162,13 @@ public sealed class IdentityMatchRegenerationTests
                 "test:auto-worker",
                 clock.GetUtcNow());
             IdentityMatchRegenerationHostedService worker = new(
-                repository,
+                new SqliteIdentityMatchRegenerationAdapter(repository),
                 new SqliteIdentityMatchRegenerationScorer(database, clock),
-                policies,
+                new SqliteIdentitySuggestionPolicyAdapter(policies),
                 new SqliteIdentityAutoAssignmentService(database, clock),
                 new SqliteIdentityMatchEvidenceVersionReader(database),
-                clock);
+                clock,
+                new ArchiveThroughputMetrics(clock));
 
             Assert.True(await worker.AdvanceOnceAsync());
             Assert.Null(await ReadActiveAssignmentAsync(database, seed.Target));

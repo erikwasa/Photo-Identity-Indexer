@@ -47,3 +47,38 @@ In addition to the existing scope above, the WI-0101 inventory must include:
 - normal runtime DI so one provider can be selected coherently before WI-0102 performs the actual migration/cutover.
 
 Do not create dual writes as a bridge. SQLite remains the sole authoritative runtime until the later controlled cutover.
+
+## Current implementation progress
+
+Started 2026-09-09 on the M24 PostgreSQL catalogue branch.
+
+- Added PostgreSQL schema migrations through version 20 for manual photo tags, manual photo people, extended photo metadata/inspection state, first-class Places action/conflict state, saved Smart Collection definitions and person presentation preferences.
+- Added PostgreSQL repositories for manual photo tags, manual photo people, capture metadata, extended metadata and metadata inspection.
+- Added a PostgreSQL Places repository for manual place state/actions and automatic place-write precedence/idempotency behind the Core-owned Places contracts.
+- Fixed the PostgreSQL schema marker so a clean database initializes idempotently through schema version 17.
+- Converted the photo-tag API endpoint and metadata-inspection service constructor to Core-owned persistence contracts instead of concrete SQLite repositories.
+- Converted metadata backfill candidate selection to a Core-owned persistence contract and added a PostgreSQL implementation preserving missing/stale/force refresh selection semantics.
+- Converted manual photo-people mutations on the photo-details API to the Core-owned `IPhotoPersonRepository` contract instead of endpoint-local SQLite repository construction.
+- Converted photo-details reads to a Core-owned persistence contract and added a PostgreSQL implementation preserving confirmed-face/manual-person evidence and metadata join semantics.
+- Converted collection photo/manifest queries to a Core-owned persistence contract and added a PostgreSQL implementation preserving confirmed-assignment and top-ranked suggestion semantics.
+- Converted saved Smart Collection definition CRUD/listing endpoints to a Core-owned persistence contract and added a PostgreSQL implementation preserving normalized names, filter schema version 2 JSON compatibility and duplicate-name conflict behavior.
+- Converted Smart Collection ad-hoc/saved query and slideshow snapshot creation to a Core-owned persistence contract and added a PostgreSQL implementation preserving people/tag match modes, manual photo-person evidence, named place ancestry, GPS/taken filters and slideshow chronology semantics.
+- Converted detector-evaluation run/photo/detection catalogue reads to a Core-owned persistence contract and added a PostgreSQL implementation preserving run summaries, staged photo ordering and latest-observation bounding box compatibility.
+- Converted person favorites, smart-collection visibility, active photo counts and representative/featured-face reads and writes to Core-owned persistence contracts and added a PostgreSQL implementation preserving favorite sorting, hidden-person filtering, manual/confirmed photo count evidence and featured-face fallback/explicit selection semantics.
+- Converted source-verification/original-access runtime services from concrete SQLite observation and availability repositories to Core-owned archive source/availability contracts.
+- Converted bounded archive analysis coverage reads and availability writes to Core-owned archive coverage/availability contracts while leaving still-unmigrated analysis/status processing collaborators unchanged.
+- Converted archive API coverage read/update/start/pause/sync entry points to the Core-owned archive coverage contract, retaining explicit conversion only at still-SQLite status/sync collaborator boundaries.
+- Converted the archive advancement worker and face-review derivative backfill coverage flow to the Core-owned archive coverage state, retaining explicit conversion only at the still-SQLite sync coordinator boundary.
+- Converted the archive item-filter endpoint coverage read to the Core-owned archive coverage contract while leaving the still-SQLite item-filter query repository unchanged.
+- Converted the person-audit API endpoint to the Core-owned `IPersonAuditRepository` contract via the existing SQLite compatibility adapter.
+- Converted identity-match regeneration API/worker run and policy state to Core-owned regeneration/policy contracts via existing SQLite adapters, retaining explicit conversion only at still-SQLite evidence and automatic-assignment collaborator boundaries.
+- Converted review suggestion list/accept/reject endpoints to the Core-owned `IReviewSuggestionRepository` contract while leaving the still-SQLite face lookup repository unchanged.
+- Converted main review create-person/assign/unknown/reject/undo action paths to the Core-owned `IReviewActionRepository` contract while leaving still-SQLite face/filter/image query paths unchanged.
+- Converted suggestion-gallery detail action history to the Core-owned `IReviewActionRepository` contract while leaving still-SQLite face/navigation query paths unchanged.
+- Converted review face target fallback resolution to the Core-owned `IArchiveReviewProxyRepository` contract while leaving still-SQLite face query inputs unchanged.
+- Converted collection review-proxy file resolution to the Core-owned `IArchiveReviewProxyRepository` contract while leaving the face-review derivative resolver on its still-SQLite implementation.
+- Added Core-owned Places contracts for manual place state/actions and automatic place writes, then converted the Places API endpoints and reverse-geocode enrichment service to those contracts through the existing SQLite adapters.
+- Added a Core-owned archive status/query contract covering folder rollups, state-filtered item paging, orthogonal availability/verification/analysis item filtering and latest archive-analysis run status.
+- Converted archive status and archive item-filter API reads to the Core-owned archive status/query contract; default DI still resolves it to SQLite until controlled provider cutover.
+- Added `PostgresArchiveStatusRepository` preserving current archive folder counts, unavailable-vs-pending classification differences between the status and orthogonal filter endpoints, failed-job error surfacing, pagination totals and latest-run job counts.
+- Kept normal runtime binding on SQLite for these newly neutralized surfaces until WI-0102 performs controlled migration/cutover; no dual writes are introduced.

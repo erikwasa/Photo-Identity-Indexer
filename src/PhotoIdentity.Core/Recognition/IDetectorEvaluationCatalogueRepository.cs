@@ -1,8 +1,7 @@
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Core.Recognition;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Core.Recognition;
 
 public sealed record CatalogueDetectorEvaluationRun(
     ProcessingRunId Id,
@@ -33,3 +32,15 @@ public sealed record CatalogueDetectorEvaluationPhotoPage(
     int Offset,
     int Limit,
     int Total);
+
+public interface IDetectorEvaluationCatalogueRepository
+{
+    Task<IReadOnlyList<CatalogueDetectorEvaluationRun>> GetRunsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<CatalogueDetectorEvaluationPhotoPage> GetPhotosAsync(
+        ProcessingRunId processingRunId,
+        int offset = 0,
+        int limit = 8,
+        CancellationToken cancellationToken = default);
+}

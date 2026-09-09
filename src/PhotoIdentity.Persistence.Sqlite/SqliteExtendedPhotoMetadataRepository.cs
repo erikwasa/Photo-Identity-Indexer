@@ -5,20 +5,6 @@ using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
-public sealed record CatalogueExtendedPhotoMetadata(
-    string? CameraMake,
-    string? CameraModel,
-    string? LensModel,
-    string? Orientation,
-    string? ExposureTime,
-    string? Aperture,
-    string? Iso,
-    string? FocalLength,
-    string? FocalLength35Mm,
-    string? Flash,
-    string? GpsAltitude,
-    IReadOnlyList<PhotoMetadataTag> RawTags);
-
 public static class SqliteExtendedPhotoMetadataSchema
 {
     public static async Task EnsureAsync(
@@ -61,7 +47,7 @@ public static class SqliteExtendedPhotoMetadataSchema
 /// capture-time/GPS table. This keeps existing collection/location contracts intact while
 /// allowing richer inspection data to evolve independently.
 /// </summary>
-public sealed class SqliteExtendedPhotoMetadataRepository
+public sealed class SqliteExtendedPhotoMetadataRepository : IExtendedPhotoMetadataRepository
 {
     private const int MaximumRawTags = 300;
     private const int MaximumTextLength = 512;

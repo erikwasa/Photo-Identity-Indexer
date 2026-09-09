@@ -2,7 +2,6 @@ using System.Security.Cryptography;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using PhotoIdentity.Worker;
 
@@ -26,9 +25,9 @@ public sealed record ArchiveSourceVerificationAdvanceResult(
 /// </summary>
 public sealed class ArchiveSourceVerificationService
 {
-    private readonly SqliteArchiveSourceObservationRepository _observations;
+    private readonly IArchiveSourceObservationRepository _observations;
     private readonly IArchiveSourceHydrationRepository _sourceHydrations;
-    private readonly SqliteArchiveAvailabilityRepository _availability;
+    private readonly IArchiveAvailabilityRepository _availability;
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
     private readonly TimeProvider _timeProvider;
@@ -36,9 +35,9 @@ public sealed class ArchiveSourceVerificationService
     private readonly StringComparison _pathComparison;
 
     public ArchiveSourceVerificationService(
-        SqliteArchiveSourceObservationRepository observations,
+        IArchiveSourceObservationRepository observations,
         IArchiveSourceHydrationRepository sourceHydrations,
-        SqliteArchiveAvailabilityRepository availability,
+        IArchiveAvailabilityRepository availability,
         ArchiveHydrationCapacityService capacity,
         IOneDriveFilesOnDemandPlatform platform,
         TimeProvider timeProvider,
@@ -66,7 +65,7 @@ public sealed class ArchiveSourceVerificationService
         SourceId sourceId,
         CancellationToken cancellationToken = default)
     {
-        ArchiveSourceObservation? source = await _observations.GetNextPendingAsync(sourceId, cancellationToken);
+        ArchiveSourceObservationSnapshot? source = await _observations.GetNextPendingAsync(sourceId, cancellationToken);
         if (source is null)
         {
             return new ArchiveSourceVerificationAdvanceResult(
@@ -182,7 +181,7 @@ public sealed class ArchiveSourceVerificationService
                 source.AssetId.ToString(),
                 cancellationToken),
             cancellationToken);
-        ArchiveSourceVerificationWriteResult persisted = await _observations.RecordVerifiedContentAsync(
+        ArchiveSourceVerificationPersistenceResult persisted = await _observations.RecordVerifiedContentAsync(
             source.AssetId,
             verified.ContentHash,
             verified.SizeBytes,
@@ -211,7 +210,7 @@ public sealed class ArchiveSourceVerificationService
             transferred);
     }
 
-    private string ResolvePath(ArchiveSourceObservation source)
+    private string ResolvePath(ArchiveSourceObservationSnapshot source)
     {
         string root = Path.GetFullPath(source.RootLocator);
         string relative = source.SourceKey

@@ -21,8 +21,10 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
     private readonly SqliteCatalogueDatabase _database;
     private readonly SqliteLocalBatchRepository _catalogue;
     private readonly SqliteArchiveAnalysisRepository _analysis;
+    private readonly IArchiveCoverageRepository _coverage;
     private readonly IArchivePostAnalysisRepository _postAnalysis;
     private readonly IArchiveReviewProxyRepository _proxies;
+    private readonly IArchiveAvailabilityRepository _availability;
     private readonly SqliteArchiveSourceVerificationStateRepository _sourceVerificationState;
     private readonly CollectionOriginalAccessService _originals;
     private readonly ArchiveSourceVerificationService _sourceVerification;
@@ -40,8 +42,10 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         SqliteCatalogueDatabase database,
         SqliteLocalBatchRepository catalogue,
         SqliteArchiveAnalysisRepository analysis,
+        IArchiveCoverageRepository coverage,
         IArchivePostAnalysisRepository postAnalysis,
         IArchiveReviewProxyRepository proxies,
+        IArchiveAvailabilityRepository availability,
         SqliteArchiveSourceVerificationStateRepository sourceVerificationState,
         CollectionOriginalAccessService originals,
         ArchiveSourceVerificationService sourceVerification,
@@ -53,8 +57,10 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(catalogue);
         ArgumentNullException.ThrowIfNull(analysis);
+        ArgumentNullException.ThrowIfNull(coverage);
         ArgumentNullException.ThrowIfNull(postAnalysis);
         ArgumentNullException.ThrowIfNull(proxies);
+        ArgumentNullException.ThrowIfNull(availability);
         ArgumentNullException.ThrowIfNull(sourceVerificationState);
         ArgumentNullException.ThrowIfNull(originals);
         ArgumentNullException.ThrowIfNull(sourceVerification);
@@ -64,8 +70,10 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         _database = database;
         _catalogue = catalogue;
         _analysis = analysis;
+        _coverage = coverage;
         _postAnalysis = postAnalysis;
         _proxies = proxies;
+        _availability = availability;
         _sourceVerificationState = sourceVerificationState;
         _originals = originals;
         _sourceVerification = sourceVerification;
@@ -109,8 +117,7 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         ArchiveOperatorConfiguration operatorConfiguration,
         CancellationToken cancellationToken)
     {
-        ArchiveCoverageConfiguration coverage = await new SqliteArchiveCoverageRepository(_database)
-            .GetAsync(cancellationToken)
+        ArchiveCoverageState coverage = await _coverage.GetAsync(cancellationToken)
             ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
 
         if (!operatorConfiguration.TryResolveAnalysisConfiguration(
@@ -179,7 +186,7 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         }
 
         ArchiveSourceVerificationAdvanceResult verification = await _sourceVerification.AdvanceAsync(
-            coverage.Source.Id,
+            coverage.Source.SourceId,
             cancellationToken);
         if (verification.WaitingForLocalContent)
         {
@@ -292,13 +299,13 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
         }
 
         IReadOnlyList<AssetRevisionId> localPending = await _analysis.GetPendingCurrentRevisionIdsAsync(
-            coverage.Source.Id,
+            coverage.Source.SourceId,
             analysisProfileHash,
             cancellationToken);
         if (localPending.Count == 0)
         {
             IReadOnlyList<AssetRevisionId> hydratablePending = await _analysis.GetPendingCurrentRevisionIdsAsync(
-                coverage.Source.Id,
+                coverage.Source.SourceId,
                 analysisProfileHash,
                 includeHydratable: true,
                 cancellationToken);
@@ -424,14 +431,14 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
     }
 
     private async Task<bool> TryAdvancePostAnalysisAsync(
-        ArchiveCoverageConfiguration coverage,
+        ArchiveCoverageState coverage,
         Sha256Digest analysisProfileHash,
         string derivativeRoot,
         ReviewProxyProfile proxyProfile,
         CancellationToken cancellationToken)
     {
         AssetRevisionId? pendingRevisionId = await _postAnalysis.GetNextMissingProxyRevisionAsync(
-            coverage.Source.Id,
+            coverage.Source.SourceId,
             analysisProfileHash,
             proxyProfile.Id,
             cancellationToken);
@@ -576,7 +583,7 @@ public sealed class ArchiveBoundedAnalysisService : IDisposable
             return;
         }
 
-        await new SqliteArchiveAvailabilityRepository(_database).RecordAsync(
+        await _availability.RecordAsync(
             revision.AssetId,
             availability,
             _timeProvider.GetUtcNow(),

@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
@@ -18,19 +19,19 @@ public sealed record ReviewProxyServingConfiguration(
 /// </summary>
 public sealed class CollectionReviewProxyFileResolver
 {
-    private readonly SqliteArchiveReviewProxyRepository _repository;
+    private readonly IArchiveReviewProxyRepository _repository;
     private readonly SqliteCatalogueDatabase? _database;
     private readonly ReviewProxyServingConfiguration _configuration;
 
     public CollectionReviewProxyFileResolver(
-        SqliteArchiveReviewProxyRepository repository,
+        IArchiveReviewProxyRepository repository,
         ReviewProxyServingConfiguration configuration)
         : this(repository, database: null, configuration)
     {
     }
 
     public CollectionReviewProxyFileResolver(
-        SqliteArchiveReviewProxyRepository repository,
+        IArchiveReviewProxyRepository repository,
         SqliteCatalogueDatabase? database,
         ReviewProxyServingConfiguration configuration)
     {
@@ -50,7 +51,7 @@ public sealed class CollectionReviewProxyFileResolver
             return null;
         }
 
-        ArchiveReviewProxyRecord? proxy = await _repository.GetAsync(
+        ArchiveReviewProxyMetadata? proxy = await _repository.GetAsync(
             revisionId,
             _configuration.ProfileId!,
             cancellationToken);

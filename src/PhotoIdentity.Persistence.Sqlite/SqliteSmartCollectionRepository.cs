@@ -5,20 +5,12 @@ using PhotoIdentity.Core.Collections;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
-public sealed class SmartCollectionNameConflictException : Exception
-{
-    public SmartCollectionNameConflictException(string name)
-        : base($"A smart collection named '{name}' already exists.")
-    {
-    }
-}
-
 /// <summary>
 /// Persists normalized smart-collection filter definitions. Membership is never persisted;
 /// callers evaluate the stored filter against the current catalogue through
 /// <see cref="SqliteSmartCollectionQueryRepository"/>.
 /// </summary>
-public sealed class SqliteSmartCollectionRepository
+public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
 {
     private const int FilterSchemaVersion = 2;
 

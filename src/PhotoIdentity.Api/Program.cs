@@ -2,10 +2,14 @@ using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.EventLog;
 using PhotoIdentity.Core.Catalogue;
+using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.People;
 using PhotoIdentity.Core.Places;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Sources;
+using PhotoIdentity.Core.Tags;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Persistence.Sqlite;
@@ -108,13 +112,31 @@ public partial class Program
             serviceProvider.GetRequiredService<SqliteIdentitySuggestionPolicyAdapter>());
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationModelRepository>();
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationRepository>();
+        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationAdapter>();
+        builder.Services.AddSingleton<IIdentityMatchRegenerationRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteIdentityMatchRegenerationAdapter>());
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationScorer>();
         builder.Services.AddSingleton<SqliteIdentityMatchEvidenceVersionReader>();
         builder.Services.AddSingleton<SqliteIdentityAutoAssignmentService>();
         builder.Services.AddSingleton<SqlitePersonAuditRepository>();
+        builder.Services.AddSingleton<SqlitePersonAuditAdapter>();
+        builder.Services.AddSingleton<IPersonAuditRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePersonAuditAdapter>());
         builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
         builder.Services.AddSingleton<IPersonMaintenanceRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqlitePersonMaintenanceRepository>());
+        builder.Services.AddSingleton<SqlitePersonPhotoCountRepository>();
+        builder.Services.AddSingleton<IPersonPhotoCountRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePersonPhotoCountRepository>());
+        builder.Services.AddSingleton<SqliteFavoritePeopleRepository>();
+        builder.Services.AddSingleton<IFavoritePeopleRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteFavoritePeopleRepository>());
+        builder.Services.AddSingleton<SqlitePersonSmartCollectionVisibilityRepository>();
+        builder.Services.AddSingleton<IPersonSmartCollectionVisibilityRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePersonSmartCollectionVisibilityRepository>());
+        builder.Services.AddSingleton<SqlitePersonFeaturedFaceRepository>();
+        builder.Services.AddSingleton<IPersonFeaturedFaceRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePersonFeaturedFaceRepository>());
         builder.Services.AddSingleton<SqliteBulkReviewRepository>();
         builder.Services.AddSingleton<IBulkReviewRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteBulkReviewRepository>());
@@ -122,22 +144,47 @@ public partial class Program
         builder.Services.AddSingleton<IBulkSuggestionReviewRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteBulkSuggestionReviewRepository>());
         builder.Services.AddSingleton<SqliteCollectionQueryRepository>();
+        builder.Services.AddSingleton<ICollectionQueryRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteCollectionQueryRepository>());
         builder.Services.AddSingleton<SqlitePhotoDetailsRepository>();
+        builder.Services.AddSingleton<IPhotoDetailsRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePhotoDetailsRepository>());
         builder.Services.AddSingleton<SqliteSmartCollectionQueryRepository>();
+        builder.Services.AddSingleton<ISmartCollectionQueryRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteSmartCollectionQueryRepository>());
         builder.Services.AddSingleton<SqliteSmartCollectionRepository>();
+        builder.Services.AddSingleton<ISmartCollectionRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteSmartCollectionRepository>());
         builder.Services.AddSingleton<SqliteAssetCatalogueRepository>();
         builder.Services.AddSingleton<IPhotoCaptureMetadataRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteAssetCatalogueRepository>());
         builder.Services.AddSingleton<SqlitePhotoMetadataBackfillRepository>();
+        builder.Services.AddSingleton<IPhotoMetadataBackfillRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePhotoMetadataBackfillRepository>());
         builder.Services.AddSingleton<SqliteExtendedPhotoMetadataRepository>();
+        builder.Services.AddSingleton<IExtendedPhotoMetadataRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteExtendedPhotoMetadataRepository>());
         builder.Services.AddSingleton<SqlitePhotoMetadataInspectionRepository>();
+        builder.Services.AddSingleton<IPhotoMetadataInspectionRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePhotoMetadataInspectionRepository>());
         builder.Services.AddSingleton<SqlitePhotoTagRepository>();
+        builder.Services.AddSingleton<IPhotoTagRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePhotoTagRepository>());
+        builder.Services.AddSingleton<SqlitePhotoPersonRepository>();
+        builder.Services.AddSingleton<IPhotoPersonRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePhotoPersonRepository>());
         builder.Services.AddSingleton<SqlitePhotoPlaceRepository>();
+        builder.Services.AddSingleton<IPhotoPlaceRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePhotoPlaceRepository>());
         builder.Services.AddSingleton<SqlitePhotoPlaceEnrichmentRepository>();
         builder.Services.AddSingleton<IPhotoPlaceEnrichmentStateRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqlitePhotoPlaceEnrichmentRepository>());
         builder.Services.AddSingleton<SqliteAutomaticPhotoPlaceRepository>();
+        builder.Services.AddSingleton<IAutomaticPhotoPlaceRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteAutomaticPhotoPlaceRepository>());
         builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
+        builder.Services.AddSingleton<IDetectorEvaluationCatalogueRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteDetectorEvaluationRepository>());
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
         builder.Services.AddSingleton<IAssetRevisionLookupRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteLocalBatchRepository>());
@@ -161,6 +208,8 @@ public partial class Program
         builder.Services.AddSingleton<IArchiveHydrationIdentityTransferRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteArchiveHydrationIdentityTransferRepository>());
         builder.Services.AddSingleton<SqliteArchiveSourceObservationRepository>();
+        builder.Services.AddSingleton<IArchiveSourceObservationRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteArchiveSourceObservationRepository>());
         builder.Services.AddSingleton<SqliteArchiveSourceVerificationStateRepository>();
         builder.Services.AddSingleton<SqliteArchiveAvailabilityRepository>();
         builder.Services.AddSingleton<IArchiveAvailabilityRepository>(serviceProvider =>
@@ -168,6 +217,9 @@ public partial class Program
         builder.Services.AddSingleton<SqliteArchiveCoverageRepository>();
         builder.Services.AddSingleton<IArchiveCoverageRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteArchiveCoverageRepository>());
+        builder.Services.AddSingleton<SqliteArchiveStatusRepository>();
+        builder.Services.AddSingleton<IArchiveStatusRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteArchiveStatusRepository>());
         builder.Services.AddSingleton<SqliteArchiveStorageRepository>();
         builder.Services.AddSingleton<IArchiveStorageAccountingRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteArchiveStorageRepository>());
@@ -241,6 +293,31 @@ public partial class Program
 
         app.UseBlazorFrameworkFiles();
         app.UseStaticFiles();
+        app.Use(async (context, next) =>
+        {
+            if (!context.Request.Path.StartsWithSegments("/api") ||
+                context.Request.Path.StartsWithSegments("/api/archive/diagnostics"))
+            {
+                await next(context);
+                return;
+            }
+
+            ArchiveThroughputMetrics metrics = context.RequestServices
+                .GetRequiredService<ArchiveThroughputMetrics>();
+            string metricName = GetApiRequestMetricName(context.Request.Path);
+            using IDisposable timing = metrics.Measure(metricName);
+            try
+            {
+                await next(context);
+            }
+            finally
+            {
+                metrics.RecordCounter(
+                    context.Response.StatusCode < StatusCodes.Status400BadRequest
+                        ? ArchiveThroughputMetricNames.ApiRequestSucceeded
+                        : ArchiveThroughputMetricNames.ApiRequestFailed);
+            }
+        });
         app.Use(async (context, next) =>
         {
             if (context.Request.Path.StartsWithSegments("/api/review") ||
@@ -349,5 +426,47 @@ public partial class Program
         }
 
         throw new InvalidOperationException($"Configuration '{key}' must be true or false.");
+    }
+
+    private static string GetApiRequestMetricName(PathString path)
+    {
+        if (path.StartsWithSegments("/api/archive"))
+        {
+            return ArchiveThroughputMetricNames.ApiArchiveRequest;
+        }
+
+        if (path.StartsWithSegments("/api/collections") ||
+            path.StartsWithSegments("/api/smart-collections"))
+        {
+            return ArchiveThroughputMetricNames.ApiCollectionRequest;
+        }
+
+        if (path.StartsWithSegments("/api/photo-metadata"))
+        {
+            return ArchiveThroughputMetricNames.ApiMetadataRequest;
+        }
+
+        if (path.StartsWithSegments("/api/places") ||
+            path.StartsWithSegments("/api/place-enrichment"))
+        {
+            return ArchiveThroughputMetricNames.ApiPlaceRequest;
+        }
+
+        if (path.StartsWithSegments("/api/review") ||
+            path.StartsWithSegments("/api/suggestions") ||
+            path.StartsWithSegments("/api/people") ||
+            path.StartsWithSegments("/api/identity"))
+        {
+            return ArchiveThroughputMetricNames.ApiReviewRequest;
+        }
+
+        if (path.StartsWithSegments("/api/slideshows"))
+        {
+            return ArchiveThroughputMetricNames.ApiSlideshowRequest;
+        }
+
+        return path.StartsWithSegments("/api/detector")
+            ? ArchiveThroughputMetricNames.ApiDetectorRequest
+            : ArchiveThroughputMetricNames.ApiOtherRequest;
     }
 }

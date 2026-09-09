@@ -1,5 +1,4 @@
 using PhotoIdentity.Core.Places;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
@@ -35,13 +34,13 @@ public sealed class PhotoPlaceEnrichmentService
 
     private readonly IReverseGeocoder _geocoder;
     private readonly IPhotoPlaceEnrichmentStateRepository _enrichment;
-    private readonly SqliteAutomaticPhotoPlaceRepository _automaticPlaces;
+    private readonly IAutomaticPhotoPlaceRepository _automaticPlaces;
     private readonly SemaphoreSlim _executionGate = new(1, 1);
 
     public PhotoPlaceEnrichmentService(
         IReverseGeocoder geocoder,
         IPhotoPlaceEnrichmentStateRepository enrichment,
-        SqliteAutomaticPhotoPlaceRepository automaticPlaces)
+        IAutomaticPhotoPlaceRepository automaticPlaces)
     {
         ArgumentNullException.ThrowIfNull(geocoder);
         ArgumentNullException.ThrowIfNull(enrichment);
@@ -98,7 +97,7 @@ public sealed class PhotoPlaceEnrichmentService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            CatalogueAutomaticPlaceEligibility eligibility =
+            AutomaticPhotoPlaceEligibility eligibility =
                 await _automaticPlaces.GetEligibilityAsync(candidate.RevisionId, cancellationToken);
             if (eligibility.BlockedByManual)
             {
@@ -222,7 +221,7 @@ public sealed class PhotoPlaceEnrichmentService
                 }
             }
 
-            CatalogueAutomaticPlaceWriteResult write = await _automaticPlaces.TrySetAsync(
+            AutomaticPhotoPlaceWriteResult write = await _automaticPlaces.TrySetAsync(
                 candidate.RevisionId,
                 resolvedPlace.Place.DisplayValue,
                 _geocoder.ProviderName,

@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -7,7 +8,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Counts distinct immutable photo revisions where an active person currently appears through
 /// confirmed face assignment and/or effective manual photo-level presence.
 /// </summary>
-public sealed class SqlitePersonPhotoCountRepository
+public sealed class SqlitePersonPhotoCountRepository : IPersonPhotoCountRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 

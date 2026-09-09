@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
 
@@ -23,7 +24,7 @@ public sealed record CataloguePhotoDetails(
 /// Confirmed face evidence and manual photo-level presence are consolidated without conflating them.
 /// Persisted capture/extended metadata is joined after the people query and never requires source IO.
 /// </summary>
-public sealed class SqlitePhotoDetailsRepository
+public sealed class SqlitePhotoDetailsRepository : IPhotoDetailsRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -154,5 +155,26 @@ public sealed class SqlitePhotoDetailsRepository
             people,
             captureMetadata,
             extendedMetadata);
+    }
+
+    async Task<PhotoDetails?> IPhotoDetailsRepository.GetAsync(
+        AssetRevisionId revisionId,
+        CancellationToken cancellationToken)
+    {
+        CataloguePhotoDetails? details = await GetAsync(revisionId, cancellationToken);
+        return details is null
+            ? null
+            : new PhotoDetails(
+                details.RevisionId,
+                details.SourceKey,
+                details.People
+                    .Select(person => new PhotoDetailsPerson(
+                        person.PersonId,
+                        person.DisplayName,
+                        person.ConfirmedFaceCount,
+                        person.ManualPresence))
+                    .ToArray(),
+                details.CaptureMetadata,
+                details.ExtendedMetadata);
     }
 }

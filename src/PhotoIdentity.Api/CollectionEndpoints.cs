@@ -1,7 +1,7 @@
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -28,9 +28,9 @@ public static class CollectionEndpoints
     }
 
     private static async Task<IResult> GetPhotosAsync(
-        SqliteCollectionQueryRepository repository,
+        ICollectionQueryRepository repository,
         string? people = null,
-        string match = CatalogueCollectionMatchModes.All,
+        string match = CollectionMatchModes.All,
         string? reviewState = null,
         bool includeSuggestions = false,
         string? suggestionModelId = null,
@@ -53,7 +53,7 @@ public static class CollectionEndpoints
                 suggestionModelId,
                 suggestionModelHash,
                 minimumSuggestionScore,
-                out CatalogueCollectionSuggestionPolicy? suggestionPolicy,
+                out CollectionSuggestionPolicy? suggestionPolicy,
                 out string? suggestionError))
         {
             return Results.BadRequest(new { error = suggestionError });
@@ -61,7 +61,7 @@ public static class CollectionEndpoints
 
         try
         {
-            CatalogueCollectionPhotoPage page = await repository.QueryPhotosAsync(
+            CollectionPhotoPage page = await repository.QueryPhotosAsync(
                 personIds,
                 match,
                 suggestionPolicy,
@@ -87,9 +87,9 @@ public static class CollectionEndpoints
 
     private static async Task<IResult> GetManifestAsync(
         HttpRequest request,
-        SqliteCollectionQueryRepository repository,
+        ICollectionQueryRepository repository,
         string? people = null,
-        string match = CatalogueCollectionMatchModes.All,
+        string match = CollectionMatchModes.All,
         string? reviewState = null,
         bool includeSuggestions = false,
         string? suggestionModelId = null,
@@ -110,7 +110,7 @@ public static class CollectionEndpoints
                 suggestionModelId,
                 suggestionModelHash,
                 minimumSuggestionScore,
-                out CatalogueCollectionSuggestionPolicy? suggestionPolicy,
+                out CollectionSuggestionPolicy? suggestionPolicy,
                 out string? suggestionError))
         {
             return Results.BadRequest(new { error = suggestionError });
@@ -118,7 +118,7 @@ public static class CollectionEndpoints
 
         try
         {
-            CatalogueCollectionPhotoPage firstPage = await repository.QueryPhotosAsync(
+            CollectionPhotoPage firstPage = await repository.QueryPhotosAsync(
                 personIds,
                 match,
                 suggestionPolicy,
@@ -130,12 +130,12 @@ public static class CollectionEndpoints
                 limit: ManifestPageSize,
                 cancellationToken);
 
-            List<CatalogueCollectionPhoto> photos = new(firstPage.Total);
+            List<CollectionPhoto> photos = new(firstPage.Total);
             photos.AddRange(firstPage.Items);
             int offset = firstPage.Items.Count;
             while (offset < firstPage.Total)
             {
-                CatalogueCollectionPhotoPage page = await repository.QueryPhotosAsync(
+                CollectionPhotoPage page = await repository.QueryPhotosAsync(
                     personIds,
                     match,
                     suggestionPolicy,
@@ -300,7 +300,7 @@ public static class CollectionEndpoints
             : Results.File(file.Stream, file.ContentType, enableRangeProcessing: true);
     }
 
-    private static CollectionPhotoResponse ToResponse(CatalogueCollectionPhoto photo) => new(
+    private static CollectionPhotoResponse ToResponse(CollectionPhoto photo) => new(
         photo.RevisionId.ToString(),
         photo.AssetId.ToString(),
         $"/api/collections/photos/{photo.RevisionId}/thumbnail",
@@ -324,7 +324,7 @@ public static class CollectionEndpoints
 
     private static CollectionManifestPhotoResponse ToManifestResponse(
         HttpRequest request,
-        CatalogueCollectionPhoto photo) => new(
+        CollectionPhoto photo) => new(
         photo.RevisionId.ToString(),
         photo.AssetId.ToString(),
         BuildPhotoUrl(request, photo.RevisionId, "thumbnail"),
@@ -335,7 +335,7 @@ public static class CollectionEndpoints
         photo.Height,
         ToPeopleResponse(photo));
 
-    private static CollectionPersonMatchResponse[] ToPeopleResponse(CatalogueCollectionPhoto photo) =>
+    private static CollectionPersonMatchResponse[] ToPeopleResponse(CollectionPhoto photo) =>
         photo.People.Select(person => new CollectionPersonMatchResponse(
             person.PersonId.ToString(),
             person.DisplayName,
@@ -345,14 +345,14 @@ public static class CollectionEndpoints
 
     private static CollectionQueryResponse ToQueryResponse(
         IReadOnlyList<PersonId> personIds,
-        CatalogueCollectionPhotoPage page,
+        CollectionPhotoPage page,
         DateTimeOffset? fromUtc,
         DateTimeOffset? toUtc,
         double? minimumConfidence) => new(
         personIds.Select(value => value.ToString()).ToArray(),
         page.MatchMode,
         page.ReviewState,
-        page.ReviewState == CatalogueCollectionReviewStates.Assigned,
+        page.ReviewState == CollectionReviewStates.Assigned,
         page.SuggestionPolicy is null
             ? null
             : new CollectionSuggestionPolicyResponse(
@@ -419,7 +419,7 @@ public static class CollectionEndpoints
         string? modelId,
         string? modelHash,
         double? minimumScore,
-        out CatalogueCollectionSuggestionPolicy? policy,
+        out CollectionSuggestionPolicy? policy,
         out string? error)
     {
         policy = null;
@@ -450,7 +450,7 @@ public static class CollectionEndpoints
 
         try
         {
-            policy = new CatalogueCollectionSuggestionPolicy(
+            policy = new CollectionSuggestionPolicy(
                 new ModelId(modelId),
                 new Sha256Digest(modelHash),
                 minimumScore.Value);

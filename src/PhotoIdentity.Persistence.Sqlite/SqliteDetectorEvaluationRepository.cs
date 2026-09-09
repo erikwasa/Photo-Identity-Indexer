@@ -11,7 +11,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// <summary>
 /// Provides read-only, photo-level detector results for one processing run.
 /// </summary>
-public sealed class SqliteDetectorEvaluationRepository
+public sealed class SqliteDetectorEvaluationRepository : IDetectorEvaluationCatalogueRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 

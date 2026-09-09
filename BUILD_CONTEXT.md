@@ -6,7 +6,7 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**M22 WI-0107 is the next slideshow implementation item. M24 WI-0099 is now active in parallel.**
+**M24 WI-0100 and WI-0105 are completed. WI-0101 is active on the local M24 branch.**
 
 Consolidated real-phone M22 acceptance passed the implemented slideshow behavior except for two functional gaps tracked by WI-0107:
 
@@ -15,7 +15,9 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 and **WI-0099 are completed**. PR #257/workflow #1484 plus maintainer post-merge verification closed WI-0099. **WI-0100 — Migrate review and identity persistence to PostgreSQL** is active on `agent/WI-0100-postgres-person-maintenance`. PR #260 merged, workflow #1497 passed, and maintainer verification accepted the bulk review workflows against schema version 12. PR #261 is the active slice. It adds schema version 13 plus provider-neutral canonical person maintenance and PostgreSQL rename/irreversible-merge audit semantics; runtime review authority remains SQLite.
+In the separate M24 thread, WI-0098, WI-0099, WI-0100 and WI-0105 are completed. Runtime authority remains SQLite until WI-0101 and WI-0102 complete provider composition and controlled cutover.
+
+WI-0101 currently has PostgreSQL schema/repositories for manual photo tags, manual photo people, capture metadata, extended metadata, metadata inspection, metadata backfill candidate selection, photo-details reads, collection queries, manual/automatic Places, Smart Collection definitions/query/snapshot evaluation, detector-evaluation catalogue reads, person presentation preferences and archive status/item-filter queries through schema version 20. The latest local slices fix the schema marker and convert the photo-tag endpoint, manual photo-people endpoint mutations, photo-details reads, collection photo/manifest queries, Smart Collection definition/query/snapshot endpoints, detector-evaluation run/photo/detection reads, person favorites/visibility/photo-count/featured-face presentation seams, metadata-inspection service constructor, metadata backfill service constructor, source-verification service, original-access availability checks, bounded archive-analysis coverage/availability seams, archive API coverage entry points, archive advancement worker coverage flow, archive status/item-filter paging, person-audit endpoint, identity-match regeneration run/policy state, review suggestion endpoints, main review action mutations, suggestion-gallery action history, review target proxy fallback, collection review-proxy file resolution and Places manual/automatic write API/service seams to Core persistence contracts while keeping SQLite as the pre-cutover runtime binding.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +33,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge the WI-0100 person-maintenance slice after CI is green, then rerun `verify-postgres.ps1` to accept schema version 13. Continue with the richer person audit view, suggestion gallery/policy/evidence and regeneration persistence without switching runtime authority. WI-0102 remains the only controlled SQLite→PostgreSQL migration/cutover step.
+For the M24 thread, continue WI-0101 by neutralizing the remaining SQLite-only normal-runtime dependencies, next moving to detector rollout/application state and remaining archive worker/query surfaces. Existing archive source observation, availability, hydration, coverage, storage and status/query contracts are now useful seams; keep normal DI on SQLite until WI-0102 and do not create dual writes.
 
 ## Relevant files
 
@@ -46,6 +48,19 @@ For the M24 thread, review/merge the WI-0100 person-maintenance slice after CI i
 - docs/delivery/milestones/M24-postgresql-catalogue-and-scale.md
 - docs/delivery/work-items/WI-0098-persistence-boundary-foundational-schema.md
 - docs/delivery/work-items/WI-0099-postgresql-archive-background-persistence.md
+- docs/delivery/work-items/WI-0101-postgresql-library-remaining-persistence.md
+- docs/delivery/work-items/WI-0105-operational-metrics-observability.md
+- docs/operations/archive-throughput-benchmark.md
+- src/PhotoIdentity.Api/PhotoTagEndpoints.cs
+- src/PhotoIdentity.Api/PhotoDetailsEndpoints.cs
+- src/PhotoIdentity.Api/PhotoPlaceEndpoints.cs
+- src/PhotoIdentity.Api/PhotoPlaceEnrichmentService.cs
+- src/PhotoIdentity.Api/PhotoMetadataInspectionService.cs
+- src/PhotoIdentity.Api/ArchiveSourceVerificationService.cs
+- src/PhotoIdentity.Api/ArchiveHydrationCapacityService.cs
+- src/PhotoIdentity.Api/CollectionOriginalAccessService.cs
+- src/PhotoIdentity.Worker/ArchiveThroughputMetrics.cs
+- src/PhotoIdentity.Api/Program.cs
 - docs/delivery/status/work-items.yaml
 - docs/delivery/status/milestones.yaml
 

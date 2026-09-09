@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 
@@ -52,7 +53,7 @@ public sealed record CatalogueCollectionPhotoPage(
 /// Queries path-free photo manifests from active confirmed assignments and, only when explicitly enabled,
 /// top-ranked pending suggestions from one exact model revision. Unknown faces are excluded from both paths.
 /// </summary>
-public sealed class SqliteCollectionQueryRepository
+public sealed class SqliteCollectionQueryRepository : ICollectionQueryRepository
 {
     private const string MatchingFaceCtes = """
         WITH latest_action AS (
@@ -384,6 +385,68 @@ public sealed class SqliteCollectionQueryRepository
             normalizedReviewState,
             suggestionPolicy);
     }
+
+    async Task<CollectionPhotoPage> ICollectionQueryRepository.QueryPhotosAsync(
+        IReadOnlyCollection<PersonId> personIds,
+        string matchMode,
+        CollectionSuggestionPolicy? suggestionPolicy,
+        string? reviewState,
+        DateTimeOffset? fromUtc,
+        DateTimeOffset? toUtc,
+        double? minimumConfidence,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        CatalogueCollectionPhotoPage page = await QueryPhotosAsync(
+            personIds,
+            matchMode,
+            suggestionPolicy is null
+                ? null
+                : new CatalogueCollectionSuggestionPolicy(
+                    suggestionPolicy.ModelId,
+                    suggestionPolicy.ModelHash,
+                    suggestionPolicy.MinimumScore),
+            reviewState,
+            fromUtc,
+            toUtc,
+            minimumConfidence,
+            offset,
+            limit,
+            cancellationToken);
+        return ToCorePage(page);
+    }
+
+    private static CollectionPhotoPage ToCorePage(CatalogueCollectionPhotoPage page) =>
+        new(
+            page.Items
+                .Select(photo => new CollectionPhoto(
+                    photo.RevisionId,
+                    photo.AssetId,
+                    photo.ObservedAtUtc,
+                    photo.MediaType,
+                    photo.Width,
+                    photo.Height,
+                    photo.People
+                        .Select(person => new CollectionPersonMatch(
+                            person.PersonId,
+                            person.DisplayName,
+                            person.ConfirmedFaceCount,
+                            person.SuggestedFaceCount,
+                            person.MaximumSuggestionScore))
+                        .ToArray()))
+                .ToArray(),
+            page.Offset,
+            page.Limit,
+            page.Total,
+            page.MatchMode,
+            page.ReviewState,
+            page.SuggestionPolicy is null
+                ? null
+                : new CollectionSuggestionPolicy(
+                    page.SuggestionPolicy.ModelId,
+                    page.SuggestionPolicy.ModelHash,
+                    page.SuggestionPolicy.MinimumScore));
 
     private static void AddParameters(
         SqliteCommand command,

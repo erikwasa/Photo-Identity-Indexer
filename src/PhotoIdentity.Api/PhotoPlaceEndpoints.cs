@@ -1,6 +1,6 @@
 using System.Globalization;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Places;
 
 namespace PhotoIdentity.Api;
 
@@ -12,25 +12,25 @@ public static class PhotoPlaceEndpoints
     {
         endpoints.MapGet(
             "/api/places",
-            async (SqlitePhotoPlaceRepository repository, CancellationToken cancellationToken) =>
+            async (IPhotoPlaceRepository repository, CancellationToken cancellationToken) =>
             {
-                IReadOnlyList<CataloguePlaceDefinition> places =
+                IReadOnlyList<PhotoPlaceDefinition> places =
                     await repository.GetDefinitionsAsync(cancellationToken);
                 return Results.Ok(places.Select(ToResponse).ToArray());
             });
 
         endpoints.MapGet(
             "/api/places/migration-conflicts",
-            async (SqlitePhotoPlaceRepository repository, CancellationToken cancellationToken) =>
+            async (IPhotoPlaceRepository repository, CancellationToken cancellationToken) =>
             {
-                IReadOnlyList<CataloguePlaceMigrationConflict> conflicts =
+                IReadOnlyList<PhotoPlaceMigrationConflict> conflicts =
                     await repository.GetMigrationConflictsAsync(cancellationToken);
                 return Results.Ok(conflicts.Select(ToResponse).ToArray());
             });
 
         endpoints.MapGet(
             "/api/collections/photos/{revisionId}/place",
-            async (string revisionId, SqlitePhotoPlaceRepository repository, CancellationToken cancellationToken) =>
+            async (string revisionId, IPhotoPlaceRepository repository, CancellationToken cancellationToken) =>
             {
                 if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
                 {
@@ -50,7 +50,7 @@ public static class PhotoPlaceEndpoints
 
         endpoints.MapPut(
             "/api/collections/photos/{revisionId}/place",
-            async (string revisionId, PhotoPlaceMutationRequest request, SqlitePhotoPlaceRepository repository, CancellationToken cancellationToken) =>
+            async (string revisionId, PhotoPlaceMutationRequest request, IPhotoPlaceRepository repository, CancellationToken cancellationToken) =>
             {
                 if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
                 {
@@ -77,7 +77,7 @@ public static class PhotoPlaceEndpoints
 
         endpoints.MapDelete(
             "/api/collections/photos/{revisionId}/place",
-            async (string revisionId, SqlitePhotoPlaceRepository repository, CancellationToken cancellationToken) =>
+            async (string revisionId, IPhotoPlaceRepository repository, CancellationToken cancellationToken) =>
             {
                 if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
                 {
@@ -100,14 +100,14 @@ public static class PhotoPlaceEndpoints
         return endpoints;
     }
 
-    private static PhotoPlaceDefinitionResponse ToResponse(CataloguePlaceDefinition place) => new(
+    private static PhotoPlaceDefinitionResponse ToResponse(PhotoPlaceDefinition place) => new(
         place.TagId.ToString(CultureInfo.InvariantCulture),
         place.Name,
         place.Value,
         place.ParentTagId?.ToString(CultureInfo.InvariantCulture),
         place.ParentValue);
 
-    private static PhotoPlaceStateResponse ToResponse(CataloguePhotoPlaceState state) => new(
+    private static PhotoPlaceStateResponse ToResponse(PhotoPlaceState state) => new(
         state.RevisionId.ToString(),
         state.Place is null
             ? null
@@ -120,7 +120,7 @@ public static class PhotoPlaceEndpoints
                 state.Place.AssignedAtUtc),
         state.MigrationConflict is null ? null : ToResponse(state.MigrationConflict));
 
-    private static PhotoPlaceMigrationConflictResponse ToResponse(CataloguePlaceMigrationConflict conflict) => new(
+    private static PhotoPlaceMigrationConflictResponse ToResponse(PhotoPlaceMigrationConflict conflict) => new(
         conflict.RevisionId.ToString(),
         conflict.CandidateValues,
         conflict.DetectedAtUtc);

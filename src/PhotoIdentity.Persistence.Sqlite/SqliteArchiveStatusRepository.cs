@@ -6,52 +6,11 @@ using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
-public sealed record CatalogueArchiveFolderStatus(
-    string RelativeFolder,
-    int CurrentImages,
-    int LocalImages,
-    int OnlineOnlyImages,
-    int DownloadingImages,
-    int UnavailableImages,
-    int AvailabilityErrorImages,
-    int AnalysedImages,
-    int PendingImages,
-    int FailedImages,
-    int NeedsSourceVerificationImages,
-    int UnverifiedSourceImages,
-    int MissingImages);
-
-public sealed record CatalogueArchiveItemStatus(
-    string RelativePath,
-    AssetRevisionId? RevisionId,
-    string Availability,
-    string SourceVerificationState,
-    string AnalysisState,
-    string? LastError);
-
-public sealed record CatalogueArchiveItemPage(
-    int Offset,
-    int Limit,
-    int Total,
-    IReadOnlyList<CatalogueArchiveItemStatus> Items);
-
-public sealed record CatalogueArchiveRunStatus(
-    ProcessingRunId RunId,
-    string Status,
-    DateTimeOffset StartedAtUtc,
-    DateTimeOffset? CompletedAtUtc,
-    int TotalJobs,
-    int QueuedJobs,
-    int RunningJobs,
-    int SucceededJobs,
-    int FailedJobs,
-    int CancelledJobs);
-
 /// <summary>
 /// Reads permanent-archive coverage, OneDrive availability, source-verification state and
 /// exact-profile analysis state without exposing the configured source root.
 /// </summary>
-public sealed class SqliteArchiveStatusRepository
+public sealed class SqliteArchiveStatusRepository : IArchiveStatusRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -361,6 +320,27 @@ public sealed class SqliteArchiveStatusRepository
             ReadCount(reader, 8),
             ReadCount(reader, 9));
     }
+
+    public Task<CatalogueArchiveItemPage> GetItemsAsync(
+        SourceId sourceId,
+        string relativeFolder,
+        Sha256Digest? profileHash,
+        string availability,
+        string verification,
+        string analysis,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken = default) =>
+        new SqliteArchiveItemFilterRepository(_database).GetItemsAsync(
+            sourceId,
+            relativeFolder,
+            profileHash,
+            availability,
+            verification,
+            analysis,
+            offset,
+            limit,
+            cancellationToken);
 
     private async Task EnsureSchemasAsync(CancellationToken cancellationToken)
     {
