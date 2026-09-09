@@ -14,6 +14,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
 
     private readonly SqliteCatalogueDatabase _database;
     private readonly IArchiveAdvancementControlRepository _control;
+    private readonly IArchiveCoverageRepository _coverage;
     private readonly IArchiveSourceObservationRepository _observations;
     private readonly SqliteArchiveAnalysisRepository _analysis;
     private readonly IArchivePostAnalysisRepository _postAnalysis;
@@ -32,6 +33,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     public ArchiveAdvancementHostedService(
         SqliteCatalogueDatabase database,
         IArchiveAdvancementControlRepository control,
+        IArchiveCoverageRepository coverage,
         IArchiveSourceObservationRepository observations,
         SqliteArchiveAnalysisRepository analysis,
         IArchivePostAnalysisRepository postAnalysis,
@@ -48,6 +50,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     {
         _database = database;
         _control = control;
+        _coverage = coverage;
         _observations = observations;
         _analysis = analysis;
         _postAnalysis = postAnalysis;
@@ -75,20 +78,19 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            ArchiveCoverageConfiguration? coverage = null;
+            ArchiveCoverageState? coverage = null;
             bool advancementRequested = false;
 
             try
             {
-                coverage = await new SqliteArchiveCoverageRepository(_database)
-                    .GetAsync(stoppingToken);
+                coverage = await _coverage.GetAsync(stoppingToken);
                 if (coverage is null)
                 {
                     await Task.Delay(IdleDelay, stoppingToken);
                     continue;
                 }
 
-                ArchiveAdvancementControlState? control = await _control.GetAsync(coverage.Source.Id, stoppingToken);
+                ArchiveAdvancementControlState? control = await _control.GetAsync(coverage.Source.SourceId, stoppingToken);
                 if (control?.IsRequested != true)
                 {
                     await Task.Delay(IdleDelay, stoppingToken);
@@ -99,7 +101,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                 if (control.SyncRequired)
                 {
                     await _control.UpdateRuntimeAsync(
-                        coverage.Source.Id,
+                        coverage.Source.SourceId,
                         "syncing",
                         syncRequired: null,
                         "Synchronizing included folders before archive processing.",
@@ -107,7 +109,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                         stoppingToken);
                     await SynchronizeAsync(coverage, stoppingToken);
                     await _control.UpdateRuntimeAsync(
-                        coverage.Source.Id,
+                        coverage.Source.SourceId,
                         "running",
                         syncRequired: false,
                         "Archive synchronization completed; processing is continuing.",
@@ -120,12 +122,12 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                 ArchiveAdvancementWorkClassification work = await GetWorkStateAsync(coverage, stoppingToken);
                 if (!work.HasWork)
                 {
-                    await _control.CompleteAsync(coverage.Source.Id, _timeProvider.GetUtcNow(), stoppingToken);
+                    await _control.CompleteAsync(coverage.Source.SourceId, _timeProvider.GetUtcNow(), stoppingToken);
                     continue;
                 }
 
                 await _control.UpdateRuntimeAsync(
-                    coverage.Source.Id,
+                    coverage.Source.SourceId,
                     work.WaitingForOneDrive ? "waiting" : "running",
                     syncRequired: null,
                     work.WaitingForOneDrive
@@ -167,7 +169,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                     await TryPersistRecoveryStateAsync(
                         "waiting",
                         cancellationToken => _control.UpdateRuntimeAsync(
-                            coverage.Source.Id,
+                            coverage.Source.SourceId,
                             "waiting",
                             syncRequired: null,
                             exception.Message,
@@ -181,7 +183,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                 await TryPersistRecoveryStateAsync(
                     "blocked",
                     cancellationToken => _control.BlockAsync(
-                        coverage.Source.Id,
+                        coverage.Source.SourceId,
                         exception.Message,
                         _timeProvider.GetUtcNow(),
                         cancellationToken),
@@ -192,21 +194,26 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     }
 
     private async Task SynchronizeAsync(
-        ArchiveCoverageConfiguration coverage,
+        ArchiveCoverageState coverage,
         CancellationToken cancellationToken)
     {
-        LocalFolderAssetSource source = new(coverage.Source.Id, coverage.Source.RootLocator);
+        LocalFolderAssetSource source = new(coverage.Source.SourceId, coverage.Source.RootLocator);
+        CatalogueSource catalogueSource = new(
+            coverage.Source.SourceId,
+            coverage.Source.Kind,
+            coverage.Source.RootLocator,
+            coverage.Source.CreatedAtUtc);
         using IDisposable syncTiming = _metrics.Measure(ArchiveThroughputMetricNames.Synchronization);
         _ = await new LocalArchiveSyncCoordinator(_database, _metrics).SyncAsync(
             source,
-            coverage.Source,
+            catalogueSource,
             coverage.IncludedFolders,
             _timeProvider.GetUtcNow(),
             cancellationToken);
     }
 
     private async Task<ArchiveAdvancementWorkClassification> GetWorkStateAsync(
-        ArchiveCoverageConfiguration coverage,
+        ArchiveCoverageState coverage,
         CancellationToken cancellationToken)
     {
         if (!_operatorConfiguration.TryResolveAnalysisConfiguration(
@@ -232,9 +239,9 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             cancellationToken);
         var profileHash = analysisProfile.ComputeHash();
 
-        bool sourcePending = await _observations.GetNextPendingAsync(coverage.Source.Id, cancellationToken) is not null;
+        bool sourcePending = await _observations.GetNextPendingAsync(coverage.Source.SourceId, cancellationToken) is not null;
         bool proxyPending = await _postAnalysis.GetNextMissingProxyRevisionAsync(
-            coverage.Source.Id,
+            coverage.Source.SourceId,
             profileHash,
             proxyProfile.Id,
             cancellationToken) is not null;
@@ -254,7 +261,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         }
 
         bool analysisPending = (await _analysis.GetPendingCurrentRevisionIdsAsync(
-            coverage.Source.Id,
+            coverage.Source.SourceId,
             profileHash,
             includeHydratable: true,
             cancellationToken)).Count > 0;

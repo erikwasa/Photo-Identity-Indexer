@@ -17,7 +17,7 @@ The same acceptance session found slideshow performance problems. M24 WI-0108 ow
 
 In the separate M24 thread, WI-0098, WI-0099, WI-0100 and WI-0105 are completed. Runtime authority remains SQLite until WI-0101 and WI-0102 complete provider composition and controlled cutover.
 
-WI-0101 currently has PostgreSQL schema/repositories for manual photo tags, manual photo people, capture metadata, extended metadata and metadata inspection through schema version 17. The latest local slices fix the schema marker and convert the photo-tag endpoint, manual photo-people endpoint mutations, metadata-inspection service constructor, source-verification service, original-access availability checks, bounded archive-analysis coverage/availability seams and archive API coverage entry points to Core persistence contracts while keeping SQLite as the pre-cutover runtime binding.
+WI-0101 currently has PostgreSQL schema/repositories for manual photo tags, manual photo people, capture metadata, extended metadata and metadata inspection through schema version 17. The latest local slices fix the schema marker and convert the photo-tag endpoint, manual photo-people endpoint mutations, metadata-inspection service constructor, source-verification service, original-access availability checks, bounded archive-analysis coverage/availability seams, archive API coverage entry points and archive advancement worker coverage flow to Core persistence contracts while keeping SQLite as the pre-cutover runtime binding.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 

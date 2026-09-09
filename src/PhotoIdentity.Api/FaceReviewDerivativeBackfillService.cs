@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
 
@@ -41,7 +42,7 @@ public sealed class FaceReviewDerivativeBackfillService
     }
 
     public async Task<bool> AdvanceAsync(
-        ArchiveCoverageConfiguration coverage,
+        ArchiveCoverageState coverage,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(coverage);
@@ -56,7 +57,7 @@ public sealed class FaceReviewDerivativeBackfillService
         }
 
         AssetRevisionId? pendingRevisionId = await _pending.GetNextPendingCurrentRevisionAsync(
-            coverage.Source.Id,
+            coverage.Source.SourceId,
             ArchiveFaceReviewDerivativeWriter.ProfileId,
             cancellationToken);
         if (pendingRevisionId is null)
@@ -117,10 +118,10 @@ public sealed class FaceReviewDerivativeBackfillService
     }
 
     public Task<AssetRevisionId?> GetNextPendingAsync(
-        ArchiveCoverageConfiguration coverage,
+        ArchiveCoverageState coverage,
         CancellationToken cancellationToken = default) =>
         _pending.GetNextPendingCurrentRevisionAsync(
-            coverage.Source.Id,
+            coverage.Source.SourceId,
             ArchiveFaceReviewDerivativeWriter.ProfileId,
             cancellationToken);
 
