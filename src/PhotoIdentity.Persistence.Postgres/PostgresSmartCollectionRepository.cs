@@ -1,26 +1,24 @@
 using System.Globalization;
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
+using Npgsql;
+using NpgsqlTypes;
 using PhotoIdentity.Core.Collections;
+using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Places;
+using PhotoIdentity.Core.Tags;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Persistence.Postgres;
 
-/// <summary>
-/// Persists normalized smart-collection filter definitions. Membership is never persisted;
-/// callers evaluate the stored filter against the current catalogue through
-/// <see cref="SqliteSmartCollectionQueryRepository"/>.
-/// </summary>
-public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
+public sealed class PostgresSmartCollectionRepository : ISmartCollectionRepository
 {
     private const int FilterSchemaVersion = 2;
-
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly PostgresCatalogueDatabase _database;
     private readonly TimeProvider _timeProvider;
 
-    public SqliteSmartCollectionRepository(
-        SqliteCatalogueDatabase database,
+    public PostgresSmartCollectionRepository(
+        PostgresCatalogueDatabase database,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(database);
@@ -38,12 +36,11 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
         SmartCollectionName canonicalName = SmartCollectionName.Parse(name);
         SmartCollectionFilter canonicalFilter = CanonicalizeFilter(filter);
         SmartCollectionId id = SmartCollectionId.New();
-        DateTimeOffset now = _timeProvider.GetUtcNow();
+        DateTimeOffset now = _timeProvider.GetUtcNow().ToUniversalTime();
 
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        await EnsureSchemaAsync(connection, cancellationToken);
-
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO smart_collections (
                 id,
@@ -54,13 +51,13 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
                 created_at_utc,
                 updated_at_utc)
             VALUES (
-                $id,
-                $normalized_name,
-                $display_name,
-                $filter_schema_version,
-                $filter_json,
-                $created_at_utc,
-                $updated_at_utc);
+                @id,
+                @normalized_name,
+                @display_name,
+                @filter_schema_version,
+                @filter_json,
+                @created_at_utc,
+                @updated_at_utc);
             """;
         AddDefinitionParameters(command, id, canonicalName, canonicalFilter, now, now);
 
@@ -68,26 +65,20 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
         {
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
-        catch (SqliteException exception) when (exception.SqliteErrorCode == 19)
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
         {
             throw new SmartCollectionNameConflictException(canonicalName.DisplayValue);
         }
 
-        return new SmartCollectionDefinition(
-            id,
-            canonicalName.DisplayValue,
-            canonicalFilter,
-            now,
-            now);
+        return new SmartCollectionDefinition(id, canonicalName.DisplayValue, canonicalFilter, now, now);
     }
 
     public async Task<IReadOnlyList<SmartCollectionDefinition>> ListAsync(
         CancellationToken cancellationToken = default)
     {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        await EnsureSchemaAsync(connection, cancellationToken);
-
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT id, display_name, filter_schema_version, filter_json, created_at_utc, updated_at_utc
             FROM smart_collections
@@ -95,7 +86,8 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
             """;
 
         List<SmartCollectionDefinition> definitions = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using NpgsqlDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
             definitions.Add(ReadDefinition(reader));
@@ -108,32 +100,9 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
         SmartCollectionId id,
         CancellationToken cancellationToken = default)
     {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        await EnsureSchemaAsync(connection, cancellationToken);
-        return await GetAsync(connection, transaction: null, id, cancellationToken);
-    }
-
-    internal static async Task<SmartCollectionDefinition?> GetAsync(
-        SqliteConnection connection,
-        SqliteTransaction? transaction,
-        SmartCollectionId id,
-        CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(connection);
-
-        using SqliteCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            SELECT id, display_name, filter_schema_version, filter_json, created_at_utc, updated_at_utc
-            FROM smart_collections
-            WHERE id = $id;
-            """;
-        command.Parameters.AddWithValue("$id", id.ToString());
-
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken)
-            ? ReadDefinition(reader)
-            : null;
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        return await GetAsync(connection, id, cancellationToken);
     }
 
     public async Task<SmartCollectionDefinition?> UpdateAsync(
@@ -145,77 +114,94 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
         ArgumentNullException.ThrowIfNull(filter);
         SmartCollectionName canonicalName = SmartCollectionName.Parse(name);
         SmartCollectionFilter canonicalFilter = CanonicalizeFilter(filter);
-        DateTimeOffset now = _timeProvider.GetUtcNow();
+        DateTimeOffset now = _timeProvider.GetUtcNow().ToUniversalTime();
 
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        await EnsureSchemaAsync(connection, cancellationToken);
-
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             UPDATE smart_collections
-            SET normalized_name = $normalized_name,
-                display_name = $display_name,
-                filter_schema_version = $filter_schema_version,
-                filter_json = $filter_json,
-                updated_at_utc = $updated_at_utc
-            WHERE id = $id;
+            SET normalized_name = @normalized_name,
+                display_name = @display_name,
+                filter_schema_version = @filter_schema_version,
+                filter_json = @filter_json,
+                updated_at_utc = @updated_at_utc
+            WHERE id = @id;
             """;
-        command.Parameters.AddWithValue("$id", id.ToString());
-        command.Parameters.AddWithValue("$normalized_name", canonicalName.NormalizedValue);
-        command.Parameters.AddWithValue("$display_name", canonicalName.DisplayValue);
-        command.Parameters.AddWithValue("$filter_schema_version", FilterSchemaVersion);
-        command.Parameters.AddWithValue("$filter_json", SerializeFilter(canonicalFilter));
-        command.Parameters.AddWithValue("$updated_at_utc", now.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id.Value);
+        command.Parameters.AddWithValue("normalized_name", canonicalName.NormalizedValue);
+        command.Parameters.AddWithValue("display_name", canonicalName.DisplayValue);
+        command.Parameters.AddWithValue("filter_schema_version", FilterSchemaVersion);
+        NpgsqlParameter filterJson = command.Parameters.Add("filter_json", NpgsqlDbType.Jsonb);
+        filterJson.Value = SerializeFilter(canonicalFilter);
+        command.Parameters.AddWithValue("updated_at_utc", now);
 
         int updated;
         try
         {
             updated = await command.ExecuteNonQueryAsync(cancellationToken);
         }
-        catch (SqliteException exception) when (exception.SqliteErrorCode == 19)
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
         {
             throw new SmartCollectionNameConflictException(canonicalName.DisplayValue);
         }
 
-        if (updated == 0)
-        {
-            return null;
-        }
-
-        return await GetAsync(id, cancellationToken);
+        return updated == 0
+            ? null
+            : await GetAsync(connection, id, cancellationToken);
     }
 
     public async Task<bool> DeleteAsync(
         SmartCollectionId id,
         CancellationToken cancellationToken = default)
     {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        await EnsureSchemaAsync(connection, cancellationToken);
-
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM smart_collections WHERE id = $id;";
-        command.Parameters.AddWithValue("$id", id.ToString());
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM smart_collections WHERE id = @id;";
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id.Value);
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 
+    private static async Task<SmartCollectionDefinition?> GetAsync(
+        NpgsqlConnection connection,
+        SmartCollectionId id,
+        CancellationToken cancellationToken)
+    {
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT id, display_name, filter_schema_version, filter_json, created_at_utc, updated_at_utc
+            FROM smart_collections
+            WHERE id = @id;
+            """;
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id.Value);
+
+        await using NpgsqlDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? ReadDefinition(reader)
+            : null;
+    }
+
     private static void AddDefinitionParameters(
-        SqliteCommand command,
+        NpgsqlCommand command,
         SmartCollectionId id,
         SmartCollectionName name,
         SmartCollectionFilter filter,
         DateTimeOffset createdAtUtc,
         DateTimeOffset updatedAtUtc)
     {
-        command.Parameters.AddWithValue("$id", id.ToString());
-        command.Parameters.AddWithValue("$normalized_name", name.NormalizedValue);
-        command.Parameters.AddWithValue("$display_name", name.DisplayValue);
-        command.Parameters.AddWithValue("$filter_schema_version", FilterSchemaVersion);
-        command.Parameters.AddWithValue("$filter_json", SerializeFilter(filter));
-        command.Parameters.AddWithValue("$created_at_utc", createdAtUtc.ToString("O", CultureInfo.InvariantCulture));
-        command.Parameters.AddWithValue("$updated_at_utc", updatedAtUtc.ToString("O", CultureInfo.InvariantCulture));
+        command.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, id.Value);
+        command.Parameters.AddWithValue("normalized_name", name.NormalizedValue);
+        command.Parameters.AddWithValue("display_name", name.DisplayValue);
+        command.Parameters.AddWithValue("filter_schema_version", FilterSchemaVersion);
+        NpgsqlParameter filterJson = command.Parameters.Add("filter_json", NpgsqlDbType.Jsonb);
+        filterJson.Value = SerializeFilter(filter);
+        command.Parameters.AddWithValue("created_at_utc", createdAtUtc);
+        command.Parameters.AddWithValue("updated_at_utc", updatedAtUtc);
     }
 
-    internal static SmartCollectionDefinition ReadDefinition(SqliteDataReader reader)
+    private static SmartCollectionDefinition ReadDefinition(NpgsqlDataReader reader)
     {
         int filterSchemaVersion = reader.GetInt32(2);
         if (filterSchemaVersion is not 1 and not FilterSchemaVersion)
@@ -225,11 +211,11 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
         }
 
         return new SmartCollectionDefinition(
-            SmartCollectionId.From(Guid.Parse(reader.GetString(0))),
+            SmartCollectionId.From(reader.GetGuid(0)),
             reader.GetString(1),
             DeserializeFilter(reader.GetString(3)),
-            ParseTimestamp(reader.GetString(4)),
-            ParseTimestamp(reader.GetString(5)));
+            reader.GetFieldValue<DateTimeOffset>(4),
+            reader.GetFieldValue<DateTimeOffset>(5));
     }
 
     private static SmartCollectionFilter CanonicalizeFilter(SmartCollectionFilter filter) => new(
@@ -278,9 +264,7 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
             bounds,
             payload.Taken is null
                 ? null
-                : new SmartCollectionDateRange(
-                    ParseDate(payload.Taken.From),
-                    ParseDate(payload.Taken.To)),
+                : new SmartCollectionDateRange(ParseDate(payload.Taken.From), ParseDate(payload.Taken.To)),
             payload.Location?.Place);
     }
 
@@ -309,14 +293,14 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
             : null;
     }
 
-    private static PhotoIdentity.Core.Identifiers.PersonId ParsePersonId(string value)
+    private static PersonId ParsePersonId(string value)
     {
         if (!Guid.TryParse(value, out Guid parsed) || parsed == Guid.Empty)
         {
             throw new InvalidDataException($"Stored smart collection person identifier '{value}' is invalid.");
         }
 
-        return PhotoIdentity.Core.Identifiers.PersonId.From(parsed);
+        return PersonId.From(parsed);
     }
 
     private static DateOnly ParseDate(string value) => DateOnly.ParseExact(
@@ -324,37 +308,6 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
         "yyyy-MM-dd",
         CultureInfo.InvariantCulture,
         DateTimeStyles.None);
-
-    private static DateTimeOffset ParseTimestamp(string value) => DateTimeOffset.Parse(
-        value,
-        CultureInfo.InvariantCulture,
-        DateTimeStyles.RoundtripKind);
-
-    internal static async Task EnsureSchemaAsync(
-        SqliteConnection connection,
-        CancellationToken cancellationToken)
-    {
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            CREATE TABLE IF NOT EXISTS smart_collections (
-                id TEXT NOT NULL PRIMARY KEY,
-                normalized_name TEXT NOT NULL UNIQUE,
-                display_name TEXT NOT NULL,
-                filter_schema_version INTEGER NOT NULL CHECK (filter_schema_version IN (1, 2)),
-                filter_json TEXT NOT NULL,
-                created_at_utc TEXT NOT NULL,
-                updated_at_utc TEXT NOT NULL,
-                CHECK (length(normalized_name) BETWEEN 1 AND 120),
-                CHECK (length(display_name) BETWEEN 1 AND 120),
-                CHECK (length(filter_json) > 0));
-            CREATE INDEX IF NOT EXISTS ix_smart_collections_name
-                ON smart_collections (normalized_name, id);
-            UPDATE smart_collections
-            SET filter_schema_version = 2
-            WHERE filter_schema_version = 1;
-            """;
-        await command.ExecuteNonQueryAsync(cancellationToken);
-    }
 
     private sealed record PersistedFilter(
         string[] People,
@@ -371,7 +324,5 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
         double? North = null,
         double? East = null);
 
-    private sealed record PersistedTaken(
-        string From,
-        string To);
+    private sealed record PersistedTaken(string From, string To);
 }

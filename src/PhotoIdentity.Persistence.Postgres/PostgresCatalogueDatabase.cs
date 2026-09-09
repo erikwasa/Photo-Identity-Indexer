@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 18;
+    public const int CurrentSchemaVersion = 19;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -985,6 +985,26 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                 resolved_by text NULL,
                 resolution_note text NULL
             );
+            """),
+        new(
+            19,
+            "smart-collections",
+            """
+            CREATE TABLE smart_collections (
+                id uuid PRIMARY KEY,
+                normalized_name text NOT NULL UNIQUE
+                    CHECK (char_length(normalized_name) BETWEEN 1 AND 120),
+                display_name text NOT NULL
+                    CHECK (char_length(display_name) BETWEEN 1 AND 120),
+                filter_schema_version integer NOT NULL
+                    CHECK (filter_schema_version IN (1, 2)),
+                filter_json jsonb NOT NULL,
+                created_at_utc timestamp with time zone NOT NULL,
+                updated_at_utc timestamp with time zone NOT NULL
+            );
+
+            CREATE INDEX ix_smart_collections_name
+                ON smart_collections (normalized_name, id);
             """),
     ];
 

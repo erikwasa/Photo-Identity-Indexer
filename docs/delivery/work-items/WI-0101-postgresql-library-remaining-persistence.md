@@ -52,7 +52,7 @@ Do not create dual writes as a bridge. SQLite remains the sole authoritative run
 
 Started 2026-09-09 on the M24 PostgreSQL catalogue branch.
 
-- Added PostgreSQL schema migrations through version 18 for manual photo tags, manual photo people, extended photo metadata/inspection state and first-class Places action/conflict state.
+- Added PostgreSQL schema migrations through version 19 for manual photo tags, manual photo people, extended photo metadata/inspection state, first-class Places action/conflict state and saved Smart Collection definitions.
 - Added PostgreSQL repositories for manual photo tags, manual photo people, capture metadata, extended metadata and metadata inspection.
 - Added a PostgreSQL Places repository for manual place state/actions and automatic place-write precedence/idempotency behind the Core-owned Places contracts.
 - Fixed the PostgreSQL schema marker so a clean database initializes idempotently through schema version 17.
@@ -61,6 +61,7 @@ Started 2026-09-09 on the M24 PostgreSQL catalogue branch.
 - Converted manual photo-people mutations on the photo-details API to the Core-owned `IPhotoPersonRepository` contract instead of endpoint-local SQLite repository construction.
 - Converted photo-details reads to a Core-owned persistence contract and added a PostgreSQL implementation preserving confirmed-face/manual-person evidence and metadata join semantics.
 - Converted collection photo/manifest queries to a Core-owned persistence contract and added a PostgreSQL implementation preserving confirmed-assignment and top-ranked suggestion semantics.
+- Converted saved Smart Collection definition CRUD/listing endpoints to a Core-owned persistence contract and added a PostgreSQL implementation preserving normalized names, filter schema version 2 JSON compatibility and duplicate-name conflict behavior; query/snapshot evaluation remains on SQLite pending the larger follow-up seam.
 - Converted source-verification/original-access runtime services from concrete SQLite observation and availability repositories to Core-owned archive source/availability contracts.
 - Converted bounded archive analysis coverage reads and availability writes to Core-owned archive coverage/availability contracts while leaving still-unmigrated analysis/status processing collaborators unchanged.
 - Converted archive API coverage read/update/start/pause/sync entry points to the Core-owned archive coverage contract, retaining explicit conversion only at still-SQLite status/sync collaborator boundaries.

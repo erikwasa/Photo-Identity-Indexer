@@ -293,6 +293,22 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(2L, Convert.ToInt64(placeTableCount));
             }
 
+            await using (NpgsqlCommand readSmartCollectionTables =
+                         verificationConnection.CreateCommand())
+            {
+                readSmartCollectionTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name = 'smart_collections';
+                    """;
+
+                object? smartCollectionTableCount =
+                    await readSmartCollectionTables.ExecuteScalarAsync();
+                Assert.Equal(1L, Convert.ToInt64(smartCollectionTableCount));
+            }
+
             await using (NpgsqlCommand readReviewTables =
                          verificationConnection.CreateCommand())
             {

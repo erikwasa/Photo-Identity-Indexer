@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.EventLog;
 using PhotoIdentity.Core.Catalogue;
+using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.People;
 using PhotoIdentity.Core.Places;
@@ -137,6 +138,8 @@ public partial class Program
             serviceProvider.GetRequiredService<SqlitePhotoDetailsRepository>());
         builder.Services.AddSingleton<SqliteSmartCollectionQueryRepository>();
         builder.Services.AddSingleton<SqliteSmartCollectionRepository>();
+        builder.Services.AddSingleton<ISmartCollectionRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteSmartCollectionRepository>());
         builder.Services.AddSingleton<SqliteAssetCatalogueRepository>();
         builder.Services.AddSingleton<IPhotoCaptureMetadataRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteAssetCatalogueRepository>());

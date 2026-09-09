@@ -106,7 +106,7 @@ public static class SmartCollectionEndpoints
 
     private static async Task<IResult> CreateAsync(
         SmartCollectionDefinitionRequest request,
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         try
@@ -130,7 +130,7 @@ public static class SmartCollectionEndpoints
     }
 
     private static async Task<IResult> ListAsync(
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<SmartCollectionDefinition> definitions =
@@ -139,7 +139,7 @@ public static class SmartCollectionEndpoints
     }
 
     private static async Task<IResult> ListSlideshowCollectionsAsync(
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<SmartCollectionDefinition> definitions =
@@ -153,7 +153,7 @@ public static class SmartCollectionEndpoints
 
     private static async Task<IResult> GetAsync(
         Guid id,
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
@@ -170,7 +170,7 @@ public static class SmartCollectionEndpoints
     private static async Task<IResult> UpdateAsync(
         Guid id,
         SmartCollectionDefinitionRequest request,
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
@@ -210,7 +210,7 @@ public static class SmartCollectionEndpoints
 
     private static async Task<IResult> DeleteAsync(
         Guid id,
-        SqliteSmartCollectionRepository repository,
+        ISmartCollectionRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
@@ -256,7 +256,7 @@ public static class SmartCollectionEndpoints
         Guid id,
         int? offset,
         int? limit,
-        SqliteSmartCollectionRepository definitions,
+        ISmartCollectionRepository definitions,
         SqliteSmartCollectionQueryRepository query,
         CancellationToken cancellationToken)
     {
