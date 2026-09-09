@@ -62,4 +62,5 @@ Started 2026-09-09 on the M24 PostgreSQL catalogue branch.
 - Converted archive API coverage read/update/start/pause/sync entry points to the Core-owned archive coverage contract, retaining explicit conversion only at still-SQLite status/sync collaborator boundaries.
 - Converted the archive advancement worker and face-review derivative backfill coverage flow to the Core-owned archive coverage state, retaining explicit conversion only at the still-SQLite sync coordinator boundary.
 - Converted the archive item-filter endpoint coverage read to the Core-owned archive coverage contract while leaving the still-SQLite item-filter query repository unchanged.
+- Converted the person-audit API endpoint to the Core-owned `IPersonAuditRepository` contract via the existing SQLite compatibility adapter.
 - Kept normal runtime binding on SQLite for these newly neutralized surfaces until WI-0102 performs controlled migration/cutover; no dual writes are introduced.

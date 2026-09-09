@@ -114,6 +114,9 @@ public partial class Program
         builder.Services.AddSingleton<SqliteIdentityMatchEvidenceVersionReader>();
         builder.Services.AddSingleton<SqliteIdentityAutoAssignmentService>();
         builder.Services.AddSingleton<SqlitePersonAuditRepository>();
+        builder.Services.AddSingleton<SqlitePersonAuditAdapter>();
+        builder.Services.AddSingleton<IPersonAuditRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePersonAuditAdapter>());
         builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
         builder.Services.AddSingleton<IPersonMaintenanceRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqlitePersonMaintenanceRepository>());
