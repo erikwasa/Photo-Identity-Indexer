@@ -1,19 +1,12 @@
 using System.Globalization;
-using Microsoft.Data.Sqlite;
+using Npgsql;
+using NpgsqlTypes;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Persistence.Postgres;
 
-/// <summary>
-/// Evaluates reusable smart-collection filters against current immutable revisions.
-/// Populated dimensions combine with AND semantics; people and tags independently support all/any.
-/// The people dimension is the union of confirmed face evidence and active manual photo-level presence.
-/// The Location dimension may combine one canonical named place with GPS bounds; named-place matching
-/// uses canonical hierarchy ancestry rather than global leaf-name matching.
-/// Missing capture metadata cannot satisfy GPS or taken-date predicates.
-/// </summary>
-public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQueryRepository
+public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQueryRepository
 {
     private const string CommonCtes = """
         WITH latest_review_action AS (
@@ -109,21 +102,20 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
         )
         """;
 
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly PostgresCatalogueDatabase _database;
+    private readonly ISmartCollectionRepository _definitions;
     private readonly TimeProvider _timeProvider;
 
-    public SqliteSmartCollectionQueryRepository(SqliteCatalogueDatabase database)
-        : this(database, TimeProvider.System)
-    {
-    }
-
-    public SqliteSmartCollectionQueryRepository(
-        SqliteCatalogueDatabase database,
+    public PostgresSmartCollectionQueryRepository(
+        PostgresCatalogueDatabase database,
+        ISmartCollectionRepository definitions,
         TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(definitions);
         ArgumentNullException.ThrowIfNull(timeProvider);
         _database = database;
+        _definitions = definitions;
         _timeProvider = timeProvider;
     }
 
@@ -141,13 +133,11 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
         }
 
         string where = BuildWhere(filter);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        await SqlitePhotoPersonSchema.EnsureAsync(connection, transaction: null, cancellationToken);
-        await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(connection, cancellationToken);
-        await EnsurePhotoMetadataSchemaAsync(connection, cancellationToken);
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
 
         int total;
-        using (SqliteCommand count = connection.CreateCommand())
+        await using (NpgsqlCommand count = connection.CreateCommand())
         {
             count.CommandText = $"""
                 {CommonCtes}
@@ -165,7 +155,7 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
                 CultureInfo.InvariantCulture);
         }
 
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = $"""
             {CommonCtes}
             SELECT
@@ -188,26 +178,18 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
                 photo_capture_metadata.taken_at_local DESC,
                 asset_revisions.observed_at_utc DESC,
                 asset_revisions.id
-            LIMIT $limit OFFSET $offset;
+            LIMIT @limit OFFSET @offset;
             """;
         AddFilterParameters(command, filter);
-        command.Parameters.AddWithValue("$limit", limit);
-        command.Parameters.AddWithValue("$offset", offset);
+        command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit);
+        command.Parameters.AddWithValue("offset", NpgsqlDbType.Integer, offset);
 
         List<SmartCollectionPhoto> items = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using NpgsqlDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            items.Add(new SmartCollectionPhoto(
-                AssetRevisionId.From(Guid.Parse(reader.GetString(0))),
-                AssetId.From(Guid.Parse(reader.GetString(1))),
-                ParseObserved(reader.GetString(2)),
-                reader.IsDBNull(3) ? null : reader.GetString(3),
-                reader.IsDBNull(4) ? null : reader.GetInt32(4),
-                reader.IsDBNull(5) ? null : reader.GetInt32(5),
-                reader.IsDBNull(6) ? null : ParseLocal(reader.GetString(6)),
-                reader.IsDBNull(7) ? null : reader.GetDouble(7),
-                reader.IsDBNull(8) ? null : reader.GetDouble(8)));
+            items.Add(ReadPhoto(reader));
         }
 
         return new SmartCollectionPhotoPage(items, offset, limit, total, filter);
@@ -217,29 +199,17 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
         SmartCollectionId collectionId,
         CancellationToken cancellationToken = default)
     {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        await SqliteSmartCollectionRepository.EnsureSchemaAsync(connection, cancellationToken);
-        await SqlitePhotoPersonSchema.EnsureAsync(connection, transaction: null, cancellationToken);
-        await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(connection, cancellationToken);
-        await EnsurePhotoMetadataSchemaAsync(connection, cancellationToken);
-
-        DateTimeOffset createdAtUtc = _timeProvider.GetUtcNow();
-        using SqliteTransaction transaction = connection.BeginTransaction();
-
-        SmartCollectionDefinition? definition = await SqliteSmartCollectionRepository.GetAsync(
-            connection,
-            transaction,
-            collectionId,
-            cancellationToken);
+        SmartCollectionDefinition? definition =
+            await _definitions.GetAsync(collectionId, cancellationToken);
         if (definition is null)
         {
-            transaction.Commit();
             return null;
         }
 
         string where = BuildWhere(definition.Filter);
-        using SqliteCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = $"""
             {CommonCtes}
             SELECT
@@ -256,18 +226,17 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
         AddFilterParameters(command, definition.Filter);
 
         List<SlideshowSnapshotCandidate> candidates = [];
-        await using (SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
+        await using (NpgsqlDataReader reader =
+                     await command.ExecuteReaderAsync(cancellationToken))
         {
             while (await reader.ReadAsync(cancellationToken))
             {
                 candidates.Add(new SlideshowSnapshotCandidate(
-                    AssetRevisionId.From(Guid.Parse(reader.GetString(0))),
-                    ParseObserved(reader.GetString(1)),
-                    reader.IsDBNull(2) ? null : ParseLocal(reader.GetString(2))));
+                    AssetRevisionId.From(reader.GetGuid(0)),
+                    reader.GetFieldValue<DateTimeOffset>(1),
+                    reader.IsDBNull(2) ? null : reader.GetDateTime(2)));
             }
         }
-
-        transaction.Commit();
 
         AssetRevisionId[] revisionIds = candidates
             .OrderBy(candidate => EffectiveSlideshowTime(candidate))
@@ -278,9 +247,20 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
         return new SmartCollectionSlideshowSnapshot(
             definition.Id,
             definition.Name,
-            createdAtUtc,
+            _timeProvider.GetUtcNow().ToUniversalTime(),
             revisionIds);
     }
+
+    private static SmartCollectionPhoto ReadPhoto(NpgsqlDataReader reader) => new(
+        AssetRevisionId.From(reader.GetGuid(0)),
+        AssetId.From(reader.GetGuid(1)),
+        reader.GetFieldValue<DateTimeOffset>(2),
+        reader.IsDBNull(3) ? null : reader.GetString(3),
+        reader.IsDBNull(4) ? null : reader.GetInt32(4),
+        reader.IsDBNull(5) ? null : reader.GetInt32(5),
+        reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+        reader.IsDBNull(7) ? null : reader.GetDouble(7),
+        reader.IsDBNull(8) ? null : reader.GetDouble(8));
 
     private static DateTime EffectiveSlideshowTime(SlideshowSnapshotCandidate candidate) =>
         candidate.TakenAtLocal
@@ -292,9 +272,9 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
 
         if (filter.People.Count > 0)
         {
-            string people = string.Join(", ", Enumerable.Range(0, filter.People.Count).Select(index => $"$person_{index}"));
+            string people = string.Join(", ", Enumerable.Range(0, filter.People.Count).Select(index => $"@person_{index}"));
             string having = filter.PeopleMatch == SmartCollectionMatchModes.All
-                ? "COUNT(DISTINCT person_id) = $person_count"
+                ? "COUNT(DISTINCT person_id) = @person_count"
                 : "COUNT(DISTINCT person_id) >= 1";
             predicates.Add($"""
                 AND asset_revisions.id IN (
@@ -308,9 +288,9 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
 
         if (filter.Tags.Count > 0)
         {
-            string tags = string.Join(", ", Enumerable.Range(0, filter.Tags.Count).Select(index => $"$tag_{index}"));
+            string tags = string.Join(", ", Enumerable.Range(0, filter.Tags.Count).Select(index => $"@tag_{index}"));
             string having = filter.TagMatch == SmartCollectionMatchModes.All
-                ? "COUNT(DISTINCT normalized_value) = $tag_count"
+                ? "COUNT(DISTINCT normalized_value) = @tag_count"
                 : "COUNT(DISTINCT normalized_value) >= 1";
             predicates.Add($"""
                 AND asset_revisions.id IN (
@@ -330,108 +310,71 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
                     FROM effective_revision_places
                     WHERE effective_revision_places.revision_id = asset_revisions.id
                       AND (
-                          effective_revision_places.normalized_value = $location_place
+                          effective_revision_places.normalized_value = @location_place
                           OR substr(
                               effective_revision_places.normalized_value,
                               1,
-                              length($location_place) + 1) = $location_place || '/'))
+                              length(@location_place) + 1) = @location_place || '/'))
                 """);
         }
 
         if (filter.Location is not null)
         {
-            predicates.Add("AND photo_capture_metadata.latitude BETWEEN $south AND $north");
-            predicates.Add("AND photo_capture_metadata.longitude BETWEEN $west AND $east");
+            predicates.Add("AND photo_capture_metadata.latitude BETWEEN @south AND @north");
+            predicates.Add("AND photo_capture_metadata.longitude BETWEEN @west AND @east");
         }
 
         if (filter.Taken is not null)
         {
-            predicates.Add("AND photo_capture_metadata.taken_at_local >= $taken_from");
-            predicates.Add("AND photo_capture_metadata.taken_at_local <= $taken_to");
+            predicates.Add("AND photo_capture_metadata.taken_at_local >= @taken_from");
+            predicates.Add("AND photo_capture_metadata.taken_at_local <= @taken_to");
         }
 
         return predicates.Count == 0 ? string.Empty : string.Join(Environment.NewLine, predicates);
     }
 
-    private static void AddFilterParameters(SqliteCommand command, SmartCollectionFilter filter)
+    private static void AddFilterParameters(NpgsqlCommand command, SmartCollectionFilter filter)
     {
         for (int index = 0; index < filter.People.Count; index++)
         {
-            command.Parameters.AddWithValue($"$person_{index}", filter.People[index].ToString());
+            command.Parameters.AddWithValue($"person_{index}", NpgsqlDbType.Uuid, filter.People[index].Value);
         }
-        command.Parameters.AddWithValue("$person_count", filter.People.Count);
+        command.Parameters.AddWithValue("person_count", NpgsqlDbType.Integer, filter.People.Count);
 
         for (int index = 0; index < filter.Tags.Count; index++)
         {
-            command.Parameters.AddWithValue($"$tag_{index}", filter.Tags[index]);
+            command.Parameters.AddWithValue($"tag_{index}", NpgsqlDbType.Text, filter.Tags[index]);
         }
-        command.Parameters.AddWithValue("$tag_count", filter.Tags.Count);
+        command.Parameters.AddWithValue("tag_count", NpgsqlDbType.Integer, filter.Tags.Count);
 
         if (filter.LocationPlace is not null)
         {
-            command.Parameters.AddWithValue("$location_place", filter.LocationPlace);
+            command.Parameters.AddWithValue("location_place", NpgsqlDbType.Text, filter.LocationPlace);
         }
 
         if (filter.Location is not null)
         {
-            command.Parameters.AddWithValue("$south", filter.Location.South);
-            command.Parameters.AddWithValue("$west", filter.Location.West);
-            command.Parameters.AddWithValue("$north", filter.Location.North);
-            command.Parameters.AddWithValue("$east", filter.Location.East);
+            command.Parameters.AddWithValue("south", NpgsqlDbType.Double, filter.Location.South);
+            command.Parameters.AddWithValue("west", NpgsqlDbType.Double, filter.Location.West);
+            command.Parameters.AddWithValue("north", NpgsqlDbType.Double, filter.Location.North);
+            command.Parameters.AddWithValue("east", NpgsqlDbType.Double, filter.Location.East);
         }
 
         if (filter.Taken is not null)
         {
-            command.Parameters.AddWithValue("$taken_from", FormatDateStart(filter.Taken.From));
-            command.Parameters.AddWithValue("$taken_to", FormatDateEnd(filter.Taken.To));
+            command.Parameters.AddWithValue("taken_from", NpgsqlDbType.Timestamp, FormatDateStart(filter.Taken.From));
+            command.Parameters.AddWithValue("taken_to", NpgsqlDbType.Timestamp, FormatDateEnd(filter.Taken.To));
         }
     }
 
-    private static string FormatDateStart(DateOnly value) =>
-        $"{value:yyyy-MM-dd}T00:00:00.0000000";
+    private static DateTime FormatDateStart(DateOnly value) =>
+        value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
 
-    private static string FormatDateEnd(DateOnly value) =>
-        $"{value:yyyy-MM-dd}T23:59:59.9999999";
-
-    private static DateTimeOffset ParseObserved(string value) => DateTimeOffset.Parse(
-        value,
-        CultureInfo.InvariantCulture,
-        DateTimeStyles.RoundtripKind);
-
-    private static DateTime ParseLocal(string value) => DateTime.SpecifyKind(
-        DateTime.ParseExact(
-            value,
-            "yyyy-MM-dd'T'HH:mm:ss.fffffff",
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.None),
-        DateTimeKind.Unspecified);
+    private static DateTime FormatDateEnd(DateOnly value) =>
+        value.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
     private sealed record SlideshowSnapshotCandidate(
         AssetRevisionId RevisionId,
         DateTimeOffset ObservedAtUtc,
         DateTime? TakenAtLocal);
-
-    private static async Task EnsurePhotoMetadataSchemaAsync(
-        SqliteConnection connection,
-        CancellationToken cancellationToken)
-    {
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            CREATE TABLE IF NOT EXISTS photo_capture_metadata (
-                asset_revision_id TEXT NOT NULL PRIMARY KEY,
-                taken_at_local TEXT NULL,
-                utc_offset_minutes INTEGER NULL CHECK (utc_offset_minutes IS NULL OR utc_offset_minutes BETWEEN -840 AND 840),
-                latitude REAL NULL CHECK (latitude IS NULL OR latitude BETWEEN -90 AND 90),
-                longitude REAL NULL CHECK (longitude IS NULL OR longitude BETWEEN -180 AND 180),
-                extracted_at_utc TEXT NOT NULL,
-                FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
-                CHECK ((latitude IS NULL) = (longitude IS NULL)),
-                CHECK (utc_offset_minutes IS NULL OR taken_at_local IS NOT NULL));
-            CREATE INDEX IF NOT EXISTS ix_photo_capture_metadata_taken
-                ON photo_capture_metadata (taken_at_local, asset_revision_id);
-            CREATE INDEX IF NOT EXISTS ix_photo_capture_metadata_location
-                ON photo_capture_metadata (latitude, longitude, asset_revision_id);
-            """;
-        await command.ExecuteNonQueryAsync(cancellationToken);
-    }
 }

@@ -2,7 +2,6 @@ using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Tags;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
@@ -225,7 +224,7 @@ public static class SmartCollectionEndpoints
 
     private static async Task<IResult> CreateSlideshowSnapshotAsync(
         Guid id,
-        SqliteSmartCollectionQueryRepository query,
+        ISmartCollectionQueryRepository query,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
@@ -257,7 +256,7 @@ public static class SmartCollectionEndpoints
         int? offset,
         int? limit,
         ISmartCollectionRepository definitions,
-        SqliteSmartCollectionQueryRepository query,
+        ISmartCollectionQueryRepository query,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
@@ -288,7 +287,7 @@ public static class SmartCollectionEndpoints
 
     private static async Task<IResult> QueryAsync(
         SmartCollectionQueryRequest request,
-        SqliteSmartCollectionQueryRepository repository,
+        ISmartCollectionQueryRepository repository,
         CancellationToken cancellationToken)
     {
         try
