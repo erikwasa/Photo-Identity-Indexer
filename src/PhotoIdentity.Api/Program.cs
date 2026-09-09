@@ -110,6 +110,9 @@ public partial class Program
             serviceProvider.GetRequiredService<SqliteIdentitySuggestionPolicyAdapter>());
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationModelRepository>();
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationRepository>();
+        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationAdapter>();
+        builder.Services.AddSingleton<IIdentityMatchRegenerationRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteIdentityMatchRegenerationAdapter>());
         builder.Services.AddSingleton<SqliteIdentityMatchRegenerationScorer>();
         builder.Services.AddSingleton<SqliteIdentityMatchEvidenceVersionReader>();
         builder.Services.AddSingleton<SqliteIdentityAutoAssignmentService>();

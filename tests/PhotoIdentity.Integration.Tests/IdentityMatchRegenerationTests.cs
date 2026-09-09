@@ -93,9 +93,9 @@ public sealed class IdentityMatchRegenerationTests
                 clock.GetUtcNow());
 
             IdentityMatchRegenerationHostedService worker = new(
-                repository,
+                new SqliteIdentityMatchRegenerationAdapter(repository),
                 new SqliteIdentityMatchRegenerationScorer(database, clock),
-                new SqliteIdentitySuggestionPolicyRepository(database, clock),
+                new SqliteIdentitySuggestionPolicyAdapter(new SqliteIdentitySuggestionPolicyRepository(database, clock)),
                 new SqliteIdentityAutoAssignmentService(database, clock),
                 new SqliteIdentityMatchEvidenceVersionReader(database),
                 clock,
@@ -162,9 +162,9 @@ public sealed class IdentityMatchRegenerationTests
                 "test:auto-worker",
                 clock.GetUtcNow());
             IdentityMatchRegenerationHostedService worker = new(
-                repository,
+                new SqliteIdentityMatchRegenerationAdapter(repository),
                 new SqliteIdentityMatchRegenerationScorer(database, clock),
-                policies,
+                new SqliteIdentitySuggestionPolicyAdapter(policies),
                 new SqliteIdentityAutoAssignmentService(database, clock),
                 new SqliteIdentityMatchEvidenceVersionReader(database),
                 clock,
