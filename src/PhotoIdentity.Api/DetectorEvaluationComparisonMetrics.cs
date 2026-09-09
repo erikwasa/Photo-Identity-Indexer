@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -66,7 +66,7 @@ public static partial class DetectorEvaluationComparisonEndpoints
     }
 
     private static async Task<IReadOnlyList<CatalogueDetectorEvaluationPhoto>> LoadRunPhotosAsync(
-        SqliteDetectorEvaluationRepository repository,
+        IDetectorEvaluationCatalogueRepository repository,
         ProcessingRunId runId,
         CancellationToken cancellationToken)
     {

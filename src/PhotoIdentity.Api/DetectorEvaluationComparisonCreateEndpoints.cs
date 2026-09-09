@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -21,7 +22,7 @@ public static partial class DetectorEvaluationComparisonEndpoints
         CreateDetectorEvaluationComparisonRequest request,
         DetectorEvaluationGroundTruthStore groundTruthStore,
         DetectorEvaluationComparisonStore comparisonStore,
-        SqliteDetectorEvaluationRepository repository,
+        IDetectorEvaluationCatalogueRepository repository,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Name))

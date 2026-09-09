@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -41,7 +42,7 @@ public static partial class DetectorEvaluationComparisonEndpoints
         string sessionId,
         DetectorEvaluationSessionStore sessionStore,
         DetectorEvaluationGroundTruthStore groundTruthStore,
-        SqliteDetectorEvaluationRepository repository,
+        IDetectorEvaluationCatalogueRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryParseIdentifier(sessionId, out Guid parsedSessionId))

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -24,7 +25,7 @@ public static class DetectorEvaluationEndpoints
     }
 
     private static async Task<IResult> GetRunsAsync(
-        SqliteDetectorEvaluationRepository repository,
+        IDetectorEvaluationCatalogueRepository repository,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<CatalogueDetectorEvaluationRun> runs = await repository.GetRunsAsync(cancellationToken);
@@ -39,7 +40,7 @@ public static class DetectorEvaluationEndpoints
 
     private static async Task<IResult> GetPhotosAsync(
         string runId,
-        SqliteDetectorEvaluationRepository repository,
+        IDetectorEvaluationCatalogueRepository repository,
         int offset = 0,
         int limit = 8,
         CancellationToken cancellationToken = default)
@@ -102,7 +103,7 @@ public static class DetectorEvaluationEndpoints
 
     private static async Task<IResult> CreateSessionAsync(
         CreateDetectorEvaluationSessionRequest request,
-        SqliteDetectorEvaluationRepository repository,
+        IDetectorEvaluationCatalogueRepository repository,
         DetectorEvaluationSessionStore store,
         CancellationToken cancellationToken)
     {
@@ -452,7 +453,7 @@ public static class DetectorEvaluationEndpoints
     }
 
     private static async Task<IReadOnlyList<CatalogueDetectorEvaluationPhoto>> LoadRunPhotosAsync(
-        SqliteDetectorEvaluationRepository repository,
+        IDetectorEvaluationCatalogueRepository repository,
         ProcessingRunId runId,
         CancellationToken cancellationToken)
     {

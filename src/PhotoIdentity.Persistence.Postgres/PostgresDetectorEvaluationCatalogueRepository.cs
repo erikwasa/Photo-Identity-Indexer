@@ -1,21 +1,19 @@
 using System.Data;
 using System.Globalization;
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
+using Npgsql;
+using NpgsqlTypes;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Persistence.Postgres;
 
-/// <summary>
-/// Provides read-only, photo-level detector results for one processing run.
-/// </summary>
-public sealed class SqliteDetectorEvaluationRepository : IDetectorEvaluationCatalogueRepository
+public sealed class PostgresDetectorEvaluationCatalogueRepository : IDetectorEvaluationCatalogueRepository
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly PostgresCatalogueDatabase _database;
 
-    public SqliteDetectorEvaluationRepository(SqliteCatalogueDatabase database)
+    public PostgresDetectorEvaluationCatalogueRepository(PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
@@ -24,8 +22,9 @@ public sealed class SqliteDetectorEvaluationRepository : IDetectorEvaluationCata
     public async Task<IReadOnlyList<CatalogueDetectorEvaluationRun>> GetRunsAsync(
         CancellationToken cancellationToken = default)
     {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT
                 processing_runs.id,
@@ -48,16 +47,17 @@ public sealed class SqliteDetectorEvaluationRepository : IDetectorEvaluationCata
             """;
 
         List<CatalogueDetectorEvaluationRun> runs = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using NpgsqlDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
             runs.Add(new CatalogueDetectorEvaluationRun(
-                ProcessingRunId.From(Guid.Parse(reader.GetString(0))),
+                ProcessingRunId.From(reader.GetGuid(0)),
                 reader.GetString(1),
-                ParseTimestamp(reader.GetString(2)),
-                reader.IsDBNull(3) ? null : ParseTimestamp(reader.GetString(3)),
-                reader.GetInt32(4),
-                reader.GetInt32(5)));
+                reader.GetFieldValue<DateTimeOffset>(2),
+                reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTimeOffset>(3),
+                Convert.ToInt32(reader.GetInt64(4), CultureInfo.InvariantCulture),
+                Convert.ToInt32(reader.GetInt64(5), CultureInfo.InvariantCulture)));
         }
 
         return runs;
@@ -75,10 +75,11 @@ public sealed class SqliteDetectorEvaluationRepository : IDetectorEvaluationCata
             throw new ArgumentOutOfRangeException(nameof(limit), "Photo page size must be between 1 and 1000.");
         }
 
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
 
         int total = await CountPhotosAsync(connection, processingRunId, cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             WITH scoped_photos AS (
                 SELECT
@@ -94,9 +95,9 @@ public sealed class SqliteDetectorEvaluationRepository : IDetectorEvaluationCata
                     ON asset_revisions.id = processing_jobs.asset_revision_id
                 INNER JOIN assets
                     ON assets.id = asset_revisions.asset_id
-                WHERE processing_jobs.processing_run_id = $processing_run_id
+                WHERE processing_jobs.processing_run_id = @processing_run_id
                 ORDER BY assets.source_key, asset_revisions.id
-                LIMIT $limit OFFSET $offset
+                LIMIT @limit OFFSET @offset
             ),
             latest_observation AS (
                 SELECT
@@ -129,23 +130,24 @@ public sealed class SqliteDetectorEvaluationRepository : IDetectorEvaluationCata
                AND latest_observation.row_number = 1
             ORDER BY scoped_photos.source_key, scoped_photos.id, face_occurrences.ordinal, face_occurrences.id;
             """;
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-        command.Parameters.AddWithValue("$limit", limit);
-        command.Parameters.AddWithValue("$offset", offset);
+        command.Parameters.AddWithValue("processing_run_id", NpgsqlDbType.Uuid, processingRunId.Value);
+        command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, limit);
+        command.Parameters.AddWithValue("offset", NpgsqlDbType.Integer, offset);
 
-        Dictionary<string, PhotoBuilder> photosByRevision = new(StringComparer.Ordinal);
+        Dictionary<Guid, PhotoBuilder> photosByRevision = [];
         List<PhotoBuilder> orderedPhotos = [];
 
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using NpgsqlDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            string revisionValue = reader.GetString(0);
+            Guid revisionValue = reader.GetGuid(0);
             if (!photosByRevision.TryGetValue(revisionValue, out PhotoBuilder? photo))
             {
                 string sourceKey = reader.GetString(1).Replace('\\', '/');
                 string photoName = Path.GetFileName(sourceKey);
                 photo = new PhotoBuilder(
-                    AssetRevisionId.From(Guid.Parse(revisionValue)),
+                    AssetRevisionId.From(revisionValue),
                     string.IsNullOrWhiteSpace(photoName) ? "Photo" : photoName,
                     reader.GetString(2),
                     reader.IsDBNull(3) ? null : reader.GetInt32(3),
@@ -162,7 +164,7 @@ public sealed class SqliteDetectorEvaluationRepository : IDetectorEvaluationCata
                 !reader.IsDBNull(10))
             {
                 photo.Detections.Add(new CatalogueDetectorEvaluationDetection(
-                    FaceOccurrenceId.From(Guid.Parse(reader.GetString(7))),
+                    FaceOccurrenceId.From(reader.GetGuid(7)),
                     reader.GetInt32(8),
                     reader.GetDouble(9),
                     DeserializeBoundingBox(reader.GetString(10))));
@@ -177,17 +179,17 @@ public sealed class SqliteDetectorEvaluationRepository : IDetectorEvaluationCata
     }
 
     private static async Task<int> CountPhotosAsync(
-        SqliteConnection connection,
+        NpgsqlConnection connection,
         ProcessingRunId processingRunId,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT COUNT(*)
             FROM processing_jobs
-            WHERE processing_run_id = $processing_run_id;
+            WHERE processing_run_id = @processing_run_id;
             """;
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
+        command.Parameters.AddWithValue("processing_run_id", NpgsqlDbType.Uuid, processingRunId.Value);
         object? result = await command.ExecuteScalarAsync(cancellationToken);
         return Convert.ToInt32(result, CultureInfo.InvariantCulture);
     }
@@ -230,12 +232,6 @@ public sealed class SqliteDetectorEvaluationRepository : IDetectorEvaluationCata
         value = 0;
         return element.TryGetProperty(name, out JsonElement property) && property.TryGetDouble(out value);
     }
-
-    private static DateTimeOffset ParseTimestamp(string value) =>
-        DateTimeOffset.Parse(
-            value,
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.RoundtripKind).ToUniversalTime();
 
     private sealed class PhotoBuilder
     {

@@ -6,6 +6,7 @@ using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.People;
 using PhotoIdentity.Core.Places;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Core.Tags;
@@ -170,6 +171,8 @@ public partial class Program
         builder.Services.AddSingleton<IAutomaticPhotoPlaceRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteAutomaticPhotoPlaceRepository>());
         builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
+        builder.Services.AddSingleton<IDetectorEvaluationCatalogueRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteDetectorEvaluationRepository>());
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
         builder.Services.AddSingleton<IAssetRevisionLookupRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteLocalBatchRepository>());
