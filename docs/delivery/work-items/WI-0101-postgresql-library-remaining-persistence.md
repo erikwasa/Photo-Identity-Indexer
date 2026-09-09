@@ -52,8 +52,9 @@ Do not create dual writes as a bridge. SQLite remains the sole authoritative run
 
 Started 2026-09-09 on the M24 PostgreSQL catalogue branch.
 
-- Added PostgreSQL schema migrations through version 17 for manual photo tags, manual photo people and extended photo metadata/inspection state.
+- Added PostgreSQL schema migrations through version 18 for manual photo tags, manual photo people, extended photo metadata/inspection state and first-class Places action/conflict state.
 - Added PostgreSQL repositories for manual photo tags, manual photo people, capture metadata, extended metadata and metadata inspection.
+- Added a PostgreSQL Places repository for manual place state/actions and automatic place-write precedence/idempotency behind the Core-owned Places contracts.
 - Fixed the PostgreSQL schema marker so a clean database initializes idempotently through schema version 17.
 - Converted the photo-tag API endpoint and metadata-inspection service constructor to Core-owned persistence contracts instead of concrete SQLite repositories.
 - Converted manual photo-people mutations on the photo-details API to the Core-owned `IPhotoPersonRepository` contract instead of endpoint-local SQLite repository construction.

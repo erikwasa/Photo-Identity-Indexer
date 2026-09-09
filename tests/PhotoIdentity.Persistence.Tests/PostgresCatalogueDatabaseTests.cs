@@ -275,6 +275,24 @@ public sealed class PostgresCatalogueDatabaseTests
                 Assert.Equal(3L, Convert.ToInt64(placeEnrichmentTableCount));
             }
 
+            await using (NpgsqlCommand readPlaceTables =
+                         verificationConnection.CreateCommand())
+            {
+                readPlaceTables.CommandText =
+                    """
+                    SELECT COUNT(*)
+                    FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name IN (
+                          'photo_place_actions',
+                          'photo_place_migration_conflicts');
+                    """;
+
+                object? placeTableCount =
+                    await readPlaceTables.ExecuteScalarAsync();
+                Assert.Equal(2L, Convert.ToInt64(placeTableCount));
+            }
+
             await using (NpgsqlCommand readReviewTables =
                          verificationConnection.CreateCommand())
             {
