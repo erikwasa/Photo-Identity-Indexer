@@ -87,12 +87,13 @@ public static class ArchiveEndpoints
 
     private static async Task<IResult> GetStatusAsync(
         SqliteCatalogueDatabase database,
+        IArchiveCoverageRepository coverageRepository,
         ArchiveOperatorConfiguration operatorConfiguration,
         CancellationToken cancellationToken)
     {
         try
         {
-            return Results.Ok(await BuildStatusAsync(database, operatorConfiguration, cancellationToken));
+            return Results.Ok(await BuildStatusAsync(database, coverageRepository, operatorConfiguration, cancellationToken));
         }
         catch (Exception exception)
         {
@@ -106,20 +107,20 @@ public static class ArchiveEndpoints
         int? offset,
         int? limit,
         SqliteCatalogueDatabase database,
+        IArchiveCoverageRepository coverageRepository,
         ArchiveOperatorConfiguration operatorConfiguration,
         CancellationToken cancellationToken)
     {
         try
         {
-            ArchiveCoverageConfiguration configured = await new SqliteArchiveCoverageRepository(database)
-                .GetAsync(cancellationToken)
+            ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
             Sha256Digest? profileHash = await ResolveProfileHashAsync(
                 configured,
                 operatorConfiguration,
                 cancellationToken);
             CatalogueArchiveItemPage page = await new SqliteArchiveStatusRepository(database).GetItemsAsync(
-                configured.Source.Id,
+                configured.Source.SourceId,
                 folder ?? string.Empty,
                 profileHash,
                 state ?? "all",
@@ -149,6 +150,7 @@ public static class ArchiveEndpoints
     private static async Task<IResult> IncludeAsync(
         ArchiveIncludeRequest request,
         SqliteCatalogueDatabase database,
+        IArchiveCoverageRepository coverageRepository,
         ArchiveOperatorConfiguration operatorConfiguration,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -156,9 +158,8 @@ public static class ArchiveEndpoints
         try
         {
             ArgumentNullException.ThrowIfNull(request);
-            SqliteArchiveCoverageRepository coverageRepository = new(database);
-            ArchiveCoverageConfiguration? configured = await coverageRepository.GetAsync(cancellationToken);
-            CatalogueSource source;
+            ArchiveCoverageState? configured = await coverageRepository.GetAsync(cancellationToken);
+            ArchiveCatalogueSource source;
 
             if (configured is null)
             {
@@ -173,10 +174,11 @@ public static class ArchiveEndpoints
                     throw new DirectoryNotFoundException($"The archive root does not exist: {root}");
                 }
 
-                source = await new SqliteLocalBatchRepository(database).GetOrCreateLocalFolderSourceAsync(
+                CatalogueSource catalogueSource = await new SqliteLocalBatchRepository(database).GetOrCreateLocalFolderSourceAsync(
                     root,
                     timeProvider.GetUtcNow(),
                     cancellationToken);
+                source = ToArchiveCatalogueSource(catalogueSource);
             }
             else
             {
@@ -193,7 +195,7 @@ public static class ArchiveEndpoints
                 request.RelativeFolder,
                 timeProvider.GetUtcNow(),
                 cancellationToken);
-            return Results.Ok(await BuildStatusAsync(database, operatorConfiguration, cancellationToken));
+            return Results.Ok(await BuildStatusAsync(database, coverageRepository, operatorConfiguration, cancellationToken));
         }
         catch (Exception exception)
         {
@@ -204,6 +206,7 @@ public static class ArchiveEndpoints
     private static async Task<IResult> ReplaceCoverageAsync(
         ArchiveCoverageUpdateRequest request,
         SqliteCatalogueDatabase database,
+        IArchiveCoverageRepository coverageRepository,
         ArchiveOperatorConfiguration operatorConfiguration,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -212,12 +215,11 @@ public static class ArchiveEndpoints
         {
             ArgumentNullException.ThrowIfNull(request);
             ArgumentNullException.ThrowIfNull(request.IncludedFolders);
-            SqliteArchiveCoverageRepository coverageRepository = new(database);
             _ = await coverageRepository.ReplaceIncludedFoldersAsync(
                 request.IncludedFolders,
                 timeProvider.GetUtcNow(),
                 cancellationToken);
-            return Results.Ok(await BuildStatusAsync(database, operatorConfiguration, cancellationToken));
+            return Results.Ok(await BuildStatusAsync(database, coverageRepository, operatorConfiguration, cancellationToken));
         }
         catch (Exception exception)
         {
@@ -227,6 +229,7 @@ public static class ArchiveEndpoints
 
     private static async Task<IResult> SyncAsync(
         SqliteCatalogueDatabase database,
+        IArchiveCoverageRepository coverageRepository,
         ArchiveOperatorConfiguration operatorConfiguration,
         ArchiveThroughputMetrics metrics,
         TimeProvider timeProvider,
@@ -234,22 +237,22 @@ public static class ArchiveEndpoints
     {
         try
         {
-            ArchiveCoverageConfiguration configured = await new SqliteArchiveCoverageRepository(database)
-                .GetAsync(cancellationToken)
+            ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
 
-            LocalFolderAssetSource source = new(configured.Source.Id, configured.Source.RootLocator);
+            LocalFolderAssetSource source = new(configured.Source.SourceId, configured.Source.RootLocator);
+            CatalogueSource catalogueSource = ToCatalogueSource(configured.Source);
             LocalArchiveSyncSummary summary;
             using (IDisposable syncTiming = metrics.Measure(ArchiveThroughputMetricNames.Synchronization))
             {
                 summary = await new LocalArchiveSyncCoordinator(database, metrics).SyncAsync(
                     source,
-                    configured.Source,
+                    catalogueSource,
                     configured.IncludedFolders,
                     timeProvider.GetUtcNow(),
                     cancellationToken);
             }
-            ArchiveStatusResponse status = await BuildStatusAsync(database, operatorConfiguration, cancellationToken);
+            ArchiveStatusResponse status = await BuildStatusAsync(database, coverageRepository, operatorConfiguration, cancellationToken);
             return Results.Ok(new ArchiveSyncResponse(
                 summary.SupportedFileCount,
                 summary.LocalFileCount,
@@ -273,6 +276,7 @@ public static class ArchiveEndpoints
 
     private static async Task<IResult> StartAdvancementAsync(
         SqliteCatalogueDatabase database,
+        IArchiveCoverageRepository coverageRepository,
         IArchiveAdvancementControlRepository advancementControl,
         ArchiveOperatorConfiguration operatorConfiguration,
         TimeProvider timeProvider,
@@ -280,14 +284,13 @@ public static class ArchiveEndpoints
     {
         try
         {
-            ArchiveCoverageConfiguration configured = await new SqliteArchiveCoverageRepository(database)
-                .GetAsync(cancellationToken)
+            ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
             await advancementControl.RequestRunAsync(
-                configured.Source.Id,
+                configured.Source.SourceId,
                 timeProvider.GetUtcNow(),
                 cancellationToken);
-            return Results.Ok(await BuildStatusAsync(database, operatorConfiguration, cancellationToken));
+            return Results.Ok(await BuildStatusAsync(database, coverageRepository, operatorConfiguration, cancellationToken));
         }
         catch (Exception exception)
         {
@@ -297,6 +300,7 @@ public static class ArchiveEndpoints
 
     private static async Task<IResult> PauseAdvancementAsync(
         SqliteCatalogueDatabase database,
+        IArchiveCoverageRepository coverageRepository,
         IArchiveAdvancementControlRepository advancementControl,
         ArchiveOperatorConfiguration operatorConfiguration,
         TimeProvider timeProvider,
@@ -304,14 +308,13 @@ public static class ArchiveEndpoints
     {
         try
         {
-            ArchiveCoverageConfiguration configured = await new SqliteArchiveCoverageRepository(database)
-                .GetAsync(cancellationToken)
+            ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
             await advancementControl.PauseAsync(
-                configured.Source.Id,
+                configured.Source.SourceId,
                 timeProvider.GetUtcNow(),
                 cancellationToken);
-            return Results.Ok(await BuildStatusAsync(database, operatorConfiguration, cancellationToken));
+            return Results.Ok(await BuildStatusAsync(database, coverageRepository, operatorConfiguration, cancellationToken));
         }
         catch (Exception exception)
         {
@@ -321,6 +324,7 @@ public static class ArchiveEndpoints
 
     private static async Task<IResult> AnalysisStepAsync(
         SqliteCatalogueDatabase database,
+        IArchiveCoverageRepository coverageRepository,
         ArchiveOperatorConfiguration operatorConfiguration,
         ArchiveBoundedAnalysisService boundedAnalysis,
         CancellationToken cancellationToken)
@@ -332,7 +336,7 @@ public static class ArchiveEndpoints
                 cancellationToken);
             return Results.Ok(new ArchiveAnalysisStepResponse(
                 advanced.StartedNewRun,
-                await BuildStatusAsync(database, operatorConfiguration, cancellationToken)));
+                await BuildStatusAsync(database, coverageRepository, operatorConfiguration, cancellationToken)));
         }
         catch (Exception exception)
         {
@@ -374,11 +378,11 @@ public static class ArchiveEndpoints
 
     private static async Task<ArchiveStatusResponse> BuildStatusAsync(
         SqliteCatalogueDatabase database,
+        IArchiveCoverageRepository coverageRepository,
         ArchiveOperatorConfiguration operatorConfiguration,
         CancellationToken cancellationToken)
     {
-        ArchiveCoverageConfiguration? configured = await new SqliteArchiveCoverageRepository(database)
-            .GetAsync(cancellationToken);
+        ArchiveCoverageState? configured = await coverageRepository.GetAsync(cancellationToken);
         ArchiveFolderStatusResponse empty = new("", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         if (configured is null)
         {
@@ -426,7 +430,7 @@ public static class ArchiveEndpoints
 
         SqliteArchiveStatusRepository statusRepository = new(database);
         CatalogueArchiveFolderStatus total = await statusRepository.GetStatusAsync(
-            configured.Source.Id,
+            configured.Source.SourceId,
             string.Empty,
             profileHash,
             cancellationToken);
@@ -434,7 +438,7 @@ public static class ArchiveEndpoints
         foreach (string folder in configured.IncludedFolders)
         {
             CatalogueArchiveFolderStatus value = await statusRepository.GetStatusAsync(
-                configured.Source.Id,
+                configured.Source.SourceId,
                 folder,
                 profileHash,
                 cancellationToken);
@@ -449,7 +453,7 @@ public static class ArchiveEndpoints
         }
 
         ArchiveAdvancementState? advancement = await new SqliteArchiveAdvancementRepository(database)
-            .GetAsync(configured.Source.Id, cancellationToken);
+            .GetAsync(configured.Source.SourceId, cancellationToken);
         ArchiveAdvancementStatusResponse? advancementResponse = advancement is null
             ? null
             : new ArchiveAdvancementStatusResponse(
@@ -476,7 +480,7 @@ public static class ArchiveEndpoints
     }
 
     private static async Task<Sha256Digest?> ResolveProfileHashAsync(
-        ArchiveCoverageConfiguration configured,
+        ArchiveCoverageState configured,
         ArchiveOperatorConfiguration operatorConfiguration,
         CancellationToken cancellationToken)
     {
@@ -493,6 +497,12 @@ public static class ArchiveEndpoints
             cancellationToken);
         return profile.ComputeHash();
     }
+
+    private static ArchiveCatalogueSource ToArchiveCatalogueSource(CatalogueSource source) =>
+        new(source.Id, source.Kind, source.RootLocator, source.CreatedAtUtc);
+
+    private static CatalogueSource ToCatalogueSource(ArchiveCatalogueSource source) =>
+        new(source.SourceId, source.Kind, source.RootLocator, source.CreatedAtUtc);
 
     private static ArchiveFolderStatusResponse ToResponse(CatalogueArchiveFolderStatus status) => new(
         status.RelativeFolder,
