@@ -41,8 +41,8 @@ public sealed class ArchiveReviewProxyWriterTests
                 .SaveRevisionAsync(source, asset, revision);
 
             ReviewProxyProfile profile = new("candidate-1600-q82", 1600, 82);
-            ArchiveReviewProxyWriter writer = new(database);
-            ArchiveReviewProxyRecord first = await writer.GenerateAsync(
+            ArchiveReviewProxyWriter writer = new(new SqliteArchiveReviewProxyRepository(database));
+            ArchiveReviewProxyMetadata first = await writer.GenerateAsync(
                 persistedRevision.Id,
                 sourcePath,
                 sourceRoot,
@@ -62,7 +62,7 @@ public sealed class ArchiveReviewProxyWriterTests
             Assert.DoesNotContain("photo.jpg", first.RelativePath, StringComparison.OrdinalIgnoreCase);
 
             File.Delete(sourcePath);
-            ArchiveReviewProxyRecord replay = await writer.GenerateAsync(
+            ArchiveReviewProxyMetadata replay = await writer.GenerateAsync(
                 persistedRevision.Id,
                 sourcePath,
                 sourceRoot,
@@ -74,7 +74,7 @@ public sealed class ArchiveReviewProxyWriterTests
             Assert.Equal(now.AddMinutes(1), replay.GeneratedAtUtc);
             Assert.Equal(
                 first,
-                await new SqliteArchiveReviewProxyRepository(database).GetAsync(
+                await ((IArchiveReviewProxyRepository)new SqliteArchiveReviewProxyRepository(database)).GetAsync(
                     persistedRevision.Id,
                     profile.Id));
 
@@ -123,7 +123,7 @@ public sealed class ArchiveReviewProxyWriterTests
                 .SaveRevisionAsync(source, asset, revision);
 
             ArgumentException exception = await Assert.ThrowsAsync<ArgumentException>(() =>
-                new ArchiveReviewProxyWriter(database).GenerateAsync(
+                new ArchiveReviewProxyWriter(new SqliteArchiveReviewProxyRepository(database)).GenerateAsync(
                     persistedRevision.Id,
                     sourcePath,
                     sourceRoot,

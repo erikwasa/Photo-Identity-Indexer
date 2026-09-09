@@ -1,5 +1,5 @@
+using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
@@ -15,16 +15,16 @@ public sealed record FaceReviewDerivativeFile(
 /// </summary>
 public sealed class FaceReviewDerivativeFileResolver
 {
-    private readonly SqliteFaceReviewDerivativeRepository _repository;
+    private readonly IFaceReviewDerivativeRepository _repository;
     private readonly ReviewProxyServingConfiguration _configuration;
 
     public FaceReviewDerivativeFileResolver(
-        SqliteCatalogueDatabase database,
+        IFaceReviewDerivativeRepository repository,
         ReviewProxyServingConfiguration configuration)
     {
-        ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(configuration);
-        _repository = new SqliteFaceReviewDerivativeRepository(database);
+        _repository = repository;
         _configuration = configuration;
     }
 

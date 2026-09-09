@@ -3,7 +3,6 @@ using System.Text;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -225,7 +224,7 @@ public static class DetectorEvaluationEndpoints
 
     private static async Task<IResult> GetSessionAsync(
         string sessionId,
-        SqliteDetectorEvaluationRepository repository,
+        IDetectorEvaluationCatalogueRepository repository,
         DetectorEvaluationSessionStore store,
         CancellationToken cancellationToken)
     {
@@ -247,7 +246,7 @@ public static class DetectorEvaluationEndpoints
         string sessionId,
         string revisionId,
         SaveDetectorEvaluationPhotoReviewRequest request,
-        SqliteDetectorEvaluationRepository repository,
+        IDetectorEvaluationCatalogueRepository repository,
         DetectorEvaluationSessionStore store,
         CancellationToken cancellationToken)
     {
@@ -352,7 +351,7 @@ public static class DetectorEvaluationEndpoints
 
     private static async Task<IResult> BuildSessionResultAsync(
         StoredDetectorEvaluationSession session,
-        SqliteDetectorEvaluationRepository repository,
+        IDetectorEvaluationCatalogueRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryParseIdentifier(session.ProcessingRunId, out Guid parsedRunId))

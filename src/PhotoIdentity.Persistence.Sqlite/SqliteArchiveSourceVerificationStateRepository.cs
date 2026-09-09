@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -10,7 +11,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// If any revision for the source asset owns managed hydration, ownership is first moved back to
 /// the source asset so re-verification can transfer it to whichever revision SHA-256 establishes.
 /// </summary>
-public sealed class SqliteArchiveSourceVerificationStateRepository
+public sealed class SqliteArchiveSourceVerificationStateRepository : IArchiveSourceVerificationStateRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 

@@ -43,7 +43,7 @@ public sealed class ReviewCropFileResolverTests
                 await command.ExecuteNonQueryAsync();
             }
 
-            ReviewCropFileResolver resolver = new(database);
+            ReviewCropFileResolver resolver = new(new SqliteProcessingRepository(database));
             string? resolved = await resolver.ResolveAsync(relativePath);
 
             Assert.Equal(Path.GetFullPath(physicalPath), resolved);

@@ -6,40 +6,24 @@ using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
-public sealed record ArchiveSourceScanBaseline(
-    string SourceKey,
-    bool WasDeleted,
-    ArchiveSourceVerificationState? VerificationState,
-    AssetRevisionId? VerifiedRevisionId,
-    long? VerifiedSizeBytes,
-    DateTimeOffset? VerifiedLastWriteTimeUtc,
-    string? VerifiedMediaType,
-    DateTimeOffset? VerifiedAtUtc,
-    AssetRevisionId? LatestRevisionId)
-{
-    public bool CanReuseVerifiedRevision(SourceAsset sourceAsset)
-    {
-        ArgumentNullException.ThrowIfNull(sourceAsset);
-        return !WasDeleted &&
-            VerificationState == ArchiveSourceVerificationState.Verified &&
-            VerifiedRevisionId is not null &&
-            VerifiedSizeBytes == sourceAsset.SizeBytes &&
-            VerifiedLastWriteTimeUtc == sourceAsset.LastWriteTimeUtc.ToUniversalTime() &&
-            string.Equals(VerifiedMediaType, sourceAsset.MediaType, StringComparison.Ordinal);
-    }
-}
-
-public sealed record ArchiveSourceScanWrite(
-    SourceAsset SourceAsset,
-    Sha256Digest? VerifiedContentHash);
-
 /// <summary>
 /// Scan-specific persistence path for permanent archive synchronization. The scanner loads
 /// lightweight verification baselines once, decides which local originals actually require
 /// SHA-256 reads, then persists one included-folder batch in a single SQLite transaction.
 /// </summary>
-public sealed class SqliteArchiveSourceScanBatchRepository
+public sealed class SqliteArchiveSourceScanBatchRepository : IArchiveSourceScanPersistence
 {
+    async Task<IReadOnlyList<ArchiveSourceObservationPersistenceResult>> IArchiveSourceScanPersistence.RecordBatchAsync(
+        ArchiveCatalogueSource source, IReadOnlyList<ArchiveSourceScanWrite> writes,
+        IReadOnlyDictionary<string, ArchiveSourceScanBaseline> baselines, DateTimeOffset scannedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ArchiveSourceObservationWriteResult> results = await RecordBatchAsync(
+            new CatalogueSource(source.SourceId, source.Kind, source.RootLocator, source.CreatedAtUtc),
+            writes, baselines, scannedAtUtc, cancellationToken);
+        return results.Select(value => new ArchiveSourceObservationPersistenceResult(value.AssetId, value.RevisionId,
+            value.NewRevision, (ArchiveSourceObservationVerificationState)value.VerificationState)).ToArray();
+    }
     private readonly SqliteCatalogueDatabase _database;
     private readonly SqliteArchiveSourceObservationRepository _observations;
 
@@ -119,7 +103,7 @@ public sealed class SqliteArchiveSourceScanBatchRepository
                 reader.GetInt64(1) != 0,
                 reader.IsDBNull(2)
                     ? null
-                    : SqliteArchiveSourceObservationRepository.ParseVerificationState(reader.GetString(2)),
+                    : (ArchiveSourceObservationVerificationState)SqliteArchiveSourceObservationRepository.ParseVerificationState(reader.GetString(2)),
                 reader.IsDBNull(3) ? null : AssetRevisionId.From(Guid.Parse(reader.GetString(3))),
                 reader.IsDBNull(4) ? null : reader.GetInt64(4),
                 reader.IsDBNull(5) ? null : Parse(reader.GetString(5)),
@@ -205,7 +189,7 @@ public sealed class SqliteArchiveSourceScanBatchRepository
             {
                 verificationState = ArchiveSourceVerificationState.NeedsSourceVerification;
             }
-            else if (baseline?.VerificationState == ArchiveSourceVerificationState.NeedsSourceVerification)
+            else if (baseline?.VerificationState == ArchiveSourceObservationVerificationState.NeedsSourceVerification)
             {
                 verificationState = ArchiveSourceVerificationState.NeedsSourceVerification;
             }
@@ -449,6 +433,45 @@ public sealed class SqliteArchiveSourceScanBatchRepository
         command.Parameters.AddWithValue("$verified_media_type", (object?)verifiedMedia ?? DBNull.Value);
         command.Parameters.AddWithValue("$verified_at_utc", (object?)(verifiedAt is null ? null : Format(verifiedAt.Value)) ?? DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    public async Task<int> MarkMissingAssetsAsync(
+        SourceId sourceId,
+        string? relativeRoot,
+        DateTimeOffset scannedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        string scope = ArchiveCoverage.NormalizeRelativeFolder(relativeRoot ?? string.Empty);
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = scope.Length == 0
+            ? """
+              UPDATE assets
+              SET deleted_at_utc = COALESCE(deleted_at_utc, $scanned_at_utc)
+              WHERE source_id = $source_id
+                AND (last_seen_at_utc IS NULL OR last_seen_at_utc <> $scanned_at_utc)
+                AND deleted_at_utc IS NULL;
+              """
+            : """
+              UPDATE assets
+              SET deleted_at_utc = COALESCE(deleted_at_utc, $scanned_at_utc)
+              WHERE source_id = $source_id
+                AND substr(source_key, 1, length($scope_prefix)) = $scope_prefix
+                AND (last_seen_at_utc IS NULL OR last_seen_at_utc <> $scanned_at_utc)
+                AND deleted_at_utc IS NULL;
+              """;
+        command.Parameters.AddWithValue("$source_id", sourceId.ToString());
+        command.Parameters.AddWithValue("$scanned_at_utc", Format(scannedAtUtc));
+        if (scope.Length > 0)
+        {
+            command.Parameters.AddWithValue("$scope_prefix", scope + "/");
+        }
+
+        int updated = await command.ExecuteNonQueryAsync(cancellationToken);
+        transaction.Commit();
+        return updated;
     }
 
     private static string Format(DateTimeOffset value) =>

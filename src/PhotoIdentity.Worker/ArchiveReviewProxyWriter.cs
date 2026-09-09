@@ -3,7 +3,6 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Worker;
 
@@ -13,16 +12,16 @@ namespace PhotoIdentity.Worker;
 /// </summary>
 public sealed class ArchiveReviewProxyWriter
 {
-    private readonly SqliteArchiveReviewProxyRepository _repository;
+    private readonly IArchiveReviewProxyRepository _repository;
     private readonly OpenCvReviewProxyRenderer _renderer;
 
-    public ArchiveReviewProxyWriter(SqliteCatalogueDatabase database)
-        : this(new SqliteArchiveReviewProxyRepository(database), new OpenCvReviewProxyRenderer())
+    public ArchiveReviewProxyWriter(IArchiveReviewProxyRepository repository)
+        : this(repository, new OpenCvReviewProxyRenderer())
     {
     }
 
     public ArchiveReviewProxyWriter(
-        SqliteArchiveReviewProxyRepository repository,
+        IArchiveReviewProxyRepository repository,
         OpenCvReviewProxyRenderer renderer)
     {
         ArgumentNullException.ThrowIfNull(repository);
@@ -31,7 +30,7 @@ public sealed class ArchiveReviewProxyWriter
         _renderer = renderer;
     }
 
-    public async Task<ArchiveReviewProxyRecord> GenerateAsync(
+    public async Task<ArchiveReviewProxyMetadata> GenerateAsync(
         AssetRevisionId revisionId,
         string sourcePath,
         string sourceRoot,
@@ -52,7 +51,7 @@ public sealed class ArchiveReviewProxyWriter
         EnsureRootsAreSeparate(normalizedSourceRoot, normalizedDerivativeRoot);
 
         await _repository.RegisterProfileAsync(profile, generatedAtUtc, cancellationToken);
-        ArchiveReviewProxyRecord? existing = await _repository.GetAsync(
+        ArchiveReviewProxyMetadata? existing = await _repository.GetAsync(
             revisionId,
             profile.Id,
             cancellationToken);
@@ -71,7 +70,7 @@ public sealed class ArchiveReviewProxyWriter
         string destination = ResolveDerivativePath(normalizedDerivativeRoot, relativePath);
 
         await WriteAtomicallyAsync(destination, encoded.Content, cancellationToken);
-        ArchiveReviewProxyRecord requested = new(
+        ArchiveReviewProxyMetadata requested = new(
             revisionId,
             profile.Id,
             encoded.Content.LongLength,
@@ -85,7 +84,7 @@ public sealed class ArchiveReviewProxyWriter
     }
 
     private static async Task<bool> IsStoredProxyValidAsync(
-        ArchiveReviewProxyRecord proxy,
+        ArchiveReviewProxyMetadata proxy,
         string derivativeRoot,
         CancellationToken cancellationToken)
     {

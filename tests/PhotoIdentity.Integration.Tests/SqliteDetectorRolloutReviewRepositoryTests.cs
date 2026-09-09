@@ -45,7 +45,7 @@ public sealed class SqliteDetectorRolloutReviewRepositoryTests
         try
         {
             TestState state = await CreateAmbiguousStateAsync(databasePath);
-            SqliteDetectorRolloutReviewRepository review = new(state.Database);
+            IDetectorRolloutReviewRepository review = new SqliteDetectorRolloutReviewRepository(state.Database);
             CatalogueDetectorCandidateInspection inspection = Inspection(state.CandidateBox, state.CandidateLandmarks, state.Now);
 
             CatalogueDetectorCandidateInspection stored = await review.SaveInspectionAsync(
@@ -81,7 +81,7 @@ public sealed class SqliteDetectorRolloutReviewRepositoryTests
         try
         {
             TestState state = await CreateAmbiguousStateAsync(databasePath);
-            SqliteDetectorRolloutReviewRepository review = new(state.Database);
+            IDetectorRolloutReviewRepository review = new SqliteDetectorRolloutReviewRepository(state.Database);
 
             CatalogueDetectorReconciliationResolution first = await review.RecordResolutionAsync(
                 state.RunId,
@@ -130,7 +130,7 @@ public sealed class SqliteDetectorRolloutReviewRepositoryTests
         try
         {
             TestState state = await CreateAmbiguousStateAsync(databasePath);
-            SqliteDetectorRolloutReviewRepository review = new(state.Database);
+            IDetectorRolloutReviewRepository review = new SqliteDetectorRolloutReviewRepository(state.Database);
 
             InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 review.RecordResolutionAsync(
@@ -177,7 +177,7 @@ public sealed class SqliteDetectorRolloutReviewRepositoryTests
                 FaceDetectionReconciliationPlanner.Plan([existing], [candidate]),
                 seed.Now);
 
-            SqliteDetectorRolloutReviewRepository review = new(database);
+            IDetectorRolloutReviewRepository review = new SqliteDetectorRolloutReviewRepository(database);
             InvalidOperationException exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 review.RecordResolutionAsync(
                     seed.RunId,

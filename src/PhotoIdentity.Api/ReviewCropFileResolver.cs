@@ -1,6 +1,6 @@
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Processing;
+using PhotoIdentity.Core.Identifiers;
 
 namespace PhotoIdentity.Api;
 
@@ -10,12 +10,12 @@ namespace PhotoIdentity.Api;
 /// </summary>
 public sealed class ReviewCropFileResolver
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly IProcessingRunConfigurationReader _repository;
 
-    public ReviewCropFileResolver(SqliteCatalogueDatabase database)
+    public ReviewCropFileResolver(IProcessingRunConfigurationReader repository)
     {
-        ArgumentNullException.ThrowIfNull(database);
-        _database = database;
+        ArgumentNullException.ThrowIfNull(repository);
+        _repository = repository;
     }
 
     public async Task<string?> ResolveAsync(
@@ -79,20 +79,11 @@ public sealed class ReviewCropFileResolver
         Guid runId,
         CancellationToken cancellationToken)
     {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT configuration_json
-            FROM processing_runs
-            WHERE id = $run_id;
-            """;
-        command.Parameters.AddWithValue("$run_id", runId.ToString());
-        object? value = await command.ExecuteScalarAsync(cancellationToken);
-        if (value is not string configurationJson)
+        string? configurationJson = await _repository.GetRunConfigurationAsync(ProcessingRunId.From(runId), cancellationToken);
+        if (configurationJson is null)
         {
             return null;
         }
-
         try
         {
             using JsonDocument document = JsonDocument.Parse(configurationJson);

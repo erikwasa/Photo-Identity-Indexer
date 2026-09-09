@@ -1,7 +1,8 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Catalogue;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Recognition.Onnx.Models;
 
 namespace PhotoIdentity.Worker;
@@ -68,30 +69,24 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
     private int _disposeState;
 
     public ArchiveAnalysisInspectionSession(
-        SqliteCatalogueDatabase database,
+        IAssetRevisionLookupRepository assets,
+        IFaceInspectionRepository faces,
         ArchiveThroughputMetrics? metrics = null)
-        : this(
-            database,
-            metrics,
-            (configuration, cancellationToken) => CreateHandlerAsync(
-                database,
-                configuration,
-                metrics,
-                cancellationToken))
+        : this(metrics, (configuration, cancellationToken) => CreateHandlerAsync(
+            assets, faces, configuration, metrics, cancellationToken))
     {
+        ArgumentNullException.ThrowIfNull(assets);
+        ArgumentNullException.ThrowIfNull(faces);
     }
 
     public ArchiveAnalysisInspectionSession(
-        SqliteCatalogueDatabase database,
         ArchiveThroughputMetrics? metrics,
         Func<LocalBatchConfiguration, CancellationToken, Task<IProcessingJobHandler>> handlerFactory)
     {
-        ArgumentNullException.ThrowIfNull(database);
         ArgumentNullException.ThrowIfNull(handlerFactory);
         _metrics = metrics;
         _handlerFactory = handlerFactory;
     }
-
     public async Task<Lease> AcquireAsync(
         LocalBatchConfiguration configuration,
         Sha256Digest profileHash,
@@ -159,13 +154,14 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
     }
 
     private static async Task<IProcessingJobHandler> CreateHandlerAsync(
-        SqliteCatalogueDatabase database,
+        IAssetRevisionLookupRepository assets,
+        IFaceInspectionRepository faces,
         LocalBatchConfiguration configuration,
         ArchiveThroughputMetrics? metrics,
         CancellationToken cancellationToken) =>
         await LocalInspectionJobHandler.CreateAsync(
-            new SqliteLocalBatchRepository(database),
-            new SqliteFaceCatalogueRepository(database),
+            assets,
+            faces,
             configuration,
             cancellationToken,
             metrics);
@@ -206,19 +202,19 @@ public sealed class ArchiveAnalysisInspectionSession : IDisposable
 /// </summary>
 public sealed class ArchiveAnalysisCoordinator
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly ArchiveAnalysisPersistence _persistence;
     private readonly TimeProvider _timeProvider;
     private readonly ArchiveThroughputMetrics? _metrics;
     private readonly ArchiveAnalysisInspectionSession? _inspectionSession;
 
     public ArchiveAnalysisCoordinator(
-        SqliteCatalogueDatabase database,
+        ArchiveAnalysisPersistence persistence,
         TimeProvider? timeProvider = null,
         ArchiveThroughputMetrics? metrics = null,
         ArchiveAnalysisInspectionSession? inspectionSession = null)
     {
-        ArgumentNullException.ThrowIfNull(database);
-        _database = database;
+        ArgumentNullException.ThrowIfNull(persistence);
+        _persistence = persistence;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _metrics = metrics;
         _inspectionSession = inspectionSession;
@@ -230,9 +226,9 @@ public sealed class ArchiveAnalysisCoordinator
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(configuration);
-        await _database.InitializeAsync(cancellationToken);
+        await _persistence.Store.InitializeAsync(cancellationToken);
 
-        ArchiveCoverageConfiguration coverage = await new SqliteArchiveCoverageRepository(_database)
+        ArchiveCoverageState coverage = await _persistence.Coverage
             .GetAsync(cancellationToken)
             ?? throw new InvalidOperationException(
                 "The catalogue has no permanent archive configuration. Run 'archive include' first.");
@@ -247,13 +243,13 @@ public sealed class ArchiveAnalysisCoordinator
             batchConfiguration,
             cancellationToken);
         Sha256Digest profileHash = profile.ComputeHash();
-        SqliteArchiveAnalysisRepository analysisRepository = new(_database);
+        IArchiveAnalysisStateRepository analysisRepository = _persistence.Analysis;
         IReadOnlyList<AssetRevisionId> pending = await analysisRepository.GetPendingCurrentRevisionIdsAsync(
-            coverage.Source.Id,
+            coverage.Source.SourceId,
             profileHash,
             cancellationToken);
         int completed = await analysisRepository.CountCompletedCurrentRevisionsAsync(
-            coverage.Source.Id,
+            coverage.Source.SourceId,
             profileHash,
             cancellationToken);
 
@@ -280,7 +276,7 @@ public sealed class ArchiveAnalysisCoordinator
                 idempotencyKey: $"archive-analyze:{runId}:{revisionId}"))
             .ToArray();
 
-        SqliteProcessingRepository processingRepository = new(_database);
+        IProcessingRunRepository processingRepository = _persistence.Runs;
         await processingRepository.CreateRunAsync(run, jobs, cancellationToken);
         await analysisRepository.RegisterRunAsync(runId, profile, now, cancellationToken);
 
@@ -288,8 +284,8 @@ public sealed class ArchiveAnalysisCoordinator
         if (_inspectionSession is null)
         {
             using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
-                new SqliteLocalBatchRepository(_database),
-                new SqliteFaceCatalogueRepository(_database),
+                _persistence.Assets,
+                _persistence.Faces,
                 batchConfiguration,
                 cancellationToken,
                 _metrics);
@@ -330,11 +326,11 @@ public sealed class ArchiveAnalysisCoordinator
         ResumableBatchProcessorOptions? processorOptions = null,
         CancellationToken cancellationToken = default)
     {
-        await _database.InitializeAsync(cancellationToken);
-        SqliteProcessingRepository processingRepository = new(_database);
+        await _persistence.Store.InitializeAsync(cancellationToken);
+        IProcessingRunRepository processingRepository = _persistence.Runs;
         CatalogueProcessingRun run = await processingRepository.GetRunAsync(runId, cancellationToken)
             ?? throw new KeyNotFoundException($"Processing run {runId} was not found.");
-        SqliteArchiveAnalysisRepository analysisRepository = new(_database);
+        IArchiveAnalysisStateRepository analysisRepository = _persistence.Analysis;
         Sha256Digest registeredHash = await analysisRepository.GetRunProfileHashAsync(runId, cancellationToken);
         LocalBatchConfiguration batchConfiguration = LocalBatchConfiguration.FromJson(run.ConfigurationJson);
         AnalysisProfileDefinition profile = await ArchiveAnalysisProfileFactory.CreateAsync(
@@ -351,8 +347,8 @@ public sealed class ArchiveAnalysisCoordinator
         if (_inspectionSession is null)
         {
             using LocalInspectionJobHandler inspection = await LocalInspectionJobHandler.CreateAsync(
-                new SqliteLocalBatchRepository(_database),
-                new SqliteFaceCatalogueRepository(_database),
+                _persistence.Assets,
+                _persistence.Faces,
                 batchConfiguration,
                 cancellationToken,
                 _metrics);
@@ -385,8 +381,8 @@ public sealed class ArchiveAnalysisCoordinator
     }
 
     private async Task<ResumableBatchProcessorResult> RunProcessingAsync(
-        SqliteProcessingRepository processingRepository,
-        SqliteArchiveAnalysisRepository analysisRepository,
+        IProcessingRunRepository processingRepository,
+        IArchiveAnalysisStateRepository analysisRepository,
         IProcessingJobHandler inspection,
         Sha256Digest profileHash,
         ProcessingRunId runId,
@@ -394,13 +390,13 @@ public sealed class ArchiveAnalysisCoordinator
         CancellationToken cancellationToken)
     {
         AnalysisTrackingJobHandler handler = new(
-            _database,
+            _persistence.Assets,
             inspection,
             analysisRepository,
             profileHash,
             _timeProvider);
         return await new ResumableBatchProcessor(
-                processingRepository,
+                _persistence.Execution,
                 handler,
                 _timeProvider)
             .RunUntilIdleAsync(runId, processorOptions, cancellationToken);
@@ -462,23 +458,23 @@ internal sealed class AnalysisTrackingJobHandler : IProcessingJobHandler
     private const FileAttributes RecallOnDataAccess = (FileAttributes)0x00400000;
 
     private readonly IProcessingJobHandler _inner;
-    private readonly SqliteLocalBatchRepository _assetRepository;
-    private readonly SqliteArchiveAnalysisRepository _repository;
+    private readonly IAssetRevisionLookupRepository _assetRepository;
+    private readonly IArchiveAnalysisStateRepository _repository;
     private readonly Sha256Digest _profileHash;
     private readonly TimeProvider _timeProvider;
 
     public AnalysisTrackingJobHandler(
-        SqliteCatalogueDatabase database,
+        IAssetRevisionLookupRepository assets,
         IProcessingJobHandler inner,
-        SqliteArchiveAnalysisRepository repository,
+        IArchiveAnalysisStateRepository repository,
         Sha256Digest profileHash,
         TimeProvider? timeProvider = null)
     {
-        ArgumentNullException.ThrowIfNull(database);
+        ArgumentNullException.ThrowIfNull(assets);
         ArgumentNullException.ThrowIfNull(inner);
         ArgumentNullException.ThrowIfNull(repository);
         _inner = inner;
-        _assetRepository = new SqliteLocalBatchRepository(database);
+        _assetRepository = assets;
         _repository = repository;
         _profileHash = profileHash;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -503,7 +499,7 @@ internal sealed class AnalysisTrackingJobHandler : IProcessingJobHandler
         AssetRevisionId revisionId,
         CancellationToken cancellationToken)
     {
-        CatalogueProcessingAssetRevision asset = await _assetRepository.GetAssetRevisionAsync(
+        AssetRevisionLookup asset = await _assetRepository.GetRevisionAsync(
             revisionId,
             cancellationToken)
             ?? throw new ProcessingJobFailureException(

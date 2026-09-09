@@ -214,13 +214,13 @@ public sealed class PostgresArchiveSourceObservationRepository : IArchiveSourceO
                 """
                 UPDATE archive_source_observations
                 SET observed_size_bytes = @size_bytes,
-                    observed_last_write_utc = @last_write_utc,
+                    observed_last_write_utc = @last_write_utc, observed_last_write_ticks = @last_write_ticks,
                     observed_media_type = @media_type,
                     observed_at_utc = @verified_at_utc,
                     verification_state = 'verified',
                     verified_revision_id = @verified_revision_id,
                     verified_size_bytes = @size_bytes,
-                    verified_last_write_utc = @last_write_utc,
+                    verified_last_write_utc = @last_write_utc, verified_last_write_ticks = @last_write_ticks,
                     verified_media_type = @media_type,
                     verified_at_utc = @verified_at_utc
                 WHERE asset_id = @asset_id;
@@ -230,6 +230,7 @@ public sealed class PostgresArchiveSourceObservationRepository : IArchiveSourceO
                 Guid.Parse(assetId.ToString()));
             command.Parameters.AddWithValue("size_bytes", sizeBytes);
             command.Parameters.AddWithValue("last_write_utc", lastWrite);
+            command.Parameters.AddWithValue("last_write_ticks", lastWrite.UtcTicks);
             command.Parameters.AddWithValue("media_type", mediaType.Trim());
             command.Parameters.AddWithValue("verified_at_utc", verifiedAt);
             command.Parameters.AddWithValue(
@@ -279,7 +280,7 @@ public sealed class PostgresArchiveSourceObservationRepository : IArchiveSourceO
                 COALESCE(availability.availability, 'local'),
                 observation.verification_state,
                 observation.verified_revision_id,
-                observation.verified_at_utc
+                observation.verified_at_utc, observation.observed_last_write_ticks
             FROM archive_source_observations AS observation
             INNER JOIN assets AS asset ON asset.id = observation.asset_id
             INNER JOIN sources AS source ON source.id = asset.source_id
@@ -302,7 +303,7 @@ public sealed class PostgresArchiveSourceObservationRepository : IArchiveSourceO
             reader.GetString(2),
             reader.GetString(3),
             reader.GetInt64(4),
-            reader.GetFieldValue<DateTimeOffset>(5),
+            reader.IsDBNull(12) ? reader.GetFieldValue<DateTimeOffset>(5) : new DateTimeOffset(reader.GetInt64(12), TimeSpan.Zero),
             reader.GetString(6),
             reader.GetFieldValue<DateTimeOffset>(7),
             ParseAvailability(reader.GetString(8)),
@@ -533,7 +534,7 @@ public sealed class PostgresArchiveSourceObservationRepository : IArchiveSourceO
                 verified_size_bytes,
                 verified_last_write_utc,
                 verified_media_type,
-                verified_at_utc
+                verified_at_utc, verified_last_write_ticks
             FROM archive_source_observations
             WHERE asset_id = @asset_id;
             """;
@@ -556,7 +557,7 @@ public sealed class PostgresArchiveSourceObservationRepository : IArchiveSourceO
             reader.IsDBNull(2) ? null : reader.GetInt64(2),
             reader.IsDBNull(3)
                 ? null
-                : reader.GetFieldValue<DateTimeOffset>(3),
+                : reader.IsDBNull(6) ? reader.GetFieldValue<DateTimeOffset>(3) : new DateTimeOffset(reader.GetInt64(6), TimeSpan.Zero),
             reader.IsDBNull(4) ? null : reader.GetString(4),
             reader.IsDBNull(5)
                 ? null
@@ -594,7 +595,7 @@ public sealed class PostgresArchiveSourceObservationRepository : IArchiveSourceO
                 verified_size_bytes,
                 verified_last_write_utc,
                 verified_media_type,
-                verified_at_utc)
+                verified_at_utc, observed_last_write_ticks, verified_last_write_ticks)
             VALUES (
                 @asset_id,
                 @observed_size_bytes,
@@ -606,7 +607,7 @@ public sealed class PostgresArchiveSourceObservationRepository : IArchiveSourceO
                 @verified_size_bytes,
                 @verified_last_write_utc,
                 @verified_media_type,
-                @verified_at_utc)
+                @verified_at_utc, @observed_last_write_ticks, @verified_last_write_ticks)
             ON CONFLICT(asset_id) DO UPDATE SET
                 observed_size_bytes = excluded.observed_size_bytes,
                 observed_last_write_utc = excluded.observed_last_write_utc,
@@ -617,7 +618,9 @@ public sealed class PostgresArchiveSourceObservationRepository : IArchiveSourceO
                 verified_size_bytes = excluded.verified_size_bytes,
                 verified_last_write_utc = excluded.verified_last_write_utc,
                 verified_media_type = excluded.verified_media_type,
-                verified_at_utc = excluded.verified_at_utc;
+                verified_at_utc = excluded.verified_at_utc,
+                observed_last_write_ticks = excluded.observed_last_write_ticks,
+                verified_last_write_ticks = excluded.verified_last_write_ticks;
             """;
         command.Parameters.AddWithValue(
             "asset_id",
@@ -656,6 +659,8 @@ public sealed class PostgresArchiveSourceObservationRepository : IArchiveSourceO
             verifiedAt is null
                 ? DBNull.Value
                 : verifiedAt.Value.ToUniversalTime());
+        command.Parameters.AddWithValue("observed_last_write_ticks", observedWrite.UtcTicks);
+        command.Parameters.AddWithValue("verified_last_write_ticks", NpgsqlTypes.NpgsqlDbType.Bigint, (object?)verifiedWrite?.UtcTicks ?? DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

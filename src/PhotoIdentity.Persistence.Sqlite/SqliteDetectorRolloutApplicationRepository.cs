@@ -13,7 +13,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Human-resolved ambiguous candidates are applied from their durable candidate payload;
 /// candidate order is never used as face identity.
 /// </summary>
-public sealed class SqliteDetectorRolloutApplicationRepository
+public sealed class SqliteDetectorRolloutApplicationRepository : IDetectorRolloutApplicationRepository
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly SqliteDetectorRolloutReviewRepository _reviewRepository;
@@ -63,6 +63,15 @@ public sealed class SqliteDetectorRolloutApplicationRepository
 
         return anchors;
     }
+
+    public async Task<FaceOccurrenceId> ApplyUnambiguousInspectionAsync(
+        ProcessingRunId processingRunId,
+        AssetRevisionId assetRevisionId,
+        int candidateIndex,
+        CatalogueDetectorCandidateInspection inspection,
+        CancellationToken cancellationToken = default) =>
+        (await new SqliteDetectorRolloutRepository(_database).ApplyUnambiguousInspectionAsync(
+            processingRunId, assetRevisionId, candidateIndex, inspection, cancellationToken)).Occurrence.Id;
 
     public async Task<CatalogueDetectorRolloutOccurrenceAnchor?> GetOccurrenceAnchorAsync(
         FaceOccurrenceId faceOccurrenceId,

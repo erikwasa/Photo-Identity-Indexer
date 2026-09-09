@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Review;
 using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
@@ -8,7 +9,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// <summary>
 /// Provides review gallery queries scoped by processing run and ranked suggestion model revision.
 /// </summary>
-public sealed class SqliteReviewFilterRepository
+public sealed class SqliteReviewFilterRepository : IReviewFilterRepository
 {
     private const string ReviewFaceCtes = """
         WITH latest_action AS (

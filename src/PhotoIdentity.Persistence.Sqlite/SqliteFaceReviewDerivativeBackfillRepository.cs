@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Imaging;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 
@@ -8,7 +9,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// the durable face-review derivative profile. This is intentionally independent of the detector
 /// profile so existing analyzed catalogues can be backfilled without rerunning inference.
 /// </summary>
-public sealed class SqliteFaceReviewDerivativeBackfillRepository
+public sealed class SqliteFaceReviewDerivativeBackfillRepository : IFaceReviewDerivativeBackfillRepository
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly SqliteFaceReviewDerivativeRepository _derivatives;

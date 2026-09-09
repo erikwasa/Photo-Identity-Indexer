@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Imaging;
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Data.Sqlite;
@@ -12,7 +13,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// recognition crop and records revision-level completion so already-analyzed photos can be
 /// backfilled without rerunning detector/embedder inference.
 /// </summary>
-public sealed class SqliteFaceReviewDerivativeRepository
+public sealed class SqliteFaceReviewDerivativeRepository : IFaceReviewDerivativeRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -194,7 +195,7 @@ public sealed class SqliteFaceReviewDerivativeRepository
                     height,
                     generated_at_utc,
                     relative_path)
-                VALUES (
+                SELECT
                     $face_occurrence_id,
                     $profile_id,
                     $encoded_byte_length,
@@ -202,7 +203,8 @@ public sealed class SqliteFaceReviewDerivativeRepository
                     $width,
                     $height,
                     $generated_at_utc,
-                    $relative_path)
+                    $relative_path
+                WHERE EXISTS (SELECT 1 FROM face_occurrences WHERE id = $face_occurrence_id AND asset_revision_id = $revision_id)
                 ON CONFLICT(face_occurrence_id, profile_id) DO UPDATE SET
                     encoded_byte_length = excluded.encoded_byte_length,
                     content_sha256 = excluded.content_sha256,
@@ -219,7 +221,9 @@ public sealed class SqliteFaceReviewDerivativeRepository
             command.Parameters.AddWithValue("$height", derivative.Height);
             command.Parameters.AddWithValue("$generated_at_utc", Format(derivative.GeneratedAtUtc));
             command.Parameters.AddWithValue("$relative_path", derivative.RelativePath);
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
+            if (await command.ExecuteNonQueryAsync(cancellationToken) != 1)
+                throw new ArgumentException("A derivative face does not belong to the requested revision.", nameof(derivatives));
         }
 
         using (SqliteCommand command = connection.CreateCommand())

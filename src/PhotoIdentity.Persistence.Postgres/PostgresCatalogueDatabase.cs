@@ -1,4 +1,5 @@
 using Npgsql;
+using PhotoIdentity.Core.Catalogue;
 
 namespace PhotoIdentity.Persistence.Postgres;
 
@@ -6,9 +7,9 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// Owns the PostgreSQL connection pool and versioned migration bootstrap while
 /// PostgreSQL is introduced alongside the still-authoritative SQLite catalogue.
 /// </summary>
-public sealed class PostgresCatalogueDatabase : IAsyncDisposable
+public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 20;
+    public const int CurrentSchemaVersion = 23;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1087,6 +1088,13 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                     AND NEW.merged_into_person_id IS NOT NULL)
                 EXECUTE FUNCTION photo_identity_move_featured_face_after_merge();
             """),
+        new(21, "detector-rollout-reconciliation", DetectorRolloutSchema),
+        new(22, "face-review-derivatives", FaceReviewSchema),
+        new(23, "archive-source-file-timestamp-precision", """
+            ALTER TABLE archive_source_observations
+                ADD COLUMN observed_last_write_ticks bigint NULL CHECK (observed_last_write_ticks BETWEEN 0 AND 3155378975999999999),
+                ADD COLUMN verified_last_write_ticks bigint NULL CHECK (verified_last_write_ticks BETWEEN 0 AND 3155378975999999999);
+            """),
     ];
 
     private readonly NpgsqlDataSource _dataSource;
@@ -1103,6 +1111,15 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
     public async Task<NpgsqlConnection> OpenConnectionAsync(
         CancellationToken cancellationToken = default) =>
         await _dataSource.OpenConnectionAsync(cancellationToken);
+
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        PostgresInitializationResult result = await TryInitializeAsync(cancellationToken);
+        if (result.Error is not null)
+        {
+            throw new InvalidOperationException("PostgreSQL catalogue initialization failed.", result.Error);
+        }
+    }
 
     public async Task<PostgresInitializationResult> TryInitializeAsync(
         CancellationToken cancellationToken = default)

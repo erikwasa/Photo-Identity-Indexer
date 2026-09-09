@@ -13,7 +13,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Durable review state for detector rollout. Candidate payloads are stored before canonical
 /// face mutation, and ambiguous identity decisions are append-only human actions.
 /// </summary>
-public sealed class SqliteDetectorRolloutReviewRepository
+public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutReviewRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 

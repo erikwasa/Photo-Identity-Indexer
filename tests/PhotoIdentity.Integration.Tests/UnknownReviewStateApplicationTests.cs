@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Review;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

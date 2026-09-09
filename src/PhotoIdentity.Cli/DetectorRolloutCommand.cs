@@ -1,7 +1,10 @@
 using System.Text.Json;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Cli;
@@ -16,14 +19,15 @@ internal enum DetectorRolloutCommandAction
 
 internal sealed record DetectorRolloutCommandOptions(
     DetectorRolloutCommandAction Action,
-    string DatabasePath,
+    string? DatabasePath,
     ProcessingRunId? RunId,
     IReadOnlyList<AssetRevisionId> RevisionIds,
     string? RevisionFile,
     string? OutputRoot,
     string? RepositoryRoot,
     string? ModelDirectory,
-    int MaxAttemptsPerInvocation)
+    int MaxAttemptsPerInvocation,
+    string? PostgresConnectionEnvironment = null)
 {
     public static DetectorRolloutCommandOptions Parse(string[] args)
     {
@@ -42,6 +46,7 @@ internal sealed record DetectorRolloutCommandOptions(
         };
 
         string? databasePath = null;
+        string? postgresConnectionEnvironment = null;
         ProcessingRunId? runId = null;
         List<AssetRevisionId> revisions = [];
         string? revisionFile = null;
@@ -60,6 +65,9 @@ internal sealed record DetectorRolloutCommandOptions(
             {
                 case "--database":
                     databasePath = Single(databasePath, value, option);
+                    break;
+                case "--postgres-connection-env":
+                    postgresConnectionEnvironment = Single(postgresConnectionEnvironment, value, option);
                     break;
                 case "--run":
                 case "--run-id":
@@ -97,9 +105,9 @@ internal sealed record DetectorRolloutCommandOptions(
             }
         }
 
-        if (databasePath is null)
+        if ((databasePath is null) == (postgresConnectionEnvironment is null))
         {
-            throw new ArgumentException("Option '--database' is required.");
+            throw new ArgumentException("Specify exactly one of '--database' or '--postgres-connection-env'.");
         }
 
         if (action == DetectorRolloutCommandAction.Start)
@@ -134,7 +142,8 @@ internal sealed record DetectorRolloutCommandOptions(
             outputRoot,
             repositoryRoot,
             modelDirectory,
-            maxAttempts);
+            maxAttempts,
+            postgresConnectionEnvironment);
     }
 
     private static string Single(string? current, string value, string option)
@@ -167,35 +176,74 @@ internal static class DetectorRolloutCommandRunner
         TextWriter output,
         CancellationToken cancellationToken)
     {
-        SqliteCatalogueDatabase database = new(options.DatabasePath);
-        await database.InitializeAsync(cancellationToken);
+        if (options.PostgresConnectionEnvironment is string environmentName)
+        {
+            string? connectionString = Environment.GetEnvironmentVariable(environmentName);
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new ArgumentException("The selected PostgreSQL connection environment variable is empty or missing.");
+            }
+            await using PostgresCatalogueDatabase postgres = new(connectionString);
+            PostgresProcessingRepository processing = new(postgres);
+            return await RunCoreAsync(options, new RolloutPersistence(
+                postgres, new PostgresAssetRevisionLookupRepository(postgres), processing, processing,
+                new PostgresDetectorReconciliationPlanRepository(postgres),
+                new PostgresDetectorRolloutReviewRepository(postgres),
+                new PostgresDetectorRolloutApplicationRepository(postgres)), output, cancellationToken);
+        }
+
+        SqliteCatalogueDatabase sqlite = new(options.DatabasePath!);
+        SqliteProcessingRepository sqliteProcessing = new(sqlite);
+        return await RunCoreAsync(options, new RolloutPersistence(
+            sqlite, new SqliteLocalBatchRepository(sqlite), sqliteProcessing, sqliteProcessing,
+            new SqliteDetectorRolloutRepository(sqlite), new SqliteDetectorRolloutReviewRepository(sqlite),
+            new SqliteDetectorRolloutApplicationRepository(sqlite)), output, cancellationToken);
+    }
+
+    private sealed record RolloutPersistence(
+        ICatalogueStoreInitializer Store,
+        IAssetRevisionLookupRepository Assets,
+        IProcessingRunRepository Runs,
+        IProcessingExecutionRepository Execution,
+        IDetectorReconciliationPlanRepository Plans,
+        IDetectorRolloutReviewRepository Reviews,
+        IDetectorRolloutApplicationRepository Application);
+
+    private static async Task<int> RunCoreAsync(
+        DetectorRolloutCommandOptions options, RolloutPersistence persistence,
+        TextWriter output, CancellationToken cancellationToken)
+    {
+        await persistence.Store.InitializeAsync(cancellationToken);
         switch (options.Action)
         {
             case DetectorRolloutCommandAction.Start:
-                return await StartAsync(options, database, output, cancellationToken);
+                return await StartAsync(options, persistence, output, cancellationToken);
             case DetectorRolloutCommandAction.Resume:
-                return await ResumeAsync(options, database, output, cancellationToken);
+                return await ResumeAsync(options, persistence, output, cancellationToken);
             case DetectorRolloutCommandAction.Status:
-                await WriteStatusAsync(database, options.RunId!.Value, output, cancellationToken);
+                await WriteStatusAsync(persistence, options.RunId!.Value, output, cancellationToken);
                 return 0;
             case DetectorRolloutCommandAction.Apply:
-                await RequireRegisteredPipelineAsync(database, options.RunId!.Value, cancellationToken);
-                CatalogueDetectorRolloutApplyResult apply = await new SqliteDetectorRolloutApplicationRepository(database)
+                await RequireRegisteredPipelineAsync(persistence, options.RunId!.Value, cancellationToken);
+                CatalogueDetectorRolloutApplyResult apply = await persistence.Application
                     .ApplyResolvedAsync(options.RunId.Value, cancellationToken);
                 output.WriteLine($"reviewed-considered: {apply.ConsideredCount}");
                 output.WriteLine($"reviewed-applied: {apply.AppliedCount}");
                 output.WriteLine($"reviewed-deferred: {apply.DeferredCount}");
                 output.WriteLine($"reviewed-awaiting: {apply.AwaitingReviewCount}");
-                await WriteStatusAsync(database, options.RunId.Value, output, cancellationToken);
+                await WriteStatusAsync(persistence, options.RunId.Value, output, cancellationToken);
                 return 0;
             default:
                 throw new ArgumentOutOfRangeException(nameof(options.Action));
         }
     }
 
+    private static DetectorRolloutCoordinator CreateCoordinator(RolloutPersistence persistence) =>
+        new(persistence.Store, persistence.Assets, persistence.Runs, persistence.Execution,
+            persistence.Plans, persistence.Reviews, persistence.Application);
     private static async Task<int> StartAsync(
         DetectorRolloutCommandOptions options,
-        SqliteCatalogueDatabase database,
+        RolloutPersistence persistence,
         TextWriter output,
         CancellationToken cancellationToken)
     {
@@ -210,7 +258,7 @@ internal static class DetectorRolloutCommandRunner
             options.OutputRoot!,
             repositoryRoot,
             options.ModelDirectory);
-        DetectorRolloutStartResult result = await new DetectorRolloutCoordinator(database).StartAsync(
+        DetectorRolloutStartResult result = await CreateCoordinator(persistence).StartAsync(
             configuration,
             revisions,
             new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
@@ -224,12 +272,12 @@ internal static class DetectorRolloutCommandRunner
 
     private static async Task<int> ResumeAsync(
         DetectorRolloutCommandOptions options,
-        SqliteCatalogueDatabase database,
+        RolloutPersistence persistence,
         TextWriter output,
         CancellationToken cancellationToken)
     {
-        await RequireRolloutConfigurationAsync(database, options.RunId!.Value, cancellationToken);
-        DetectorRolloutResumeResult result = await new DetectorRolloutCoordinator(database).ResumeAsync(
+        await RequireRolloutConfigurationAsync(persistence, options.RunId!.Value, cancellationToken);
+        DetectorRolloutResumeResult result = await CreateCoordinator(persistence).ResumeAsync(
             options.RunId.Value,
             new ResumableBatchProcessorOptions(maxAttemptsPerInvocation: options.MaxAttemptsPerInvocation),
             cancellationToken);
@@ -241,15 +289,15 @@ internal static class DetectorRolloutCommandRunner
     }
 
     private static async Task WriteStatusAsync(
-        SqliteCatalogueDatabase database,
+        RolloutPersistence persistence,
         ProcessingRunId runId,
         TextWriter output,
         CancellationToken cancellationToken)
     {
-        await RequireRegisteredPipelineAsync(database, runId, cancellationToken);
-        ProcessingRunSummary processing = await new SqliteProcessingRepository(database)
+        await RequireRegisteredPipelineAsync(persistence, runId, cancellationToken);
+        ProcessingRunSummary processing = await persistence.Execution
             .GetRunSummaryAsync(runId, cancellationToken);
-        CatalogueDetectorRolloutSummary rollout = await new SqliteDetectorRolloutApplicationRepository(database)
+        CatalogueDetectorRolloutSummary rollout = await persistence.Application
             .GetSummaryAsync(runId, cancellationToken);
         WriteProcessingSummary(processing, output);
         WriteRolloutSummary(rollout, processing, output);
@@ -257,11 +305,11 @@ internal static class DetectorRolloutCommandRunner
     }
 
     private static async Task RequireRolloutConfigurationAsync(
-        SqliteCatalogueDatabase database,
+        RolloutPersistence persistence,
         ProcessingRunId runId,
         CancellationToken cancellationToken)
     {
-        CatalogueProcessingRun run = await new SqliteProcessingRepository(database)
+        CatalogueProcessingRun run = await persistence.Runs
             .GetRunAsync(runId, cancellationToken)
             ?? throw new KeyNotFoundException($"Processing run {runId} was not found.");
         try
@@ -288,13 +336,13 @@ internal static class DetectorRolloutCommandRunner
     }
 
     private static async Task RequireRegisteredPipelineAsync(
-        SqliteCatalogueDatabase database,
+        RolloutPersistence persistence,
         ProcessingRunId runId,
         CancellationToken cancellationToken)
     {
         try
         {
-            _ = await new SqliteDetectorRolloutApplicationRepository(database)
+            _ = await persistence.Application
                 .GetPipelineHashAsync(runId, cancellationToken);
         }
         catch (KeyNotFoundException exception)

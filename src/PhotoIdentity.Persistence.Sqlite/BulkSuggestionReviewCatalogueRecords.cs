@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 

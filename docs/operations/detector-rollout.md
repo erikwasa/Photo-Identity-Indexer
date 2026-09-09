@@ -41,6 +41,19 @@ PR #97 fixed two issues found during the first disposable pilot:
 
 The ordinary `batch start` path still has its historical deterministic ordinal semantics. **Never use `batch start` as a detector-migration command.**
 
+## PostgreSQL provider selection
+
+All four rollout CLI actions accept `--postgres-connection-env NAME` instead of `--database PATH`. The named environment variable contains the PostgreSQL connection string; keep credentials out of command arguments and shell history. Exactly one provider must be selected. PostgreSQL selection initializes its migrations and uses PostgreSQL processing, revision lookup, reconciliation, review and application repositories throughout the rollout worker. It does not open a SQLite catalogue or perform dual writes.
+
+For example, after configuring the connection variable securely:
+
+```powershell
+dotnet run --project src/PhotoIdentity.Cli -- rollout status --postgres-connection-env PHOTOIDENTITY_ROLLOUT_CONNECTION --run RUN_ID
+dotnet run --project src/PhotoIdentity.Cli -- rollout apply --postgres-connection-env PHOTOIDENTITY_ROLLOUT_CONNECTION --run RUN_ID
+```
+
+This explicit provider path supports M24 verification; production API authority remains SQLite until WI-0102 controlled cutover. Use the provider containing the run and its immutable revisions. Provider selection does not import an existing catalogue.
+
 ## Why ordinal migration is unsafe
 
 Existing face occurrences are unique by asset revision and ordinal. The legacy inspection worker sorts the current detector result and uses that sort position as the ordinal. A different detector can therefore cause ordinal `0` to refer to a different physical face.

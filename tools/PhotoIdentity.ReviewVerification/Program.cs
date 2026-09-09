@@ -6,6 +6,7 @@ using System.Text.Json;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.ReviewVerification;

@@ -2,7 +2,6 @@ using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Imaging.OpenCv;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -33,7 +32,7 @@ public static class ReviewEndpoints
     }
 
     private static async Task<IResult> GetFacesAsync(
-        SqliteReviewFilterRepository repository,
+        IReviewFilterRepository repository,
         ReviewFaceTargetResolver targetResolver,
         int offset = 0,
         int limit = 40,
@@ -80,7 +79,7 @@ public static class ReviewEndpoints
     }
 
     private static async Task<IResult> GetFiltersAsync(
-        SqliteReviewFilterRepository repository,
+        IReviewFilterRepository repository,
         CancellationToken cancellationToken)
     {
         CatalogueReviewFilterOptions options = await repository.GetOptionsAsync(cancellationToken);
@@ -100,9 +99,9 @@ public static class ReviewEndpoints
 
     private static async Task<IResult> GetFaceAsync(
         string id,
-        SqliteReviewRepository repository,
+        IReviewFaceRepository repository,
         IReviewActionRepository actionRepository,
-        SqliteReviewFilterRepository filterRepository,
+        IReviewFilterRepository filterRepository,
         ReviewFaceTargetResolver targetResolver,
         string state = "all",
         string? processingRunId = null,
@@ -169,9 +168,8 @@ public static class ReviewEndpoints
 
     private static async Task<IResult> GetFaceImageAsync(
         string id,
-        SqliteReviewRepository repository,
+        IReviewFaceRepository repository,
         ReviewCropFileResolver cropFileResolver,
-        SqliteCatalogueDatabase database,
         CollectionReviewProxyFileResolver proxyFileResolver,
         CollectionOriginalAccessService originalAccessService,
         int size = GalleryImageSize,
@@ -194,7 +192,7 @@ public static class ReviewEndpoints
         }
 
         ReviewFacePreviewResolver previewResolver = new(
-            database,
+            repository,
             proxyFileResolver,
             originalAccessService,
             new OpenCvReviewFaceRenderer());
@@ -229,7 +227,7 @@ public static class ReviewEndpoints
     }
 
     private static async Task<IResult> GetPeopleAsync(
-        SqliteReviewRepository repository,
+        IReviewFaceRepository repository,
         IFavoritePeopleRepository favoritePeopleRepository,
         IPersonSmartCollectionVisibilityRepository visibilityRepository,
         IPersonFeaturedFaceRepository featuredFaceRepository,

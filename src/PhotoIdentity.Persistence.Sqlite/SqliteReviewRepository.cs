@@ -10,7 +10,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Provides review-oriented queries and append-only, reversible human actions.
 /// Current face state is derived from the newest unreversed assignment, Unknown decision or rejection.
 /// </summary>
-public sealed class SqliteReviewRepository : IReviewActionRepository
+public sealed class SqliteReviewRepository : IReviewActionRepository, IReviewFaceRepository
 {
     private const string ReviewFaceSelect = """
         WITH latest_action AS (
