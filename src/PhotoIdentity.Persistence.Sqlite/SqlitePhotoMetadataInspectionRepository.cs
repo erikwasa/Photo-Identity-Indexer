@@ -1,12 +1,9 @@
 using System.Globalization;
 using Microsoft.Data.Sqlite;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Core.Identifiers;
 
 namespace PhotoIdentity.Persistence.Sqlite;
-
-public sealed record CataloguePhotoMetadataInspection(
-    int ExtractionContractVersion,
-    DateTimeOffset InspectedAtUtc);
 
 public static class SqlitePhotoMetadataInspectionSchema
 {
@@ -43,7 +40,7 @@ public static class SqlitePhotoMetadataInspectionSchema
 /// The marker is intentionally separate from capture metadata so older rows remain readable and can
 /// be recognized as stale after the extraction contract expands.
 /// </summary>
-public sealed class SqlitePhotoMetadataInspectionRepository
+public sealed class SqlitePhotoMetadataInspectionRepository : IPhotoMetadataInspectionRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
