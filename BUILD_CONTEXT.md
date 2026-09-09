@@ -6,7 +6,7 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**M24 WI-0105 operational observability is implemented and in review. WI-0101 remains the next PostgreSQL migration slice after maintainer review/live PostgreSQL verification of WI-0100.**
+**M24 WI-0100 and WI-0105 are completed. WI-0101 is active on the local M24 branch.**
 
 Consolidated real-phone M22 acceptance passed the implemented slideshow behavior except for two functional gaps tracked by WI-0107:
 
@@ -15,7 +15,9 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 and **WI-0099 are completed**. WI-0100 now has provider-neutral contracts and PostgreSQL implementations for canonical review actions, ranked and grouped suggestions, bulk review, person maintenance/audit, evidence versions, suggestion policy, suggestion gallery and regeneration execution. Runtime review/identity authority remains SQLite until WI-0101 and WI-0102 complete provider composition and controlled cutover. WI-0105 extends the existing process-local, aggregate-only archive diagnostics with fixed API request families and regeneration/place-enrichment cycle counters; it records neither request paths nor photo-specific data.
+In the separate M24 thread, WI-0098, WI-0099, WI-0100 and WI-0105 are completed. Runtime authority remains SQLite until WI-0101 and WI-0102 complete provider composition and controlled cutover.
+
+WI-0101 currently has PostgreSQL schema/repositories for manual photo tags, manual photo people, capture metadata, extended metadata and metadata inspection through schema version 17. The latest local slice fixes the schema marker and converts the photo-tag endpoint plus metadata-inspection service constructor to Core persistence contracts while keeping SQLite as the pre-cutover runtime binding.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +33,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, complete maintainer review/live PostgreSQL verification for WI-0100 and WI-0105, then start WI-0101 to migrate the remaining library, metadata, Places, smart-collection, slideshow and detector persistence without switching authority. WI-0102 remains the only controlled SQLite→PostgreSQL migration/cutover step.
+For the M24 thread, continue WI-0101 by neutralizing the remaining SQLite-only normal-runtime dependencies, starting with Places/automatic place writes and then collection/photo-detail/smart-collection/slideshow/detector surfaces. Do not create dual writes or switch default authority before WI-0102.
 
 ## Relevant files
 
@@ -46,8 +48,11 @@ For the M24 thread, complete maintainer review/live PostgreSQL verification for 
 - docs/delivery/milestones/M24-postgresql-catalogue-and-scale.md
 - docs/delivery/work-items/WI-0098-persistence-boundary-foundational-schema.md
 - docs/delivery/work-items/WI-0099-postgresql-archive-background-persistence.md
+- docs/delivery/work-items/WI-0101-postgresql-library-remaining-persistence.md
 - docs/delivery/work-items/WI-0105-operational-metrics-observability.md
 - docs/operations/archive-throughput-benchmark.md
+- src/PhotoIdentity.Api/PhotoTagEndpoints.cs
+- src/PhotoIdentity.Api/PhotoMetadataInspectionService.cs
 - src/PhotoIdentity.Worker/ArchiveThroughputMetrics.cs
 - src/PhotoIdentity.Api/Program.cs
 - docs/delivery/status/work-items.yaml

@@ -47,3 +47,13 @@ In addition to the existing scope above, the WI-0101 inventory must include:
 - normal runtime DI so one provider can be selected coherently before WI-0102 performs the actual migration/cutover.
 
 Do not create dual writes as a bridge. SQLite remains the sole authoritative runtime until the later controlled cutover.
+
+## Current implementation progress
+
+Started 2026-09-09 on the M24 PostgreSQL catalogue branch.
+
+- Added PostgreSQL schema migrations through version 17 for manual photo tags, manual photo people and extended photo metadata/inspection state.
+- Added PostgreSQL repositories for manual photo tags, manual photo people, capture metadata, extended metadata and metadata inspection.
+- Fixed the PostgreSQL schema marker so a clean database initializes idempotently through schema version 17.
+- Converted the photo-tag API endpoint and metadata-inspection service constructor to Core-owned persistence contracts instead of concrete SQLite repositories.
+- Kept normal runtime binding on SQLite for these newly neutralized surfaces until WI-0102 performs controlled migration/cutover; no dual writes are introduced.

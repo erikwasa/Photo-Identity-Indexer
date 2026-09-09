@@ -6,6 +6,7 @@ using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Sources;
+using PhotoIdentity.Core.Tags;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Persistence.Sqlite;
@@ -130,8 +131,14 @@ public partial class Program
             serviceProvider.GetRequiredService<SqliteAssetCatalogueRepository>());
         builder.Services.AddSingleton<SqlitePhotoMetadataBackfillRepository>();
         builder.Services.AddSingleton<SqliteExtendedPhotoMetadataRepository>();
+        builder.Services.AddSingleton<IExtendedPhotoMetadataRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteExtendedPhotoMetadataRepository>());
         builder.Services.AddSingleton<SqlitePhotoMetadataInspectionRepository>();
+        builder.Services.AddSingleton<IPhotoMetadataInspectionRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePhotoMetadataInspectionRepository>());
         builder.Services.AddSingleton<SqlitePhotoTagRepository>();
+        builder.Services.AddSingleton<IPhotoTagRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqlitePhotoTagRepository>());
         builder.Services.AddSingleton<SqlitePhotoPlaceRepository>();
         builder.Services.AddSingleton<SqlitePhotoPlaceEnrichmentRepository>();
         builder.Services.AddSingleton<IPhotoPlaceEnrichmentStateRepository>(serviceProvider =>

@@ -1285,10 +1285,13 @@ work_items:
 - id: WI-0100
   title: Migrate review and identity persistence to PostgreSQL
   milestone: M24
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0100-postgresql-review-identity-persistence.md
   started_at: 2026-09-03
+  completed_at: 2026-09-09
+  verified_at: 2026-09-09
+  verified_by: maintainer
   last_updated_at: 2026-09-09
   branch: agent/WI-0100-postgres-person-maintenance
   blockers:
@@ -1320,6 +1323,8 @@ work_items:
     value: 07dddf3d0120d41859cf5a5816c251135d21159a
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/261
+  - type: verification
+    value: '2026-09-09 maintainer live PostgreSQL verification passed: verify-postgres.ps1 and WI-0100 focused live persistence tests on autopilot/m24 schema 17'
 - id: WI-0101
   title: Migrate library and remaining authoritative persistence to PostgreSQL
   milestone: M24
@@ -1370,17 +1375,22 @@ work_items:
 - id: WI-0105
   title: Add low-overhead PostgreSQL and background-work observability
   milestone: M24
-  status: in_review
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0105-operational-metrics-observability.md
   started_at: 2026-09-09
+  completed_at: 2026-09-09
+  verified_at: 2026-09-09
+  verified_by: ai-agent
   last_updated_at: 2026-09-09
   branch: autopilot/m24
   blockers:
   - WI-0099
   blocker_notes:
   - Metrics replace repeated manual A/B performance exercises; telemetry must remain aggregated, bounded and privacy-safe.
-  evidence: []
+  evidence:
+  - type: verification
+    value: 2026-09-09 local build, full test suite, Docs validate and generate --check passed for aggregate operational diagnostics
 - id: WI-0106
   title: Operationalize PostgreSQL and resume full-archive catch-up
   milestone: M24

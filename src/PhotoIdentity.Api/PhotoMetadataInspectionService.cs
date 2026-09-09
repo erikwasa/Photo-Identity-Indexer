@@ -1,6 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
@@ -13,15 +12,15 @@ namespace PhotoIdentity.Api;
 public sealed class PhotoMetadataInspectionService
 {
     private readonly IPhotoCaptureMetadataRepository _catalogue;
-    private readonly SqliteExtendedPhotoMetadataRepository _extendedMetadata;
-    private readonly SqlitePhotoMetadataInspectionRepository _inspections;
+    private readonly IExtendedPhotoMetadataRepository _extendedMetadata;
+    private readonly IPhotoMetadataInspectionRepository _inspections;
     private readonly IPhotoMetadataReader _reader;
     private readonly TimeProvider _timeProvider;
 
     public PhotoMetadataInspectionService(
         IPhotoCaptureMetadataRepository catalogue,
-        SqliteExtendedPhotoMetadataRepository extendedMetadata,
-        SqlitePhotoMetadataInspectionRepository inspections,
+        IExtendedPhotoMetadataRepository extendedMetadata,
+        IPhotoMetadataInspectionRepository inspections,
         IPhotoMetadataReader reader,
         TimeProvider timeProvider)
     {
