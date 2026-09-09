@@ -217,6 +217,9 @@ public partial class Program
         builder.Services.AddSingleton<SqliteArchiveCoverageRepository>();
         builder.Services.AddSingleton<IArchiveCoverageRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteArchiveCoverageRepository>());
+        builder.Services.AddSingleton<SqliteArchiveStatusRepository>();
+        builder.Services.AddSingleton<IArchiveStatusRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteArchiveStatusRepository>());
         builder.Services.AddSingleton<SqliteArchiveStorageRepository>();
         builder.Services.AddSingleton<IArchiveStorageAccountingRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteArchiveStorageRepository>());

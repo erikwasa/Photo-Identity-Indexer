@@ -1,6 +1,5 @@
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web;
 using PhotoIdentity.Worker;
 
@@ -21,8 +20,8 @@ public static class ArchiveItemFilterEndpoints
         string? analysis,
         int? offset,
         int? limit,
-        SqliteCatalogueDatabase database,
         IArchiveCoverageRepository coverageRepository,
+        IArchiveStatusRepository archiveStatusRepository,
         ArchiveOperatorConfiguration operatorConfiguration,
         CancellationToken cancellationToken)
     {
@@ -34,7 +33,7 @@ public static class ArchiveItemFilterEndpoints
                 configured,
                 operatorConfiguration,
                 cancellationToken);
-            CatalogueArchiveItemPage page = await new SqliteArchiveItemFilterRepository(database).GetItemsAsync(
+            CatalogueArchiveItemPage page = await archiveStatusRepository.GetItemsAsync(
                 configured.Source.SourceId,
                 folder ?? string.Empty,
                 profileHash,

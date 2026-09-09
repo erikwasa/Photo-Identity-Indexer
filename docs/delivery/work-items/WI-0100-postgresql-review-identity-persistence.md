@@ -22,10 +22,12 @@ Implement PostgreSQL-backed review, people, suggestion, policy and identity-matc
 - Add PostgreSQL integration coverage for representative single, bulk and restart/recovery workflows.
 
 ## Acceptance criteria
-- [ ] Face review and identity workflows execute against PostgreSQL without SQLite authoritative writes.
-- [ ] Existing IDs/history and accepted/rejected suggestion semantics map losslessly.
-- [ ] Regeneration run state remains durable/resumable; algorithmic scaling is deferred to WI-0103.
-- [ ] Review/audit behavior matches current accepted semantics.
+- [x] Face review and identity workflows execute against PostgreSQL without SQLite authoritative writes.
+- [x] Existing IDs/history and accepted/rejected suggestion semantics map losslessly.
+- [x] Regeneration run state remains durable/resumable; algorithmic scaling is deferred to WI-0103.
+- [x] Review/audit behavior matches current accepted semantics.
+
+Completed 2026-09-09 and maintainer-verified in the canonical work-item registry. Normal application runtime remains bound to SQLite until the WI-0101/WI-0102 provider-composition and controlled-cutover work; that deferred runtime binding does not reopen WI-0100's scoped persistence acceptance.
 
 
 ## Slice 1 — canonical people and review actions
