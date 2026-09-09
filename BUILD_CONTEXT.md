@@ -6,7 +6,7 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**M22 WI-0107 is the next slideshow implementation item. M24 WI-0099 is now active in parallel.**
+**M24 WI-0100 review/identity persistence is implemented and in review; WI-0101 is the next M24 implementation item.**
 
 Consolidated real-phone M22 acceptance passed the implemented slideshow behavior except for two functional gaps tracked by WI-0107:
 
@@ -15,7 +15,7 @@ Consolidated real-phone M22 acceptance passed the implemented slideshow behavior
 
 The same acceptance session found slideshow performance problems. M24 WI-0108 owns slow saved-collection loading, long first-image/startup latency and slow image-to-image transitions; PostgreSQL migration alone is not assumed to fix database-independent repeated file/hash work.
 
-In the separate M24 thread, WI-0098 and **WI-0099 are completed**. PR #257/workflow #1484 plus maintainer post-merge verification closed WI-0099. **WI-0100 — Migrate review and identity persistence to PostgreSQL** is active on `agent/WI-0100-postgres-person-maintenance`. PR #260 merged, workflow #1497 passed, and maintainer verification accepted the bulk review workflows against schema version 12. PR #261 is the active slice. It adds schema version 13 plus provider-neutral canonical person maintenance and PostgreSQL rename/irreversible-merge audit semantics; runtime review authority remains SQLite.
+In the separate M24 thread, WI-0098 and **WI-0099 are completed**. WI-0100 now has provider-neutral contracts and PostgreSQL implementations for canonical review actions, ranked and grouped suggestions, bulk review, person maintenance/audit, evidence versions, suggestion policy, suggestion gallery and regeneration execution. Runtime review/identity authority remains SQLite until WI-0101 and WI-0102 complete provider composition and controlled cutover.
 
 WI-0076 remains separately recorded as in_progress and is not part of this M22 slice.
 
@@ -31,7 +31,7 @@ For the M22 thread:
 6. Re-test only those two remaining M22 scenarios on the real phone.
 7. If both pass, record maintainer acceptance and close the M22 work items/milestone.
 
-For the M24 thread, review/merge the WI-0100 person-maintenance slice after CI is green, then rerun `verify-postgres.ps1` to accept schema version 13. Continue with the richer person audit view, suggestion gallery/policy/evidence and regeneration persistence without switching runtime authority. WI-0102 remains the only controlled SQLite→PostgreSQL migration/cutover step.
+For the M24 thread, complete maintainer review/live PostgreSQL verification for WI-0100, then start WI-0101 to migrate the remaining library, metadata, Places, smart-collection, slideshow and detector persistence without switching authority. WI-0102 remains the only controlled SQLite→PostgreSQL migration/cutover step.
 
 ## Relevant files
 

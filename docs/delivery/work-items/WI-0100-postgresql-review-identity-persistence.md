@@ -155,4 +155,14 @@ Started 2026-09-03.
 - Added `PostgresIdentitySuggestionPolicyRepository` preserving default initialization, no-op updates, exact-model isolation and durable versioned changes. Updates lock the exact policy row before incrementing the version.
 - Focused live PostgreSQL coverage verifies defaults, exact-model isolation, changed/no-op updates, restart durability and invalid-policy rejection.
 
-Suggestion gallery persistence and identity regeneration run/target durability remain later WI-0100 slices. Runtime review/identity authority remains SQLite until controlled cutover.
+## Slice 8 — suggestion gallery and regeneration persistence
+
+Started 2026-09-03.
+
+- Added provider-neutral suggestion-gallery and regeneration execution contracts with SQLite compatibility adapters.
+- Added PostgreSQL suggestion-gallery persistence over the existing ranked-suggestion schema, preserving filtering, pagination, exact-model selection and deterministic ordering.
+- Added PostgreSQL regeneration run/target persistence, scorer and automatic-assignment adapters, including durable claims, checkpoints, retries and evidence-version handling.
+- Added focused PostgreSQL coverage for gallery queries, run/target lifecycle, restart/resume behavior and execution persistence.
+- Kept runtime regeneration composition SQLite-backed until the controlled provider selection and cutover work owned by WI-0101/WI-0102.
+
+All persistence surfaces named by WI-0100 now have provider-neutral contracts and PostgreSQL implementations. Runtime review/identity authority remains SQLite until controlled cutover.
