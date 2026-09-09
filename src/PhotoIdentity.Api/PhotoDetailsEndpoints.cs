@@ -1,7 +1,7 @@
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.People;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -20,7 +20,7 @@ public static class PhotoDetailsEndpoints
 
     private static async Task<IResult> GetPhotoDetailsAsync(
         string revisionId,
-        SqlitePhotoDetailsRepository repository,
+        IPhotoDetailsRepository repository,
         CancellationToken cancellationToken)
     {
         if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
@@ -28,7 +28,7 @@ public static class PhotoDetailsEndpoints
             return Results.BadRequest(new PhotoPersonErrorResponse("The asset revision identifier is invalid."));
         }
 
-        CataloguePhotoDetails? details = await repository.GetAsync(parsedRevisionId, cancellationToken);
+        PhotoDetails? details = await repository.GetAsync(parsedRevisionId, cancellationToken);
         if (details is null)
         {
             return Results.NotFound();
@@ -41,7 +41,7 @@ public static class PhotoDetailsEndpoints
         string revisionId,
         PhotoPersonMutationRequest request,
         IPhotoPersonRepository repository,
-        SqlitePhotoDetailsRepository detailsRepository,
+        IPhotoDetailsRepository detailsRepository,
         CancellationToken cancellationToken)
     {
         if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
@@ -61,7 +61,7 @@ public static class PhotoDetailsEndpoints
                 personId,
                 LocalMaintainerActor,
                 cancellationToken);
-            CataloguePhotoDetails details = await detailsRepository.GetAsync(parsedRevisionId, cancellationToken)
+            PhotoDetails details = await detailsRepository.GetAsync(parsedRevisionId, cancellationToken)
                 ?? throw new KeyNotFoundException($"Asset revision '{parsedRevisionId}' was not found.");
             return Results.Ok(ToResponse(details));
         }
@@ -83,7 +83,7 @@ public static class PhotoDetailsEndpoints
         string revisionId,
         string personId,
         IPhotoPersonRepository repository,
-        SqlitePhotoDetailsRepository detailsRepository,
+        IPhotoDetailsRepository detailsRepository,
         CancellationToken cancellationToken)
     {
         if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
@@ -103,7 +103,7 @@ public static class PhotoDetailsEndpoints
                 parsedPersonId,
                 LocalMaintainerActor,
                 cancellationToken);
-            CataloguePhotoDetails details = await detailsRepository.GetAsync(parsedRevisionId, cancellationToken)
+            PhotoDetails details = await detailsRepository.GetAsync(parsedRevisionId, cancellationToken)
                 ?? throw new KeyNotFoundException($"Asset revision '{parsedRevisionId}' was not found.");
             return Results.Ok(ToResponse(details));
         }
@@ -121,7 +121,7 @@ public static class PhotoDetailsEndpoints
         }
     }
 
-    private static PhotoDetailsResponse ToResponse(CataloguePhotoDetails details)
+    private static PhotoDetailsResponse ToResponse(PhotoDetails details)
     {
         string fileName = FileNameOnly(details.SourceKey);
         return new PhotoDetailsResponse(

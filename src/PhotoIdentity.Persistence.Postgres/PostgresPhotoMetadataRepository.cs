@@ -62,7 +62,8 @@ public sealed class PostgresExtendedPhotoMetadataRepository : IExtendedPhotoMeta
         AddNullable(command, "focal_length_35mm", metadata.FocalLength35Mm);
         AddNullable(command, "flash", metadata.Flash);
         AddNullable(command, "gps_altitude", metadata.GpsAltitude);
-        command.Parameters.AddWithValue("raw_tags_json", JsonSerializer.Serialize(BoundTags(metadata.RawTags), JsonOptions));
+        NpgsqlParameter rawTags = command.Parameters.Add("raw_tags_json", NpgsqlDbType.Jsonb);
+        rawTags.Value = JsonSerializer.Serialize(BoundTags(metadata.RawTags), JsonOptions);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
