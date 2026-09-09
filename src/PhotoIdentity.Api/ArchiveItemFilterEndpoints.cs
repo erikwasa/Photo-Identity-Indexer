@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web;
 using PhotoIdentity.Worker;
@@ -21,20 +22,20 @@ public static class ArchiveItemFilterEndpoints
         int? offset,
         int? limit,
         SqliteCatalogueDatabase database,
+        IArchiveCoverageRepository coverageRepository,
         ArchiveOperatorConfiguration operatorConfiguration,
         CancellationToken cancellationToken)
     {
         try
         {
-            ArchiveCoverageConfiguration configured = await new SqliteArchiveCoverageRepository(database)
-                .GetAsync(cancellationToken)
+            ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
             Sha256Digest? profileHash = await ResolveProfileHashAsync(
                 configured,
                 operatorConfiguration,
                 cancellationToken);
             CatalogueArchiveItemPage page = await new SqliteArchiveItemFilterRepository(database).GetItemsAsync(
-                configured.Source.Id,
+                configured.Source.SourceId,
                 folder ?? string.Empty,
                 profileHash,
                 availability ?? "all",
@@ -62,7 +63,7 @@ public static class ArchiveItemFilterEndpoints
     }
 
     private static async Task<Sha256Digest?> ResolveProfileHashAsync(
-        ArchiveCoverageConfiguration configured,
+        ArchiveCoverageState configured,
         ArchiveOperatorConfiguration operatorConfiguration,
         CancellationToken cancellationToken)
     {
