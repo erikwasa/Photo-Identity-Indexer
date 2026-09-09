@@ -247,8 +247,9 @@ public sealed class ArchiveSourceVerificationTests
                 catalogueSource,
                 new SourceScanOptions(null, true),
                 now);
-            ArchiveSourceObservation pending = Assert.IsType<ArchiveSourceObservation>(
-                await new SqliteArchiveSourceObservationRepository(database).GetNextPendingAsync(catalogueSource.Id));
+            IArchiveSourceObservationRepository observations = new SqliteArchiveSourceObservationRepository(database);
+            ArchiveSourceObservationSnapshot pending = Assert.IsType<ArchiveSourceObservationSnapshot>(
+                await observations.GetNextPendingAsync(catalogueSource.Id));
 
             FakeFilesOnDemandPlatform platform = new();
             ArchiveHydrationCapacityService capacity = new(

@@ -14,7 +14,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
 
     private readonly SqliteCatalogueDatabase _database;
     private readonly IArchiveAdvancementControlRepository _control;
-    private readonly SqliteArchiveSourceObservationRepository _observations;
+    private readonly IArchiveSourceObservationRepository _observations;
     private readonly SqliteArchiveAnalysisRepository _analysis;
     private readonly IArchivePostAnalysisRepository _postAnalysis;
     private readonly IArchiveHydrationRepository _hydrations;
@@ -32,7 +32,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     public ArchiveAdvancementHostedService(
         SqliteCatalogueDatabase database,
         IArchiveAdvancementControlRepository control,
-        SqliteArchiveSourceObservationRepository observations,
+        IArchiveSourceObservationRepository observations,
         SqliteArchiveAnalysisRepository analysis,
         IArchivePostAnalysisRepository postAnalysis,
         IArchiveHydrationRepository hydrations,

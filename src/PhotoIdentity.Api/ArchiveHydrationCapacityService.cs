@@ -1,7 +1,6 @@
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 
 namespace PhotoIdentity.Api;
@@ -173,7 +172,7 @@ public sealed class ArchiveHydrationCapacityService
     }
 
     public Task<ArchiveHydrationAdmission> ExecuteSourceHydrationAdmissionAsync(
-        ArchiveSourceObservation source,
+        ArchiveSourceObservationSnapshot source,
         Func<Task> acceptedAction,
         CancellationToken cancellationToken = default)
     {

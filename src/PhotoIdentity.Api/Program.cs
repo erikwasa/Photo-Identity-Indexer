@@ -172,6 +172,8 @@ public partial class Program
         builder.Services.AddSingleton<IArchiveHydrationIdentityTransferRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteArchiveHydrationIdentityTransferRepository>());
         builder.Services.AddSingleton<SqliteArchiveSourceObservationRepository>();
+        builder.Services.AddSingleton<IArchiveSourceObservationRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteArchiveSourceObservationRepository>());
         builder.Services.AddSingleton<SqliteArchiveSourceVerificationStateRepository>();
         builder.Services.AddSingleton<SqliteArchiveAvailabilityRepository>();
         builder.Services.AddSingleton<IArchiveAvailabilityRepository>(serviceProvider =>

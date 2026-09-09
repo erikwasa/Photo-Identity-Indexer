@@ -3,7 +3,6 @@ using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.OneDriveSync;
 using PhotoIdentity.Worker;
 
@@ -35,7 +34,7 @@ public sealed class CollectionOriginalAccessService
 
     private readonly IAssetRevisionLookupRepository _catalogue;
     private readonly IArchiveHydrationRepository _hydrations;
-    private readonly SqliteArchiveAvailabilityRepository _availability;
+    private readonly IArchiveAvailabilityRepository _availability;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly TimeProvider _timeProvider;
@@ -45,7 +44,7 @@ public sealed class CollectionOriginalAccessService
     public CollectionOriginalAccessService(
         IAssetRevisionLookupRepository catalogue,
         IArchiveHydrationRepository hydrations,
-        SqliteArchiveAvailabilityRepository availability,
+        IArchiveAvailabilityRepository availability,
         IOneDriveFilesOnDemandPlatform platform,
         ArchiveHydrationCapacityService capacity,
         TimeProvider timeProvider,
