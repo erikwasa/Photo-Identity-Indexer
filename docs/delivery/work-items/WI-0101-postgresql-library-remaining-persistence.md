@@ -64,4 +64,5 @@ Started 2026-09-09 on the M24 PostgreSQL catalogue branch.
 - Converted the archive item-filter endpoint coverage read to the Core-owned archive coverage contract while leaving the still-SQLite item-filter query repository unchanged.
 - Converted the person-audit API endpoint to the Core-owned `IPersonAuditRepository` contract via the existing SQLite compatibility adapter.
 - Converted identity-match regeneration API/worker run and policy state to Core-owned regeneration/policy contracts via existing SQLite adapters, retaining explicit conversion only at still-SQLite evidence and automatic-assignment collaborator boundaries.
+- Converted review suggestion list/accept/reject endpoints to the Core-owned `IReviewSuggestionRepository` contract while leaving the still-SQLite face lookup repository unchanged.
 - Kept normal runtime binding on SQLite for these newly neutralized surfaces until WI-0102 performs controlled migration/cutover; no dual writes are introduced.
