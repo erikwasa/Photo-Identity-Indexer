@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -165,6 +166,38 @@ public sealed class ArchiveApplicationTests
             Assert.Empty(secondReset.Stages);
             Assert.Empty(secondReset.Counters);
             Assert.Empty(secondReset.HashReads);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Throughput_diagnostics_group_api_requests_without_recording_request_paths()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            await using PhotoIdentityApiTestFactory factory = new(databasePath);
+            using HttpClient client = factory.CreateClient();
+
+            await (await client.PostAsync("/api/archive/diagnostics/throughput/reset", null))
+                .EnsureSuccessWithDiagnosticBodyAsync();
+            using HttpResponseMessage archiveStatus = await client.GetAsync("/api/archive/status");
+            Assert.Equal(HttpStatusCode.OK, archiveStatus.StatusCode);
+
+            ArchiveThroughputDiagnosticsResponse snapshot = Assert.IsType<ArchiveThroughputDiagnosticsResponse>(
+                await (await client.GetAsync("/api/archive/diagnostics/throughput"))
+                    .Content.ReadFromJsonAsync<ArchiveThroughputDiagnosticsResponse>());
+            ArchiveThroughputStageMetricResponse request = Assert.Single(snapshot.Stages);
+            Assert.Equal(ArchiveThroughputMetricNames.ApiArchiveRequest, request.Name);
+            Assert.Equal(1, request.Count);
+            Assert.Contains(
+                snapshot.Counters,
+                value => value.Name == ArchiveThroughputMetricNames.ApiRequestSucceeded &&
+                    value.Value == 1);
         }
         finally
         {

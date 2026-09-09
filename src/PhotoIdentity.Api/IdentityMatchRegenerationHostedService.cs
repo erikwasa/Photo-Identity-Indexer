@@ -1,4 +1,5 @@
 using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
 
@@ -18,6 +19,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
     private readonly SqliteIdentityAutoAssignmentService _autoAssignment;
     private readonly SqliteIdentityMatchEvidenceVersionReader _evidence;
     private readonly TimeProvider _timeProvider;
+    private readonly ArchiveThroughputMetrics _metrics;
 
     public IdentityMatchRegenerationHostedService(
         SqliteIdentityMatchRegenerationRepository runs,
@@ -25,7 +27,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         SqliteIdentitySuggestionPolicyRepository policies,
         SqliteIdentityAutoAssignmentService autoAssignment,
         SqliteIdentityMatchEvidenceVersionReader evidence,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ArchiveThroughputMetrics metrics)
     {
         _runs = runs;
         _scorer = scorer;
@@ -33,6 +36,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         _autoAssignment = autoAssignment;
         _evidence = evidence;
         _timeProvider = timeProvider;
+        _metrics = metrics;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -55,6 +59,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
 
     public async Task<bool> AdvanceOnceAsync(CancellationToken cancellationToken = default)
     {
+        using IDisposable timing = _metrics.Measure(
+            ArchiveThroughputMetricNames.IdentityRegenerationCycle);
         CatalogueIdentityMatchRegenerationRun? run = await _runs.GetNextActiveAsync(cancellationToken);
         if (run is null)
         {
@@ -67,6 +73,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
             cancellationToken);
         if (target is not null)
         {
+            _metrics.RecordCounter(
+                ArchiveThroughputMetricNames.IdentityRegenerationTargetsClaimed);
             try
             {
                 int suggestionCount = await _scorer.ScoreTargetAsync(
@@ -80,6 +88,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                     suggestionCount,
                     _timeProvider.GetUtcNow(),
                     cancellationToken);
+                _metrics.RecordCounter(
+                    ArchiveThroughputMetricNames.IdentityRegenerationTargetsCompleted);
             }
             catch (OperationCanceledException)
             {
@@ -93,6 +103,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                     exception.Message,
                     _timeProvider.GetUtcNow(),
                     cancellationToken);
+                _metrics.RecordCounter(
+                    ArchiveThroughputMetricNames.IdentityRegenerationTargetsFailed);
             }
 
             return true;
@@ -169,6 +181,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 auto.AssignedCount,
                 _timeProvider.GetUtcNow(),
                 cancellationToken);
+            _metrics.RecordCounter(
+                ArchiveThroughputMetricNames.IdentityRegenerationRunsCompleted);
         }
         catch (OperationCanceledException)
         {
@@ -181,6 +195,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 exception.Message,
                 _timeProvider.GetUtcNow(),
                 cancellationToken);
+            _metrics.RecordCounter(
+                ArchiveThroughputMetricNames.IdentityRegenerationRunsFailed);
         }
 
         return true;

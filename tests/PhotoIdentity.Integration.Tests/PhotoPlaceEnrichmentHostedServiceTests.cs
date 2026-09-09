@@ -6,6 +6,7 @@ using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Worker;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -33,6 +34,7 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
                 minimumRequestIntervalMilliseconds: 1_000,
                 idlePollIntervalMilliseconds: 1_000);
             PhotoPlaceEnrichmentWorkerState workerState = new();
+            ArchiveThroughputMetrics metrics = new(clock);
             PhotoPlaceEnrichmentHostedService worker = new(
                 new GeoNamesReverseGeocodingConfiguration(
                     "configured-test-user",
@@ -43,6 +45,7 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
                 enrichment,
                 workerState,
                 clock,
+                metrics,
                 NullLogger<PhotoPlaceEnrichmentHostedService>.Instance);
 
             PhotoPlaceEnrichmentWorkerCycleResult cycle = await worker.RunOnceAsync();
@@ -65,6 +68,10 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
             Assert.NotNull(snapshot.LastActivityAtUtc);
             Assert.NotNull(snapshot.NextAttemptAtUtc);
             Assert.True(snapshot.NextAttemptAtUtc > snapshot.LastActivityAtUtc);
+            Assert.Contains(
+                metrics.GetSnapshot().Counters,
+                value => value.Name == ArchiveThroughputMetricNames.PlaceEnrichmentAssignments &&
+                    value.Value == 1);
         }
         finally
         {
@@ -127,6 +134,7 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
                 enrichment,
                 workerState,
                 clock,
+                new ArchiveThroughputMetrics(clock),
                 NullLogger<PhotoPlaceEnrichmentHostedService>.Instance);
 
             PhotoPlaceEnrichmentWorkerCycleResult cycle = await worker.RunOnceAsync();
@@ -174,6 +182,7 @@ public sealed class PhotoPlaceEnrichmentHostedServiceTests
                 enrichment,
                 workerState,
                 clock,
+                new ArchiveThroughputMetrics(clock),
                 NullLogger<PhotoPlaceEnrichmentHostedService>.Instance);
 
             PhotoPlaceEnrichmentWorkerCycleResult cycle = await worker.RunOnceAsync();

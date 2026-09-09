@@ -24,6 +24,16 @@ public static class ArchiveThroughputMetricNames
     public const string FaceReviewDerivativeGeneration = "face-review-derivative-generation";
     public const string HydrationRequest = "hydration-request";
     public const string ReleaseRequest = "release-request";
+    public const string ApiArchiveRequest = "api-archive-request";
+    public const string ApiCollectionRequest = "api-collection-request";
+    public const string ApiMetadataRequest = "api-metadata-request";
+    public const string ApiPlaceRequest = "api-place-request";
+    public const string ApiReviewRequest = "api-review-request";
+    public const string ApiSlideshowRequest = "api-slideshow-request";
+    public const string ApiDetectorRequest = "api-detector-request";
+    public const string ApiOtherRequest = "api-other-request";
+    public const string IdentityRegenerationCycle = "identity-regeneration-cycle";
+    public const string PlaceEnrichmentCycle = "place-enrichment-cycle";
 
     public const string AdvanceInvocations = "advance-invocations";
     public const string AnalysisAttempts = "analysis-attempts";
@@ -37,6 +47,17 @@ public static class ArchiveThroughputMetricNames
     public const string HydrationRequests = "hydration-requests";
     public const string ReleaseRequests = "release-requests";
     public const string ArchiveErrors = "archive-errors";
+    public const string ApiRequestSucceeded = "api-requests-succeeded";
+    public const string ApiRequestFailed = "api-requests-failed";
+    public const string IdentityRegenerationTargetsClaimed = "identity-regeneration-targets-claimed";
+    public const string IdentityRegenerationTargetsCompleted = "identity-regeneration-targets-completed";
+    public const string IdentityRegenerationTargetsFailed = "identity-regeneration-targets-failed";
+    public const string IdentityRegenerationRunsCompleted = "identity-regeneration-runs-completed";
+    public const string IdentityRegenerationRunsFailed = "identity-regeneration-runs-failed";
+    public const string PlaceEnrichmentCycles = "place-enrichment-cycles";
+    public const string PlaceEnrichmentCandidates = "place-enrichment-candidates";
+    public const string PlaceEnrichmentAssignments = "place-enrichment-assignments";
+    public const string PlaceEnrichmentFailures = "place-enrichment-failures";
 
     public const string SourceVerificationHashKind = "source-verification";
     public const string OriginalStatusHashKind = "original-status";

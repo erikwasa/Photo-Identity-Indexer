@@ -1,3 +1,5 @@
+using PhotoIdentity.Worker;
+
 namespace PhotoIdentity.Api;
 
 /// <summary>
@@ -104,6 +106,7 @@ public sealed class PhotoPlaceEnrichmentHostedService : BackgroundService
     private readonly PhotoPlaceEnrichmentService _service;
     private readonly PhotoPlaceEnrichmentWorkerState _state;
     private readonly TimeProvider _timeProvider;
+    private readonly ArchiveThroughputMetrics _metrics;
     private readonly ILogger<PhotoPlaceEnrichmentHostedService> _logger;
 
     public PhotoPlaceEnrichmentHostedService(
@@ -112,6 +115,7 @@ public sealed class PhotoPlaceEnrichmentHostedService : BackgroundService
         PhotoPlaceEnrichmentService service,
         PhotoPlaceEnrichmentWorkerState state,
         TimeProvider timeProvider,
+        ArchiveThroughputMetrics metrics,
         ILogger<PhotoPlaceEnrichmentHostedService> logger)
     {
         ArgumentNullException.ThrowIfNull(geoNames);
@@ -119,12 +123,14 @@ public sealed class PhotoPlaceEnrichmentHostedService : BackgroundService
         ArgumentNullException.ThrowIfNull(service);
         ArgumentNullException.ThrowIfNull(state);
         ArgumentNullException.ThrowIfNull(timeProvider);
+        ArgumentNullException.ThrowIfNull(metrics);
         ArgumentNullException.ThrowIfNull(logger);
         _geoNames = geoNames;
         _automatic = automatic;
         _service = service;
         _state = state;
         _timeProvider = timeProvider;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -167,6 +173,9 @@ public sealed class PhotoPlaceEnrichmentHostedService : BackgroundService
     public async Task<PhotoPlaceEnrichmentWorkerCycleResult> RunOnceAsync(
         CancellationToken cancellationToken = default)
     {
+        using IDisposable timing = _metrics.Measure(
+            ArchiveThroughputMetricNames.PlaceEnrichmentCycle);
+        _metrics.RecordCounter(ArchiveThroughputMetricNames.PlaceEnrichmentCycles);
         DateTimeOffset now = _timeProvider.GetUtcNow();
         TimeSpan idleDelay = TimeSpan.FromMilliseconds(_automatic.IdlePollIntervalMilliseconds);
 
@@ -195,6 +204,8 @@ public sealed class PhotoPlaceEnrichmentHostedService : BackgroundService
             refresh: false,
             cancellationToken);
         now = _timeProvider.GetUtcNow();
+        _metrics.RecordCounter(ArchiveThroughputMetricNames.PlaceEnrichmentCandidates, report.Candidates);
+        _metrics.RecordCounter(ArchiveThroughputMetricNames.PlaceEnrichmentAssignments, report.Assigned);
 
         if (report.Candidates == 0)
         {

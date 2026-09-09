@@ -4,6 +4,7 @@ using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Worker;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -97,7 +98,8 @@ public sealed class IdentityMatchRegenerationTests
                 new SqliteIdentitySuggestionPolicyRepository(database, clock),
                 new SqliteIdentityAutoAssignmentService(database, clock),
                 new SqliteIdentityMatchEvidenceVersionReader(database),
-                clock);
+                clock,
+                new ArchiveThroughputMetrics(clock));
 
             Assert.True(await worker.AdvanceOnceAsync());
             CatalogueIdentityMatchRegenerationRun progressed = Assert.IsType<CatalogueIdentityMatchRegenerationRun>(
@@ -165,7 +167,8 @@ public sealed class IdentityMatchRegenerationTests
                 policies,
                 new SqliteIdentityAutoAssignmentService(database, clock),
                 new SqliteIdentityMatchEvidenceVersionReader(database),
-                clock);
+                clock,
+                new ArchiveThroughputMetrics(clock));
 
             Assert.True(await worker.AdvanceOnceAsync());
             Assert.Null(await ReadActiveAssignmentAsync(database, seed.Target));

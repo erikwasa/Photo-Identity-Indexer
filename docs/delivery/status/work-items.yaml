@@ -1370,9 +1370,12 @@ work_items:
 - id: WI-0105
   title: Add low-overhead PostgreSQL and background-work observability
   milestone: M24
-  status: proposed
-  owner: unassigned
+  status: in_review
+  owner: ai-agent
   document: ../work-items/WI-0105-operational-metrics-observability.md
+  started_at: 2026-09-09
+  last_updated_at: 2026-09-09
+  branch: autopilot/m24
   blockers:
   - WI-0099
   blocker_notes:

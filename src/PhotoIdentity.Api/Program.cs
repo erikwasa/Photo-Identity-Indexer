@@ -243,6 +243,31 @@ public partial class Program
         app.UseStaticFiles();
         app.Use(async (context, next) =>
         {
+            if (!context.Request.Path.StartsWithSegments("/api") ||
+                context.Request.Path.StartsWithSegments("/api/archive/diagnostics"))
+            {
+                await next(context);
+                return;
+            }
+
+            ArchiveThroughputMetrics metrics = context.RequestServices
+                .GetRequiredService<ArchiveThroughputMetrics>();
+            string metricName = GetApiRequestMetricName(context.Request.Path);
+            using IDisposable timing = metrics.Measure(metricName);
+            try
+            {
+                await next(context);
+            }
+            finally
+            {
+                metrics.RecordCounter(
+                    context.Response.StatusCode < StatusCodes.Status400BadRequest
+                        ? ArchiveThroughputMetricNames.ApiRequestSucceeded
+                        : ArchiveThroughputMetricNames.ApiRequestFailed);
+            }
+        });
+        app.Use(async (context, next) =>
+        {
             if (context.Request.Path.StartsWithSegments("/api/review") ||
                 context.Request.Path.StartsWithSegments("/api/collections") ||
                 context.Request.Path.StartsWithSegments("/api/smart-collections") ||
@@ -349,5 +374,47 @@ public partial class Program
         }
 
         throw new InvalidOperationException($"Configuration '{key}' must be true or false.");
+    }
+
+    private static string GetApiRequestMetricName(PathString path)
+    {
+        if (path.StartsWithSegments("/api/archive"))
+        {
+            return ArchiveThroughputMetricNames.ApiArchiveRequest;
+        }
+
+        if (path.StartsWithSegments("/api/collections") ||
+            path.StartsWithSegments("/api/smart-collections"))
+        {
+            return ArchiveThroughputMetricNames.ApiCollectionRequest;
+        }
+
+        if (path.StartsWithSegments("/api/photo-metadata"))
+        {
+            return ArchiveThroughputMetricNames.ApiMetadataRequest;
+        }
+
+        if (path.StartsWithSegments("/api/places") ||
+            path.StartsWithSegments("/api/place-enrichment"))
+        {
+            return ArchiveThroughputMetricNames.ApiPlaceRequest;
+        }
+
+        if (path.StartsWithSegments("/api/review") ||
+            path.StartsWithSegments("/api/suggestions") ||
+            path.StartsWithSegments("/api/people") ||
+            path.StartsWithSegments("/api/identity"))
+        {
+            return ArchiveThroughputMetricNames.ApiReviewRequest;
+        }
+
+        if (path.StartsWithSegments("/api/slideshows"))
+        {
+            return ArchiveThroughputMetricNames.ApiSlideshowRequest;
+        }
+
+        return path.StartsWithSegments("/api/detector")
+            ? ArchiveThroughputMetricNames.ApiDetectorRequest
+            : ArchiveThroughputMetricNames.ApiOtherRequest;
     }
 }
