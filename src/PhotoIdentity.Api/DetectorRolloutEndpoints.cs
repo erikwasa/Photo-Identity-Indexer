@@ -1,6 +1,7 @@
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
@@ -25,8 +26,8 @@ public static class DetectorRolloutEndpoints
 
     private static async Task<IResult> GetRunAsync(
         string runId,
-        SqliteProcessingRepository processingRepository,
-        SqliteDetectorRolloutApplicationRepository rolloutRepository,
+        IProcessingExecutionRepository processingRepository,
+        IDetectorRolloutApplicationRepository rolloutRepository,
         CancellationToken cancellationToken)
     {
         if (!TryRunId(runId, out ProcessingRunId parsedRunId))
@@ -67,7 +68,7 @@ public static class DetectorRolloutEndpoints
 
     private static async Task<IResult> GetPendingAsync(
         string runId,
-        SqliteDetectorRolloutApplicationRepository rolloutRepository,
+        IDetectorRolloutApplicationRepository rolloutRepository,
         SqliteReviewRepository reviewRepository,
         CancellationToken cancellationToken)
     {
@@ -144,7 +145,7 @@ public static class DetectorRolloutEndpoints
         string runId,
         string revisionId,
         int candidateIndex,
-        SqliteDetectorRolloutReviewRepository reviewRepository,
+        IDetectorRolloutReviewRepository reviewRepository,
         DetectorRolloutCropFileResolver resolver,
         CancellationToken cancellationToken)
     {
@@ -174,7 +175,7 @@ public static class DetectorRolloutEndpoints
         string revisionId,
         int candidateIndex,
         SaveDetectorRolloutResolutionRequest request,
-        SqliteDetectorRolloutReviewRepository reviewRepository,
+        IDetectorRolloutReviewRepository reviewRepository,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {

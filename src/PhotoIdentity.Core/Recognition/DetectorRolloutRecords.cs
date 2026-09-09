@@ -1,8 +1,7 @@
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Core.Recognition;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Core.Recognition;
 
 /// <summary>
 /// Durable registration of one exact detector pipeline against a processing run.

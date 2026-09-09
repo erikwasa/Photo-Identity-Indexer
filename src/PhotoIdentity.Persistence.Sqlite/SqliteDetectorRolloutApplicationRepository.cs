@@ -13,7 +13,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// Human-resolved ambiguous candidates are applied from their durable candidate payload;
 /// candidate order is never used as face identity.
 /// </summary>
-public sealed class SqliteDetectorRolloutApplicationRepository
+public sealed class SqliteDetectorRolloutApplicationRepository : IDetectorRolloutApplicationRepository
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly SqliteDetectorRolloutReviewRepository _reviewRepository;

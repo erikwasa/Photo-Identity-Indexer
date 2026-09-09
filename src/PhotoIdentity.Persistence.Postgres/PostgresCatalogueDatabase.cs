@@ -6,9 +6,9 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// Owns the PostgreSQL connection pool and versioned migration bootstrap while
 /// PostgreSQL is introduced alongside the still-authoritative SQLite catalogue.
 /// </summary>
-public sealed class PostgresCatalogueDatabase : IAsyncDisposable
+public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable
 {
-    public const int CurrentSchemaVersion = 20;
+    public const int CurrentSchemaVersion = 21;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1087,6 +1087,7 @@ public sealed class PostgresCatalogueDatabase : IAsyncDisposable
                     AND NEW.merged_into_person_id IS NOT NULL)
                 EXECUTE FUNCTION photo_identity_move_featured_face_after_merge();
             """),
+        new(21, "detector-rollout-reconciliation", DetectorRolloutSchema),
     ];
 
     private readonly NpgsqlDataSource _dataSource;

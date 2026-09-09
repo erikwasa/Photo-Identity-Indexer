@@ -1,6 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Core.Recognition;
 
 public enum DetectorReconciliationResolutionKind
 {

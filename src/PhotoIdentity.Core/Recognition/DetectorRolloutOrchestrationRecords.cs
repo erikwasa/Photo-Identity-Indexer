@@ -1,7 +1,7 @@
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Core.Recognition;
 
 public sealed record CatalogueDetectorRolloutOccurrenceAnchor(
     FaceOccurrenceId FaceOccurrenceId,

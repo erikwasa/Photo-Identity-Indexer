@@ -15,7 +15,7 @@ public sealed class SqliteDetectorRolloutApplicationRepositoryTests
         try
         {
             TestState state = await CreateAmbiguousStateAsync(databasePath);
-            SqliteDetectorRolloutReviewRepository review = new(state.Database);
+            IDetectorRolloutReviewRepository review = new SqliteDetectorRolloutReviewRepository(state.Database);
             CatalogueDetectorCandidateInspection inspection = Inspection(
                 state.CandidateBox,
                 state.CandidateLandmarks,
@@ -35,7 +35,7 @@ public sealed class SqliteDetectorRolloutApplicationRepositoryTests
                 state.Now.AddMinutes(1),
                 "same physical face");
 
-            SqliteDetectorRolloutApplicationRepository application = new(state.Database);
+            IDetectorRolloutApplicationRepository application = new SqliteDetectorRolloutApplicationRepository(state.Database);
             CatalogueDetectorRolloutApplyResult applied = await application.ApplyResolvedAsync(state.RunId);
             CatalogueDetectorReconciliationReview current = (await review.GetReviewAsync(
                 state.RunId,
@@ -73,7 +73,7 @@ public sealed class SqliteDetectorRolloutApplicationRepositoryTests
         try
         {
             TestState state = await CreateAmbiguousStateAsync(databasePath, existingOrdinals: [0, 5]);
-            SqliteDetectorRolloutReviewRepository review = new(state.Database);
+            IDetectorRolloutReviewRepository review = new SqliteDetectorRolloutReviewRepository(state.Database);
             CatalogueDetectorCandidateInspection inspection = Inspection(
                 state.CandidateBox,
                 state.CandidateLandmarks,
@@ -93,7 +93,7 @@ public sealed class SqliteDetectorRolloutApplicationRepositoryTests
                 state.Now.AddMinutes(1),
                 "additional legitimate face");
 
-            SqliteDetectorRolloutApplicationRepository application = new(state.Database);
+            IDetectorRolloutApplicationRepository application = new SqliteDetectorRolloutApplicationRepository(state.Database);
             FaceOccurrenceId first = await application.ApplyReviewedCandidateAsync(
                 state.RunId,
                 state.RevisionId,
@@ -136,14 +136,14 @@ public sealed class SqliteDetectorRolloutApplicationRepositoryTests
         try
         {
             TestState state = await CreateAmbiguousStateAsync(databasePath);
-            SqliteDetectorRolloutReviewRepository review = new(state.Database);
+            IDetectorRolloutReviewRepository review = new SqliteDetectorRolloutReviewRepository(state.Database);
             await review.SaveInspectionAsync(
                 state.RunId,
                 state.RevisionId,
                 state.CandidateIndex,
                 Inspection(state.CandidateBox, state.CandidateLandmarks, state.Now));
 
-            SqliteDetectorRolloutApplicationRepository application = new(state.Database);
+            IDetectorRolloutApplicationRepository application = new SqliteDetectorRolloutApplicationRepository(state.Database);
             CatalogueDetectorRolloutSummary awaiting = await application.GetSummaryAsync(state.RunId);
             Assert.Equal(1, awaiting.AwaitingReviewCount);
             Assert.Equal(0, awaiting.ReadyToApplyCount);

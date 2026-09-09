@@ -82,3 +82,19 @@ Started 2026-09-09 on the M24 PostgreSQL catalogue branch.
 - Converted archive status and archive item-filter API reads to the Core-owned archive status/query contract; default DI still resolves it to SQLite until controlled provider cutover.
 - Added `PostgresArchiveStatusRepository` preserving current archive folder counts, unavailable-vs-pending classification differences between the status and orthogonal filter endpoints, failed-job error surfacing, pagination totals and latest-run job counts.
 - Kept normal runtime binding on SQLite for these newly neutralized surfaces until WI-0102 performs controlled migration/cutover; no dual writes are introduced.
+
+## Detector rollout contract slice (2026-09-09)
+
+- Moved detector pipeline, candidate inspection, reconciliation review/resolution and rollout orchestration records into `PhotoIdentity.Core.Recognition`. This explicitly changes their CLR namespace from the SQLite assembly; HTTP payloads and stored representations are unchanged.
+- Added `IDetectorRolloutReviewRepository` and `IDetectorRolloutApplicationRepository`, implemented by the existing SQLite repositories. Detector rollout endpoints now consume these contracts, and run-summary reads consume `IProcessingExecutionRepository`.
+- Existing repository tests exercise the new interfaces; the existing HTTP tests verify runtime DI. No additional host-heavy tests or required CI gates were introduced.
+- PostgreSQL detector schema/repositories, rollout worker/CLI composition and the pending-review face lookup remain unfinished. This slice is not PostgreSQL detector acceptance or provider cutover.
+
+## PostgreSQL detector review slice (2026-09-09)
+
+- Added schema version 21 for detector pipelines, run provenance, reconciliation plans/candidates/options/unmatched faces, durable candidate inspections and append-only resolution actions. UUID keys, JSONB geometry, binary embedding payloads, timestamp precision, foreign keys and pending/history indexes preserve the existing storage semantics on PostgreSQL.
+- Added `PostgresDetectorRolloutReviewRepository` implementing the Core review contract. Candidate-row locks serialize inspection writes and resolution retries; applied candidates reject further mutation. Timestamp comparison accounts for PostgreSQL microsecond precision so valid .NET timestamps remain replayable.
+- Added a repository-level live PostgreSQL test covering immutable payload round-trips, concurrent identical writes, resolution history, invalid options, pending reviews, cancellation and applied-state rejection. It uses an isolated disposable database and does not start the HTTP host. The existing schema migration test and new review test passed together against live PostgreSQL (2 tests, 3 seconds).
+- Required CI gates are unchanged. The live test follows the existing `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING` opt-in convention; an ordinary test run without that setting does not establish live PostgreSQL acceptance.
+- Remaining detector work: pipeline registration/plan persistence, unambiguous and reviewed candidate application, application queries, and worker/CLI composition. Normal runtime still binds SQLite until controlled cutover.
+- Local verification: `./build.ps1` passed with zero warnings/errors; `./test.ps1` passed 533 tests, including 402 integration tests in 1 minute 39 seconds; `./verify-review.ps1 -Mode Smoke -Configuration Release -SkipBuild` passed the comprehensive published-app smoke checks. Documentation validation and generated-output checks also passed.

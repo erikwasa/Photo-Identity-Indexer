@@ -6,6 +6,7 @@ using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.People;
 using PhotoIdentity.Core.Places;
+using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Sources;
@@ -189,8 +190,10 @@ public partial class Program
         builder.Services.AddSingleton<IAssetRevisionLookupRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteLocalBatchRepository>());
         builder.Services.AddSingleton<SqliteProcessingRepository>();
-        builder.Services.AddSingleton<SqliteDetectorRolloutReviewRepository>();
-        builder.Services.AddSingleton<SqliteDetectorRolloutApplicationRepository>();
+        builder.Services.AddSingleton<IProcessingExecutionRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteProcessingRepository>());
+        builder.Services.AddSingleton<IDetectorRolloutReviewRepository, SqliteDetectorRolloutReviewRepository>();
+        builder.Services.AddSingleton<IDetectorRolloutApplicationRepository, SqliteDetectorRolloutApplicationRepository>();
         builder.Services.AddSingleton<SqliteArchiveAnalysisRepository>();
         builder.Services.AddSingleton<SqliteArchiveReviewProxyRepository>();
         builder.Services.AddSingleton<IArchiveReviewProxyRepository>(serviceProvider =>

@@ -2,22 +2,23 @@ using System.Buffers.Binary;
 using System.Data;
 using System.Globalization;
 using System.Text.Json;
-using Microsoft.Data.Sqlite;
+using Npgsql;
+using NpgsqlTypes;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
 /// Durable review state for detector rollout. Candidate payloads are stored before canonical
 /// face mutation, and ambiguous identity decisions are append-only human actions.
 /// </summary>
-public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutReviewRepository
+public sealed class PostgresDetectorRolloutReviewRepository : IDetectorRolloutReviewRepository
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly PostgresCatalogueDatabase _database;
 
-    public SqliteDetectorRolloutReviewRepository(SqliteCatalogueDatabase database)
+    public PostgresDetectorRolloutReviewRepository(PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
@@ -33,8 +34,8 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
         ArgumentOutOfRangeException.ThrowIfNegative(candidateIndex);
         ArgumentNullException.ThrowIfNull(inspection);
 
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteTransaction transaction = connection.BeginTransaction();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         (NormalizedBoundingBox Box, NormalizedFaceLandmarks Landmarks, FaceOccurrenceId? AppliedId) candidate =
             await ReadCandidateGeometryAsync(
@@ -71,7 +72,7 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
             throw new InvalidOperationException("The candidate inspection detector does not match the registered pipeline.");
         }
 
-        using (SqliteCommand command = connection.CreateCommand())
+        using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;
             command.CommandText = """
@@ -95,24 +96,24 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
                     embedding_vector_blob,
                     observed_at_utc)
                 VALUES (
-                    $processing_run_id,
-                    $asset_revision_id,
-                    $candidate_index,
-                    $detector_model_id,
-                    $detector_model_hash,
-                    $confidence,
-                    $crop_id,
-                    $crop_protocol,
-                    $crop_content_sha256,
-                    $crop_storage_path,
-                    $crop_width,
-                    $crop_height,
-                    $embedder_model_id,
-                    $embedder_model_hash,
-                    $embedding_dimensions,
-                    $embedding_l2_norm,
-                    $embedding_vector_blob,
-                    $observed_at_utc)
+                    @processing_run_id,
+                    @asset_revision_id,
+                    @candidate_index,
+                    @detector_model_id,
+                    @detector_model_hash,
+                    @confidence,
+                    @crop_id,
+                    @crop_protocol,
+                    @crop_content_sha256,
+                    @crop_storage_path,
+                    @crop_width,
+                    @crop_height,
+                    @embedder_model_id,
+                    @embedder_model_hash,
+                    @embedding_dimensions,
+                    @embedding_l2_norm,
+                    @embedding_vector_blob,
+                    @observed_at_utc)
                 ON CONFLICT(processing_run_id, asset_revision_id, candidate_index) DO NOTHING;
                 """;
             AddInspectionParameters(command, processingRunId, assetRevisionId, candidateIndex, inspection);
@@ -133,7 +134,7 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
                 "A different durable inspection payload already exists for this rollout candidate.");
         }
 
-        transaction.Commit();
+        await transaction.CommitAsync(cancellationToken);
         return persisted;
     }
 
@@ -144,7 +145,7 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(candidateIndex);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         return await ReadInspectionAsync(
             connection,
             transaction: null,
@@ -181,8 +182,8 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
             throw new ArgumentException("Only an existing-occurrence resolution may include a face occurrence.", nameof(faceOccurrenceId));
         }
 
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteTransaction transaction = connection.BeginTransaction();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
 
         (FaceDetectionReconciliationDisposition Disposition, FaceOccurrenceId? AppliedId) state =
             await ReadCandidateStateAsync(
@@ -244,11 +245,11 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
             string.Equals(latest.Actor, canonicalActor, StringComparison.Ordinal) &&
             string.Equals(latest.Note, canonicalNote, StringComparison.Ordinal))
         {
-            transaction.Commit();
+            await transaction.CommitAsync(cancellationToken);
             return latest;
         }
 
-        using (SqliteCommand command = connection.CreateCommand())
+        using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.Transaction = transaction;
             command.CommandText = """
@@ -262,26 +263,25 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
                     note,
                     created_at_utc)
                 VALUES (
-                    $processing_run_id,
-                    $asset_revision_id,
-                    $candidate_index,
-                    $action_kind,
-                    $face_occurrence_id,
-                    $actor,
-                    $note,
-                    $created_at_utc);
-                SELECT last_insert_rowid();
+                    @processing_run_id,
+                    @asset_revision_id,
+                    @candidate_index,
+                    @action_kind,
+                    @face_occurrence_id,
+                    @actor,
+                    @note,
+                    @created_at_utc) RETURNING id;
                 """;
-            command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-            command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
-            command.Parameters.AddWithValue("$candidate_index", candidateIndex);
-            command.Parameters.AddWithValue("$action_kind", ToStorage(kind));
-            command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId?.ToString() ?? (object)DBNull.Value);
-            command.Parameters.AddWithValue("$actor", canonicalActor);
-            command.Parameters.AddWithValue("$note", canonicalNote ?? (object)DBNull.Value);
-            command.Parameters.AddWithValue("$created_at_utc", Format(createdAt));
+            command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+            command.Parameters.AddWithValue("@asset_revision_id", assetRevisionId.Value);
+            command.Parameters.AddWithValue("@candidate_index", candidateIndex);
+            command.Parameters.AddWithValue("@action_kind", ToStorage(kind));
+            command.Parameters.AddWithValue("@face_occurrence_id", NpgsqlDbType.Uuid, (object?)faceOccurrenceId?.Value ?? DBNull.Value);
+            command.Parameters.AddWithValue("@actor", canonicalActor);
+            command.Parameters.AddWithValue("@note", NpgsqlDbType.Text, canonicalNote ?? (object)DBNull.Value);
+            command.Parameters.AddWithValue("@created_at_utc", createdAt);
             long id = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
-            transaction.Commit();
+            await transaction.CommitAsync(cancellationToken);
             return new CatalogueDetectorReconciliationResolution(
                 id,
                 processingRunId,
@@ -302,21 +302,21 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(candidateIndex);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT id, action_kind, face_occurrence_id, actor, note, created_at_utc
             FROM detector_reconciliation_resolution_actions
-            WHERE processing_run_id = $processing_run_id
-              AND asset_revision_id = $asset_revision_id
-              AND candidate_index = $candidate_index
+            WHERE processing_run_id = @processing_run_id
+              AND asset_revision_id = @asset_revision_id
+              AND candidate_index = @candidate_index
             ORDER BY id;
             """;
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-        command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
-        command.Parameters.AddWithValue("$candidate_index", candidateIndex);
+        command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+        command.Parameters.AddWithValue("@asset_revision_id", assetRevisionId.Value);
+        command.Parameters.AddWithValue("@candidate_index", candidateIndex);
         List<CatalogueDetectorReconciliationResolution> values = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
             values.Add(ReadResolution(reader, processingRunId, assetRevisionId, candidateIndex));
@@ -332,7 +332,7 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
         CancellationToken cancellationToken = default)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(candidateIndex);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         CatalogueDetectorReconciliationCandidate? candidate = await ReadCandidateAsync(
             connection,
             processingRunId,
@@ -365,23 +365,23 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
         ProcessingRunId processingRunId,
         CancellationToken cancellationToken = default)
     {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         List<(AssetRevisionId RevisionId, int CandidateIndex)> keys = [];
-        using (SqliteCommand command = connection.CreateCommand())
+        using (NpgsqlCommand command = connection.CreateCommand())
         {
             command.CommandText = """
                 SELECT asset_revision_id, candidate_index
                 FROM detector_reconciliation_candidates
-                WHERE processing_run_id = $processing_run_id
+                WHERE processing_run_id = @processing_run_id
                   AND disposition = 'ambiguous'
                   AND applied_face_occurrence_id IS NULL
                 ORDER BY asset_revision_id, candidate_index;
                 """;
-            command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+            command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                keys.Add((AssetRevisionId.From(Guid.Parse(reader.GetString(0))), reader.GetInt32(1)));
+                keys.Add((AssetRevisionId.From(reader.GetGuid(0)), reader.GetInt32(1)));
             }
         }
 
@@ -420,41 +420,41 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
     }
 
     private static void AddInspectionParameters(
-        SqliteCommand command,
+        NpgsqlCommand command,
         ProcessingRunId processingRunId,
         AssetRevisionId assetRevisionId,
         int candidateIndex,
         CatalogueDetectorCandidateInspection inspection)
     {
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-        command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
-        command.Parameters.AddWithValue("$candidate_index", candidateIndex);
-        command.Parameters.AddWithValue("$detector_model_id", inspection.DetectorModelId.ToString());
-        command.Parameters.AddWithValue("$detector_model_hash", inspection.DetectorModelHash.ToString());
-        command.Parameters.AddWithValue("$confidence", inspection.Confidence);
-        command.Parameters.AddWithValue("$crop_id", inspection.CropId.ToString());
-        command.Parameters.AddWithValue("$crop_protocol", inspection.CropProtocol.ToString());
-        command.Parameters.AddWithValue("$crop_content_sha256", inspection.CropContentHash.ToString());
-        command.Parameters.AddWithValue("$crop_storage_path", inspection.CropStoragePath);
-        command.Parameters.AddWithValue("$crop_width", inspection.CropWidth);
-        command.Parameters.AddWithValue("$crop_height", inspection.CropHeight);
-        command.Parameters.AddWithValue("$embedder_model_id", inspection.EmbedderModelId.ToString());
-        command.Parameters.AddWithValue("$embedder_model_hash", inspection.EmbedderModelHash.ToString());
-        command.Parameters.AddWithValue("$embedding_dimensions", inspection.Embedding.Dimensions);
-        command.Parameters.AddWithValue("$embedding_l2_norm", inspection.Embedding.L2Norm);
-        command.Parameters.AddWithValue("$embedding_vector_blob", SerializeVector(inspection.Embedding));
-        command.Parameters.AddWithValue("$observed_at_utc", Format(inspection.ObservedAtUtc));
+        command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+        command.Parameters.AddWithValue("@asset_revision_id", assetRevisionId.Value);
+        command.Parameters.AddWithValue("@candidate_index", candidateIndex);
+        command.Parameters.AddWithValue("@detector_model_id", inspection.DetectorModelId.ToString());
+        command.Parameters.AddWithValue("@detector_model_hash", inspection.DetectorModelHash.ToString());
+        command.Parameters.AddWithValue("@confidence", inspection.Confidence);
+        command.Parameters.AddWithValue("@crop_id", inspection.CropId.Value);
+        command.Parameters.AddWithValue("@crop_protocol", inspection.CropProtocol.ToString());
+        command.Parameters.AddWithValue("@crop_content_sha256", inspection.CropContentHash.ToString());
+        command.Parameters.AddWithValue("@crop_storage_path", inspection.CropStoragePath);
+        command.Parameters.AddWithValue("@crop_width", inspection.CropWidth);
+        command.Parameters.AddWithValue("@crop_height", inspection.CropHeight);
+        command.Parameters.AddWithValue("@embedder_model_id", inspection.EmbedderModelId.ToString());
+        command.Parameters.AddWithValue("@embedder_model_hash", inspection.EmbedderModelHash.ToString());
+        command.Parameters.AddWithValue("@embedding_dimensions", inspection.Embedding.Dimensions);
+        command.Parameters.AddWithValue("@embedding_l2_norm", inspection.Embedding.L2Norm);
+        command.Parameters.AddWithValue("@embedding_vector_blob", SerializeVector(inspection.Embedding));
+        command.Parameters.AddWithValue("@observed_at_utc", inspection.ObservedAtUtc);
     }
 
     private static async Task<CatalogueDetectorCandidateInspection?> ReadInspectionAsync(
-        SqliteConnection connection,
-        SqliteTransaction? transaction,
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
         ProcessingRunId processingRunId,
         AssetRevisionId assetRevisionId,
         int candidateIndex,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             SELECT detector_model_id, detector_model_hash, confidence,
@@ -462,14 +462,23 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
                    embedder_model_id, embedder_model_hash,
                    embedding_dimensions, embedding_l2_norm, embedding_vector_blob, observed_at_utc
             FROM detector_reconciliation_candidate_inspections
-            WHERE processing_run_id = $processing_run_id
-              AND asset_revision_id = $asset_revision_id
-              AND candidate_index = $candidate_index;
+            WHERE processing_run_id = @processing_run_id
+              AND asset_revision_id = @asset_revision_id
+              AND candidate_index = @candidate_index;
             """;
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-        command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
-        command.Parameters.AddWithValue("$candidate_index", candidateIndex);
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+        command.Parameters.AddWithValue("@asset_revision_id", assetRevisionId.Value);
+        command.Parameters.AddWithValue("@candidate_index", candidateIndex);
+        (NormalizedBoundingBox Box, NormalizedFaceLandmarks Landmarks, FaceOccurrenceId? AppliedId)? geometry =
+            await ReadCandidateGeometryAsync(
+                connection,
+                transaction,
+                processingRunId,
+                assetRevisionId,
+                candidateIndex,
+                cancellationToken);
+
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
             return null;
@@ -484,15 +493,7 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
             throw new DataException("The stored rollout embedding norm does not match its vector data.");
         }
 
-        (NormalizedBoundingBox Box, NormalizedFaceLandmarks Landmarks, FaceOccurrenceId? AppliedId) candidate =
-            await ReadCandidateGeometryAsync(
-                connection,
-                transaction,
-                processingRunId,
-                assetRevisionId,
-                candidateIndex,
-                cancellationToken)
-            ?? throw new DataException("The rollout candidate disappeared while its inspection was being read.");
+        var candidate = geometry ?? throw new DataException("The rollout candidate disappeared while its inspection was being read.");
 
         return new CatalogueDetectorCandidateInspection(
             new ModelId(reader.GetString(0)),
@@ -500,7 +501,7 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
             reader.GetDouble(2),
             candidate.Box,
             candidate.Landmarks,
-            FaceCropId.From(Guid.Parse(reader.GetString(3))),
+            FaceCropId.From(reader.GetGuid(3)),
             new AlignmentProtocolId(reader.GetString(4)),
             new Sha256Digest(reader.GetString(5)),
             reader.GetString(6),
@@ -509,29 +510,29 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
             new ModelId(reader.GetString(9)),
             new Sha256Digest(reader.GetString(10)),
             embedding,
-            ParseTimestamp(reader.GetString(14)));
+            reader.GetFieldValue<DateTimeOffset>(14));
     }
 
     private static async Task<CatalogueDetectorReconciliationCandidate?> ReadCandidateAsync(
-        SqliteConnection connection,
+        NpgsqlConnection connection,
         ProcessingRunId processingRunId,
         AssetRevisionId assetRevisionId,
         int candidateIndex,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT disposition, proposed_face_occurrence_id, bounding_box_json, landmarks_json,
                    applied_face_occurrence_id, applied_at_utc
             FROM detector_reconciliation_candidates
-            WHERE processing_run_id = $processing_run_id
-              AND asset_revision_id = $asset_revision_id
-              AND candidate_index = $candidate_index;
+            WHERE processing_run_id = @processing_run_id
+              AND asset_revision_id = @asset_revision_id
+              AND candidate_index = @candidate_index;
             """;
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-        command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
-        command.Parameters.AddWithValue("$candidate_index", candidateIndex);
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+        command.Parameters.AddWithValue("@asset_revision_id", assetRevisionId.Value);
+        command.Parameters.AddWithValue("@candidate_index", candidateIndex);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
         {
             return null;
@@ -540,13 +541,13 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
         FaceDetectionReconciliationDisposition disposition = FromStorageDisposition(reader.GetString(0));
         FaceOccurrenceId? proposed = reader.IsDBNull(1)
             ? null
-            : FaceOccurrenceId.From(Guid.Parse(reader.GetString(1)));
+            : FaceOccurrenceId.From(reader.GetGuid(1));
         NormalizedBoundingBox box = DeserializeBoundingBox(reader.GetString(2));
         NormalizedFaceLandmarks landmarks = DeserializeLandmarks(reader.GetString(3));
         FaceOccurrenceId? applied = reader.IsDBNull(4)
             ? null
-            : FaceOccurrenceId.From(Guid.Parse(reader.GetString(4)));
-        DateTimeOffset? appliedAt = reader.IsDBNull(5) ? null : ParseTimestamp(reader.GetString(5));
+            : FaceOccurrenceId.From(reader.GetGuid(4));
+        DateTimeOffset? appliedAt = reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5);
         await reader.DisposeAsync();
 
         IReadOnlyList<FaceOccurrenceId> options = await ReadOptionsAsync(
@@ -567,188 +568,196 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
     }
 
     private static async Task<IReadOnlyList<FaceOccurrenceId>> ReadOptionsAsync(
-        SqliteConnection connection,
+        NpgsqlConnection connection,
         ProcessingRunId processingRunId,
         AssetRevisionId assetRevisionId,
         int candidateIndex,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT face_occurrence_id
             FROM detector_reconciliation_candidate_options
-            WHERE processing_run_id = $processing_run_id
-              AND asset_revision_id = $asset_revision_id
-              AND candidate_index = $candidate_index
+            WHERE processing_run_id = @processing_run_id
+              AND asset_revision_id = @asset_revision_id
+              AND candidate_index = @candidate_index
             ORDER BY face_occurrence_id;
             """;
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-        command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
-        command.Parameters.AddWithValue("$candidate_index", candidateIndex);
+        command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+        command.Parameters.AddWithValue("@asset_revision_id", assetRevisionId.Value);
+        command.Parameters.AddWithValue("@candidate_index", candidateIndex);
         List<FaceOccurrenceId> values = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            values.Add(FaceOccurrenceId.From(Guid.Parse(reader.GetString(0))));
+            values.Add(FaceOccurrenceId.From(reader.GetGuid(0)));
         }
 
         return values;
     }
 
     private static async Task<(NormalizedBoundingBox Box, NormalizedFaceLandmarks Landmarks, FaceOccurrenceId? AppliedId)?> ReadCandidateGeometryAsync(
-        SqliteConnection connection,
-        SqliteTransaction? transaction,
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
         ProcessingRunId processingRunId,
         AssetRevisionId assetRevisionId,
         int candidateIndex,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             SELECT bounding_box_json, landmarks_json, applied_face_occurrence_id
             FROM detector_reconciliation_candidates
-            WHERE processing_run_id = $processing_run_id
-              AND asset_revision_id = $asset_revision_id
-              AND candidate_index = $candidate_index;
+            WHERE processing_run_id = @processing_run_id
+              AND asset_revision_id = @asset_revision_id
+              AND candidate_index = @candidate_index;
             """;
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-        command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
-        command.Parameters.AddWithValue("$candidate_index", candidateIndex);
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            command.CommandText = command.CommandText.TrimEnd().TrimEnd(';') + " FOR UPDATE;";
+        }
+        command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+        command.Parameters.AddWithValue("@asset_revision_id", assetRevisionId.Value);
+        command.Parameters.AddWithValue("@candidate_index", candidateIndex);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
             ? (
                 DeserializeBoundingBox(reader.GetString(0)),
                 DeserializeLandmarks(reader.GetString(1)),
-                reader.IsDBNull(2) ? null : FaceOccurrenceId.From(Guid.Parse(reader.GetString(2))))
+                reader.IsDBNull(2) ? null : FaceOccurrenceId.From(reader.GetGuid(2)))
             : null;
     }
 
     private static async Task<(FaceDetectionReconciliationDisposition Disposition, FaceOccurrenceId? AppliedId)?> ReadCandidateStateAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
         ProcessingRunId processingRunId,
         AssetRevisionId assetRevisionId,
         int candidateIndex,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             SELECT disposition, applied_face_occurrence_id
             FROM detector_reconciliation_candidates
-            WHERE processing_run_id = $processing_run_id
-              AND asset_revision_id = $asset_revision_id
-              AND candidate_index = $candidate_index;
+            WHERE processing_run_id = @processing_run_id
+              AND asset_revision_id = @asset_revision_id
+              AND candidate_index = @candidate_index;
             """;
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-        command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
-        command.Parameters.AddWithValue("$candidate_index", candidateIndex);
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            command.CommandText = command.CommandText.TrimEnd().TrimEnd(';') + " FOR UPDATE;";
+        }
+        command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+        command.Parameters.AddWithValue("@asset_revision_id", assetRevisionId.Value);
+        command.Parameters.AddWithValue("@candidate_index", candidateIndex);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
             ? (
                 FromStorageDisposition(reader.GetString(0)),
-                reader.IsDBNull(1) ? null : FaceOccurrenceId.From(Guid.Parse(reader.GetString(1))))
+                reader.IsDBNull(1) ? null : FaceOccurrenceId.From(reader.GetGuid(1)))
             : null;
     }
 
     private static async Task<(string ModelId, string ModelHash)?> ReadRunPipelineAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
         ProcessingRunId processingRunId,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             SELECT pipeline.detector_model_id, pipeline.detector_model_hash
             FROM processing_run_detector_pipelines AS link
             INNER JOIN detector_pipelines AS pipeline ON pipeline.pipeline_hash = link.pipeline_hash
-            WHERE link.processing_run_id = $processing_run_id;
+            WHERE link.processing_run_id = @processing_run_id;
             """;
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
             ? (reader.GetString(0), reader.GetString(1))
             : null;
     }
 
     private static async Task<bool> IsCandidateOptionAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
         ProcessingRunId processingRunId,
         AssetRevisionId assetRevisionId,
         int candidateIndex,
         FaceOccurrenceId faceOccurrenceId,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             SELECT COUNT(*)
             FROM detector_reconciliation_candidate_options
-            WHERE processing_run_id = $processing_run_id
-              AND asset_revision_id = $asset_revision_id
-              AND candidate_index = $candidate_index
-              AND face_occurrence_id = $face_occurrence_id;
+            WHERE processing_run_id = @processing_run_id
+              AND asset_revision_id = @asset_revision_id
+              AND candidate_index = @candidate_index
+              AND face_occurrence_id = @face_occurrence_id;
             """;
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-        command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
-        command.Parameters.AddWithValue("$candidate_index", candidateIndex);
-        command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
+        command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+        command.Parameters.AddWithValue("@asset_revision_id", assetRevisionId.Value);
+        command.Parameters.AddWithValue("@candidate_index", candidateIndex);
+        command.Parameters.AddWithValue("@face_occurrence_id", faceOccurrenceId.Value);
         return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) == 1;
     }
 
     private static async Task<bool> OccurrenceBelongsToRevisionAsync(
-        SqliteConnection connection,
-        SqliteTransaction transaction,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
         FaceOccurrenceId faceOccurrenceId,
         AssetRevisionId assetRevisionId,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             SELECT COUNT(*)
             FROM face_occurrences
-            WHERE id = $face_occurrence_id
-              AND asset_revision_id = $asset_revision_id;
+            WHERE id = @face_occurrence_id
+              AND asset_revision_id = @asset_revision_id;
             """;
-        command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
-        command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
+        command.Parameters.AddWithValue("@face_occurrence_id", faceOccurrenceId.Value);
+        command.Parameters.AddWithValue("@asset_revision_id", assetRevisionId.Value);
         return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) == 1;
     }
 
     private static async Task<CatalogueDetectorReconciliationResolution?> ReadLatestResolutionAsync(
-        SqliteConnection connection,
-        SqliteTransaction? transaction,
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
         ProcessingRunId processingRunId,
         AssetRevisionId assetRevisionId,
         int candidateIndex,
         CancellationToken cancellationToken)
     {
-        using SqliteCommand command = connection.CreateCommand();
+        using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = """
             SELECT id, action_kind, face_occurrence_id, actor, note, created_at_utc
             FROM detector_reconciliation_resolution_actions
-            WHERE processing_run_id = $processing_run_id
-              AND asset_revision_id = $asset_revision_id
-              AND candidate_index = $candidate_index
+            WHERE processing_run_id = @processing_run_id
+              AND asset_revision_id = @asset_revision_id
+              AND candidate_index = @candidate_index
             ORDER BY id DESC
             LIMIT 1;
             """;
-        command.Parameters.AddWithValue("$processing_run_id", processingRunId.ToString());
-        command.Parameters.AddWithValue("$asset_revision_id", assetRevisionId.ToString());
-        command.Parameters.AddWithValue("$candidate_index", candidateIndex);
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        command.Parameters.AddWithValue("@processing_run_id", processingRunId.Value);
+        command.Parameters.AddWithValue("@asset_revision_id", assetRevisionId.Value);
+        command.Parameters.AddWithValue("@candidate_index", candidateIndex);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
             ? ReadResolution(reader, processingRunId, assetRevisionId, candidateIndex)
             : null;
     }
 
     private static CatalogueDetectorReconciliationResolution ReadResolution(
-        SqliteDataReader reader,
+        NpgsqlDataReader reader,
         ProcessingRunId processingRunId,
         AssetRevisionId assetRevisionId,
         int candidateIndex) =>
@@ -758,10 +767,10 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
             assetRevisionId,
             candidateIndex,
             FromStorageResolution(reader.GetString(1)),
-            reader.IsDBNull(2) ? null : FaceOccurrenceId.From(Guid.Parse(reader.GetString(2))),
+            reader.IsDBNull(2) ? null : FaceOccurrenceId.From(reader.GetGuid(2)),
             reader.GetString(3),
             reader.IsDBNull(4) ? null : reader.GetString(4),
-            ParseTimestamp(reader.GetString(5)));
+            reader.GetFieldValue<DateTimeOffset>(5));
 
     private static bool InspectionsEquivalent(
         CatalogueDetectorCandidateInspection left,
@@ -780,7 +789,8 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
         left.EmbedderModelId == right.EmbedderModelId &&
         left.EmbedderModelHash == right.EmbedderModelHash &&
         left.Embedding.Values.SequenceEqual(right.Embedding.Values) &&
-        left.ObservedAtUtc.ToUniversalTime() == right.ObservedAtUtc.ToUniversalTime();
+        // PostgreSQL timestamps retain microseconds; .NET timestamps can include 100 ns ticks.
+        left.ObservedAtUtc.UtcTicks / 10 == right.ObservedAtUtc.UtcTicks / 10;
 
     private static bool GeometryEquals(NormalizedBoundingBox left, NormalizedBoundingBox right) =>
         left.X.Equals(right.X) &&
@@ -880,9 +890,4 @@ public sealed class SqliteDetectorRolloutReviewRepository : IDetectorRolloutRevi
         _ => throw new DataException($"Unknown detector reconciliation resolution '{value}'."),
     };
 
-    private static string Format(DateTimeOffset value) =>
-        value.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
-
-    private static DateTimeOffset ParseTimestamp(string value) =>
-        DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
 }

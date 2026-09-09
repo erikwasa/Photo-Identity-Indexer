@@ -1,6 +1,7 @@
 using System.Text.Json;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
 
