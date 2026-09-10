@@ -77,7 +77,7 @@ public sealed class PostgresArchiveRuntimeAcceptanceTests
                 "1970",
                 now);
             Assert.Equal(sourceId, configured.Source.SourceId);
-            Assert.Equal(["1970"], configured.IncludedFolders);
+            Assert.Equal(new[] { "1970" }, configured.IncludedFolders);
 
             CatalogueArchiveFolderStatus initial = await status.GetStatusAsync(
                 sourceId,
