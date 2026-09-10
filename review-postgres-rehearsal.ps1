@@ -10,6 +10,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+$composeDirectory = Join-Path $PSScriptRoot "deploy\postgres"
+$composePath = Join-Path $composeDirectory "compose.yaml"
 $apiProject = Join-Path $PSScriptRoot "src\PhotoIdentity.Api\PhotoIdentity.Api.csproj"
 $launcherPath = Join-Path $PSScriptRoot "Start-PhotoIdentity.ps1"
 
@@ -97,6 +99,9 @@ if ($DatabaseName -notmatch '^[a-z][a-z0-9_]{0,62}$') {
 if (-not (Test-Path -LiteralPath $EnvironmentPath -PathType Leaf)) {
     throw "PostgreSQL private environment file was not found: $EnvironmentPath"
 }
+if (-not (Test-Path -LiteralPath $composePath -PathType Leaf)) {
+    throw "PostgreSQL compose definition was not found: $composePath"
+}
 if (-not (Test-Path -LiteralPath $apiProject -PathType Leaf)) {
     throw "Photo Identity API project was not found: $apiProject"
 }
@@ -105,73 +110,102 @@ if (-not (Test-Path -LiteralPath $launcherPath -PathType Leaf)) {
 }
 
 $settings = Read-DotEnv -Path $EnvironmentPath
-foreach ($required in @("PHOTOIDENTITY_POSTGRES_USER", "PHOTOIDENTITY_POSTGRES_PASSWORD", "PHOTOIDENTITY_POSTGRES_PORT")) {
+foreach ($required in @("PHOTOIDENTITY_POSTGRES_DATABASE", "PHOTOIDENTITY_POSTGRES_USER", "PHOTOIDENTITY_POSTGRES_PASSWORD", "PHOTOIDENTITY_POSTGRES_PORT")) {
     if (-not $settings.ContainsKey($required) -or [string]::IsNullOrWhiteSpace([string]$settings[$required])) {
         throw "Required PostgreSQL setting '$required' is missing from $EnvironmentPath."
     }
 }
 
-$builder = [System.Data.Common.DbConnectionStringBuilder]::new()
-$builder["Host"] = "127.0.0.1"
-$builder["Port"] = [string][int]$settings["PHOTOIDENTITY_POSTGRES_PORT"]
-$builder["Database"] = $DatabaseName
-$builder["Username"] = [string]$settings["PHOTOIDENTITY_POSTGRES_USER"]
-$builder["Password"] = [string]$settings["PHOTOIDENTITY_POSTGRES_PASSWORD"]
-$builder["SSL Mode"] = "Disable"
-$builder["GSS Encryption Mode"] = "Disable"
-$builder["Pooling"] = "false"
-$builder["Timeout"] = "5"
-$builder["Command Timeout"] = "30"
-$connectionString = $builder.ConnectionString
-
-$reviewRoot = if ([string]::IsNullOrWhiteSpace($PublishDirectory)) {
-    Join-Path ([IO.Path]::GetTempPath()) "PhotoIdentity\postgres-rehearsal-review\$DatabaseName"
-}
-else {
-    [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($PublishDirectory))
-}
-$publishPath = Join-Path $reviewRoot "app"
-$temporaryConfigurationPath = Join-Path $reviewRoot "launcher.json"
-New-Item -ItemType Directory -Path $reviewRoot -Force | Out-Null
-
-Write-Host "Publishing the current Photo Identity API for rehearsal review..."
-& dotnet publish $apiProject --configuration Release --output $publishPath | Out-Host
-if ($LASTEXITCODE -ne 0) {
-    throw "Photo Identity API rehearsal publish failed with code $LASTEXITCODE."
-}
-if (-not (Test-Path -LiteralPath (Join-Path $publishPath "PhotoIdentity.Api.dll") -PathType Leaf)) {
-    throw "Rehearsal publish did not produce PhotoIdentity.Api.dll at '$publishPath'."
+$podman = Get-Command podman -ErrorAction SilentlyContinue
+if ($null -eq $podman) {
+    throw "Podman was not found on PATH."
 }
 
-$baseConfigurationPath = Resolve-BaseConfigurationPath
-$runtimeEnvironmentName = "PHOTOIDENTITY_REHEARSAL_RUNTIME_CONNECTION_STRING"
-$configuration = New-ReviewConfiguration -BasePath $baseConfigurationPath -OutputPath $temporaryConfigurationPath -ConnectionEnvironmentName $runtimeEnvironmentName
-$url = if ($null -ne $configuration.PSObject.Properties["url"] -and -not [string]::IsNullOrWhiteSpace([string]$configuration.url)) {
-    ([string]$configuration.url).Trim().TrimEnd('/')
-}
-else {
-    "http://127.0.0.1:5080"
+$previousComposeEnvironment = @{}
+foreach ($name in $settings.Keys) {
+    $previousComposeEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+    [Environment]::SetEnvironmentVariable($name, [string]$settings[$name], "Process")
 }
 
-$previousRuntimeConnection = [Environment]::GetEnvironmentVariable($runtimeEnvironmentName, "Process")
 try {
-    [Environment]::SetEnvironmentVariable($runtimeEnvironmentName, $connectionString, "Process")
-    Write-Host "Starting Photo Identity against rehearsal database '$DatabaseName'..."
-    & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $launcherPath -ConfigurationPath $temporaryConfigurationPath -PublishPathOverride $publishPath
+    Push-Location $composeDirectory
+    try {
+        & $podman.Source compose up -d
+        if ($LASTEXITCODE -ne 0) {
+            throw "podman compose up failed with code $LASTEXITCODE."
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
+    $builder["Host"] = "127.0.0.1"
+    $builder["Port"] = [string][int]$settings["PHOTOIDENTITY_POSTGRES_PORT"]
+    $builder["Database"] = $DatabaseName
+    $builder["Username"] = [string]$settings["PHOTOIDENTITY_POSTGRES_USER"]
+    $builder["Password"] = [string]$settings["PHOTOIDENTITY_POSTGRES_PASSWORD"]
+    $builder["SSL Mode"] = "Disable"
+    $builder["GSS Encryption Mode"] = "Disable"
+    $builder["Pooling"] = "false"
+    $builder["Timeout"] = "5"
+    $builder["Command Timeout"] = "30"
+    $connectionString = $builder.ConnectionString
+
+    $reviewRoot = if ([string]::IsNullOrWhiteSpace($PublishDirectory)) {
+        Join-Path ([IO.Path]::GetTempPath()) "PhotoIdentity\postgres-rehearsal-review\$DatabaseName"
+    }
+    else {
+        [IO.Path]::GetFullPath([Environment]::ExpandEnvironmentVariables($PublishDirectory))
+    }
+    $publishPath = Join-Path $reviewRoot "app"
+    $temporaryConfigurationPath = Join-Path $reviewRoot "launcher.json"
+    New-Item -ItemType Directory -Path $reviewRoot -Force | Out-Null
+
+    Write-Host "Publishing the current Photo Identity API for rehearsal review..."
+    & dotnet publish $apiProject --configuration Release --output $publishPath | Out-Host
     if ($LASTEXITCODE -ne 0) {
-        throw "Photo Identity launcher failed with code $LASTEXITCODE."
+        throw "Photo Identity API rehearsal publish failed with code $LASTEXITCODE."
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $publishPath "PhotoIdentity.Api.dll") -PathType Leaf)) {
+        throw "Rehearsal publish did not produce PhotoIdentity.Api.dll at '$publishPath'."
     }
 
-    $health = Invoke-RestMethod -Method Get -Uri "$url/health" -TimeoutSec 5
-    if ([string]$health.status -ne "ok" -or [string]$health.catalogueProvider -ne "postgresql") {
-        throw "Rehearsal runtime health did not confirm catalogueProvider=postgresql."
+    $baseConfigurationPath = Resolve-BaseConfigurationPath
+    $runtimeEnvironmentName = "PHOTOIDENTITY_REHEARSAL_RUNTIME_CONNECTION_STRING"
+    $configuration = New-ReviewConfiguration -BasePath $baseConfigurationPath -OutputPath $temporaryConfigurationPath -ConnectionEnvironmentName $runtimeEnvironmentName
+    $url = if ($null -ne $configuration.PSObject.Properties["url"] -and -not [string]::IsNullOrWhiteSpace([string]$configuration.url)) {
+        ([string]$configuration.url).Trim().TrimEnd('/')
+    }
+    else {
+        "http://127.0.0.1:5080"
     }
 
-    Write-Host "rehearsal-database: $DatabaseName"
-    Write-Host "rehearsal-launcher-config: $temporaryConfigurationPath"
-    Write-Host "rehearsal-publish-path: $publishPath"
-    Write-Host "rehearsal-runtime-health: postgresql"
+    $previousRuntimeConnection = [Environment]::GetEnvironmentVariable($runtimeEnvironmentName, "Process")
+    try {
+        [Environment]::SetEnvironmentVariable($runtimeEnvironmentName, $connectionString, "Process")
+        Write-Host "Starting Photo Identity against rehearsal database '$DatabaseName'..."
+        & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $launcherPath -ConfigurationPath $temporaryConfigurationPath -PublishPathOverride $publishPath
+        if ($LASTEXITCODE -ne 0) {
+            throw "Photo Identity launcher failed with code $LASTEXITCODE."
+        }
+
+        $health = Invoke-RestMethod -Method Get -Uri "$url/health" -TimeoutSec 5
+        if ([string]$health.status -ne "ok" -or [string]$health.catalogueProvider -ne "postgresql") {
+            throw "Rehearsal runtime health did not confirm catalogueProvider=postgresql."
+        }
+
+        Write-Host "rehearsal-database: $DatabaseName"
+        Write-Host "rehearsal-launcher-config: $temporaryConfigurationPath"
+        Write-Host "rehearsal-publish-path: $publishPath"
+        Write-Host "rehearsal-runtime-health: postgresql"
+    }
+    finally {
+        [Environment]::SetEnvironmentVariable($runtimeEnvironmentName, $previousRuntimeConnection, "Process")
+    }
 }
 finally {
-    [Environment]::SetEnvironmentVariable($runtimeEnvironmentName, $previousRuntimeConnection, "Process")
+    foreach ($name in $settings.Keys) {
+        [Environment]::SetEnvironmentVariable($name, $previousComposeEnvironment[$name], "Process")
+    }
 }
