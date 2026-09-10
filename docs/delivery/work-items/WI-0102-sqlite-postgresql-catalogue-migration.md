@@ -59,12 +59,15 @@ WI-0101 completed the PostgreSQL runtime/persistence boundary in PR #277. WI-010
 - [x] Prove the importer itself is deterministic/repeatable by importing one preserved test backup into two separate fresh PostgreSQL databases and comparing source hash, schema versions, copied/per-table/critical counts and sequence-repair evidence.
 - [x] Include catalogue migration acceptance in the existing `verify-postgres.ps1` runtime filter.
 - [x] Maintainer live PostgreSQL verification passed on 2026-09-10 with the two-target migration acceptance and generated-key continuation enabled.
-- [ ] Prove repeatability with the maintainer's preserved real-catalogue backup by importing the same file into a second fresh PostgreSQL database and comparing the accepted reports.
+- [x] Make the real-catalogue rehearsal perform the same-backup/two-target rule automatically: create one immutable backup, import it into two separately created fresh PostgreSQL databases and compare stable migration-report evidence before reporting success.
+- [ ] Execute that repeatability proof with the maintainer's preserved real-catalogue backup and retain both accepted reports.
 
 ### 4. Real-catalogue rehearsal and representative verification
-- [x] Add a single rehearsal wrapper that creates a fresh PostgreSQL database from the private local compose configuration and runs backup/import without printing credentials.
-- [x] Verify the preserved backup SHA-256 is unchanged after migration and mark the successful rehearsal backup read-only.
-- [x] Allow `-LaunchForReview` to start an isolated PostgreSQL-selected runtime against the rehearsal target using temporary process environment only, and require `/health` to report `catalogueProvider: postgresql`.
+- [x] Add a single rehearsal wrapper that creates fresh PostgreSQL databases from the private local compose configuration and runs backup/import without printing credentials.
+- [x] Verify the preserved backup SHA-256 is unchanged after both imports and mark the rehearsal backup read-only before migration begins.
+- [x] Automatically reject a repeatability run when source hash/schema/count/sequence evidence differs between the two PostgreSQL imports.
+- [x] Allow `-LaunchForReview` to start an isolated PostgreSQL-selected runtime against the primary rehearsal target using a temporary no-secret launcher configuration, and require `/health` to report `catalogueProvider: postgresql`.
+- [x] Add Windows CI coverage that parses the rehearsal PowerShell file so syntax regressions fail an integration shard before maintainer use.
 - [ ] Verify people/face review history and undo/rejection state from the migrated maintainer catalogue.
 - [ ] Verify tags, Places and automatic place-enrichment state.
 - [ ] Verify saved Smart Collections and slideshow snapshot membership against representative collections.
@@ -72,8 +75,10 @@ WI-0101 completed the PostgreSQL runtime/persistence boundary in PR #277. WI-010
 - [ ] Verify metadata/photo details and person presentation/favorites/visibility state.
 
 ### 5. Controlled cutover and rollback
-- [x] Document the single-authority backup/import/provider-switch/rollback sequence in `docs/operations/postgresql-catalogue-cutover.md`, including the runtime environment keys `PhotoIdentity__CatalogueProvider=postgresql` and `PhotoIdentity__Postgres__ConnectionString`.
-- [ ] Test the exact packaged/launcher configuration path that persists/applies PostgreSQL authority rather than relying only on temporary shell environment variables.
+- [x] Document the single-authority backup/import/provider-switch/rollback sequence in `docs/operations/postgresql-catalogue-cutover.md`.
+- [x] Add a supported packaged/launcher configuration path that persists `PhotoIdentity__CatalogueProvider=postgresql` while storing only the PostgreSQL connection environment-variable name in `launcher.json`; direct connection strings in launcher settings are rejected.
+- [x] Add launcher preflight (`-ValidateConfigurationOnly`), provider validation, secret non-disclosure checks and refusal to switch providers while a healthy process is already running with another authoritative provider.
+- [x] Update root/package launcher examples to show the safe environment-variable reference while leaving SQLite as the default provider until cutover.
 - [ ] Before cutover, stop the SQLite-authoritative application and retain the source backup unchanged/read-only.
 - [ ] Start PostgreSQL-authoritative runtime and verify `/health`, Review, Library/Smart Collections, Archive and background workers before allowing new writes.
 - [ ] Record the cutover timestamp and PostgreSQL migration report as acceptance evidence.
@@ -88,12 +93,12 @@ The copy plan is generated from both schemas. This is intentional: WI-0102 shoul
 
 The live disposable-database integration test seeds immutable catalogue identity, a face/crop/embedding, a person label, review assignment and identity suggestion with explicit integer IDs. It imports that exact backup into two independent fresh PostgreSQL databases, compares the stable report evidence, verifies the imported IDs/relationships in both targets and inserts a new embedding in each target without an explicit ID to prove generated-key continuation. The test is included in the same live PostgreSQL runtime filter used by `verify-postgres.ps1` and was accepted by the maintainer on 2026-09-10.
 
-## Real-catalogue rehearsal slice (2026-09-10)
+## Development-complete rehearsal/cutover tooling (2026-09-10)
 
-The next slice adds `catalogue backup` and `rehearse-postgres-migration.ps1`. The backup command requires explicit stopped-application acknowledgement, opens the source SQLite catalogue read-only, verifies schema/FKs, creates a logical snapshot through SQLite's backup API and validates the result with `PRAGMA integrity_check` plus foreign-key checks. It fingerprints the source before and after snapshot creation and refuses to overwrite an existing backup.
+`catalogue backup` and `rehearse-postgres-migration.ps1` now cover the development-side migration workflow. The rehearsal resolves the maintained SQLite catalogue, requires the application to be stopped, creates one consistent SQLite backup through the backup API, marks that backup read-only, creates two independent fresh PostgreSQL rehearsal databases, imports the exact same backup into both and compares stable report evidence. The backup hash is checked again after both imports. Failed/incomplete targets are removed; successful rehearsal targets remain available for inspection.
 
-The rehearsal wrapper resolves the same launcher/default catalogue path used by the application, checks for a still-running Photo Identity process, creates the timestamped backup, starts the private Podman PostgreSQL service, creates a unique fresh rehearsal database, runs the schema-driven migration and verifies that the backup hash remained unchanged. A successful backup is marked read-only. With `-LaunchForReview`, the wrapper starts Photo Identity against the rehearsal target using inherited process environment only, so the normal launcher configuration and SQLite authority remain untouched; `/health` must confirm PostgreSQL selection.
+With `-LaunchForReview`, the script generates a temporary launcher configuration that preserves the normal local settings but explicitly selects PostgreSQL and references a temporary connection-string environment variable. It does not edit the user's normal launcher configuration. The launched runtime must become healthy with `catalogueProvider: postgresql`.
 
-`docs/operations/postgresql-catalogue-cutover.md` now makes this stopped logical-backup/rehearsal wrapper the primary operator path. Raw file copying is no longer the recommended SQLite backup mechanism.
+The normal Windows launcher is also ready for final cutover. `launcher.json` may persist `PhotoIdentity__CatalogueProvider=postgresql` plus `postgresConnectionEnvironmentVariable`, but it cannot contain `PhotoIdentity__Postgres__ConnectionString` directly. The launcher resolves the secret from Process/User/Machine environment scope, injects it only into the child process, validates provider agreement with `/health`, and refuses an apparent provider switch while another healthy authority is still running. CI launcher verification exercises the invalid-provider, missing-secret, direct-secret-rejection, preflight and stop-before-switch paths.
 
-The remaining acceptance work is deliberately real-data and authority-transfer work: run this rehearsal against the maintainer catalogue, close any populated-schema compatibility gaps, verify representative domains, repeat the accepted real backup into a second fresh target, then add/test the persistent packaged-launcher PostgreSQL configuration and perform the controlled cutover/rollback acceptance.
+At this point no known WI-0102 implementation-only task remains. The unchecked items above intentionally require the maintainer's actual catalogue or the real authority-transfer window: run the repeatable real-catalogue rehearsal, resolve any real populated-schema incompatibility, perform representative UI/domain checks, then execute and accept the PostgreSQL cutover/rollback boundary.
