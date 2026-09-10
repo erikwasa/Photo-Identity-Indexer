@@ -141,6 +141,7 @@ public sealed class PortableBundleCommandTests
                 now);
             PortableBundleExportCoordinator exporter = new(
                 database,
+                new SqliteLocalBatchRepository(database),
                 timeProvider: new FixedTimeProvider(now.AddMinutes(1)));
 
             string fullPath = Path.Combine(directory, "full.photoid-job");
