@@ -29,7 +29,22 @@ public sealed class CataloguePersistenceCompositionTests
 
         Assert.DoesNotContain(services, descriptor => descriptor.ServiceType == typeof(SqliteCatalogueDatabase));
 
+        Type[] authoritativeContracts = services
+            .Select(descriptor => descriptor.ServiceType)
+            .Where(serviceType => serviceType.Namespace?.StartsWith("PhotoIdentity.Core", StringComparison.Ordinal) == true)
+            .Distinct()
+            .ToArray();
+        Assert.NotEmpty(authoritativeContracts);
+
         await using ServiceProvider provider = services.BuildServiceProvider();
+        foreach (Type contract in authoritativeContracts)
+        {
+            object resolved = provider.GetRequiredService(contract);
+            Assert.NotEqual(
+                typeof(SqliteCatalogueDatabase).Assembly,
+                resolved.GetType().Assembly);
+        }
+
         Assert.Same(database, provider.GetRequiredService<PostgresCatalogueDatabase>());
         Assert.Same(database, provider.GetRequiredService<ICatalogueStoreInitializer>());
 
@@ -40,6 +55,7 @@ public sealed class CataloguePersistenceCompositionTests
         Assert.IsType<PostgresIdentityMatchRegenerationScorer>(provider.GetRequiredService<IIdentityMatchRegenerationScorer>());
         Assert.IsType<PostgresPersonPresentationRepository>(provider.GetRequiredService<IPersonFeaturedFaceRepository>());
         Assert.IsType<PostgresCollectionQueryRepository>(provider.GetRequiredService<ICollectionQueryRepository>());
+        Assert.IsType<PostgresSmartCollectionQueryRepository>(provider.GetRequiredService<ISmartCollectionQueryRepository>());
         Assert.IsType<PostgresPhotoMetadataInspectionRepository>(provider.GetRequiredService<IPhotoMetadataInspectionRepository>());
         Assert.IsType<PostgresPhotoPlaceRepository>(provider.GetRequiredService<IPhotoPlaceRepository>());
         Assert.IsType<PostgresDetectorEvaluationCatalogueRepository>(provider.GetRequiredService<IDetectorEvaluationCatalogueRepository>());
