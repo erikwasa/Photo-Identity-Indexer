@@ -45,8 +45,12 @@ After connectivity succeeds, the verifier builds the Release solution and runs t
 
 `PostgresArchiveRuntimeAcceptanceTests` adds a cross-repository archive scenario in one disposable database rather than proving repositories only in isolation. The scenario exercises archive coverage, status and item paging, availability transitions, revision/source hydration ownership transfer during re-verification, storage accounting and post-analysis proxy completion through the Core contracts used by the runtime.
 
-A normal CI run still cannot claim live PostgreSQL acceptance when the private connection setting is absent; those opt-in tests return without connecting. WI-0101 may check its remaining live-runtime acceptance items only after `verify-postgres.ps1` is run against the configured PostgreSQL service and succeeds. Existing-catalogue import/cutover remains WI-0102.
+A normal CI run still cannot claim live PostgreSQL acceptance when the private connection setting is absent; those opt-in tests return without connecting. Existing-catalogue import/cutover remains WI-0102.
 
-## Remaining verification boundary
+## WI-0101 accepted runtime boundary
 
-The implementation boundary is complete: PostgreSQL provider composition covers the authoritative Core contracts, while the remaining SQLite references are the default-provider implementation and explicit CLI/import compatibility paths. The remaining WI-0101 work is verification evidence and closure: run the live acceptance verifier, run the normal solution/published-runtime/documentation checks, review allowed SQLite/privacy/logging boundaries, and record the results before marking the remaining acceptance criteria complete.
+On 2026-09-10 the maintainer ran `verify-postgres.ps1` from `codex/m24-6` against the configured Podman PostgreSQL service. Podman authentication and the Windows-localhost PostgreSQL protocol check passed. The Release solution built in 24.96 seconds with zero warnings and zero errors. The complete live PostgreSQL persistence set passed 28/28 tests in 6 seconds with zero skips, and PostgreSQL runtime/composition acceptance passed 4/4 tests in 1 second with zero skips.
+
+PR #277 CI run #1547 also completed successfully. Both integration shards, the normal build/test lane, documentation validation/generated-output checks, published review verification and Windows mixed-media verification passed. This CI evidence is complementary to the local live run: CI proves the normal repository/application gates remain intact, while the explicit verifier proves the PostgreSQL-only tests actually connected and executed.
+
+The accepted WI-0101 boundary is therefore: PostgreSQL mode provides the authoritative runtime graph without SQLite catalogue reads/writes or dual writes; remaining SQLite code is confined to the still-default SQLite provider plus explicit CLI/import/migration/test compatibility boundaries awaiting WI-0102. PostgreSQL schema initialization/upgrade and the cross-domain archive/runtime behavior have live acceptance evidence. Production cutover, existing-catalogue import and rollback remain WI-0102 rather than WI-0101.
