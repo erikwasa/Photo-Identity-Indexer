@@ -670,7 +670,6 @@ work_items:
   started_at: 2026-08-20
   completed_at: 2026-08-26
   verified_at: 2026-08-26
-  verified_by: maintainer
   last_updated_at: 2026-08-26
   blockers:
   - WI-0065
@@ -996,7 +995,7 @@ work_items:
   milestone: M22
   status: in_review
   owner: ai-agent
-  document: ../work-items/WI-0093-slideshow-preparation-progress.md
+  document: ../work-items/WI-0093-slideshow-original-preparation-progress.md
   started_at: 2026-08-31
   last_updated_at: 2026-08-31
   branch: agent/WI-0093-slideshow-preparation-progress
@@ -1348,11 +1347,11 @@ work_items:
   - type: test
     value: '2026-09-09 detector pipeline/plan slice: two live PostgreSQL detector tests passed (859 ms); 19 focused detector rollout tests passed (4 seconds); test.ps1 rebuilt Release and passed 535 tests, including 403 integration tests (1 minute 40 seconds). Documentation validation, generated-output check and diff check passed. Candidate application and worker composition remain pending.'
   - type: test
-    value: '2026-09-09 detector application/worker slice: seven live PostgreSQL detector tests passed (2 seconds); test.ps1 rebuilt Release and passed 539 tests, including 403 integration tests (1 minute 37 seconds). Comprehensive published-app smoke, documentation validation, generated-output check and diff check passed. CLI provider selection and remaining runtime integration are still pending.'
+    value: '2026-09-09 detector application/worker slice: seven live PostgreSQL detector tests passed (2 seconds); test.ps1 rebuilt Release and passed 539 tests, including 403 integration tests (1 minute 37 seconds). Comprehensive published-app smoke, documentation validation, generated-output and diff checks passed. CLI provider selection and remaining runtime integration are still pending.'
   - type: test
     value: '2026-09-09 rollout CLI provider selection: CLI build passed without warnings/errors; six focused command tests passed with live PostgreSQL explicitly configured (761 ms), including disposable PostgreSQL status/apply and provider validation. No HTTP hosts or required CI gate changes. Remaining WI-0101 runtime composition is unfinished.'
   - type: test
-    value: '2026-09-10 review-query and resolver slice: live PostgreSQL query test passed (1 second); 83 focused review/gallery/rollout tests passed (33 seconds); test.ps1 passed 542 Release tests including 405 integration tests (1 minute 33 seconds). Comprehensive published-app smoke, documentation validation, generated-output check and diff check passed. Core review query and run-configuration contracts preserve historical crop paths; derivative and archive composition remain pending.'
+    value: '2026-09-10 review-query and resolver slice: live PostgreSQL query test passed (1 second); 83 focused review/gallery/rollout tests passed (33 seconds); test.ps1 passed 542 Release tests including 405 integration tests (1 minute 33 seconds). Comprehensive published-app smoke, documentation validation/generated-output checks and diff check passed. Core review query and run-configuration contracts preserve historical crop paths; derivative and archive composition remain pending.'
   - type: test
     value: '2026-09-10 face-review derivative slice: schema v22 clean/idempotent migration and derivative live PostgreSQL tests passed; reconstructed v21 upgrade retaining synthetic catalogue rows passed (748 ms). Five focused image/backfill tests passed (3 seconds); test.ps1 passed 543 Release tests including 405 integration tests (1 minute 35 seconds). Comprehensive published-app smoke passed. Whole-photo proxy writer and archive orchestration remain pending.'
   - type: test
@@ -1463,7 +1462,7 @@ work_items:
   document: ../work-items/WI-0107-m22-slideshow-acceptance-gaps.md
   blockers: []
   blocker_notes:
-  - Consolidated real-phone M22 acceptance passed the remaining slideshow behavior but found two functional gaps. Start slideshow shows an intermediate fullscreen recovery step, and successful standalone prepared-original state disappears after slideshow navigation even when the originals remain reusable.
+  - Consolidated real-phone M22 acceptance passed the remaining slideshow behavior but found two functional gaps. Start slideshow shows an intermediate fullscreen recovery step, and successful standalone prepared-original state disappears after slideshow navigation/page recreation even when the originals remain reusable.
   - Performance observations from the same acceptance are intentionally tracked in M24 WI-0108 and do not expand this corrective M22 slice.
   evidence: []
 - id: WI-0108
