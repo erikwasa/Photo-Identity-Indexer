@@ -37,6 +37,22 @@ The PostgreSQL schema already exposes indexes aligned with those predicates and 
 
 WI-0101 does not claim slideshow latency acceptance from the presence of these indexes. Query plans and real-library latency remain WI-0108 work. The WI-0101 conclusion is narrower: PostgreSQL mode has one authoritative Smart Collection/slideshow query implementation and schema-level index support for every current filter dimension.
 
-## Remaining verification boundary
+## Acceptance verification
 
-Provider registration tests prove that representative contracts across the authoritative domains resolve to PostgreSQL without registering `SqliteCatalogueDatabase`. Repository tests cover individual PostgreSQL behavior. WI-0101 still needs live PostgreSQL startup/host verification and cross-domain archive behavior verification before it can claim that normal PostgreSQL operation is fully accepted. Those checks are distinct from WI-0102's production cutover and existing-catalogue import work.
+`verify-postgres.ps1` is the explicit live acceptance entry point for WI-0101. It retains the Windows/Podman/WSL connectivity and PostgreSQL-protocol checks, then exports `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING` only for the child verification process. The connection string is not printed.
+
+After connectivity succeeds, the verifier builds the Release solution and runs the full `Postgres*` persistence test set with live PostgreSQL enabled. That set includes clean/idempotent schema initialization and upgrade coverage plus repository behavior for review/identity, people/presentation, metadata/Places, Smart Collections, detector state, source scanning, processing, archive state and derivatives. It then runs PostgreSQL runtime/composition integration coverage, including the selected-host proof that no `SqliteCatalogueDatabase` is registered or created.
+
+`PostgresArchiveRuntimeAcceptanceTests` adds a cross-repository archive scenario in one disposable database rather than proving repositories only in isolation. The scenario exercises archive coverage, status and item paging, availability transitions, revision/source hydration ownership transfer during re-verification, storage accounting and post-analysis proxy completion through the Core contracts used by the runtime.
+
+A normal CI run still cannot claim live PostgreSQL acceptance when the private connection setting is absent; those opt-in tests return without connecting. Existing-catalogue import/cutover remains WI-0102.
+
+## WI-0101 accepted runtime boundary
+
+On 2026-09-10 the maintainer ran `verify-postgres.ps1` from `codex/m24-6` against the configured Podman PostgreSQL service. Podman authentication and the Windows-localhost PostgreSQL protocol check passed. The Release solution built in 24.96 seconds with zero warnings and zero errors. The complete live PostgreSQL persistence set passed 28/28 tests in 6 seconds with zero skips, and PostgreSQL runtime/composition acceptance passed 4/4 tests in 1 second with zero skips.
+
+PR #277 CI run #1547 also completed successfully. Both integration shards, the normal build/test lane, documentation validation/generated-output checks, published review verification and Windows mixed-media verification passed. This CI evidence is complementary to the local live run: CI proves the normal repository/application gates remain intact, while the explicit verifier proves the PostgreSQL-only tests actually connected and executed.
+
+The accepted WI-0101 boundary is therefore: PostgreSQL mode provides the authoritative runtime graph without SQLite catalogue reads/writes or dual writes; remaining SQLite code is confined to the still-default SQLite provider plus explicit CLI/import/migration/test compatibility boundaries awaiting WI-0102. PostgreSQL schema initialization/upgrade and the cross-domain archive/runtime behavior have live acceptance evidence. Production cutover, existing-catalogue import and rollback remain WI-0102 rather than WI-0101.
+
+The remaining WI-0101 work is administrative only: add the final verification/CI evidence to the work-item status registry and transition the item through review/completion when PR #277 is finalized. Those lifecycle updates should not be confused with additional PostgreSQL implementation work.

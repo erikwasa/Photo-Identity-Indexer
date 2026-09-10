@@ -28,16 +28,16 @@ Complete PostgreSQL coverage for the remaining authoritative application domains
 WI-0101 is a persistence migration item, not acceptance of slideshow responsiveness. PostgreSQL may reduce snapshot/query contention or scan cost, but the 2026-09-02 real-phone findings for slow `/slideshows` loading, slow first-image startup and slow image transitions remain owned by WI-0108. Database-independent repeated original hashing/file-serving work is explicitly outside the claim that this migration alone fixes performance.
 
 ## Acceptance criteria
-- [ ] All authoritative runtime domains have PostgreSQL implementations.
-- [ ] Normal PostgreSQL mode performs no SQLite authoritative read/write dependency.
-- [ ] Remaining SQLite code is explicitly limited to migration/import/compatibility/test scenarios.
-- [ ] Existing feature integration tests remain behaviorally equivalent on PostgreSQL.
-- [ ] Smart Collection/slideshow persistence exposes the indexes/query boundary needed for WI-0108 without claiming the WI-0108 latency acceptance itself.
+- [x] All authoritative runtime domains have PostgreSQL implementations.
+- [x] Normal PostgreSQL mode performs no SQLite authoritative read/write dependency.
+- [x] Remaining SQLite code is explicitly limited to migration/import/compatibility/test scenarios.
+- [x] Existing feature integration tests remain behaviorally equivalent on PostgreSQL.
+- [x] Smart Collection/slideshow persistence exposes the indexes/query boundary needed for WI-0108 without claiming the WI-0108 latency acceptance itself.
 
 
 ## Remaining work checklist
 
-Current as of 2026-09-10, including verified detector, review-query and face-review derivative slices. This is the current implementation checklist; the slice notes below retain historical evidence. Update these checkboxes as each task is implemented and verified, with supporting evidence in the work-item registry. Formal lifecycle status remains in the registry.
+Current as of 2026-09-10, including verified detector, review-query, archive-composition, PostgreSQL runtime-composition and live acceptance slices. This is the current implementation checklist; the slice notes below retain historical evidence. Update these checkboxes as each task is implemented and verified, with supporting evidence in the work-item registry. Formal lifecycle status remains in the registry.
 
 Many PostgreSQL repositories already exist. An unchecked integration task does not necessarily require a new repository: reuse the existing Core contract and PostgreSQL implementation where available. A completed repository slice does not establish that normal runtime is free of SQLite dependencies.
 
@@ -57,41 +57,41 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 
 ### 2. Archive, processing and file access
 
-- [ ] Migrate source scanning/sync and current-revision/general catalogue lookup composition, including `LocalArchiveSyncCoordinator.cs`.
+- [x] Migrate source scanning/sync and current-revision/general catalogue lookup composition, including `LocalArchiveSyncCoordinator.cs`.
 - [x] Remove concrete SQLite persistence from `ArchiveAnalysisProcessing.cs` and `ArchiveBoundedAnalysisService.cs`; add PostgreSQL pending/completed revision queries and mismatch re-verification state handling.
-- [ ] Remove remaining concrete SQLite collaborators from `ArchiveEndpoints.cs` and the hosted archive advancement flow.
+- [x] Remove remaining concrete SQLite collaborators from `ArchiveEndpoints.cs` and the hosted archive advancement flow.
 - [x] Add PostgreSQL face-review derivative metadata/completion and backfill persistence; move derivative writer, backfill service and file resolvers to Core contracts.
 - [x] Migrate the whole-photo review-proxy writer to the existing Core contract and PostgreSQL implementation.
-- [ ] Remove remaining SQLite construction of derivative collaborators in hosted archive advancement; bounded analysis now uses injected contracts.
-- [ ] Audit `PortableBundleExportCoordinator.cs` and other production catalogue lookup paths; migrate runtime dependencies while explicitly identifying legitimate import/export compatibility boundaries.
-- [ ] Verify archive coverage, status/filter paging, availability, hydration, verification, storage accounting and post-analysis operate together through PostgreSQL-backed contracts. Existing individual repositories are not sufficient evidence for this end-to-end composition.
+- [x] Remove remaining SQLite construction of derivative collaborators in hosted archive advancement; bounded analysis now uses injected contracts.
+- [x] Audit `PortableBundleExportCoordinator.cs` and other production catalogue lookup paths; migrate runtime dependencies while explicitly identifying legitimate import/export compatibility boundaries.
+- [x] Verify archive coverage, status/filter paging, availability, hydration, verification, storage accounting and post-analysis operate together through PostgreSQL-backed contracts. Existing individual repositories are not sufficient evidence for this end-to-end composition.
 
 ### 3. Review, gallery and identity runtime
 
 - [x] Replace concrete SQLite face/filter/navigation queries in review, suggestion and gallery endpoints with Core contracts and PostgreSQL queries.
 - [x] Move review crop configuration and face-preview geometry reads to Core contracts, preserving historical run configuration compatibility.
 - [x] Complete face-review derivative and collection revision resolver contracts and PostgreSQL implementations; whole-photo proxy and review-target reads also use Core contracts. Whole-runtime provider selection remains outstanding.
-- [ ] Connect identity-match regeneration runtime to provider-neutral scoring, evidence-version and automatic-assignment implementations; remove remaining SQLite model/policy conversion and composition dependencies.
+- [x] Connect identity-match regeneration runtime to provider-neutral scoring, evidence-version and automatic-assignment implementations; remove remaining SQLite model/policy conversion and composition dependencies.
 
 ### 4. Remaining library and feature-state coverage
 
-- [ ] Verify metadata inspection/backfill, tags, manual people, presentation preferences, Places and reverse-geocode cache/enrichment are fully composed through PostgreSQL, including their workers and lookup collaborators.
-- [ ] Audit slideshow snapshots, preparation sessions and leases. Document which state is intentionally transient and which is authoritative; complete required PostgreSQL persistence without silently changing preparation/revalidation semantics.
-- [ ] Verify Smart Collection and slideshow snapshot queries expose the required PostgreSQL indexes/query boundary for WI-0108. Slideshow latency acceptance itself remains outside WI-0101.
+- [x] Verify metadata inspection/backfill, tags, manual people, presentation preferences, Places and reverse-geocode cache/enrichment are fully composed through PostgreSQL, including their workers and lookup collaborators.
+- [x] Audit slideshow snapshots, preparation sessions and leases. Document which state is intentionally transient and which is authoritative; complete required PostgreSQL persistence without silently changing preparation/revalidation semantics.
+- [x] Verify Smart Collection and slideshow snapshot queries expose the required PostgreSQL indexes/query boundary for WI-0108. Slideshow latency acceptance itself remains outside WI-0101.
 
 ### 5. Provider selection and startup
 
-- [ ] Complete coherent provider selection in API/worker composition so PostgreSQL mode resolves every authoritative dependency to PostgreSQL implementations, with no dual writes.
-- [ ] Remove SQLite schema ensure/migration calls from PostgreSQL startup, including the remaining calls in `Program.cs`; ensure PostgreSQL migrations and readiness checks cover the complete runtime schema.
-- [ ] Finish the inventory of direct SQLite types, connections and SQL in normal API/worker paths. Record each remaining occurrence as removed or an explicit migration/import/compatibility/test exception; a namespace import alone is not proof of a runtime dependency.
-- [ ] Prove PostgreSQL startup and normal feature/worker operations do not require an authoritative SQLite catalogue. Keep the current production SQLite binding until WI-0102 performs controlled cutover.
+- [x] Complete coherent provider selection in API/worker composition so PostgreSQL mode resolves every authoritative dependency to PostgreSQL implementations, with no dual writes.
+- [x] Remove SQLite schema ensure/migration calls from PostgreSQL startup, including the remaining calls in `Program.cs`; ensure PostgreSQL migrations and readiness checks cover the complete runtime schema.
+- [x] Finish the inventory of direct SQLite types, connections and SQL in normal API/worker paths. Record each remaining occurrence as removed or an explicit migration/import/compatibility/test exception; a namespace import alone is not proof of a runtime dependency.
+- [x] Prove PostgreSQL startup and normal feature/worker operations do not require an authoritative SQLite catalogue. Keep the current production SQLite binding until WI-0102 performs controlled cutover.
 
 ### 6. Verification and closure
 
-- [ ] Add/run PostgreSQL behavior-equivalence tests for the remaining domains, including mutations, cancellation, failure handling, transaction rollback and idempotent retries. Prefer repository tests; use HTTP-host tests only for composition/contracts requiring that layer.
-- [ ] Verify migrations on clean and existing supported PostgreSQL schemas and run live tests with PostgreSQL explicitly configured; opt-in tests returning early do not prove PostgreSQL acceptance.
+- [x] Add/run PostgreSQL behavior-equivalence tests for the remaining domains, including mutations, cancellation, failure handling, transaction rollback and idempotent retries. Prefer repository tests; use HTTP-host tests only for composition/contracts requiring that layer.
+- [x] Verify migrations on clean and existing supported PostgreSQL schemas and run live tests with PostgreSQL explicitly configured; opt-in tests returning early do not prove PostgreSQL acceptance.
 - [ ] Run the relevant solution build/tests and published-runtime checks for the completed composition; record test scope, outcomes and material timing in the registry.
-- [ ] Review logging/privacy, migration coverage and allowed SQLite exceptions, then verify every acceptance criterion above against the final runtime.
+- [x] Review logging/privacy, migration coverage and allowed SQLite exceptions, then verify every acceptance criterion above against the final runtime.
 - [ ] Update the handoff and affected documentation, pass `PhotoIdentity.Docs validate` and `generate --check`, and transition WI-0101 through review to completion only when the full item is verified.
 
 ### Work owned by later items
@@ -140,6 +140,30 @@ In addition to the existing scope above, the WI-0101 inventory must include:
 - normal runtime DI so one provider can be selected coherently before WI-0102 performs the actual migration/cutover.
 
 Do not create dual writes as a bridge. SQLite remains the sole authoritative runtime until the later controlled cutover.
+
+### Runtime composition and provider-selection slice (2026-09-10)
+
+PR #276 introduced explicit `PhotoIdentity:CatalogueProvider` selection. SQLite remains the default provider until WI-0102; PostgreSQL is an opt-in authoritative runtime used for migration verification. PostgreSQL mode binds review/identity/people, collections, metadata/Places, detector, source/processing, archive state, hydration ownership and derivative contracts coherently to PostgreSQL implementations and does not dual-write.
+
+`CataloguePersistenceComposition.AddPostgres` now covers every registered Core persistence contract. The integration composition test resolves all registered `PhotoIdentity.Core.*` contracts and rejects any implementation from the SQLite assembly. The missing generic PostgreSQL face-inspection writer was added so archive analysis has a provider-complete write path. Identity regeneration model discovery, scoring, evidence-version reads and automatic assignment are provider-neutral in the worker/API runtime.
+
+PostgreSQL-selected startup initializes only PostgreSQL and skips SQLite initialization and SQLite schema ensure/migration helpers. The live host test verifies `/health` reports PostgreSQL, `SqliteCatalogueDatabase` is absent from DI and the configured SQLite catalogue path is never created. Because that test remains opt-in, full runtime acceptance still requires an explicitly configured live PostgreSQL verification run rather than an ordinary CI pass.
+
+Source scanning/sync and hosted archive advancement now consume Core contracts and injected provider-neutral collaborators. `PortableBundleExportCoordinator` uses `ICatalogueStoreInitializer` and `IAssetRevisionLookupRepository`; the current SQLite CLI composition and result-import adapter are explicit compatibility/cutover boundaries rather than hidden worker dependencies. `PhotoIdentity.Worker` has no SQLite project reference.
+
+Slideshow snapshots are request-time immutable revision lists, while preparation sessions and short eviction-protection leases are intentionally transient process coordination. Durable hydration ownership remains provider-backed. PostgreSQL Smart Collection/slideshow queries use existing people/tag/place/date indexes and semantics; WI-0108 retains latency acceptance and any query-tuning work.
+
+The remaining WI-0101 implementation risk is no longer missing provider wiring. It is acceptance: run the PostgreSQL repositories and selected runtime together on a live database, verify cross-domain archive state, migrations and behavior-equivalence, then perform the final allowed-SQLite/privacy/documentation review.
+
+### Live PostgreSQL acceptance (2026-09-10)
+
+The maintainer ran `verify-postgres.ps1` from `codex/m24-6` against the configured Podman PostgreSQL service. Container authentication and the Windows-localhost PostgreSQL protocol check passed. The Release solution built in 24.96 seconds with zero warnings and zero errors. The complete live PostgreSQL persistence acceptance set passed 28/28 tests in 6 seconds with zero skips, and the PostgreSQL runtime/composition acceptance set passed 4/4 tests in 1 second with zero skips.
+
+The live suite includes clean/idempotent and supported upgrade migration coverage, provider-specific mutation/query behavior, cancellation/failure/rollback/replay coverage accumulated across the PostgreSQL repository tests, the PostgreSQL-selected host proof with no registered/created SQLite catalogue, and the cross-repository archive acceptance scenario covering coverage, status/filter paging, availability, hydration ownership transfer during re-verification, storage accounting and post-analysis proxy completion.
+
+PR #277 CI run #1547 completed successfully. The normal build/test lane, both integration shards, documentation validation/generated-output checks, published review verification and Windows mixed-media verification all passed. This separates two kinds of evidence correctly: CI proves the regular repository/application gates, while the explicit verifier proves the opt-in PostgreSQL tests actually connected and executed rather than returning early.
+
+All WI-0101 technical acceptance criteria are therefore satisfied. Remaining unchecked work is administrative closure: record the final test/CI evidence in the status registry and transition the work item through review/completion after this PR is finalized. Existing-catalogue import, production cutover and rollback remain WI-0102.
 
 ## Current implementation progress
 

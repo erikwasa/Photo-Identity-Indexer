@@ -168,9 +168,21 @@ function Invoke-LivePostgresTest {
             $ConnectionString,
             "Process")
 
-        & dotnet test (Join-Path $PSScriptRoot "tests\PhotoIdentity.Persistence.Tests\PhotoIdentity.Persistence.Tests.csproj") --configuration Release --filter "FullyQualifiedName~PostgresCatalogueDatabaseTests.InitializeAsync_IsVersionedAndIdempotent_WhenLivePostgresIsConfigured" | Out-Host
-        $testExitCode = $LASTEXITCODE
-        return [int]$testExitCode
+        Write-Host "Building the Release solution before live PostgreSQL acceptance..."
+        & dotnet build (Join-Path $PSScriptRoot "PhotoIdentity.slnx") --configuration Release | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            return [int]$LASTEXITCODE
+        }
+
+        Write-Host "Running the complete PostgreSQL persistence acceptance set..."
+        & dotnet test (Join-Path $PSScriptRoot "tests\PhotoIdentity.Persistence.Tests\PhotoIdentity.Persistence.Tests.csproj") --configuration Release --no-build --filter "FullyQualifiedName~Postgres" | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            return [int]$LASTEXITCODE
+        }
+
+        Write-Host "Running PostgreSQL runtime/composition acceptance..."
+        & dotnet test (Join-Path $PSScriptRoot "tests\PhotoIdentity.Integration.Tests\PhotoIdentity.Integration.Tests.csproj") --configuration Release --no-build --filter "FullyQualifiedName~PostgresRuntimeApplicationTests|FullyQualifiedName~CataloguePersistenceCompositionTests|FullyQualifiedName~DetectorRolloutCommandTests.Status_and_apply_use_only_selected_postgres_catalogue_when_live_postgres_is_configured" | Out-Host
+        return [int]$LASTEXITCODE
     }
     finally {
         [Environment]::SetEnvironmentVariable(
@@ -407,7 +419,7 @@ if (-not (Test-TcpPortOpen -HostName "127.0.0.1" -Port $hostPort)) {
     }
 
     if ($networkingMode -eq "mirrored") {
-        throw "PostgreSQL is healthy, but Windows localhost is not receiving the Podman-published port while WSL networking mode is mirrored. Podman reported mapping: $mappingDetail. Photo Identity requires a stable Windows-localhost database endpoint. Use WSL NAT networking with localhostForwarding=true for this environment, then run 'wsl --shutdown', restart the Podman machine, and rerun this verification."
+        throw "PostgreSQL is healthy, but Windows localhost is not receiving the Podman-published port while WSL networking mode is mirrored. Podman reported mapping: $mappingDetail. Photo Identity requires a stable Windows-localhost database endpoint. Use WSL NAT networking with localhostForwarding=true for this environment, then run 'wsl --shutdown', restart the Podman machine, and rerun verification."
     }
 
     throw "PostgreSQL is healthy inside Podman, but Windows cannot connect to 127.0.0.1:$hostPort. Podman reported mapping: $mappingDetail; WSL networking mode: $networkingMode. WSL normally forwards Linux-bound ports to Windows localhost. Run 'wsl --shutdown', restart the Podman machine, and rerun verification. If it still fails, check WSL Settings/.wslconfig for localhost forwarding and Windows/Hyper-V firewall policy."
@@ -468,12 +480,12 @@ Write-Host "Windows localhost PostgreSQL protocol check passed."
 $hostConnectionString = New-PostgresConnectionString -HostName "127.0.0.1" -Port $hostPort -Settings $settings
 $testExitCode = Invoke-LivePostgresTest -ConnectionString $hostConnectionString
 if ($testExitCode -eq 0) {
-    Write-Host "PostgreSQL runtime verification passed."
+    Write-Host "PostgreSQL runtime acceptance verification passed."
     exit 0
 }
 
 if ($null -ne $directProtocolAddress) {
-    Write-Host "Localhost Npgsql verification failed. Retrying against Podman-machine address $($directProtocolAddress):$hostPort for diagnosis only."
+    Write-Host "Localhost Npgsql acceptance verification failed. Retrying against Podman-machine address $($directProtocolAddress):$hostPort for diagnosis only."
     $directConnectionString = New-PostgresConnectionString -HostName $directProtocolAddress -Port $hostPort -Settings $settings
     $directExitCode = Invoke-LivePostgresTest -ConnectionString $directConnectionString
 
@@ -486,11 +498,11 @@ if ($null -ne $directProtocolAddress) {
         }
 
         if ($userModeNetworking -eq "false") {
-            throw "The PostgreSQL migration test succeeds through the Podman-machine address but fails through Windows localhost. Enable Podman WSL user-mode networking with: podman machine stop; podman machine set --user-mode-networking=true; podman machine start. Then rerun verify-postgres.ps1. Do not use the dynamic Podman-machine IP as the permanent application connection string."
+            throw "The PostgreSQL acceptance suite succeeds through the Podman-machine address but fails through Windows localhost. Enable Podman WSL user-mode networking with: podman machine stop; podman machine set --user-mode-networking=true; podman machine start. Then rerun verify-postgres.ps1. Do not use the dynamic Podman-machine IP as the permanent application connection string."
         }
 
-        throw "The PostgreSQL migration test succeeds through the Podman-machine address but fails through Windows localhost even though Podman reports user-mode networking=$userModeNetworking. Restart/update Podman and rerun verification; do not use the dynamic machine IP as permanent configuration."
+        throw "The PostgreSQL acceptance suite succeeds through the Podman-machine address but fails through Windows localhost even though Podman reports user-mode networking=$userModeNetworking. Restart/update Podman and rerun verification; do not use the dynamic machine IP as permanent configuration."
     }
 }
 
-throw "Windows localhost PostgreSQL protocol verification passed, but the live PostgreSQL migration test failed. Review the dotnet test failure above; this is not classified as a Podman/WSL networking failure."
+throw "Windows localhost PostgreSQL protocol verification passed, but the live PostgreSQL acceptance suite failed. Review the dotnet build/test failure above; this is not classified as a Podman/WSL networking failure."
