@@ -62,6 +62,10 @@ public static class Program
                     BundleCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
                     cancellationToken),
+                "catalogue" => await CatalogueMigrationCommandRunner.RunAsync(
+                    CatalogueMigrationCommandOptions.Parse(args.Skip(1).ToArray()),
+                    output,
+                    cancellationToken),
                 "decode" => await DecodeCommandRunner.RunAsync(
                     DecodeCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
@@ -113,6 +117,10 @@ public static class Program
     {
         output.WriteLine("""
             Photo Identity Indexer CLI
+
+              catalogue migrate --sqlite-backup PATH
+                                --postgres-connection-env NAME
+                                [--report PATH]
 
               archive include --database PATH --root DIR --folder RELATIVE_DIR
               archive list --database PATH
@@ -182,6 +190,18 @@ public static class Program
                                [--high-score-threshold 0..1]
                                [--high-margin-threshold 0..2]
                                [--medium-score-threshold 0..1]
+
+            Catalogue migrate is the offline WI-0102 SQLite-to-PostgreSQL import path.
+            It reads an already-created SQLite backup in read-only/query-only mode, requires
+            a PostgreSQL database with no existing public tables, initializes the current
+            PostgreSQL schema, copies all compatible authoritative tables in foreign-key
+            dependency order, preserves explicit stable IDs, repairs generated integer
+            sequences and verifies source/target row counts before commit. Populated SQLite
+            tables or columns without a PostgreSQL destination fail the migration rather
+            than being silently dropped. The PostgreSQL connection string is read only from
+            the named environment variable and is never written to output or the report.
+            Stop the application before taking the final SQLite backup; never migrate from
+            one writable catalogue while another writable authoritative catalogue is active.
 
             Archive include configures one permanent local archive root and stores a
             recursively included folder relative to that root. Adding a parent folder
