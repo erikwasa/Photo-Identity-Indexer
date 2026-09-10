@@ -62,6 +62,11 @@ public static class Program
                     BundleCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
                     cancellationToken),
+                "catalogue" when args.Length > 1 && args[1] == "backup" =>
+                    await CatalogueBackupCommandRunner.RunAsync(
+                        CatalogueBackupCommandOptions.Parse(args.Skip(1).ToArray()),
+                        output,
+                        cancellationToken),
                 "catalogue" => await CatalogueMigrationCommandRunner.RunAsync(
                     CatalogueMigrationCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
@@ -118,6 +123,7 @@ public static class Program
         output.WriteLine("""
             Photo Identity Indexer CLI
 
+              catalogue backup --database PATH --output PATH --application-stopped
               catalogue migrate --sqlite-backup PATH
                                 --postgres-connection-env NAME
                                 [--report PATH]
@@ -190,6 +196,14 @@ public static class Program
                                [--high-score-threshold 0..1]
                                [--high-margin-threshold 0..2]
                                [--medium-score-threshold 0..1]
+
+            Catalogue backup is the WI-0102 stopped-source snapshot path. It requires the
+            operator to explicitly confirm that Photo Identity has been stopped, opens the
+            source SQLite catalogue read-only, verifies the current schema and foreign keys,
+            creates a consistent SQLite backup through the SQLite backup API, then verifies
+            backup integrity and foreign keys. It refuses to overwrite an existing backup and
+            prints only the backup filename, hashes, size and schema version rather than the
+            private catalogue path.
 
             Catalogue migrate is the offline WI-0102 SQLite-to-PostgreSQL import path.
             It reads an already-created SQLite backup in read-only/query-only mode, requires
