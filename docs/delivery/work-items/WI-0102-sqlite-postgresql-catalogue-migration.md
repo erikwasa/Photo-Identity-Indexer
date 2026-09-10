@@ -27,10 +27,10 @@ WI-0101 completed the PostgreSQL runtime/persistence boundary in PR #277. WI-010
 ## Acceptance criteria
 - [x] Migration is repeatable from the same SQLite backup into an empty PostgreSQL database.
 - [x] Critical table/entity counts and referential/domain invariants pass before application startup on the maintainer catalogue.
-- [ ] Review history, identities, tags/Places, smart collections and processing state survive representative maintainer-catalogue verification.
+- [x] Review history, identities, tags/Places, smart collections and processing state survive representative maintainer-catalogue verification.
 - [x] New inserts after migration do not collide with imported integer sequences.
-- [ ] Cutover selects exactly one authoritative writable database.
-- [ ] Rollback can restore the pre-cutover SQLite application state without modifying the preserved backup.
+- [x] Cutover selects exactly one authoritative writable database.
+- [x] Rollback can restore the pre-cutover SQLite application state without modifying the preserved backup.
 
 ## Implementation checklist
 
@@ -72,22 +72,22 @@ WI-0101 completed the PostgreSQL runtime/persistence boundary in PR #277. WI-010
 - [x] Ensure local rehearsal review disables inherited mobile-certificate settings and surfaces API startup log tails when the published runtime exits before health is reached.
 - [x] Fix PostgreSQL identity-regeneration active-run reads so the data reader is disposed before transaction commit; the migrated catalogue exposed the reader-lifetime defect when its preserved active regeneration state caused the hosted service to execute `GetNextActiveAsync` immediately after startup.
 - [x] Add live PostgreSQL regression coverage for `GetNextActiveAsync` with an active regeneration run so transaction commit cannot regress while a reader remains open.
-- [ ] Verify people/face review history and undo/rejection state from the migrated maintainer catalogue.
-- [ ] Verify tags, Places and automatic place-enrichment state.
-- [ ] Verify saved Smart Collections and slideshow snapshot membership against representative collections.
-- [ ] Verify archive coverage, source observations/availability/hydration ownership, processing runs/jobs and completion state.
-- [ ] Verify metadata/photo details and person presentation/favorites/visibility state.
+- [x] Verify people/face review history and undo/rejection state from the migrated maintainer catalogue.
+- [x] Verify tags, Places and automatic place-enrichment state.
+- [x] Verify saved Smart Collections and slideshow snapshot membership against representative collections.
+- [x] Verify archive coverage, source observations/availability/hydration ownership, processing runs/jobs and completion state.
+- [x] Verify metadata/photo details and person presentation/favorites/visibility state.
 
 ### 5. Controlled cutover and rollback
 - [x] Document the single-authority backup/import/provider-switch/rollback sequence in `docs/operations/postgresql-catalogue-cutover.md`.
 - [x] Add a supported packaged/launcher configuration path that persists `PhotoIdentity__CatalogueProvider=postgresql` while storing only the PostgreSQL connection environment-variable name in `launcher.json`; direct connection strings in launcher settings are rejected.
 - [x] Add launcher preflight (`-ValidateConfigurationOnly`), provider validation, secret non-disclosure checks and refusal to switch providers while a healthy process is already running with another authoritative provider.
 - [x] Update root/package launcher examples to show the safe environment-variable reference while leaving SQLite as the default provider until cutover.
-- [ ] Before cutover, stop the SQLite-authoritative application and retain the source backup unchanged/read-only.
-- [ ] Start PostgreSQL-authoritative runtime and verify `/health`, Review, Library/Smart Collections, Archive and background workers before allowing new writes.
-- [ ] Record the cutover timestamp and PostgreSQL migration report as acceptance evidence.
+- [x] Before cutover, stop the SQLite-authoritative application and retain the source backup unchanged/read-only.
+- [x] Start PostgreSQL-authoritative runtime and verify `/health`, Review, Library/Smart Collections, Archive and background workers before allowing new writes.
+- [x] Record the cutover timestamp and PostgreSQL migration report as acceptance evidence.
 - [x] Define rollback as stopping PostgreSQL-authoritative runtime and restoring a working copy of the pre-cutover SQLite backup/configuration; never copy post-cutover PostgreSQL writes back into the preserved backup.
-- [ ] Perform maintainer cutover/rollback acceptance before marking WI-0102 complete.
+- [x] Perform maintainer cutover/rollback acceptance before marking WI-0102 complete.
 
 ## Migration-tool slice (2026-09-10)
 
@@ -109,10 +109,18 @@ The first guarded import exposed 27 rows in `identity_match_regeneration_runs` w
 
 Subsequent full rehearsals imported the exact same source content independently into two fresh PostgreSQL databases. Each import copied 57 tables / 480,147 rows, repaired 11 generated sequences and returned `validation: passed`; stable migration reports compared equal, producing `repeatability: passed` and `production-authority-changed: false`.
 
-UI review setup then exposed three review-only assumptions without invalidating migration evidence: inherited mobile certificate settings required an unrelated password secret, the launcher assumed an installed `%LOCALAPPDATA%\PhotoIdentity\app`, and the migrated active identity-regeneration state exercised a PostgreSQL `GetNextActiveAsync` reader-lifetime bug. Rehearsal review is now local-only, publishes the current checkout itself, can reuse an already-successful rehearsal target, surfaces startup logs directly, and closes the regeneration data reader before committing its transaction. Production SQLite authority and the accepted backup remain unchanged.
+UI review setup then exposed three review-only assumptions without invalidating migration evidence: inherited mobile certificate settings required an unrelated password secret, the launcher assumed an installed `%LOCALAPPDATA%\PhotoIdentity\app`, and the migrated active identity-regeneration state exercised a PostgreSQL `GetNextActiveAsync` reader-lifetime bug. Rehearsal review is now local-only, publishes the current checkout itself, can reuse an already-successful rehearsal target, surfaces startup logs directly, and closes the regeneration data reader before committing its transaction. Production SQLite authority and the accepted backup remained unchanged during this rehearsal phase.
 
 ## Development-complete rehearsal/cutover tooling (2026-09-10)
 
-`catalogue backup`, `catalogue migrate`, `rehearse-postgres-migration.ps1`, and `review-postgres-rehearsal.ps1` now cover the development-side migration and review workflow. The normal Windows launcher is also ready for final cutover. `launcher.json` may persist `PhotoIdentity__CatalogueProvider=postgresql` plus `postgresConnectionEnvironmentVariable`, but it cannot contain `PhotoIdentity__Postgres__ConnectionString` directly. The launcher resolves the secret from Process/User/Machine environment scope, injects it only into the child process, validates provider agreement with `/health`, and refuses an apparent provider switch while another healthy authority is still running.
+`catalogue backup`, `catalogue migrate`, `rehearse-postgres-migration.ps1`, and `review-postgres-rehearsal.ps1` cover the development-side migration and review workflow. The normal Windows launcher is also ready for final cutover. `launcher.json` may persist `PhotoIdentity__CatalogueProvider=postgresql` plus `postgresConnectionEnvironmentVariable`, but it cannot contain `PhotoIdentity__Postgres__ConnectionString` directly. The launcher resolves the secret from Process/User/Machine environment scope, injects it only into the child process, validates provider agreement with `/health`, and refuses an apparent provider switch while another healthy authority is still running.
 
-The unchecked items above intentionally require maintainer inspection of the migrated UI/domain state or the real authority-transfer window. No additional migration should be performed merely to retry UI acceptance; the retained successful rehearsal PostgreSQL target can be reopened with `review-postgres-rehearsal.ps1`.
+## Final maintainer cutover acceptance (2026-09-11)
+
+PR #278 merged to `main` at `811569f06d2db7b973af32c12e0e0b28bb1cb74f` after workflow #1599 passed on the PR head. From merged `main`, the maintainer ran the final stopped-source two-target rehearsal with `-ApplicationStopped -LaunchForReview` and accepted the generated immutable backup, both migration reports and representative UI/domain state.
+
+The persistent Windows launcher was then configured with `PhotoIdentity__CatalogueProvider=postgresql` and an environment-variable reference for the PostgreSQL connection string. The normal production runtime reported `status: ok`, `catalogueProvider: postgresql`, PostgreSQL `status: ready`, and schema version 23. The maintainer verified Needs Review, Smart Collections and Archive against the PostgreSQL authority; a missing repository-root setting discovered during cutover was added to the private launcher configuration, after which Archive profile/status and analysed state were healthy.
+
+Rollback acceptance was performed before normal post-cutover edits: PostgreSQL-authoritative Photo Identity was stopped, a writable working copy was made from the preserved final SQLite backup, the launcher was temporarily switched to `sqlite`, and representative application state was verified. The preserved backup itself was not modified. The SQLite rollback runtime was then stopped, the accepted PostgreSQL launcher configuration was restored, and the application returned successfully to PostgreSQL authority with healthy schema-23 `/health` state.
+
+WI-0102 is therefore complete. PostgreSQL is the accepted authoritative catalogue. The preserved SQLite backup remains a rollback/migration artifact rather than an active authority; longer-term PostgreSQL backup/recovery and operational stabilization belong to WI-0106.
