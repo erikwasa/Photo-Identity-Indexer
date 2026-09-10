@@ -37,6 +37,16 @@ The PostgreSQL schema already exposes indexes aligned with those predicates and 
 
 WI-0101 does not claim slideshow latency acceptance from the presence of these indexes. Query plans and real-library latency remain WI-0108 work. The WI-0101 conclusion is narrower: PostgreSQL mode has one authoritative Smart Collection/slideshow query implementation and schema-level index support for every current filter dimension.
 
+## Acceptance verification
+
+`verify-postgres.ps1` is the explicit live acceptance entry point for WI-0101. It retains the Windows/Podman/WSL connectivity and PostgreSQL-protocol checks, then exports `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING` only for the child verification process. The connection string is not printed.
+
+After connectivity succeeds, the verifier builds the Release solution and runs the full `Postgres*` persistence test set with live PostgreSQL enabled. That set includes clean/idempotent schema initialization and upgrade coverage plus repository behavior for review/identity, people/presentation, metadata/Places, Smart Collections, detector state, source scanning, processing, archive state and derivatives. It then runs PostgreSQL runtime/composition integration coverage, including the selected-host proof that no `SqliteCatalogueDatabase` is registered or created.
+
+`PostgresArchiveRuntimeAcceptanceTests` adds a cross-repository archive scenario in one disposable database rather than proving repositories only in isolation. The scenario exercises archive coverage, status and item paging, availability transitions, revision/source hydration ownership transfer during re-verification, storage accounting and post-analysis proxy completion through the Core contracts used by the runtime.
+
+A normal CI run still cannot claim live PostgreSQL acceptance when the private connection setting is absent; those opt-in tests return without connecting. WI-0101 may check its remaining live-runtime acceptance items only after `verify-postgres.ps1` is run against the configured PostgreSQL service and succeeds. Existing-catalogue import/cutover remains WI-0102.
+
 ## Remaining verification boundary
 
-Provider registration tests prove that representative contracts across the authoritative domains resolve to PostgreSQL without registering `SqliteCatalogueDatabase`. Repository tests cover individual PostgreSQL behavior. WI-0101 still needs live PostgreSQL startup/host verification and cross-domain archive behavior verification before it can claim that normal PostgreSQL operation is fully accepted. Those checks are distinct from WI-0102's production cutover and existing-catalogue import work.
+The implementation boundary is complete: PostgreSQL provider composition covers the authoritative Core contracts, while the remaining SQLite references are the default-provider implementation and explicit CLI/import compatibility paths. The remaining WI-0101 work is verification evidence and closure: run the live acceptance verifier, run the normal solution/published-runtime/documentation checks, review allowed SQLite/privacy/logging boundaries, and record the results before marking the remaining acceptance criteria complete.
