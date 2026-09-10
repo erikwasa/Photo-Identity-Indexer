@@ -1,7 +1,6 @@
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Web;
 using PhotoIdentity.Worker;
@@ -155,7 +154,7 @@ public static class ArchiveEndpoints
 
     private static async Task<IResult> IncludeAsync(
         ArchiveIncludeRequest request,
-        SqliteCatalogueDatabase database,
+        ICatalogueSourceRepository catalogueSources,
         IArchiveCoverageRepository coverageRepository,
         IArchiveStatusRepository archiveStatusRepository,
         IArchiveAdvancementControlRepository advancementControl,
@@ -182,11 +181,10 @@ public static class ArchiveEndpoints
                     throw new DirectoryNotFoundException($"The archive root does not exist: {root}");
                 }
 
-                CatalogueSource catalogueSource = await new SqliteLocalBatchRepository(database).GetOrCreateLocalFolderSourceAsync(
+                source = await catalogueSources.GetOrCreateLocalFolderSourceAsync(
                     root,
                     timeProvider.GetUtcNow(),
                     cancellationToken);
-                source = ToArchiveCatalogueSource(catalogueSource);
             }
             else
             {
@@ -247,11 +245,11 @@ public static class ArchiveEndpoints
     }
 
     private static async Task<IResult> SyncAsync(
-        SqliteCatalogueDatabase database,
         IArchiveCoverageRepository coverageRepository,
         IArchiveStatusRepository archiveStatusRepository,
         IArchiveAdvancementControlRepository advancementControl,
         ArchiveOperatorConfiguration operatorConfiguration,
+        LocalArchiveSyncCoordinator syncCoordinator,
         ArchiveThroughputMetrics metrics,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
@@ -262,13 +260,12 @@ public static class ArchiveEndpoints
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
 
             LocalFolderAssetSource source = new(configured.Source.SourceId, configured.Source.RootLocator);
-            CatalogueSource catalogueSource = ToCatalogueSource(configured.Source);
             LocalArchiveSyncSummary summary;
             using (IDisposable syncTiming = metrics.Measure(ArchiveThroughputMetricNames.Synchronization))
             {
-                summary = await new LocalArchiveSyncCoordinator(database, metrics).SyncAsync(
+                summary = await syncCoordinator.SyncAsync(
                     source,
-                    catalogueSource,
+                    configured.Source,
                     configured.IncludedFolders,
                     timeProvider.GetUtcNow(),
                     cancellationToken);
@@ -359,7 +356,6 @@ public static class ArchiveEndpoints
     }
 
     private static async Task<IResult> AnalysisStepAsync(
-        SqliteCatalogueDatabase database,
         IArchiveCoverageRepository coverageRepository,
         IArchiveStatusRepository archiveStatusRepository,
         IArchiveAdvancementControlRepository advancementControl,
@@ -540,12 +536,6 @@ public static class ArchiveEndpoints
             cancellationToken);
         return profile.ComputeHash();
     }
-
-    private static ArchiveCatalogueSource ToArchiveCatalogueSource(CatalogueSource source) =>
-        new(source.Id, source.Kind, source.RootLocator, source.CreatedAtUtc);
-
-    private static CatalogueSource ToCatalogueSource(ArchiveCatalogueSource source) =>
-        new(source.SourceId, source.Kind, source.RootLocator, source.CreatedAtUtc);
 
     private static ArchiveFolderStatusResponse ToResponse(CatalogueArchiveFolderStatus status) => new(
         status.RelativeFolder,
