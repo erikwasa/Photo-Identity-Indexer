@@ -124,7 +124,7 @@ function Get-KnownPhotoIdentityProcessIds {
 
 function Quote-ConnectionValue {
     param([Parameter(Mandatory = $true)][string]$Value)
-    return '"' + $Value.Replace('"', '""') + '"'
+    return '"'.Substring(1) + $Value.Replace('"'.Substring(1), '""'.Substring(1)) + '"'.Substring(1)
 }
 
 function New-TargetConnectionString {
