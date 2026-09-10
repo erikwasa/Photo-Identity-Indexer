@@ -122,26 +122,24 @@ function Get-KnownPhotoIdentityProcessIds {
     return @($ids | Sort-Object -Unique)
 }
 
-function Quote-ConnectionValue {
-    param([Parameter(Mandatory = $true)][string]$Value)
-    return '"'.Substring(1) + $Value.Replace('"'.Substring(1), '""'.Substring(1)) + '"'.Substring(1)
-}
-
 function New-TargetConnectionString {
     param(
         [Parameter(Mandatory = $true)]$Settings,
         [Parameter(Mandatory = $true)][string]$DatabaseName
     )
 
-    $hostPort = [int]$Settings["PHOTOIDENTITY_POSTGRES_PORT"]
-    return (
-        "Host=127.0.0.1;" +
-        "Port=$hostPort;" +
-        "Database=$(Quote-ConnectionValue -Value $DatabaseName);" +
-        "Username=$(Quote-ConnectionValue -Value ([string]$Settings["PHOTOIDENTITY_POSTGRES_USER"]));" +
-        "Password=$(Quote-ConnectionValue -Value ([string]$Settings["PHOTOIDENTITY_POSTGRES_PASSWORD"]));" +
-        "SSL Mode=Disable;GSS Encryption Mode=Disable;" +
-        "Pooling=false;Timeout=5;Command Timeout=30")
+    $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
+    $builder["Host"] = "127.0.0.1"
+    $builder["Port"] = [string][int]$Settings["PHOTOIDENTITY_POSTGRES_PORT"]
+    $builder["Database"] = $DatabaseName
+    $builder["Username"] = [string]$Settings["PHOTOIDENTITY_POSTGRES_USER"]
+    $builder["Password"] = [string]$Settings["PHOTOIDENTITY_POSTGRES_PASSWORD"]
+    $builder["SSL Mode"] = "Disable"
+    $builder["GSS Encryption Mode"] = "Disable"
+    $builder["Pooling"] = "false"
+    $builder["Timeout"] = "5"
+    $builder["Command Timeout"] = "30"
+    return $builder.ConnectionString
 }
 
 function Invoke-Cli {
