@@ -8,7 +8,7 @@ When `PhotoIdentity:CatalogueProvider=sqlite` (or the setting is omitted), the A
 
 When `PhotoIdentity:CatalogueProvider=postgresql`, `PhotoIdentity:Postgres:ConnectionString` is required. Review and identity, people and presentation state, Smart Collections, metadata and Places, detector state, source scanning, processing, archive state, hydration ownership and derivative metadata are bound to PostgreSQL implementations. PostgreSQL initialization runs before the application starts. The SQLite catalogue is not registered, opened or migrated in this mode, and the SQLite schema ensure helpers are not called.
 
-`PhotoIdentity.Api` intentionally keeps a project reference to the SQLite adapter while SQLite remains the supported default provider. `Program.cs` and `CataloguePersistenceComposition.cs` therefore remain legitimate SQLite references until WI-0102. `PhotoIdentity.Worker` has no SQLite project reference; worker application services cannot silently acquire a concrete SQLite dependency.
+`PhotoIdentity.Api` intentionally keeps a project reference to the SQLite adapter while SQLite remains the supported default provider. `Program.cs` and `CataloguePersistenceComposition.cs` therefore remain legitimate SQLite references until WI-0102. `PhotoIdentity.Worker` has no SQLite project reference; worker application services cannot silently acquire a concrete SQLite dependency. Detector-evaluation API files consume Core catalogue contracts only; stale SQLite namespace imports were removed so those provider-independent paths are not mistaken for catalogue dependencies during the remaining inventory.
 
 The portable bundle CLI remains an explicit compatibility boundary. Bundle export now consumes Core store/revision contracts, but the current CLI `--database` workflow deliberately composes the SQLite provider. Bundle result import remains an SQLite import adapter until the import/cutover work owned by WI-0102. Detector-evaluation session, comparison and ground-truth JSON stores are provider-independent portable private artifacts, not catalogue persistence.
 
@@ -28,6 +28,14 @@ The practical boundary is:
 - durable hydration ownership created while preparing originals remains authoritative archive state and follows the selected catalogue provider.
 
 No additional PostgreSQL slideshow-session or snapshot tables are required for WI-0101. WI-0108 may optimize snapshot/query execution, but it must preserve these semantics rather than make transient presentation state authoritative.
+
+## Smart Collection and slideshow query boundary
+
+`PostgresSmartCollectionQueryRepository` owns both paged Smart Collection queries and slideshow snapshot membership. Both paths use the same provider-neutral filter semantics for confirmed face assignments, manual photo people, generic tags, hierarchical Places, capture date and geographic bounds. Snapshot creation therefore does not fall back to SQLite or a second query implementation when PostgreSQL is selected.
+
+The PostgreSQL schema already exposes indexes aligned with those predicates and history lookups: face occurrence/review-action history, photo-person history by revision and person, photo-tag history by revision and tag, photo-place history by revision and tag, capture-date and latitude/longitude indexes, asset source/presence indexes, and the Smart Collection normalized-name index. These indexes establish the persistence/query boundary that WI-0108 can tune without changing storage ownership or snapshot semantics.
+
+WI-0101 does not claim slideshow latency acceptance from the presence of these indexes. Query plans and real-library latency remain WI-0108 work. The WI-0101 conclusion is narrower: PostgreSQL mode has one authoritative Smart Collection/slideshow query implementation and schema-level index support for every current filter dimension.
 
 ## Remaining verification boundary
 
