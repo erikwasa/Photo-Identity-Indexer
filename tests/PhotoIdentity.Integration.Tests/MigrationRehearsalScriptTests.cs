@@ -16,6 +16,12 @@ public sealed class MigrationRehearsalScriptTests
         string scriptPath = Path.Combine(repositoryRoot, "rehearse-postgres-migration.ps1");
         Assert.True(File.Exists(scriptPath), $"Expected rehearsal script at {scriptPath}.");
 
+        string escapedScriptPath = scriptPath.Replace("'", "''", StringComparison.Ordinal);
+        string parserCommand =
+            "$tokens=$null; $errors=$null; " +
+            $"[System.Management.Automation.Language.Parser]::ParseFile('{escapedScriptPath}',[ref]$tokens,[ref]$errors) | Out-Null; " +
+            "if ($errors.Count -ne 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }";
+
         ProcessStartInfo startInfo = new("powershell.exe")
         {
             RedirectStandardOutput = true,
@@ -26,11 +32,7 @@ public sealed class MigrationRehearsalScriptTests
         startInfo.ArgumentList.Add("-NoLogo");
         startInfo.ArgumentList.Add("-NoProfile");
         startInfo.ArgumentList.Add("-Command");
-        startInfo.ArgumentList.Add(
-            "$tokens=$null; $errors=$null; " +
-            "[System.Management.Automation.Language.Parser]::ParseFile($args[0],[ref]$tokens,[ref]$errors) | Out-Null; " +
-            "if ($errors.Count -ne 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }");
-        startInfo.ArgumentList.Add(scriptPath);
+        startInfo.ArgumentList.Add(parserCommand);
 
         using Process process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("Could not start Windows PowerShell for script syntax verification.");
