@@ -1,7 +1,6 @@
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Worker;
 
@@ -12,11 +11,11 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     private static readonly TimeSpan IdleDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan ActiveDelay = TimeSpan.FromMilliseconds(500);
 
-    private readonly SqliteCatalogueDatabase _database;
     private readonly IArchiveAdvancementControlRepository _control;
     private readonly IArchiveCoverageRepository _coverage;
     private readonly IArchiveSourceObservationRepository _observations;
-    private readonly SqliteArchiveAnalysisRepository _analysis;
+    private readonly IArchiveAnalysisStateRepository _analysis;
+    private readonly IArchiveStatusRepository _status;
     private readonly IArchivePostAnalysisRepository _postAnalysis;
     private readonly IArchiveHydrationRepository _hydrations;
     private readonly IArchiveSourceHydrationRepository _sourceHydrations;
@@ -24,6 +23,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     private readonly ArchiveBoundedAnalysisService _boundedAnalysis;
     private readonly CollectionOriginalAccessService _originals;
     private readonly FaceReviewDerivativeBackfillService _faceReviewBackfill;
+    private readonly LocalArchiveSyncCoordinator _syncCoordinator;
     private readonly ArchiveOperatorConfiguration _operatorConfiguration;
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
     private readonly TimeProvider _timeProvider;
@@ -31,47 +31,42 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     private readonly ILogger<ArchiveAdvancementHostedService> _logger;
 
     public ArchiveAdvancementHostedService(
-        SqliteCatalogueDatabase database,
         IArchiveAdvancementControlRepository control,
         IArchiveCoverageRepository coverage,
         IArchiveSourceObservationRepository observations,
-        SqliteArchiveAnalysisRepository analysis,
+        IArchiveAnalysisStateRepository analysis,
+        IArchiveStatusRepository status,
         IArchivePostAnalysisRepository postAnalysis,
         IArchiveHydrationRepository hydrations,
         IArchiveSourceHydrationRepository sourceHydrations,
         ArchiveHydrationCapacityService capacity,
         ArchiveBoundedAnalysisService boundedAnalysis,
         CollectionOriginalAccessService originals,
+        FaceReviewDerivativeBackfillService faceReviewBackfill,
+        LocalArchiveSyncCoordinator syncCoordinator,
         ArchiveOperatorConfiguration operatorConfiguration,
         ReviewProxyGenerationConfiguration proxyConfiguration,
         TimeProvider timeProvider,
         ArchiveThroughputMetrics metrics,
         ILogger<ArchiveAdvancementHostedService> logger)
     {
-        _database = database;
         _control = control;
         _coverage = coverage;
         _observations = observations;
         _analysis = analysis;
+        _status = status;
         _postAnalysis = postAnalysis;
         _hydrations = hydrations;
         _sourceHydrations = sourceHydrations;
         _capacity = capacity;
         _boundedAnalysis = boundedAnalysis;
         _originals = originals;
-        ArgumentNullException.ThrowIfNull(metrics);
-        _faceReviewBackfill = new FaceReviewDerivativeBackfillService(
-            new SqliteFaceReviewDerivativeRepository(database),
-            new SqliteFaceReviewDerivativeBackfillRepository(database),
-            new SqliteLocalBatchRepository(database),
-            originals,
-            proxyConfiguration,
-            timeProvider,
-            metrics);
+        _faceReviewBackfill = faceReviewBackfill ?? throw new ArgumentNullException(nameof(faceReviewBackfill));
+        _syncCoordinator = syncCoordinator ?? throw new ArgumentNullException(nameof(syncCoordinator));
         _operatorConfiguration = operatorConfiguration;
         _proxyConfiguration = proxyConfiguration;
         _timeProvider = timeProvider;
-        _metrics = metrics;
+        _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _logger = logger;
     }
 
@@ -199,15 +194,10 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         CancellationToken cancellationToken)
     {
         LocalFolderAssetSource source = new(coverage.Source.SourceId, coverage.Source.RootLocator);
-        CatalogueSource catalogueSource = new(
-            coverage.Source.SourceId,
-            coverage.Source.Kind,
-            coverage.Source.RootLocator,
-            coverage.Source.CreatedAtUtc);
         using IDisposable syncTiming = _metrics.Measure(ArchiveThroughputMetricNames.Synchronization);
-        _ = await new LocalArchiveSyncCoordinator(_database, _metrics).SyncAsync(
+        _ = await _syncCoordinator.SyncAsync(
             source,
-            catalogueSource,
+            coverage.Source,
             coverage.IncludedFolders,
             _timeProvider.GetUtcNow(),
             cancellationToken);
@@ -267,8 +257,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             includeHydratable: true,
             cancellationToken)).Count > 0;
 
-        CatalogueArchiveRunStatus? latest = await new SqliteArchiveStatusRepository(_database)
-            .GetLatestRunAsync(profileHash, cancellationToken);
+        CatalogueArchiveRunStatus? latest = await _status.GetLatestRunAsync(profileHash, cancellationToken);
         bool activeRun = latest is not null && (latest.QueuedJobs > 0 || latest.RunningJobs > 0);
         bool hasRunnableWork = sourcePending ||
             proxyPending ||
