@@ -1,10 +1,10 @@
 using System.Security.Cryptography;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Transfer.Bundles;
 
 namespace PhotoIdentity.Worker;
@@ -30,19 +30,21 @@ public sealed record PortableBundleExportResult(
 /// </summary>
 public sealed class PortableBundleExportCoordinator
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly ICatalogueStoreInitializer _store;
+    private readonly IAssetRevisionLookupRepository _catalogue;
     private readonly IImageDecoder _decoder;
     private readonly OpenCvPngEncoder _encoder;
     private readonly TimeProvider _timeProvider;
 
     public PortableBundleExportCoordinator(
-        SqliteCatalogueDatabase database,
+        ICatalogueStoreInitializer store,
+        IAssetRevisionLookupRepository catalogue,
         IImageDecoder? decoder = null,
         OpenCvPngEncoder? encoder = null,
         TimeProvider? timeProvider = null)
     {
-        ArgumentNullException.ThrowIfNull(database);
-        _database = database;
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _catalogue = catalogue ?? throw new ArgumentNullException(nameof(catalogue));
         _decoder = decoder ?? new OpenCvImageDecoder();
         _encoder = encoder ?? new OpenCvPngEncoder();
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -54,10 +56,9 @@ public sealed class PortableBundleExportCoordinator
     {
         ArgumentNullException.ThrowIfNull(options);
         ValidateOptions(options);
-        await _database.InitializeAsync(cancellationToken);
+        await _store.InitializeAsync(cancellationToken);
 
-        CatalogueProcessingAssetRevision asset = await new SqliteLocalBatchRepository(_database)
-            .GetAssetRevisionAsync(options.AssetRevisionId, cancellationToken)
+        AssetRevisionLookup asset = await _catalogue.GetRevisionAsync(options.AssetRevisionId, cancellationToken)
             ?? throw new KeyNotFoundException($"Asset revision {options.AssetRevisionId} was not found.");
 
         string bundlePath = Path.GetFullPath(options.BundlePath);
@@ -108,7 +109,7 @@ public sealed class PortableBundleExportCoordinator
     }
 
     private async Task<IReadOnlyList<PortableJobInput>> CreateFullImageInputAsync(
-        CatalogueProcessingAssetRevision asset,
+        AssetRevisionLookup asset,
         CancellationToken cancellationToken)
     {
         string sourcePath = await ResolveAndVerifySourceAsync(asset, cancellationToken);
@@ -117,7 +118,7 @@ public sealed class PortableBundleExportCoordinator
     }
 
     private async Task<IReadOnlyList<PortableJobInput>> CreateReducedImageInputAsync(
-        CatalogueProcessingAssetRevision asset,
+        AssetRevisionLookup asset,
         PortableBundleExportOptions options,
         string exportDirectory,
         CancellationToken cancellationToken)
@@ -235,7 +236,7 @@ public sealed class PortableBundleExportCoordinator
     }
 
     private static async Task<string> ResolveAndVerifySourceAsync(
-        CatalogueProcessingAssetRevision asset,
+        AssetRevisionLookup asset,
         CancellationToken cancellationToken)
     {
         string root = Path.GetFullPath(asset.RootLocator);
