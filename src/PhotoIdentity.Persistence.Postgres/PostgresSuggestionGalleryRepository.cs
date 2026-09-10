@@ -7,34 +7,8 @@ namespace PhotoIdentity.Persistence.Postgres;
 
 public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepository
 {
-    private const string Ctes = """
-        WITH latest_action AS (
-            SELECT
-                review_actions.*,
-                ROW_NUMBER() OVER (
-                    PARTITION BY face_occurrence_id
-                    ORDER BY id DESC) AS row_number
-            FROM review_actions
-            WHERE action_kind IN ('assign', 'unknown', 'reject')
-              AND reversed_at_utc IS NULL
-        ),
-        latest_crop AS (
-            SELECT
-                face_crops.*,
-                ROW_NUMBER() OVER (
-                    PARTITION BY face_occurrence_id
-                    ORDER BY created_at_utc DESC, id DESC) AS row_number
-            FROM face_crops
-        ),
-        latest_observation AS (
-            SELECT
-                face_observations.*,
-                ROW_NUMBER() OVER (
-                    PARTITION BY face_occurrence_id
-                    ORDER BY observed_at_utc DESC, detector_model_id, detector_model_hash) AS row_number
-            FROM face_observations
-        ),
-        top_suggestion AS (
+    private const string TopSuggestionCte = """
+        WITH top_suggestion AS (
             SELECT
                 rankings.face_occurrence_id,
                 suggestions.id AS suggestion_id,
@@ -58,6 +32,24 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
               AND rankings.model_id = @model_id
               AND rankings.model_hash = @model_hash
         )
+        """;
+
+    private const string CandidateFrom = """
+        FROM face_occurrences
+        LEFT JOIN LATERAL (
+            SELECT
+                review_actions.id,
+                review_actions.action_kind,
+                review_actions.person_id
+            FROM review_actions
+            WHERE review_actions.face_occurrence_id = face_occurrences.id
+              AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
+              AND review_actions.reversed_at_utc IS NULL
+            ORDER BY review_actions.id DESC
+            LIMIT 1
+        ) AS latest_action ON TRUE
+        LEFT JOIN top_suggestion
+            ON top_suggestion.face_occurrence_id = face_occurrences.id
         """;
 
     private const string Columns = """
@@ -89,21 +81,43 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         face_occurrences.asset_revision_id
         """;
 
-    private const string From = """
-        FROM face_occurrences
+    private const string DetailFrom = """
+        FROM candidate_faces AS face_occurrences
         INNER JOIN asset_revisions
             ON asset_revisions.id = face_occurrences.asset_revision_id
         INNER JOIN assets
             ON assets.id = asset_revisions.asset_id
-        LEFT JOIN latest_crop
-            ON latest_crop.face_occurrence_id = face_occurrences.id
-           AND latest_crop.row_number = 1
-        LEFT JOIN latest_observation
-            ON latest_observation.face_occurrence_id = face_occurrences.id
-           AND latest_observation.row_number = 1
-        LEFT JOIN latest_action
-            ON latest_action.face_occurrence_id = face_occurrences.id
-           AND latest_action.row_number = 1
+        LEFT JOIN LATERAL (
+            SELECT face_crops.storage_path
+            FROM face_crops
+            WHERE face_crops.face_occurrence_id = face_occurrences.id
+            ORDER BY face_crops.created_at_utc DESC, face_crops.id DESC
+            LIMIT 1
+        ) AS latest_crop ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT
+                face_observations.confidence,
+                face_observations.bounding_box_json
+            FROM face_observations
+            WHERE face_observations.face_occurrence_id = face_occurrences.id
+            ORDER BY
+                face_observations.observed_at_utc DESC,
+                face_observations.detector_model_id,
+                face_observations.detector_model_hash
+            LIMIT 1
+        ) AS latest_observation ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT
+                review_actions.id,
+                review_actions.action_kind,
+                review_actions.person_id
+            FROM review_actions
+            WHERE review_actions.face_occurrence_id = face_occurrences.id
+              AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
+              AND review_actions.reversed_at_utc IS NULL
+            ORDER BY review_actions.id DESC
+            LIMIT 1
+        ) AS latest_action ON TRUE
         LEFT JOIN people AS assigned_people
             ON assigned_people.id = latest_action.person_id
         LEFT JOIN top_suggestion
@@ -150,13 +164,22 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = $"""
-            {Ctes}
+            {TopSuggestionCte},
+            candidate_faces AS (
+                SELECT
+                    face_occurrences.id,
+                    face_occurrences.ordinal,
+                    face_occurrences.created_at_utc,
+                    face_occurrences.asset_revision_id
+                {CandidateFrom}
+                WHERE {predicate}
+                ORDER BY {orderBy}
+                LIMIT @limit OFFSET @offset
+            )
             SELECT
                 {Columns}
-            {From}
-            WHERE {predicate}
-            ORDER BY {orderBy}
-            LIMIT @limit OFFSET @offset;
+            {DetailFrom}
+            ORDER BY {orderBy};
             """;
         AddParameters(command, modelId, modelHash, processingRunId, policy, suggestedPersonId);
         command.Parameters.AddWithValue("limit", limit);
@@ -173,9 +196,9 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
 
         await using NpgsqlCommand countCommand = connection.CreateCommand();
         countCommand.CommandText = $"""
-            {Ctes}
+            {TopSuggestionCte}
             SELECT COUNT(*)
-            {From}
+            {CandidateFrom}
             WHERE {predicate};
             """;
         AddParameters(countCommand, modelId, modelHash, processingRunId, policy, suggestedPersonId);
@@ -210,7 +233,7 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = $"""
-            {Ctes},
+            {TopSuggestionCte},
             scoped_faces AS (
                 SELECT
                     face_occurrences.id,
@@ -218,7 +241,7 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
                     LEAD(face_occurrences.id) OVER (ORDER BY {orderBy}) AS next_face_id,
                     ROW_NUMBER() OVER (ORDER BY {orderBy}) AS position,
                     COUNT(*) OVER () AS total
-                {From}
+                {CandidateFrom}
                 WHERE {predicate}
             )
             SELECT previous_face_id, next_face_id, position, total
