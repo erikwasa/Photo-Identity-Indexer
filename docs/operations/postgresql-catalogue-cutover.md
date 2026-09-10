@@ -5,7 +5,7 @@ WI-0102 moves one existing authoritative SQLite catalogue to PostgreSQL. The mig
 ## Safety rules
 
 - Do not snapshot or migrate the SQLite catalogue while Photo Identity or another process can write it.
-- Do not point the normal application configuration at PostgreSQL until the import report and representative verification pass.
+- Do not point the normal application configuration at PostgreSQL until the import reports and representative verification pass.
 - Keep the accepted pre-cutover SQLite backup unchanged until PostgreSQL cutover has been accepted.
 - Never copy post-cutover PostgreSQL state back into that preserved backup. A rollback intentionally returns to the pre-cutover state.
 - Keep PostgreSQL credentials outside source control and command output. Migration/rehearsal code reads them only from private environment/configuration state.
@@ -29,23 +29,25 @@ By default the script resolves the SQLite catalogue from the same launcher locat
   -LaunchForReview
 ~~~
 
-The script uses `deploy/postgres/.env`, starts the existing Podman PostgreSQL service if required, and creates a uniquely named fresh database. It never reuses the ordinary verification database or an earlier rehearsal target.
+The script uses `deploy/postgres/.env`, starts the existing Podman PostgreSQL service if required, and creates **two** uniquely named fresh rehearsal databases. It never reuses the ordinary verification database or an earlier rehearsal target.
 
 The rehearsal performs these steps in order:
 
 1. builds the Release CLI;
-2. creates a timestamped SQLite backup through `catalogue backup` rather than a raw file copy;
+2. creates one timestamped SQLite backup through `catalogue backup` rather than a raw file copy;
 3. validates the source/backup schema, SQLite integrity and foreign keys;
-4. records the backup SHA-256 and verifies the source file did not change while the backup was created;
-5. creates a fresh PostgreSQL rehearsal database;
-6. runs `catalogue migrate` and writes a timestamped migration report;
-7. verifies the preserved backup hash is still unchanged and marks the backup read-only;
-8. leaves the new PostgreSQL target in place for representative review; and
-9. with `-LaunchForReview`, starts Photo Identity against that rehearsal database using temporary process environment only, then requires `/health` to report `catalogueProvider: postgresql`.
+4. records the backup SHA-256, verifies the source file did not change while the backup was created and marks the backup read-only;
+5. creates two fresh PostgreSQL rehearsal databases;
+6. imports the exact same preserved backup into the primary target and writes the primary migration report;
+7. imports that exact same preserved backup into the secondary target and writes the repeatability report;
+8. compares stable source hash/size, schema versions, copied/per-table/critical counts and sequence-repair evidence between the two reports;
+9. verifies the preserved backup SHA-256 is still unchanged after both imports;
+10. leaves both successful PostgreSQL targets in place for inspection; and
+11. with `-LaunchForReview`, starts Photo Identity against the **primary** rehearsal database using a temporary no-secret launcher configuration and requires `/health` to report `catalogueProvider: postgresql`.
 
-The script prints the rehearsal database name, backup path/hash and report path but never prints the PostgreSQL password or connection string. `production-authority-changed: false` is expected: the normal launcher configuration remains untouched.
+The script prints both rehearsal database names, the backup path/hash and both report paths but never prints the PostgreSQL password or connection string. `repeatability: passed` and `production-authority-changed: false` are expected success markers.
 
-If the rehearsal fails after creating a PostgreSQL target but before a successful import, the script removes that incomplete target. The preserved SQLite backup is never reported as accepted unless its validation succeeds.
+If one target fails before a successful import, that incomplete target is removed. A successfully imported target is retained for diagnosis/review. The preserved SQLite backup is never considered accepted unless its validation succeeds and its SHA-256 remains unchanged through the complete two-target rehearsal.
 
 ## 2. Stopped SQLite backup contract
 
@@ -98,28 +100,39 @@ A failed migration target is disposable. Diagnose the reported schema/state mism
 
 ## 4. Repeatability
 
-The automated live acceptance test imports the same fixture backup into two separate fresh PostgreSQL databases. Both successful reports must agree on source hash/size, schema versions, total rows copied, per-table counts, critical-domain counts and generated-sequence repair coverage. The maintainer's real backup must pass the same rule before final cutover; the second real import should use the exact same read-only backup file.
+The live automated migration test and the real-catalogue rehearsal now use the same rule: one immutable SQLite backup is imported independently into two fresh PostgreSQL databases. Both successful reports must agree on:
+
+- source SHA-256 and byte length;
+- SQLite and PostgreSQL schema versions;
+- total rows copied;
+- per-table source/target counts;
+- critical-domain counts; and
+- generated-sequence repair coverage.
+
+Start/completion timestamps are intentionally excluded from the comparison. Any difference in stable evidence fails the rehearsal before it can be accepted. The second target must never be produced from a newly copied SQLite file; it exists specifically to prove repeatability from the **same** preserved backup bytes.
 
 ## 5. Representative verification before authority transfer
 
-`-LaunchForReview` starts an isolated PostgreSQL-selected runtime against the migrated rehearsal target without modifying the normal launcher configuration. Before accepting the migrated state, verify representative examples of:
+`-LaunchForReview` starts an isolated PostgreSQL-selected runtime against the primary migrated rehearsal target without modifying the normal launcher configuration. It generates a temporary launcher JSON that selects PostgreSQL and stores only the name of a temporary environment variable containing the target connection string.
+
+Before accepting the migrated state, verify representative examples of:
 
 - people, confirmed/unknown/rejected review state, review history and undo relationships;
 - identity suggestions and identity-regeneration policy/state;
-- manual tags and first-class Places, including automatic place-enrichment cache/state;
+- manual tags and first-class Places, including automatic place enrichment cache/state;
 - saved Smart Collections and representative slideshow snapshot membership;
 - archive root/included folders, source observations, availability, hydration ownership and storage accounting;
 - processing runs/jobs, completed analysis state and derivative/proxy completion;
 - capture/extended metadata and Photo Details; and
 - person favorites, visibility and featured-face presentation state.
 
-The migration report proves structural completeness and counts; this representative pass proves user-visible meaning. Keep ordinary editing to a minimum during rehearsal because this database is disposable and is not yet the accepted authority.
+The migration reports prove structural completeness and counts; this representative pass proves user-visible meaning. Keep ordinary editing to a minimum during rehearsal because these databases are disposable and are not yet the accepted authority.
 
 When review is finished, stop the rehearsal Photo Identity process before restarting the normal SQLite-authoritative application.
 
 ## 6. Persisted Windows launcher cutover
 
-The supported launcher now persists the **provider selection** in `launcher.json` but deliberately keeps the PostgreSQL connection string out of that file. The private JSON contains only the name of an environment variable holding the secret.
+The supported launcher persists the **provider selection** in `launcher.json` but deliberately keeps the PostgreSQL connection string out of that file. The private JSON contains only the name of an environment variable holding the secret. Both repository/package launcher examples show this safe indirection while retaining SQLite as the default provider until cutover.
 
 First put the accepted target connection string in a Windows environment variable. If the final migration already placed it in a process variable, persist that value without retyping it:
 
@@ -156,7 +169,7 @@ The preflight must report `catalogueProvider: postgresql` and the environment-va
 
 Only after final backup/import/repeatability/representative checks pass should the real switch happen. Stop the SQLite-authoritative Photo Identity process first, then start normally through `PhotoIdentity.cmd` or `Start-PhotoIdentity.ps1`. If a healthy process is already running with a different `catalogueProvider`, the launcher refuses to claim the switch and requires that process to be stopped first.
 
-After start, the launcher itself requires the healthy runtime provider to match the configured provider. Confirm `/health` reports `catalogueProvider: postgresql`, the current PostgreSQL schema version and PostgreSQL status `ready`. Verify Review, Library/Smart Collections, Archive status and background workers before normal writes resume. Record the cutover timestamp and accepted migration report.
+After start, the launcher itself requires the healthy runtime provider to match the configured provider. Confirm `/health` reports `catalogueProvider: postgresql`, the current PostgreSQL schema version and PostgreSQL status `ready`. Verify Review, Library/Smart Collections, Archive status and background workers before normal writes resume. Record the cutover timestamp and accepted primary migration report.
 
 Do not delete the pre-cutover SQLite backup. Keep it unchanged through maintainer acceptance and the operational stabilization period owned by later M24 work.
 
@@ -178,7 +191,7 @@ Any user changes made after PostgreSQL cutover are outside this rollback snapsho
 WI-0102 is complete only after the maintainer has recorded:
 
 - the final stopped/quiesced SQLite backup filename and SHA-256;
-- successful repeatable import reports from that same backup;
+- both successful migration reports from that exact backup;
 - representative domain verification;
 - successful PostgreSQL-selected `/health` and runtime checks;
 - the cutover timestamp; and
