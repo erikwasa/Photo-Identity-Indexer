@@ -4,47 +4,75 @@ WI-0102 moves one existing authoritative SQLite catalogue to PostgreSQL. The mig
 
 ## Safety rules
 
-- Do not migrate from the SQLite file while Photo Identity or another process can write it.
-- Do not point the application at PostgreSQL until the import report and representative verification pass.
+- Do not snapshot or migrate the SQLite catalogue while Photo Identity or another process can write it.
+- Do not point the normal application configuration at PostgreSQL until the import report and representative verification pass.
 - Keep the accepted pre-cutover SQLite backup unchanged until PostgreSQL cutover has been accepted.
 - Never copy post-cutover PostgreSQL state back into that preserved backup. A rollback intentionally returns to the pre-cutover state.
-- Keep PostgreSQL credentials outside source control and command output. The migration command accepts the connection string only through a named environment variable.
+- Keep PostgreSQL credentials outside source control and command output. Migration/rehearsal code reads them only from private environment/configuration state.
 
-## 1. Rehearsal backup
+## 1. Automated real-catalogue rehearsal
 
-A rehearsal must use a copy of the real catalogue, not the active catalogue itself. For the final migration, first exit Photo Identity completely so hosted workers and API requests cannot write SQLite. Confirm no Photo Identity process remains before copying the database.
-
-Choose a timestamped backup name and copy the stopped catalogue:
-
-~~~powershell
-$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$source = "<path-to-active-catalogue.db>"
-$backup = "<backup-directory>\catalogue-$stamp.db"
-Copy-Item -LiteralPath $source -Destination $backup
-Get-FileHash -LiteralPath $backup -Algorithm SHA256
-~~~
-
-Do not resume the SQLite-authoritative application during the final migration/cutover window. The migration command computes the same SHA-256 and records it in its report, so the operator hash can be matched to the imported backup.
-
-If the active SQLite database uses WAL mode, the supported final procedure is still to stop the application first and then copy the database file. Do not manually assemble a live `.db`/`-wal`/`-shm` snapshot while writers are running.
-
-## 2. Prepare a fresh PostgreSQL target
-
-The migration command deliberately rejects a PostgreSQL database that already contains public tables. Rehearsal and final migration therefore use a newly created empty database. Do not reuse the WI-0101 verification catalogue or a prior failed/rehearsal target.
-
-Use the local PostgreSQL runtime described in `postgresql-local-runtime.md`, create the target database, and put its private connection string in a process environment variable, for example:
-
-~~~powershell
-$env:PHOTOIDENTITY_MIGRATION_CONNECTION = "Host=127.0.0.1;Port=5432;Database=<fresh-database>;Username=<user>;Password=<private-password>;SSL Mode=Disable;GSS Encryption Mode=Disable;Pooling=false"
-~~~
-
-The environment-variable name may differ; the value must not be committed or pasted into the migration report.
-
-## 3. Import the preserved SQLite backup
+The supported rehearsal path is `rehearse-postgres-migration.ps1`. Exit Photo Identity completely first. The script requires the explicit `-ApplicationStopped` acknowledgement and also rejects a detected `PhotoIdentity.Api`/known `dotnet PhotoIdentity.Api` process.
 
 From the repository root:
 
 ~~~powershell
+.\rehearse-postgres-migration.ps1 -ApplicationStopped -LaunchForReview
+~~~
+
+By default the script resolves the SQLite catalogue from the same launcher locations used by Photo Identity, falling back to `%LOCALAPPDATA%\PhotoIdentity\catalogue.db`. If this installation uses another catalogue, specify it explicitly:
+
+~~~powershell
+.\rehearse-postgres-migration.ps1 `
+  -ApplicationStopped `
+  -DatabasePath "C:\path\to\catalogue.db" `
+  -LaunchForReview
+~~~
+
+The script uses `deploy/postgres/.env`, starts the existing Podman PostgreSQL service if required, and creates a uniquely named fresh database. It never reuses the ordinary verification database or an earlier rehearsal target.
+
+The rehearsal performs these steps in order:
+
+1. builds the Release CLI;
+2. creates a timestamped SQLite backup through `catalogue backup` rather than a raw file copy;
+3. validates the source/backup schema, SQLite integrity and foreign keys;
+4. records the backup SHA-256 and verifies the source file did not change while the backup was created;
+5. creates a fresh PostgreSQL rehearsal database;
+6. runs `catalogue migrate` and writes a timestamped migration report;
+7. verifies the preserved backup hash is still unchanged and marks the backup read-only;
+8. leaves the new PostgreSQL target in place for representative review; and
+9. with `-LaunchForReview`, starts Photo Identity against that rehearsal database using temporary process environment only, then requires `/health` to report `catalogueProvider: postgresql`.
+
+The script prints the rehearsal database name, backup path/hash and report path but never prints the PostgreSQL password or connection string. `production-authority-changed: false` is expected: the normal launcher configuration remains untouched.
+
+If the rehearsal fails after creating a PostgreSQL target but before a successful import, the script removes that incomplete target. The preserved SQLite backup is never reported as accepted unless its validation succeeds.
+
+## 2. Stopped SQLite backup contract
+
+The underlying backup command can also be used independently:
+
+~~~powershell
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$backup = "<backup-directory>\catalogue-$stamp.db"
+
+dotnet run --project .\src\PhotoIdentity.Cli --configuration Release -- `
+  catalogue backup `
+  --database "<path-to-active-catalogue.db>" `
+  --output $backup `
+  --application-stopped
+~~~
+
+`--application-stopped` is deliberately mandatory. The command opens the source read-only, requires the current SQLite schema, runs `PRAGMA foreign_key_check`, creates the destination through SQLite's backup API, then reopens the result read-only and runs `PRAGMA integrity_check` plus foreign-key validation. Existing backup paths are never overwritten.
+
+This is the supported replacement for copying only the `.db` file. It creates a logical SQLite snapshot and therefore does not depend on whether the source previously used rollback-journal or WAL mode.
+
+## 3. PostgreSQL import contract
+
+The underlying migration command is:
+
+~~~powershell
+$env:PHOTOIDENTITY_MIGRATION_CONNECTION = "<private connection string to a fresh database>"
+
 dotnet run --project .\src\PhotoIdentity.Cli --configuration Release -- `
   catalogue migrate `
   --sqlite-backup $backup `
@@ -68,61 +96,50 @@ A successful report contains the backup filename, SHA-256, size, schema versions
 
 A failed migration target is disposable. Diagnose the reported schema/state mismatch, create another fresh PostgreSQL database, and rerun from the same preserved SQLite backup. Do not weaken the no-silent-loss checks merely to make a previously unknown SQLite table disappear.
 
-## 4. Repeatability rehearsal
+## 4. Repeatability
 
-Before final cutover, import the same backup into two separate fresh PostgreSQL databases. Both successful reports must agree on:
-
-- source SHA-256 and byte length;
-- SQLite and PostgreSQL schema versions;
-- total rows copied;
-- per-table source/target counts;
-- critical-domain counts; and
-- generated-sequence repair coverage.
-
-Timestamps and target database identity are not equivalence inputs. The automated live migration test exercises this same-backup/two-target rule on a representative catalogue fixture.
+The automated live acceptance test imports the same fixture backup into two separate fresh PostgreSQL databases. Both successful reports must agree on source hash/size, schema versions, total rows copied, per-table counts, critical-domain counts and generated-sequence repair coverage. The maintainer's real backup must pass the same rule before final cutover; the second real import should use the exact same read-only backup file.
 
 ## 5. Representative verification before authority transfer
 
-Keep the application stopped or, for a rehearsal only, run an isolated PostgreSQL-selected instance against the imported target. Verify representative state before accepting the target:
+`-LaunchForReview` starts an isolated PostgreSQL-selected runtime against the migrated rehearsal target without modifying the normal launcher configuration. Before accepting the migrated state, verify representative examples of:
 
 - people, confirmed/unknown/rejected review state, review history and undo relationships;
 - identity suggestions and identity-regeneration policy/state;
-- manual tags and first-class Places, including automatic place enrichment cache/state;
+- manual tags and first-class Places, including automatic place-enrichment cache/state;
 - saved Smart Collections and representative slideshow snapshot membership;
 - archive root/included folders, source observations, availability, hydration ownership and storage accounting;
 - processing runs/jobs, completed analysis state and derivative/proxy completion;
 - capture/extended metadata and Photo Details; and
 - person favorites, visibility and featured-face presentation state.
 
-The migration report proves structural completeness and counts; this representative pass proves user-visible meaning.
+The migration report proves structural completeness and counts; this representative pass proves user-visible meaning. Keep ordinary editing to a minimum during rehearsal because this database is disposable and is not yet the accepted authority.
 
-## 6. Cut over exactly one writable authority
+When review is finished, stop the rehearsal Photo Identity process before restarting the normal SQLite-authoritative application.
 
-Only after the final backup/import/verification passes should the runtime provider be changed. Keep the SQLite-authoritative application stopped. Supply the PostgreSQL connection string and provider selection to the process:
+## 6. Final cutover exactly once
+
+Only after the final backup/import/repeatability/representative checks pass should the normal runtime provider be changed. Keep the SQLite-authoritative application stopped. PostgreSQL-selected runtime uses:
 
 ~~~powershell
 $env:PhotoIdentity__CatalogueProvider = "postgresql"
-$env:PhotoIdentity__Postgres__ConnectionString = $env:PHOTOIDENTITY_MIGRATION_CONNECTION
+$env:PhotoIdentity__Postgres__ConnectionString = "<accepted target connection string>"
 ~~~
 
-Then start Photo Identity normally. PostgreSQL-selected startup must not open or migrate the SQLite catalogue. Confirm `/health` reports:
+The packaged launcher configuration path for persisting this selection is part of WI-0102 and must be accepted before final cutover. Do not store a database password in `PhotoIdentity.launcher.json` merely to make the switch persistent.
 
-- `catalogueProvider: postgresql`;
-- the current PostgreSQL schema version; and
-- PostgreSQL status `ready`.
+After the supported launcher configuration is in place, start Photo Identity and confirm `/health` reports `catalogueProvider: postgresql`, the current PostgreSQL schema version and PostgreSQL status `ready`. Verify Review, Library/Smart Collections, Archive status and background workers before normal writes resume. Record the cutover timestamp and accepted migration report.
 
-Before normal use, verify Review, Library/Smart Collections, Archive status and the relevant hosted workers. Record the cutover time and the accepted migration report. Only then allow ordinary new writes in PostgreSQL-authoritative mode.
-
-Do not delete the pre-cutover SQLite backup. Keep it read-only/unchanged through maintainer acceptance and the operational stabilization period owned by later M24 work.
+Do not delete the pre-cutover SQLite backup. Keep it unchanged through maintainer acceptance and the operational stabilization period owned by later M24 work.
 
 ## 7. Rollback boundary
 
 Rollback is intentionally a return to the exact pre-cutover SQLite state, not a reverse migration.
 
-1. Stop the PostgreSQL-authoritative Photo Identity process first so no further PostgreSQL writes can occur.
+1. Stop the PostgreSQL-authoritative Photo Identity process so no further PostgreSQL writes occur.
 2. Preserve PostgreSQL for diagnosis; do not attempt to merge its post-cutover writes into SQLite.
 3. Make a new working copy from the unchanged pre-cutover SQLite backup. Do not use or modify the preserved backup itself as the working database.
-4. Remove/set aside `PhotoIdentity__CatalogueProvider=postgresql` and restore the normal SQLite catalogue path/configuration.
+4. Restore the SQLite provider/catalogue configuration.
 5. Start Photo Identity and confirm `/health` reports `catalogueProvider: sqlite`.
 6. Verify representative Review, Library and Archive state is the expected pre-cutover state.
 
@@ -133,7 +150,7 @@ Any user changes made after PostgreSQL cutover are outside this rollback snapsho
 WI-0102 is complete only after the maintainer has recorded:
 
 - the final stopped/quiesced SQLite backup filename and SHA-256;
-- successful repeatable import reports;
+- successful repeatable import reports from that same backup;
 - representative domain verification;
 - successful PostgreSQL-selected `/health` and runtime checks;
 - the cutover timestamp; and
