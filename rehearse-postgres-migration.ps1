@@ -105,6 +105,46 @@ function Resolve-LauncherInfo {
     }
 }
 
+function New-RehearsalLauncherConfiguration {
+    param(
+        [string]$BaseConfigurationPath,
+        [Parameter(Mandatory = $true)][string]$OutputPath,
+        [Parameter(Mandatory = $true)][string]$PostgresEnvironmentName,
+        [Parameter(Mandatory = $true)][string]$Url
+    )
+
+    if ([string]::IsNullOrWhiteSpace($BaseConfigurationPath)) {
+        $configuration = [pscustomobject][ordered]@{
+            url = $Url
+            postgresConnectionEnvironmentVariable = $PostgresEnvironmentName
+            settings = [pscustomobject][ordered]@{
+                PhotoIdentity__CatalogueProvider = "postgresql"
+            }
+        }
+    }
+    else {
+        $configuration = Get-Content -LiteralPath $BaseConfigurationPath -Raw | ConvertFrom-Json
+        if ($null -eq $configuration.PSObject.Properties["postgresConnectionEnvironmentVariable"]) {
+            Add-Member -InputObject $configuration -MemberType NoteProperty -Name "postgresConnectionEnvironmentVariable" -Value $PostgresEnvironmentName
+        }
+        else {
+            $configuration.postgresConnectionEnvironmentVariable = $PostgresEnvironmentName
+        }
+
+        if ($null -eq $configuration.PSObject.Properties["settings"] -or $null -eq $configuration.settings) {
+            Add-Member -InputObject $configuration -MemberType NoteProperty -Name "settings" -Value ([pscustomobject]@{}) -Force
+        }
+        if ($null -eq $configuration.settings.PSObject.Properties["PhotoIdentity__CatalogueProvider"]) {
+            Add-Member -InputObject $configuration.settings -MemberType NoteProperty -Name "PhotoIdentity__CatalogueProvider" -Value "postgresql"
+        }
+        else {
+            $configuration.settings.PhotoIdentity__CatalogueProvider = "postgresql"
+        }
+    }
+
+    $configuration | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $OutputPath -Encoding UTF8
+}
+
 function Get-KnownPhotoIdentityProcessIds {
     $ids = @()
     $ids += @(Get-Process -Name "PhotoIdentity.Api" -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
@@ -194,6 +234,7 @@ New-Item -ItemType Directory -Path $BackupDirectory -Force | Out-Null
 $timestamp = [DateTime]::UtcNow.ToString("yyyyMMdd_HHmmss")
 $backupPath = Join-Path $BackupDirectory "catalogue-$timestamp.db"
 $reportPath = Join-Path $BackupDirectory "postgres-migration-$timestamp.json"
+$rehearsalLauncherPath = Join-Path $BackupDirectory "launcher-rehearsal-$timestamp.json"
 if ([string]::IsNullOrWhiteSpace($TargetDatabaseName)) {
     $TargetDatabaseName = "photoidentity_rehearsal_${timestamp}_$([Guid]::NewGuid().ToString('N').Substring(0, 8))".ToLowerInvariant()
 }
@@ -325,19 +366,21 @@ try {
             throw "Launcher was not found: $launcherPath"
         }
 
-        $previousProvider = [Environment]::GetEnvironmentVariable("PhotoIdentity__CatalogueProvider", "Process")
-        $previousRuntimeConnection = [Environment]::GetEnvironmentVariable("PhotoIdentity__Postgres__ConnectionString", "Process")
+        $runtimeEnvironmentName = "PHOTOIDENTITY_REHEARSAL_RUNTIME_CONNECTION_STRING"
+        $previousRuntimeConnection = [Environment]::GetEnvironmentVariable($runtimeEnvironmentName, "Process")
         try {
-            [Environment]::SetEnvironmentVariable("PhotoIdentity__CatalogueProvider", "postgresql", "Process")
-            [Environment]::SetEnvironmentVariable("PhotoIdentity__Postgres__ConnectionString", $targetConnectionString, "Process")
+            [Environment]::SetEnvironmentVariable($runtimeEnvironmentName, $targetConnectionString, "Process")
+            New-RehearsalLauncherConfiguration `
+                -BaseConfigurationPath $launcherInfo.ConfigurationPath `
+                -OutputPath $rehearsalLauncherPath `
+                -PostgresEnvironmentName $runtimeEnvironmentName `
+                -Url $launcherInfo.Url
 
             $launcherArguments = @(
                 "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                "-File", $launcherPath
+                "-File", $launcherPath,
+                "-ConfigurationPath", $rehearsalLauncherPath
             )
-            if ($null -ne $launcherInfo.ConfigurationPath) {
-                $launcherArguments += @("-ConfigurationPath", $launcherInfo.ConfigurationPath)
-            }
 
             Write-Host "Starting Photo Identity against the rehearsal PostgreSQL database for read/review acceptance..."
             & powershell.exe @launcherArguments
@@ -349,11 +392,11 @@ try {
             if ([string]$health.status -ne "ok" -or [string]$health.catalogueProvider -ne "postgresql") {
                 throw "Rehearsal runtime health did not confirm catalogueProvider=postgresql."
             }
+            Write-Host "rehearsal-launcher-config: $rehearsalLauncherPath"
             Write-Host "rehearsal-runtime-health: postgresql"
         }
         finally {
-            [Environment]::SetEnvironmentVariable("PhotoIdentity__CatalogueProvider", $previousProvider, "Process")
-            [Environment]::SetEnvironmentVariable("PhotoIdentity__Postgres__ConnectionString", $previousRuntimeConnection, "Process")
+            [Environment]::SetEnvironmentVariable($runtimeEnvironmentName, $previousRuntimeConnection, "Process")
         }
     }
     else {
