@@ -651,7 +651,6 @@ work_items:
   verified_at: 2026-08-21
   verified_by: maintainer
   last_updated_at: 2026-08-26
-  branch: agent/WI-0074-suggested-person-filter
   blockers:
   - WI-0043
   - WI-0047
@@ -997,7 +996,7 @@ work_items:
   milestone: M22
   status: in_review
   owner: ai-agent
-  document: ../work-items/WI-0093-slideshow-original-preparation-progress.md
+  document: ../work-items/WI-0093-slideshow-preparation-progress.md
   started_at: 2026-08-31
   last_updated_at: 2026-08-31
   branch: agent/WI-0093-slideshow-preparation-progress
@@ -1328,15 +1327,19 @@ work_items:
 - id: WI-0101
   title: Migrate library and remaining authoritative persistence to PostgreSQL
   milestone: M24
-  status: in_progress
+  status: completed
   owner: ai-agent
   document: ../work-items/WI-0101-postgresql-library-remaining-persistence.md
   started_at: 2026-09-09
-  last_updated_at: 2026-09-09
-  branch: erik-wahlstrom-folksam1-m24-postgresql-catalogue-scale
+  completed_at: 2026-09-10
+  verified_at: 2026-09-10
+  verified_by: maintainer
+  last_updated_at: 2026-09-11
+  branch: codex/m24-6
   blockers:
   - WI-0098
-  blocker_notes: []
+  blocker_notes:
+  - PR #276 completed coherent provider selection and PR #277 completed live PostgreSQL runtime/composition acceptance; production cutover was intentionally deferred to WI-0102.
   evidence:
   - type: test
     value: '2026-09-09 detector rollout Core contract slice: API build passed with zero warnings/errors; dotnet test tests/PhotoIdentity.Integration.Tests --no-restore --filter FullyQualifiedName~DetectorRollout passed 18/18 tests (3 seconds). PostgreSQL detector persistence remains pending.'
@@ -1354,18 +1357,47 @@ work_items:
     value: '2026-09-10 face-review derivative slice: schema v22 clean/idempotent migration and derivative live PostgreSQL tests passed; reconstructed v21 upgrade retaining synthetic catalogue rows passed (748 ms). Five focused image/backfill tests passed (3 seconds); test.ps1 passed 543 Release tests including 405 integration tests (1 minute 35 seconds). Comprehensive published-app smoke passed. Whole-photo proxy writer and archive orchestration remain pending.'
   - type: test
     value: '2026-09-10 archive analysis/proxy composition: live PostgreSQL pending/completed query and mismatch hydration-transfer tests passed (997 ms); 59 focused archive/derivative tests passed (13 seconds). test.ps1 passed 544 Release tests including 405 integration tests (1 minute 35 seconds); comprehensive published-app smoke and documentation checks passed. Source scanning and hosted advancement remain pending.'
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/276
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/277
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34441306569
+  - type: merge_commit
+    value: 2b5d2cd07428b2d102bd3d69bda6ad39929ef63c
+  - type: verification
+    value: '2026-09-10 maintainer live verification: Release build passed with zero warnings/errors; PostgreSQL persistence acceptance passed 28/28 with zero skips; runtime/composition acceptance passed 4/4 with zero skips.'
 - id: WI-0102
   title: Migrate the existing SQLite catalogue and perform controlled PostgreSQL cutover
   milestone: M24
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0102-sqlite-postgresql-catalogue-migration.md
+  started_at: 2026-09-10
+  completed_at: 2026-09-11
+  verified_at: 2026-09-11
+  verified_by: maintainer
+  last_updated_at: 2026-09-11
+  branch: codex/m24-7
   blockers:
   - WI-0099
   - WI-0100
   - WI-0101
-  blocker_notes: []
-  evidence: []
+  blocker_notes:
+  - WI-0101 completed the provider-neutral PostgreSQL runtime boundary; WI-0102 then performed the stopped-source migration, representative review, single-authority cutover and rollback acceptance.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/278
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34531203522
+  - type: merge_commit
+    value: 811569f06d2db7b973af32c12e0e0b28bb1cb74f
+  - type: verification
+    value: '2026-09-11 final rehearsal from merged main passed the stopped-source two-target migration/repeatability and representative UI/domain review; generated backup and reports remain private local acceptance artifacts.'
+  - type: verification
+    value: '2026-09-11 production cutover accepted: /health reported status ok, catalogueProvider postgresql, PostgreSQL status ready and schemaVersion 23; Needs Review, Smart Collections and Archive were verified after the repository-root launcher setting was corrected.'
+  - type: verification
+    value: '2026-09-11 rollback acceptance passed before normal post-cutover edits: a writable copy of the preserved SQLite backup booted successfully under the SQLite provider, representative state was verified, then PostgreSQL authority was restored successfully; the preserved backup itself remained unchanged.'
 - id: WI-0103
   title: Make identity match regeneration scalable and bounded
   milestone: M24
