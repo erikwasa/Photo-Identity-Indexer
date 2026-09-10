@@ -15,6 +15,7 @@ $ErrorActionPreference = "Stop"
 $composeDirectory = Join-Path $PSScriptRoot "deploy\postgres"
 $composePath = Join-Path $composeDirectory "compose.yaml"
 $cliProject = Join-Path $PSScriptRoot "src\PhotoIdentity.Cli\PhotoIdentity.Cli.csproj"
+$apiProject = Join-Path $PSScriptRoot "src\PhotoIdentity.Api\PhotoIdentity.Api.csproj"
 $launcherPath = Join-Path $PSScriptRoot "Start-PhotoIdentity.ps1"
 
 function Read-DotEnv {
@@ -306,6 +307,9 @@ if (-not (Test-Path -LiteralPath $EnvironmentPath -PathType Leaf)) {
 if (-not (Test-Path -LiteralPath $cliProject -PathType Leaf)) {
     throw "Photo Identity CLI project was not found: $cliProject"
 }
+if ($LaunchForReview -and -not (Test-Path -LiteralPath $apiProject -PathType Leaf)) {
+    throw "Photo Identity API project was not found: $apiProject"
+}
 
 $launcherInfo = Resolve-LauncherInfo
 $sourcePath = if ([string]::IsNullOrWhiteSpace($DatabasePath)) {
@@ -329,6 +333,7 @@ $backupPath = Join-Path $BackupDirectory "catalogue-$timestamp.db"
 $primaryReportPath = Join-Path $BackupDirectory "postgres-migration-$timestamp-primary.json"
 $secondaryReportPath = Join-Path $BackupDirectory "postgres-migration-$timestamp-repeat.json"
 $rehearsalLauncherPath = Join-Path $BackupDirectory "launcher-rehearsal-$timestamp.json"
+$rehearsalPublishPath = Join-Path $BackupDirectory "published-rehearsal-$timestamp"
 if ([string]::IsNullOrWhiteSpace($TargetDatabaseName)) {
     $TargetDatabaseName = "photoidentity_rehearsal_${timestamp}_a$([Guid]::NewGuid().ToString('N').Substring(0, 6))".ToLowerInvariant()
 }
@@ -448,6 +453,15 @@ try {
             throw "Launcher was not found: $launcherPath"
         }
 
+        Write-Host "Publishing the current Photo Identity API for isolated rehearsal review..."
+        & dotnet publish $apiProject --configuration Release --output $rehearsalPublishPath | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "Photo Identity API rehearsal publish failed with code $LASTEXITCODE."
+        }
+        if (-not (Test-Path -LiteralPath (Join-Path $rehearsalPublishPath "PhotoIdentity.Api.dll") -PathType Leaf)) {
+            throw "Rehearsal publish did not produce PhotoIdentity.Api.dll at '$rehearsalPublishPath'."
+        }
+
         $runtimeEnvironmentName = "PHOTOIDENTITY_REHEARSAL_RUNTIME_CONNECTION_STRING"
         $previousRuntimeConnection = [Environment]::GetEnvironmentVariable($runtimeEnvironmentName, "Process")
         try {
@@ -455,7 +469,7 @@ try {
             New-RehearsalLauncherConfiguration -BaseConfigurationPath $launcherInfo.ConfigurationPath -OutputPath $rehearsalLauncherPath -PostgresEnvironmentName $runtimeEnvironmentName -Url $launcherInfo.Url
 
             Write-Host "Starting Photo Identity against the primary rehearsal PostgreSQL database for UI acceptance..."
-            & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $launcherPath -ConfigurationPath $rehearsalLauncherPath
+            & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $launcherPath -ConfigurationPath $rehearsalLauncherPath -PublishPathOverride $rehearsalPublishPath
             if ($LASTEXITCODE -ne 0) {
                 throw "Photo Identity launcher failed with code $LASTEXITCODE."
             }
@@ -465,6 +479,7 @@ try {
                 throw "Rehearsal runtime health did not confirm catalogueProvider=postgresql."
             }
             Write-Host "rehearsal-launcher-config: $rehearsalLauncherPath"
+            Write-Host "rehearsal-publish-path: $rehearsalPublishPath"
             Write-Host "rehearsal-runtime-health: postgresql"
         }
         finally {
