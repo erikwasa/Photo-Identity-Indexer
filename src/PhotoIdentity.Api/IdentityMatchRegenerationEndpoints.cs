@@ -1,7 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
@@ -17,10 +16,10 @@ public static class IdentityMatchRegenerationEndpoints
     }
 
     private static async Task<IResult> ListModelsAsync(
-        SqliteIdentityMatchRegenerationModelRepository models,
+        IIdentityMatchModelRepository models,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<CatalogueIdentityMatchModelRevision> revisions = await models.ListAsync(cancellationToken);
+        IReadOnlyList<ReviewIdentityMatchModelRevision> revisions = await models.ListAsync(cancellationToken);
         return Results.Ok(revisions.Select(model => new
         {
             ModelId = model.ModelId.ToString(),
@@ -32,7 +31,7 @@ public static class IdentityMatchRegenerationEndpoints
     private static async Task<IResult> GetAsync(
         IIdentityMatchRegenerationRepository repository,
         IIdentitySuggestionPolicyRepository policyRepository,
-        SqliteIdentityMatchEvidenceVersionReader evidenceReader,
+        IIdentityMatchEvidenceVersionReader evidenceReader,
         string? modelId,
         string? modelHash,
         CancellationToken cancellationToken)
@@ -74,16 +73,16 @@ public static class IdentityMatchRegenerationEndpoints
             });
         }
 
-        IdentityMatchEvidenceVersion currentEvidence = await evidenceReader.ReadAsync(
+        ReviewIdentityMatchEvidenceVersion currentEvidence = await evidenceReader.ReadAsync(
             parsedModelId,
             parsedModelHash,
             cancellationToken);
-        IdentityMatchEvidenceVersion expectedEvidence =
+        ReviewIdentityMatchEvidenceVersion expectedEvidence =
             string.Equals(run.Status, ReviewIdentityMatchRegenerationStatuses.Completed, StringComparison.Ordinal)
-                ? SqliteIdentityMatchEvidenceVersionReader.ExpectedAfterAutomaticAssignments(
-                    ToSqliteEvidenceVersion(run.EvidenceVersion),
+                ? ReviewIdentityMatchEvidenceVersions.ExpectedAfterAutomaticAssignments(
+                    run.EvidenceVersion,
                     run.AutomaticallyAssignedCount)
-                : ToSqliteEvidenceVersion(run.EvidenceVersion);
+                : run.EvidenceVersion;
         bool evidenceMatches = currentEvidence == expectedEvidence;
         bool stale = string.Equals(run.Status, ReviewIdentityMatchRegenerationStatuses.Stale, StringComparison.Ordinal)
             || string.Equals(run.Status, ReviewIdentityMatchRegenerationStatuses.Failed, StringComparison.Ordinal)
@@ -160,14 +159,6 @@ public static class IdentityMatchRegenerationEndpoints
         run.UpdatedAtUtc,
         run.Error,
     };
-
-    private static IdentityMatchEvidenceVersion ToSqliteEvidenceVersion(
-        ReviewIdentityMatchEvidenceVersion value) =>
-        new(
-            value.ReviewActionId,
-            value.SuggestionReviewActionId,
-            value.PersonMergeActionId,
-            value.EmbeddingId);
 
     private static bool TryModelRevision(
         string? modelId,

@@ -1,18 +1,18 @@
-using Microsoft.Data.Sqlite;
+using Npgsql;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
 /// Lists exact embedding revisions that can be regenerated even when no suggestion ranking exists yet.
 /// </summary>
-public sealed class SqliteIdentityMatchRegenerationModelRepository : IIdentityMatchModelRepository
+public sealed class PostgresIdentityMatchModelRepository : IIdentityMatchModelRepository
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly PostgresCatalogueDatabase _database;
 
-    public SqliteIdentityMatchRegenerationModelRepository(SqliteCatalogueDatabase database)
+    public PostgresIdentityMatchModelRepository(PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
@@ -21,14 +21,13 @@ public sealed class SqliteIdentityMatchRegenerationModelRepository : IIdentityMa
     public async Task<IReadOnlyList<ReviewIdentityMatchModelRevision>> ListAsync(
         CancellationToken cancellationToken = default)
     {
-        await _database.InitializeAsync(cancellationToken);
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
             SELECT
                 embedding.model_id,
                 embedding.model_hash,
-                COUNT(DISTINCT crop.face_occurrence_id) AS face_count
+                COUNT(DISTINCT crop.face_occurrence_id)::integer AS face_count
             FROM embeddings AS embedding
             INNER JOIN face_crops AS crop
                 ON crop.id = embedding.face_crop_id
@@ -37,7 +36,7 @@ public sealed class SqliteIdentityMatchRegenerationModelRepository : IIdentityMa
             """;
 
         List<ReviewIdentityMatchModelRevision> results = [];
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
             results.Add(new ReviewIdentityMatchModelRevision(

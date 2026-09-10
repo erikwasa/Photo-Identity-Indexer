@@ -1,6 +1,5 @@
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Persistence.Sqlite;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Api;
 
@@ -10,31 +9,19 @@ namespace PhotoIdentity.Api;
 /// </summary>
 public sealed class ReviewFaceRevisionResolver
 {
-    private readonly SqliteCatalogueDatabase _database;
+    private readonly IReviewFaceRepository _repository;
 
-    public ReviewFaceRevisionResolver(SqliteCatalogueDatabase database)
+    public ReviewFaceRevisionResolver(IReviewFaceRepository repository)
     {
-        ArgumentNullException.ThrowIfNull(database);
-        _database = database;
+        ArgumentNullException.ThrowIfNull(repository);
+        _repository = repository;
     }
 
     public async Task<AssetRevisionId?> ResolveAsync(
         FaceOccurrenceId faceOccurrenceId,
         CancellationToken cancellationToken = default)
     {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT asset_revision_id
-            FROM face_occurrences
-            WHERE id = $face_occurrence_id;
-            """;
-        command.Parameters.AddWithValue("$face_occurrence_id", faceOccurrenceId.ToString());
-        object? value = await command.ExecuteScalarAsync(cancellationToken);
-        return value is string revisionId &&
-               Guid.TryParse(revisionId, out Guid parsed) &&
-               parsed != Guid.Empty
-            ? AssetRevisionId.From(parsed)
-            : null;
+        CatalogueReviewFace? face = await _repository.GetFaceAsync(faceOccurrenceId, cancellationToken);
+        return face?.RevisionId;
     }
 }

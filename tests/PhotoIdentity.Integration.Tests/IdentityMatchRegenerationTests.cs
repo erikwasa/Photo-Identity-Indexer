@@ -95,10 +95,10 @@ public sealed class IdentityMatchRegenerationTests
 
             IdentityMatchRegenerationHostedService worker = new(
                 new SqliteIdentityMatchRegenerationAdapter(repository),
-                new SqliteIdentityMatchRegenerationScorer(database, clock),
+                new SqliteIdentityMatchRegenerationScorerAdapter(new SqliteIdentityMatchRegenerationScorer(database, clock)),
                 new SqliteIdentitySuggestionPolicyAdapter(new SqliteIdentitySuggestionPolicyRepository(database, clock)),
-                new SqliteIdentityAutoAssignmentService(database, clock),
-                new SqliteIdentityMatchEvidenceVersionReader(database),
+                new SqliteIdentityAutoAssignmentAdapter(new SqliteIdentityAutoAssignmentService(database, clock)),
+                new SqliteIdentityMatchEvidenceVersionAdapter(database),
                 clock,
                 new ArchiveThroughputMetrics(clock));
 
@@ -164,10 +164,10 @@ public sealed class IdentityMatchRegenerationTests
                 clock.GetUtcNow());
             IdentityMatchRegenerationHostedService worker = new(
                 new SqliteIdentityMatchRegenerationAdapter(repository),
-                new SqliteIdentityMatchRegenerationScorer(database, clock),
+                new SqliteIdentityMatchRegenerationScorerAdapter(new SqliteIdentityMatchRegenerationScorer(database, clock)),
                 new SqliteIdentitySuggestionPolicyAdapter(policies),
-                new SqliteIdentityAutoAssignmentService(database, clock),
-                new SqliteIdentityMatchEvidenceVersionReader(database),
+                new SqliteIdentityAutoAssignmentAdapter(new SqliteIdentityAutoAssignmentService(database, clock)),
+                new SqliteIdentityMatchEvidenceVersionAdapter(database),
                 clock,
                 new ArchiveThroughputMetrics(clock));
 

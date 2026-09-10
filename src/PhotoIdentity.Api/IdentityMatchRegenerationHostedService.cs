@@ -1,5 +1,4 @@
 using PhotoIdentity.Core.Review;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
@@ -15,19 +14,19 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
     private static readonly TimeSpan ActiveDelay = TimeSpan.FromMilliseconds(25);
 
     private readonly IIdentityMatchRegenerationRepository _runs;
-    private readonly SqliteIdentityMatchRegenerationScorer _scorer;
+    private readonly IIdentityMatchRegenerationScorer _scorer;
     private readonly IIdentitySuggestionPolicyRepository _policies;
-    private readonly SqliteIdentityAutoAssignmentService _autoAssignment;
-    private readonly SqliteIdentityMatchEvidenceVersionReader _evidence;
+    private readonly IIdentityAutoAssignmentService _autoAssignment;
+    private readonly IIdentityMatchEvidenceVersionReader _evidence;
     private readonly TimeProvider _timeProvider;
     private readonly ArchiveThroughputMetrics _metrics;
 
     public IdentityMatchRegenerationHostedService(
         IIdentityMatchRegenerationRepository runs,
-        SqliteIdentityMatchRegenerationScorer scorer,
+        IIdentityMatchRegenerationScorer scorer,
         IIdentitySuggestionPolicyRepository policies,
-        SqliteIdentityAutoAssignmentService autoAssignment,
-        SqliteIdentityMatchEvidenceVersionReader evidence,
+        IIdentityAutoAssignmentService autoAssignment,
+        IIdentityMatchEvidenceVersionReader evidence,
         TimeProvider timeProvider,
         ArchiveThroughputMetrics metrics)
     {
@@ -153,19 +152,19 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 run.ModelHash,
                 run.Id,
                 cancellationToken);
-            IdentityAutoAssignmentSummary auto = await _autoAssignment.ApplyAsync(
+            ReviewIdentityAutoAssignmentSummary auto = await _autoAssignment.ApplyAsync(
                 run.ModelId,
                 run.ModelHash,
-                ToSqlitePolicy(policy),
+                policy,
                 cancellationToken);
 
-            IdentityMatchEvidenceVersion currentEvidence = await _evidence.ReadAsync(
+            ReviewIdentityMatchEvidenceVersion currentEvidence = await _evidence.ReadAsync(
                 run.ModelId,
                 run.ModelHash,
                 cancellationToken);
-            IdentityMatchEvidenceVersion expectedEvidence =
-                SqliteIdentityMatchEvidenceVersionReader.ExpectedAfterAutomaticAssignments(
-                    ToSqliteEvidenceVersion(run.EvidenceVersion),
+            ReviewIdentityMatchEvidenceVersion expectedEvidence =
+                ReviewIdentityMatchEvidenceVersions.ExpectedAfterAutomaticAssignments(
+                    run.EvidenceVersion,
                     auto.AssignedCount);
             if (currentEvidence != expectedEvidence)
             {
@@ -202,23 +201,4 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
 
         return true;
     }
-
-    private static IdentityMatchEvidenceVersion ToSqliteEvidenceVersion(
-        ReviewIdentityMatchEvidenceVersion value) =>
-        new(
-            value.ReviewActionId,
-            value.SuggestionReviewActionId,
-            value.PersonMergeActionId,
-            value.EmbeddingId);
-
-    private static IdentitySuggestionPolicy ToSqlitePolicy(
-        ReviewIdentitySuggestionPolicy policy) =>
-        new(
-            policy.Version,
-            policy.AutoAssignEnabled,
-            policy.HighScoreThreshold,
-            policy.HighMarginThreshold,
-            policy.MediumScoreThreshold,
-            policy.UpdatedBy,
-            policy.UpdatedAtUtc);
 }
