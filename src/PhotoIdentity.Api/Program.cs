@@ -191,6 +191,11 @@ public partial class Program
         builder.Services.AddSingleton<SqliteLocalBatchRepository>();
         builder.Services.AddSingleton<IAssetRevisionLookupRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<SqliteLocalBatchRepository>());
+        builder.Services.AddSingleton<ICatalogueSourceRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<SqliteLocalBatchRepository>());
+        builder.Services.AddSingleton<IArchiveSourceScanPersistence, SqliteArchiveSourceScanBatchRepository>();
+        builder.Services.AddSingleton<ArchiveSourceCatalogueScanner>();
+        builder.Services.AddSingleton<LocalArchiveSyncCoordinator>();
         builder.Services.AddSingleton<SqliteProcessingRepository>();
         builder.Services.AddSingleton<IProcessingRunConfigurationReader>(services => services.GetRequiredService<SqliteProcessingRepository>());
         builder.Services.AddSingleton<IProcessingRunRepository>(serviceProvider =>

@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -20,7 +21,7 @@ public sealed record CatalogueProcessingAssetRevision(
 /// <summary>
 /// Resolves local source configuration and immutable revisions for durable batch processing.
 /// </summary>
-public sealed class SqliteLocalBatchRepository : IAssetRevisionLookupRepository
+public sealed class SqliteLocalBatchRepository : IAssetRevisionLookupRepository, ICatalogueSourceRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -79,6 +80,22 @@ public sealed class SqliteLocalBatchRepository : IAssetRevisionLookupRepository
             ?? throw new InvalidOperationException("The local source was unavailable after it was persisted.");
         transaction.Commit();
         return persisted;
+    }
+
+    async Task<ArchiveCatalogueSource> ICatalogueSourceRepository.GetOrCreateLocalFolderSourceAsync(
+        string rootLocator,
+        DateTimeOffset createdAtUtc,
+        CancellationToken cancellationToken)
+    {
+        CatalogueSource source = await GetOrCreateLocalFolderSourceAsync(
+            rootLocator,
+            createdAtUtc,
+            cancellationToken);
+        return new ArchiveCatalogueSource(
+            source.Id,
+            source.Kind,
+            source.RootLocator,
+            source.CreatedAtUtc);
     }
 
     public async Task<IReadOnlyList<AssetRevisionId>> GetCurrentRevisionIdsAsync(

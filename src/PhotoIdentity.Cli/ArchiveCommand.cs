@@ -1,6 +1,7 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Worker;
@@ -323,10 +324,18 @@ internal static class ArchiveCommandRunner
         }
 
         LocalFolderAssetSource source = new(configured.Source.Id, configured.Source.RootLocator);
-        LocalArchiveSyncCoordinator coordinator = new(database);
+        ArchiveSourceCatalogueScanner scanner = new(
+            database,
+            new SqliteArchiveSourceScanBatchRepository(database));
+        LocalArchiveSyncCoordinator coordinator = new(scanner);
+        ArchiveCatalogueSource catalogueSource = new(
+            configured.Source.Id,
+            configured.Source.Kind,
+            configured.Source.RootLocator,
+            configured.Source.CreatedAtUtc);
         LocalArchiveSyncSummary summary = await coordinator.SyncAsync(
             source,
-            configured.Source,
+            catalogueSource,
             configured.IncludedFolders,
             DateTimeOffset.UtcNow,
             cancellationToken);

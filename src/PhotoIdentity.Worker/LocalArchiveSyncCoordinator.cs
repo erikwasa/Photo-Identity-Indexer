@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Source.OneDriveSync;
 
@@ -52,21 +51,20 @@ public sealed record LocalArchiveSyncSummary(
 /// </summary>
 public sealed class LocalArchiveSyncCoordinator
 {
-    private readonly SqliteArchiveSourceCatalogueScanner _scanner;
+    private readonly ArchiveSourceCatalogueScanner _scanner;
     private readonly ArchiveThroughputMetrics? _metrics;
 
     public LocalArchiveSyncCoordinator(
-        SqliteCatalogueDatabase database,
+        ArchiveSourceCatalogueScanner scanner,
         ArchiveThroughputMetrics? metrics = null)
     {
-        ArgumentNullException.ThrowIfNull(database);
-        _scanner = new SqliteArchiveSourceCatalogueScanner(database);
+        _scanner = scanner ?? throw new ArgumentNullException(nameof(scanner));
         _metrics = metrics;
     }
 
     public async Task<LocalArchiveSyncSummary> SyncAsync(
         IAssetSource source,
-        CatalogueSource catalogueSource,
+        ArchiveCatalogueSource catalogueSource,
         IEnumerable<string> includedFolders,
         DateTimeOffset scannedAtUtc,
         CancellationToken cancellationToken = default)
@@ -76,7 +74,7 @@ public sealed class LocalArchiveSyncCoordinator
         ArgumentNullException.ThrowIfNull(includedFolders);
 
         IAssetSource archiveSource = source is LocalFolderAssetSource
-            ? new OneDriveSyncAssetSource(catalogueSource.Id, catalogueSource.RootLocator)
+            ? new OneDriveSyncAssetSource(catalogueSource.SourceId, catalogueSource.RootLocator)
             : source;
         IReadOnlyList<string> normalized = ArchiveCoverage.NormalizeIncludedFolders(includedFolders);
         if (normalized.Count == 0)
@@ -171,7 +169,7 @@ public sealed class LocalArchiveSyncCoordinator
             hashedFiles);
 
         return new LocalArchiveSyncSummary(
-            catalogueSource.Id,
+            catalogueSource.SourceId,
             scannedAtUtc.ToUniversalTime(),
             normalized,
             supported,
