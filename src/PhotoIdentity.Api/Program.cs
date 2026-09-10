@@ -41,8 +41,9 @@ public partial class Program
         string defaultDetectorEvaluationRoot = Path.Combine(defaultApplicationRoot, "detector-evaluations");
         string defaultArchiveAnalysisRoot = Path.Combine(defaultApplicationRoot, "archive-analysis");
         string databasePath = builder.Configuration["PhotoIdentity:DatabasePath"] ?? defaultDatabasePath;
-        string? postgresConnectionString =
-            builder.Configuration["PhotoIdentity:Postgres:ConnectionString"];
+        string? postgresConnectionString = builder.Configuration["PhotoIdentity:Postgres:ConnectionString"];
+        CatalogueProviderKind catalogueProvider = CataloguePersistenceComposition.ResolveProvider(builder.Configuration);
+        string catalogueProviderName = catalogueProvider == CatalogueProviderKind.Postgres ? "postgresql" : "sqlite";
         string detectorEvaluationRoot =
             builder.Configuration["PhotoIdentity:DetectorEvaluationRoot"] ?? defaultDetectorEvaluationRoot;
         string archiveAnalysisRoot =
@@ -62,13 +63,31 @@ public partial class Program
                     GeoNamesReverseGeocodingConfiguration.DefaultMinimumRequestIntervalMilliseconds)
                 : GeoNamesReverseGeocodingConfiguration.DefaultMinimumRequestIntervalMilliseconds);
 
-        builder.Services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
         PostgresCatalogueDatabase? postgresCatalogueDatabase = null;
-        if (!string.IsNullOrWhiteSpace(postgresConnectionString))
+        if (catalogueProvider == CatalogueProviderKind.Postgres)
         {
-            postgresCatalogueDatabase = new PostgresCatalogueDatabase(postgresConnectionString);
-            builder.Services.AddSingleton(postgresCatalogueDatabase);
+            if (string.IsNullOrWhiteSpace(postgresConnectionString))
+            {
+                throw new InvalidOperationException(
+                    "PhotoIdentity:Postgres:ConnectionString is required when PhotoIdentity:CatalogueProvider is 'postgresql'.");
+            }
+
+            postgresCatalogueDatabase = CataloguePersistenceComposition.AddPostgres(
+                builder.Services,
+                postgresConnectionString);
         }
+        else
+        {
+            CataloguePersistenceComposition.AddSqlite(builder.Services, databasePath);
+            if (!string.IsNullOrWhiteSpace(postgresConnectionString))
+            {
+                // Preserve the migration-foundation health probe while SQLite remains selected.
+                // No authoritative service contract is bound to this secondary database.
+                postgresCatalogueDatabase = new PostgresCatalogueDatabase(postgresConnectionString);
+                builder.Services.AddSingleton(postgresCatalogueDatabase);
+            }
+        }
+
         builder.Services.AddSingleton<ArchiveThroughputMetrics>();
         builder.Services.AddSingleton(new ArchiveOperatorConfiguration(
             archiveAnalysisRoot,
@@ -96,166 +115,24 @@ public partial class Program
             automaticGeoNamesMinimumRequestInterval,
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:AutomaticIdlePollIntervalMilliseconds")));
         builder.Services.AddSingleton<PhotoPlaceEnrichmentWorkerState>();
-        builder.Services.AddSingleton<SqliteReviewRepository>();
-        builder.Services.AddSingleton<IReviewActionRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteReviewRepository>());
-        builder.Services.AddSingleton<SqliteReviewFilterRepository>();
-        builder.Services.AddSingleton<IReviewFaceRepository>(services => services.GetRequiredService<SqliteReviewRepository>());
-        builder.Services.AddSingleton<IReviewFilterRepository>(services => services.GetRequiredService<SqliteReviewFilterRepository>());
-        builder.Services.AddSingleton<SqliteReviewSuggestionRepository>();
-        builder.Services.AddSingleton<IReviewSuggestionRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteReviewSuggestionRepository>());
-        builder.Services.AddSingleton<SqliteSuggestionGalleryRepository>();
-        builder.Services.AddSingleton<SqliteSuggestionGalleryAdapter>();
-        builder.Services.AddSingleton<ISuggestionGalleryRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteSuggestionGalleryAdapter>());
-        builder.Services.AddSingleton<SqliteIdentitySuggestionPolicyRepository>();
-        builder.Services.AddSingleton<SqliteIdentitySuggestionPolicyAdapter>();
-        builder.Services.AddSingleton<IIdentitySuggestionPolicyRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteIdentitySuggestionPolicyAdapter>());
-        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationModelRepository>();
-        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationRepository>();
-        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationAdapter>();
-        builder.Services.AddSingleton<IIdentityMatchRegenerationRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteIdentityMatchRegenerationAdapter>());
-        builder.Services.AddSingleton<SqliteIdentityMatchRegenerationScorer>();
-        builder.Services.AddSingleton<SqliteIdentityMatchEvidenceVersionReader>();
-        builder.Services.AddSingleton<SqliteIdentityAutoAssignmentService>();
-        builder.Services.AddSingleton<SqlitePersonAuditRepository>();
-        builder.Services.AddSingleton<SqlitePersonAuditAdapter>();
-        builder.Services.AddSingleton<IPersonAuditRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePersonAuditAdapter>());
-        builder.Services.AddSingleton<SqlitePersonMaintenanceRepository>();
-        builder.Services.AddSingleton<IPersonMaintenanceRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePersonMaintenanceRepository>());
-        builder.Services.AddSingleton<SqlitePersonPhotoCountRepository>();
-        builder.Services.AddSingleton<IPersonPhotoCountRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePersonPhotoCountRepository>());
-        builder.Services.AddSingleton<SqliteFavoritePeopleRepository>();
-        builder.Services.AddSingleton<IFavoritePeopleRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteFavoritePeopleRepository>());
-        builder.Services.AddSingleton<SqlitePersonSmartCollectionVisibilityRepository>();
-        builder.Services.AddSingleton<IPersonSmartCollectionVisibilityRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePersonSmartCollectionVisibilityRepository>());
-        builder.Services.AddSingleton<SqlitePersonFeaturedFaceRepository>();
-        builder.Services.AddSingleton<IPersonFeaturedFaceRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePersonFeaturedFaceRepository>());
-        builder.Services.AddSingleton<SqliteBulkReviewRepository>();
-        builder.Services.AddSingleton<IBulkReviewRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteBulkReviewRepository>());
-        builder.Services.AddSingleton<SqliteBulkSuggestionReviewRepository>();
-        builder.Services.AddSingleton<IBulkSuggestionReviewRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteBulkSuggestionReviewRepository>());
-        builder.Services.AddSingleton<SqliteCollectionQueryRepository>();
-        builder.Services.AddSingleton<ICollectionQueryRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteCollectionQueryRepository>());
-        builder.Services.AddSingleton<SqlitePhotoDetailsRepository>();
-        builder.Services.AddSingleton<IPhotoDetailsRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePhotoDetailsRepository>());
-        builder.Services.AddSingleton<SqliteSmartCollectionQueryRepository>();
-        builder.Services.AddSingleton<ISmartCollectionQueryRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteSmartCollectionQueryRepository>());
-        builder.Services.AddSingleton<SqliteSmartCollectionRepository>();
-        builder.Services.AddSingleton<ISmartCollectionRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteSmartCollectionRepository>());
-        builder.Services.AddSingleton<SqliteAssetCatalogueRepository>();
-        builder.Services.AddSingleton<IPhotoCaptureMetadataRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteAssetCatalogueRepository>());
-        builder.Services.AddSingleton<SqlitePhotoMetadataBackfillRepository>();
-        builder.Services.AddSingleton<IPhotoMetadataBackfillRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePhotoMetadataBackfillRepository>());
-        builder.Services.AddSingleton<SqliteExtendedPhotoMetadataRepository>();
-        builder.Services.AddSingleton<IExtendedPhotoMetadataRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteExtendedPhotoMetadataRepository>());
-        builder.Services.AddSingleton<SqlitePhotoMetadataInspectionRepository>();
-        builder.Services.AddSingleton<IPhotoMetadataInspectionRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePhotoMetadataInspectionRepository>());
-        builder.Services.AddSingleton<SqlitePhotoTagRepository>();
-        builder.Services.AddSingleton<IPhotoTagRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePhotoTagRepository>());
-        builder.Services.AddSingleton<SqlitePhotoPersonRepository>();
-        builder.Services.AddSingleton<IPhotoPersonRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePhotoPersonRepository>());
-        builder.Services.AddSingleton<SqlitePhotoPlaceRepository>();
-        builder.Services.AddSingleton<IPhotoPlaceRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePhotoPlaceRepository>());
-        builder.Services.AddSingleton<SqlitePhotoPlaceEnrichmentRepository>();
-        builder.Services.AddSingleton<IPhotoPlaceEnrichmentStateRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqlitePhotoPlaceEnrichmentRepository>());
-        builder.Services.AddSingleton<SqliteAutomaticPhotoPlaceRepository>();
-        builder.Services.AddSingleton<IAutomaticPhotoPlaceRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteAutomaticPhotoPlaceRepository>());
-        builder.Services.AddSingleton<SqliteDetectorEvaluationRepository>();
-        builder.Services.AddSingleton<IDetectorEvaluationCatalogueRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteDetectorEvaluationRepository>());
-        builder.Services.AddSingleton<SqliteLocalBatchRepository>();
-        builder.Services.AddSingleton<IAssetRevisionLookupRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteLocalBatchRepository>());
-        builder.Services.AddSingleton<ICatalogueSourceRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteLocalBatchRepository>());
-        builder.Services.AddSingleton<IArchiveSourceScanPersistence, SqliteArchiveSourceScanBatchRepository>();
+
         builder.Services.AddSingleton<ArchiveSourceCatalogueScanner>();
         builder.Services.AddSingleton<LocalArchiveSyncCoordinator>();
-        builder.Services.AddSingleton<SqliteProcessingRepository>();
-        builder.Services.AddSingleton<IProcessingRunConfigurationReader>(services => services.GetRequiredService<SqliteProcessingRepository>());
-        builder.Services.AddSingleton<IProcessingRunRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteProcessingRepository>());
-        builder.Services.AddSingleton<IProcessingExecutionRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteProcessingRepository>());
-        builder.Services.AddSingleton<IDetectorRolloutReviewRepository, SqliteDetectorRolloutReviewRepository>();
-        builder.Services.AddSingleton<IDetectorRolloutApplicationRepository, SqliteDetectorRolloutApplicationRepository>();
-        builder.Services.AddSingleton<SqliteArchiveAnalysisRepository>();
-        builder.Services.AddSingleton<IArchiveAnalysisStateRepository>(services => services.GetRequiredService<SqliteArchiveAnalysisRepository>());
-        builder.Services.AddSingleton<IFaceInspectionRepository, SqliteFaceCatalogueRepository>();
-        builder.Services.AddSingleton<ICatalogueStoreInitializer>(services => services.GetRequiredService<SqliteCatalogueDatabase>());
         builder.Services.AddSingleton<ArchiveAnalysisPersistence>(services => new(
-            services.GetRequiredService<ICatalogueStoreInitializer>(), services.GetRequiredService<IArchiveCoverageRepository>(),
-            services.GetRequiredService<IAssetRevisionLookupRepository>(), services.GetRequiredService<IFaceInspectionRepository>(),
-            services.GetRequiredService<IProcessingRunRepository>(), services.GetRequiredService<IProcessingExecutionRepository>(),
+            services.GetRequiredService<ICatalogueStoreInitializer>(),
+            services.GetRequiredService<IArchiveCoverageRepository>(),
+            services.GetRequiredService<IAssetRevisionLookupRepository>(),
+            services.GetRequiredService<IFaceInspectionRepository>(),
+            services.GetRequiredService<IProcessingRunRepository>(),
+            services.GetRequiredService<IProcessingExecutionRepository>(),
             services.GetRequiredService<IArchiveAnalysisStateRepository>()));
         builder.Services.AddSingleton<FaceReviewDerivativeBackfillService>();
-        builder.Services.AddSingleton<SqliteArchiveReviewProxyRepository>();
-        builder.Services.AddSingleton<IFaceReviewDerivativeRepository, SqliteFaceReviewDerivativeRepository>();
-        builder.Services.AddSingleton<IFaceReviewDerivativeBackfillRepository, SqliteFaceReviewDerivativeBackfillRepository>();
-        builder.Services.AddSingleton<IArchiveReviewProxyRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteArchiveReviewProxyRepository>());
-        builder.Services.AddSingleton<SqliteArchivePostAnalysisRepository>();
-        builder.Services.AddSingleton<IArchivePostAnalysisRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteArchivePostAnalysisRepository>());
-        builder.Services.AddSingleton<SqliteArchiveHydrationRepository>();
-        builder.Services.AddSingleton<IArchiveHydrationRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteArchiveHydrationRepository>());
-        builder.Services.AddSingleton<SqliteArchiveSourceHydrationRepository>();
-        builder.Services.AddSingleton<IArchiveSourceHydrationRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteArchiveSourceHydrationRepository>());
-        builder.Services.AddSingleton<SqliteArchiveHydrationIdentityTransferRepository>();
-        builder.Services.AddSingleton<IArchiveHydrationIdentityTransferRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteArchiveHydrationIdentityTransferRepository>());
-        builder.Services.AddSingleton<SqliteArchiveSourceObservationRepository>();
-        builder.Services.AddSingleton<IArchiveSourceObservationRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteArchiveSourceObservationRepository>());
-        builder.Services.AddSingleton<SqliteArchiveSourceVerificationStateRepository>();
-        builder.Services.AddSingleton<IArchiveSourceVerificationStateRepository>(services => services.GetRequiredService<SqliteArchiveSourceVerificationStateRepository>());
-        builder.Services.AddSingleton<SqliteArchiveAvailabilityRepository>();
-        builder.Services.AddSingleton<IArchiveAvailabilityRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteArchiveAvailabilityRepository>());
-        builder.Services.AddSingleton<SqliteArchiveCoverageRepository>();
-        builder.Services.AddSingleton<IArchiveCoverageRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteArchiveCoverageRepository>());
-        builder.Services.AddSingleton<SqliteArchiveStatusRepository>();
-        builder.Services.AddSingleton<IArchiveStatusRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteArchiveStatusRepository>());
-        builder.Services.AddSingleton<SqliteArchiveStorageRepository>();
-        builder.Services.AddSingleton<IArchiveStorageAccountingRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteArchiveStorageRepository>());
-        builder.Services.AddSingleton<SqliteArchiveAdvancementRepository>();
-        builder.Services.AddSingleton<IArchiveAdvancementControlRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<SqliteArchiveAdvancementRepository>());
         builder.Services.AddSingleton<ReviewCropFileResolver>();
         builder.Services.AddSingleton<DetectorRolloutCropFileResolver>();
         builder.Services.AddSingleton<CollectionPhotoFileResolver>();
         builder.Services.AddSingleton<CollectionReviewProxyFileResolver>();
         builder.Services.AddSingleton<ReviewFaceTargetResolver>();
+        builder.Services.AddSingleton<ReviewFaceRevisionResolver>();
         builder.Services.AddSingleton<CollectionOriginalAccessService>();
         builder.Services.AddSingleton<SlideshowOriginalLeaseRegistry>();
         builder.Services.AddSingleton<ArchiveHydrationCapacityService>();
@@ -287,33 +164,57 @@ public partial class Program
             serviceProvider.GetRequiredService<TimeProvider>()));
 
         WebApplication app = builder.Build();
-        SqliteCatalogueDatabase catalogueDatabase = app.Services.GetRequiredService<SqliteCatalogueDatabase>();
-        await catalogueDatabase.InitializeAsync();
-        await SqliteExtendedPhotoMetadataSchema.EnsureAsync(catalogueDatabase);
-        await SqlitePhotoMetadataInspectionSchema.EnsureAsync(catalogueDatabase);
-        await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(catalogueDatabase);
-        await SqlitePhotoPlaceEnrichmentSchema.EnsureAsync(catalogueDatabase);
 
         PostgresCatalogueHealth postgresHealth = PostgresCatalogueHealth.NotConfigured;
-        if (postgresCatalogueDatabase is not null)
+        int? catalogueSchemaVersion;
+        if (catalogueProvider == CatalogueProviderKind.Sqlite)
         {
-            PostgresInitializationResult postgresInitialization =
-                await postgresCatalogueDatabase.TryInitializeAsync();
-            postgresHealth = postgresInitialization.Health;
+            SqliteCatalogueDatabase catalogueDatabase = app.Services.GetRequiredService<SqliteCatalogueDatabase>();
+            await catalogueDatabase.InitializeAsync();
+            await SqliteExtendedPhotoMetadataSchema.EnsureAsync(catalogueDatabase);
+            await SqlitePhotoMetadataInspectionSchema.EnsureAsync(catalogueDatabase);
+            await SqlitePhotoPlaceSchema.EnsureAndMigrateAsync(catalogueDatabase);
+            await SqlitePhotoPlaceEnrichmentSchema.EnsureAsync(catalogueDatabase);
+            catalogueSchemaVersion = SqliteCatalogueDatabase.CurrentSchemaVersion;
 
-            if (postgresInitialization.Error is null)
+            if (postgresCatalogueDatabase is not null)
             {
-                app.Logger.LogInformation(
-                    "PostgreSQL migration foundation is ready at schema version {SchemaVersion}; SQLite remains the authoritative catalogue.",
-                    postgresHealth.SchemaVersion);
+                PostgresInitializationResult postgresInitialization =
+                    await postgresCatalogueDatabase.TryInitializeAsync();
+                postgresHealth = postgresInitialization.Health;
+
+                if (postgresInitialization.Error is null)
+                {
+                    app.Logger.LogInformation(
+                        "PostgreSQL migration foundation is ready at schema version {SchemaVersion}; SQLite remains the selected catalogue provider.",
+                        postgresHealth.SchemaVersion);
+                }
+                else
+                {
+                    app.Logger.LogWarning(
+                        postgresInitialization.Error,
+                        "PostgreSQL migration foundation status is {PostgresStatus}; SQLite remains the selected catalogue provider.",
+                        postgresHealth.Status);
+                }
             }
-            else
+        }
+        else
+        {
+            PostgresCatalogueDatabase database = postgresCatalogueDatabase
+                ?? throw new InvalidOperationException("PostgreSQL catalogue composition was not initialized.");
+            PostgresInitializationResult postgresInitialization = await database.TryInitializeAsync();
+            postgresHealth = postgresInitialization.Health;
+            if (postgresInitialization.Error is not null)
             {
-                app.Logger.LogWarning(
-                    postgresInitialization.Error,
-                    "PostgreSQL migration foundation status is {PostgresStatus}; SQLite remains the authoritative catalogue.",
-                    postgresHealth.Status);
+                throw new InvalidOperationException(
+                    $"PostgreSQL catalogue initialization failed with status '{postgresHealth.Status}'.",
+                    postgresInitialization.Error);
             }
+
+            catalogueSchemaVersion = postgresHealth.SchemaVersion;
+            app.Logger.LogInformation(
+                "PostgreSQL is the selected catalogue provider at schema version {SchemaVersion}. SQLite catalogue initialization is disabled for this process.",
+                catalogueSchemaVersion);
         }
 
         app.UseBlazorFrameworkFiles();
@@ -371,8 +272,8 @@ public partial class Program
         app.MapGet("/health", () => Results.Ok(new
         {
             status = "ok",
-            schemaVersion = SqliteCatalogueDatabase.CurrentSchemaVersion,
-            catalogueProvider = "sqlite",
+            schemaVersion = catalogueSchemaVersion,
+            catalogueProvider = catalogueProviderName,
             postgres = postgresHealth,
         }));
         app.MapReviewEndpoints();
