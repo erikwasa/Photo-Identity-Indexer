@@ -71,6 +71,7 @@ function New-ReviewConfiguration {
             postgresConnectionEnvironmentVariable = $ConnectionEnvironmentName
             settings = [pscustomobject][ordered]@{
                 PhotoIdentity__CatalogueProvider = "postgresql"
+                PhotoIdentity__RepositoryRoot = $PSScriptRoot
             }
             mobileAccess = [pscustomobject][ordered]@{
                 enabled = $false
@@ -84,6 +85,7 @@ function New-ReviewConfiguration {
             Add-Member -InputObject $configuration -MemberType NoteProperty -Name "settings" -Value ([pscustomobject]@{}) -Force
         }
         Add-Member -InputObject $configuration.settings -MemberType NoteProperty -Name "PhotoIdentity__CatalogueProvider" -Value "postgresql" -Force
+        Add-Member -InputObject $configuration.settings -MemberType NoteProperty -Name "PhotoIdentity__RepositoryRoot" -Value $PSScriptRoot -Force
         Add-Member -InputObject $configuration -MemberType NoteProperty -Name "mobileAccess" -Value ([pscustomobject][ordered]@{
             enabled = $false
         }) -Force
