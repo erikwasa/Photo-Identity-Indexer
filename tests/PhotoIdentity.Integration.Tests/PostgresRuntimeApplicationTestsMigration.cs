@@ -6,6 +6,6 @@ public sealed class PostgresRuntimeApplicationTestsMigration
     public async Task SQLite_catalogue_migration_is_included_in_live_postgres_runtime_acceptance()
     {
         await new CatalogueMigrationCommandTests()
-            .Migrate_preserves_stable_history_and_repairs_sequences_WhenLivePostgresIsConfigured();
+            .Migrate_preserves_stable_history_repairs_sequences_and_is_repeatable_WhenLivePostgresIsConfigured();
     }
 }
