@@ -29,15 +29,15 @@ WI-0101 is a persistence migration item, not acceptance of slideshow responsiven
 
 ## Acceptance criteria
 - [x] All authoritative runtime domains have PostgreSQL implementations.
-- [ ] Normal PostgreSQL mode performs no SQLite authoritative read/write dependency.
-- [ ] Remaining SQLite code is explicitly limited to migration/import/compatibility/test scenarios.
-- [ ] Existing feature integration tests remain behaviorally equivalent on PostgreSQL.
+- [x] Normal PostgreSQL mode performs no SQLite authoritative read/write dependency.
+- [x] Remaining SQLite code is explicitly limited to migration/import/compatibility/test scenarios.
+- [x] Existing feature integration tests remain behaviorally equivalent on PostgreSQL.
 - [x] Smart Collection/slideshow persistence exposes the indexes/query boundary needed for WI-0108 without claiming the WI-0108 latency acceptance itself.
 
 
 ## Remaining work checklist
 
-Current as of 2026-09-10, including verified detector, review-query, archive-composition and PostgreSQL runtime-composition slices. This is the current implementation checklist; the slice notes below retain historical evidence. Update these checkboxes as each task is implemented and verified, with supporting evidence in the work-item registry. Formal lifecycle status remains in the registry.
+Current as of 2026-09-10, including verified detector, review-query, archive-composition, PostgreSQL runtime-composition and live acceptance slices. This is the current implementation checklist; the slice notes below retain historical evidence. Update these checkboxes as each task is implemented and verified, with supporting evidence in the work-item registry. Formal lifecycle status remains in the registry.
 
 Many PostgreSQL repositories already exist. An unchecked integration task does not necessarily require a new repository: reuse the existing Core contract and PostgreSQL implementation where available. A completed repository slice does not establish that normal runtime is free of SQLite dependencies.
 
@@ -64,7 +64,7 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 - [x] Migrate the whole-photo review-proxy writer to the existing Core contract and PostgreSQL implementation.
 - [x] Remove remaining SQLite construction of derivative collaborators in hosted archive advancement; bounded analysis now uses injected contracts.
 - [x] Audit `PortableBundleExportCoordinator.cs` and other production catalogue lookup paths; migrate runtime dependencies while explicitly identifying legitimate import/export compatibility boundaries.
-- [ ] Verify archive coverage, status/filter paging, availability, hydration, verification, storage accounting and post-analysis operate together through PostgreSQL-backed contracts. Existing individual repositories are not sufficient evidence for this end-to-end composition.
+- [x] Verify archive coverage, status/filter paging, availability, hydration, verification, storage accounting and post-analysis operate together through PostgreSQL-backed contracts. Existing individual repositories are not sufficient evidence for this end-to-end composition.
 
 ### 3. Review, gallery and identity runtime
 
@@ -84,14 +84,14 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 - [x] Complete coherent provider selection in API/worker composition so PostgreSQL mode resolves every authoritative dependency to PostgreSQL implementations, with no dual writes.
 - [x] Remove SQLite schema ensure/migration calls from PostgreSQL startup, including the remaining calls in `Program.cs`; ensure PostgreSQL migrations and readiness checks cover the complete runtime schema.
 - [x] Finish the inventory of direct SQLite types, connections and SQL in normal API/worker paths. Record each remaining occurrence as removed or an explicit migration/import/compatibility/test exception; a namespace import alone is not proof of a runtime dependency.
-- [ ] Prove PostgreSQL startup and normal feature/worker operations do not require an authoritative SQLite catalogue. Keep the current production SQLite binding until WI-0102 performs controlled cutover.
+- [x] Prove PostgreSQL startup and normal feature/worker operations do not require an authoritative SQLite catalogue. Keep the current production SQLite binding until WI-0102 performs controlled cutover.
 
 ### 6. Verification and closure
 
-- [ ] Add/run PostgreSQL behavior-equivalence tests for the remaining domains, including mutations, cancellation, failure handling, transaction rollback and idempotent retries. Prefer repository tests; use HTTP-host tests only for composition/contracts requiring that layer.
-- [ ] Verify migrations on clean and existing supported PostgreSQL schemas and run live tests with PostgreSQL explicitly configured; opt-in tests returning early do not prove PostgreSQL acceptance.
+- [x] Add/run PostgreSQL behavior-equivalence tests for the remaining domains, including mutations, cancellation, failure handling, transaction rollback and idempotent retries. Prefer repository tests; use HTTP-host tests only for composition/contracts requiring that layer.
+- [x] Verify migrations on clean and existing supported PostgreSQL schemas and run live tests with PostgreSQL explicitly configured; opt-in tests returning early do not prove PostgreSQL acceptance.
 - [ ] Run the relevant solution build/tests and published-runtime checks for the completed composition; record test scope, outcomes and material timing in the registry.
-- [ ] Review logging/privacy, migration coverage and allowed SQLite exceptions, then verify every acceptance criterion above against the final runtime.
+- [x] Review logging/privacy, migration coverage and allowed SQLite exceptions, then verify every acceptance criterion above against the final runtime.
 - [ ] Update the handoff and affected documentation, pass `PhotoIdentity.Docs validate` and `generate --check`, and transition WI-0101 through review to completion only when the full item is verified.
 
 ### Work owned by later items
@@ -154,6 +154,16 @@ Source scanning/sync and hosted archive advancement now consume Core contracts a
 Slideshow snapshots are request-time immutable revision lists, while preparation sessions and short eviction-protection leases are intentionally transient process coordination. Durable hydration ownership remains provider-backed. PostgreSQL Smart Collection/slideshow queries use existing people/tag/place/date indexes and semantics; WI-0108 retains latency acceptance and any query-tuning work.
 
 The remaining WI-0101 implementation risk is no longer missing provider wiring. It is acceptance: run the PostgreSQL repositories and selected runtime together on a live database, verify cross-domain archive state, migrations and behavior-equivalence, then perform the final allowed-SQLite/privacy/documentation review.
+
+### Live PostgreSQL acceptance (2026-09-10)
+
+The maintainer ran `verify-postgres.ps1` from `codex/m24-6` against the configured Podman PostgreSQL service. Container authentication and the Windows-localhost PostgreSQL protocol check passed. The Release solution built in 24.96 seconds with zero warnings and zero errors. The complete live PostgreSQL persistence acceptance set passed 28/28 tests in 6 seconds with zero skips, and the PostgreSQL runtime/composition acceptance set passed 4/4 tests in 1 second with zero skips.
+
+The live suite includes clean/idempotent and supported upgrade migration coverage, provider-specific mutation/query behavior, cancellation/failure/rollback/replay coverage accumulated across the PostgreSQL repository tests, the PostgreSQL-selected host proof with no registered/created SQLite catalogue, and the cross-repository archive acceptance scenario covering coverage, status/filter paging, availability, hydration ownership transfer during re-verification, storage accounting and post-analysis proxy completion.
+
+PR #277 CI run #1547 completed successfully. The normal build/test lane, both integration shards, documentation validation/generated-output checks, published review verification and Windows mixed-media verification all passed. This separates two kinds of evidence correctly: CI proves the regular repository/application gates, while the explicit verifier proves the opt-in PostgreSQL tests actually connected and executed rather than returning early.
+
+All WI-0101 technical acceptance criteria are therefore satisfied. Remaining unchecked work is administrative closure: record the final test/CI evidence in the status registry and transition the work item through review/completion after this PR is finalized. Existing-catalogue import, production cutover and rollback remain WI-0102.
 
 ## Current implementation progress
 
