@@ -93,6 +93,33 @@ function New-ReviewConfiguration {
     return $configuration
 }
 
+function Write-LauncherLogTail {
+    $applicationRoot = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        Join-Path $PSScriptRoot ".photoidentity"
+    }
+    else {
+        Join-Path $env:LOCALAPPDATA "PhotoIdentity"
+    }
+    $logDirectory = Join-Path $applicationRoot "launcher-logs"
+    $stderrPath = Join-Path $logDirectory "api.stderr.log"
+    $stdoutPath = Join-Path $logDirectory "api.stdout.log"
+
+    Write-Host ""
+    Write-Host "Rehearsal startup diagnostics:" -ForegroundColor Yellow
+    if (Test-Path -LiteralPath $stderrPath -PathType Leaf) {
+        Write-Host "--- api.stderr.log (last 80 lines) ---" -ForegroundColor Yellow
+        @(Get-Content -LiteralPath $stderrPath -Tail 80 -ErrorAction SilentlyContinue) | Out-Host
+    }
+    else {
+        Write-Host "No api.stderr.log was created at '$stderrPath'." -ForegroundColor Yellow
+    }
+
+    if (Test-Path -LiteralPath $stdoutPath -PathType Leaf) {
+        Write-Host "--- api.stdout.log (last 40 lines) ---" -ForegroundColor Yellow
+        @(Get-Content -LiteralPath $stdoutPath -Tail 40 -ErrorAction SilentlyContinue) | Out-Host
+    }
+}
+
 if ($DatabaseName -notmatch '^[a-z][a-z0-9_]{0,62}$') {
     throw "DatabaseName must start with a letter and contain only lowercase letters, digits and underscores (maximum 63 characters)."
 }
@@ -185,19 +212,21 @@ try {
     try {
         [Environment]::SetEnvironmentVariable($runtimeEnvironmentName, $connectionString, "Process")
         Write-Host "Starting Photo Identity against rehearsal database '$DatabaseName'..."
+        Write-Host "rehearsal-launcher-config: $temporaryConfigurationPath"
+        Write-Host "rehearsal-publish-path: $publishPath"
         & powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File $launcherPath -ConfigurationPath $temporaryConfigurationPath -PublishPathOverride $publishPath
         if ($LASTEXITCODE -ne 0) {
+            Write-LauncherLogTail
             throw "Photo Identity launcher failed with code $LASTEXITCODE."
         }
 
         $health = Invoke-RestMethod -Method Get -Uri "$url/health" -TimeoutSec 5
         if ([string]$health.status -ne "ok" -or [string]$health.catalogueProvider -ne "postgresql") {
+            Write-LauncherLogTail
             throw "Rehearsal runtime health did not confirm catalogueProvider=postgresql."
         }
 
         Write-Host "rehearsal-database: $DatabaseName"
-        Write-Host "rehearsal-launcher-config: $temporaryConfigurationPath"
-        Write-Host "rehearsal-publish-path: $publishPath"
         Write-Host "rehearsal-runtime-health: postgresql"
     }
     finally {
