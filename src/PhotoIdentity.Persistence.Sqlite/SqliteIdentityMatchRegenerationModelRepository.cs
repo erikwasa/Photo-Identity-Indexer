@@ -1,18 +1,14 @@
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Review;
 
 namespace PhotoIdentity.Persistence.Sqlite;
-
-public sealed record CatalogueIdentityMatchModelRevision(
-    ModelId ModelId,
-    Sha256Digest ModelHash,
-    int FaceCount);
 
 /// <summary>
 /// Lists exact embedding revisions that can be regenerated even when no suggestion ranking exists yet.
 /// </summary>
-public sealed class SqliteIdentityMatchRegenerationModelRepository
+public sealed class SqliteIdentityMatchRegenerationModelRepository : IIdentityMatchModelRepository
 {
     private readonly SqliteCatalogueDatabase _database;
 
@@ -22,7 +18,7 @@ public sealed class SqliteIdentityMatchRegenerationModelRepository
         _database = database;
     }
 
-    public async Task<IReadOnlyList<CatalogueIdentityMatchModelRevision>> ListAsync(
+    public async Task<IReadOnlyList<ReviewIdentityMatchModelRevision>> ListAsync(
         CancellationToken cancellationToken = default)
     {
         await _database.InitializeAsync(cancellationToken);
@@ -40,11 +36,11 @@ public sealed class SqliteIdentityMatchRegenerationModelRepository
             ORDER BY embedding.model_id, embedding.model_hash;
             """;
 
-        List<CatalogueIdentityMatchModelRevision> results = [];
+        List<ReviewIdentityMatchModelRevision> results = [];
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            results.Add(new CatalogueIdentityMatchModelRevision(
+            results.Add(new ReviewIdentityMatchModelRevision(
                 new ModelId(reader.GetString(0)),
                 new Sha256Digest(reader.GetString(1)),
                 reader.GetInt32(2)));
