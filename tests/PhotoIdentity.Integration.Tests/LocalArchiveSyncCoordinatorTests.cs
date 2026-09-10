@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Worker;
@@ -28,13 +29,21 @@ public sealed class LocalArchiveSyncCoordinatorTests
             await database.InitializeAsync();
             SqliteLocalBatchRepository repository = new(database);
             var catalogueSource = await repository.GetOrCreateLocalFolderSourceAsync(archiveRoot, Utc(10));
+            ArchiveCatalogueSource archiveCatalogueSource = new(
+                catalogueSource.Id,
+                catalogueSource.Kind,
+                catalogueSource.RootLocator,
+                catalogueSource.CreatedAtUtc);
             LocalFolderAssetSource source = new(catalogueSource.Id, archiveRoot);
-            LocalArchiveSyncCoordinator coordinator = new(database);
+            ArchiveSourceCatalogueScanner archiveScanner = new(
+                database,
+                new SqliteArchiveSourceScanBatchRepository(database));
+            LocalArchiveSyncCoordinator coordinator = new(archiveScanner);
             SqliteSourceCatalogueScanner scanner = new(database);
 
             LocalArchiveSyncSummary januarySync = await coordinator.SyncAsync(
                 source,
-                catalogueSource,
+                archiveCatalogueSource,
                 ["1970/01"],
                 Utc(10));
 
@@ -52,7 +61,7 @@ public sealed class LocalArchiveSyncCoordinatorTests
             await File.WriteAllBytesAsync(Path.Combine(january, "new.jpg"), [4]);
             LocalArchiveSyncSummary monthSync = await coordinator.SyncAsync(
                 source,
-                catalogueSource,
+                archiveCatalogueSource,
                 ["1970/01", "1970/02"],
                 Utc(11));
 
@@ -68,7 +77,7 @@ public sealed class LocalArchiveSyncCoordinatorTests
 
             LocalArchiveSyncSummary yearSync = await coordinator.SyncAsync(
                 source,
-                catalogueSource,
+                archiveCatalogueSource,
                 ["1970/01", "1970/02", "1970"],
                 Utc(12));
 
