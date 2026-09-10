@@ -38,7 +38,7 @@ WI-0101 completed the PostgreSQL runtime/persistence boundary in PR #277. WI-010
 - [x] Add an explicit `catalogue migrate` CLI path that requires `--sqlite-backup` and a PostgreSQL connection supplied through a named environment variable.
 - [x] Open the SQLite input read-only and set `PRAGMA query_only = ON`; reject backups not at the current SQLite schema version or failing `PRAGMA foreign_key_check`.
 - [x] Require a PostgreSQL target with no existing public tables before initializing the current PostgreSQL schema.
-- [ ] Add the final operator backup step that produces a timestamped SQLite backup only after the application is stopped/quiesced, and record its SHA-256 before migration.
+- [x] Document the final operator backup step: stop/quiesce Photo Identity first, create a timestamped SQLite backup, record SHA-256 and keep the preserved copy unchanged. Execution against the real catalogue remains acceptance work.
 
 ### 2. Complete schema-driven import
 - [x] Discover SQLite and PostgreSQL tables/columns at migration time instead of maintaining a hand-written table list.
@@ -54,8 +54,9 @@ WI-0101 completed the PostgreSQL runtime/persistence boundary in PR #277. WI-010
 - [x] Repair PostgreSQL identity/serial sequences from imported maxima.
 - [x] Emit a privacy-safe JSON migration report containing source backup filename/hash/size, schema versions, per-table counts, critical-domain counts and sequence-repair evidence; never include the PostgreSQL connection string.
 - [x] Add live PostgreSQL integration coverage preserving stable source/revision/person/review/suggestion IDs and proving a generated embedding ID advances beyond the imported value.
+- [x] Prove the importer itself is deterministic/repeatable by importing one preserved test backup into two separate fresh PostgreSQL databases and comparing source hash, schema versions, copied/per-table/critical counts and sequence-repair evidence.
 - [x] Include catalogue migration acceptance in the existing `verify-postgres.ps1` runtime filter.
-- [ ] Prove repeatability by importing the same preserved SQLite backup into a second fresh PostgreSQL database and comparing the validation reports/critical counts.
+- [ ] Prove repeatability with the maintainer's preserved real-catalogue backup by importing the same file into a second fresh PostgreSQL database and comparing the accepted reports.
 
 ### 4. Representative domain verification
 - [ ] Verify people/face review history and undo/rejection state from the migrated maintainer catalogue.
@@ -65,11 +66,12 @@ WI-0101 completed the PostgreSQL runtime/persistence boundary in PR #277. WI-010
 - [ ] Verify metadata/photo details and person presentation/favorites/visibility state.
 
 ### 5. Controlled cutover and rollback
-- [ ] Document and test the exact launcher/application configuration change from SQLite authority to `PhotoIdentity:CatalogueProvider=postgresql`.
+- [x] Document the single-authority backup/import/provider-switch/rollback sequence in `docs/operations/postgresql-catalogue-cutover.md`, including the runtime environment keys `PhotoIdentity__CatalogueProvider=postgresql` and `PhotoIdentity__Postgres__ConnectionString`.
+- [ ] Test the exact packaged/launcher configuration path that persists/applies PostgreSQL authority rather than relying only on shell environment variables.
 - [ ] Before cutover, stop the SQLite-authoritative application and retain the source backup unchanged/read-only.
 - [ ] Start PostgreSQL-authoritative runtime and verify `/health`, Review, Library/Smart Collections, Archive and background workers before allowing new writes.
 - [ ] Record the cutover timestamp and PostgreSQL migration report as acceptance evidence.
-- [ ] Define rollback as stopping PostgreSQL-authoritative runtime and restoring the pre-cutover SQLite application configuration/catalogue copy; never copy post-cutover PostgreSQL writes back into the preserved backup.
+- [x] Define rollback as stopping PostgreSQL-authoritative runtime and restoring a working copy of the pre-cutover SQLite backup/configuration; never copy post-cutover PostgreSQL writes back into the preserved backup.
 - [ ] Perform maintainer cutover/rollback acceptance before marking WI-0102 complete.
 
 ## First migration-tool slice (2026-09-10)
@@ -78,6 +80,8 @@ WI-0101 completed the PostgreSQL runtime/persistence boundary in PR #277. WI-010
 
 The copy plan is generated from both schemas. This is intentional: WI-0102 should fail loudly when a future or previously overlooked SQLite table/column contains authoritative state without a PostgreSQL destination. Shared tables are inserted in PostgreSQL foreign-key dependency order. Stable identifiers are inserted explicitly; PostgreSQL identity/serial sequences are repaired after import. Per-table source/target counts are compared before commit, and the migration report contains aggregate/identifier-safe evidence only.
 
-A live disposable-database integration test seeds immutable catalogue identity, a face/crop/embedding, a person label, review assignment and identity suggestion with explicit integer IDs. It verifies those IDs and relationships after migration and inserts another embedding without an explicit ID to prove sequence continuation. The test is included in the same live PostgreSQL runtime filter used by `verify-postgres.ps1`.
+The live disposable-database integration test seeds immutable catalogue identity, a face/crop/embedding, a person label, review assignment and identity suggestion with explicit integer IDs. It imports that exact backup into two independent fresh PostgreSQL databases, compares the stable report evidence, verifies the imported IDs/relationships in both targets and inserts a new embedding in each target without an explicit ID to prove generated-key continuation. The test is included in the same live PostgreSQL runtime filter used by `verify-postgres.ps1`.
 
-This slice is not production cutover. The remaining acceptance work is to run the importer against the maintainer's preserved full SQLite backup, close any real-schema compatibility gaps, prove repeatability, verify representative domains, then perform the single-authority configuration cutover with a preserved rollback copy.
+`docs/operations/postgresql-catalogue-cutover.md` defines the operational boundary now, before the real-catalogue rehearsal: stop writers before backup, hash and preserve the SQLite copy, require a fresh PostgreSQL target, verify representative domains before authority transfer, switch the runtime explicitly to `postgresql`, and roll back only by stopping PostgreSQL and creating a working copy from the untouched pre-cutover SQLite backup. Actual packaged-launcher configuration and maintainer cutover/rollback verification remain open.
+
+This slice is not production cutover. The remaining acceptance work is to run the importer against the maintainer's preserved full SQLite backup, close any real-schema compatibility gaps, prove real-backup repeatability, verify representative domains, test the packaged configuration path, then perform the single-authority cutover with the preserved rollback copy.
