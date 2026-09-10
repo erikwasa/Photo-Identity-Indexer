@@ -21,6 +21,9 @@ Optional launcher configuration is read from:
 
 Copy PhotoIdentity.launcher.example.json there if you need non-default durable paths. For the packaged application, normally leave publishPath unset; PhotoIdentity.cmd always starts the app directory shipped beside it.
 
+The launcher example explicitly selects the normal SQLite authority:
+  PhotoIdentity__CatalogueProvider = sqlite
+
 The current launcher example selects the measured review-proxy profile used for the maintained archive:
   PhotoIdentity__ReviewProxyProfileId = jpeg-1600-q78
   PhotoIdentity__ReviewProxyMaximumLongEdge = 1600
@@ -49,6 +52,35 @@ Automatic GeoNames enrichment timing is also configurable in launcher.json:
 The request interval is milliseconds and must be at least 30000 (30 seconds). The launcher rejects lower values instead of silently clamping them. The idle poll interval is milliseconds from 1000 through 600000 (1 second through 10 minutes). Provider quota and transport backoff can still delay requests longer than the normal configured pacing. Restart Photo Identity after changing these startup values. Settings shows the effective automatic timing through the GeoNames status diagnostics.
 
 The Settings page shows the effective hydration values, whether managed hydration is enabled, current Photo Identity-managed usage, remaining managed budget, and current free space on the archive volume. These values are startup configuration; edit launcher.json and restart Photo Identity to apply changes.
+
+POSTGRESQL CATALOGUE AUTHORITY
+-----------------------------
+Do not switch the packaged application to PostgreSQL until the WI-0102 stopped backup, migration report and representative rehearsal have been accepted.
+
+The launcher never accepts the PostgreSQL connection string directly inside launcher.json. Store the secret connection string in a Windows environment variable and put only that variable's name in launcher.json. For example, create a private user environment variable named:
+  PHOTOIDENTITY_POSTGRES_CONNECTION_STRING
+
+Then change the private launcher configuration to include:
+
+  "postgresConnectionEnvironmentVariable": "PHOTOIDENTITY_POSTGRES_CONNECTION_STRING",
+  "settings": {
+    "PhotoIdentity__CatalogueProvider": "postgresql",
+    ... existing non-secret settings ...
+  }
+
+The launcher searches Process, User and Machine environment scopes for the named variable, copies the value only into the child Photo Identity process, and never prints it. A direct `PhotoIdentity__Postgres__ConnectionString` entry under settings is rejected.
+
+Before the real provider switch, stop the currently running PhotoIdentity.Api process. The launcher compares a healthy existing process's `/health` catalogueProvider with the requested provider and refuses to claim a switch while the old authority is still running.
+
+Preflight the private configuration without starting the app:
+
+  powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File Start-PhotoIdentity.ps1 -ConfigurationPath "%LOCALAPPDATA%\PhotoIdentity\launcher.json" -ValidateConfigurationOnly
+
+A PostgreSQL cutover preflight must report:
+  catalogueProvider: postgresql
+  postgresConnectionEnvironmentVariable: PHOTOIDENTITY_POSTGRES_CONNECTION_STRING
+
+The connection string itself must not appear. After the final switch, `/health` must report catalogueProvider `postgresql`. For rollback, stop PostgreSQL-authoritative Photo Identity before restoring the SQLite provider/configuration and a working copy made from the preserved pre-cutover backup.
 
 TRUSTED-LAN PHONE ACCESS
 ------------------------

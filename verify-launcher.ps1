@@ -19,11 +19,18 @@ $invalidPrimaryUrlConfigurationPath = Join-Path $artifactRoot "launcher-invalid-
 $invalidMobileHttpConfigurationPath = Join-Path $artifactRoot "launcher-invalid-mobile-http.json"
 $invalidMobileWildcardConfigurationPath = Join-Path $artifactRoot "launcher-invalid-mobile-wildcard.json"
 $invalidMobileCertificateConfigurationPath = Join-Path $artifactRoot "launcher-invalid-mobile-certificate.json"
+$invalidProviderConfigurationPath = Join-Path $artifactRoot "launcher-invalid-provider.json"
+$missingPostgresEnvironmentConfigurationPath = Join-Path $artifactRoot "launcher-missing-postgres-env.json"
+$directPostgresSecretConfigurationPath = Join-Path $artifactRoot "launcher-direct-postgres-secret.json"
+$validPostgresValidationConfigurationPath = Join-Path $artifactRoot "launcher-valid-postgres-reference.json"
+$providerSwitchConfigurationPath = Join-Path $artifactRoot "launcher-provider-switch.json"
 $launcherPath = Join-Path $repositoryRoot "Start-PhotoIdentity.ps1"
 $databasePath = Join-Path $artifactRoot "catalogue.db"
 $analysisPath = Join-Path $artifactRoot "analysis"
 $reviewProxyPath = Join-Path $artifactRoot "review-proxies"
 $url = "http://127.0.0.1:$Port"
+$postgresEnvironmentName = "PHOTOIDENTITY_LAUNCHER_VERIFICATION_POSTGRES_CONNECTION"
+$postgresSentinelConnection = "Host=127.0.0.1;Port=65432;Database=launcher_validation_only;Username=test;Password=launcher-secret-sentinel"
 
 function Get-LauncherServerProcesses {
     $processes = @(Get-CimInstance Win32_Process | Where-Object {
@@ -51,7 +58,6 @@ function Invoke-Launcher {
     }
 }
 
-
 function Invoke-LauncherExpectFailure {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -71,6 +77,88 @@ function Invoke-LauncherExpectFailure {
     }
     if (@(Get-LauncherServerProcesses).Count -ne 0) {
         throw "Invalid launcher configuration '$Description' started a server before being rejected."
+    }
+}
+
+function Assert-PostgresLauncherConfiguration {
+    $invalidProvider = [ordered]@{
+        publishPath = $publishPath
+        url = $url
+        settings = [ordered]@{
+            PhotoIdentity__CatalogueProvider = "mysql"
+            PhotoIdentity__DatabasePath = $databasePath
+        }
+    }
+    $invalidProvider | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $invalidProviderConfigurationPath -Encoding UTF8
+    Invoke-LauncherExpectFailure -Path $invalidProviderConfigurationPath -ExpectedPattern "must be sqlite or postgresql" -Description "unsupported catalogue provider"
+
+    $missingEnvironmentName = "PHOTOIDENTITY_LAUNCHER_MISSING_$([Guid]::NewGuid().ToString('N'))"
+    [Environment]::SetEnvironmentVariable($missingEnvironmentName, $null, "Process")
+    $missingPostgresEnvironment = [ordered]@{
+        publishPath = $publishPath
+        url = $url
+        postgresConnectionEnvironmentVariable = $missingEnvironmentName
+        settings = [ordered]@{
+            PhotoIdentity__CatalogueProvider = "postgresql"
+            PhotoIdentity__DatabasePath = $databasePath
+        }
+    }
+    $missingPostgresEnvironment | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $missingPostgresEnvironmentConfigurationPath -Encoding UTF8
+    Invoke-LauncherExpectFailure -Path $missingPostgresEnvironmentConfigurationPath -ExpectedPattern "empty or missing" -Description "missing PostgreSQL launcher secret"
+
+    $directSecret = [ordered]@{
+        publishPath = $publishPath
+        url = $url
+        settings = [ordered]@{
+            PhotoIdentity__CatalogueProvider = "postgresql"
+            PhotoIdentity__Postgres__ConnectionString = $postgresSentinelConnection
+        }
+    }
+    $directSecret | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $directPostgresSecretConfigurationPath -Encoding UTF8
+    Invoke-LauncherExpectFailure -Path $directPostgresSecretConfigurationPath -ExpectedPattern "Unsupported launcher setting.*Postgres__ConnectionString" -Description "PostgreSQL connection string stored directly in launcher settings"
+
+    $previous = [Environment]::GetEnvironmentVariable($postgresEnvironmentName, "Process")
+    try {
+        [Environment]::SetEnvironmentVariable($postgresEnvironmentName, $postgresSentinelConnection, "Process")
+        $validReference = [ordered]@{
+            publishPath = $publishPath
+            url = $url
+            postgresConnectionEnvironmentVariable = $postgresEnvironmentName
+            settings = [ordered]@{
+                PhotoIdentity__CatalogueProvider = "postgresql"
+                PhotoIdentity__DatabasePath = $databasePath
+            }
+        }
+        $validReference | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $validPostgresValidationConfigurationPath -Encoding UTF8
+
+        $validationOutput = @(& powershell.exe `
+            -NoLogo `
+            -NoProfile `
+            -ExecutionPolicy Bypass `
+            -File $launcherPath `
+            -ConfigurationPath $validPostgresValidationConfigurationPath `
+            -ValidateConfigurationOnly 2>&1)
+        $validationExitCode = $LASTEXITCODE
+        $validationMessage = $validationOutput -join [Environment]::NewLine
+        if ($validationExitCode -ne 0) {
+            throw "Launcher rejected a valid PostgreSQL environment-reference configuration. Output: $validationMessage"
+        }
+        if ($validationMessage -notmatch "catalogueProvider: postgresql") {
+            throw "PostgreSQL launcher validation did not report the selected provider. Output: $validationMessage"
+        }
+        if ($validationMessage -notmatch [regex]::Escape($postgresEnvironmentName)) {
+            throw "PostgreSQL launcher validation did not report the configured environment-variable name. Output: $validationMessage"
+        }
+        if ($validationMessage -match [regex]::Escape($postgresSentinelConnection) -or
+            $validationMessage -match "launcher-secret-sentinel") {
+            throw "PostgreSQL launcher validation leaked the connection string or password."
+        }
+        if (@(Get-LauncherServerProcesses).Count -ne 0) {
+            throw "ValidateConfigurationOnly unexpectedly started Photo Identity."
+        }
+    }
+    finally {
+        [Environment]::SetEnvironmentVariable($postgresEnvironmentName, $previous, "Process")
     }
 }
 
@@ -182,6 +270,7 @@ $launcherConfiguration = [ordered]@{
     publishPath = $publishPath
     url = $url
     settings = [ordered]@{
+        PhotoIdentity__CatalogueProvider = "sqlite"
         PhotoIdentity__DatabasePath = $databasePath
         PhotoIdentity__ArchiveAnalysisOutputRoot = $analysisPath
         PhotoIdentity__ReviewProxyRoot = $reviewProxyPath
@@ -205,6 +294,7 @@ try {
 
     Assert-RejectsInvalidGeoNamesTiming
     Assert-RejectsUnsafeMobileAccess
+    Assert-PostgresLauncherConfiguration
     Invoke-Launcher
 
     $firstProcesses = @(Get-LauncherServerProcesses)
@@ -219,6 +309,44 @@ try {
     $payload = $health.Content | ConvertFrom-Json
     if ($health.StatusCode -ne 200 -or [string]$payload.status -ne "ok") {
         throw "Launcher-started application did not return the expected health response."
+    }
+    if ([string]$payload.catalogueProvider -ne "sqlite") {
+        throw "SQLite launcher verification expected catalogueProvider=sqlite."
+    }
+
+    $previousPostgres = [Environment]::GetEnvironmentVariable($postgresEnvironmentName, "Process")
+    try {
+        [Environment]::SetEnvironmentVariable($postgresEnvironmentName, $postgresSentinelConnection, "Process")
+        $providerSwitchConfiguration = [ordered]@{
+            publishPath = $publishPath
+            url = $url
+            postgresConnectionEnvironmentVariable = $postgresEnvironmentName
+            settings = [ordered]@{
+                PhotoIdentity__CatalogueProvider = "postgresql"
+                PhotoIdentity__DatabasePath = $databasePath
+            }
+        }
+        $providerSwitchConfiguration | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $providerSwitchConfigurationPath -Encoding UTF8
+
+        $switchOutput = @(& powershell.exe `
+            -NoLogo `
+            -NoProfile `
+            -ExecutionPolicy Bypass `
+            -File $launcherPath `
+            -ConfigurationPath $providerSwitchConfigurationPath `
+            -NoBrowser `
+            -StartupTimeoutSeconds 5 2>&1)
+        $switchExitCode = $LASTEXITCODE
+        $switchMessage = $switchOutput -join [Environment]::NewLine
+        if ($switchExitCode -eq 0 -or $switchMessage -notmatch "already running with catalogueProvider 'sqlite'") {
+            throw "Launcher did not require the existing SQLite-authoritative process to stop before a PostgreSQL provider switch. Output: $switchMessage"
+        }
+        if ($switchMessage -match "launcher-secret-sentinel") {
+            throw "Provider-switch rejection leaked the PostgreSQL secret."
+        }
+    }
+    finally {
+        [Environment]::SetEnvironmentVariable($postgresEnvironmentName, $previousPostgres, "Process")
     }
 
     $geoNamesStatus = Invoke-RestMethod -Method Get -Uri "$url/api/place-enrichment/status" -TimeoutSec 5
