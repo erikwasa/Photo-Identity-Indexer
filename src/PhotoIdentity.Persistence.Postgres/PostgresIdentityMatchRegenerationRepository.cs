@@ -228,28 +228,30 @@ public sealed class PostgresIdentityMatchRegenerationRepository :
             await connection.BeginTransactionAsync(cancellationToken);
         await EnsureSchemaAsync(connection, transaction, cancellationToken);
 
-        await using NpgsqlCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText =
-            RunSelect +
-            """
-            WHERE status IN (@pending_status, @running_status)
-            ORDER BY requested_at_utc, id
-            LIMIT 1;
-            """;
-        command.Parameters.AddWithValue(
-            "pending_status",
-            ReviewIdentityMatchRegenerationStatuses.Pending);
-        command.Parameters.AddWithValue(
-            "running_status",
-            ReviewIdentityMatchRegenerationStatuses.Running);
-
         ReviewIdentityMatchRegenerationRun? result = null;
-        await using NpgsqlDataReader reader =
-            await command.ExecuteReaderAsync(cancellationToken);
-        if (await reader.ReadAsync(cancellationToken))
+        await using (NpgsqlCommand command = connection.CreateCommand())
         {
-            result = ReadRun(reader);
+            command.Transaction = transaction;
+            command.CommandText =
+                RunSelect +
+                """
+                WHERE status IN (@pending_status, @running_status)
+                ORDER BY requested_at_utc, id
+                LIMIT 1;
+                """;
+            command.Parameters.AddWithValue(
+                "pending_status",
+                ReviewIdentityMatchRegenerationStatuses.Pending);
+            command.Parameters.AddWithValue(
+                "running_status",
+                ReviewIdentityMatchRegenerationStatuses.Running);
+
+            await using NpgsqlDataReader reader =
+                await command.ExecuteReaderAsync(cancellationToken);
+            if (await reader.ReadAsync(cancellationToken))
+            {
+                result = ReadRun(reader);
+            }
         }
 
         await transaction.CommitAsync(cancellationToken);
