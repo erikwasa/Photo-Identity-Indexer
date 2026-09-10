@@ -124,12 +124,14 @@ internal static class CatalogueBackupCommandRunner
                 DataSource = sourcePath,
                 Mode = SqliteOpenMode.ReadOnly,
                 Cache = SqliteCacheMode.Private,
+                Pooling = false,
             };
             SqliteConnectionStringBuilder backupBuilder = new()
             {
                 DataSource = backupPath,
                 Mode = SqliteOpenMode.ReadWriteCreate,
                 Cache = SqliteCacheMode.Private,
+                Pooling = false,
             };
 
             await using (SqliteConnection source = new(sourceBuilder.ConnectionString))
@@ -201,6 +203,7 @@ internal static class CatalogueBackupCommandRunner
             DataSource = backupPath,
             Mode = SqliteOpenMode.ReadOnly,
             Cache = SqliteCacheMode.Private,
+            Pooling = false,
         };
         await using SqliteConnection backup = new(builder.ConnectionString);
         await backup.OpenAsync(cancellationToken);
