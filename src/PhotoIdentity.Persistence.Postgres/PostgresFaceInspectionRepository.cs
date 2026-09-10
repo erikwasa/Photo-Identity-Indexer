@@ -48,11 +48,9 @@ public sealed class PostgresFaceInspectionRepository : IFaceInspectionRepository
             occurrence.CommandText = """
                 INSERT INTO face_occurrences (id, asset_revision_id, ordinal, created_at_utc)
                 VALUES (@id, @revision, @ordinal, @created_at)
-                ON CONFLICT (asset_revision_id, ordinal) DO NOTHING;
-
-                SELECT id
-                FROM face_occurrences
-                WHERE asset_revision_id = @revision AND ordinal = @ordinal;
+                ON CONFLICT (asset_revision_id, ordinal) DO UPDATE SET
+                    created_at_utc = face_occurrences.created_at_utc
+                RETURNING id;
                 """;
             occurrence.Parameters.AddWithValue("id", inspection.OccurrenceId.Value);
             occurrence.Parameters.AddWithValue("revision", inspection.AssetRevisionId.Value);
