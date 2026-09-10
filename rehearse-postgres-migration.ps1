@@ -134,6 +134,12 @@ function New-RehearsalLauncherConfiguration {
         }
     }
 
+    # Rehearsal UI review is local-only. Do not inherit operator mobile certificate
+    # paths or password-environment requirements into the temporary launcher file.
+    Add-Member -InputObject $configuration -MemberType NoteProperty -Name "mobileAccess" -Value ([pscustomobject][ordered]@{
+        enabled = $false
+    }) -Force
+
     $configuration | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $OutputPath -Encoding UTF8
 }
 
