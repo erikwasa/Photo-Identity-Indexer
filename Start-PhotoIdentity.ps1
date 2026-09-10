@@ -2,6 +2,7 @@
 param(
     [string]$ConfigurationPath,
     [string]$PublishPathOverride,
+    [switch]$ValidateConfigurationOnly,
     [switch]$NoBrowser,
     [ValidateRange(1, 300)]
     [int]$StartupTimeoutSeconds = 45
@@ -11,6 +12,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $SupportedSettings = @(
+    "PhotoIdentity__CatalogueProvider",
     "PhotoIdentity__DatabasePath",
     "PhotoIdentity__ArchiveAnalysisOutputRoot",
     "PhotoIdentity__ReviewProxyRoot",
@@ -31,6 +33,23 @@ $SupportedSettings = @(
     "PhotoIdentity__ModelDirectory"
 )
 
+function Get-LauncherEnvironmentValue {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    foreach ($target in @("Process", "User", "Machine")) {
+        try {
+            $value = [Environment]::GetEnvironmentVariable($Name, $target)
+            if (-not [string]::IsNullOrWhiteSpace($value)) {
+                return $value
+            }
+        }
+        catch {
+        }
+    }
+
+    return $null
+}
+
 function Assert-LauncherSettingValue {
     param(
         [Parameter(Mandatory = $true)]
@@ -40,6 +59,12 @@ function Assert-LauncherSettingValue {
     )
 
     switch ($Name) {
+        "PhotoIdentity__CatalogueProvider" {
+            $provider = $Value.Trim().ToLowerInvariant()
+            if ($provider -notin @("sqlite", "postgresql")) {
+                throw "$Name must be sqlite or postgresql."
+            }
+        }
         "PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled" {
             [bool]$parsed = $false
             if (-not [bool]::TryParse($Value, [ref]$parsed)) {
@@ -124,7 +149,6 @@ function Resolve-ConfiguredPath {
     return [IO.Path]::GetFullPath((Join-Path $BaseDirectory $expanded))
 }
 
-
 function Read-MobileAccessConfiguration {
     param(
         $ParsedConfiguration,
@@ -204,7 +228,7 @@ function Read-MobileAccessConfiguration {
             throw "mobileAccess.certificatePasswordEnvironmentVariable must be an environment-variable name."
         }
 
-        $certificatePassword = [Environment]::GetEnvironmentVariable($certificatePasswordEnvironmentVariable, "Process")
+        $certificatePassword = Get-LauncherEnvironmentValue -Name $certificatePasswordEnvironmentVariable
         if ([string]::IsNullOrEmpty($certificatePassword)) {
             throw "The environment variable '$certificatePasswordEnvironmentVariable' configured for the mobile certificate password is not set."
         }
@@ -255,6 +279,7 @@ function Read-LauncherConfiguration {
     $url = "http://127.0.0.1:5080"
     $settings = @{}
     $configurationDirectory = $null
+    $postgresConnectionEnvironmentVariable = $null
     $mobileAccess = [pscustomobject]@{
         Enabled = $false
         ListenUri = $null
@@ -283,6 +308,14 @@ function Read-LauncherConfiguration {
             $url = ([string]$parsed.url).Trim()
         }
 
+        if ($null -ne $parsed.PSObject.Properties["postgresConnectionEnvironmentVariable"] -and
+            -not [string]::IsNullOrWhiteSpace([string]$parsed.postgresConnectionEnvironmentVariable)) {
+            $postgresConnectionEnvironmentVariable = ([string]$parsed.postgresConnectionEnvironmentVariable).Trim()
+            if ($postgresConnectionEnvironmentVariable -notmatch "^[A-Za-z_][A-Za-z0-9_]*$") {
+                throw "postgresConnectionEnvironmentVariable must be an environment-variable name."
+            }
+        }
+
         $mobileAccess = Read-MobileAccessConfiguration -ParsedConfiguration $parsed -ConfigurationDirectory $configurationDirectory
 
         if ($null -ne $parsed.PSObject.Properties["settings"] -and $null -ne $parsed.settings) {
@@ -297,6 +330,9 @@ function Read-LauncherConfiguration {
 
                 $value = [Environment]::ExpandEnvironmentVariables(([string]$property.Value).Trim())
                 Assert-LauncherSettingValue -Name $property.Name -Value $value
+                if ($property.Name -eq "PhotoIdentity__CatalogueProvider") {
+                    $value = $value.ToLowerInvariant()
+                }
                 $settings[$property.Name] = $value
             }
         }
@@ -307,6 +343,24 @@ function Read-LauncherConfiguration {
 
     if (-not [string]::IsNullOrWhiteSpace($PublishPathOverride)) {
         $publishPath = Resolve-ConfiguredPath -Value $PublishPathOverride -BaseDirectory $PSScriptRoot
+    }
+
+    $catalogueProvider = if ($settings.ContainsKey("PhotoIdentity__CatalogueProvider")) {
+        [string]$settings["PhotoIdentity__CatalogueProvider"]
+    }
+    else {
+        "sqlite"
+    }
+
+    if ($catalogueProvider -eq "postgresql") {
+        if ([string]::IsNullOrWhiteSpace($postgresConnectionEnvironmentVariable)) {
+            throw "postgresConnectionEnvironmentVariable is required when PhotoIdentity__CatalogueProvider is postgresql. Store only the environment-variable name in launcher.json, never the connection string."
+        }
+
+        $postgresConnectionString = Get-LauncherEnvironmentValue -Name $postgresConnectionEnvironmentVariable
+        if ([string]::IsNullOrWhiteSpace($postgresConnectionString)) {
+            throw "The PostgreSQL connection environment variable '$postgresConnectionEnvironmentVariable' is empty or missing."
+        }
     }
 
     try {
@@ -329,26 +383,32 @@ function Read-LauncherConfiguration {
         PublishPath = [IO.Path]::GetFullPath($publishPath)
         BaseUri = $baseUri
         Settings = $settings
+        CatalogueProvider = $catalogueProvider
+        PostgresConnectionEnvironmentVariable = $postgresConnectionEnvironmentVariable
         MobileAccess = $mobileAccess
         LocalApplicationRoot = [IO.Path]::GetFullPath($localApplicationRoot)
     }
 }
 
-function Test-PhotoIdentityHealth {
+function Get-PhotoIdentityHealth {
     param([Parameter(Mandatory = $true)][Uri]$BaseUri)
 
     $healthUri = New-Object Uri($BaseUri, "/health")
     try {
         $response = Invoke-WebRequest -UseBasicParsing -Uri $healthUri.AbsoluteUri -TimeoutSec 2
         if ($response.StatusCode -lt 200 -or $response.StatusCode -ge 300) {
-            return $false
+            return $null
         }
 
         $payload = $response.Content | ConvertFrom-Json
-        return $null -ne $payload -and [string]$payload.status -eq "ok"
+        if ($null -eq $payload -or [string]$payload.status -ne "ok") {
+            return $null
+        }
+
+        return $payload
     }
     catch {
-        return $false
+        return $null
     }
 }
 
@@ -427,6 +487,14 @@ function Start-PhotoIdentityServer {
         $processEnvironment[$name] = $Configuration.Settings[$name]
     }
 
+    if ($Configuration.CatalogueProvider -eq "postgresql") {
+        $postgresConnectionString = Get-LauncherEnvironmentValue -Name $Configuration.PostgresConnectionEnvironmentVariable
+        if ([string]::IsNullOrWhiteSpace($postgresConnectionString)) {
+            throw "The PostgreSQL connection environment variable '$($Configuration.PostgresConnectionEnvironmentVariable)' became unavailable before process start."
+        }
+        $processEnvironment["PhotoIdentity__Postgres__ConnectionString"] = $postgresConnectionString
+    }
+
     if ($Configuration.MobileAccess.Enabled) {
         $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Path"] = $Configuration.MobileAccess.CertificatePath
         $passwordVariable = $Configuration.MobileAccess.CertificatePasswordEnvironmentVariable
@@ -435,7 +503,7 @@ function Start-PhotoIdentityServer {
         }
         else {
             $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Password"] =
-                [Environment]::GetEnvironmentVariable($passwordVariable, "Process")
+                Get-LauncherEnvironmentValue -Name $passwordVariable
         }
     }
 
@@ -465,7 +533,22 @@ function Start-PhotoIdentityServer {
 try {
     $configuration = Read-LauncherConfiguration
 
-    if (Test-PhotoIdentityHealth -BaseUri $configuration.BaseUri) {
+    if ($ValidateConfigurationOnly) {
+        Write-Host "Photo Identity launcher configuration validation passed."
+        Write-Host "catalogueProvider: $($configuration.CatalogueProvider)"
+        if ($configuration.CatalogueProvider -eq "postgresql") {
+            Write-Host "postgresConnectionEnvironmentVariable: $($configuration.PostgresConnectionEnvironmentVariable)"
+        }
+        exit 0
+    }
+
+    $existingHealth = Get-PhotoIdentityHealth -BaseUri $configuration.BaseUri
+    if ($null -ne $existingHealth) {
+        $actualProvider = [string]$existingHealth.catalogueProvider
+        if ($actualProvider -ne $configuration.CatalogueProvider) {
+            throw "Photo Identity is already running with catalogueProvider '$actualProvider', but the launcher configuration requests '$($configuration.CatalogueProvider)'. Stop the existing process before switching catalogue authority."
+        }
+
         Write-Host "Photo Identity is already running at $($configuration.BaseUri.AbsoluteUri)"
         if ($configuration.MobileAccess.Enabled) {
             Write-Host "The current launcher configuration requests trusted-LAN mobile access at $($configuration.MobileAccess.PhoneUri.AbsoluteUri). Restart the existing Photo Identity process if mobile settings changed."
@@ -499,8 +582,16 @@ try {
             throw "Photo Identity exited during startup with code $($process.ExitCode). Review '$logDirectory\api.stderr.log' for details."
         }
 
-        if (Test-PhotoIdentityHealth -BaseUri $configuration.BaseUri) {
+        $health = Get-PhotoIdentityHealth -BaseUri $configuration.BaseUri
+        if ($null -ne $health) {
+            $actualProvider = [string]$health.catalogueProvider
+            if ($actualProvider -ne $configuration.CatalogueProvider) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+                throw "Photo Identity became healthy with catalogueProvider '$actualProvider', but '$($configuration.CatalogueProvider)' was requested. The attempted process was stopped."
+            }
+
             Write-Host "Photo Identity is ready at $($configuration.BaseUri.AbsoluteUri)"
+            Write-Host "Catalogue provider: $actualProvider"
             if ($configuration.MobileAccess.Enabled) {
                 Write-Host "Trusted-LAN mobile HTTPS is enabled at $($configuration.MobileAccess.PhoneUri.AbsoluteUri)"
             }
