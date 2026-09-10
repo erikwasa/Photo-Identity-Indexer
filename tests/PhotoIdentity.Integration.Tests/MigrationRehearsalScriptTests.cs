@@ -111,6 +111,16 @@ public sealed class MigrationRehearsalScriptTests
         Assert.Contains("PhotoIdentity.Api.dll", script, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Existing_target_review_uses_checkout_as_repository_root()
+    {
+        string repositoryRoot = FindRepositoryRoot();
+        string script = File.ReadAllText(Path.Combine(repositoryRoot, "review-postgres-rehearsal.ps1"));
+
+        Assert.Contains("PhotoIdentity__RepositoryRoot", script, StringComparison.Ordinal);
+        Assert.Contains("-Value $PSScriptRoot -Force", script, StringComparison.Ordinal);
+    }
+
     private static async Task<ProcessResult> RunPowerShellAsync(string command)
     {
         ProcessStartInfo startInfo = new("powershell.exe")
