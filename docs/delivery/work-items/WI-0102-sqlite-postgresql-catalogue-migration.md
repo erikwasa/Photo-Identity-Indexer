@@ -67,9 +67,11 @@ WI-0101 completed the PostgreSQL runtime/persistence boundary in PR #277. WI-010
 - [x] Verify the preserved backup SHA-256 is unchanged after both imports and mark the rehearsal backup read-only before migration begins.
 - [x] Automatically reject a repeatability run when source hash/schema/count/sequence evidence differs between the two PostgreSQL imports.
 - [x] Allow `-LaunchForReview` to start an isolated PostgreSQL-selected runtime against the primary rehearsal target using a temporary no-secret launcher configuration, and require `/health` to report `catalogueProvider: postgresql`.
-- [x] Make source-checkout review independent of an installed Windows package by publishing the current API into an isolated temporary review directory and passing that path explicitly to the launcher.
-- [x] Add `review-postgres-rehearsal.ps1` so a successful existing rehearsal database can be reopened for UI acceptance without repeating the full backup/two-target import; the helper starts the local PostgreSQL compose service if needed.
-- [x] Add Windows CI coverage that parses both rehearsal PowerShell files, verifies mobile-certificate state is stripped from the local review configuration and verifies the current-API publish/path-override contract.
+- [x] Add Windows CI coverage that parses the rehearsal PowerShell file so syntax regressions fail an integration shard before maintainer use.
+- [x] Add `review-postgres-rehearsal.ps1` so a successful rehearsal database can be reopened for UI acceptance without repeating the catalogue backup/import, and publish the current checkout into an isolated review directory rather than requiring a preinstalled package.
+- [x] Ensure local rehearsal review disables inherited mobile-certificate settings and surfaces API startup log tails when the published runtime exits before health is reached.
+- [x] Fix PostgreSQL identity-regeneration active-run reads so the data reader is disposed before transaction commit; the migrated catalogue exposed the reader-lifetime defect when its preserved active regeneration state caused the hosted service to execute `GetNextActiveAsync` immediately after startup.
+- [x] Add live PostgreSQL regression coverage for `GetNextActiveAsync` with an active regeneration run so transaction commit cannot regress while a reader remains open.
 - [ ] Verify people/face review history and undo/rejection state from the migrated maintainer catalogue.
 - [ ] Verify tags, Places and automatic place-enrichment state.
 - [ ] Verify saved Smart Collections and slideshow snapshot membership against representative collections.
@@ -95,20 +97,22 @@ The copy plan is generated from both schemas. This is intentional: WI-0102 shoul
 
 The live disposable-database integration test seeds immutable catalogue identity, a face/crop/embedding, a person label, review assignment and identity suggestion with explicit integer IDs. It imports that exact backup into two independent fresh PostgreSQL databases, compares the stable report evidence, verifies the imported IDs/relationships in both targets and inserts a new embedding in each target without an explicit ID to prove generated-key continuation. The test is included in the same live PostgreSQL runtime filter used by `verify-postgres.ps1` and was accepted by the maintainer on 2026-09-10.
 
+## Maintainer real-catalogue rehearsal evidence (2026-09-10)
+
+The real stopped SQLite catalogue was backed up and migrated repeatedly without modifying production authority. The accepted backup characteristics are:
+
+- SQLite schema version 16.
+- 313,171,968 bytes.
+- SHA-256 `7b39f6d59944e5a3c8b6720bd8cfc922b15b6ec47325883b4be232f153eb469c`.
+
+The first guarded import exposed 27 rows in `identity_match_regeneration_runs` whose PostgreSQL control tables were previously created lazily by the runtime repository. Those tables were promoted into fresh PostgreSQL schema initialization and live migration coverage now proves regeneration run/target state survives the import. The no-silent-loss guard remained enabled.
+
+Subsequent full rehearsals imported the exact same source content independently into two fresh PostgreSQL databases. Each import copied 57 tables / 480,147 rows, repaired 11 generated sequences and returned `validation: passed`; stable migration reports compared equal, producing `repeatability: passed` and `production-authority-changed: false`.
+
+UI review setup then exposed three review-only assumptions without invalidating migration evidence: inherited mobile certificate settings required an unrelated password secret, the launcher assumed an installed `%LOCALAPPDATA%\PhotoIdentity\app`, and the migrated active identity-regeneration state exercised a PostgreSQL `GetNextActiveAsync` reader-lifetime bug. Rehearsal review is now local-only, publishes the current checkout itself, can reuse an already-successful rehearsal target, surfaces startup logs directly, and closes the regeneration data reader before committing its transaction. Production SQLite authority and the accepted backup remain unchanged.
+
 ## Development-complete rehearsal/cutover tooling (2026-09-10)
 
-`catalogue backup` and `rehearse-postgres-migration.ps1` cover the development-side migration workflow. The rehearsal resolves the maintained SQLite catalogue, requires the application to be stopped, creates one consistent SQLite backup through the backup API, marks that backup read-only, creates two independent fresh PostgreSQL rehearsal databases, imports the exact same backup into both and compares stable report evidence. The backup hash is checked again after both imports. Failed/incomplete targets are removed; successful rehearsal targets remain available for inspection.
+`catalogue backup`, `catalogue migrate`, `rehearse-postgres-migration.ps1`, and `review-postgres-rehearsal.ps1` now cover the development-side migration and review workflow. The normal Windows launcher is also ready for final cutover. `launcher.json` may persist `PhotoIdentity__CatalogueProvider=postgresql` plus `postgresConnectionEnvironmentVariable`, but it cannot contain `PhotoIdentity__Postgres__ConnectionString` directly. The launcher resolves the secret from Process/User/Machine environment scope, injects it only into the child process, validates provider agreement with `/health`, and refuses an apparent provider switch while another healthy authority is still running.
 
-With `-LaunchForReview`, the script generates a temporary launcher configuration that preserves normal local settings, explicitly selects PostgreSQL, disables inherited mobile-access/certificate state and references a temporary connection-string environment variable. It publishes `PhotoIdentity.Api` from the current checkout into an isolated timestamped directory and passes that directory to the launcher through `-PublishPathOverride`, so source-checkout rehearsal does not assume `%LOCALAPPDATA%\PhotoIdentity\app` already exists. It does not edit the user's normal launcher configuration. The launched runtime must become healthy with `catalogueProvider: postgresql`.
-
-A successful rehearsal target can also be reviewed later without repeating the full migration by running `review-postgres-rehearsal.ps1 -DatabaseName <primary-rehearsal-database>`. That helper ensures the local PostgreSQL compose service is running, rebuilds/publishes the current API, creates a temporary local-only PostgreSQL launcher configuration, resolves the connection string from the private PostgreSQL `.env`, and validates runtime health without modifying production configuration or the rehearsal database.
-
-The normal Windows launcher is ready for final cutover. `launcher.json` may persist `PhotoIdentity__CatalogueProvider=postgresql` plus `postgresConnectionEnvironmentVariable`, but it cannot contain `PhotoIdentity__Postgres__ConnectionString` directly. The launcher resolves the secret from Process/User/Machine environment scope, injects it only into the child process, validates provider agreement with `/health`, and refuses an apparent provider switch while another healthy authority is still running. CI launcher verification exercises the invalid-provider, missing-secret, direct-secret-rejection, preflight and stop-before-switch paths.
-
-## Maintainer rehearsal evidence (2026-09-10)
-
-The real SQLite catalogue produced a validated schema-16 backup of 313,171,968 bytes with SHA-256 `7b39f6d59944e5a3c8b6720bd8cfc922b15b6ec47325883b4be232f153eb469c`. An initial guarded import exposed 27 `identity_match_regeneration_runs` rows whose PostgreSQL tables had previously been created lazily at runtime. That state was treated as authoritative, promoted into fresh PostgreSQL schema initialization and covered by a live migration regression test; the no-silent-loss guard was not weakened.
-
-After that correction, two independent fresh PostgreSQL targets both imported 57 tables and 480,147 rows from the exact same preserved backup, repaired 11 generated sequences and reported `validation: passed`. Their stable reports matched and the rehearsal reported `repeatability: passed` with `production-authority-changed: false`. A second full rehearsal reproduced those same catalogue-level results. The remaining launch-only failures were unrelated to migrated data: first an inherited mobile-certificate password requirement, then absence of a preinstalled `%LOCALAPPDATA%\PhotoIdentity\app` package. Both review-launch assumptions are now removed by the local-only temporary configuration and current-source publish path described above.
-
-At this point the unchecked items intentionally require human review of the migrated runtime or the real authority-transfer window: perform representative UI/domain checks, then execute and accept the PostgreSQL cutover/rollback boundary.
+The unchecked items above intentionally require maintainer inspection of the migrated UI/domain state or the real authority-transfer window. No additional migration should be performed merely to retry UI acceptance; the retained successful rehearsal PostgreSQL target can be reopened with `review-postgres-rehearsal.ps1`.
