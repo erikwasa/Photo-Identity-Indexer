@@ -322,7 +322,9 @@ internal static class BundleCommandRunner
         CancellationToken cancellationToken)
     {
         SqliteCatalogueDatabase database = new(options.DatabasePath!);
-        PortableBundleExportCoordinator coordinator = new(database);
+        PortableBundleExportCoordinator coordinator = new(
+            database,
+            new SqliteLocalBatchRepository(database));
         PortableBundleExportResult result = await coordinator.ExportAsync(
             new PortableBundleExportOptions(
                 options.RevisionId!.Value,
