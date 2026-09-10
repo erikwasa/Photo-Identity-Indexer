@@ -5,7 +5,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class MigrationRehearsalScriptTests
 {
     [Fact]
-    public async Task Rehearsal_script_parses_without_PowerShell_errors_on_Windows()
+    public async Task Rehearsal_scripts_parse_without_PowerShell_errors_on_Windows()
     {
         if (!OperatingSystem.IsWindows())
         {
@@ -13,19 +13,22 @@ public sealed class MigrationRehearsalScriptTests
         }
 
         string repositoryRoot = FindRepositoryRoot();
-        string scriptPath = Path.Combine(repositoryRoot, "rehearse-postgres-migration.ps1");
-        Assert.True(File.Exists(scriptPath), $"Expected rehearsal script at {scriptPath}.");
+        foreach (string fileName in new[] { "rehearse-postgres-migration.ps1", "review-postgres-rehearsal.ps1" })
+        {
+            string scriptPath = Path.Combine(repositoryRoot, fileName);
+            Assert.True(File.Exists(scriptPath), $"Expected rehearsal script at {scriptPath}.");
 
-        string escapedScriptPath = EscapePowerShellLiteral(scriptPath);
-        string parserCommand =
-            "$tokens=$null; $errors=$null; " +
-            $"[System.Management.Automation.Language.Parser]::ParseFile('{escapedScriptPath}',[ref]$tokens,[ref]$errors) | Out-Null; " +
-            "if ($errors.Count -ne 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }";
+            string escapedScriptPath = EscapePowerShellLiteral(scriptPath);
+            string parserCommand =
+                "$tokens=$null; $errors=$null; " +
+                $"[System.Management.Automation.Language.Parser]::ParseFile('{escapedScriptPath}',[ref]$tokens,[ref]$errors) | Out-Null; " +
+                "if ($errors.Count -ne 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }";
 
-        ProcessResult result = await RunPowerShellAsync(parserCommand);
-        Assert.True(
-            result.ExitCode == 0,
-            $"PowerShell parser rejected rehearse-postgres-migration.ps1. stdout: {result.StandardOutput} stderr: {result.StandardError}");
+            ProcessResult result = await RunPowerShellAsync(parserCommand);
+            Assert.True(
+                result.ExitCode == 0,
+                $"PowerShell parser rejected {fileName}. stdout: {result.StandardOutput} stderr: {result.StandardError}");
+        }
     }
 
     [Fact]
@@ -95,6 +98,17 @@ public sealed class MigrationRehearsalScriptTests
                 Directory.Delete(directory, recursive: true);
             }
         }
+    }
+
+    [Fact]
+    public void Rehearsal_review_publishes_current_api_and_overrides_package_path()
+    {
+        string repositoryRoot = FindRepositoryRoot();
+        string script = File.ReadAllText(Path.Combine(repositoryRoot, "rehearse-postgres-migration.ps1"));
+
+        Assert.Contains("dotnet publish $apiProject", script, StringComparison.Ordinal);
+        Assert.Contains("-PublishPathOverride $rehearsalPublishPath", script, StringComparison.Ordinal);
+        Assert.Contains("PhotoIdentity.Api.dll", script, StringComparison.Ordinal);
     }
 
     private static async Task<ProcessResult> RunPowerShellAsync(string command)
