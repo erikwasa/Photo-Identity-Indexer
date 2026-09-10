@@ -42,7 +42,7 @@ V1 starts from saved Smart Collections only. Transient/unsaved Smart Collection 
 - [WI-0085](../work-items/WI-0085-protected-toddler-slideshow.md) — make protected phone playback the default, including parent unlock, history/fullscreen recovery, orientation lock, wake lock and capability fallbacks.
 - [WI-0086](../work-items/WI-0086-slideshow-original-preparation.md) — add explicit best-quality preparation that preflights/reserves the full snapshot and keeps slideshow-owned originals local for uninterrupted playback under existing storage limits.
 - [WI-0092](../work-items/WI-0092-slideshow-input-orientation-settings.md) — add a Manual navigation preference and explicit Current/Portrait/Landscape orientation settings.
-- [WI-0093](../work-items/WI-0093-slideshow-original-preparation-progress.md) — make preparation progress show downloading/queued/waiting state and provide no-progress retry/cancel recovery.
+- [WI-0093](../work-items/WI-0093-slideshow-preparation-progress.md) — make preparation progress show downloading/queued/waiting state and provide no-progress retry/cancel recovery.
 - [WI-0094](../work-items/WI-0094-read-only-slideshow-library.md) — add the basic-user slideshow library and standalone collection original preparation.
 - [WI-0095](../work-items/WI-0095-model-download-retry.md) — keep the required Windows package gate reliable when governed model downloads encounter transient HTTP/stream interruptions, without weakening integrity verification.
 - [WI-0096](../work-items/WI-0096-slideshow-preparation-quiescence.md) — make preparation cancellation await background-task quiescence so session teardown releases catalogue resources deterministically.
