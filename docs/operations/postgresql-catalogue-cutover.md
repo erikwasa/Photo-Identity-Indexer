@@ -117,18 +117,46 @@ The migration report proves structural completeness and counts; this representat
 
 When review is finished, stop the rehearsal Photo Identity process before restarting the normal SQLite-authoritative application.
 
-## 6. Final cutover exactly once
+## 6. Persisted Windows launcher cutover
 
-Only after the final backup/import/repeatability/representative checks pass should the normal runtime provider be changed. Keep the SQLite-authoritative application stopped. PostgreSQL-selected runtime uses:
+The supported launcher now persists the **provider selection** in `launcher.json` but deliberately keeps the PostgreSQL connection string out of that file. The private JSON contains only the name of an environment variable holding the secret.
+
+First put the accepted target connection string in a Windows environment variable. If the final migration already placed it in a process variable, persist that value without retyping it:
 
 ~~~powershell
-$env:PhotoIdentity__CatalogueProvider = "postgresql"
-$env:PhotoIdentity__Postgres__ConnectionString = "<accepted target connection string>"
+[Environment]::SetEnvironmentVariable(
+  "PHOTOIDENTITY_POSTGRES_CONNECTION_STRING",
+  $env:PHOTOIDENTITY_MIGRATION_CONNECTION,
+  "User")
 ~~~
 
-The packaged launcher configuration path for persisting this selection is part of WI-0102 and must be accepted before final cutover. Do not store a database password in `PhotoIdentity.launcher.json` merely to make the switch persistent.
+Then update the private launcher configuration. Keep all existing non-secret settings and add/change only this provider boundary:
 
-After the supported launcher configuration is in place, start Photo Identity and confirm `/health` reports `catalogueProvider: postgresql`, the current PostgreSQL schema version and PostgreSQL status `ready`. Verify Review, Library/Smart Collections, Archive status and background workers before normal writes resume. Record the cutover timestamp and accepted migration report.
+~~~json
+{
+  "postgresConnectionEnvironmentVariable": "PHOTOIDENTITY_POSTGRES_CONNECTION_STRING",
+  "settings": {
+    "PhotoIdentity__CatalogueProvider": "postgresql"
+  }
+}
+~~~
+
+The abbreviated example above is not a complete replacement configuration; retain the existing database/archive/proxy/GeoNames settings alongside `PhotoIdentity__CatalogueProvider`. A direct `PhotoIdentity__Postgres__ConnectionString` value under `settings` is intentionally rejected.
+
+The launcher searches Process, User and Machine environment scopes for `postgresConnectionEnvironmentVariable`, copies the resolved value only into the child Photo Identity process, and never prints it. Before starting the app, preflight the exact private configuration:
+
+~~~powershell
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass `
+  -File .\Start-PhotoIdentity.ps1 `
+  -ConfigurationPath "$env:LOCALAPPDATA\PhotoIdentity\launcher.json" `
+  -ValidateConfigurationOnly
+~~~
+
+The preflight must report `catalogueProvider: postgresql` and the environment-variable **name**, never the connection string. It starts no server.
+
+Only after final backup/import/repeatability/representative checks pass should the real switch happen. Stop the SQLite-authoritative Photo Identity process first, then start normally through `PhotoIdentity.cmd` or `Start-PhotoIdentity.ps1`. If a healthy process is already running with a different `catalogueProvider`, the launcher refuses to claim the switch and requires that process to be stopped first.
+
+After start, the launcher itself requires the healthy runtime provider to match the configured provider. Confirm `/health` reports `catalogueProvider: postgresql`, the current PostgreSQL schema version and PostgreSQL status `ready`. Verify Review, Library/Smart Collections, Archive status and background workers before normal writes resume. Record the cutover timestamp and accepted migration report.
 
 Do not delete the pre-cutover SQLite backup. Keep it unchanged through maintainer acceptance and the operational stabilization period owned by later M24 work.
 
@@ -139,8 +167,8 @@ Rollback is intentionally a return to the exact pre-cutover SQLite state, not a 
 1. Stop the PostgreSQL-authoritative Photo Identity process so no further PostgreSQL writes occur.
 2. Preserve PostgreSQL for diagnosis; do not attempt to merge its post-cutover writes into SQLite.
 3. Make a new working copy from the unchanged pre-cutover SQLite backup. Do not use or modify the preserved backup itself as the working database.
-4. Restore the SQLite provider/catalogue configuration.
-5. Start Photo Identity and confirm `/health` reports `catalogueProvider: sqlite`.
+4. Change `PhotoIdentity__CatalogueProvider` back to `sqlite` and restore the normal SQLite catalogue path. `postgresConnectionEnvironmentVariable` may be removed from the JSON; it is ignored while SQLite is selected.
+5. Start Photo Identity and confirm the launcher and `/health` report `catalogueProvider: sqlite`.
 6. Verify representative Review, Library and Archive state is the expected pre-cutover state.
 
 Any user changes made after PostgreSQL cutover are outside this rollback snapshot. That limitation is why cutover acceptance should happen before normal writes resume and why the rollback window should be short and controlled.
