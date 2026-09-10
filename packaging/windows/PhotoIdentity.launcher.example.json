@@ -4,6 +4,7 @@
     "enabled": false
   },
   "settings": {
+    "PhotoIdentity__CatalogueProvider": "sqlite",
     "PhotoIdentity__DatabasePath": "%LOCALAPPDATA%\\PhotoIdentity\\catalogue.db",
     "PhotoIdentity__ArchiveAnalysisOutputRoot": "%LOCALAPPDATA%\\PhotoIdentity\\archive-analysis",
     "PhotoIdentity__ReviewProxyRoot": "%LOCALAPPDATA%\\PhotoIdentity\\review-proxies",
