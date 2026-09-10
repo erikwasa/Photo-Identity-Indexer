@@ -24,6 +24,20 @@ public static class ReviewIdentityMatchRegenerationTargetStatuses
     public const string Error = "error";
 }
 
+public sealed record ReviewIdentityMatchModelRevision(
+    ModelId ModelId,
+    Sha256Digest ModelHash,
+    int FaceCount);
+
+/// <summary>
+/// Lists exact embedding-model revisions that have catalogue evidence and can be regenerated.
+/// </summary>
+public interface IIdentityMatchModelRepository
+{
+    Task<IReadOnlyList<ReviewIdentityMatchModelRevision>> ListAsync(
+        CancellationToken cancellationToken = default);
+}
+
 public sealed record ReviewIdentityMatchRegenerationRun(
     Guid Id,
     ModelId ModelId,
