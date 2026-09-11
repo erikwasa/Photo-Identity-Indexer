@@ -26,14 +26,20 @@ Remove the current per-target reload of invariant evidence and make regeneration
 
 - PR #280 prepares invariant PostgreSQL exemplar evidence once per durable run, reads rejected people per target instead of loading the full rejected-pair corpus, and advances the hosted worker in bounded eight-target cycles while retaining per-target commits and restart recovery.
 - PR #281 moves target snapshot creation fully into PostgreSQL with one `INSERT ... SELECT`, so run creation no longer materializes all target IDs in application memory or performs one insert round trip per target.
-- The live PostgreSQL scale-acceptance test uses an isolated disposable database with 96 targets and 32 confirmed exemplars. It verifies eight-target progress boundaries, concurrent status reads with a two-second cancellation bound, final durable counts, zero target/run failures, and the identity-regeneration throughput counters.
-- `verify-postgres.ps1` already selects `PostgresRuntimeApplicationTests`, so the scale acceptance runs automatically during the maintainer PostgreSQL verification without touching the production catalogue.
+- PR #282 adds a live PostgreSQL scale-acceptance test using an isolated disposable database with 96 targets and 32 confirmed exemplars. It verifies eight-target progress boundaries, concurrent status reads with a two-second cancellation bound, final durable counts, zero target/run failures, and the identity-regeneration throughput counters.
+- `verify-postgres.ps1` selects `PostgresRuntimeApplicationTests`, so the scale acceptance runs during maintainer PostgreSQL verification without touching the production catalogue.
 
 ## Acceptance criteria
 - [x] Invariant exemplar evidence is not reread from PostgreSQL for every target.
 - [x] Target processing uses bounded batches and commits recoverable progress.
 - [x] Restart resumes without duplicating completed target work.
-- [ ] UI polling/status reads remain responsive during active regeneration.
+- [x] UI polling/status reads remain responsive during active regeneration.
 - [x] Correctness tests prove ranking/rejection/evidence-version semantics remain unchanged.
 
-The remaining unchecked criterion requires the live PostgreSQL scale acceptance to pass in the maintainer environment. If it exposes status-read contention or throughput regressions, corrective query/index work remains part of WI-0103 before closeout.
+## Final maintainer acceptance (2026-09-11)
+
+The maintainer ran `verify-postgres.ps1 -SkipContainerStart` against the existing PostgreSQL runtime after PR #282 was merged. The Release solution build completed with zero warnings and zero errors. The complete PostgreSQL persistence acceptance set passed 29/29 tests with zero skips, and the PostgreSQL runtime/composition acceptance set passed 7/7 tests with zero skips in 8 seconds.
+
+That runtime/composition set includes the WI-0103 scale acceptance: 96 eligible targets, 32 confirmed exemplars, real PostgreSQL scoring in bounded eight-target cycles, a concurrent status read during every active cycle with a two-second cancellation bound, durable final counts, and regeneration throughput/failure counters. No status-read contention, target failures or run failures were observed.
+
+WI-0103 is therefore complete. Exact scoring semantics remain unchanged; pgvector/approximate nearest-neighbor work remains optional follow-up rather than an M24 prerequisite.
