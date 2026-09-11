@@ -63,7 +63,7 @@ function Resolve-CatalogueDatabase {
 
     $matches = @(
         foreach ($candidate in $serverDatabases) {
-            if (Test-PhotoIdentityDatabase -ContainerId $ContainerId -Candidate $candidate) {
+            if (Test-PhotoIdentityDatabase -ContainerId $containerId -Candidate $candidate) {
                 $candidate
             }
         })
@@ -79,6 +79,7 @@ function Resolve-CatalogueDatabase {
 }
 
 Push-Location $composeDirectory
+$containerDumpPath = $null
 try {
     $containerId = (& $podman.Source compose ps -q postgres).Trim()
     if ([string]::IsNullOrWhiteSpace($containerId)) {
@@ -95,7 +96,7 @@ try {
             Join-Path $env:LOCALAPPDATA "PhotoIdentity\backups\postgresql"
         }
         [IO.Directory]::CreateDirectory($root) | Out-Null
-        $OutputPath = Join-Path $root ("photoidentity-postgresql-{0}.sql" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
+        $OutputPath = Join-Path $root ("photoidentity-postgresql-{0}.dump" -f (Get-Date -Format "yyyyMMdd-HHmmss"))
     }
     else {
         $OutputPath = [IO.Path]::GetFullPath($OutputPath)
@@ -110,30 +111,26 @@ try {
         throw "Backup output already exists. Existing backups and reports are never overwritten."
     }
 
+    $containerDumpPath = "/tmp/photoidentity-$([Guid]::NewGuid().ToString('N')).dump"
     Write-Host "Creating PostgreSQL logical backup from '$catalogueDatabase'..."
-    $encoding = [Text.UTF8Encoding]::new($false)
-    $writer = [IO.StreamWriter]::new($OutputPath, $false, $encoding)
-    try {
-        & $podman.Source exec `
-            -e "TARGET_DATABASE=$catalogueDatabase" `
-            $containerId sh -lc `
-            'pg_dump -U "$POSTGRES_USER" -d "$TARGET_DATABASE" --no-owner --no-acl' `
-            2>$null |
-            ForEach-Object { $writer.WriteLine([string]$_) }
-        $dumpExitCode = $LASTEXITCODE
-    }
-    finally {
-        $writer.Dispose()
+    & $podman.Source exec `
+        -e "TARGET_DATABASE=$catalogueDatabase" `
+        -e "DUMP_PATH=$containerDumpPath" `
+        $containerId sh -lc `
+        'pg_dump -U "$POSTGRES_USER" -d "$TARGET_DATABASE" --format=custom --compress=6 --no-owner --no-acl --file="$DUMP_PATH"' `
+        2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "PostgreSQL backup failed inside the container."
     }
 
-    if ($dumpExitCode -ne 0) {
-        Remove-Item -LiteralPath $OutputPath -Force -ErrorAction SilentlyContinue
-        throw "PostgreSQL backup failed inside the container."
+    $containerSource = "$containerId`:$containerDumpPath"
+    & $podman.Source cp $containerSource $OutputPath | Out-Null
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $OutputPath -PathType Leaf)) {
+        throw "Podman could not copy the completed PostgreSQL backup to the host."
     }
 
     $backupInfo = Get-Item -LiteralPath $OutputPath
     if ($backupInfo.Length -le 0) {
-        Remove-Item -LiteralPath $OutputPath -Force -ErrorAction SilentlyContinue
         throw "PostgreSQL backup output is empty."
     }
 
@@ -144,7 +141,7 @@ try {
         backupPath = $OutputPath
         backupBytes = [long]$backupInfo.Length
         backupSha256 = $sha256
-        format = "plain-sql"
+        format = "pg_dump-custom"
         privacyNote = "Credentials and connection strings are omitted. The backup contains the private catalogue and must be protected as sensitive local data."
     }
     $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reportPath -Encoding UTF8
@@ -156,5 +153,8 @@ try {
     Write-Host "report: $reportPath"
 }
 finally {
+    if (-not [string]::IsNullOrWhiteSpace($containerDumpPath)) {
+        & $podman.Source exec -e "DUMP_PATH=$containerDumpPath" $containerId sh -lc 'rm -f "$DUMP_PATH"' *> $null
+    }
     Pop-Location
 }
