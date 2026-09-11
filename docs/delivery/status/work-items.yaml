@@ -111,7 +111,7 @@ work_items:
   - type: workflow
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31756173422
   - type: merge_commit
-    value: 1c1f09c956f3d3d93f72b0d338f0dc29b077245a
+    value: 1c1f09c956f3d3d93f72b0d338946125a1bdad4
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/144
   - type: workflow
@@ -202,7 +202,7 @@ work_items:
   milestone: M19
   status: completed
   owner: ai-agent
-  document: ../work-items/WI-0056-manual-photo-tags.md
+  document: ../work-items/WI-0056-immich-tag-hierarchy.md
   started_at: 2026-08-13
   completed_at: 2026-08-14
   verified_at: 2026-08-14
@@ -1401,25 +1401,67 @@ work_items:
 - id: WI-0103
   title: Make identity match regeneration scalable and bounded
   milestone: M24
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0103-scalable-match-regeneration.md
+  started_at: 2026-09-11
+  completed_at: 2026-09-11
+  verified_at: 2026-09-11
+  verified_by: maintainer
+  last_updated_at: 2026-09-11
+  branch: codex/wi-0103-postgres-scale-acceptance
   blockers:
   - WI-0100
   blocker_notes:
   - Preserve current exact scoring semantics first; pgvector/approximate nearest-neighbor work is optional follow-up, not a migration prerequisite.
-  evidence: []
+  - PRs #280 and #281 removed the invariant-evidence/rejection and target-snapshot scaling multipliers; PR #282 turned live PostgreSQL responsiveness into repeatable scale acceptance.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/280
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/281
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/282
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34567566761
+  - type: merge_commit
+    value: b66d1173b9b0d4f4bdd31ec49e71322530195ade
+  - type: verification
+    value: '2026-09-11 maintainer live PostgreSQL verification: Release build passed with zero warnings/errors; persistence acceptance passed 29/29 and runtime/composition acceptance passed 7/7, including 96 regeneration targets, 32 confirmed exemplars, bounded eight-target cycles, responsive concurrent status reads and zero target/run failures.'
 - id: WI-0104
   title: Remove known operator query and UI scaling bottlenecks
   milestone: M24
-  status: proposed
-  owner: unassigned
+  status: completed
+  owner: ai-agent
   document: ../work-items/WI-0104-operator-query-ui-performance.md
+  started_at: 2026-09-11
+  completed_at: 2026-09-11
+  verified_at: 2026-09-11
+  verified_by: maintainer
+  last_updated_at: 2026-09-11
+  branch: codex/m24-wi0104-settings-independent-load
   blockers:
   - WI-0100
   - WI-0101
-  blocker_notes: []
-  evidence: []
+  blocker_notes:
+  - PR #284 removed per-card people-list and loaded-set action multipliers; PR #293 bounded PostgreSQL review-state page work; PR #294 added generated-once gallery derivatives; PR #295 made Settings configuration/sections load independently.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/284
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/293
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/294
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/295
+  - type: workflow
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34623660450
+  - type: merge_commit
+    value: 0b623220cb23ec67efe09ed053ead7c496ad7657
+  - type: verification
+    value: '2026-09-11 representative schema-23 PostgreSQL after-plan: Suggested person 32.397 ms, Newest first 19.567 ms, all-confidence count 3.973 ms and high-confidence count 2.821 ms with no temporary I/O; no additional index justified.'
+  - type: verification
+    value: '2026-09-11 maintainer real-catalogue Settings smoke after PR #295 merge: shell/configuration loaded independently, Archive Coverage/Storage/Identity Matching loaded and refreshed independently, configured archive identity/coverage was correct and no full archive filesystem path was exposed.'
 - id: WI-0105
   title: Add low-overhead PostgreSQL and background-work observability
   milestone: M24
