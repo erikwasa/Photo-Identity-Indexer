@@ -9,6 +9,12 @@ public sealed class WorkItemRegistry
     public List<WorkItem> WorkItems { get; set; } = [];
 }
 
+public sealed class WorkItemShardRegistry
+{
+    public int SchemaVersion { get; set; }
+    public List<string> AllowedStatuses { get; set; } = [];
+}
+
 public sealed class WorkItem
 {
     public string Id { get; set; } = "";
