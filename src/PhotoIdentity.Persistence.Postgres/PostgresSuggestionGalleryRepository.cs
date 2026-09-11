@@ -34,6 +34,27 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         )
         """;
 
+    private const string CountTopSuggestionCte = """
+        WITH top_suggestion AS (
+            SELECT
+                rankings.face_occurrence_id,
+                suggestions.id AS suggestion_id,
+                suggestions.suggested_person_id,
+                suggestions.score,
+                rankings.score_margin
+            FROM identity_suggestion_rankings AS rankings
+            INNER JOIN identity_suggestions AS suggestions
+                ON suggestions.id = rankings.suggestion_id
+            INNER JOIN people AS suggested_people
+                ON suggested_people.id = suggestions.suggested_person_id
+               AND suggested_people.merged_into_person_id IS NULL
+            WHERE rankings.rank = 1
+              AND suggestions.status = 'pending'
+              AND rankings.model_id = @model_id
+              AND rankings.model_hash = @model_hash
+        )
+        """;
+
     private const string CandidateFrom = """
         FROM face_occurrences
         LEFT JOIN LATERAL (
@@ -63,20 +84,20 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         asset_revisions.content_sha256,
         latest_crop.storage_path,
         latest_observation.confidence,
-        latest_action.id,
-        latest_action.action_kind,
-        latest_action.person_id,
+        face_occurrences.review_action_id,
+        face_occurrences.review_action_kind,
+        face_occurrences.review_person_id,
         assigned_people.display_name,
-        top_suggestion.suggestion_id,
-        top_suggestion.suggested_person_id,
-        top_suggestion.display_name,
-        top_suggestion.model_id,
-        top_suggestion.model_hash,
-        top_suggestion.rank,
-        top_suggestion.score,
-        top_suggestion.score_margin,
-        top_suggestion.status,
-        top_suggestion.generated_at_utc,
+        face_occurrences.suggestion_id,
+        face_occurrences.suggested_person_id,
+        face_occurrences.suggested_person_name,
+        face_occurrences.suggestion_model_id,
+        face_occurrences.suggestion_model_hash,
+        face_occurrences.suggestion_rank,
+        face_occurrences.suggestion_score,
+        face_occurrences.suggestion_score_margin,
+        face_occurrences.suggestion_status,
+        face_occurrences.suggestion_generated_at_utc,
         latest_observation.bounding_box_json,
         face_occurrences.asset_revision_id
         """;
@@ -106,22 +127,8 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
                 face_observations.detector_model_hash
             LIMIT 1
         ) AS latest_observation ON TRUE
-        LEFT JOIN LATERAL (
-            SELECT
-                review_actions.id,
-                review_actions.action_kind,
-                review_actions.person_id
-            FROM review_actions
-            WHERE review_actions.face_occurrence_id = face_occurrences.id
-              AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
-              AND review_actions.reversed_at_utc IS NULL
-            ORDER BY review_actions.id DESC
-            LIMIT 1
-        ) AS latest_action ON TRUE
         LEFT JOIN people AS assigned_people
-            ON assigned_people.id = latest_action.person_id
-        LEFT JOIN top_suggestion
-            ON top_suggestion.face_occurrence_id = face_occurrences.id
+            ON assigned_people.id = face_occurrences.review_person_id
         """;
 
     private readonly PostgresCatalogueDatabase _database;
@@ -160,6 +167,7 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
             cancellationToken);
         string predicate = BuildPredicate(state, processingRunId, confidenceGroup, suggestedPersonId);
         string orderBy = SortExpression(sort);
+        string detailOrderBy = DetailSortExpression(sort);
 
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlCommand command = connection.CreateCommand();
@@ -170,7 +178,20 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
                     face_occurrences.id,
                     face_occurrences.ordinal,
                     face_occurrences.created_at_utc,
-                    face_occurrences.asset_revision_id
+                    face_occurrences.asset_revision_id,
+                    latest_action.id AS review_action_id,
+                    latest_action.action_kind AS review_action_kind,
+                    latest_action.person_id AS review_person_id,
+                    top_suggestion.suggestion_id,
+                    top_suggestion.suggested_person_id,
+                    top_suggestion.display_name AS suggested_person_name,
+                    top_suggestion.model_id AS suggestion_model_id,
+                    top_suggestion.model_hash AS suggestion_model_hash,
+                    top_suggestion.rank AS suggestion_rank,
+                    top_suggestion.score AS suggestion_score,
+                    top_suggestion.score_margin AS suggestion_score_margin,
+                    top_suggestion.status AS suggestion_status,
+                    top_suggestion.generated_at_utc AS suggestion_generated_at_utc
                 {CandidateFrom}
                 WHERE {predicate}
                 ORDER BY {orderBy}
@@ -179,7 +200,7 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
             SELECT
                 {Columns}
             {DetailFrom}
-            ORDER BY {orderBy};
+            ORDER BY {detailOrderBy};
             """;
         AddParameters(command, modelId, modelHash, processingRunId, policy, suggestedPersonId);
         command.Parameters.AddWithValue("limit", limit);
@@ -195,12 +216,11 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         }
 
         await using NpgsqlCommand countCommand = connection.CreateCommand();
-        countCommand.CommandText = $"""
-            {TopSuggestionCte}
-            SELECT COUNT(*)
-            {CandidateFrom}
-            WHERE {predicate};
-            """;
+        countCommand.CommandText = BuildCountSql(
+            state,
+            processingRunId,
+            confidenceGroup,
+            suggestedPersonId);
         AddParameters(countCommand, modelId, modelHash, processingRunId, policy, suggestedPersonId);
         object? count = await countCommand.ExecuteScalarAsync(cancellationToken);
 
@@ -291,6 +311,66 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         return string.Join(" AND ", predicates.Select(value => $"({value})"));
     }
 
+    private static string BuildCountSql(
+        string state,
+        ProcessingRunId? processingRunId,
+        string confidenceGroup,
+        PersonId? suggestedPersonId)
+    {
+        string normalizedConfidenceGroup = NormalizeConfidenceGroup(confidenceGroup);
+        bool requiresTopSuggestion =
+            normalizedConfidenceGroup != "all" || suggestedPersonId is not null;
+        string predicate = BuildCountPredicate(
+            state,
+            processingRunId,
+            normalizedConfidenceGroup,
+            suggestedPersonId);
+
+        if (!requiresTopSuggestion)
+        {
+            return $"""
+                SELECT COUNT(*)
+                FROM face_occurrences
+                WHERE {predicate};
+                """;
+        }
+
+        return $"""
+            {CountTopSuggestionCte}
+            SELECT COUNT(*)
+            FROM face_occurrences
+            INNER JOIN top_suggestion
+                ON top_suggestion.face_occurrence_id = face_occurrences.id
+            WHERE {predicate};
+            """;
+    }
+
+    private static string BuildCountPredicate(
+        string state,
+        ProcessingRunId? processingRunId,
+        string confidenceGroup,
+        PersonId? suggestedPersonId)
+    {
+        List<string> predicates = [StateCountPredicate(state), ConfidencePredicate(confidenceGroup)];
+        if (processingRunId is not null)
+        {
+            predicates.Add("""
+                EXISTS (
+                    SELECT 1
+                    FROM processing_jobs
+                    WHERE processing_jobs.asset_revision_id = face_occurrences.asset_revision_id
+                      AND processing_jobs.processing_run_id = @processing_run_id)
+                """);
+        }
+
+        if (suggestedPersonId is not null)
+        {
+            predicates.Add("top_suggestion.suggested_person_id = @suggested_person_id");
+        }
+
+        return string.Join(" AND ", predicates.Select(value => $"({value})"));
+    }
+
     private static void AddParameters(
         NpgsqlCommand command,
         ModelId modelId,
@@ -329,6 +409,41 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
             _ => throw new ArgumentException($"Unsupported review state '{state}'.", nameof(state)),
         };
     }
+
+    private static string StateCountPredicate(string state)
+    {
+        string normalized = string.IsNullOrWhiteSpace(state)
+            ? "unreviewed"
+            : state.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "unreviewed" => """
+                NOT EXISTS (
+                    SELECT 1
+                    FROM review_actions
+                    WHERE review_actions.face_occurrence_id = face_occurrences.id
+                      AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
+                      AND review_actions.reversed_at_utc IS NULL)
+                """,
+            "assigned" => LatestActionKindPredicate("assign"),
+            "unknown" => LatestActionKindPredicate("unknown"),
+            "rejected" => LatestActionKindPredicate("reject"),
+            "all" => "1 = 1",
+            _ => throw new ArgumentException($"Unsupported review state '{state}'.", nameof(state)),
+        };
+    }
+
+    private static string LatestActionKindPredicate(string actionKind) => $"""
+        (
+            SELECT review_actions.action_kind
+            FROM review_actions
+            WHERE review_actions.face_occurrence_id = face_occurrences.id
+              AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
+              AND review_actions.reversed_at_utc IS NULL
+            ORDER BY review_actions.id DESC
+            LIMIT 1
+        ) = '{actionKind}'
+        """;
 
     private static string ConfidencePredicate(string confidenceGroup) => NormalizeConfidenceGroup(confidenceGroup) switch
     {
@@ -421,6 +536,45 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
             "face_occurrences.created_at_utc DESC, face_occurrences.id",
         "no-suggestion-first" =>
             "CASE WHEN top_suggestion.suggestion_id IS NULL THEN 0 ELSE 1 END, " +
+            "face_occurrences.created_at_utc DESC, face_occurrences.id",
+        _ => throw new ArgumentOutOfRangeException(nameof(sort)),
+    };
+
+    private static string DetailSortExpression(string sort) => NormalizeSort(sort) switch
+    {
+        "created-desc" =>
+            "face_occurrences.created_at_utc DESC, face_occurrences.id",
+        "suggested-person" =>
+            "CASE WHEN face_occurrences.suggestion_id IS NULL THEN 1 ELSE 0 END, " +
+            "lower(face_occurrences.suggested_person_name), face_occurrences.suggested_person_id, " +
+            "face_occurrences.suggestion_score_margin DESC, face_occurrences.suggestion_score DESC, " +
+            "face_occurrences.created_at_utc DESC, face_occurrences.id",
+        "confidence-group" =>
+            "CASE " +
+            "WHEN face_occurrences.suggestion_id IS NULL THEN 3 " +
+            "WHEN face_occurrences.suggestion_score >= @high_score_threshold " +
+            "AND face_occurrences.suggestion_score_margin IS NOT NULL " +
+            "AND face_occurrences.suggestion_score_margin >= @high_margin_threshold THEN 0 " +
+            "WHEN face_occurrences.suggestion_score >= @medium_score_threshold THEN 1 " +
+            "ELSE 2 END, " +
+            "face_occurrences.suggestion_score DESC, face_occurrences.suggestion_score_margin DESC, " +
+            "face_occurrences.created_at_utc DESC, face_occurrences.id",
+        "margin-desc" =>
+            "CASE WHEN face_occurrences.suggestion_id IS NULL THEN 1 ELSE 0 END, " +
+            "CASE WHEN face_occurrences.suggestion_score_margin IS NULL THEN 1 ELSE 0 END, " +
+            "face_occurrences.suggestion_score_margin DESC, face_occurrences.suggestion_score DESC, " +
+            "face_occurrences.created_at_utc DESC, face_occurrences.id",
+        "margin-asc" =>
+            "CASE WHEN face_occurrences.suggestion_id IS NULL THEN 1 ELSE 0 END, " +
+            "CASE WHEN face_occurrences.suggestion_score_margin IS NULL THEN 1 ELSE 0 END, " +
+            "face_occurrences.suggestion_score_margin, face_occurrences.suggestion_score DESC, " +
+            "face_occurrences.created_at_utc DESC, face_occurrences.id",
+        "score-desc" =>
+            "CASE WHEN face_occurrences.suggestion_id IS NULL THEN 1 ELSE 0 END, " +
+            "face_occurrences.suggestion_score DESC, face_occurrences.suggestion_score_margin DESC, " +
+            "face_occurrences.created_at_utc DESC, face_occurrences.id",
+        "no-suggestion-first" =>
+            "CASE WHEN face_occurrences.suggestion_id IS NULL THEN 0 ELSE 1 END, " +
             "face_occurrences.created_at_utc DESC, face_occurrences.id",
         _ => throw new ArgumentOutOfRangeException(nameof(sort)),
     };
