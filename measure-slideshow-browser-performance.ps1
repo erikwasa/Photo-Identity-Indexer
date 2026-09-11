@@ -44,15 +44,13 @@ $positions = @(
         ForEach-Object {
             $suffix = $_.name.Substring($positionPrefix.Length)
             [int]$position = 0
-            if (-not [int]::TryParse($suffix, [ref]$position)) {
-                return
-            }
-
-            [ordered]@{
-                sequence = $position
-                count = [long]$_.count
-                averageMilliseconds = [double]$_.averageMilliseconds
-                maxMilliseconds = [double]$_.maxMilliseconds
+            if ([int]::TryParse($suffix, [ref]$position)) {
+                [ordered]@{
+                    sequence = $position
+                    count = [long]$_.count
+                    averageMilliseconds = [double]$_.averageMilliseconds
+                    maxMilliseconds = [double]$_.maxMilliseconds
+                }
             }
         } |
         Sort-Object sequence)
