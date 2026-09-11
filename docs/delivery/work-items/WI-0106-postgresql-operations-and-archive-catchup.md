@@ -24,7 +24,18 @@ Make PostgreSQL routine to operate on the maintainer machine, then use the migra
 
 ## Dependency note
 
-M24 operational acceptance occurs after WI-0108 has addressed the slideshow-library/start/playback latency carried forward from M22 acceptance. PostgreSQL operations are not considered fully accepted while those known scale-path delays remain unresolved.
+M24 operational acceptance occurs after WI-0108 has addressed the slideshow-library/start/playback latency carried forward from M22 acceptance. WI-0108 completed with direct-server and real-phone evidence plus a bounded-prefetch deduplication correction, so WI-0106 is now the remaining substantive M24 work.
+
+## Implementation progress
+
+The first WI-0106 slice establishes the production operations boundary without changing catalogue schema or application semantics:
+
+- `backup-postgres-catalogue.ps1` discovers the Photo Identity database in the running repository PostgreSQL service, requires explicit selection if multiple catalogue databases are present, creates a binary-safe custom-format `pg_dump`, copies it to protected host storage, and writes a SHA-256 report without credentials or connection strings.
+- `verify-postgres-backup-restore.ps1` requires explicit application-stop acknowledgement, verifies the backup hash, creates a uniquely named isolated database, restores with `pg_restore --single-transaction`, and compares the current schema version, complete public-table set, exact table row counts and constraint validation state with the stopped production source.
+- The isolated restore database is deliberately retained after verification for maintainer inspection; cleanup is an explicit operator action against the exact verification database name.
+- `docs/operations/postgresql-operations.md` defines normal startup/shutdown, restart persistence checks, logical backup/restore, PostgreSQL 18 same-major update rules, major-version migration boundaries, failure diagnosis, sustained catch-up evidence and the final daily-style increment gate.
+
+This slice intentionally does not claim the live acceptance criteria before the maintainer runs them against the accepted production catalogue.
 
 ## Acceptance criteria
 - [ ] Normal operator startup makes PostgreSQL readiness/failure understandable.
