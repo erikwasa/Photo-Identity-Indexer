@@ -114,6 +114,9 @@ public sealed class RegistryStore
     public void SaveMilestones(RepositoryPaths paths, MilestoneRegistry registry) =>
         Save(paths.MilestonesRegistry, registry);
 
+    public string SerializeWorkItemRegistry(WorkItemRegistry registry) =>
+        Serialize(registry);
+
     private WorkItemRegistry LoadLegacyWorkItems(RepositoryPaths paths)
     {
         WorkItemRegistry active = Load<WorkItemRegistry>(paths.WorkItemsRegistry);
@@ -373,11 +376,11 @@ public sealed class RegistryStore
             ?? throw new InvalidDataException($"Could not deserialize {path}.");
     }
 
-    private void Save<T>(string path, T value)
-    {
-        string content = _serializer.Serialize(value).Replace("\r\n", "\n", StringComparison.Ordinal);
-        WriteAtomically(path, content);
-    }
+    private void Save<T>(string path, T value) =>
+        WriteAtomically(path, Serialize(value));
+
+    private string Serialize<T>(T value) =>
+        _serializer.Serialize(value).Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static bool IsTerminal(string status) =>
         status is "completed" or "cancelled";
