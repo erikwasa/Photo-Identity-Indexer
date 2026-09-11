@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$DatabaseName,
-    [string]$OutputPath
+    [string]$OutputPath,
+    [string]$ConfigurationPath
 )
 
 Set-StrictMode -Version Latest
@@ -11,6 +12,116 @@ $composeDirectory = Join-Path $PSScriptRoot "deploy\postgres"
 $podman = Get-Command podman -ErrorAction SilentlyContinue
 if ($null -eq $podman) {
     throw "Podman is required for PostgreSQL catalogue backup."
+}
+
+function Get-LauncherEnvironmentValue {
+    param([Parameter(Mandatory = $true)][string]$Name)
+
+    foreach ($target in @("Process", "User", "Machine")) {
+        try {
+            $value = [Environment]::GetEnvironmentVariable($Name, $target)
+            if (-not [string]::IsNullOrWhiteSpace($value)) {
+                return $value
+            }
+        }
+        catch {
+        }
+    }
+
+    return $null
+}
+
+function Resolve-LauncherConfigurationPath {
+    if (-not [string]::IsNullOrWhiteSpace($ConfigurationPath)) {
+        $candidate = [Environment]::ExpandEnvironmentVariables($ConfigurationPath)
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "Launcher configuration does not exist: $candidate"
+        }
+        return (Resolve-Path -LiteralPath $candidate).Path
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:PHOTOIDENTITY_LAUNCHER_CONFIG)) {
+        $candidate = [Environment]::ExpandEnvironmentVariables($env:PHOTOIDENTITY_LAUNCHER_CONFIG)
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            throw "PHOTOIDENTITY_LAUNCHER_CONFIG points to a missing file: $candidate"
+        }
+        return (Resolve-Path -LiteralPath $candidate).Path
+    }
+
+    $adjacent = Join-Path $PSScriptRoot "PhotoIdentity.launcher.json"
+    if (Test-Path -LiteralPath $adjacent -PathType Leaf) {
+        return (Resolve-Path -LiteralPath $adjacent).Path
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $local = Join-Path $env:LOCALAPPDATA "PhotoIdentity\launcher.json"
+        if (Test-Path -LiteralPath $local -PathType Leaf) {
+            return (Resolve-Path -LiteralPath $local).Path
+        }
+    }
+
+    return $null
+}
+
+function Get-LauncherSelectedDatabase {
+    $launcherPath = Resolve-LauncherConfigurationPath
+    if ([string]::IsNullOrWhiteSpace($launcherPath)) {
+        return $null
+    }
+
+    try {
+        $configuration = Get-Content -LiteralPath $launcherPath -Raw | ConvertFrom-Json
+    }
+    catch {
+        throw "Launcher configuration is not valid JSON: $launcherPath"
+    }
+
+    $provider = $null
+    if ($null -ne $configuration.PSObject.Properties["settings"] -and
+        $null -ne $configuration.settings -and
+        $null -ne $configuration.settings.PSObject.Properties["PhotoIdentity__CatalogueProvider"]) {
+        $provider = ([string]$configuration.settings.PhotoIdentity__CatalogueProvider).Trim().ToLowerInvariant()
+    }
+
+    if ($provider -ne "postgresql") {
+        return $null
+    }
+
+    if ($null -eq $configuration.PSObject.Properties["postgresConnectionEnvironmentVariable"] -or
+        [string]::IsNullOrWhiteSpace([string]$configuration.postgresConnectionEnvironmentVariable)) {
+        throw "The PostgreSQL launcher configuration does not specify postgresConnectionEnvironmentVariable."
+    }
+
+    $environmentVariableName = ([string]$configuration.postgresConnectionEnvironmentVariable).Trim()
+    $connectionString = Get-LauncherEnvironmentValue -Name $environmentVariableName
+    if ([string]::IsNullOrWhiteSpace($connectionString)) {
+        throw "The PostgreSQL connection environment variable referenced by the launcher is empty or missing."
+    }
+
+    $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
+    try {
+        $builder.ConnectionString = $connectionString
+    }
+    catch {
+        throw "The PostgreSQL connection string referenced by the launcher could not be parsed."
+    }
+
+    $database = $null
+    foreach ($key in @("Database", "Initial Catalog")) {
+        if ($builder.ContainsKey($key) -and -not [string]::IsNullOrWhiteSpace([string]$builder[$key])) {
+            $database = ([string]$builder[$key]).Trim()
+            break
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($database)) {
+        throw "The PostgreSQL connection string referenced by the launcher does not specify a database."
+    }
+
+    return [pscustomobject]@{
+        Name = $database
+        SelectionSource = "launcher"
+    }
 }
 
 function Get-ServerDatabaseNames {
@@ -58,7 +169,21 @@ function Resolve-CatalogueDatabase {
         if (-not (Test-PhotoIdentityDatabase -ContainerId $ContainerId -Candidate $DatabaseName)) {
             throw "The requested -DatabaseName '$DatabaseName' does not contain the Photo Identity catalogue markers."
         }
-        return $DatabaseName
+        return [pscustomobject]@{
+            Name = $DatabaseName
+            SelectionSource = "explicit"
+        }
+    }
+
+    $launcherDatabase = Get-LauncherSelectedDatabase
+    if ($null -ne $launcherDatabase) {
+        if ($serverDatabases -notcontains $launcherDatabase.Name) {
+            throw "The production database selected by the launcher was not found in the running PostgreSQL service."
+        }
+        if (-not (Test-PhotoIdentityDatabase -ContainerId $ContainerId -Candidate $launcherDatabase.Name)) {
+            throw "The production database selected by the launcher does not contain the Photo Identity catalogue markers."
+        }
+        return $launcherDatabase
     }
 
     $matches = @(
@@ -69,13 +194,16 @@ function Resolve-CatalogueDatabase {
         })
 
     if ($matches.Count -eq 1) {
-        return [string]$matches[0]
+        return [pscustomobject]@{
+            Name = [string]$matches[0]
+            SelectionSource = "schema-markers"
+        }
     }
     if ($matches.Count -eq 0) {
         throw "No Photo Identity PostgreSQL catalogue database was found in the running service."
     }
 
-    throw "Multiple Photo Identity PostgreSQL catalogue databases were found: $($matches -join ', '). Rerun with -DatabaseName <name> to choose the production authority explicitly."
+    throw "Multiple Photo Identity PostgreSQL catalogue databases were found and no PostgreSQL production database could be resolved from the launcher. Rerun with -DatabaseName <name> or -ConfigurationPath <launcher.json>."
 }
 
 Push-Location $composeDirectory
@@ -112,9 +240,10 @@ try {
     }
 
     $containerDumpPath = "/tmp/photoidentity-$([Guid]::NewGuid().ToString('N')).dump"
-    Write-Host "Creating PostgreSQL logical backup from '$catalogueDatabase'..."
+    Write-Host "Creating PostgreSQL logical backup from '$($catalogueDatabase.Name)'..."
+    Write-Host "database selection: $($catalogueDatabase.SelectionSource)"
     & $podman.Source exec `
-        -e "TARGET_DATABASE=$catalogueDatabase" `
+        -e "TARGET_DATABASE=$($catalogueDatabase.Name)" `
         -e "DUMP_PATH=$containerDumpPath" `
         $containerId sh -lc `
         'pg_dump -U "$POSTGRES_USER" -d "$TARGET_DATABASE" --format=custom --compress=6 --no-owner --no-acl --file="$DUMP_PATH"' `
@@ -137,7 +266,8 @@ try {
     $sha256 = (Get-FileHash -LiteralPath $OutputPath -Algorithm SHA256).Hash.ToLowerInvariant()
     $report = [ordered]@{
         capturedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
-        sourceDatabase = $catalogueDatabase
+        sourceDatabase = $catalogueDatabase.Name
+        databaseSelectionSource = $catalogueDatabase.SelectionSource
         backupPath = $OutputPath
         backupBytes = [long]$backupInfo.Length
         backupSha256 = $sha256
@@ -147,13 +277,13 @@ try {
     $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 
     Write-Host "PostgreSQL catalogue backup completed."
-    Write-Host "database: $catalogueDatabase"
+    Write-Host "database: $($catalogueDatabase.Name)"
     Write-Host "backup: $OutputPath"
     Write-Host "sha256: $sha256"
     Write-Host "report: $reportPath"
 }
 finally {
-    if (-not [string]::IsNullOrWhiteSpace($containerDumpPath)) {
+    if (-not [string]::IsNullOrWhiteSpace($containerDumpPath) -and -not [string]::IsNullOrWhiteSpace([string]$containerId)) {
         & $podman.Source exec -e "DUMP_PATH=$containerDumpPath" $containerId sh -lc 'rm -f "$DUMP_PATH"' *> $null
     }
     Pop-Location
