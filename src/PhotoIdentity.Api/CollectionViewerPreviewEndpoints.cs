@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
 
@@ -15,12 +16,16 @@ public static class CollectionViewerPreviewEndpoints
         string revisionId,
         CollectionReviewProxyFileResolver proxyResolver,
         CollectionOriginalAccessService originalAccess,
+        ArchiveThroughputMetrics metrics,
         CancellationToken cancellationToken)
     {
         if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
         {
             return InvalidRevision();
         }
+
+        using IDisposable timing = metrics.Measure(
+            ArchiveThroughputMetricNames.CollectionViewerPreviewOpen);
 
         // Photo Details should prefer a verified local original only when the browser can render
         // its media type directly. OpenVerifiedAsync never hydrates an online-only source implicitly.
