@@ -62,6 +62,11 @@ public sealed record ArchiveStatusResponse(
     ArchiveRunStatusResponse? LatestRun,
     ArchiveAdvancementStatusResponse? Advancement);
 
+public sealed record ArchiveConfigurationResponse(
+    bool Configured,
+    string? RootName,
+    IReadOnlyList<string> IncludedFolders);
+
 public sealed record ArchiveStorageStatusResponse(
     bool ArchiveConfigured,
     bool PolicyConfigured,

@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Web;
 
 namespace PhotoIdentity.Api;
@@ -6,8 +7,26 @@ public static class ArchiveStorageEndpoints
 {
     public static IEndpointRouteBuilder MapArchiveStorageEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapGet("/api/archive/configuration", GetConfigurationAsync);
         endpoints.MapGet("/api/archive/storage", GetStorageAsync);
         return endpoints;
+    }
+
+    private static async Task<IResult> GetConfigurationAsync(
+        IArchiveCoverageRepository coverageRepository,
+        CancellationToken cancellationToken)
+    {
+        ArchiveCoverageState? configured = await coverageRepository.GetAsync(cancellationToken);
+        if (configured is null)
+        {
+            return Results.Ok(new ArchiveConfigurationResponse(false, null, []));
+        }
+
+        string rootName = new DirectoryInfo(configured.Source.RootLocator).Name;
+        return Results.Ok(new ArchiveConfigurationResponse(
+            true,
+            rootName,
+            configured.IncludedFolders));
     }
 
     private static async Task<IResult> GetStorageAsync(
