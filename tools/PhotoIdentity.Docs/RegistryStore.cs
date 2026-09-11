@@ -106,6 +106,7 @@ public sealed class RegistryStore
             Save(targetPath, item);
         }
 
+        VerifyMigratedShardEquivalence(paths, legacy);
         Save(paths.WorkItemShardRegistry, metadata);
         return legacy;
     }
@@ -258,6 +259,39 @@ public sealed class RegistryStore
         }
 
         return archivedItems;
+    }
+
+    private void VerifyMigratedShardEquivalence(RepositoryPaths paths, WorkItemRegistry legacy)
+    {
+        List<WorkItem> migrated = [];
+        Dictionary<string, string> sources = new(StringComparer.Ordinal);
+        foreach (string path in paths.ActiveWorkItemShards)
+        {
+            AddShard(migrated, sources, path, expectedTerminal: false);
+        }
+
+        foreach (string path in paths.ArchivedWorkItemShards)
+        {
+            AddShard(migrated, sources, path, expectedTerminal: true);
+        }
+
+        if (migrated.Count != legacy.WorkItems.Count)
+        {
+            throw new InvalidDataException(
+                $"Migrated shard count {migrated.Count} does not match legacy logical registry count {legacy.WorkItems.Count}.");
+        }
+
+        Dictionary<string, WorkItem> migratedMap = migrated
+            .ToDictionary(item => item.Id, StringComparer.Ordinal);
+        foreach (WorkItem legacyItem in legacy.WorkItems)
+        {
+            if (!migratedMap.TryGetValue(legacyItem.Id, out WorkItem? migratedItem) ||
+                !Equivalent(legacyItem, migratedItem))
+            {
+                throw new InvalidDataException(
+                    $"Migrated shard for '{legacyItem.Id}' is not equivalent to the legacy logical registry.");
+            }
+        }
     }
 
     private void AddShard(
