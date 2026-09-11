@@ -59,14 +59,9 @@ public sealed class PostgresIdentityMatchRegenerationRepository :
             modelId,
             modelHash,
             cancellationToken);
-        IReadOnlyList<FaceOccurrenceId> targets = await ReadEligibleTargetIdsAsync(
-            connection,
-            transaction,
-            modelId,
-            modelHash,
-            cancellationToken);
 
         Guid runId = Guid.NewGuid();
+        int targetCount = 0;
         try
         {
             await using (NpgsqlCommand insertRun = connection.CreateCommand())
@@ -106,7 +101,7 @@ public sealed class PostgresIdentityMatchRegenerationRepository :
                         @suggestion_review_action_id,
                         @person_merge_action_id,
                         @embedding_id,
-                        @target_count,
+                        0,
                         0,
                         0,
                         0,
@@ -132,44 +127,31 @@ public sealed class PostgresIdentityMatchRegenerationRepository :
                     "person_merge_action_id",
                     evidence.PersonMergeActionId);
                 insertRun.Parameters.AddWithValue("embedding_id", evidence.EmbeddingId);
-                insertRun.Parameters.AddWithValue("target_count", targets.Count);
                 insertRun.Parameters.AddWithValue("requested_by", actor);
                 insertRun.Parameters.AddWithValue("requested_at_utc", now);
                 insertRun.Parameters.AddWithValue("updated_at_utc", now);
                 await insertRun.ExecuteNonQueryAsync(cancellationToken);
             }
 
-            for (int index = 0; index < targets.Count; index++)
-            {
-                await using NpgsqlCommand insertTarget = connection.CreateCommand();
-                insertTarget.Transaction = transaction;
-                insertTarget.CommandText =
-                    """
-                    INSERT INTO identity_match_regeneration_targets (
-                        run_id,
-                        face_occurrence_id,
-                        ordinal,
-                        status,
-                        suggestion_count,
-                        error)
-                    VALUES (
-                        @run_id,
-                        @face_occurrence_id,
-                        @ordinal,
-                        @status,
-                        0,
-                        NULL);
-                    """;
-                insertTarget.Parameters.AddWithValue("run_id", runId);
-                insertTarget.Parameters.AddWithValue(
-                    "face_occurrence_id",
-                    Guid.Parse(targets[index].ToString()));
-                insertTarget.Parameters.AddWithValue("ordinal", index);
-                insertTarget.Parameters.AddWithValue(
-                    "status",
-                    ReviewIdentityMatchRegenerationTargetStatuses.Pending);
-                await insertTarget.ExecuteNonQueryAsync(cancellationToken);
-            }
+            targetCount = await InsertEligibleTargetsAsync(
+                connection,
+                transaction,
+                runId,
+                modelId,
+                modelHash,
+                cancellationToken);
+
+            await using NpgsqlCommand updateTargetCount = connection.CreateCommand();
+            updateTargetCount.Transaction = transaction;
+            updateTargetCount.CommandText =
+                """
+                UPDATE identity_match_regeneration_runs
+                SET target_count = @target_count
+                WHERE id = @run_id;
+                """;
+            updateTargetCount.Parameters.AddWithValue("target_count", targetCount);
+            updateTargetCount.Parameters.AddWithValue("run_id", runId);
+            await updateTargetCount.ExecuteNonQueryAsync(cancellationToken);
         }
         catch (PostgresException exception)
             when (exception.SqlState == PostgresErrorCodes.UniqueViolation)
@@ -185,7 +167,7 @@ public sealed class PostgresIdentityMatchRegenerationRepository :
             policyVersion,
             ReviewIdentityMatchRegenerationStatuses.Pending,
             evidence,
-            targets.Count,
+            targetCount,
             0,
             0,
             0,
@@ -672,9 +654,10 @@ public sealed class PostgresIdentityMatchRegenerationRepository :
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private static async Task<IReadOnlyList<FaceOccurrenceId>> ReadEligibleTargetIdsAsync(
+    private static async Task<int> InsertEligibleTargetsAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
+        Guid runId,
         ModelId modelId,
         Sha256Digest modelHash,
         CancellationToken cancellationToken)
@@ -714,32 +697,46 @@ public sealed class PostgresIdentityMatchRegenerationRepository :
                     ON embedding.face_crop_id = crop.id
                 WHERE embedding.model_id = @model_id
                   AND embedding.model_hash = @model_hash
+            ),
+            eligible_targets AS (
+                SELECT
+                    matching.face_occurrence_id,
+                    (ROW_NUMBER() OVER (ORDER BY matching.face_occurrence_id) - 1)::integer AS ordinal
+                FROM matching_embeddings AS matching
+                WHERE matching.row_number = 1
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM latest_review AS review
+                      WHERE review.face_occurrence_id = matching.face_occurrence_id
+                        AND review.row_number = 1)
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM legacy_confirmed AS confirmed
+                      WHERE confirmed.face_occurrence_id = matching.face_occurrence_id)
             )
-            SELECT matching.face_occurrence_id
-            FROM matching_embeddings AS matching
-            WHERE matching.row_number = 1
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM latest_review AS review
-                  WHERE review.face_occurrence_id = matching.face_occurrence_id
-                    AND review.row_number = 1)
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM legacy_confirmed AS confirmed
-                  WHERE confirmed.face_occurrence_id = matching.face_occurrence_id)
-            ORDER BY matching.face_occurrence_id;
+            INSERT INTO identity_match_regeneration_targets (
+                run_id,
+                face_occurrence_id,
+                ordinal,
+                status,
+                suggestion_count,
+                error)
+            SELECT
+                @run_id,
+                eligible.face_occurrence_id,
+                eligible.ordinal,
+                @status,
+                0,
+                NULL
+            FROM eligible_targets AS eligible
+            ORDER BY eligible.ordinal;
             """;
+        command.Parameters.AddWithValue("run_id", runId);
+        command.Parameters.AddWithValue(
+            "status",
+            ReviewIdentityMatchRegenerationTargetStatuses.Pending);
         AddModelParameters(command, modelId, modelHash);
-
-        List<FaceOccurrenceId> targets = [];
-        await using NpgsqlDataReader reader =
-            await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
-        {
-            targets.Add(FaceOccurrenceId.From(reader.GetGuid(0)));
-        }
-
-        return targets;
+        return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<ReviewIdentityMatchEvidenceVersion> ReadEvidenceVersionAsync(
