@@ -1,5 +1,6 @@
 [CmdletBinding()]
 param(
+    [string]$DatabaseName,
     [string]$OutputPath
 )
 
@@ -12,12 +13,79 @@ if ($null -eq $podman) {
     throw "Podman is required for PostgreSQL catalogue backup."
 }
 
+function Get-ServerDatabaseNames {
+    param([Parameter(Mandatory = $true)][string]$ContainerId)
+
+    $rows = @(
+        & $podman.Source exec $ContainerId sh -lc `
+            'psql -X -A -t -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -c "SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate ORDER BY datname"' `
+            2>$null)
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not enumerate PostgreSQL databases inside the running container."
+    }
+
+    @(
+        $rows |
+            ForEach-Object { ([string]$_).Trim() } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Unique)
+}
+
+function Test-PhotoIdentityDatabase {
+    param(
+        [Parameter(Mandatory = $true)][string]$ContainerId,
+        [Parameter(Mandatory = $true)][string]$Candidate
+    )
+
+    $rows = @(
+        & $podman.Source exec `
+            -e "TARGET_DATABASE=$Candidate" `
+            $ContainerId sh -lc `
+            'psql -X -A -t -U "$POSTGRES_USER" -d "$TARGET_DATABASE" -v ON_ERROR_STOP=1 -c "SELECT CASE WHEN to_regclass(''public.photo_identity_schema_migrations'') IS NOT NULL AND to_regclass(''public.asset_revisions'') IS NOT NULL AND to_regclass(''public.review_actions'') IS NOT NULL THEN 1 ELSE 0 END"' `
+            2>$null)
+
+    return $LASTEXITCODE -eq 0 -and (($rows -join " ").Trim()) -eq "1"
+}
+
+function Resolve-CatalogueDatabase {
+    param([Parameter(Mandatory = $true)][string]$ContainerId)
+
+    $serverDatabases = @(Get-ServerDatabaseNames -ContainerId $ContainerId)
+    if (-not [string]::IsNullOrWhiteSpace($DatabaseName)) {
+        if ($serverDatabases -notcontains $DatabaseName) {
+            throw "The requested -DatabaseName '$DatabaseName' was not found."
+        }
+        if (-not (Test-PhotoIdentityDatabase -ContainerId $ContainerId -Candidate $DatabaseName)) {
+            throw "The requested -DatabaseName '$DatabaseName' does not contain the Photo Identity catalogue markers."
+        }
+        return $DatabaseName
+    }
+
+    $matches = @(
+        foreach ($candidate in $serverDatabases) {
+            if (Test-PhotoIdentityDatabase -ContainerId $ContainerId -Candidate $candidate) {
+                $candidate
+            }
+        })
+
+    if ($matches.Count -eq 1) {
+        return [string]$matches[0]
+    }
+    if ($matches.Count -eq 0) {
+        throw "No Photo Identity PostgreSQL catalogue database was found in the running service."
+    }
+
+    throw "Multiple Photo Identity PostgreSQL catalogue databases were found: $($matches -join ', '). Rerun with -DatabaseName <name> to choose the production authority explicitly."
+}
+
 Push-Location $composeDirectory
 try {
     $containerId = (& $podman.Source compose ps -q postgres).Trim()
     if ([string]::IsNullOrWhiteSpace($containerId)) {
         throw "The repository PostgreSQL service is not running. Run ./verify-postgres.ps1 first."
     }
+
+    $catalogueDatabase = Resolve-CatalogueDatabase -ContainerId $containerId
 
     if ([string]::IsNullOrWhiteSpace($OutputPath)) {
         $root = if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
@@ -37,34 +105,52 @@ try {
         }
     }
 
-    if (Test-Path -LiteralPath $OutputPath) {
-        throw "Backup output already exists. Existing backups are never overwritten: $OutputPath"
+    $reportPath = "$OutputPath.json"
+    if ((Test-Path -LiteralPath $OutputPath) -or (Test-Path -LiteralPath $reportPath)) {
+        throw "Backup output already exists. Existing backups and reports are never overwritten."
     }
 
-    $output = @(& $podman.Source exec $containerId sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl' 2>&1)
-    if ($LASTEXITCODE -ne 0) {
+    Write-Host "Creating PostgreSQL logical backup from '$catalogueDatabase'..."
+    $encoding = [Text.UTF8Encoding]::new($false)
+    $writer = [IO.StreamWriter]::new($OutputPath, $false, $encoding)
+    try {
+        & $podman.Source exec `
+            -e "TARGET_DATABASE=$catalogueDatabase" `
+            $containerId sh -lc `
+            'pg_dump -U "$POSTGRES_USER" -d "$TARGET_DATABASE" --no-owner --no-acl' `
+            2>$null |
+            ForEach-Object { $writer.WriteLine([string]$_) }
+        $dumpExitCode = $LASTEXITCODE
+    }
+    finally {
+        $writer.Dispose()
+    }
+
+    if ($dumpExitCode -ne 0) {
+        Remove-Item -LiteralPath $OutputPath -Force -ErrorAction SilentlyContinue
         throw "PostgreSQL backup failed inside the container."
     }
 
-    $output | Set-Content -LiteralPath $OutputPath -Encoding UTF8
     $backupInfo = Get-Item -LiteralPath $OutputPath
     if ($backupInfo.Length -le 0) {
+        Remove-Item -LiteralPath $OutputPath -Force -ErrorAction SilentlyContinue
         throw "PostgreSQL backup output is empty."
     }
 
     $sha256 = (Get-FileHash -LiteralPath $OutputPath -Algorithm SHA256).Hash.ToLowerInvariant()
     $report = [ordered]@{
         capturedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
+        sourceDatabase = $catalogueDatabase
         backupPath = $OutputPath
         backupBytes = [long]$backupInfo.Length
         backupSha256 = $sha256
         format = "plain-sql"
         privacyNote = "Credentials and connection strings are omitted. The backup contains the private catalogue and must be protected as sensitive local data."
     }
-    $reportPath = "$OutputPath.json"
     $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $reportPath -Encoding UTF8
 
     Write-Host "PostgreSQL catalogue backup completed."
+    Write-Host "database: $catalogueDatabase"
     Write-Host "backup: $OutputPath"
     Write-Host "sha256: $sha256"
     Write-Host "report: $reportPath"
