@@ -48,6 +48,13 @@ These are hypotheses, not predetermined solutions. PostgreSQL query/index improv
 - Prefetch remains bounded and should reduce perceived transition latency rather than multiplying redundant expensive verification.
 - Preserve the M22 rule that image loading time is not charged against the configured display duration.
 
+## Implementation progress
+
+- The first WI-0108 slice is measurement-only: it adds aggregate stages for slideshow-library loading, snapshot creation, preparation start/status, prepared-original opening and collection viewer-preview opening to the existing process-local throughput diagnostics. Existing `original-status` and `original-open` hash-read aggregates remain the evidence for repeated full-file immutable verification.
+- `measure-slideshow-performance.ps1` provides a bounded real-catalogue probe. It resets diagnostics between phases, measures library and selected snapshot latency, downloads the same first viewer-preview repeatedly, and can optionally exercise prepared-original serving only when explicitly enabled. Prepared-original probing refuses collections above a caller-visible item cap by default so the diagnostic does not accidentally hydrate a large slideshow.
+- The probe/report deliberately omits collection names, revision IDs, filenames, source paths and credentials. It records only catalogue provider/schema, item counts, wall-clock timings, aggregate stage timings and aggregate hash-read statistics.
+- Code inspection before optimization confirms two hypotheses that the real-catalogue probe should distinguish: PostgreSQL snapshot creation currently carries the common current-state CTE set even when a saved filter does not require every state domain and sorts the full candidate set in application memory; local viewer/prepared-original paths perform full SHA-256 verification on each status/open. No query or verification semantics are changed in the measurement slice.
+
 ## Acceptance criteria
 
 - [ ] Timing evidence can distinguish slideshow-library load, snapshot creation, preparation/preflight, first-image serving and subsequent-image serving without exposing private source data.

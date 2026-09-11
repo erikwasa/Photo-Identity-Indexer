@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Web.Contracts;
+using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
 
@@ -20,6 +21,7 @@ public static class SlideshowOriginalPreparationEndpoints
     private static async Task<IResult> StartAsync(
         SlideshowOriginalPreparationRequest request,
         SlideshowOriginalPreparationService service,
+        ArchiveThroughputMetrics metrics,
         CancellationToken cancellationToken)
     {
         if (!TryRevisionIds(request.RevisionIds, out AssetRevisionId[] revisionIds))
@@ -32,9 +34,14 @@ public static class SlideshowOriginalPreparationEndpoints
 
         try
         {
-            SlideshowOriginalPreparationSnapshot snapshot = await service.StartAsync(
-                revisionIds,
-                cancellationToken);
+            SlideshowOriginalPreparationSnapshot snapshot;
+            using (metrics.Measure(ArchiveThroughputMetricNames.SlideshowPreparationStart))
+            {
+                snapshot = await service.StartAsync(
+                    revisionIds,
+                    cancellationToken);
+            }
+
             return Results.Accepted(
                 $"/api/slideshows/original-preparation/{snapshot.SessionId:D}",
                 ToResponse(snapshot));
@@ -51,9 +58,15 @@ public static class SlideshowOriginalPreparationEndpoints
 
     private static IResult GetStatus(
         Guid sessionId,
-        SlideshowOriginalPreparationService service)
+        SlideshowOriginalPreparationService service,
+        ArchiveThroughputMetrics metrics)
     {
-        SlideshowOriginalPreparationSnapshot? snapshot = service.GetStatus(sessionId);
+        SlideshowOriginalPreparationSnapshot? snapshot;
+        using (metrics.Measure(ArchiveThroughputMetricNames.SlideshowPreparationStatus))
+        {
+            snapshot = service.GetStatus(sessionId);
+        }
+
         return snapshot is null
             ? Results.NotFound(new { error = "The slideshow preparation session is no longer available." })
             : Results.Ok(ToResponse(snapshot));
@@ -81,6 +94,7 @@ public static class SlideshowOriginalPreparationEndpoints
         Guid sessionId,
         string revisionId,
         SlideshowOriginalPreparationService service,
+        ArchiveThroughputMetrics metrics,
         CancellationToken cancellationToken)
     {
         if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
@@ -88,10 +102,15 @@ public static class SlideshowOriginalPreparationEndpoints
             return Results.BadRequest(new { error = "The asset revision identifier is invalid." });
         }
 
-        VerifiedCollectionOriginal? original = await service.OpenPreparedOriginalAsync(
-            sessionId,
-            parsedRevisionId,
-            cancellationToken);
+        VerifiedCollectionOriginal? original;
+        using (metrics.Measure(ArchiveThroughputMetricNames.SlideshowPreparedOriginalOpen))
+        {
+            original = await service.OpenPreparedOriginalAsync(
+                sessionId,
+                parsedRevisionId,
+                cancellationToken);
+        }
+
         return original is null
             ? Results.NotFound(new
             {
