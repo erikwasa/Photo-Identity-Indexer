@@ -6,17 +6,15 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 ## Current focus
 
-**M24 WI-0101, WI-0102 and WI-0103 are completed. The maintainer's production catalogue was cut over to PostgreSQL on 2026-09-11, rollback acceptance passed, and bounded PostgreSQL identity regeneration passed live scale acceptance on 2026-09-11. WI-0104 operator query/UI scaling is in its final Settings closeout slice.**
+**M24 WI-0101, WI-0102, WI-0103, WI-0104 and WI-0105 are completed. The maintainer's production catalogue was cut over to PostgreSQL on 2026-09-11, rollback acceptance passed, bounded PostgreSQL identity regeneration passed live scale acceptance, and the operator review/gallery/Settings scale work passed real-catalogue acceptance. The next M24 engineering work is WI-0108 slideshow performance, followed by WI-0106 PostgreSQL operations and sustained archive catch-up.**
 
 The production launcher selects PostgreSQL as the single authoritative catalogue. `/health` was maintainer-verified with `status: ok`, `catalogueProvider: postgresql`, PostgreSQL `status: ready` and schema version 23. The preserved final SQLite backup remains a rollback/migration artifact and must not be treated as a second writable authority.
 
-WI-0104 has removed the per-card full people-list rendering and whole-loaded-set reload after a single review action. PR #293 also replaced catalogue-wide latest-review-action page probes with set-based review-state membership and bounded post-page action enrichment. On the same schema-23 catalogue used for the baseline (18,281 faces, 10,366 rank-one suggestions, 8,702 active review actions), the 2026-09-11 after-plan measured 32.397 ms for Suggested person, 19.567 ms for Newest first, 3.973 ms for the all-confidence count and 2.821 ms for the high-confidence count, with no temporary I/O. Face Gallery page/scroll query acceptance is complete and no additional PostgreSQL index is justified by current evidence.
+WI-0103 removed the regeneration hot-path multipliers and passed live PostgreSQL scale acceptance on 2026-09-11: 96 eligible targets, 32 confirmed exemplars, bounded eight-target cycles, concurrent status reads within the two-second acceptance bound, durable final counts and zero target/run failures.
 
-PR #294 completed the face-image slice. Stable 360px Gallery/person-card requests now use a generated-once private response variant derived from the durable 960px contextual face derivative instead of repeating OpenCV resize/re-encode work. Exact-head workflow #1640 passed all required build/test, integration, documentation, review, Windows, launcher and package gates while retaining the `/api/review` `Cache-Control: no-store` privacy boundary.
+WI-0104 removed per-card full people-list rendering and whole-loaded-set reloads, replaced catalogue-wide latest-review-action page probes with set-based state membership and bounded detail enrichment, and added generated-once 360px gallery response variants. On the representative schema-23 catalogue (18,281 faces, 10,366 rank-one suggestions, 8,702 active review actions), the after-plan measured 32.397 ms for Suggested person, 19.567 ms for Newest first, 3.973 ms for the all-confidence count and 2.821 ms for the high-confidence count with no temporary I/O; no additional PostgreSQL index was justified. PR #295 then split Settings into independently loading Archive Coverage, Archive Storage and Identity Matching sections backed by a cheap archive-configuration endpoint. After merge, the maintainer started the normal PostgreSQL-authoritative application and completed the real-catalogue Settings smoke successfully, including independent section loading/refresh and path-safe archive configuration display.
 
-The active final WI-0104 slice separates Settings loading. `/api/archive/configuration` reads only archive coverage/source identity, and Settings is split into independent Archive Coverage, Archive Storage and Identity Matching components. The shell and archive configuration no longer await full archive status, storage aggregation or review-filter/policy requests. Integration coverage explicitly proves the configuration endpoint still succeeds when the full archive-status repository is replaced by a throwing implementation.
-
-M24's remaining scale work after WI-0104 is WI-0108 (slideshow performance) and, after those dependencies, WI-0106 (PostgreSQL operations and sustained archive catch-up). WI-0105 observability is already completed.
+M24's remaining substantive work is WI-0108 (slideshow performance) and, after that dependency, WI-0106 (PostgreSQL operations, backup/restore, sustained archive catch-up and daily-style increment acceptance).
 
 Consolidated real-phone M22 acceptance passed the implemented slideshow behavior except for two functional gaps tracked by WI-0107:
 
@@ -33,23 +31,20 @@ WI-0076 remains separately recorded as in_progress and is not part of this M24 c
 
 For the M24 thread:
 
-1. Verify and merge the final WI-0104 independent Settings-loading slice, then perform a short maintainer Settings smoke before administrative WI-0104 closeout.
-2. Complete WI-0108 slideshow-library/start/playback performance work.
-3. Then execute WI-0106 operational PostgreSQL backup/recovery and sustained full-archive catch-up acceptance.
+1. Start WI-0108 by measuring the PostgreSQL-backed slideshow library, snapshot creation, preparation/preflight, first-image serving and subsequent-image serving paths on the real catalogue.
+2. Correct the measured slideshow query/file-verification bottlenecks and complete real-archive maintainer slideshow performance acceptance.
+3. Then execute WI-0106 operational PostgreSQL startup/restart, backup/restore and sustained full-archive catch-up acceptance, followed by a small daily-style increment.
+4. Close M24 only after WI-0108 and WI-0106 are complete and the milestone exit criteria are reconciled in the canonical status registry.
 
 For the M22 thread, WI-0107 remains the focused functional closeout for direct originating-gesture fullscreen launch and durable/revalidated prepared-original receipt state.
 
 ## Relevant files
 
-- docs/delivery/work-items/WI-0104-operator-query-ui-performance.md
-- docs/delivery/work-items/WI-0106-postgresql-operations-and-archive-catchup.md
 - docs/delivery/work-items/WI-0108-slideshow-performance.md
+- docs/delivery/work-items/WI-0106-postgresql-operations-and-archive-catchup.md
+- docs/delivery/work-items/WI-0104-operator-query-ui-performance.md
+- docs/delivery/work-items/WI-0103-scalable-match-regeneration.md
 - docs/delivery/work-items/WI-0107-m22-slideshow-acceptance-gaps.md
-- src/PhotoIdentity.Web/Pages/Settings.razor
-- src/PhotoIdentity.Web/Components/ArchiveCoverageSettings.razor
-- src/PhotoIdentity.Web/Components/ArchiveStorageSettings.razor
-- src/PhotoIdentity.Web/Components/IdentityMatchingSettings.razor
-- src/PhotoIdentity.Api/ArchiveStorageEndpoints.cs
 - docs/delivery/status/work-items.yaml
 - docs/delivery/status/milestones.yaml
 
