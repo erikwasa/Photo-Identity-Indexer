@@ -1,0 +1,128 @@
+<div class="review-person-picker">
+    <label class="field-label" for="@InputId">@Label</label>
+    <input id="@InputId"
+           type="search"
+           placeholder="Search people"
+           autocomplete="off"
+           disabled="@Disabled"
+           @bind="Search"
+           @bind:event="oninput"
+           @onfocus="OpenResults"
+           @onkeydown="HandleKeyDown" />
+
+    @if (SelectedPerson is ReviewPersonResponse selected)
+    {
+        <div class="review-person-selected" aria-label="Selected person">
+            <span>
+                <strong>@selected.DisplayName</strong>
+                @if (selected.IsFavorite)
+                {
+                    <span class="state-badge">Favorite</span>
+                }
+            </span>
+            <button type="button"
+                    class="button secondary"
+                    disabled="@Disabled"
+                    @onclick="ClearAsync">
+                Clear
+            </button>
+        </div>
+    }
+
+    @if (ResultsOpen && !Disabled)
+    {
+        <div class="review-person-results" role="listbox" aria-label="Person search results">
+            @if (FilteredPeople.Count == 0)
+            {
+                <p>No people match this search.</p>
+            }
+            else
+            {
+                @foreach (ReviewPersonResponse person in FilteredPeople.Take(MaximumRenderedResults))
+                {
+                    <button type="button"
+                            class="review-person-option"
+                            role="option"
+                            aria-selected="@(person.Id == SelectedPersonId)"
+                            @onclick="() => SelectAsync(person.Id)">
+                        <span>
+                            <strong>@person.DisplayName</strong>
+                            @if (person.IsFavorite)
+                            {
+                                <span class="state-badge">Favorite</span>
+                            }
+                        </span>
+                        <span class="review-person-use">Use</span>
+                    </button>
+                }
+            }
+
+            @if (FilteredPeople.Count > MaximumRenderedResults)
+            {
+                <small class="review-person-help">Showing the first @MaximumRenderedResults matches. Type more to narrow the list.</small>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private const int MaximumRenderedResults = 20;
+
+    [Parameter, EditorRequired]
+    public string InputId { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+
+    [Parameter]
+    public string Label { get; set; } = "Person";
+
+    [Parameter]
+    public string SelectedPersonId { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> SelectedPersonIdChanged { get; set; }
+
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    private string Search { get; set; } = string.Empty;
+    private bool ResultsOpen { get; set; }
+
+    private ReviewPersonResponse? SelectedPerson =>
+        People.FirstOrDefault(person => person.Id == SelectedPersonId);
+
+    private IReadOnlyList<ReviewPersonResponse> FilteredPeople => People
+        .Where(person =>
+            person.Id != SelectedPersonId &&
+            (string.IsNullOrWhiteSpace(Search) ||
+             person.DisplayName.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase)))
+        .OrderByDescending(person => person.IsFavorite)
+        .ThenBy(person => person.DisplayName, StringComparer.OrdinalIgnoreCase)
+        .ThenBy(person => person.Id, StringComparer.Ordinal)
+        .ToArray();
+
+    private void OpenResults() => ResultsOpen = true;
+
+    private void HandleKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            ResultsOpen = false;
+        }
+    }
+
+    private async Task SelectAsync(string personId)
+    {
+        Search = string.Empty;
+        ResultsOpen = false;
+        await SelectedPersonIdChanged.InvokeAsync(personId);
+    }
+
+    private async Task ClearAsync()
+    {
+        Search = string.Empty;
+        ResultsOpen = false;
+        await SelectedPersonIdChanged.InvokeAsync(string.Empty);
+    }
+}
