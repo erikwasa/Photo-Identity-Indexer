@@ -95,6 +95,22 @@ function Select-HashReads {
             Select-Object kind, count, bytes, subjectCount, averageReadsPerSubject, maxReadsPerSubject)
 }
 
+function First-OrNull {
+    param([double[]]$Values)
+    if ($null -eq $Values -or $Values.Count -eq 0) {
+        return $null
+    }
+    return $Values[0]
+}
+
+function Rest-OrEmpty {
+    param([double[]]$Values)
+    if ($null -eq $Values -or $Values.Count -le 1) {
+        return @()
+    }
+    return @($Values | Select-Object -Skip 1)
+}
+
 $health = Invoke-JsonRequest -Method GET -Path "/health"
 if ($null -eq $health -or $health.status -ne "ok") {
     throw "Photo Identity did not report a healthy API at '$base'."
@@ -140,6 +156,7 @@ if ($IncludePreparedOriginals) {
     $sessionId = $null
     try {
         Reset-Diagnostics
+        $preparationWatch = [Diagnostics.Stopwatch]::StartNew()
         $request = @{ revisionIds = @($snapshot.items | ForEach-Object { [string]$_.revisionId }) }
         $start = Invoke-JsonRequest -Method POST -Path "/api/slideshows/original-preparation" -Body $request
         $sessionId = [string]$start.sessionId
@@ -153,6 +170,8 @@ if ($IncludePreparedOriginals) {
             Start-Sleep -Milliseconds 500
             $status = Invoke-JsonRequest -Method GET -Path "/api/slideshows/original-preparation/$sessionId"
         }
+        $preparationWatch.Stop()
+        $preparationToTerminalMilliseconds = [Math]::Round($preparationWatch.Elapsed.TotalMilliseconds, 3)
 
         if ($status.state -eq "preparing") {
             throw "Original preparation did not reach a terminal/ready state within $PreparationTimeoutSeconds seconds."
@@ -171,7 +190,9 @@ if ($IncludePreparedOriginals) {
             state = [string]$status.state
             total = [int]$status.total
             ready = [int]$status.ready
-            repeatedOriginalMilliseconds = $preparedMilliseconds
+            preparationToTerminalMilliseconds = $preparationToTerminalMilliseconds
+            firstOriginalMilliseconds = First-OrNull -Values $preparedMilliseconds
+            subsequentOriginalMilliseconds = Rest-OrEmpty -Values $preparedMilliseconds
             stages = Select-DiagnosticStage -Diagnostics $preparedDiagnostics -Names @(
                 "slideshow-preparation-start",
                 "slideshow-preparation-status",
@@ -200,7 +221,8 @@ $report = [ordered]@{
     snapshotItemCount = $total
     libraryMilliseconds = $libraryMilliseconds
     snapshotMilliseconds = $snapshotMilliseconds
-    repeatedViewerPreviewMilliseconds = $viewerPreviewMilliseconds
+    firstViewerPreviewMilliseconds = First-OrNull -Values $viewerPreviewMilliseconds
+    subsequentViewerPreviewMilliseconds = Rest-OrEmpty -Values $viewerPreviewMilliseconds
     libraryStages = Select-DiagnosticStage -Diagnostics $libraryDiagnostics -Names @("slideshow-library-load")
     snapshotStages = Select-DiagnosticStage -Diagnostics $snapshotDiagnostics -Names @("slideshow-snapshot-creation")
     viewerPreviewStages = if ($null -eq $viewerPreviewDiagnostics) { @() } else {
