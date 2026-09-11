@@ -1,0 +1,76 @@
+.review-person-picker {
+    display: grid;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.review-person-selected,
+.review-person-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    min-width: 0;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--line, #d8dde6);
+    border-radius: 0.65rem;
+    background: var(--surface, #fff);
+}
+
+.review-person-selected > span,
+.review-person-option > span:first-child {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0.3rem 0.4rem;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.review-person-selected strong,
+.review-person-option strong {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.review-person-results {
+    display: grid;
+    gap: 0.3rem;
+    max-height: 14rem;
+    overflow: auto;
+    scrollbar-gutter: stable;
+}
+
+.review-person-results > p {
+    margin: 0;
+    color: var(--muted, #667085);
+    font-size: 0.88rem;
+}
+
+.review-person-option {
+    width: 100%;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.review-person-option:hover,
+.review-person-option:focus-visible {
+    box-shadow: inset 0 0 0 2px currentColor;
+}
+
+.review-person-use,
+.review-person-help {
+    color: var(--muted, #667085);
+    font-size: 0.82rem;
+}
+
+.review-person-use {
+    flex: 0 0 auto;
+    font-weight: 700;
+    white-space: nowrap;
+}

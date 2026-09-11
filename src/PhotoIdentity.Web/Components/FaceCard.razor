@@ -57,14 +57,11 @@
             <p class="current-person">Assigned to <strong>@Face.Person.DisplayName</strong></p>
         }
 
-        <label class="field-label" for="person-@Face.Id">Person</label>
-        <select id="person-@Face.Id" @bind="SelectedPersonId" disabled="@(People.Count == 0 || Busy)">
-            <option value="">Choose a person</option>
-            @foreach (ReviewPersonResponse person in People)
-            {
-                <option value="@person.Id">@PersonLabel(person)</option>
-            }
-        </select>
+        <ReviewPersonPicker InputId="@($"person-{Face.Id}")"
+                            People="People"
+                            SelectedPersonId="@SelectedPersonId"
+                            SelectedPersonIdChanged="SelectPersonAsync"
+                            Disabled="@(People.Count == 0 || Busy)" />
 
         <div class="card-actions">
             <button class="button primary" disabled="@(string.IsNullOrWhiteSpace(SelectedPersonId) || Busy)" @onclick="AssignAsync">
@@ -163,6 +160,12 @@
         return SelectionChanged.InvokeAsync((Face.Id, nextSelected, args.ShiftKey));
     }
 
+    private Task SelectPersonAsync(string personId)
+    {
+        SelectedPersonId = personId;
+        return Task.CompletedTask;
+    }
+
     private async Task AcceptTopSuggestionAsync()
     {
         if (Face.TopSuggestion is not ReviewTopSuggestionResponse suggestion)
@@ -237,9 +240,6 @@
             Busy = false;
         }
     }
-
-    private static string PersonLabel(ReviewPersonResponse person) =>
-        person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
 
     private static string ConfidenceGroupLabel(string value) => value.ToLowerInvariant() switch
     {
