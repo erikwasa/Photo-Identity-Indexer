@@ -55,6 +55,7 @@ These are hypotheses, not predetermined solutions. PostgreSQL query/index improv
 - The probe/report deliberately omits collection names, revision IDs, filenames, source paths and credentials. It records only catalogue provider/schema, item counts, wall-clock timings, aggregate stage timings and aggregate hash-read statistics.
 - Code inspection before optimization confirmed two hypotheses that the real-catalogue probe could distinguish: PostgreSQL snapshot creation currently carries the common current-state CTE set even when a saved filter does not require every state domain and sorts the full candidate set in application memory; local viewer/prepared-original paths can perform full SHA-256 verification on status/open. Neither should be optimized without measured evidence that it is material.
 - The follow-up measurement slice changes the probe's default loopback origin to `http://127.0.0.1:5080` and adds bounded ordered viewer-preview measurements across distinct slideshow positions. This closes the direct-server evidence gap for the acceptance criterion that transition latency must not increase as playback advances.
+- Browser-side timing instrumentation then measures the actual phone presentation surface without image or collection identity. It records bounded DOM-presentation-to-load timing, same-origin Resource Timing and prefetch-hit evidence so phone-visible latency can be compared with server stages.
 
 ## Maintainer evidence — 2026-09-11
 
@@ -83,8 +84,6 @@ For a representative 11-photo saved Smart Collection using `127.0.0.1`:
 
 These measurements rule out slideshow-library definition loading, PostgreSQL snapshot creation, immutable hash verification and prepared-original opening as the primary cause of the previously reported multi-second one-photo startup delay for the measured collections. No PostgreSQL index/query rewrite or verification-cache weakening is justified from this evidence.
 
-The remaining evidence gap is actual playback progression. The first probe repeatedly requested only the first snapshot revision and therefore could not test whether distinct image transitions become slower with slideshow position. The next probe slice measures a bounded ordered sequence of distinct viewer previews while retaining the repeated-first-image phase for cache/verification evidence. If ordered direct-server latency remains bounded, the investigation should move to browser-visible request/render/prefetch timing on the real playback surface rather than speculative server optimization.
-
 ## Ordered-sequence evidence — 2026-09-11
 
 After PR #301 merged, the representative 11-photo collection was measured with the bounded ordered probe. Caller-observed viewer-preview times by position were approximately 58, 83, 68, 36, 35, 40, 39, 59, 77, 35 and 79 ms. `collection-viewer-preview-open` averaged about 47 ms and peaked around 73 ms.
@@ -93,7 +92,26 @@ Five of the 11 distinct images required one `original-open` hash read each. Thos
 
 The ordered timings fluctuate by image but do not systematically grow with slideshow position: several later positions return to the mid-30-to-40 ms range. Direct server serving therefore does not reproduce the reported progressive slowdown, and the measured hash work is not cumulative enough to explain it.
 
-The next WI-0108 slice instruments the actual browser slideshow image surface. It records at most 50 identity-free samples per slideshow: one-based sequence, time from DOM presentation to `<img>` load, same-origin Resource Timing duration when available, and whether the resource had already completed before presentation. Samples are batched so diagnostics do not compete with every image prefetch. No image URL, revision ID, collection identity, filename or source path is submitted.
+## Real-phone browser evidence — 2026-09-11
+
+After PR #303 merged and the browser instrumentation was republished, the maintainer ran the representative 11-photo slideshow on the phone. The slideshow was subjectively responsive; the run did not reproduce a user-visible progressive slowdown.
+
+The 11 displayed images measured browser presentation times of approximately 73, 389, 242, 94, 145, 94, 119, 103, 106, 104 and 378 ms. Presentation averaged about 168 ms and Resource Timing averaged about 156 ms, leaving only about 12 ms per image outside browser resource loading on average. The positions were spiky but did not trend upward through the slideshow.
+
+The same diagnostics generation exposed request amplification that is worth correcting preventively even though the current phone experience was acceptable:
+
+- 39 `collection-viewer-preview-open` operations for 11 displayed images, averaging about 40 ms;
+- 50 `api-collection-request` operations, averaging about 124 ms;
+- 22 `original-verification-hash` operations, averaging about 9.7 ms;
+- 22 `original-open` hash reads across only five revision subjects, with one revision read up to seven times.
+
+The initial browser report classified all 11 displayed images as prefetch misses, but the original diagnostic inferred prefetch completion from only the latest Resource Timing entry. That classification was not reliable enough to prove prefetch never occurred.
+
+Code inspection found a narrower defect consistent with the amplification: every `setPrefetchUrls` call cleared and recreated the complete prefetch `Image` set. `UpdatePrefetchAsync` can run both when navigation moves and when the displayed image finishes loading, so unchanged prefetch URLs could be restarted. More importantly, at navigation the revision becoming current leaves the desired prefetch set immediately, allowing its already-started prefetch `Image` to be cleared before the displayed `<img>` completes.
+
+The preventive corrective slice therefore keeps the existing bounded prefetch window and slideshow semantics but makes the browser prefetch set stable: unchanged URLs retain their existing `Image` objects, newly requested URLs are added once, and entries outside the desired set are retained for one generation before removal so a revision that just became current can reuse/coalesce its prefetch. The diagnostic now captures the slideshow's explicit prefetch state at presentation time instead of inferring a hit from the newest Resource Timing entry. No PostgreSQL, image-quality, immutable-verification or prefetch-window-size change is part of this correction.
+
+After merge, the same 11-photo phone run should be repeated. Success is a materially lower request/hash amplification than the 39 preview opens / 22 hash reads baseline, credible prefetch-hit evidence, no systematic latency growth and no regression in the already-responsive perceived experience.
 
 ## Acceptance criteria
 
@@ -104,7 +122,7 @@ The next WI-0108 slice instruments the actual browser slideshow image surface. I
 - [ ] Reusing an unchanged prepared original does not require a full-file SHA-256 read on every image request.
 - [ ] Any skipped/reused full verification remains safe: changed/unavailable bytes cannot be served as the old immutable revision.
 - [ ] Image-to-image latency remains bounded through a representative slideshow and does not systematically increase with slideshow position because of accumulated/repeated work.
-- [ ] Bounded prefetch continues to cap browser/server resource use.
+- [ ] Bounded prefetch continues to cap browser/server resource use without repeatedly restarting unchanged requests.
 - [ ] Existing M22 fullscreen, protected-mode, preparation, storage-ownership and immutable-snapshot semantics remain unchanged.
 - [ ] Maintainer verification on the real archive confirms the slideshow library, first-image startup and repeated navigation are practically responsive without requiring a SQLite/PostgreSQL comparison run.
 
