@@ -27,11 +27,12 @@ public sealed class FaceReviewImageVariantCacheTests
                     new Rect(240, 120, 360, 360),
                     new Scalar(210, 180, 70),
                     thickness: -1);
-                Assert.True(Cv2.ImEncode(
+                Cv2.ImEncode(
                     ".jpg",
                     image,
                     out source,
-                    new ImageEncodingParam(ImwriteFlags.JpegQuality, OpenCvReviewFaceRenderer.JpegQuality)));
+                    new ImageEncodingParam(ImwriteFlags.JpegQuality, OpenCvReviewFaceRenderer.JpegQuality));
+                Assert.NotEmpty(source);
             }
             await File.WriteAllBytesAsync(durablePath, source);
 
