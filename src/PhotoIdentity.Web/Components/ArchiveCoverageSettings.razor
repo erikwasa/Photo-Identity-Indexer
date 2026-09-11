@@ -1,0 +1,220 @@
+@inject HttpClient Http
+
+<section class="review-filter-panel" aria-labelledby="archive-settings-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Permanent archive</p>
+            <h2 id="archive-settings-heading">Archive coverage</h2>
+        </div>
+        @if (Archive is { Configured: true })
+        {
+            <span class="model-summary">Source: @Archive.RootName</span>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="notice error" role="alert">@Error</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <div class="notice success" role="status">@Message</div>
+    }
+
+    @if (Loading)
+    {
+        <div class="empty-state compact" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <p>Loading archive configuration…</p>
+        </div>
+    }
+    else if (Archive is not { Configured: true })
+    {
+        <p>Configure the permanent source once. The browser sends the path during setup, but API responses expose only the source folder name and root-relative coverage.</p>
+        <form @onsubmit="ConfigureArchiveAsync" @onsubmit:preventDefault>
+            <div class="review-filter-grid">
+                <div>
+                    <label class="field-label" for="settings-archive-root">Permanent archive root</label>
+                    <input id="settings-archive-root"
+                           @bind="ArchiveRootPath"
+                           disabled="@Busy"
+                           placeholder="C:\Users\…\OneDrive\Bilder\Kamerabilder" />
+                    <p>Once configured, this source identity is preserved by later coverage changes.</p>
+                </div>
+                <div>
+                    <label class="field-label" for="settings-initial-folder">First included folder</label>
+                    <input id="settings-initial-folder"
+                           @bind="InitialArchiveFolder"
+                           disabled="@Busy"
+                           placeholder="1970/01" />
+                    <p>Use a root-relative folder. Enter <code>.</code> to include the complete archive root.</p>
+                </div>
+            </div>
+            <div class="card-actions">
+                <button type="submit"
+                        class="button primary"
+                        disabled="@(Busy || string.IsNullOrWhiteSpace(ArchiveRootPath) || string.IsNullOrWhiteSpace(InitialArchiveFolder))">
+                    Configure archive
+                </button>
+            </div>
+        </form>
+    }
+    else
+    {
+        <form @onsubmit="SaveCoverageAsync" @onsubmit:preventDefault>
+            <label class="field-label" for="settings-coverage">Included folders</label>
+            <textarea id="settings-coverage"
+                      rows="7"
+                      @bind="CoverageFoldersText"
+                      disabled="@Busy"></textarea>
+            <p>One root-relative folder per line. Parent folders subsume children, so <code>1970</code> replaces separate <code>1970/01</code>, <code>1970/02</code>, and similar entries. Enter <code>.</code> for the archive root.</p>
+            <div class="notice warning">
+                Changing coverage does not delete catalogue assets. It changes which folders future synchronization, verification and processing runs include.
+            </div>
+            <div class="card-actions">
+                <button type="submit" class="button primary" disabled="@Busy">Save archive coverage</button>
+                <a class="button secondary" href="/archive">Open archive progress</a>
+            </div>
+        </form>
+    }
+</section>
+
+@code {
+    [Parameter]
+    public int RefreshVersion { get; set; }
+
+    private ArchiveConfigurationResponse? Archive { get; set; }
+    private string ArchiveRootPath { get; set; } = string.Empty;
+    private string InitialArchiveFolder { get; set; } = string.Empty;
+    private string CoverageFoldersText { get; set; } = string.Empty;
+    private bool Loading { get; set; } = true;
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+    private int LoadedRefreshVersion { get; set; } = -1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (LoadedRefreshVersion == RefreshVersion)
+        {
+            return;
+        }
+
+        LoadedRefreshVersion = RefreshVersion;
+        Message = null;
+        await LoadConfigurationAsync();
+    }
+
+    private async Task LoadConfigurationAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Archive = await Http.GetFromJsonAsync<ArchiveConfigurationResponse>("api/archive/configuration");
+            if (Archive is null)
+            {
+                Error = "The archive configuration response was empty.";
+                return;
+            }
+
+            CopyCoverageFromArchive();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task ConfigureArchiveAsync()
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/archive/include",
+                new ArchiveIncludeRequest(ArchiveRootPath, InitialArchiveFolder));
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            ArchiveStatusResponse? status = await response.Content.ReadFromJsonAsync<ArchiveStatusResponse>();
+            if (status is null)
+            {
+                Error = "The archive configuration response was empty.";
+                return;
+            }
+
+            Archive = ToConfiguration(status);
+            CopyCoverageFromArchive();
+            ArchiveRootPath = string.Empty;
+            InitialArchiveFolder = string.Empty;
+            Message = "Permanent archive source and initial coverage saved.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task SaveCoverageAsync()
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            string[] folders = CoverageFoldersText
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                "api/archive/coverage",
+                new ArchiveCoverageUpdateRequest(folders));
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            ArchiveStatusResponse? status = await response.Content.ReadFromJsonAsync<ArchiveStatusResponse>();
+            if (status is null)
+            {
+                Error = "The archive coverage response was empty.";
+                return;
+            }
+
+            Archive = ToConfiguration(status);
+            CopyCoverageFromArchive();
+            Message = "Archive coverage saved. Existing catalogue assets were preserved.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void CopyCoverageFromArchive()
+    {
+        CoverageFoldersText = Archive is { Configured: true }
+            ? string.Join(Environment.NewLine, Archive.IncludedFolders.Select(folder => string.IsNullOrEmpty(folder) ? "." : folder))
+            : string.Empty;
+    }
+
+    private static ArchiveConfigurationResponse ToConfiguration(ArchiveStatusResponse status) =>
+        new(status.Configured, status.RootName, status.IncludedFolders);
+}
