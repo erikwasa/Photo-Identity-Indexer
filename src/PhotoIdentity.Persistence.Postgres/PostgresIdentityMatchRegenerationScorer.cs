@@ -9,8 +9,10 @@ using PhotoIdentity.Core.Review;
 namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
-/// Scores one snapshotted regeneration target per PostgreSQL transaction while preserving the
+/// Scores snapshotted regeneration targets per PostgreSQL transaction while preserving the
 /// accepted SQLite candidate, rejection, ranking and stale-derived-suggestion semantics.
+/// Confirmed exemplar evidence can be prepared once per durable run, while rejected identities
+/// remain target-scoped so the growing rejected-pair corpus is never reloaded for every target.
 /// </summary>
 public sealed class PostgresIdentityMatchRegenerationScorer :
     IIdentityMatchRegenerationScorer
@@ -20,6 +22,8 @@ public sealed class PostgresIdentityMatchRegenerationScorer :
 
     private readonly PostgresCatalogueDatabase _database;
     private readonly TimeProvider _timeProvider;
+    private readonly SemaphoreSlim _prepareGate = new(1, 1);
+    private PreparedRun? _preparedRun;
 
     public PostgresIdentityMatchRegenerationScorer(
         PostgresCatalogueDatabase database,
@@ -28,6 +32,66 @@ public sealed class PostgresIdentityMatchRegenerationScorer :
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
         _timeProvider = timeProvider ?? TimeProvider.System;
+    }
+
+    public async Task PrepareRunAsync(
+        ReviewIdentityMatchRegenerationRun run,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(run);
+        if (IsPrepared(run.Id))
+        {
+            return;
+        }
+
+        await _prepareGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (IsPrepared(run.Id))
+            {
+                return;
+            }
+
+            await using NpgsqlConnection connection =
+                await _database.OpenConnectionAsync(cancellationToken);
+            await using NpgsqlTransaction transaction =
+                await connection.BeginTransactionAsync(cancellationToken);
+            IReadOnlyList<Exemplar> exemplars = await ReadExemplarsAsync(
+                connection,
+                transaction,
+                run.ModelId,
+                run.ModelHash,
+                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+
+            _preparedRun = new PreparedRun(
+                run.Id,
+                run.ModelId.ToString(),
+                run.ModelHash.ToString(),
+                exemplars);
+        }
+        finally
+        {
+            _prepareGate.Release();
+        }
+    }
+
+    public async Task ReleaseRunAsync(
+        Guid runId,
+        CancellationToken cancellationToken = default)
+    {
+        await _prepareGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (_preparedRun?.RunId == runId)
+            {
+                _preparedRun = null;
+            }
+        }
+        finally
+        {
+            _prepareGate.Release();
+        }
     }
 
     public async Task<int> ScoreTargetAsync(
@@ -61,17 +125,21 @@ public sealed class PostgresIdentityMatchRegenerationScorer :
             return 0;
         }
 
-        IReadOnlyList<Exemplar> exemplars = await ReadExemplarsAsync(
+        IReadOnlyList<Exemplar>? preparedExemplars = TryGetPreparedExemplars(
+            modelId,
+            modelHash);
+        IReadOnlyList<Exemplar> exemplars = preparedExemplars ?? await ReadExemplarsAsync(
             connection,
             transaction,
             modelId,
             modelHash,
             cancellationToken);
-        HashSet<RejectedPair> rejectedPairs = await ReadRejectedPairsAsync(
+        HashSet<PersonId> rejectedPersonIds = await ReadRejectedPersonIdsAsync(
             connection,
             transaction,
+            faceOccurrenceId,
             cancellationToken);
-        Candidate[] candidates = ScoreCandidates(target, exemplars, rejectedPairs)
+        Candidate[] candidates = ScoreCandidates(target, exemplars, rejectedPersonIds)
             .OrderByDescending(candidate => candidate.Score)
             .ThenBy(candidate => candidate.PersonId.ToString(), StringComparer.Ordinal)
             .Take(2)
@@ -148,6 +216,20 @@ public sealed class PostgresIdentityMatchRegenerationScorer :
         }
 
         await transaction.CommitAsync(cancellationToken);
+    }
+
+    private bool IsPrepared(Guid runId) => _preparedRun?.RunId == runId;
+
+    private IReadOnlyList<Exemplar>? TryGetPreparedExemplars(
+        ModelId modelId,
+        Sha256Digest modelHash)
+    {
+        PreparedRun? prepared = _preparedRun;
+        return prepared is not null
+            && string.Equals(prepared.ModelId, modelId.ToString(), StringComparison.Ordinal)
+            && string.Equals(prepared.ModelHash, modelHash.ToString(), StringComparison.Ordinal)
+                ? prepared.Exemplars
+                : null;
     }
 
     private static async Task<StoredEmbedding?> ReadEligibleTargetAsync(
@@ -312,43 +394,46 @@ public sealed class PostgresIdentityMatchRegenerationScorer :
         return exemplars;
     }
 
-    private static async Task<HashSet<RejectedPair>> ReadRejectedPairsAsync(
+    private static async Task<HashSet<PersonId>> ReadRejectedPersonIdsAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
+        FaceOccurrenceId faceOccurrenceId,
         CancellationToken cancellationToken)
     {
         await using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText =
             """
-            SELECT DISTINCT face_occurrence_id, suggested_person_id
+            SELECT DISTINCT suggested_person_id
             FROM identity_suggestions
-            WHERE status = @status;
+            WHERE face_occurrence_id = @face_occurrence_id
+              AND status = @status;
             """;
+        command.Parameters.AddWithValue(
+            "face_occurrence_id",
+            Guid.Parse(faceOccurrenceId.ToString()));
         command.Parameters.AddWithValue("status", RejectedStatus);
 
-        HashSet<RejectedPair> pairs = [];
+        HashSet<PersonId> personIds = [];
         await using NpgsqlDataReader reader =
             await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            pairs.Add(new RejectedPair(
-                FaceOccurrenceId.From(reader.GetGuid(0)),
-                PersonId.From(reader.GetGuid(1))));
+            personIds.Add(PersonId.From(reader.GetGuid(0)));
         }
 
-        return pairs;
+        return personIds;
     }
 
     private static IEnumerable<Candidate> ScoreCandidates(
         StoredEmbedding target,
         IReadOnlyList<Exemplar> exemplars,
-        IReadOnlySet<RejectedPair> rejectedPairs)
+        IReadOnlySet<PersonId> rejectedPersonIds)
     {
         Dictionary<PersonId, double> bestByPerson = [];
         foreach (Exemplar exemplar in exemplars)
         {
-            if (rejectedPairs.Contains(new RejectedPair(target.FaceOccurrenceId, exemplar.PersonId)))
+            if (rejectedPersonIds.Contains(exemplar.PersonId))
             {
                 continue;
             }
@@ -593,6 +678,12 @@ public sealed class PostgresIdentityMatchRegenerationScorer :
         command.Parameters.AddWithValue("model_hash", modelHash.ToString());
     }
 
+    private sealed record PreparedRun(
+        Guid RunId,
+        string ModelId,
+        string ModelHash,
+        IReadOnlyList<Exemplar> Exemplars);
+
     private sealed record StoredEmbedding(
         FaceOccurrenceId FaceOccurrenceId,
         EmbeddingVector Vector);
@@ -603,8 +694,4 @@ public sealed class PostgresIdentityMatchRegenerationScorer :
         EmbeddingVector Vector);
 
     private sealed record Candidate(PersonId PersonId, double Score);
-
-    private readonly record struct RejectedPair(
-        FaceOccurrenceId FaceOccurrenceId,
-        PersonId PersonId);
 }
