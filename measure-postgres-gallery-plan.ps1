@@ -50,33 +50,107 @@ function Get-ConnectionValue {
         [Parameter(Mandatory)][string[]]$Names
     )
 
-    foreach ($name in $Names) {
-        if ($Builder.ContainsKey($name)) {
-            return [string]$Builder[$name]
+    foreach ($key in $Builder.Keys) {
+        $keyText = [string]$key
+        foreach ($name in $Names) {
+            if ([string]::Equals(
+                    $keyText,
+                    $name,
+                    [System.StringComparison]::OrdinalIgnoreCase)) {
+                return [string]$Builder[$keyText]
+            }
         }
     }
 
     return $null
 }
 
-$connectionString = [Environment]::GetEnvironmentVariable($ConnectionEnvironmentVariable, "Process")
-if ([string]::IsNullOrWhiteSpace($connectionString)) {
-    $connectionString = [Environment]::GetEnvironmentVariable($ConnectionEnvironmentVariable, "User")
-}
-if ([string]::IsNullOrWhiteSpace($connectionString)) {
-    throw "The PostgreSQL connection environment variable '$ConnectionEnvironmentVariable' is not set at Process or User scope."
+function Read-ConnectionIdentity {
+    param([AllowNull()][string]$ConnectionString)
+
+    if ([string]::IsNullOrWhiteSpace($ConnectionString)) {
+        return $null
+    }
+
+    $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
+    try {
+        $builder.ConnectionString = $ConnectionString
+    }
+    catch {
+        return [pscustomobject]@{
+            DatabaseName = $null
+            Username = $null
+            ParsedKeys = @()
+        }
+    }
+
+    return [pscustomobject]@{
+        DatabaseName = Get-ConnectionValue -Builder $builder -Names @(
+            "Database",
+            "Initial Catalog",
+            "Database Name",
+            "Db")
+        Username = Get-ConnectionValue -Builder $builder -Names @(
+            "Username",
+            "User Name",
+            "User ID",
+            "UserID",
+            "User Id")
+        ParsedKeys = @($builder.Keys | ForEach-Object { [string]$_ } | Sort-Object)
+    }
 }
 
-$builder = [System.Data.Common.DbConnectionStringBuilder]::new()
-$builder.ConnectionString = $connectionString
-$databaseName = Get-ConnectionValue -Builder $builder -Names @("Database", "Initial Catalog")
-$username = Get-ConnectionValue -Builder $builder -Names @("Username", "User ID", "UserID", "User Id")
-if ([string]::IsNullOrWhiteSpace($databaseName)) {
-    throw "The configured PostgreSQL connection string does not name a database."
+$processConnectionString = [Environment]::GetEnvironmentVariable(
+    $ConnectionEnvironmentVariable,
+    "Process")
+$userConnectionString = [Environment]::GetEnvironmentVariable(
+    $ConnectionEnvironmentVariable,
+    "User")
+
+$processIdentity = Read-ConnectionIdentity -ConnectionString $processConnectionString
+$userIdentity = Read-ConnectionIdentity -ConnectionString $userConnectionString
+
+$connectionIdentity = $null
+$connectionScope = $null
+if ($null -ne $processIdentity -and
+    -not [string]::IsNullOrWhiteSpace([string]$processIdentity.DatabaseName) -and
+    -not [string]::IsNullOrWhiteSpace([string]$processIdentity.Username)) {
+    $connectionIdentity = $processIdentity
+    $connectionScope = "Process"
 }
-if ([string]::IsNullOrWhiteSpace($username)) {
-    throw "The configured PostgreSQL connection string does not name a user."
+elseif ($null -ne $userIdentity -and
+    -not [string]::IsNullOrWhiteSpace([string]$userIdentity.DatabaseName) -and
+    -not [string]::IsNullOrWhiteSpace([string]$userIdentity.Username)) {
+    $connectionIdentity = $userIdentity
+    $connectionScope = "User"
 }
+
+if ($null -eq $connectionIdentity) {
+    if ([string]::IsNullOrWhiteSpace($processConnectionString) -and
+        [string]::IsNullOrWhiteSpace($userConnectionString)) {
+        throw "The PostgreSQL connection environment variable '$ConnectionEnvironmentVariable' is not set at Process or User scope."
+    }
+
+    $parsedKeys = @()
+    if ($null -ne $processIdentity) {
+        $parsedKeys += $processIdentity.ParsedKeys
+    }
+    if ($null -ne $userIdentity) {
+        $parsedKeys += $userIdentity.ParsedKeys
+    }
+    $parsedKeys = @($parsedKeys | Sort-Object -Unique)
+    $keySummary = if ($parsedKeys.Count -eq 0) {
+        "<none>"
+    }
+    else {
+        $parsedKeys -join ", "
+    }
+
+    throw "The configured PostgreSQL connection string does not expose both a database and user name. Parsed key names: $keySummary. Values are intentionally omitted."
+}
+
+$databaseName = [string]$connectionIdentity.DatabaseName
+$username = [string]$connectionIdentity.Username
 if ($databaseName -notmatch '^[A-Za-z0-9_]+$') {
     throw "The configured PostgreSQL database name contains unsupported characters for this diagnostic."
 }
@@ -118,6 +192,7 @@ $header = @(
     "Photo Identity PostgreSQL gallery plan evidence",
     "captured-at-utc: $([DateTimeOffset]::UtcNow.ToString('O'))",
     "connection-environment-variable: $ConnectionEnvironmentVariable",
+    "connection-environment-scope: $connectionScope",
     "statement-timeout-seconds: $StatementTimeoutSeconds",
     "note: connection string and credentials are intentionally omitted",
     ""
