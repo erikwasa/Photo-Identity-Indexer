@@ -6,6 +6,7 @@
     let gestureHandler = null;
     let prefetchEntries = new Map();
     let prefetchGeneration = 0;
+    let prefetchDesiredUrls = new Set();
     let startingOrientationType = null;
     let orientationActive = false;
     let orientationFailed = false;
@@ -280,6 +281,18 @@
         }
     }
 
+    function sameUrlSet(left, right) {
+        if (left.size !== right.size) {
+            return false;
+        }
+        for (const value of left) {
+            if (!right.has(value)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     function removePrefetchEntry(url, entry) {
         if (!entry.completed) {
             entry.image.src = "";
@@ -293,16 +306,23 @@
         }
         prefetchEntries = new Map();
         prefetchGeneration = 0;
+        prefetchDesiredUrls = new Set();
     }
 
     function updatePrefetch(urls) {
-        prefetchGeneration++;
-        const generation = prefetchGeneration;
         const bounded = Array.isArray(urls) ? urls.slice(0, 4) : [];
         const desired = new Set(
             bounded
                 .map(normalizePrefetchUrl)
                 .filter(url => url !== null));
+
+        if (sameUrlSet(desired, prefetchDesiredUrls)) {
+            return;
+        }
+
+        prefetchDesiredUrls = desired;
+        prefetchGeneration++;
+        const generation = prefetchGeneration;
 
         for (const [url, entry] of prefetchEntries) {
             if (desired.has(url)) {
@@ -312,8 +332,8 @@
 
             // Retain the previous desired generation once. During navigation the revision
             // becoming current drops out of the prefetch set before the displayed <img>
-            // finishes loading; keeping that Image alive for one more update lets the
-            // browser reuse or coalesce the already-started request instead of cancelling it.
+            // finishes loading; keeping that Image alive until the next actual prefetch-set
+            // change lets the browser reuse or coalesce the already-started request.
             if (entry.lastDesiredGeneration === generation - 1) {
                 continue;
             }
