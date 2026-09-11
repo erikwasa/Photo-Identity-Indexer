@@ -29,9 +29,28 @@ public static class Program
 
         RepositoryPaths paths = RepositoryPaths.Discover(root);
         RegistryStore store = new();
+        DocumentationValidator validator = new();
+
+        if (command == "migrate-work-items")
+        {
+            store.MigrateLegacyWorkItemsToShards(paths);
+            WorkItemRegistry migratedWorkItems = store.LoadWorkItems(paths);
+            MilestoneRegistry migratedMilestones = store.LoadMilestones(paths);
+            ValidationResult migratedValidation = validator.Validate(paths, migratedWorkItems, migratedMilestones);
+            if (!migratedValidation.IsValid)
+            {
+                error.WriteLine("Migrated sharded documentation state is invalid:");
+                PrintValidation(migratedValidation, error);
+                return 1;
+            }
+
+            output.WriteLine(
+                $"Migrated {migratedWorkItems.WorkItems.Count} work items to canonical shards under {paths.WorkItemShardDirectory}.");
+            return 0;
+        }
+
         WorkItemRegistry workItems = store.LoadWorkItems(paths);
         MilestoneRegistry milestones = store.LoadMilestones(paths);
-        DocumentationValidator validator = new();
         StatusGenerator generator = new(store);
 
         if (command == "validate")
@@ -242,6 +261,7 @@ public static class Program
               validate [--root PATH]
               generate [--check] [--root PATH]
               next [--root PATH]
+              migrate-work-items [--root PATH]
               start ID [--owner NAME] [--branch NAME] [--root PATH]
               block ID --on BLOCKER [--on BLOCKER] [--note TEXT] [--root PATH]
               review ID [--root PATH]
