@@ -1,8 +1,15 @@
+using System.Globalization;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Web.Contracts;
 using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
+
+public sealed record SlideshowBrowserPlaybackTimingRequest(
+    int Sequence,
+    double PresentationMilliseconds,
+    double? ResourceMilliseconds,
+    bool Prefetched);
 
 public static class SlideshowOriginalPreparationEndpoints
 {
@@ -15,7 +22,50 @@ public static class SlideshowOriginalPreparationEndpoints
         group.MapPost("/{sessionId:guid}/retry", Retry);
         group.MapDelete("/{sessionId:guid}", EndAsync);
         group.MapGet("/{sessionId:guid}/photos/{revisionId}/original", GetPreparedOriginalAsync);
+        endpoints.MapPost("/api/slideshows/diagnostics/playback", RecordBrowserPlaybackTiming);
         return endpoints;
+    }
+
+    private static IResult RecordBrowserPlaybackTiming(
+        SlideshowBrowserPlaybackTimingRequest request,
+        ArchiveThroughputMetrics metrics)
+    {
+        const double maximumMilliseconds = 120_000d;
+        if (request.Sequence is < 1 or > 50 ||
+            !double.IsFinite(request.PresentationMilliseconds) ||
+            request.PresentationMilliseconds < 0d ||
+            request.PresentationMilliseconds > maximumMilliseconds ||
+            (request.ResourceMilliseconds is double resourceMilliseconds &&
+                (!double.IsFinite(resourceMilliseconds) ||
+                 resourceMilliseconds < 0d ||
+                 resourceMilliseconds > maximumMilliseconds)))
+        {
+            return Results.BadRequest(new
+            {
+                error = "The slideshow browser timing sample is outside the supported diagnostic bounds.",
+            });
+        }
+
+        TimeSpan presentation = TimeSpan.FromMilliseconds(request.PresentationMilliseconds);
+        metrics.RecordStage(ArchiveThroughputMetricNames.SlideshowBrowserImagePresentation, presentation);
+        metrics.RecordStage(
+            ArchiveThroughputMetricNames.SlideshowBrowserImagePresentationPositionPrefix +
+            request.Sequence.ToString("D2", CultureInfo.InvariantCulture),
+            presentation);
+
+        if (request.ResourceMilliseconds is double measuredResourceMilliseconds)
+        {
+            metrics.RecordStage(
+                ArchiveThroughputMetricNames.SlideshowBrowserImageResource,
+                TimeSpan.FromMilliseconds(measuredResourceMilliseconds));
+        }
+
+        metrics.RecordCounter(
+            request.Prefetched
+                ? ArchiveThroughputMetricNames.SlideshowBrowserPrefetchHits
+                : ArchiveThroughputMetricNames.SlideshowBrowserPrefetchMisses);
+
+        return Results.NoContent();
     }
 
     private static async Task<IResult> StartAsync(
