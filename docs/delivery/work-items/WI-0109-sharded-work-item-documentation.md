@@ -63,6 +63,13 @@ The narrative work-item documents under `docs/delivery/work-items/` remain separ
 - Retain a generated current-work compatibility view only where it materially reduces migration risk; clearly mark it generated and remove any code path that treats it as canonical.
 - Keep the migration reproducible/idempotent so a partially prepared branch can be checked safely without duplicating work items.
 
+## Implementation progress
+
+- The first WI-0109 slice adds shard-aware repository discovery and a small `work-items/registry.yaml` metadata model while retaining legacy registry reads until migration is explicitly activated.
+- `RegistryStore` can load the sharded active/archive areas as one logical registry, rejects duplicate IDs and wrong-area terminal state, persists exactly one changed active item, and moves a newly terminal item to the archive area while keeping existing archive shards read-only.
+- `migrate-work-items` converts the current legacy logical registry to deterministic per-item shards without rewriting or deleting the legacy source files. Existing identical partial shards are reusable; conflicting or unexpected shards fail explicitly, and the shard metadata file is written last so an interrupted initial migration does not switch normal reads to an incomplete store.
+- The repository itself intentionally remains on the legacy layout in this slice. A later migration slice will run the converter on the real delivery history, verify logical equivalence, introduce the compact generated discovery view, and then update agent guidance/status-source references.
+
 ## Acceptance criteria
 
 - [ ] Canonical work-item lifecycle/status data is stored as one work item per YAML file rather than in an indefinitely growing editable registry.
