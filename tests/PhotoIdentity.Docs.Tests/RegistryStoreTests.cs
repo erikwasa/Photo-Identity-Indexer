@@ -249,12 +249,7 @@ public sealed class RegistryStoreTests
         WriteShardRegistry(paths);
         WriteShard(paths.ArchivedWorkItemShard("WI-0001"), ArchivedItem("WI-0001"));
         WriteShard(paths.ActiveWorkItemShard("WI-0002"), ActiveItem("WI-0002"));
-        WriteShard(
-            paths.ActiveWorkItemShard("WI-0003"),
-            ActiveItem("WI-0003")
-                .Replace("title: Active", "title: Other active", StringComparison.Ordinal)
-                .Replace("status: proposed", "status: ready", StringComparison.Ordinal)
-                .Replace("- WI-0001", "[]", StringComparison.Ordinal));
+        WriteShard(paths.ActiveWorkItemShard("WI-0003"), ReadyItem("WI-0003"));
     }
 
     private static void WriteShardRegistry(RepositoryPaths paths) =>
@@ -285,6 +280,19 @@ public sealed class RegistryStoreTests
         document: ../work-items/{{id}}.md
         blockers:
         - WI-0001
+        blocker_notes: []
+        evidence: []
+        """;
+
+    private static string ReadyItem(string id) =>
+        $$"""
+        id: {{id}}
+        title: Other active
+        milestone: M00
+        status: ready
+        owner: unassigned
+        document: ../work-items/{{id}}.md
+        blockers: []
         blocker_notes: []
         evidence: []
         """;
@@ -324,19 +332,22 @@ public sealed class RegistryStoreTests
     private static string Describe(WorkItem item) =>
         string.Join(
             "|",
-            item.Id,
-            item.Title,
-            item.Milestone,
-            item.Status,
-            item.Owner,
-            item.Document,
-            item.StartedAt,
-            item.CompletedAt,
-            item.VerifiedAt,
-            item.VerifiedBy,
-            item.LastUpdatedAt,
-            item.Branch,
-            string.Join(",", item.Blockers),
-            string.Join(";", item.BlockerNotes),
-            string.Join(";", item.Evidence.Select(evidence => $"{evidence.Type}:{evidence.Value}")));
+            new[]
+            {
+                item.Id,
+                item.Title,
+                item.Milestone,
+                item.Status,
+                item.Owner,
+                item.Document,
+                item.StartedAt ?? "",
+                item.CompletedAt ?? "",
+                item.VerifiedAt ?? "",
+                item.VerifiedBy ?? "",
+                item.LastUpdatedAt ?? "",
+                item.Branch ?? "",
+                string.Join(",", item.Blockers),
+                string.Join(";", item.BlockerNotes),
+                string.Join(";", item.Evidence.Select(evidence => $"{evidence.Type}:{evidence.Value}")),
+            });
 }
