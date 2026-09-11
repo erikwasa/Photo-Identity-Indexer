@@ -2,7 +2,6 @@ using System.Text.Json;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
-using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Imaging.OpenCv;
 
 namespace PhotoIdentity.Api;
@@ -46,7 +45,7 @@ public sealed class ReviewFacePreviewResolver
             cancellationToken);
         if (durable is not null)
         {
-            EncodedReviewFace? rendered = await RenderStoredDerivativeAsync(
+            EncodedReviewFace? rendered = await FaceReviewImageVariantCache.RenderAsync(
                 durable,
                 maximumEdge,
                 cancellationToken);
@@ -77,53 +76,6 @@ public sealed class ReviewFacePreviewResolver
             cancellationToken);
     }
 
-    private static async Task<EncodedReviewFace?> RenderStoredDerivativeAsync(
-        FaceReviewDerivativeFile durable,
-        int maximumEdge,
-        CancellationToken cancellationToken)
-    {
-        if (maximumEdge >= Math.Max(durable.Width, durable.Height))
-        {
-            try
-            {
-                byte[] content = await File.ReadAllBytesAsync(durable.Path, cancellationToken);
-                return new EncodedReviewFace(
-                    content,
-                    "image/jpeg",
-                    durable.Width,
-                    durable.Height);
-            }
-            catch (Exception exception) when (
-                exception is IOException or
-                UnauthorizedAccessException or
-                System.Security.SecurityException)
-            {
-                return null;
-            }
-        }
-
-        ReviewProxyProfile responseProfile = new(
-            $"face-response-{maximumEdge}",
-            maximumEdge,
-            OpenCvReviewFaceRenderer.JpegQuality);
-        try
-        {
-            EncodedReviewProxy encoded = await new OpenCvReviewProxyRenderer().RenderAsync(
-                durable.Path,
-                responseProfile,
-                cancellationToken);
-            return new EncodedReviewFace(
-                encoded.Content,
-                encoded.ContentType,
-                encoded.Width,
-                encoded.Height);
-        }
-        catch (InvalidDataException)
-        {
-            return null;
-        }
-    }
-
     private async Task<ReviewFaceGeometry?> GetGeometryAsync(
         FaceOccurrenceId faceOccurrenceId,
         CancellationToken cancellationToken)
@@ -136,6 +88,7 @@ public sealed class ReviewFacePreviewResolver
         }
         return new ReviewFaceGeometry(face.RevisionId, boundingBox);
     }
+
     internal static NormalizedBoundingBox? CalculateTargetBoundingBox(
         string? value,
         int? photoWidth,
