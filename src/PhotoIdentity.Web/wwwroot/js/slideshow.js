@@ -4,7 +4,8 @@
     let visibilityHandler = null;
     let fullscreenHandler = null;
     let gestureHandler = null;
-    let prefetchImages = [];
+    let prefetchEntries = new Map();
+    let prefetchGeneration = 0;
     let startingOrientationType = null;
     let orientationActive = false;
     let orientationFailed = false;
@@ -267,11 +268,106 @@
         }
     }
 
-    function clearPrefetch() {
-        for (const image of prefetchImages) {
-            image.src = "";
+    function normalizePrefetchUrl(url) {
+        if (typeof url !== "string" || url.length === 0) {
+            return null;
         }
-        prefetchImages = [];
+
+        try {
+            return new URL(url, document.baseURI).href;
+        } catch {
+            return null;
+        }
+    }
+
+    function removePrefetchEntry(url, entry) {
+        if (!entry.completed) {
+            entry.image.src = "";
+        }
+        prefetchEntries.delete(url);
+    }
+
+    function clearPrefetch() {
+        for (const [url, entry] of prefetchEntries) {
+            removePrefetchEntry(url, entry);
+        }
+        prefetchEntries = new Map();
+        prefetchGeneration = 0;
+    }
+
+    function updatePrefetch(urls) {
+        prefetchGeneration++;
+        const generation = prefetchGeneration;
+        const bounded = Array.isArray(urls) ? urls.slice(0, 4) : [];
+        const desired = new Set(
+            bounded
+                .map(normalizePrefetchUrl)
+                .filter(url => url !== null));
+
+        for (const [url, entry] of prefetchEntries) {
+            if (desired.has(url)) {
+                entry.lastDesiredGeneration = generation;
+                continue;
+            }
+
+            // Retain the previous desired generation once. During navigation the revision
+            // becoming current drops out of the prefetch set before the displayed <img>
+            // finishes loading; keeping that Image alive for one more update lets the
+            // browser reuse or coalesce the already-started request instead of cancelling it.
+            if (entry.lastDesiredGeneration === generation - 1) {
+                continue;
+            }
+
+            removePrefetchEntry(url, entry);
+        }
+
+        for (const url of desired) {
+            if (prefetchEntries.has(url)) {
+                continue;
+            }
+
+            const image = new Image();
+            const entry = {
+                image,
+                startedAt: performance.now(),
+                completedAt: null,
+                completed: false,
+                failed: false,
+                lastDesiredGeneration: generation
+            };
+            image.decoding = "async";
+            image.addEventListener("load", () => {
+                entry.completed = true;
+                entry.completedAt = performance.now();
+            }, { once: true });
+            image.addEventListener("error", () => {
+                entry.failed = true;
+            }, { once: true });
+            prefetchEntries.set(url, entry);
+            image.src = url;
+        }
+    }
+
+    function getPrefetchState(url) {
+        const normalized = normalizePrefetchUrl(url);
+        const entry = normalized ? prefetchEntries.get(normalized) : null;
+        if (!entry) {
+            return {
+                known: false,
+                completed: false,
+                failed: false,
+                startedAt: null,
+                completedAt: null
+            };
+        }
+
+        return {
+            known: true,
+            completed: entry.completed,
+            failed: entry.failed,
+            startedAt: entry.startedAt,
+            completedAt: entry.completedAt
+        };
     }
 
     window.photoIdentitySlideshow = {
@@ -403,16 +499,9 @@
             document.addEventListener("gestureend", gestureHandler, { passive: false });
         },
 
-        setPrefetchUrls: urls => {
-            clearPrefetch();
-            const bounded = Array.isArray(urls) ? urls.slice(0, 4) : [];
-            prefetchImages = bounded.map(url => {
-                const image = new Image();
-                image.decoding = "async";
-                image.src = url;
-                return image;
-            });
-        },
+        setPrefetchUrls: updatePrefetch,
+
+        getPrefetchState,
 
         unregister: async (release = true) => {
             if (keydownHandler) {
