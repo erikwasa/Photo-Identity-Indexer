@@ -57,18 +57,6 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
 
     private const string CandidateFrom = """
         FROM face_occurrences
-        LEFT JOIN LATERAL (
-            SELECT
-                review_actions.id,
-                review_actions.action_kind,
-                review_actions.person_id
-            FROM review_actions
-            WHERE review_actions.face_occurrence_id = face_occurrences.id
-              AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
-              AND review_actions.reversed_at_utc IS NULL
-            ORDER BY review_actions.id DESC
-            LIMIT 1
-        ) AS latest_action ON TRUE
         LEFT JOIN top_suggestion
             ON top_suggestion.face_occurrence_id = face_occurrences.id
         """;
@@ -84,9 +72,9 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         asset_revisions.content_sha256,
         latest_crop.storage_path,
         latest_observation.confidence,
-        face_occurrences.review_action_id,
-        face_occurrences.review_action_kind,
-        face_occurrences.review_person_id,
+        latest_action.id,
+        latest_action.action_kind,
+        latest_action.person_id,
         assigned_people.display_name,
         face_occurrences.suggestion_id,
         face_occurrences.suggested_person_id,
@@ -127,8 +115,20 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
                 face_observations.detector_model_hash
             LIMIT 1
         ) AS latest_observation ON TRUE
+        LEFT JOIN LATERAL (
+            SELECT
+                review_actions.id,
+                review_actions.action_kind,
+                review_actions.person_id
+            FROM review_actions
+            WHERE review_actions.face_occurrence_id = face_occurrences.id
+              AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
+              AND review_actions.reversed_at_utc IS NULL
+            ORDER BY review_actions.id DESC
+            LIMIT 1
+        ) AS latest_action ON TRUE
         LEFT JOIN people AS assigned_people
-            ON assigned_people.id = face_occurrences.review_person_id
+            ON assigned_people.id = latest_action.person_id
         """;
 
     private readonly PostgresCatalogueDatabase _database;
@@ -179,9 +179,6 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
                     face_occurrences.ordinal,
                     face_occurrences.created_at_utc,
                     face_occurrences.asset_revision_id,
-                    latest_action.id AS review_action_id,
-                    latest_action.action_kind AS review_action_kind,
-                    latest_action.person_id AS review_person_id,
                     top_suggestion.suggestion_id,
                     top_suggestion.suggested_person_id,
                     top_suggestion.display_name AS suggested_person_name,
@@ -291,7 +288,7 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         string confidenceGroup,
         PersonId? suggestedPersonId)
     {
-        List<string> predicates = [StatePredicate(state), ConfidencePredicate(confidenceGroup)];
+        List<string> predicates = [StateCountPredicate(state), ConfidencePredicate(confidenceGroup)];
         if (processingRunId is not null)
         {
             predicates.Add("""
@@ -392,22 +389,6 @@ public sealed class PostgresSuggestionGalleryRepository : ISuggestionGalleryRepo
         {
             command.Parameters.AddWithValue("suggested_person_id", Guid.Parse(personId.ToString()));
         }
-    }
-
-    private static string StatePredicate(string state)
-    {
-        string normalized = string.IsNullOrWhiteSpace(state)
-            ? "unreviewed"
-            : state.Trim().ToLowerInvariant();
-        return normalized switch
-        {
-            "unreviewed" => "latest_action.id IS NULL",
-            "assigned" => "latest_action.action_kind = 'assign'",
-            "unknown" => "latest_action.action_kind = 'unknown'",
-            "rejected" => "latest_action.action_kind = 'reject'",
-            "all" => "1 = 1",
-            _ => throw new ArgumentException($"Unsupported review state '{state}'.", nameof(state)),
-        };
     }
 
     private static string StateCountPredicate(string state)
