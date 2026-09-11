@@ -65,6 +65,25 @@ function Get-ConnectionValue {
     return $null
 }
 
+function Find-ConnectionKey {
+    param(
+        [Parameter(Mandatory)][System.Data.Common.DbConnectionStringBuilder]$Builder,
+        [Parameter(Mandatory)][string]$Name
+    )
+
+    foreach ($key in $Builder.Keys) {
+        $keyText = [string]$key
+        if ([string]::Equals(
+                $keyText,
+                $Name,
+                [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $keyText
+        }
+    }
+
+    return $null
+}
+
 function Read-ConnectionIdentity {
     param([AllowNull()][string]$ConnectionString)
 
@@ -72,85 +91,150 @@ function Read-ConnectionIdentity {
         return $null
     }
 
-    $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
+    $databaseNames = @(
+        "Database",
+        "Initial Catalog",
+        "Database Name",
+        "Db")
+    $usernameNames = @(
+        "Username",
+        "User Name",
+        "User ID",
+        "UserID",
+        "User Id")
+
+    $outerBuilder = [System.Data.Common.DbConnectionStringBuilder]::new()
     try {
-        $builder.ConnectionString = $ConnectionString
+        $outerBuilder.ConnectionString = $ConnectionString
     }
     catch {
         return [pscustomobject]@{
             DatabaseName = $null
             Username = $null
-            ParsedKeys = @()
+            OuterParsedKeys = @()
+            NestedParsedKeys = @()
+            Format = $null
+        }
+    }
+
+    $outerKeys = @($outerBuilder.Keys | ForEach-Object { [string]$_ } | Sort-Object)
+    $databaseName = Get-ConnectionValue -Builder $outerBuilder -Names $databaseNames
+    $username = Get-ConnectionValue -Builder $outerBuilder -Names $usernameNames
+    if (-not [string]::IsNullOrWhiteSpace($databaseName) -and
+        -not [string]::IsNullOrWhiteSpace($username)) {
+        return [pscustomobject]@{
+            DatabaseName = $databaseName
+            Username = $username
+            OuterParsedKeys = $outerKeys
+            NestedParsedKeys = @()
+            Format = "direct"
+        }
+    }
+
+    # Some launcher/operator configurations wrap the Npgsql value once as
+    # ConnectionString="Host=...;Database=...;Username=...". Accept exactly
+    # that one explicit wrapper; do not recursively unwrap arbitrary values.
+    $wrapperKey = Find-ConnectionKey -Builder $outerBuilder -Name "ConnectionString"
+    if (-not [string]::IsNullOrWhiteSpace($wrapperKey)) {
+        $nestedConnectionString = [string]$outerBuilder[$wrapperKey]
+        if (-not [string]::IsNullOrWhiteSpace($nestedConnectionString)) {
+            $nestedBuilder = [System.Data.Common.DbConnectionStringBuilder]::new()
+            try {
+                $nestedBuilder.ConnectionString = $nestedConnectionString
+                $nestedKeys = @(
+                    $nestedBuilder.Keys |
+                        ForEach-Object { [string]$_ } |
+                        Sort-Object)
+                $databaseName = Get-ConnectionValue -Builder $nestedBuilder -Names $databaseNames
+                $username = Get-ConnectionValue -Builder $nestedBuilder -Names $usernameNames
+                return [pscustomobject]@{
+                    DatabaseName = $databaseName
+                    Username = $username
+                    OuterParsedKeys = $outerKeys
+                    NestedParsedKeys = $nestedKeys
+                    Format = "wrapped-connection-string"
+                }
+            }
+            catch {
+                return [pscustomobject]@{
+                    DatabaseName = $null
+                    Username = $null
+                    OuterParsedKeys = $outerKeys
+                    NestedParsedKeys = @()
+                    Format = "wrapped-connection-string"
+                }
+            }
         }
     }
 
     return [pscustomobject]@{
-        DatabaseName = Get-ConnectionValue -Builder $builder -Names @(
-            "Database",
-            "Initial Catalog",
-            "Database Name",
-            "Db")
-        Username = Get-ConnectionValue -Builder $builder -Names @(
-            "Username",
-            "User Name",
-            "User ID",
-            "UserID",
-            "User Id")
-        ParsedKeys = @($builder.Keys | ForEach-Object { [string]$_ } | Sort-Object)
+        DatabaseName = $databaseName
+        Username = $username
+        OuterParsedKeys = $outerKeys
+        NestedParsedKeys = @()
+        Format = "direct"
     }
 }
 
-$processConnectionString = [Environment]::GetEnvironmentVariable(
-    $ConnectionEnvironmentVariable,
-    "Process")
-$userConnectionString = [Environment]::GetEnvironmentVariable(
-    $ConnectionEnvironmentVariable,
-    "User")
-
-$processIdentity = Read-ConnectionIdentity -ConnectionString $processConnectionString
-$userIdentity = Read-ConnectionIdentity -ConnectionString $userConnectionString
-
+$scopeCandidates = @()
 $connectionIdentity = $null
 $connectionScope = $null
-if ($null -ne $processIdentity -and
-    -not [string]::IsNullOrWhiteSpace([string]$processIdentity.DatabaseName) -and
-    -not [string]::IsNullOrWhiteSpace([string]$processIdentity.Username)) {
-    $connectionIdentity = $processIdentity
-    $connectionScope = "Process"
-}
-elseif ($null -ne $userIdentity -and
-    -not [string]::IsNullOrWhiteSpace([string]$userIdentity.DatabaseName) -and
-    -not [string]::IsNullOrWhiteSpace([string]$userIdentity.Username)) {
-    $connectionIdentity = $userIdentity
-    $connectionScope = "User"
+foreach ($scope in @("Process", "User", "Machine")) {
+    $candidateConnectionString = [Environment]::GetEnvironmentVariable(
+        $ConnectionEnvironmentVariable,
+        $scope)
+    if ([string]::IsNullOrWhiteSpace($candidateConnectionString)) {
+        continue
+    }
+
+    $candidateIdentity = Read-ConnectionIdentity -ConnectionString $candidateConnectionString
+    $scopeCandidates += [pscustomobject]@{
+        Scope = $scope
+        Identity = $candidateIdentity
+    }
+
+    if ($null -ne $candidateIdentity -and
+        -not [string]::IsNullOrWhiteSpace([string]$candidateIdentity.DatabaseName) -and
+        -not [string]::IsNullOrWhiteSpace([string]$candidateIdentity.Username)) {
+        $connectionIdentity = $candidateIdentity
+        $connectionScope = $scope
+        break
+    }
 }
 
 if ($null -eq $connectionIdentity) {
-    if ([string]::IsNullOrWhiteSpace($processConnectionString) -and
-        [string]::IsNullOrWhiteSpace($userConnectionString)) {
-        throw "The PostgreSQL connection environment variable '$ConnectionEnvironmentVariable' is not set at Process or User scope."
+    if ($scopeCandidates.Count -eq 0) {
+        throw "The PostgreSQL connection environment variable '$ConnectionEnvironmentVariable' is not set at Process, User, or Machine scope."
     }
 
-    $parsedKeys = @()
-    if ($null -ne $processIdentity) {
-        $parsedKeys += $processIdentity.ParsedKeys
-    }
-    if ($null -ne $userIdentity) {
-        $parsedKeys += $userIdentity.ParsedKeys
-    }
-    $parsedKeys = @($parsedKeys | Sort-Object -Unique)
-    $keySummary = if ($parsedKeys.Count -eq 0) {
+    $outerParsedKeys = @(
+        $scopeCandidates |
+            ForEach-Object { $_.Identity.OuterParsedKeys } |
+            Sort-Object -Unique)
+    $nestedParsedKeys = @(
+        $scopeCandidates |
+            ForEach-Object { $_.Identity.NestedParsedKeys } |
+            Sort-Object -Unique)
+
+    $outerKeySummary = if ($outerParsedKeys.Count -eq 0) {
         "<none>"
     }
     else {
-        $parsedKeys -join ", "
+        $outerParsedKeys -join ", "
+    }
+    $nestedKeySummary = if ($nestedParsedKeys.Count -eq 0) {
+        "<none>"
+    }
+    else {
+        $nestedParsedKeys -join ", "
     }
 
-    throw "The configured PostgreSQL connection string does not expose both a database and user name. Parsed key names: $keySummary. Values are intentionally omitted."
+    throw "The configured PostgreSQL connection string does not expose both a database and user name. Outer parsed key names: $outerKeySummary. Nested ConnectionString key names: $nestedKeySummary. Values are intentionally omitted."
 }
 
 $databaseName = [string]$connectionIdentity.DatabaseName
 $username = [string]$connectionIdentity.Username
+$connectionFormat = [string]$connectionIdentity.Format
 if ($databaseName -notmatch '^[A-Za-z0-9_]+$') {
     throw "The configured PostgreSQL database name contains unsupported characters for this diagnostic."
 }
@@ -193,6 +277,7 @@ $header = @(
     "captured-at-utc: $([DateTimeOffset]::UtcNow.ToString('O'))",
     "connection-environment-variable: $ConnectionEnvironmentVariable",
     "connection-environment-scope: $connectionScope",
+    "connection-environment-format: $connectionFormat",
     "statement-timeout-seconds: $StatementTimeoutSeconds",
     "note: connection string and credentials are intentionally omitted",
     ""
