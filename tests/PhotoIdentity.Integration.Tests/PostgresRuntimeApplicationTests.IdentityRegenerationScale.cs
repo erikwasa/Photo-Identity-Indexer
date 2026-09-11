@@ -99,17 +99,18 @@ public sealed class PostgresRuntimeApplicationTests_IdentityRegenerationScale
 
                 using CancellationTokenSource statusTimeout = new(TimeSpan.FromSeconds(2));
                 Stopwatch statusTimer = Stopwatch.StartNew();
-                ReviewIdentityMatchRegenerationRun? duringBatch = await runs.GetLatestAsync(
-                    modelId,
-                    modelHash,
-                    statusTimeout.Token);
+                ReviewIdentityMatchRegenerationRun duringBatch =
+                    Assert.IsType<ReviewIdentityMatchRegenerationRun>(
+                        await runs.GetLatestAsync(
+                            modelId,
+                            modelHash,
+                            statusTimeout.Token));
                 statusTimer.Stop();
 
                 statusReadCount++;
                 maxStatusReadMilliseconds = Math.Max(
                     maxStatusReadMilliseconds,
                     statusTimer.Elapsed.TotalMilliseconds);
-                Assert.NotNull(duringBatch);
                 Assert.True(duringBatch.IsActive);
 
                 Assert.True(await advance);
