@@ -30,6 +30,9 @@ public static class ArchiveThroughputMetricNames
     public const string SlideshowPreparationStatus = "slideshow-preparation-status";
     public const string SlideshowPreparedOriginalOpen = "slideshow-prepared-original-open";
     public const string CollectionViewerPreviewOpen = "collection-viewer-preview-open";
+    public const string SlideshowBrowserImagePresentation = "slideshow-browser-image-presentation";
+    public const string SlideshowBrowserImageResource = "slideshow-browser-image-resource";
+    public const string SlideshowBrowserImagePresentationPositionPrefix = "slideshow-browser-image-presentation-position-";
     public const string ApiArchiveRequest = "api-archive-request";
     public const string ApiCollectionRequest = "api-collection-request";
     public const string ApiMetadataRequest = "api-metadata-request";
@@ -55,6 +58,8 @@ public static class ArchiveThroughputMetricNames
     public const string ArchiveErrors = "archive-errors";
     public const string ApiRequestSucceeded = "api-requests-succeeded";
     public const string ApiRequestFailed = "api-requests-failed";
+    public const string SlideshowBrowserPrefetchHits = "slideshow-browser-prefetch-hits";
+    public const string SlideshowBrowserPrefetchMisses = "slideshow-browser-prefetch-misses";
     public const string IdentityRegenerationTargetsClaimed = "identity-regeneration-targets-claimed";
     public const string IdentityRegenerationTargetsCompleted = "identity-regeneration-targets-completed";
     public const string IdentityRegenerationTargetsFailed = "identity-regeneration-targets-failed";
@@ -124,6 +129,17 @@ public sealed class ArchiveThroughputMetrics
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         return new MeasurementScope(this, name, Stopwatch.GetTimestamp());
+    }
+
+    public void RecordStage(string name, TimeSpan elapsed)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (elapsed < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(elapsed));
+        }
+
+        RecordStageCore(name, elapsed);
     }
 
     public void RecordCounter(string name, long delta = 1)
@@ -261,7 +277,7 @@ public sealed class ArchiveThroughputMetrics
         }
     }
 
-    private void RecordStage(string name, TimeSpan elapsed)
+    private void RecordStageCore(string name, TimeSpan elapsed)
     {
         lock (_gate)
         {
@@ -302,7 +318,7 @@ public sealed class ArchiveThroughputMetrics
                 return;
             }
 
-            _owner.RecordStage(_name, Stopwatch.GetElapsedTime(_startedTimestamp));
+            _owner.RecordStageCore(_name, Stopwatch.GetElapsedTime(_startedTimestamp));
         }
     }
 

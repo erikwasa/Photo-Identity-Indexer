@@ -10,15 +10,15 @@ Formal work-item lifecycle status and evidence are resolved by PhotoIdentity.Doc
 
 The production launcher selects PostgreSQL as the single authoritative catalogue. `/health` was maintainer-verified with `status: ok`, `catalogueProvider: postgresql`, PostgreSQL `status: ready` and schema version 23. The preserved final SQLite backup remains a rollback/migration artifact and must not be treated as a second writable authority.
 
-WI-0103 passed live PostgreSQL regeneration scale acceptance and WI-0104 passed real-catalogue review/gallery/Settings acceptance. Their canonical administrative closeout merged through PR #296. The first WI-0108 timing/probe slice merged through PR #297.
+WI-0103 passed live PostgreSQL regeneration scale acceptance and WI-0104 passed real-catalogue review/gallery/Settings acceptance. Their canonical administrative closeout merged through PR #296. WI-0108 server timing instrumentation merged through PR #297 and ordered distinct-image probing merged through PR #301.
 
-The 2026-09-11 WI-0108 real-catalogue baseline materially narrows the performance investigation. Once the PR #297 build was actually published into the launcher-selected application directory and the probe used `http://127.0.0.1:5080`, the measured server paths were already fast: one-photo library/snapshot/viewer/prepared-original operations were tens of milliseconds, and an 11-photo representative collection created its snapshot in about 34 ms and served its first preview in about 51 ms. Hash verification in the measured one-photo path was only a few milliseconds per read.
+The 2026-09-11 WI-0108 real-catalogue evidence now rules out the measured server paths as the source of the reported multi-second slideshow delay. With explicit IPv4 loopback, one-photo library/snapshot/viewer/prepared-original operations were tens of milliseconds. The representative 11-photo ordered sequence measured distinct viewer previews between roughly 35 and 83 ms with no systematic growth by slideshow position; `collection-viewer-preview-open` averaged about 47 ms and peaked around 73 ms.
 
-The probe's original `http://localhost:5080` default produced an artificial roughly two-second delay per request on the maintainer's Windows environment while server stages stayed fast. That was a probe/client loopback artifact and does not explain real browser slideshow playback, which uses application-relative URLs.
+Five of the 11 distinct images required one `original-open` hash read each. Those reads averaged about 24 ms and peaked around 38 ms, but did not accumulate with later positions. Repeating the first preview after the ordered sequence took about 31 ms and required no additional hash read. PostgreSQL query/index work or immutable-verification caching is therefore not justified as the first correction from current evidence.
 
-The evidence therefore does not justify a PostgreSQL query/index rewrite or immutable-verification cache as the first WI-0108 correction. The remaining direct-server evidence gap is progression through distinct slideshow items: the first probe repeatedly fetched only the first revision and could not test the reported latency growth as playback advances.
+The earlier `http://localhost:5080` roughly two-second request penalty was a PowerShell/Windows loopback artifact in the diagnostic probe and was corrected by using `http://127.0.0.1:5080`. It does not explain real phone/browser slideshow playback, which uses application-relative URLs.
 
-The current slice changes the probe default to explicit IPv4 loopback and adds a bounded ordered distinct-viewer-preview sequence. It preserves repeated-first-preview and optional prepared-original phases for cache/hash evidence and keeps reports path-free and revision-free.
+The active WI-0108 slice instruments the actual browser slideshow surface without changing playback behavior. A browser observer records at most 50 identity-free samples per slideshow: one-based sequence, DOM-presentation-to-`load` elapsed time, same-origin Resource Timing duration when available, and whether the resource had already completed before presentation. Samples are added to the existing process-local throughput diagnostics through `/api/slideshows/diagnostics/playback`.
 
 Consolidated real-phone M22 acceptance still has two separate functional gaps tracked by WI-0107: direct originating-gesture fullscreen launch and durable/revalidated prepared-original receipt state. Do not mix those functional corrections into WI-0108 performance work.
 
@@ -28,26 +28,28 @@ A separate Collections / Library navigation gap remains outside this M24 thread.
 
 For the M24 thread:
 
-1. Merge the WI-0108 ordered-sequence diagnostic slice after green CI.
+1. Merge the WI-0108 browser-playback diagnostic slice after green CI.
 2. Republish the merged `main` build into the launcher-selected application directory.
-3. Run `measure-slideshow-performance.ps1` against the representative 11-photo Smart Collection with the default ordered sample (or `-SequenceItemCount 11`) and inspect `sequenceViewerPreviews`, `sequenceViewerPreviewStages` and hash-read evidence.
-4. If distinct direct-server image latency remains bounded with slideshow position, instrument the actual slideshow playback surface for browser-visible image request/load/prefetch timing and reproduce on the real phone before changing PostgreSQL query shape or immutable verification semantics.
-5. Complete WI-0108 real-archive performance acceptance, then execute WI-0106 PostgreSQL startup/restart, backup/restore, sustained catch-up and daily-style increment acceptance.
-6. Close M24 only after WI-0108 and WI-0106 are complete and milestone exit criteria are reconciled.
+3. On Windows run `./measure-slideshow-browser-performance.ps1 -Reset`.
+4. On the supported phone/browser run the representative slideshow through at least 10 distinct images using the navigation mode that previously felt slow.
+5. Back on Windows run `./measure-slideshow-browser-performance.ps1` and inspect per-sequence presentation time, Resource Timing and prefetch hit/miss evidence together with the server stages from the same diagnostics generation.
+6. Choose a correction only if the phone evidence identifies a material browser/network/prefetch stage; otherwise move WI-0108 to maintainer performance acceptance.
+7. Complete WI-0108, then execute WI-0106 PostgreSQL startup/restart, backup/restore, sustained catch-up and daily-style increment acceptance.
+8. Close M24 only after WI-0108 and WI-0106 are complete and milestone exit criteria are reconciled.
 
 ## Relevant files
 
 - docs/delivery/work-items/WI-0108-slideshow-performance.md
 - docs/operations/slideshow-performance-diagnostics.md
+- docs/operations/slideshow-browser-performance-diagnostics.md
 - measure-slideshow-performance.ps1
+- measure-slideshow-browser-performance.ps1
 - src/PhotoIdentity.Web/Pages/Slideshow.razor
 - src/PhotoIdentity.Web/Pages/Slideshow.razor.cs
-- src/PhotoIdentity.Api/SmartCollectionEndpoints.cs
+- src/PhotoIdentity.Web/wwwroot/js/slideshow.js
+- src/PhotoIdentity.Web/wwwroot/js/slideshow-performance.js
 - src/PhotoIdentity.Api/SlideshowOriginalPreparationEndpoints.cs
 - src/PhotoIdentity.Api/CollectionViewerPreviewEndpoints.cs
-- src/PhotoIdentity.Api/CollectionOriginalAccessService.cs
-- src/PhotoIdentity.Api/SlideshowOriginalPreparationService.cs
-- src/PhotoIdentity.Persistence.Postgres/PostgresSmartCollectionQueryRepository.cs
 - src/PhotoIdentity.Worker/ArchiveThroughputMetrics.cs
 - docs/delivery/work-items/WI-0106-postgresql-operations-and-archive-catchup.md
 - docs/delivery/status/work-items.yaml
