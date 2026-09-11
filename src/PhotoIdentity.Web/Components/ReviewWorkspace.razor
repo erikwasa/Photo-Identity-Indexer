@@ -557,12 +557,6 @@ else
 
     private Task LoadMoreAsync() => LoadFacesAsync(reset: false, targetCount: Faces.Count + PageSize);
 
-    private async Task ReloadLoadedAsync()
-    {
-        int target = Math.Max(PageSize, Faces.Count);
-        await LoadFacesAsync(reset: true, targetCount: target);
-    }
-
     private async Task ChangeStateAsync(string state)
     {
         State = state;
@@ -919,59 +913,241 @@ else
 
     private async Task AcceptSuggestionAsync((string FaceId, long SuggestionId) request)
     {
-        await ApplyActionAsync(
-            $"api/review/faces/{Uri.EscapeDataString(request.FaceId)}/suggestions/{request.SuggestionId}/accept",
-            new ReviewSuggestionActionRequest(Actor),
-            "Suggestion accepted.");
+        int desiredLoaded = Faces.Count;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/review/faces/{Uri.EscapeDataString(request.FaceId)}/suggestions/{request.SuggestionId}/accept",
+                new ReviewSuggestionActionRequest(Actor));
+            await RequireSuccessAsync(response);
+            ReviewIdentitySuggestionResponse accepted =
+                await response.Content.ReadFromJsonAsync<ReviewIdentitySuggestionResponse>()
+                ?? throw new InvalidOperationException("The accepted suggestion response was empty.");
+            ReviewPersonResponse person =
+                People.FirstOrDefault(candidate => candidate.Id == accepted.Person.Id) ?? accepted.Person;
+            ApplySingleFaceDecision(request.FaceId, "assigned", person, topSuggestion: null);
+            Message = "Suggestion accepted.";
+            await BackfillAfterSingleAsync(desiredLoaded);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
     }
 
     private async Task AssignAsync((string FaceId, string PersonId) request)
     {
-        await ApplyActionAsync(
+        ReviewPersonResponse? person = People.FirstOrDefault(candidate => candidate.Id == request.PersonId);
+        await ApplySingleFaceActionAsync(
+            request.FaceId,
             $"api/review/faces/{Uri.EscapeDataString(request.FaceId)}/assign",
             new AssignFaceRequest(request.PersonId, Actor),
+            "assigned",
+            person,
             "Face assignment saved.");
     }
 
-    private async Task MarkUnknownAsync(string faceId)
-    {
-        await ApplyActionAsync(
+    private Task MarkUnknownAsync(string faceId) =>
+        ApplySingleFaceActionAsync(
+            faceId,
             $"api/review/faces/{Uri.EscapeDataString(faceId)}/unknown",
             new ReviewFaceActionRequest(Actor),
+            "unknown",
+            person: null,
             "Face marked as an unknown person.");
-    }
 
-    private async Task RejectAsync(string faceId)
-    {
-        await ApplyActionAsync(
+    private Task RejectAsync(string faceId) =>
+        ApplySingleFaceActionAsync(
+            faceId,
             $"api/review/faces/{Uri.EscapeDataString(faceId)}/reject",
             new ReviewFaceActionRequest(Actor),
+            "rejected",
+            person: null,
             "False detection saved.");
-    }
 
     private async Task UndoAsync(string faceId)
     {
-        await ApplyActionAsync(
-            $"api/review/faces/{Uri.EscapeDataString(faceId)}/undo",
-            new ReviewFaceActionRequest(Actor),
-            "Latest review action undone.");
+        int desiredLoaded = Faces.Count;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/review/faces/{Uri.EscapeDataString(faceId)}/undo",
+                new ReviewFaceActionRequest(Actor));
+            await RequireSuccessAsync(response);
+            ReviewFaceResponse refreshed = await LoadSingleFaceAsync(faceId);
+            ReconcileSingleFace(refreshed);
+            Message = "Latest review action undone.";
+            await BackfillAfterSingleAsync(desiredLoaded);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
     }
 
-    private async Task ApplyActionAsync<TRequest>(string url, TRequest request, string successMessage)
+    private async Task ApplySingleFaceActionAsync<TRequest>(
+        string faceId,
+        string url,
+        TRequest request,
+        string state,
+        ReviewPersonResponse? person,
+        string successMessage)
     {
+        int desiredLoaded = Faces.Count;
         Error = null;
         Message = null;
         try
         {
             using HttpResponseMessage response = await Http.PostAsJsonAsync(url, request);
             await RequireSuccessAsync(response);
+            ApplySingleFaceDecision(faceId, state, person);
             Message = successMessage;
-            await ReloadLoadedAsync();
+            await BackfillAfterSingleAsync(desiredLoaded);
         }
         catch (Exception exception)
         {
             Error = exception.Message;
         }
+    }
+
+    private void ApplySingleFaceDecision(
+        string faceId,
+        string state,
+        ReviewPersonResponse? person,
+        ReviewTopSuggestionResponse? topSuggestion = null)
+    {
+        int index = Faces.FindIndex(face => face.Id == faceId);
+        if (index < 0)
+        {
+            return;
+        }
+
+        ReviewFaceResponse current = Faces[index];
+        ReviewFaceResponse updated = current with
+        {
+            State = state,
+            Person = person,
+            TopSuggestion = topSuggestion ?? current.TopSuggestion,
+        };
+        if (state == "assigned" && topSuggestion is null && current.TopSuggestion is { Status: "pending" } && person?.Id == current.TopSuggestion.Person.Id)
+        {
+            updated = updated with { TopSuggestion = null };
+        }
+
+        ReconcileSingleFace(updated);
+    }
+
+    private void ReconcileSingleFace(ReviewFaceResponse updated)
+    {
+        int index = Faces.FindIndex(face => face.Id == updated.Id);
+        if (index < 0)
+        {
+            return;
+        }
+
+        bool matches = MatchesCurrentQueue(updated);
+        if (matches)
+        {
+            Faces[index] = updated;
+        }
+        else
+        {
+            Faces.RemoveAt(index);
+            Total = Math.Max(0, Total - 1);
+            SelectedFaceIds.Remove(updated.Id);
+            if (SelectionAnchorFaceId == updated.Id)
+            {
+                SelectionAnchorFaceId = null;
+            }
+        }
+
+        ScrollGeneration++;
+    }
+
+    private bool MatchesCurrentQueue(ReviewFaceResponse face)
+    {
+        if (State != "all" && !string.Equals(State, face.State, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (SelectedModel is null)
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(SuggestedPersonId) &&
+            !string.Equals(face.TopSuggestion?.Person.Id, SuggestedPersonId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        return ConfidenceGroup == AllConfidenceGroups ||
+               string.Equals(face.TopSuggestion?.ConfidenceGroup, ConfidenceGroup, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task<ReviewFaceResponse> LoadSingleFaceAsync(string faceId)
+    {
+        ReviewFaceDetailsResponse details =
+            await Http.GetFromJsonAsync<ReviewFaceDetailsResponse>(
+                $"api/review/faces/{Uri.EscapeDataString(faceId)}")
+            ?? throw new InvalidOperationException("The refreshed face response was empty.");
+        ReviewFaceResponse face = details.Face;
+
+        if (SelectedModel is not ReviewModelRevisionFilterResponse model)
+        {
+            return face;
+        }
+
+        ReviewIdentitySuggestionResponse[] suggestions =
+            await Http.GetFromJsonAsync<ReviewIdentitySuggestionResponse[]>(
+                $"api/review/faces/{Uri.EscapeDataString(faceId)}/suggestions") ?? [];
+        ReviewIdentitySuggestionResponse? top = suggestions
+            .Where(suggestion =>
+                suggestion.ModelId == model.ModelId &&
+                suggestion.ModelHash == model.ModelHash &&
+                suggestion.Rank == 1 &&
+                suggestion.Status == "pending")
+            .OrderBy(suggestion => suggestion.Id)
+            .FirstOrDefault();
+        if (top is null)
+        {
+            return face;
+        }
+
+        string confidenceGroup = Faces
+            .FirstOrDefault(candidate => candidate.Id == faceId)?
+            .TopSuggestion?.ConfidenceGroup ?? string.Empty;
+        ReviewPersonResponse person =
+            People.FirstOrDefault(candidate => candidate.Id == top.Person.Id) ?? top.Person;
+        return face with
+        {
+            TopSuggestion = new ReviewTopSuggestionResponse(
+                top.Id,
+                person,
+                top.ModelId,
+                top.ModelHash,
+                top.Rank,
+                top.Score,
+                top.ScoreMargin,
+                top.Status,
+                top.GeneratedAtUtc,
+                confidenceGroup),
+        };
+    }
+
+    private async Task BackfillAfterSingleAsync(int desiredLoaded)
+    {
+        if (!HasMore || Faces.Count >= desiredLoaded)
+        {
+            return;
+        }
+
+        await LoadFacesAsync(reset: false, targetCount: Math.Min(desiredLoaded, MaximumInitialLoad));
     }
 
     private static string PersonLabel(ReviewPersonResponse person) =>
