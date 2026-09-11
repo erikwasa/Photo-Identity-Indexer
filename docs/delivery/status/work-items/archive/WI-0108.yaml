@@ -1,0 +1,34 @@
+id: WI-0108
+title: Remove slideshow library, startup and playback latency bottlenecks
+milestone: M24
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0108-slideshow-performance.md
+started_at: 2026-09-11
+completed_at: 2026-09-12
+verified_at: 2026-09-12
+verified_by: maintainer
+last_updated_at: 2026-09-12
+branch: codex/m24-wi0108-closeout
+blockers:
+- WI-0101
+blocker_notes:
+- Real-phone M22 acceptance observed slow saved-collection loading, roughly 20-second startup for an already-prepared one-photo slideshow, and slow image-to-image transitions that appeared to worsen through playback.
+- PostgreSQL migration may improve some query costs, but WI-0108 explicitly owns both database and database-independent slideshow latency so these findings are not assumed fixed by cutover alone.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/297
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/301
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/303
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/304
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34653500870
+- type: merge_commit
+  value: 74ca77b6230ec76df6112013e0e583ed60b03d45
+- type: verification
+  value: '2026-09-11 schema-23 PostgreSQL direct probe: slideshow library about 9-12 ms, one-photo snapshot about 23-27 ms, 11-photo snapshot about 34 ms, viewer/prepared-original serving tens of milliseconds, and no systematic ordered-position latency growth.'
+- type: verification
+  value: '2026-09-12 maintainer phone acceptance after PR #304: slideshow remained subjectively responsive; 10/11 displayed images were prefetch hits, presentation averaged about 7.7 ms, preview opens fell 39->12, collection API requests 50->13 and original-open hash reads 22->6 with no systematic latency growth.'

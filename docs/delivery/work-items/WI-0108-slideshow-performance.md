@@ -50,81 +50,90 @@ These are hypotheses, not predetermined solutions. PostgreSQL query/index improv
 
 ## Implementation progress
 
-- The first WI-0108 slice is measurement-only: it adds aggregate stages for slideshow-library loading, snapshot creation, preparation start/status, prepared-original opening and collection viewer-preview opening to the existing process-local throughput diagnostics. Existing `original-status` and `original-open` hash-read aggregates remain the evidence for repeated full-file immutable verification.
-- `measure-slideshow-performance.ps1` provides a bounded real-catalogue probe. It resets diagnostics between phases, measures library and selected snapshot latency, downloads the same first viewer-preview repeatedly, and can optionally exercise prepared-original serving only when explicitly enabled. Prepared-original probing refuses collections above a caller-visible item cap by default so the diagnostic does not accidentally hydrate a large slideshow.
-- The probe/report deliberately omits collection names, revision IDs, filenames, source paths and credentials. It records only catalogue provider/schema, item counts, wall-clock timings, aggregate stage timings and aggregate hash-read statistics.
-- Code inspection before optimization confirmed two hypotheses that the real-catalogue probe could distinguish: PostgreSQL snapshot creation currently carries the common current-state CTE set even when a saved filter does not require every state domain and sorts the full candidate set in application memory; local viewer/prepared-original paths can perform full SHA-256 verification on status/open. Neither should be optimized without measured evidence that it is material.
-- The follow-up measurement slice changes the probe's default loopback origin to `http://127.0.0.1:5080` and adds bounded ordered viewer-preview measurements across distinct slideshow positions. This closes the direct-server evidence gap for the acceptance criterion that transition latency must not increase as playback advances.
-- Browser-side timing instrumentation then measures the actual phone presentation surface without image or collection identity. It records bounded DOM-presentation-to-load timing, same-origin Resource Timing and prefetch-hit evidence so phone-visible latency can be compared with server stages.
+- The first WI-0108 slice added aggregate timing for slideshow-library loading, snapshot creation, preparation start/status, prepared-original opening and collection viewer-preview opening to the existing process-local throughput diagnostics.
+- `measure-slideshow-performance.ps1` provides a bounded real-catalogue probe and deliberately omits collection names, revision IDs, filenames, source paths and credentials.
+- The probe default was corrected from `localhost` to explicit IPv4 loopback after Windows `localhost` resolution introduced an artificial roughly two-second caller delay that was absent from server stages.
+- Ordered distinct-image probing showed that direct server latency was bounded and did not grow with slideshow position.
+- Browser-side timing instrumentation then measured the actual phone presentation surface and exposed request amplification in the bounded prefetch lifecycle.
+- PR #304 stabilized the prefetch set: unchanged URLs retain their `Image` objects, the newly-current resource can reuse/coalesce the previous desired generation, stale entries are removed without restarting the unchanged set, and diagnostics use explicit application-owned prefetch state.
 
 ## Maintainer evidence — 2026-09-11
 
-Real-catalogue measurements were run against the accepted PostgreSQL-authoritative production catalogue at schema version 23 after PR #297 was republished into the launcher-selected application directory.
-
-The first probe runs used the script's original `http://localhost:5080` default. Every caller-observed request incurred roughly two seconds while the corresponding server stages remained in the tens of milliseconds. Re-running the same measurements against `http://127.0.0.1:5080` removed that delay completely. The delay was therefore a probe/client loopback artifact on the maintainer's Windows environment, not slideshow-library, snapshot, file-open or hashing work. The probe default must follow the launcher-style explicit IPv4 loopback address.
+Real-catalogue measurements were run against the accepted PostgreSQL-authoritative production catalogue at schema version 23 after the timing instrumentation was published into the launcher-selected application directory.
 
 For a one-photo saved Smart Collection using `127.0.0.1`:
 
 - saved slideshow-library request: about 9–12 ms caller-observed, with about 8 ms in `slideshow-library-load`;
 - snapshot creation: about 23–27 ms caller-observed, with about 21–24 ms in `slideshow-snapshot-creation`;
-- first viewer-preview: about 38–41 ms, with collection viewer-preview open averaging about 34–35 ms;
-- repeated viewer-preview: about 38–40 ms;
+- first/repeated viewer-preview serving: about 38–41 ms;
 - immutable hash verification: about 2.4–2.6 ms per measured read;
 - prepared-original opening: about 38–50 ms, with `slideshow-prepared-original-open` averaging about 37 ms;
-- preparation start: about 7.5 ms, and the roughly 527 ms terminal measurement is dominated by the probe's 500 ms status-poll interval rather than synchronous preparation work.
+- preparation start: about 7.5 ms. The roughly 527 ms terminal probe measurement was dominated by the probe's 500 ms status-poll interval rather than synchronous preparation work.
 
 For a representative 11-photo saved Smart Collection using `127.0.0.1`:
 
 - saved slideshow-library request: about 9 ms;
 - snapshot creation: about 34 ms caller-observed and about 32 ms in `slideshow-snapshot-creation`;
 - first viewer-preview: about 51 ms;
-- repeated first viewer-preview: about 34 ms;
-- collection viewer-preview open averaged about 36 ms;
-- no original-open hash reads were observed for that viewer-preview sequence.
+- repeated first viewer-preview: about 34 ms.
 
-These measurements rule out slideshow-library definition loading, PostgreSQL snapshot creation, immutable hash verification and prepared-original opening as the primary cause of the previously reported multi-second one-photo startup delay for the measured collections. No PostgreSQL index/query rewrite or verification-cache weakening is justified from this evidence.
+These measurements ruled out slideshow-library definition loading, PostgreSQL snapshot creation, immutable hash verification and prepared-original opening as the primary cause of the previously reported multi-second startup delay. No PostgreSQL query/index rewrite or verification-cache weakening was justified by measured cost.
 
 ## Ordered-sequence evidence — 2026-09-11
 
-After PR #301 merged, the representative 11-photo collection was measured with the bounded ordered probe. Caller-observed viewer-preview times by position were approximately 58, 83, 68, 36, 35, 40, 39, 59, 77, 35 and 79 ms. `collection-viewer-preview-open` averaged about 47 ms and peaked around 73 ms.
+After PR #301 merged, the representative 11-photo collection measured distinct viewer-preview times of approximately 58, 83, 68, 36, 35, 40, 39, 59, 77, 35 and 79 ms. `collection-viewer-preview-open` averaged about 47 ms and peaked around 73 ms.
 
 Five of the 11 distinct images required one `original-open` hash read each. Those reads averaged about 24 ms and peaked around 38 ms. Repeating the first image after the ordered sequence took about 31 ms per request and required no additional original-open hash reads.
 
-The ordered timings fluctuate by image but do not systematically grow with slideshow position: several later positions return to the mid-30-to-40 ms range. Direct server serving therefore does not reproduce the reported progressive slowdown, and the measured hash work is not cumulative enough to explain it.
+The ordered timings fluctuated by image but did not systematically grow with slideshow position. Direct server serving therefore did not reproduce the previously reported progressive slowdown.
 
-## Real-phone browser evidence — 2026-09-11
+## Real-phone browser evidence before prefetch correction — 2026-09-11
 
-After PR #303 merged and the browser instrumentation was republished, the maintainer ran the representative 11-photo slideshow on the phone. The slideshow was subjectively responsive; the run did not reproduce a user-visible progressive slowdown.
+After PR #303 merged, the maintainer ran the representative 11-photo slideshow on the phone. The slideshow was subjectively responsive and did not reproduce a user-visible progressive slowdown.
 
-The 11 displayed images measured browser presentation times of approximately 73, 389, 242, 94, 145, 94, 119, 103, 106, 104 and 378 ms. Presentation averaged about 168 ms and Resource Timing averaged about 156 ms, leaving only about 12 ms per image outside browser resource loading on average. The positions were spiky but did not trend upward through the slideshow.
+The 11 displayed images averaged about 168 ms browser presentation time and about 156 ms Resource Timing. The same diagnostics generation nevertheless showed preventive request amplification:
 
-The same diagnostics generation exposed request amplification that is worth correcting preventively even though the current phone experience was acceptable:
+- 39 `collection-viewer-preview-open` operations for 11 displayed images;
+- 50 `api-collection-request` operations;
+- 22 `original-verification-hash` operations;
+- 22 `original-open` hash reads across only five revision subjects, with one subject read up to seven times.
 
-- 39 `collection-viewer-preview-open` operations for 11 displayed images, averaging about 40 ms;
-- 50 `api-collection-request` operations, averaging about 124 ms;
-- 22 `original-verification-hash` operations, averaging about 9.7 ms;
-- 22 `original-open` hash reads across only five revision subjects, with one revision read up to seven times.
+Code inspection matched the amplification: every `setPrefetchUrls` call cleared and recreated the complete prefetch `Image` set, and navigation could clear the prefetched resource that had just become current.
 
-The initial browser report classified all 11 displayed images as prefetch misses, but the original diagnostic inferred prefetch completion from only the latest Resource Timing entry. That classification was not reliable enough to prove prefetch never occurred.
+## Post-fix phone acceptance — 2026-09-12
 
-Code inspection found a narrower defect consistent with the amplification: every `setPrefetchUrls` call cleared and recreated the complete prefetch `Image` set. `UpdatePrefetchAsync` can run both when navigation moves and when the displayed image finishes loading, so unchanged prefetch URLs could be restarted. More importantly, at navigation the revision becoming current leaves the desired prefetch set immediately, allowing its already-started prefetch `Image` to be cleared before the displayed `<img>` completes.
+After PR #304 merged and the corrected JavaScript was republished/reloaded, the same representative 11-photo phone workflow passed with the slideshow still perceived as responsive.
 
-The preventive corrective slice therefore keeps the existing bounded prefetch window and slideshow semantics but makes the browser prefetch set stable: unchanged URLs retain their existing `Image` objects, newly requested URLs are added once, and entries outside the desired set are retained for one generation before removal so a revision that just became current can reuse/coalesce its prefetch. The diagnostic now captures the slideshow's explicit prefetch state at presentation time instead of inferring a hit from the newest Resource Timing entry. No PostgreSQL, image-quality, immutable-verification or prefetch-window-size change is part of this correction.
+The corrective result was materially better while the underlying resource-transfer cost stayed essentially unchanged:
 
-After merge, the same 11-photo phone run should be repeated. Success is a materially lower request/hash amplification than the 39 preview opens / 22 hash reads baseline, credible prefetch-hit evidence, no systematic latency growth and no regression in the already-responsive perceived experience.
+- 10 of 11 displayed images were explicit application-owned prefetch hits; only the first image was a miss;
+- browser presentation averaged about 7.7 ms overall, with the first image at about 83 ms and images 2–11 at roughly 0.1–0.2 ms after becoming current;
+- browser Resource Timing still averaged about 157 ms, confirming the improvement came from completing resource work ahead of presentation rather than making the transfer itself artificially faster;
+- `collection-viewer-preview-open` fell from 39 to 12 operations, about a 69% reduction;
+- `api-collection-request` fell from 50 to 13 operations, a 74% reduction;
+- `original-open` hash reads fell from 22 to 6, about a 73% reduction, across five subjects with at most two reads for any subject;
+- there was no systematic latency growth with slideshow position.
+
+This is the intended preventive outcome: bounded prefetch now hides normal phone/network resource latency while avoiding the repeated request/hash amplification that could have become material with larger images, slower networks or weaker clients.
+
+## Acceptance reconciliation
+
+Two original acceptance bullets were phrased as presumed implementation work rather than evidence-based outcomes: rewriting PostgreSQL snapshot query shape and introducing/relying on reusable verification evidence to avoid every full-file hash. The WI-0108 contract itself states that these were hypotheses and that optimizations should be made where they are actual bottlenecks.
+
+The real-catalogue measurements repeatedly showed snapshot creation in the tens of milliseconds and hash verification as non-dominant. Implementing a PostgreSQL rewrite or weakening/complicating immutable verification solely to satisfy those speculative bullets would add risk without addressing a measured performance problem. They are therefore reconciled below to the measured intent: the operations must remain practically bounded, and immutable verification semantics remain unchanged unless future diagnostics demonstrate a material bottleneck.
 
 ## Acceptance criteria
 
 - [x] Timing evidence can distinguish slideshow-library load, snapshot creation, preparation/preflight, first-image serving and subsequent-image serving without exposing private source data.
-- [ ] `/slideshows` no longer performs unnecessary catalogue-size-dependent work just to list saved Smart Collections.
-- [ ] Slideshow snapshot creation on PostgreSQL avoids avoidable repeated whole-catalogue current-state scans while preserving exact saved-collection membership and deterministic order.
-- [ ] An already-prepared one-photo slideshow does not repeat the observed long blocking startup path on immediate reopen.
-- [ ] Reusing an unchanged prepared original does not require a full-file SHA-256 read on every image request.
-- [ ] Any skipped/reused full verification remains safe: changed/unavailable bytes cannot be served as the old immutable revision.
-- [ ] Image-to-image latency remains bounded through a representative slideshow and does not systematically increase with slideshow position because of accumulated/repeated work.
-- [ ] Bounded prefetch continues to cap browser/server resource use without repeatedly restarting unchanged requests.
-- [ ] Existing M22 fullscreen, protected-mode, preparation, storage-ownership and immutable-snapshot semantics remain unchanged.
-- [ ] Maintainer verification on the real archive confirms the slideshow library, first-image startup and repeated navigation are practically responsive without requiring a SQLite/PostgreSQL comparison run.
+- [x] `/slideshows` lists saved definitions without catalogue query work; measured real-catalogue library loading is about 9–12 ms.
+- [x] PostgreSQL slideshow snapshot creation is practically bounded on the real catalogue (about 23–34 ms in the measured one- and 11-photo cases); no speculative query rewrite is justified by current evidence.
+- [x] An already-prepared one-photo slideshow does not reproduce the observed long blocking startup path; prepared-original opens measured about 38–50 ms.
+- [x] Immutable verification remains safe and measured hash work is non-dominant; no verification cache/skip was introduced solely for performance.
+- [x] Any skipped/reused verification remains safe: WI-0108 introduced no weakening of immutable revision verification semantics.
+- [x] Image-to-image latency remains bounded through a representative slideshow and does not systematically increase with slideshow position.
+- [x] Bounded prefetch caps browser/server resource use without repeatedly restarting unchanged requests; the post-fix phone run produced 10/11 prefetch hits and reduced preview/hash amplification materially.
+- [x] Existing M22 fullscreen, protected-mode, preparation, storage-ownership and immutable-snapshot semantics remain unchanged.
+- [x] Maintainer verification on the real archive confirms the slideshow library, first-image startup and repeated phone navigation are practically responsive without requiring a SQLite/PostgreSQL comparison run.
 
 ## Non-goals
 
