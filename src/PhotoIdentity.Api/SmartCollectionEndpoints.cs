@@ -2,6 +2,7 @@ using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Tags;
+using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
 
@@ -139,10 +140,15 @@ public static class SmartCollectionEndpoints
 
     private static async Task<IResult> ListSlideshowCollectionsAsync(
         ISmartCollectionRepository repository,
+        ArchiveThroughputMetrics metrics,
         CancellationToken cancellationToken)
     {
-        IReadOnlyList<SmartCollectionDefinition> definitions =
-            await repository.ListAsync(cancellationToken);
+        IReadOnlyList<SmartCollectionDefinition> definitions;
+        using (metrics.Measure(ArchiveThroughputMetricNames.SlideshowLibraryLoad))
+        {
+            definitions = await repository.ListAsync(cancellationToken);
+        }
+
         return Results.Ok(definitions
             .Select(definition => new SlideshowLibraryCollectionResponse(
                 definition.Id.ToString(),
@@ -225,6 +231,7 @@ public static class SmartCollectionEndpoints
     private static async Task<IResult> CreateSlideshowSnapshotAsync(
         Guid id,
         ISmartCollectionQueryRepository query,
+        ArchiveThroughputMetrics metrics,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
@@ -232,8 +239,12 @@ public static class SmartCollectionEndpoints
             return error!;
         }
 
-        SmartCollectionSlideshowSnapshot? snapshot =
-            await query.CreateSlideshowSnapshotAsync(collectionId, cancellationToken);
+        SmartCollectionSlideshowSnapshot? snapshot;
+        using (metrics.Measure(ArchiveThroughputMetricNames.SlideshowSnapshotCreation))
+        {
+            snapshot = await query.CreateSlideshowSnapshotAsync(collectionId, cancellationToken);
+        }
+
         if (snapshot is null)
         {
             return Results.NotFound();
