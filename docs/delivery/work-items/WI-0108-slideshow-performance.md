@@ -53,11 +53,41 @@ These are hypotheses, not predetermined solutions. PostgreSQL query/index improv
 - The first WI-0108 slice is measurement-only: it adds aggregate stages for slideshow-library loading, snapshot creation, preparation start/status, prepared-original opening and collection viewer-preview opening to the existing process-local throughput diagnostics. Existing `original-status` and `original-open` hash-read aggregates remain the evidence for repeated full-file immutable verification.
 - `measure-slideshow-performance.ps1` provides a bounded real-catalogue probe. It resets diagnostics between phases, measures library and selected snapshot latency, downloads the same first viewer-preview repeatedly, and can optionally exercise prepared-original serving only when explicitly enabled. Prepared-original probing refuses collections above a caller-visible item cap by default so the diagnostic does not accidentally hydrate a large slideshow.
 - The probe/report deliberately omits collection names, revision IDs, filenames, source paths and credentials. It records only catalogue provider/schema, item counts, wall-clock timings, aggregate stage timings and aggregate hash-read statistics.
-- Code inspection before optimization confirms two hypotheses that the real-catalogue probe should distinguish: PostgreSQL snapshot creation currently carries the common current-state CTE set even when a saved filter does not require every state domain and sorts the full candidate set in application memory; local viewer/prepared-original paths perform full SHA-256 verification on each status/open. No query or verification semantics are changed in the measurement slice.
+- Code inspection before optimization confirmed two hypotheses that the real-catalogue probe could distinguish: PostgreSQL snapshot creation currently carries the common current-state CTE set even when a saved filter does not require every state domain and sorts the full candidate set in application memory; local viewer/prepared-original paths can perform full SHA-256 verification on status/open. Neither should be optimized without measured evidence that it is material.
+- The follow-up measurement slice changes the probe's default loopback origin to `http://127.0.0.1:5080` and adds bounded ordered viewer-preview measurements across distinct slideshow positions. This closes the direct-server evidence gap for the acceptance criterion that transition latency must not increase as playback advances.
+
+## Maintainer evidence — 2026-09-11
+
+Real-catalogue measurements were run against the accepted PostgreSQL-authoritative production catalogue at schema version 23 after PR #297 was republished into the launcher-selected application directory.
+
+The first probe runs used the script's original `http://localhost:5080` default. Every caller-observed request incurred roughly two seconds while the corresponding server stages remained in the tens of milliseconds. Re-running the same measurements against `http://127.0.0.1:5080` removed that delay completely. The delay was therefore a probe/client loopback artifact on the maintainer's Windows environment, not slideshow-library, snapshot, file-open or hashing work. The probe default must follow the launcher-style explicit IPv4 loopback address.
+
+For a one-photo saved Smart Collection using `127.0.0.1`:
+
+- saved slideshow-library request: about 9–12 ms caller-observed, with about 8 ms in `slideshow-library-load`;
+- snapshot creation: about 23–27 ms caller-observed, with about 21–24 ms in `slideshow-snapshot-creation`;
+- first viewer-preview: about 38–41 ms, with collection viewer-preview open averaging about 34–35 ms;
+- repeated viewer-preview: about 38–40 ms;
+- immutable hash verification: about 2.4–2.6 ms per measured read;
+- prepared-original opening: about 38–50 ms, with `slideshow-prepared-original-open` averaging about 37 ms;
+- preparation start: about 7.5 ms, and the roughly 527 ms terminal measurement is dominated by the probe's 500 ms status-poll interval rather than synchronous preparation work.
+
+For a representative 11-photo saved Smart Collection using `127.0.0.1`:
+
+- saved slideshow-library request: about 9 ms;
+- snapshot creation: about 34 ms caller-observed and about 32 ms in `slideshow-snapshot-creation`;
+- first viewer-preview: about 51 ms;
+- repeated first viewer-preview: about 34 ms;
+- collection viewer-preview open averaged about 36 ms;
+- no original-open hash reads were observed for that viewer-preview sequence.
+
+These measurements rule out slideshow-library definition loading, PostgreSQL snapshot creation, immutable hash verification and prepared-original opening as the primary cause of the previously reported multi-second one-photo startup delay for the measured collections. No PostgreSQL index/query rewrite or verification-cache weakening is justified from this evidence.
+
+The remaining evidence gap is actual playback progression. The first probe repeatedly requested only the first snapshot revision and therefore could not test whether distinct image transitions become slower with slideshow position. The next probe slice measures a bounded ordered sequence of distinct viewer previews while retaining the repeated-first-image phase for cache/verification evidence. If ordered direct-server latency remains bounded, the investigation should move to browser-visible request/render/prefetch timing on the real playback surface rather than speculative server optimization.
 
 ## Acceptance criteria
 
-- [ ] Timing evidence can distinguish slideshow-library load, snapshot creation, preparation/preflight, first-image serving and subsequent-image serving without exposing private source data.
+- [x] Timing evidence can distinguish slideshow-library load, snapshot creation, preparation/preflight, first-image serving and subsequent-image serving without exposing private source data.
 - [ ] `/slideshows` no longer performs unnecessary catalogue-size-dependent work just to list saved Smart Collections.
 - [ ] Slideshow snapshot creation on PostgreSQL avoids avoidable repeated whole-catalogue current-state scans while preserving exact saved-collection membership and deterministic order.
 - [ ] An already-prepared one-photo slideshow does not repeat the observed long blocking startup path on immediate reopen.
