@@ -28,6 +28,9 @@ $sourceDatabase = [string]$backupReport.sourceDatabase
 if ([string]::IsNullOrWhiteSpace($sourceDatabase)) {
     throw "The backup report does not identify the source database."
 }
+if ([string]$backupReport.format -ne "pg_dump-custom") {
+    throw "The backup report does not describe the expected pg_dump custom format."
+}
 
 $actualHash = (Get-FileHash -LiteralPath $BackupPath -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($actualHash -ne ([string]$backupReport.backupSha256).ToLowerInvariant()) {
@@ -57,6 +60,8 @@ if ($null -eq $podman) {
 }
 
 $composeDirectory = Join-Path $PSScriptRoot "deploy\postgres"
+$containerBackupPath = $null
+$containerId = $null
 
 function Invoke-DatabaseQuery {
     param(
@@ -151,14 +156,20 @@ try {
         throw "Could not create the isolated restore-verification database."
     }
 
+    $containerBackupPath = "/tmp/photoidentity-restore-$([Guid]::NewGuid().ToString('N')).dump"
+    $containerDestination = "$containerId`:$containerBackupPath"
+    & $podman.Source cp $BackupPath $containerDestination | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not copy the PostgreSQL backup into the container for isolated restore verification."
+    }
+
     Write-Host "Restoring the backup into the isolated database..."
-    Get-Content -LiteralPath $BackupPath |
-        & $podman.Source exec `
-            -i `
-            -e "VERIFY_DATABASE=$VerificationDatabaseName" `
-            $containerId sh -lc `
-            'psql -X -U "$POSTGRES_USER" -d "$VERIFY_DATABASE" -v ON_ERROR_STOP=1' `
-            2>$null | Out-Null
+    & $podman.Source exec `
+        -e "VERIFY_DATABASE=$VerificationDatabaseName" `
+        -e "DUMP_PATH=$containerBackupPath" `
+        $containerId sh -lc `
+        'pg_restore -U "$POSTGRES_USER" -d "$VERIFY_DATABASE" --exit-on-error --single-transaction --no-owner --no-acl "$DUMP_PATH"' `
+        2>$null | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "Restore failed. The production database was not modified. The isolated verification database was retained for diagnosis."
     }
@@ -204,5 +215,8 @@ try {
     Write-Host "The verification database was retained intentionally. Follow the operations runbook to remove it after review."
 }
 finally {
+    if (-not [string]::IsNullOrWhiteSpace($containerBackupPath) -and -not [string]::IsNullOrWhiteSpace($containerId)) {
+        & $podman.Source exec -e "DUMP_PATH=$containerBackupPath" $containerId sh -lc 'rm -f "$DUMP_PATH"' *> $null
+    }
     Pop-Location
 }
