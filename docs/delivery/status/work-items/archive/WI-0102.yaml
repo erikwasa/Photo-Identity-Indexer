@@ -1,0 +1,31 @@
+id: WI-0102
+title: Migrate the existing SQLite catalogue and perform controlled PostgreSQL cutover
+milestone: M24
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0102-sqlite-postgresql-catalogue-migration.md
+started_at: 2026-09-10
+completed_at: 2026-09-11
+verified_at: 2026-09-11
+verified_by: maintainer
+last_updated_at: 2026-09-11
+branch: codex/m24-7
+blockers:
+- WI-0099
+- WI-0100
+- WI-0101
+blocker_notes:
+- WI-0101 completed the provider-neutral PostgreSQL runtime boundary; WI-0102 then performed the stopped-source migration, representative review, single-authority cutover and rollback acceptance.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/278
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34531203522
+- type: merge_commit
+  value: 811569f06d2db7b973af32c12e0e0b28bb1cb74f
+- type: verification
+  value: 2026-09-11 final rehearsal from merged main passed the stopped-source two-target migration/repeatability and representative UI/domain review; generated backup and reports remain private local acceptance artifacts.
+- type: verification
+  value: '2026-09-11 production cutover accepted: /health reported status ok, catalogueProvider postgresql, PostgreSQL status ready and schemaVersion 23; Needs Review, Smart Collections and Archive were verified after the repository-root launcher setting was corrected.'
+- type: verification
+  value: '2026-09-11 rollback acceptance passed before normal post-cutover edits: a writable copy of the preserved SQLite backup booted successfully under the SQLite provider, representative state was verified, then PostgreSQL authority was restored successfully; the preserved backup itself remained unchanged.'

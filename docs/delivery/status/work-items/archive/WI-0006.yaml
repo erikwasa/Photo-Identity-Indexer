@@ -1,0 +1,21 @@
+id: WI-0006
+title: Implement image decoding
+milestone: M01
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0006-image-decoder.md
+started_at: 2026-07-25
+completed_at: 2026-07-25
+verified_at: 2026-07-25
+verified_by: human
+last_updated_at: 2026-07-25
+branch: agent/WI-0006-image-decoding
+blockers: []
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/6
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30150930457
+- type: merge_commit
+  value: d85c098474e621769569f7110e34e164570c23c1

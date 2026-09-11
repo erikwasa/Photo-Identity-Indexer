@@ -1,0 +1,11 @@
+id: WI-0020
+title: Run Azure VM pilot
+milestone: M09
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0020-azure-pilot.md
+blockers:
+- WI-0018
+- WI-0032
+blocker_notes: []
+evidence: []

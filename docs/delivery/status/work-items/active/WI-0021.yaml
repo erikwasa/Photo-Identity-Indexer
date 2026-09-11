@@ -1,0 +1,10 @@
+id: WI-0021
+title: Add Azure checkpointing
+milestone: M10
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0021-azure-checkpointing.md
+blockers:
+- WI-0020
+blocker_notes: []
+evidence: []

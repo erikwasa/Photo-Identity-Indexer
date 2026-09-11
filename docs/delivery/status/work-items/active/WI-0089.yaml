@@ -1,0 +1,11 @@
+id: WI-0089
+title: Add durable source-copy exclusion and access enforcement
+milestone: M23
+status: ready
+owner: unassigned
+document: ../work-items/WI-0089-source-copy-exclusion-boundary.md
+blockers:
+- WI-0041
+- WI-0042
+blocker_notes: []
+evidence: []

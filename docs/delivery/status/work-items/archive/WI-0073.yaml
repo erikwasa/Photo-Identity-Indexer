@@ -1,0 +1,25 @@
+id: WI-0073
+title: Polish cards, menus and archive navigation
+milestone: M20
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0073-ui-navigation-polish.md
+started_at: 2026-08-19
+completed_at: 2026-08-26
+verified_at: 2026-08-26
+verified_by: maintainer
+last_updated_at: 2026-08-26
+branch: agent/WI-0073-ui-navigation-polish
+blockers:
+- WI-0061
+- WI-0066
+- WI-0068
+blocker_notes:
+- Final 2026-08-26 maintainer pass verified the corrective Face Review, Smart Collection, Maintain People and archive advancement-state behavior.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/196
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/202
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32528282922

@@ -1,0 +1,25 @@
+id: WI-0043
+title: Add configurable confidence groups and canonical auto-assignment
+milestone: M17
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0043-confidence-auto-assignment.md
+started_at: 2026-08-10
+completed_at: 2026-08-11
+verified_at: 2026-08-11
+verified_by: human
+last_updated_at: 2026-08-11
+branch: wi-0043
+blockers:
+- WI-0016
+- WI-0033
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/116
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31430785546
+- type: merge_commit
+  value: b275103baca69a8ca947b88607ff8ae517804944
+- type: human_verification
+  value: Maintainer completed milestone-wide M17 verification on Windows laptop and Pixel on 2026-08-11 and accepted configurable confidence grouping, conservative score-plus-margin High classification, threshold tuning, automatic-assignment behavior and manual correction/audit behavior; only minor non-blocking Faces layout comments remained.

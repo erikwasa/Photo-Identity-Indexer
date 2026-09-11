@@ -1,0 +1,19 @@
+id: WI-0001
+title: Establish living documentation
+milestone: M00
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0001-living-documentation.md
+started_at: 2026-07-24
+completed_at: 2026-07-24
+verified_at: 2026-07-24
+verified_by: human
+last_updated_at: 2026-07-24
+branch: agent/living-documentation
+blockers: []
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/1
+- type: merge_commit
+  value: f342e76b94b5e643d353c852d55cd08907f159f7

@@ -1,0 +1,40 @@
+id: WI-0064
+title: Add GeoNames reverse-geocoded Places enrichment
+milestone: M19
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0064-geonames-place-enrichment.md
+started_at: 2026-08-17
+completed_at: 2026-08-26
+verified_at: 2026-08-26
+verified_by: maintainer
+last_updated_at: 2026-08-26
+branch: agent/WI-0064-provider-error-reporting
+blockers:
+- WI-0050
+- WI-0063
+blocker_notes:
+- Final 2026-08-26 maintainer verification passed automatic pickup, manual precedence and Sweden-local/else-English live naming after the GeoNames corrective slices.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/160
+- type: merge_commit
+  value: 56313e91e9344fc825df3772f95c8a449d442aad
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/161
+- type: merge_commit
+  value: b3d1b5205d9160fc55da8109eb0c9228c99df5a9
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/163
+- type: merge_commit
+  value: 96f8a66e239782d40d9cb452272466f28d63e1e7
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/165
+- type: merge_commit
+  value: cec72d1a801fba7cb1ec6d75e5bee322da2e55f6
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/203
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/205
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32528282922

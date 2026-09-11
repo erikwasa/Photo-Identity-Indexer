@@ -1,0 +1,38 @@
+id: WI-0039
+title: Build detector evaluation workspace
+milestone: M16
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0039-detector-evaluation-workspace.md
+started_at: 2026-08-03
+completed_at: 2026-08-05
+verified_at: 2026-08-05
+verified_by: automated
+last_updated_at: 2026-08-05
+branch: agent/WI-0039-comparison-slice
+blockers:
+- WI-0029
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/70
+- type: merge_commit
+  value: 55b8fcbd2aeaf95c7f4a94885aba4077e2e86aba
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/71
+- type: merge_commit
+  value: 1f9221be5999ac3a21041fd0bdfada309fe3f8da
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/72
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30802539255
+- type: merge_commit
+  value: 9831e62372cecaf0b417ee314108e61f3667e5dc
+- type: human_verification
+  value: Private confidence-0.9 manifest import, resumable authoring, full 100-photo review, source-pixel zoom and CSV export were verified locally on Windows PowerShell 5.1 by 2026-08-05; detailed evidence remains outside Git.
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/74
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31013795777
+- type: merge_commit
+  value: 23790991b0abf4e6dea32fd33f312df3e37d6e50

@@ -1,0 +1,34 @@
+id: WI-0104
+title: Remove known operator query and UI scaling bottlenecks
+milestone: M24
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0104-operator-query-ui-performance.md
+started_at: 2026-09-11
+completed_at: 2026-09-11
+verified_at: 2026-09-11
+verified_by: maintainer
+last_updated_at: 2026-09-11
+branch: codex/m24-wi0104-settings-independent-load
+blockers:
+- WI-0100
+- WI-0101
+blocker_notes:
+- PR
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/284
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/293
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/294
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/295
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34623660450
+- type: merge_commit
+  value: 0b623220cb23ec67efe09ed053ead7c496ad7657
+- type: verification
+  value: '2026-09-11 representative schema-23 PostgreSQL after-plan: Suggested person 32.397 ms, Newest first 19.567 ms, all-confidence count 3.973 ms and high-confidence count 2.821 ms with no temporary I/O; no additional index justified.'
+- type: verification
+  value: '2026-09-11 maintainer real-catalogue Settings smoke after PR #295 merge: shell/configuration loaded independently, Archive Coverage/Storage/Identity Matching loaded and refreshed independently, configured archive identity/coverage was correct and no full archive filesystem path was exposed.'

@@ -1,0 +1,35 @@
+id: WI-0063
+title: Make Places a first-class location hierarchy
+milestone: M19
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0063-first-class-places.md
+started_at: 2026-08-17
+completed_at: 2026-08-19
+verified_at: 2026-08-19
+verified_by: maintainer
+last_updated_at: 2026-08-19
+branch: agent/WI-0063-place-ui
+blockers:
+- WI-0050
+- WI-0056
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/156
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31976609502
+- type: merge_commit
+  value: 2c67f7ae653c441b6ce11e79e89d3f9c38d7aef2
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/157
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31982186662
+- type: merge_commit
+  value: 816fd00004fe5fed0678794afbd32158a72b35ac
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/159
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31983283093
+- type: merge_commit
+  value: 81ec2c33df3dd61fe30799a8de483e7f56d9156d

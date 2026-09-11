@@ -1,0 +1,54 @@
+id: WI-0097
+title: Establish PostgreSQL runtime and migration foundation
+milestone: M24
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0097-postgresql-runtime-foundation.md
+started_at: 2026-09-01
+completed_at: 2026-09-02
+verified_at: 2026-09-02
+verified_by: maintainer
+last_updated_at: 2026-09-02
+branch: agent/WI-0097-verifier-exit-code
+blockers: []
+blocker_notes:
+- PostgreSQL is the accepted long-term authoritative catalogue per ADR-0009; comparative SQLite/PostgreSQL benchmarking is not required.
+- Maintainer verification after PR
+- Windows forwarding became reachable after PR
+- After PR
+- Maintainer verification after PR
+- Upstream Podman issue
+- 'Maintainer confirmed both Windows client and Linux server were Podman 6.0.2 (commit b28edb9ad70ce4317dc762ee9ce0a6d081d154e9), matching the upstream regression report exactly. The runtime has now been downgraded/recreated to the accepted 5.8.x baseline: client 5.8.5 (6d48b6f12f793176f3f6bc808b5a440984c14eb2), server 5.8.6 (a859fc66702c23e869c282c63e92d9b6cd264229). Next step is rerun live verification.'
+- On the 5.8.x baseline, authenticated in-container SQL and the Windows localhost PostgreSQL protocol preflight both pass. A verifier-only PowerShell bug then captured dotnet test output together with the exit code, causing a false generic failure; the active slice returns only the numeric test exit code.
+- 'Final maintainer verification passed on 2026-09-02: verify-postgres.ps1 completed the isolated migration bootstrap successfully; current main /health reported catalogueProvider=sqlite and PostgreSQL configured=true, status=ready, schemaVersion=1 while the real SQLite catalogue remained at schemaVersion=16.'
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/229
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33560243159
+- type: merge_commit
+  value: 3e3c14e775de3dd0719e6df488dfd6524d7a67df
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/230
+- type: merge_commit
+  value: d105500c4ce032cffb290efad8c7f40924b3994c
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/231
+- type: merge_commit
+  value: 1c63ada8da0b6b1ba19e518d91839e691a4aa6db
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/232
+- type: merge_commit
+  value: 9f6c57921b512018c2cbc724ac76819b78f61a97
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/234
+- type: merge_commit
+  value: 7f77ae769cfcb3ad5499c15df70047c5231dd593
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/235
+- type: merge_commit
+  value: 75da3e7feacb29dacaf68e4205e7fe7f0dd142b9
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/236
+- type: merge_commit
+  value: d0b3b1bad692893f8cb599d4482de268445ed9f0

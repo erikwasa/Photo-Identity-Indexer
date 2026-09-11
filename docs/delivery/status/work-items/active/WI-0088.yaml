@@ -1,0 +1,11 @@
+id: WI-0088
+title: Reconcile exact unambiguous source moves for included photos
+milestone: M23
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0088-source-move-reconciliation.md
+blockers:
+- WI-0041
+- WI-0087
+blocker_notes: []
+evidence: []

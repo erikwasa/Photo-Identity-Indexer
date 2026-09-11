@@ -1,0 +1,21 @@
+id: WI-0072
+title: Integrate archive photo metadata and enrich Photo Details
+milestone: M19
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0072-archive-photo-metadata.md
+started_at: 2026-08-19
+completed_at: 2026-08-26
+verified_at: 2026-08-26
+verified_by: maintainer
+last_updated_at: 2026-08-26
+branch: agent/WI-0072-archive-photo-metadata
+blockers:
+- WI-0050
+blocker_notes:
+- Final 2026-08-26 real-media pass verified automatic archive metadata inspection, representative JPEG/HEIC fields and the GPS-to-automatic-GeoNames handoff.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/191
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32528282922
