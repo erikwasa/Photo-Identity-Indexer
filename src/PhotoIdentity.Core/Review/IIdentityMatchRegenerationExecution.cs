@@ -5,9 +5,15 @@ namespace PhotoIdentity.Core.Review;
 
 /// <summary>
 /// Provider-neutral target scoring and derived ranking maintenance for one exact model revision.
+/// Providers may prepare invariant evidence once for a durable run and release it after the run
+/// stops being active.
 /// </summary>
 public interface IIdentityMatchRegenerationScorer
 {
+    Task PrepareRunAsync(
+        ReviewIdentityMatchRegenerationRun run,
+        CancellationToken cancellationToken = default) => Task.CompletedTask;
+
     Task<int> ScoreTargetAsync(
         ModelId modelId,
         Sha256Digest modelHash,
@@ -19,6 +25,10 @@ public interface IIdentityMatchRegenerationScorer
         Sha256Digest modelHash,
         Guid runId,
         CancellationToken cancellationToken = default);
+
+    Task ReleaseRunAsync(
+        Guid runId,
+        CancellationToken cancellationToken = default) => Task.CompletedTask;
 }
 
 public sealed record ReviewIdentityAutoAssignmentSummary(

@@ -4,12 +4,13 @@ using PhotoIdentity.Worker;
 namespace PhotoIdentity.Api;
 
 /// <summary>
-/// Advances durable identity regeneration work in small units so browser requests only enqueue
-/// or inspect work. The run repository makes an interrupted running target reclaimable after an
-/// application restart.
+/// Advances durable identity regeneration work in bounded batches so browser requests only
+/// enqueue or inspect work. Each target still commits independently, preserving durable restart
+/// and reclaim semantics while avoiding a scheduler delay between every target.
 /// </summary>
 public sealed class IdentityMatchRegenerationHostedService : BackgroundService
 {
+    private const int TargetBatchSize = 8;
     private static readonly TimeSpan IdleDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan ActiveDelay = TimeSpan.FromMilliseconds(25);
 
@@ -67,16 +68,31 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
             return false;
         }
 
-        ReviewIdentityMatchRegenerationTarget? target = await _runs.ClaimNextTargetAsync(
-            run.Id,
-            _timeProvider.GetUtcNow(),
-            cancellationToken);
-        if (target is not null)
+        int processedInBatch = 0;
+        bool stoppedBecauseNoTarget = false;
+        bool prepared = false;
+        while (processedInBatch < TargetBatchSize)
         {
+            ReviewIdentityMatchRegenerationTarget? target = await _runs.ClaimNextTargetAsync(
+                run.Id,
+                _timeProvider.GetUtcNow(),
+                cancellationToken);
+            if (target is null)
+            {
+                stoppedBecauseNoTarget = true;
+                break;
+            }
+
             _metrics.RecordCounter(
                 ArchiveThroughputMetricNames.IdentityRegenerationTargetsClaimed);
             try
             {
+                if (!prepared)
+                {
+                    await _scorer.PrepareRunAsync(run, cancellationToken);
+                    prepared = true;
+                }
+
                 int suggestionCount = await _scorer.ScoreTargetAsync(
                     run.ModelId,
                     run.ModelHash,
@@ -107,6 +123,23 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                     ArchiveThroughputMetricNames.IdentityRegenerationTargetsFailed);
             }
 
+            processedInBatch++;
+        }
+
+        if (processedInBatch > 0)
+        {
+            if (stoppedBecauseNoTarget)
+            {
+                ReviewIdentityMatchRegenerationRun? latestAfterBatch = await _runs.GetLatestAsync(
+                    run.ModelId,
+                    run.ModelHash,
+                    cancellationToken);
+                if (latestAfterBatch is null || !latestAfterBatch.IsActive || latestAfterBatch.Id != run.Id)
+                {
+                    await _scorer.ReleaseRunAsync(run.Id, cancellationToken);
+                }
+            }
+
             return true;
         }
 
@@ -116,6 +149,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
             cancellationToken);
         if (latest is null || !latest.IsActive || latest.Id != run.Id)
         {
+            await _scorer.ReleaseRunAsync(run.Id, cancellationToken);
             return true;
         }
 
@@ -128,6 +162,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 "Identity evidence changed after the final target was scored. Start a new regeneration from the current catalogue state.",
                 _timeProvider.GetUtcNow(),
                 cancellationToken);
+            await _scorer.ReleaseRunAsync(run.Id, cancellationToken);
             return true;
         }
 
@@ -142,6 +177,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 $"Suggestion policy changed from version {run.PolicyVersion} to {policy.Version} while regeneration was running. Start a new regeneration.",
                 _timeProvider.GetUtcNow(),
                 cancellationToken);
+            await _scorer.ReleaseRunAsync(run.Id, cancellationToken);
             return true;
         }
 
@@ -173,6 +209,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                     "Identity evidence changed while automatic assignments were being finalized. The generated suggestions are stale; start a new regeneration.",
                     _timeProvider.GetUtcNow(),
                     cancellationToken);
+                await _scorer.ReleaseRunAsync(run.Id, cancellationToken);
                 return true;
             }
 
@@ -181,6 +218,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 auto.AssignedCount,
                 _timeProvider.GetUtcNow(),
                 cancellationToken);
+            await _scorer.ReleaseRunAsync(run.Id, cancellationToken);
             _metrics.RecordCounter(
                 ArchiveThroughputMetricNames.IdentityRegenerationRunsCompleted);
         }
@@ -195,6 +233,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 exception.Message,
                 _timeProvider.GetUtcNow(),
                 cancellationToken);
+            await _scorer.ReleaseRunAsync(run.Id, cancellationToken);
             _metrics.RecordCounter(
                 ArchiveThroughputMetricNames.IdentityRegenerationRunsFailed);
         }

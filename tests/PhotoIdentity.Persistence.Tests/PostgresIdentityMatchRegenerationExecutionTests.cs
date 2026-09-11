@@ -142,11 +142,14 @@ public sealed class PostgresIdentityMatchRegenerationExecutionTests
 
             IIdentityMatchRegenerationScorer scorer =
                 new PostgresIdentityMatchRegenerationScorer(database);
+            await scorer.PrepareRunAsync(run);
+            await scorer.PrepareRunAsync(run);
             int suggestionCount = await scorer.ScoreTargetAsync(
                 modelId,
                 modelHash,
                 target.FaceOccurrenceId);
             Assert.Equal(2, suggestionCount);
+            await scorer.ReleaseRunAsync(run.Id);
 
             IReviewSuggestionRepository suggestions =
                 new PostgresReviewSuggestionRepository(database);

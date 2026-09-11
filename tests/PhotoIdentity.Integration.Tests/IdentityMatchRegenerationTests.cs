@@ -135,6 +135,72 @@ public sealed class IdentityMatchRegenerationTests
     }
 
     [Fact]
+    public async Task Worker_processes_at_most_eight_targets_per_cycle_before_yielding()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            DateTimeOffset now = new(2026, 8, 11, 1, 30, 0, TimeSpan.Zero);
+            FixedTimeProvider clock = new(now.AddMinutes(10));
+            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+            _ = await SeedThreeFacesAsync(database, now);
+            for (int index = 3; index < 12; index++)
+            {
+                _ = await SeedFaceAsync(database, [1f, 0f], index, now);
+            }
+
+            SqliteIdentityMatchRegenerationRepository repository = new(database);
+            IdentitySuggestionPolicy policy = await new SqliteIdentitySuggestionPolicyRepository(database, clock)
+                .GetAsync(EmbeddingModelId, EmbeddingModelHash);
+            CatalogueIdentityMatchRegenerationRun run = await repository.StartAsync(
+                EmbeddingModelId,
+                EmbeddingModelHash,
+                policy.Version,
+                "test:bounded-worker",
+                clock.GetUtcNow());
+            Assert.Equal(10, run.TargetCount);
+
+            IdentityMatchRegenerationHostedService worker = new(
+                new SqliteIdentityMatchRegenerationAdapter(repository),
+                new SqliteIdentityMatchRegenerationScorerAdapter(new SqliteIdentityMatchRegenerationScorer(database, clock)),
+                new SqliteIdentitySuggestionPolicyAdapter(new SqliteIdentitySuggestionPolicyRepository(database, clock)),
+                new SqliteIdentityAutoAssignmentAdapter(new SqliteIdentityAutoAssignmentService(database, clock)),
+                new SqliteIdentityMatchEvidenceVersionAdapter(database),
+                clock,
+                new ArchiveThroughputMetrics(clock));
+
+            Assert.True(await worker.AdvanceOnceAsync());
+            CatalogueIdentityMatchRegenerationRun firstBatch = Assert.IsType<CatalogueIdentityMatchRegenerationRun>(
+                await repository.GetLatestAsync(EmbeddingModelId, EmbeddingModelHash));
+            Assert.Equal(8, firstBatch.ProcessedTargetCount);
+            Assert.Equal(8, firstBatch.SuggestedTargetCount);
+            Assert.Equal(16, firstBatch.SuggestionCount);
+            Assert.Equal(IdentityMatchRegenerationStatuses.Running, firstBatch.Status);
+
+            Assert.True(await worker.AdvanceOnceAsync());
+            CatalogueIdentityMatchRegenerationRun secondBatch = Assert.IsType<CatalogueIdentityMatchRegenerationRun>(
+                await repository.GetLatestAsync(EmbeddingModelId, EmbeddingModelHash));
+            Assert.Equal(10, secondBatch.ProcessedTargetCount);
+            Assert.Equal(10, secondBatch.SuggestedTargetCount);
+            Assert.Equal(20, secondBatch.SuggestionCount);
+            Assert.Equal(IdentityMatchRegenerationStatuses.Running, secondBatch.Status);
+
+            Assert.True(await worker.AdvanceOnceAsync());
+            CatalogueIdentityMatchRegenerationRun completed = Assert.IsType<CatalogueIdentityMatchRegenerationRun>(
+                await repository.GetLatestAsync(EmbeddingModelId, EmbeddingModelHash));
+            Assert.Equal(run.Id, completed.Id);
+            Assert.Equal(IdentityMatchRegenerationStatuses.Completed, completed.Status);
+            Assert.Equal(10, completed.ProcessedTargetCount);
+            Assert.Equal(0, completed.ErrorCount);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Worker_applies_captured_high_policy_only_after_all_targets_are_scored()
     {
         string directory = CreateTemporaryDirectory();
