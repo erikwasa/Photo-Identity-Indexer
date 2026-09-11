@@ -70,6 +70,7 @@ The narrative work-item documents under `docs/delivery/work-items/` remain separ
 - The old batch archive is removed. `work-items.yaml` is now a generated non-terminal compatibility view and `work-items-index.md` is the compact human discovery view.
 - `PhotoIdentity.Docs show WI-XXXX` locates both active and historical canonical status without loading archive history manually.
 - Agent/tooling guidance now treats per-item shards as canonical and generated aggregate/index files as read-only views.
+- Final PR #300 CI run #1658 passed the committed cutover state, including living-documentation validation and generated-documentation drift checks; WI-0109 is therefore complete.
 
 ## Acceptance criteria
 
@@ -84,7 +85,7 @@ The narrative work-item documents under `docs/delivery/work-items/` remain separ
 - [x] A compact generated human overview or equivalent `PhotoIdentity.Docs` command makes it easy to discover current work and locate historical items without opening every shard.
 - [x] Repository/agent guidance describes the new canonical layout and tells agents to read only the relevant work-item status shard plus linked documentation.
 - [x] Tests cover shard discovery, duplicate detection, active/archive status constraints, archived dependency resolution, single-item persistence, terminal movement, read-only archive behavior and lossless migration from the existing layout.
-- [ ] `PhotoIdentity.Docs validate` and `generate --check` pass after the final committed cutover state, and CI detects drift in generated aggregate/index output.
+- [x] `PhotoIdentity.Docs validate` and `generate --check` pass after the final committed cutover state, and CI detects drift in generated aggregate/index output.
 
 ## Implementation notes
 

@@ -1,14 +1,19 @@
 id: WI-0109
 title: Migrate work-item status to bounded canonical shards
 milestone: M00
-status: in_progress
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0109-sharded-work-item-documentation.md
 started_at: 2026-09-11
+completed_at: 2026-09-11
+verified_at: 2026-09-11
+verified_by: ai-agent
 last_updated_at: 2026-09-11
 branch: agent/WI-0109-repository-cutover
 blockers:
 - WI-0057
 blocker_notes:
 - WI-0057 established the active/archive logical split; this follow-up makes bounded per-item storage and automatic terminal archival the normal model.
-evidence: []
+evidence:
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34647841705
