@@ -1,0 +1,69 @@
+name: WI-0109 closeout
+
+on:
+  push:
+    branches:
+      - agent/WI-0109-closeout
+    paths:
+      - .github/workflows/wi0109-closeout.yml
+
+permissions:
+  contents: write
+
+jobs:
+  closeout:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: agent/WI-0109-closeout
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Move WI-0109 through review and completion
+        shell: bash
+        run: |
+          dotnet run --project tools/PhotoIdentity.Docs -- review WI-0109
+          dotnet run --project tools/PhotoIdentity.Docs -- complete WI-0109 \
+            --evidence-type workflow \
+            --evidence-value https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34647841705 \
+            --verified-by ai-agent
+
+      - name: Mark final acceptance criterion complete
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path("docs/delivery/work-items/WI-0109-sharded-work-item-documentation.md")
+          text = path.read_text(encoding="utf-8")
+          old = "- [ ] `PhotoIdentity.Docs validate` and `generate --check` pass after the final committed cutover state, and CI detects drift in generated aggregate/index output."
+          new = "- [x] `PhotoIdentity.Docs validate` and `generate --check` pass after the final committed cutover state, and CI detects drift in generated aggregate/index output."
+          if old not in text:
+              raise SystemExit("Expected unchecked WI-0109 final acceptance criterion was not found.")
+          text = text.replace(old, new, 1)
+          marker = "- Agent/tooling guidance now treats per-item shards as canonical and generated aggregate/index files as read-only views.\n"
+          addition = "- Final PR #300 CI run #1658 passed the committed cutover state, including living-documentation validation and generated-documentation drift checks; WI-0109 is therefore complete.\n"
+          if addition not in text:
+              if marker not in text:
+                  raise SystemExit("Expected WI-0109 implementation-progress marker was not found.")
+              text = text.replace(marker, marker + addition, 1)
+          path.write_text(text, encoding="utf-8", newline="\n")
+
+      - name: Validate final documentation state
+        shell: bash
+        run: |
+          dotnet run --project tools/PhotoIdentity.Docs -- validate
+          dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+
+      - name: Commit generated closeout state
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/delivery/status docs/delivery/work-items/WI-0109-sharded-work-item-documentation.md
+          git diff --cached --check
+          git commit -m "docs: complete WI-0109"
+          git push origin HEAD:agent/WI-0109-closeout
