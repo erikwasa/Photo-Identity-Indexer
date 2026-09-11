@@ -1,0 +1,35 @@
+id: WI-0018
+title: Add portable bundles
+milestone: M07
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0018-portable-bundles.md
+started_at: 2026-07-26
+completed_at: 2026-07-27
+verified_at: 2026-07-27
+verified_by: human
+last_updated_at: 2026-07-27
+branch: agent/WI-0018-production-portable-cli
+blockers: []
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/29
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30201002371
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30201861843
+- type: merge_commit
+  value: 8df838dd2764480baf8de87777c019dfdb23ed0e
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/30
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30209633129
+- type: merge_commit
+  value: 16c5d8e9bca30ae4ee0e905e1b7d937f2d9ba6d7
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/32
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30223294058
+- type: merge_commit
+  value: 64e640e08ff6ca0355e7b662d650901c0a360dbf

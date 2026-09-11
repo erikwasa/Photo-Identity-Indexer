@@ -1,0 +1,19 @@
+id: WI-0029
+title: Run a 500-image local acceptance pilot
+milestone: M06
+status: completed
+owner: human-maintainer
+document: ../work-items/WI-0029-local-acceptance-pilot.md
+started_at: 2026-07-30
+completed_at: 2026-07-30
+verified_at: 2026-07-30
+verified_by: human
+last_updated_at: 2026-07-30
+branch: agent/WI-0029-completion-and-review-speed
+blockers:
+- WI-0027
+- WI-0028
+blocker_notes: []
+evidence:
+- type: human_verification
+  value: Private 450-550 image pilot completed locally on Windows and Pixel on 2026-07-30; only privacy-safe aggregate findings were retained.

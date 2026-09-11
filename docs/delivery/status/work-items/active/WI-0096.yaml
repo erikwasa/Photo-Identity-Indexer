@@ -1,0 +1,20 @@
+id: WI-0096
+title: Wait for slideshow preparation cancellation to quiesce
+milestone: M22
+status: in_review
+owner: ai-agent
+document: ../work-items/WI-0096-slideshow-preparation-quiescence.md
+started_at: 2026-09-01
+last_updated_at: 2026-09-01
+branch: agent/WI-0096-slideshow-preparation-quiescence
+blockers:
+- WI-0093
+blocker_notes:
+- 'WI-0093 is implemented/merged. PR #227 and post-merge main workflow #1362 are green; the item remains in_review only as part of consolidated M22 closeout.'
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/227
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33552806915
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33553799973

@@ -1,0 +1,19 @@
+id: WI-0105
+title: Add low-overhead PostgreSQL and background-work observability
+milestone: M24
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0105-operational-metrics-observability.md
+started_at: 2026-09-09
+completed_at: 2026-09-09
+verified_at: 2026-09-09
+verified_by: ai-agent
+last_updated_at: 2026-09-09
+branch: autopilot/m24
+blockers:
+- WI-0099
+blocker_notes:
+- Metrics replace repeated manual A/B performance exercises; telemetry must remain aggregated, bounded and privacy-safe.
+evidence:
+- type: verification
+  value: 2026-09-09 local build, full test suite, Docs validate and generate --check passed for aggregate operational diagnostics

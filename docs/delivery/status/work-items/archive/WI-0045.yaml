@@ -1,0 +1,25 @@
+id: WI-0045
+title: Regenerate identity matches from the web application
+milestone: M17
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0045-web-match-regeneration.md
+started_at: 2026-08-11
+completed_at: 2026-08-11
+verified_at: 2026-08-11
+verified_by: human
+last_updated_at: 2026-08-11
+branch: wi-0045
+blockers:
+- WI-0016
+- WI-0043
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/123
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31444575754
+- type: merge_commit
+  value: 6cd010c7568b295c981ee19ff84f28307a05d10f
+- type: human_verification
+  value: Maintainer completed milestone-wide M17 local verification on 2026-08-11 and accepted browser-triggered exact-model regeneration, durable progress/current-stale feedback and normal review usage during regeneration.

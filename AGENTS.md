@@ -3,11 +3,11 @@
 ## Read before changing the repository
 
 1. Read `BUILD_CONTEXT.md` for the current handoff only.
-2. Read the active work-item file.
+2. Use `PhotoIdentity.Docs show WI-XXXX` to locate the item's canonical status shard, then read that shard and the linked work-item document.
 3. Read only the linked ADRs and module documents needed for that item.
-4. Use `PhotoIdentity.Docs` for dependency and formal lifecycle status. `docs/delivery/status/work-items.yaml` contains current work; archived terminal history is resolved by the tool and should not be loaded routinely.
+4. Use `PhotoIdentity.Docs` for dependency and formal lifecycle status. Do not load archived work-item shards routinely.
 
-`BUILD_CONTEXT.md` should stay short and current. Do not turn it into a project history or repeat completion details that already live in work-item documents, ADRs, milestone documents or the canonical registries.
+`BUILD_CONTEXT.md` should stay short and current. Do not turn it into a project history or repeat completion details that already live in work-item documents, ADRs, milestone documents or canonical status shards.
 
 ## Architecture constraints
 
@@ -35,13 +35,16 @@ Never commit personal photos, face crops, embeddings, biometric datasets, model 
 
 ## Status workflow
 
-The YAML registries are canonical machine/audit records. `docs/delivery/status/work-items.yaml` is the small writable registry for current work. Immutable files under `docs/delivery/status/archive/work-items-*.yaml` retain terminal history. `PhotoIdentity.Docs` combines the current registry with terminal archive entries for validation, blockers, milestone status and work selection.
+Canonical machine/audit status is stored one work item per YAML file under `docs/delivery/status/work-items/`. Non-terminal items live in `active/WI-XXXX.yaml`; `completed` and `cancelled` items live in `archive/WI-XXXX.yaml`. `registry.yaml` contains only schema/status metadata. `PhotoIdentity.Docs` combines active and archived shards for validation, blockers, milestone status and work selection.
 
-Do not load archive files during normal handoff work. Open archived history only when specific historical evidence is needed. Use `PhotoIdentity.Docs` instead of hand-editing status when the required command is available.
+`docs/delivery/status/work-items.yaml` and `docs/delivery/status/work-items-index.md` are deterministic generated current-work/discovery views. They are not editable sources of truth. Lifecycle commands update only the target canonical shard; completing or cancelling an item moves that shard to the archive automatically.
+
+Do not load archive files during normal handoff work. Use `show` when a specific historical item is needed, and use lifecycle commands rather than hand-editing status when the required command is available.
 
 ```powershell
 dotnet run --project tools/PhotoIdentity.Docs -- validate
 dotnet run --project tools/PhotoIdentity.Docs -- next
+dotnet run --project tools/PhotoIdentity.Docs -- show WI-0005
 dotnet run --project tools/PhotoIdentity.Docs -- start WI-0005 --owner ai-agent --branch agent/WI-0005
 dotnet run --project tools/PhotoIdentity.Docs -- review WI-0005
 ```

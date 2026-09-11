@@ -1,0 +1,34 @@
+id: WI-0037
+title: Evaluate another face detector
+milestone: M16
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0037-detector-candidate.md
+started_at: 2026-08-07
+completed_at: 2026-08-07
+verified_at: 2026-08-07
+verified_by: human
+last_updated_at: 2026-08-07
+branch: agent/WI-0037-centerface-smoke-pass
+blockers:
+- WI-0036
+blocker_notes: []
+evidence:
+- type: human_verification
+  value: Governed multi-scale YuNet candidates failed the complete M16 gate, activating alternative-detector evaluation on 2026-08-07.
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/84
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/86
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/88
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/89
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/90
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/91
+- type: human_verification
+  value: The maintainer explicitly accepted the documented CenterFace pretrained-weight and training-data uncertainty for local evaluation on 2026-08-07; rollout engineering was separately instructed, and redistribution remains outside that acceptance.
+- type: human_verification
+  value: The maintainer completed the unchanged governed CenterFace confidence-0.5 single-pass comparison against the fixed private 100-photo M16 sample and frozen ground truth on 2026-08-07 and reported that it passed the complete M16 gate; detailed metrics remain outside Git.

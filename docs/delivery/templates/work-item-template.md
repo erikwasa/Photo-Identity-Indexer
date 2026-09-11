@@ -2,7 +2,7 @@
 id: WI-XXXX
 title: Work item title
 milestone: MXX
-status_source: ../status/work-items.yaml
+status_source: PhotoIdentity.Docs
 depends_on: []
 related_adrs: []
 affected_modules: []

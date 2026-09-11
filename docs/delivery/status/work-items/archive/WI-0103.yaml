@@ -1,0 +1,30 @@
+id: WI-0103
+title: Make identity match regeneration scalable and bounded
+milestone: M24
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0103-scalable-match-regeneration.md
+started_at: 2026-09-11
+completed_at: 2026-09-11
+verified_at: 2026-09-11
+verified_by: maintainer
+last_updated_at: 2026-09-11
+branch: codex/wi-0103-postgres-scale-acceptance
+blockers:
+- WI-0100
+blocker_notes:
+- Preserve current exact scoring semantics first; pgvector/approximate nearest-neighbor work is optional follow-up, not a migration prerequisite.
+- PRs
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/280
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/281
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/282
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34567566761
+- type: merge_commit
+  value: b66d1173b9b0d4f4bdd31ec49e71322530195ade
+- type: verification
+  value: '2026-09-11 maintainer live PostgreSQL verification: Release build passed with zero warnings/errors; persistence acceptance passed 29/29 and runtime/composition acceptance passed 7/7, including 96 regeneration targets, 32 confirmed exemplars, bounded eight-target cycles, responsive concurrent status reads and zero target/run failures.'

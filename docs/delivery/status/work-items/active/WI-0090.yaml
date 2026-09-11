@@ -1,0 +1,10 @@
+id: WI-0090
+title: Purge excluded photo data and derivatives safely
+milestone: M23
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0090-exclusion-purge-service.md
+blockers:
+- WI-0089
+blocker_notes: []
+evidence: []

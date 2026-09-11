@@ -1,0 +1,16 @@
+id: WI-0034
+title: Measure baseline detector recall
+milestone: M16
+status: completed
+owner: human-maintainer
+document: ../work-items/WI-0034-detector-recall-baseline.md
+started_at: 2026-08-03
+completed_at: 2026-08-05
+verified_at: 2026-08-05
+verified_by: human
+last_updated_at: 2026-08-05
+blockers: []
+blocker_notes: []
+evidence:
+- type: human_verification
+  value: The fixed private 100-photo YuNet confidence-0.9 baseline was fully reviewed and evaluated on Windows PowerShell 5.1 by 2026-08-05; it did not meet the predeclared M16 decision target, and detailed counts remain outside Git.

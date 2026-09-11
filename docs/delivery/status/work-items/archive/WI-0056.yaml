@@ -1,0 +1,22 @@
+id: WI-0056
+title: Add Immich-compatible hierarchical manual photo tags
+milestone: M19
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0056-manual-photo-tags.md
+started_at: 2026-08-13
+completed_at: 2026-08-14
+verified_at: 2026-08-14
+verified_by: automated
+last_updated_at: 2026-08-14
+branch: agent/WI-0056-immich-tag-hierarchy
+blockers:
+- WI-0042
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/142
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31752534536
+- type: merge_commit
+  value: 3cd4d44af0f2a902fb54bbf40057c09c480f8f9a

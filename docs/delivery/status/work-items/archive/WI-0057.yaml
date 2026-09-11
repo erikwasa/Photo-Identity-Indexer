@@ -1,0 +1,22 @@
+id: WI-0057
+title: Split active and archived work-item registries
+milestone: M00
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0057-work-item-registry-archive.md
+started_at: 2026-08-13
+completed_at: 2026-08-14
+verified_at: 2026-08-14
+verified_by: automated
+last_updated_at: 2026-08-14
+branch: agent/WI-0057-work-item-registry-archive
+blockers:
+- WI-0004
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/140
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/31748239801
+- type: merge_commit
+  value: 31487a9e431b004e91c5f65127f3cc5d213c9042

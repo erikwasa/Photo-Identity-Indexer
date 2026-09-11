@@ -48,6 +48,11 @@ public sealed class RegistryStore
 
     public WorkItemRegistry MigrateLegacyWorkItemsToShards(RepositoryPaths paths)
     {
+        if (paths.HasShardedWorkItemStore)
+        {
+            return LoadShardedWorkItems(paths, includeArchived: true);
+        }
+
         if (!File.Exists(paths.WorkItemsRegistry))
         {
             throw new FileNotFoundException(
@@ -63,12 +68,6 @@ public sealed class RegistryStore
             SchemaVersion = legacy.SchemaVersion,
             AllowedStatuses = [.. legacy.AllowedStatuses],
         };
-
-        if (File.Exists(paths.WorkItemShardRegistry))
-        {
-            WorkItemShardRegistry existingMetadata = Load<WorkItemShardRegistry>(paths.WorkItemShardRegistry);
-            EnsureCompatible(metadata, existingMetadata, paths.WorkItemShardRegistry);
-        }
 
         HashSet<string> expectedIds = legacy.WorkItems
             .Select(item => item.Id)
@@ -113,6 +112,9 @@ public sealed class RegistryStore
 
     public void SaveMilestones(RepositoryPaths paths, MilestoneRegistry registry) =>
         Save(paths.MilestonesRegistry, registry);
+
+    public string SerializeWorkItemRegistry(WorkItemRegistry registry) =>
+        Serialize(registry);
 
     private WorkItemRegistry LoadLegacyWorkItems(RepositoryPaths paths)
     {
@@ -373,11 +375,11 @@ public sealed class RegistryStore
             ?? throw new InvalidDataException($"Could not deserialize {path}.");
     }
 
-    private void Save<T>(string path, T value)
-    {
-        string content = _serializer.Serialize(value).Replace("\r\n", "\n", StringComparison.Ordinal);
-        WriteAtomically(path, content);
-    }
+    private void Save<T>(string path, T value) =>
+        WriteAtomically(path, Serialize(value));
+
+    private string Serialize<T>(T value) =>
+        _serializer.Serialize(value).Replace("\r\n", "\n", StringComparison.Ordinal);
 
     private static bool IsTerminal(string status) =>
         status is "completed" or "cancelled";
@@ -397,19 +399,6 @@ public sealed class RegistryStore
         {
             throw new InvalidDataException(
                 $"Archived work-item registry {archivePath} does not use the active allowed-status set.");
-        }
-    }
-
-    private static void EnsureCompatible(
-        WorkItemShardRegistry expected,
-        WorkItemShardRegistry actual,
-        string path)
-    {
-        if (actual.SchemaVersion != expected.SchemaVersion ||
-            !actual.AllowedStatuses.SequenceEqual(expected.AllowedStatuses, StringComparer.Ordinal))
-        {
-            throw new InvalidDataException(
-                $"Existing shard registry metadata conflicts with the legacy registry: {path}.");
         }
     }
 

@@ -1,0 +1,21 @@
+id: WI-0012
+title: Add local folder scanning
+milestone: M02
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0012-local-scanner.md
+started_at: 2026-07-26
+completed_at: 2026-07-26
+verified_at: 2026-07-26
+verified_by: human
+last_updated_at: 2026-07-26
+branch: agent/WI-0012-local-folder-scanning
+blockers: []
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/23
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30179785787
+- type: merge_commit
+  value: 5ac2b8263a7b0d82b7a3e23d9dfb676733cc702a

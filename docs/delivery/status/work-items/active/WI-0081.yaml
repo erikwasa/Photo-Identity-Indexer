@@ -1,0 +1,12 @@
+id: WI-0081
+title: Investigate degraded identity suggestion accuracy
+milestone: M21
+status: ready
+owner: unassigned
+document: ../work-items/WI-0081-suggestion-accuracy-degradation.md
+blockers:
+- WI-0016
+- WI-0043
+blocker_notes:
+- Medium priority. Quantify the apparent regression and audit reference/ranking/model behavior before changing production suggestion semantics.
+evidence: []

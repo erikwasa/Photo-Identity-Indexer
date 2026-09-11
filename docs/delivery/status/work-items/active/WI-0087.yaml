@@ -1,0 +1,10 @@
+id: WI-0087
+title: Add authoritative exact-duplicate source-copy inventory
+milestone: M23
+status: ready
+owner: unassigned
+document: ../work-items/WI-0087-exact-duplicate-inventory.md
+blockers:
+- WI-0041
+blocker_notes: []
+evidence: []

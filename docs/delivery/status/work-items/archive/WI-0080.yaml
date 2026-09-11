@@ -1,0 +1,28 @@
+id: WI-0080
+title: Make the detected face unambiguous in review images
+milestone: M21
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0080-detected-face-clarity.md
+started_at: 2026-08-26
+completed_at: 2026-08-28
+verified_at: 2026-08-28
+verified_by: maintainer
+last_updated_at: 2026-08-28
+branch: agent/WI-0080-existing-catalogue-target-overlay
+blockers:
+- WI-0038
+- WI-0058
+blocker_notes:
+- Final 2026-08-28 maintainer real-catalogue verification passed after PR
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/209
+- type: merge_commit
+  value: baec2e0b76cafea232e25ce45a065b5c52653b63
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/213
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33199227541
+- type: merge_commit
+  value: 8d120dce6fd2780250868a7485d29c7585dea55d

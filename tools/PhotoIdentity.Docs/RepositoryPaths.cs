@@ -12,6 +12,7 @@ public sealed record RepositoryPaths(
     public string WorkItemShardRegistry => Path.Combine(WorkItemShardDirectory, "registry.yaml");
     public string ActiveWorkItemShardDirectory => Path.Combine(WorkItemShardDirectory, "active");
     public string ArchivedWorkItemShardDirectory => Path.Combine(WorkItemShardDirectory, "archive");
+    public string WorkItemsIndex => Path.Combine(StatusDirectory, "work-items-index.md");
     public string WorkItemsDirectory => Path.GetFullPath(Path.Combine(StatusDirectory, "../work-items"));
     public string MilestonesDirectory => Path.GetFullPath(Path.Combine(StatusDirectory, "../milestones"));
 

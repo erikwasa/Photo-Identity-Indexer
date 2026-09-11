@@ -1,0 +1,12 @@
+id: WI-0108
+title: Remove slideshow library, startup and playback latency bottlenecks
+milestone: M24
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0108-slideshow-performance.md
+blockers:
+- WI-0101
+blocker_notes:
+- Real-phone M22 acceptance observed slow saved-collection loading, roughly 20-second startup for an already-prepared one-photo slideshow, and slow image-to-image transitions that appeared to worsen through playback.
+- PostgreSQL migration may improve some query costs, but WI-0108 explicitly owns both database and database-independent slideshow latency so these findings are not assumed fixed by cutover alone.
+evidence: []

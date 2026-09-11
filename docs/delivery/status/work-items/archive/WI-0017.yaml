@@ -1,0 +1,22 @@
+id: WI-0017
+title: Add evaluation harness
+milestone: M06
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0017-evaluation.md
+started_at: 2026-07-27
+completed_at: 2026-07-27
+verified_at: 2026-07-27
+verified_by: human
+last_updated_at: 2026-07-27
+branch: agent/WI-0017-evaluation-harness
+blockers:
+- WI-0016
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/34
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/30254835059
+- type: merge_commit
+  value: d0093e1a817dd81c905cc3edf908f35e8fe4b65f

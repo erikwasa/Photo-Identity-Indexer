@@ -2,7 +2,7 @@
 id: WI-0109
 title: Migrate work-item status to bounded canonical shards
 milestone: M00
-status_source: ../status/work-items.yaml
+status_source: PhotoIdentity.Docs
 depends_on: [WI-0057]
 affected_modules: [tools/PhotoIdentity.Docs, PhotoIdentity.Docs.Tests, delivery-status]
 ---
@@ -31,11 +31,11 @@ docs/delivery/status/
     archive/
       WI-0057.yaml
       WI-0105.yaml
-  work-items.yaml            # generated compatibility/current-work view, if retained
-  work-items-index.md        # generated compact human index, if useful
+  work-items.yaml            # generated compatibility/current-work view
+  work-items-index.md        # generated compact human index
 ```
 
-The exact manifest and generated-view filenames may change during implementation if a simpler layout provides the same contracts. The invariants are that one work item is the canonical unit of storage, active and terminal history are physically separated, aggregate views are generated rather than hand-maintained, and agents do not need to load project history to update one item.
+The invariants are that one work item is the canonical unit of storage, active and terminal history are physically separated, aggregate views are generated rather than hand-maintained, and agents do not need to load project history to update one item.
 
 The narrative work-item documents under `docs/delivery/work-items/` remain separate from lifecycle/status YAML in this migration.
 
@@ -65,25 +65,26 @@ The narrative work-item documents under `docs/delivery/work-items/` remain separ
 
 ## Implementation progress
 
-- The first WI-0109 slice adds shard-aware repository discovery and a small `work-items/registry.yaml` metadata model while retaining legacy registry reads until migration is explicitly activated.
-- `RegistryStore` can load the sharded active/archive areas as one logical registry, rejects duplicate IDs and wrong-area terminal state, persists exactly one changed active item, and moves a newly terminal item to the archive area while keeping existing archive shards read-only.
-- `migrate-work-items` converts the current legacy logical registry to deterministic per-item shards without rewriting or deleting the legacy source files. Existing identical partial shards are reusable; conflicting or unexpected shards fail explicitly, and the shard metadata file is written last so an interrupted initial migration does not switch normal reads to an incomplete store.
-- The repository itself intentionally remains on the legacy layout in this slice. A later migration slice will run the converter on the real delivery history, verify logical equivalence, introduce the compact generated discovery view, and then update agent guidance/status-source references.
+- PR #299 added shard-aware repository discovery, logical active/archive loading, one-shard lifecycle persistence, terminal movement, archive immutability and the deterministic legacy migration command.
+- PR #300 executes the repository cutover. The migration command was run in CI against the exact PR state, transitioned WI-0109 to `in_progress`, generated 30 active and 78 archived canonical shards, and passed `PhotoIdentity.Docs validate` plus `generate --check` before the generated tree was committed.
+- The old batch archive is removed. `work-items.yaml` is now a generated non-terminal compatibility view and `work-items-index.md` is the compact human discovery view.
+- `PhotoIdentity.Docs show WI-XXXX` locates both active and historical canonical status without loading archive history manually.
+- Agent/tooling guidance now treats per-item shards as canonical and generated aggregate/index files as read-only views.
 
 ## Acceptance criteria
 
-- [ ] Canonical work-item lifecycle/status data is stored as one work item per YAML file rather than in an indefinitely growing editable registry.
-- [ ] Active and archived canonical shards are physically separated and enforce non-terminal versus terminal status semantics.
-- [ ] `PhotoIdentity.Docs validate`, `next`, `start`, `review` and the other existing lifecycle transitions operate on the combined sharded model with unchanged user-facing lifecycle semantics.
-- [ ] A normal lifecycle update rewrites only the affected work-item shard, apart from deterministic generated outputs that genuinely need refresh.
-- [ ] Completing or cancelling a work item automatically moves it from active canonical storage to archived canonical storage.
-- [ ] Archived items remain available for blocker/dependency resolution, milestone calculation and audit inspection without being loaded routinely by agents.
-- [ ] The current registry and legacy archive are migrated losslessly; IDs, statuses, metadata, blocker notes and evidence are preserved and conflicting duplicates fail explicitly.
-- [ ] Any retained `work-items.yaml` aggregate is generated, bounded to current-work/compatibility needs, and documented as non-canonical.
-- [ ] A compact generated human overview or equivalent `PhotoIdentity.Docs` command makes it easy to discover current work and locate historical items without opening every shard.
-- [ ] Repository/agent guidance describes the new canonical layout and tells agents to read only the relevant work-item status shard plus linked documentation.
-- [ ] Tests cover shard discovery, duplicate detection, active/archive status constraints, archived dependency resolution, single-item persistence, terminal movement, read-only archive behavior and lossless migration from the existing layout.
-- [ ] `PhotoIdentity.Docs validate` and `generate --check` pass after migration, and CI detects drift in generated aggregate/index output.
+- [x] Canonical work-item lifecycle/status data is stored as one work item per YAML file rather than in an indefinitely growing editable registry.
+- [x] Active and archived canonical shards are physically separated and enforce non-terminal versus terminal status semantics.
+- [x] `PhotoIdentity.Docs validate`, `next`, `start`, `review` and the other existing lifecycle transitions operate on the combined sharded model with unchanged user-facing lifecycle semantics.
+- [x] A normal lifecycle update rewrites only the affected work-item shard, apart from deterministic generated outputs that genuinely need refresh.
+- [x] Completing or cancelling a work item automatically moves it from active canonical storage to archived canonical storage.
+- [x] Archived items remain available for blocker/dependency resolution, milestone calculation and audit inspection without being loaded routinely by agents.
+- [x] The current registry and legacy archive are migrated losslessly; IDs, statuses, metadata, blocker notes and evidence are preserved and conflicting duplicates fail explicitly.
+- [x] Any retained `work-items.yaml` aggregate is generated, bounded to current-work/compatibility needs, and documented as non-canonical.
+- [x] A compact generated human overview or equivalent `PhotoIdentity.Docs` command makes it easy to discover current work and locate historical items without opening every shard.
+- [x] Repository/agent guidance describes the new canonical layout and tells agents to read only the relevant work-item status shard plus linked documentation.
+- [x] Tests cover shard discovery, duplicate detection, active/archive status constraints, archived dependency resolution, single-item persistence, terminal movement, read-only archive behavior and lossless migration from the existing layout.
+- [ ] `PhotoIdentity.Docs validate` and `generate --check` pass after the final committed cutover state, and CI detects drift in generated aggregate/index output.
 
 ## Implementation notes
 

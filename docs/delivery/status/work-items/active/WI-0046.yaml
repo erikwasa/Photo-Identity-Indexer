@@ -1,0 +1,12 @@
+id: WI-0046
+title: Simplify the application around Review and Library
+milestone: M18
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0046-simplified-application-shell.md
+blockers:
+- WI-0025
+- WI-0045
+- WI-0048
+blocker_notes: []
+evidence: []

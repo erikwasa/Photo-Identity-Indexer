@@ -1,0 +1,19 @@
+id: WI-0035
+title: Tune YuNet confidence threshold
+milestone: M16
+status: completed
+owner: human-maintainer
+document: ../work-items/WI-0035-yunet-threshold-sweep.md
+started_at: 2026-08-05
+completed_at: 2026-08-06
+verified_at: 2026-08-06
+verified_by: human
+last_updated_at: 2026-08-06
+blockers:
+- WI-0039
+blocker_notes: []
+evidence:
+- type: human_verification
+  value: 'PR #74 completed reusable candidate-run matching and activated the fixed 0.8, 0.7, 0.6 and 0.5 YuNet threshold sweep.'
+- type: human_verification
+  value: The maintainer completed isolated comparison runs for confidence 0.8, 0.7, 0.6 and 0.5 against the immutable confidence-0.9 ground truth by 2026-08-06. Every governed threshold from 0.9 through 0.5 failed the complete M16 gate; detailed metrics and category evidence remain private, and threshold tuning is insufficient.
