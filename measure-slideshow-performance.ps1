@@ -1,10 +1,12 @@
 [CmdletBinding()]
 param(
-    [Uri]$BaseUri = "http://localhost:5080",
+    [Uri]$BaseUri = "http://127.0.0.1:5080",
     [Parameter(Mandatory = $true)]
     [Guid]$CollectionId,
     [ValidateRange(1, 10)]
     [int]$RepeatCount = 3,
+    [ValidateRange(1, 50)]
+    [int]$SequenceItemCount = 10,
     [switch]$IncludePreparedOriginals,
     [ValidateRange(1, 200)]
     [int]$MaximumPreparationItems = 5,
@@ -136,6 +138,28 @@ if ($null -eq $snapshot) {
 
 $total = [int]$snapshot.total
 $firstRevisionId = if ($total -gt 0) { [string]$snapshot.items[0].revisionId } else { $null }
+
+$sequenceViewerPreviews = @()
+$sequenceViewerPreviewDiagnostics = $null
+$sequenceCount = [Math]::Min($SequenceItemCount, $total)
+if ($sequenceCount -gt 0) {
+    Reset-Diagnostics
+    for ($index = 0; $index -lt $sequenceCount; $index++) {
+        $revisionId = [string]$snapshot.items[$index].revisionId
+        if ([string]::IsNullOrWhiteSpace($revisionId)) {
+            continue
+        }
+
+        $encodedRevision = [Uri]::EscapeDataString($revisionId)
+        $milliseconds = Measure-DownloadMilliseconds -Path "/api/collections/photos/$encodedRevision/viewer-preview"
+        $sequenceViewerPreviews += [ordered]@{
+            position = $index + 1
+            milliseconds = $milliseconds
+        }
+    }
+    $sequenceViewerPreviewDiagnostics = Get-Diagnostics
+}
+
 $viewerPreviewMilliseconds = @()
 $viewerPreviewDiagnostics = $null
 if (-not [string]::IsNullOrWhiteSpace($firstRevisionId)) {
@@ -221,10 +245,19 @@ $report = [ordered]@{
     snapshotItemCount = $total
     libraryMilliseconds = $libraryMilliseconds
     snapshotMilliseconds = $snapshotMilliseconds
+    sequenceViewerPreviews = $sequenceViewerPreviews
     firstViewerPreviewMilliseconds = First-OrNull -Values $viewerPreviewMilliseconds
     subsequentViewerPreviewMilliseconds = Rest-OrEmpty -Values $viewerPreviewMilliseconds
     libraryStages = Select-DiagnosticStage -Diagnostics $libraryDiagnostics -Names @("slideshow-library-load")
     snapshotStages = Select-DiagnosticStage -Diagnostics $snapshotDiagnostics -Names @("slideshow-snapshot-creation")
+    sequenceViewerPreviewStages = if ($null -eq $sequenceViewerPreviewDiagnostics) { @() } else {
+        Select-DiagnosticStage -Diagnostics $sequenceViewerPreviewDiagnostics -Names @(
+            "collection-viewer-preview-open",
+            "original-verification-hash")
+    }
+    sequenceViewerPreviewHashReads = if ($null -eq $sequenceViewerPreviewDiagnostics) { @() } else {
+        Select-HashReads -Diagnostics $sequenceViewerPreviewDiagnostics
+    }
     viewerPreviewStages = if ($null -eq $viewerPreviewDiagnostics) { @() } else {
         Select-DiagnosticStage -Diagnostics $viewerPreviewDiagnostics -Names @(
             "collection-viewer-preview-open",
@@ -234,7 +267,7 @@ $report = [ordered]@{
         Select-HashReads -Diagnostics $viewerPreviewDiagnostics
     }
     preparedOriginals = $preparedResult
-    privacyNote = "Collection names, revision identifiers, filenames, source paths and credentials are intentionally omitted."
+    privacyNote = "Collection names, revision identifiers, filenames, source paths and credentials are intentionally omitted. Ordered viewer measurements contain only one-based slideshow position and elapsed milliseconds."
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
