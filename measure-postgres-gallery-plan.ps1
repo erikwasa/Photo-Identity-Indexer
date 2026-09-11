@@ -102,78 +102,90 @@ function Read-ConnectionIdentity {
         "User ID",
         "UserID",
         "User Id")
+    $maxWrapperDepth = 8
+    $parsedKeyLayers = @()
+    $currentConnectionString = $ConnectionString
+    $wrapperDepth = 0
 
-    $outerBuilder = [System.Data.Common.DbConnectionStringBuilder]::new()
-    try {
-        $outerBuilder.ConnectionString = $ConnectionString
-    }
-    catch {
-        return [pscustomobject]@{
-            DatabaseName = $null
-            Username = $null
-            OuterParsedKeys = @()
-            NestedParsedKeys = @()
-            Format = $null
+    for ($depth = 0; $depth -le $maxWrapperDepth; $depth++) {
+        $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
+        try {
+            $builder.ConnectionString = $currentConnectionString
         }
-    }
-
-    $outerKeys = @($outerBuilder.Keys | ForEach-Object { [string]$_ } | Sort-Object)
-    $databaseName = Get-ConnectionValue -Builder $outerBuilder -Names $databaseNames
-    $username = Get-ConnectionValue -Builder $outerBuilder -Names $usernameNames
-    if (-not [string]::IsNullOrWhiteSpace($databaseName) -and
-        -not [string]::IsNullOrWhiteSpace($username)) {
-        return [pscustomobject]@{
-            DatabaseName = $databaseName
-            Username = $username
-            OuterParsedKeys = $outerKeys
-            NestedParsedKeys = @()
-            Format = "direct"
-        }
-    }
-
-    # Some launcher/operator configurations wrap the Npgsql value once as
-    # ConnectionString="Host=...;Database=...;Username=...". Accept exactly
-    # that one explicit wrapper; do not recursively unwrap arbitrary values.
-    $wrapperKey = Find-ConnectionKey -Builder $outerBuilder -Name "ConnectionString"
-    if (-not [string]::IsNullOrWhiteSpace($wrapperKey)) {
-        $nestedConnectionString = [string]$outerBuilder[$wrapperKey]
-        if (-not [string]::IsNullOrWhiteSpace($nestedConnectionString)) {
-            $nestedBuilder = [System.Data.Common.DbConnectionStringBuilder]::new()
-            try {
-                $nestedBuilder.ConnectionString = $nestedConnectionString
-                $nestedKeys = @(
-                    $nestedBuilder.Keys |
-                        ForEach-Object { [string]$_ } |
-                        Sort-Object)
-                $databaseName = Get-ConnectionValue -Builder $nestedBuilder -Names $databaseNames
-                $username = Get-ConnectionValue -Builder $nestedBuilder -Names $usernameNames
-                return [pscustomobject]@{
-                    DatabaseName = $databaseName
-                    Username = $username
-                    OuterParsedKeys = $outerKeys
-                    NestedParsedKeys = $nestedKeys
-                    Format = "wrapped-connection-string"
-                }
-            }
-            catch {
-                return [pscustomobject]@{
-                    DatabaseName = $null
-                    Username = $null
-                    OuterParsedKeys = $outerKeys
-                    NestedParsedKeys = @()
-                    Format = "wrapped-connection-string"
-                }
+        catch {
+            return [pscustomobject]@{
+                DatabaseName = $null
+                Username = $null
+                ParsedKeyLayers = $parsedKeyLayers
+                Format = if ($wrapperDepth -eq 0) { "direct" } else { "wrapped-connection-string" }
+                WrapperDepth = $wrapperDepth
+                WrapperLimitReached = $false
             }
         }
+
+        $keys = @($builder.Keys | ForEach-Object { [string]$_ } | Sort-Object)
+        $parsedKeyLayers += [pscustomobject]@{
+            Depth = $depth
+            Keys = $keys
+        }
+
+        $databaseName = Get-ConnectionValue -Builder $builder -Names $databaseNames
+        $username = Get-ConnectionValue -Builder $builder -Names $usernameNames
+        if (-not [string]::IsNullOrWhiteSpace($databaseName) -and
+            -not [string]::IsNullOrWhiteSpace($username)) {
+            return [pscustomobject]@{
+                DatabaseName = $databaseName
+                Username = $username
+                ParsedKeyLayers = $parsedKeyLayers
+                Format = if ($wrapperDepth -eq 0) { "direct" } else { "wrapped-connection-string" }
+                WrapperDepth = $wrapperDepth
+                WrapperLimitReached = $false
+            }
+        }
+
+        # Operator/launcher values can be wrapped more than once as
+        # ConnectionString="ConnectionString=...". Follow only that explicit
+        # key, never arbitrary nested values, and stop after a bounded depth.
+        $wrapperKey = Find-ConnectionKey -Builder $builder -Name "ConnectionString"
+        if ([string]::IsNullOrWhiteSpace($wrapperKey)) {
+            return [pscustomobject]@{
+                DatabaseName = $databaseName
+                Username = $username
+                ParsedKeyLayers = $parsedKeyLayers
+                Format = if ($wrapperDepth -eq 0) { "direct" } else { "wrapped-connection-string" }
+                WrapperDepth = $wrapperDepth
+                WrapperLimitReached = $false
+            }
+        }
+
+        $nestedConnectionString = [string]$builder[$wrapperKey]
+        if ([string]::IsNullOrWhiteSpace($nestedConnectionString)) {
+            return [pscustomobject]@{
+                DatabaseName = $databaseName
+                Username = $username
+                ParsedKeyLayers = $parsedKeyLayers
+                Format = if ($wrapperDepth -eq 0) { "direct" } else { "wrapped-connection-string" }
+                WrapperDepth = $wrapperDepth
+                WrapperLimitReached = $false
+            }
+        }
+
+        if ($depth -ge $maxWrapperDepth) {
+            return [pscustomobject]@{
+                DatabaseName = $databaseName
+                Username = $username
+                ParsedKeyLayers = $parsedKeyLayers
+                Format = "wrapped-connection-string"
+                WrapperDepth = $wrapperDepth
+                WrapperLimitReached = $true
+            }
+        }
+
+        $currentConnectionString = $nestedConnectionString
+        $wrapperDepth = $depth + 1
     }
 
-    return [pscustomobject]@{
-        DatabaseName = $databaseName
-        Username = $username
-        OuterParsedKeys = $outerKeys
-        NestedParsedKeys = @()
-        Format = "direct"
-    }
+    throw "Unexpected gallery probe connection parsing state."
 }
 
 $scopeCandidates = @()
@@ -207,34 +219,42 @@ if ($null -eq $connectionIdentity) {
         throw "The PostgreSQL connection environment variable '$ConnectionEnvironmentVariable' is not set at Process, User, or Machine scope."
     }
 
-    $outerParsedKeys = @(
-        $scopeCandidates |
-            ForEach-Object { $_.Identity.OuterParsedKeys } |
-            Sort-Object -Unique)
-    $nestedParsedKeys = @(
-        $scopeCandidates |
-            ForEach-Object { $_.Identity.NestedParsedKeys } |
-            Sort-Object -Unique)
-
-    $outerKeySummary = if ($outerParsedKeys.Count -eq 0) {
+    $layerSummaries = @(
+        foreach ($candidate in $scopeCandidates) {
+            foreach ($layer in $candidate.Identity.ParsedKeyLayers) {
+                $keySummary = if ($layer.Keys.Count -eq 0) {
+                    "<none>"
+                }
+                else {
+                    $layer.Keys -join ", "
+                }
+                "$($candidate.Scope) depth $($layer.Depth): $keySummary"
+            }
+        })
+    $layerSummary = if ($layerSummaries.Count -eq 0) {
         "<none>"
     }
     else {
-        $outerParsedKeys -join ", "
+        $layerSummaries -join " | "
     }
-    $nestedKeySummary = if ($nestedParsedKeys.Count -eq 0) {
-        "<none>"
+    $limitReachedScopes = @(
+        $scopeCandidates |
+            Where-Object { $_.Identity.WrapperLimitReached } |
+            ForEach-Object { $_.Scope })
+    $limitSummary = if ($limitReachedScopes.Count -eq 0) {
+        ""
     }
     else {
-        $nestedParsedKeys -join ", "
+        " Wrapper depth limit 8 was reached at scope(s): $($limitReachedScopes -join ', ')."
     }
 
-    throw "The configured PostgreSQL connection string does not expose both a database and user name. Outer parsed key names: $outerKeySummary. Nested ConnectionString key names: $nestedKeySummary. Values are intentionally omitted."
+    throw "The configured PostgreSQL connection string does not expose both a database and user name. Parsed key layers: $layerSummary.$limitSummary Values are intentionally omitted."
 }
 
 $databaseName = [string]$connectionIdentity.DatabaseName
 $username = [string]$connectionIdentity.Username
 $connectionFormat = [string]$connectionIdentity.Format
+$connectionWrapperDepth = [int]$connectionIdentity.WrapperDepth
 if ($databaseName -notmatch '^[A-Za-z0-9_]+$') {
     throw "The configured PostgreSQL database name contains unsupported characters for this diagnostic."
 }
@@ -278,6 +298,7 @@ $header = @(
     "connection-environment-variable: $ConnectionEnvironmentVariable",
     "connection-environment-scope: $connectionScope",
     "connection-environment-format: $connectionFormat",
+    "connection-environment-wrapper-depth: $connectionWrapperDepth",
     "statement-timeout-seconds: $StatementTimeoutSeconds",
     "note: connection string and credentials are intentionally omitted",
     ""
