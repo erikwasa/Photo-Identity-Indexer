@@ -207,6 +207,7 @@ function Resolve-CatalogueDatabase {
 }
 
 Push-Location $composeDirectory
+$containerId = $null
 $containerDumpPath = $null
 try {
     $containerId = (& $podman.Source compose ps -q postgres).Trim()
@@ -283,7 +284,7 @@ try {
     Write-Host "report: $reportPath"
 }
 finally {
-    if (-not [string]::IsNullOrWhiteSpace($containerDumpPath) -and -not [string]::IsNullOrWhiteSpace([string]$containerId)) {
+    if (-not [string]::IsNullOrWhiteSpace($containerDumpPath) -and -not [string]::IsNullOrWhiteSpace($containerId)) {
         & $podman.Source exec -e "DUMP_PATH=$containerDumpPath" $containerId sh -lc 'rm -f "$DUMP_PATH"' *> $null
     }
     Pop-Location
