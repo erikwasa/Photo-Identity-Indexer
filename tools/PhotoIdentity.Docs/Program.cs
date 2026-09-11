@@ -65,6 +65,21 @@ public static class Program
             return success ? 0 : 1;
         }
 
+        if (command == "show")
+        {
+            if (positionals.Count != 1)
+            {
+                throw new ArgumentException("show requires exactly one work-item ID.");
+            }
+
+            WorkItem selected = FindWorkItem(workItems, positionals[0]);
+            output.WriteLine($"{selected.Id}\t{selected.Milestone}\t{selected.Status}\t{selected.Title}");
+            output.WriteLine($"owner\t{selected.Owner}");
+            output.WriteLine($"status_file\t{StatusSource(paths, selected)}");
+            output.WriteLine($"document\t{DocumentSource(paths, selected)}");
+            return 0;
+        }
+
         if (command == "next")
         {
             Dictionary<string, WorkItem> itemMap = workItems.WorkItems
@@ -173,6 +188,32 @@ public static class Program
         return 0;
     }
 
+    private static WorkItem FindWorkItem(WorkItemRegistry registry, string id) =>
+        registry.WorkItems.SingleOrDefault(item => string.Equals(item.Id, id, StringComparison.Ordinal))
+        ?? throw new KeyNotFoundException($"Unknown work item '{id}'.");
+
+    private static string StatusSource(RepositoryPaths paths, WorkItem item)
+    {
+        if (!paths.HasShardedWorkItemStore)
+        {
+            return "legacy combined registry view";
+        }
+
+        string source = item.Status is "completed" or "cancelled"
+            ? paths.ArchivedWorkItemShard(item.Id)
+            : paths.ActiveWorkItemShard(item.Id);
+        return RepositoryRelative(paths.Root, source);
+    }
+
+    private static string DocumentSource(RepositoryPaths paths, WorkItem item)
+    {
+        string source = Path.GetFullPath(Path.Combine(paths.StatusDirectory, item.Document));
+        return RepositoryRelative(paths.Root, source);
+    }
+
+    private static string RepositoryRelative(string root, string path) =>
+        Path.GetRelativePath(root, path).Replace('\\', '/');
+
     private static int PrintValidation(ValidationResult result, TextWriter output)
     {
         if (result.IsValid)
@@ -261,6 +302,7 @@ public static class Program
               validate [--root PATH]
               generate [--check] [--root PATH]
               next [--root PATH]
+              show ID [--root PATH]
               migrate-work-items [--root PATH]
               start ID [--owner NAME] [--branch NAME] [--root PATH]
               block ID --on BLOCKER [--on BLOCKER] [--note TEXT] [--root PATH]
