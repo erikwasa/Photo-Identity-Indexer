@@ -55,7 +55,7 @@ function Measure-ActionMilliseconds {
     param([Parameter(Mandatory = $true)][scriptblock]$Action)
 
     $watch = [Diagnostics.Stopwatch]::StartNew()
-    & $Action
+    $null = & $Action
     $watch.Stop()
     return [Math]::Round($watch.Elapsed.TotalMilliseconds, 3)
 }
