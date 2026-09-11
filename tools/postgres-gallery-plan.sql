@@ -69,9 +69,6 @@ candidate_faces AS (
         face_occurrences.ordinal,
         face_occurrences.created_at_utc,
         face_occurrences.asset_revision_id,
-        latest_action.id AS review_action_id,
-        latest_action.action_kind AS review_action_kind,
-        latest_action.person_id AS review_person_id,
         top_suggestion.suggestion_id,
         top_suggestion.suggested_person_id,
         top_suggestion.display_name AS suggested_person_name,
@@ -83,18 +80,14 @@ candidate_faces AS (
         top_suggestion.status AS suggestion_status,
         top_suggestion.generated_at_utc AS suggestion_generated_at_utc
     FROM face_occurrences
-    LEFT JOIN LATERAL (
-        SELECT review_actions.id, review_actions.action_kind, review_actions.person_id
+    LEFT JOIN top_suggestion
+        ON top_suggestion.face_occurrence_id = face_occurrences.id
+    WHERE NOT EXISTS (
+        SELECT 1
         FROM review_actions
         WHERE review_actions.face_occurrence_id = face_occurrences.id
           AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
-          AND review_actions.reversed_at_utc IS NULL
-        ORDER BY review_actions.id DESC
-        LIMIT 1
-    ) AS latest_action ON TRUE
-    LEFT JOIN top_suggestion
-        ON top_suggestion.face_occurrence_id = face_occurrences.id
-    WHERE latest_action.id IS NULL
+          AND review_actions.reversed_at_utc IS NULL)
     ORDER BY
         CASE WHEN top_suggestion.suggestion_id IS NULL THEN 1 ELSE 0 END,
         lower(top_suggestion.display_name),
@@ -116,9 +109,9 @@ SELECT
     asset_revisions.content_sha256,
     latest_crop.storage_path,
     latest_observation.confidence,
-    face_occurrences.review_action_id,
-    face_occurrences.review_action_kind,
-    face_occurrences.review_person_id,
+    latest_action.id,
+    latest_action.action_kind,
+    latest_action.person_id,
     assigned_people.display_name,
     face_occurrences.suggestion_id,
     face_occurrences.suggested_person_id,
@@ -154,8 +147,17 @@ LEFT JOIN LATERAL (
         face_observations.detector_model_hash
     LIMIT 1
 ) AS latest_observation ON TRUE
+LEFT JOIN LATERAL (
+    SELECT review_actions.id, review_actions.action_kind, review_actions.person_id
+    FROM review_actions
+    WHERE review_actions.face_occurrence_id = face_occurrences.id
+      AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
+      AND review_actions.reversed_at_utc IS NULL
+    ORDER BY review_actions.id DESC
+    LIMIT 1
+) AS latest_action ON TRUE
 LEFT JOIN people AS assigned_people
-    ON assigned_people.id = face_occurrences.review_person_id
+    ON assigned_people.id = latest_action.person_id
 ORDER BY
     CASE WHEN face_occurrences.suggestion_id IS NULL THEN 1 ELSE 0 END,
     lower(face_occurrences.suggested_person_name),
@@ -197,9 +199,6 @@ candidate_faces AS (
         face_occurrences.ordinal,
         face_occurrences.created_at_utc,
         face_occurrences.asset_revision_id,
-        latest_action.id AS review_action_id,
-        latest_action.action_kind AS review_action_kind,
-        latest_action.person_id AS review_person_id,
         top_suggestion.suggestion_id,
         top_suggestion.suggested_person_id,
         top_suggestion.display_name AS suggested_person_name,
@@ -211,18 +210,14 @@ candidate_faces AS (
         top_suggestion.status AS suggestion_status,
         top_suggestion.generated_at_utc AS suggestion_generated_at_utc
     FROM face_occurrences
-    LEFT JOIN LATERAL (
-        SELECT review_actions.id, review_actions.action_kind, review_actions.person_id
+    LEFT JOIN top_suggestion
+        ON top_suggestion.face_occurrence_id = face_occurrences.id
+    WHERE NOT EXISTS (
+        SELECT 1
         FROM review_actions
         WHERE review_actions.face_occurrence_id = face_occurrences.id
           AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
-          AND review_actions.reversed_at_utc IS NULL
-        ORDER BY review_actions.id DESC
-        LIMIT 1
-    ) AS latest_action ON TRUE
-    LEFT JOIN top_suggestion
-        ON top_suggestion.face_occurrence_id = face_occurrences.id
-    WHERE latest_action.id IS NULL
+          AND review_actions.reversed_at_utc IS NULL)
     ORDER BY face_occurrences.created_at_utc DESC, face_occurrences.id
     LIMIT :page_limit OFFSET 0
 )
@@ -237,9 +232,9 @@ SELECT
     asset_revisions.content_sha256,
     latest_crop.storage_path,
     latest_observation.confidence,
-    face_occurrences.review_action_id,
-    face_occurrences.review_action_kind,
-    face_occurrences.review_person_id,
+    latest_action.id,
+    latest_action.action_kind,
+    latest_action.person_id,
     assigned_people.display_name,
     face_occurrences.suggestion_id,
     face_occurrences.suggested_person_id,
@@ -275,8 +270,17 @@ LEFT JOIN LATERAL (
         face_observations.detector_model_hash
     LIMIT 1
 ) AS latest_observation ON TRUE
+LEFT JOIN LATERAL (
+    SELECT review_actions.id, review_actions.action_kind, review_actions.person_id
+    FROM review_actions
+    WHERE review_actions.face_occurrence_id = face_occurrences.id
+      AND review_actions.action_kind IN ('assign', 'unknown', 'reject')
+      AND review_actions.reversed_at_utc IS NULL
+    ORDER BY review_actions.id DESC
+    LIMIT 1
+) AS latest_action ON TRUE
 LEFT JOIN people AS assigned_people
-    ON assigned_people.id = face_occurrences.review_person_id
+    ON assigned_people.id = latest_action.person_id
 ORDER BY face_occurrences.created_at_utc DESC, face_occurrences.id;
 
 \echo === needs-review-all-count ===
