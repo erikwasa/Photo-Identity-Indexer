@@ -62,12 +62,26 @@ $stages = @(
             "slideshow-browser-image-resource") } |
         Select-Object name, count, totalMilliseconds, averageMilliseconds, maxMilliseconds)
 
+$serverStages = @(
+    $diagnostics.stages |
+        Where-Object { $_.name -in @(
+            "collection-viewer-preview-open",
+            "original-verification-hash",
+            "api-collection-request",
+            "api-slideshow-request") } |
+        Select-Object name, count, totalMilliseconds, averageMilliseconds, maxMilliseconds)
+
 $counters = @(
     $diagnostics.counters |
         Where-Object { $_.name -in @(
             "slideshow-browser-prefetch-hits",
             "slideshow-browser-prefetch-misses") } |
         Select-Object name, value)
+
+$hashReads = @(
+    $diagnostics.hashReads |
+        Where-Object { $_.kind -in @("original-open", "original-status") } |
+        Select-Object kind, count, bytes, subjectCount, averageReadsPerSubject, maxReadsPerSubject)
 
 $report = [ordered]@{
     capturedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
@@ -76,7 +90,9 @@ $report = [ordered]@{
     browserStages = $stages
     browserPresentationSequence = $positions
     browserPrefetchCounters = $counters
-    privacyNote = "The report contains only aggregate browser timing, one-based sample sequence and prefetch hit/miss counts. It omits collection names, revision identifiers, filenames, URLs, source paths and credentials."
+    serverStages = $serverStages
+    hashReads = $hashReads
+    privacyNote = "The report contains only aggregate browser/server timing, one-based sample sequence, prefetch hit/miss counts and aggregate hash-read statistics. It omits collection names, revision identifiers, filenames, URLs, source paths and credentials."
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
