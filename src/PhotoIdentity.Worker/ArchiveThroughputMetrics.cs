@@ -24,6 +24,12 @@ public static class ArchiveThroughputMetricNames
     public const string FaceReviewDerivativeGeneration = "face-review-derivative-generation";
     public const string HydrationRequest = "hydration-request";
     public const string ReleaseRequest = "release-request";
+    public const string SlideshowLibraryLoad = "slideshow-library-load";
+    public const string SlideshowSnapshotCreation = "slideshow-snapshot-creation";
+    public const string SlideshowPreparationStart = "slideshow-preparation-start";
+    public const string SlideshowPreparationStatus = "slideshow-preparation-status";
+    public const string SlideshowPreparedOriginalOpen = "slideshow-prepared-original-open";
+    public const string CollectionViewerPreviewOpen = "collection-viewer-preview-open";
     public const string ApiArchiveRequest = "api-archive-request";
     public const string ApiCollectionRequest = "api-collection-request";
     public const string ApiMetadataRequest = "api-metadata-request";
