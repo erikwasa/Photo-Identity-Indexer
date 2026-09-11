@@ -24,7 +24,7 @@ work_items:
   milestone: M10
   status: proposed
   owner: unassigned
-  document: ../work-items/WI-0021-checkpointing.md
+  document: ../work-items/WI-0021-azure-checkpointing.md
   blockers:
   - WI-0020
   blocker_notes: []
@@ -246,7 +246,7 @@ work_items:
   milestone: M18
   status: completed
   owner: ai-agent
-  document: ../work-items/WI-0058-face-details-quality.md
+  document: ../work-items/WI-0058-face-details-image-quality.md
   started_at: 2026-08-15
   completed_at: 2026-08-17
   verified_at: 2026-08-17
