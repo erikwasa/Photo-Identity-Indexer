@@ -1,8 +1,8 @@
 # PostgreSQL local runtime
 
-PostgreSQL is the selected long-term authoritative catalogue under ADR-0009. During WI-0097 and the later migration slices, the existing SQLite catalogue remains authoritative and must not be deleted or replaced.
+PostgreSQL is the selected long-term authoritative catalogue under ADR-0009. WI-0102 completed the maintainer production cutover on 2026-09-11, including rollback acceptance; the preserved SQLite backup is now a rollback/migration artifact rather than a second writable authority.
 
-This runbook establishes the local PostgreSQL service used for migration development and verification on a Windows machine with WSL2 and Podman Desktop.
+This runbook establishes the local PostgreSQL service used for migration development, verification and the accepted Windows-hosted PostgreSQL catalogue. Full day-to-day PostgreSQL backup/recovery and sustained archive-catch-up operations are completed under WI-0106.
 
 ## Private configuration
 
@@ -51,26 +51,28 @@ The verification script:
 
 The script does not print the configured PostgreSQL password or connection string.
 
-## Connect Photo Identity to the migration foundation
+## Connect Photo Identity to PostgreSQL
 
-Supply the PostgreSQL connection string outside source control. For a development shell:
+The supported production launcher keeps the PostgreSQL connection string outside source control and `launcher.json`. Persist the private connection string in a Windows environment variable and configure the launcher with only that environment-variable name plus `PhotoIdentity__CatalogueProvider=postgresql`; see [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) for the accepted WI-0102 boundary.
+
+For an ad-hoc development shell, a direct process environment variable can still be used:
 
 ~~~powershell
 $env:PhotoIdentity__Postgres__ConnectionString = "Host=127.0.0.1;Port=5432;Database=photoidentity;Username=photoidentity;Password=<private-password>;SSL Mode=Disable;GSS Encryption Mode=Disable"
+$env:PhotoIdentity__CatalogueProvider = "postgresql"
 ~~~
 
-Start Photo Identity normally. SQLite remains the active catalogue in WI-0097; PostgreSQL is initialized only as the migration target.
-
-The existing /health endpoint reports both boundaries. A configured and initialized PostgreSQL service appears as:
+A healthy PostgreSQL-authoritative runtime reports:
 
 ~~~json
 {
   "status": "ok",
-  "catalogueProvider": "sqlite",
+  "schemaVersion": 23,
+  "catalogueProvider": "postgresql",
   "postgres": {
     "configured": true,
     "status": "ready",
-    "schemaVersion": 1
+    "schemaVersion": 23
   }
 }
 ~~~
@@ -108,10 +110,11 @@ Pop-Location
 
 This removes the named PostgreSQL data volume.
 
-## Current migration boundary
+## Current authority boundary
 
-WI-0097 does not move any source, asset, face, review or archive state out of SQLite. The PostgreSQL schema contains only the migration-history foundation. Foundational catalogue tables are introduced by WI-0098, and the real SQLite-to-PostgreSQL cutover is deferred to WI-0102.
+WI-0102 completed the real SQLite-to-PostgreSQL migration and controlled authority transfer. The normal maintainer runtime now selects PostgreSQL. SQLite remains supported for explicit migration/import compatibility and as the tested rollback path from the preserved pre-cutover backup, but it must not run concurrently as another writable production authority.
 
+Longer-term PostgreSQL backup/recovery, stabilization and sustained real-archive catch-up are owned by WI-0106.
 
 If the server works directly through the Podman-machine address but the Windows localhost relay corrupts or closes PostgreSQL sessions, do not configure Photo Identity with the dynamic machine IP. For a WSL-backed Podman machine whose `UserModeNetworking` value is false, the supported remediation is:
 

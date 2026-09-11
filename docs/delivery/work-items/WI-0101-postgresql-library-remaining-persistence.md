@@ -90,9 +90,9 @@ Many PostgreSQL repositories already exist. An unchecked integration task does n
 
 - [x] Add/run PostgreSQL behavior-equivalence tests for the remaining domains, including mutations, cancellation, failure handling, transaction rollback and idempotent retries. Prefer repository tests; use HTTP-host tests only for composition/contracts requiring that layer.
 - [x] Verify migrations on clean and existing supported PostgreSQL schemas and run live tests with PostgreSQL explicitly configured; opt-in tests returning early do not prove PostgreSQL acceptance.
-- [ ] Run the relevant solution build/tests and published-runtime checks for the completed composition; record test scope, outcomes and material timing in the registry.
+- [x] Run the relevant solution build/tests and published-runtime checks for the completed composition; record test scope, outcomes and material timing in the registry.
 - [x] Review logging/privacy, migration coverage and allowed SQLite exceptions, then verify every acceptance criterion above against the final runtime.
-- [ ] Update the handoff and affected documentation, pass `PhotoIdentity.Docs validate` and `generate --check`, and transition WI-0101 through review to completion only when the full item is verified.
+- [x] Update the handoff and affected documentation, pass `PhotoIdentity.Docs validate` and `generate --check`, and transition WI-0101 through review to completion only when the full item is verified.
 
 ### Work owned by later items
 
@@ -163,7 +163,7 @@ The live suite includes clean/idempotent and supported upgrade migration coverag
 
 PR #277 CI run #1547 completed successfully. The normal build/test lane, both integration shards, documentation validation/generated-output checks, published review verification and Windows mixed-media verification all passed. This separates two kinds of evidence correctly: CI proves the regular repository/application gates, while the explicit verifier proves the opt-in PostgreSQL tests actually connected and executed rather than returning early.
 
-All WI-0101 technical acceptance criteria are therefore satisfied. Remaining unchecked work is administrative closure: record the final test/CI evidence in the status registry and transition the work item through review/completion after this PR is finalized. Existing-catalogue import, production cutover and rollback remain WI-0102.
+All WI-0101 technical acceptance criteria are therefore satisfied. The administrative closure is completed in the PostgreSQL cutover closeout PR: the final live verification and CI evidence are recorded in the canonical registry, the handoff is updated, and WI-0101 is transitioned to completed. Existing-catalogue import, production cutover and rollback are completed separately by WI-0102.
 
 ## Current implementation progress
 
