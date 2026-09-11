@@ -6,9 +6,12 @@ Use this page to decide which runbook is current. Some files under `docs/operati
 
 - [Local operator guide](local-operator-guide.md) — authoritative day-to-day setup, application, permanent-archive and recovery path.
 - [Windows operator package](windows-package.md) — self-contained `win-x64` package build, installation, durable-data boundary and side-by-side upgrade procedure.
-- [SQLite persistence operations](sqlite-persistence.md) — current authoritative-catalogue backup, restore, migration and locking policy until the M24 cutover.\n- [PostgreSQL local runtime](postgresql-local-runtime.md) — M24 migration-target setup and Podman verification while SQLite remains authoritative.
+- [PostgreSQL production operations](postgresql-operations.md) — current production startup/restart, logical backup, isolated restore verification, upgrade boundary and WI-0106 catch-up acceptance path.
+- [PostgreSQL local runtime](postgresql-local-runtime.md) — Podman/WSL PostgreSQL service setup, localhost diagnostics and verification details.
+- [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) — accepted SQLite-to-PostgreSQL authority-transfer and rollback boundary; not the normal daily backup procedure.
+- [SQLite persistence operations](sqlite-persistence.md) — retained compatibility/migration/rollback guidance now that PostgreSQL is production authority.
 - [Review-proxy serving and bounded originals](review-proxy-serving.md) — current archive storage/original-serving semantics.
-- [Bounded archive acceptance](bounded-archive-acceptance.md) — active human gate while WI-0042 remains incomplete; after completion it remains the acceptance record/runbook.
+- [Bounded archive acceptance](bounded-archive-acceptance.md) — retained permanent-archive acceptance record/runbook.
 
 ## Conditional maintenance and engineering procedures
 
