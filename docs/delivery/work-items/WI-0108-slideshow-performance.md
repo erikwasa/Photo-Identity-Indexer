@@ -85,6 +85,16 @@ These measurements rule out slideshow-library definition loading, PostgreSQL sna
 
 The remaining evidence gap is actual playback progression. The first probe repeatedly requested only the first snapshot revision and therefore could not test whether distinct image transitions become slower with slideshow position. The next probe slice measures a bounded ordered sequence of distinct viewer previews while retaining the repeated-first-image phase for cache/verification evidence. If ordered direct-server latency remains bounded, the investigation should move to browser-visible request/render/prefetch timing on the real playback surface rather than speculative server optimization.
 
+## Ordered-sequence evidence — 2026-09-11
+
+After PR #301 merged, the representative 11-photo collection was measured with the bounded ordered probe. Caller-observed viewer-preview times by position were approximately 58, 83, 68, 36, 35, 40, 39, 59, 77, 35 and 79 ms. `collection-viewer-preview-open` averaged about 47 ms and peaked around 73 ms.
+
+Five of the 11 distinct images required one `original-open` hash read each. Those reads averaged about 24 ms and peaked around 38 ms. Repeating the first image after the ordered sequence took about 31 ms per request and required no additional original-open hash reads.
+
+The ordered timings fluctuate by image but do not systematically grow with slideshow position: several later positions return to the mid-30-to-40 ms range. Direct server serving therefore does not reproduce the reported progressive slowdown, and the measured hash work is not cumulative enough to explain it.
+
+The next WI-0108 slice instruments the actual browser slideshow image surface. It records at most 50 identity-free samples per slideshow: one-based sequence, time from DOM presentation to `<img>` load, same-origin Resource Timing duration when available, and whether the resource had already completed before presentation. Samples are batched so diagnostics do not compete with every image prefetch. No image URL, revision ID, collection identity, filename or source path is submitted.
+
 ## Acceptance criteria
 
 - [x] Timing evidence can distinguish slideshow-library load, snapshot creation, preparation/preflight, first-image serving and subsequent-image serving without exposing private source data.
