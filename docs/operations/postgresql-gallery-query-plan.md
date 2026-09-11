@@ -56,16 +56,27 @@ It intentionally omits connection strings and credentials. The report may contai
 
 ## Representative baseline (2026-09-11)
 
-The maintainer-scale schema-23 rehearsal catalogue used for WI-0104 contained 18,281 face occurrences, 10,366 rank-one suggestions and 8,702 active review actions. With a 40-row page:
+The maintainer-scale schema-23 rehearsal catalogue used for WI-0104 contained 18,281 face occurrences, 10,366 rank-one suggestions and 8,702 active review actions. With a 40-row page before PR #293:
 
 - Needs review / Suggested person: about 806 ms and about 132k shared-buffer hits.
 - Needs review / Newest first: about 255 ms and about 132k shared-buffer hits.
 - Needs review / All confidence count: about 7.5 ms.
 - Needs review / High confidence count: about 7.4 ms.
 
-The page plans performed 18,281 latest-review-action index probes and then about 9,584 rank-one suggestion/suggestion/person lookups before applying the 40-row page limit. The count plan used a set-based anti join and estimated the 9,584 unreviewed faces correctly. This evidence supports changing the page current-state query shape before adding indexes.
+The page plans performed 18,281 latest-review-action index probes and then about 9,584 rank-one suggestion/suggestion/person lookups before applying the 40-row page limit. The count plan used a set-based anti join and estimated the 9,584 unreviewed faces correctly. This evidence supported changing the page current-state query shape before adding indexes.
 
-The first correction therefore moves latest-review-action enrichment to the bounded detail phase and uses the same state-membership predicates as the exact count path. Rerun this probe against the same representative catalogue after merge before deciding whether suggestion-oriented indexes or further query decomposition are justified.
+## Representative after-plan (2026-09-11)
+
+After PR #293 moved latest-review-action enrichment behind the page limit and changed page/navigation state membership to the set-based predicate, the same schema-23 catalogue measured:
+
+- Needs review / Suggested person: 32.397 ms, 2,008 shared-buffer hits, no reads and no temporary I/O.
+- Needs review / Newest first: 19.567 ms, 1,987 shared-buffer hits, no reads and no temporary I/O.
+- Needs review / All confidence count: 3.973 ms.
+- Needs review / High confidence count: 2.821 ms.
+
+The page plans now build the 9,584 unreviewed-face set with a hash anti join, join rank-one suggestion state set-wise, use an in-memory top-N sort for the requested 40 rows, and only then resolve asset/crop/observation/latest-action details. The final review-action detail lookup performs 40 indexed searches rather than one probe for every catalogue face. At this scale the remaining sequential scans and top-N sort are inexpensive and selective-index changes are not justified by the representative evidence.
+
+This after-plan closes WI-0104's Face Gallery page/scroll query acceptance slice. Retain the probe for future catalogue-growth regression checks rather than adding speculative indexes now.
 
 ## Interpreting the result
 
@@ -73,4 +84,4 @@ Review actual execution time, shared read/hit blocks, sort nodes, sequential sca
 
 If one scenario hits the configured statement timeout, retain the partial report. A representative timeout is itself acceptance evidence that the query shape still needs corrective work; do not raise the timeout merely to make the probe pass.
 
-After any query/index correction, rerun the same probe against the same representative catalogue and compare the before/after plans before marking the Face Gallery page/scroll acceptance criterion complete.
+After any future query/index correction, rerun the same probe against the same representative catalogue and compare the before/after plans.
