@@ -45,6 +45,20 @@
         return entries[entries.length - 1];
     }
 
+    function currentPrefetchState(image) {
+        const resourceUrl = image.currentSrc || image.src;
+        const getState = window.photoIdentitySlideshow?.getPrefetchState;
+        if (!resourceUrl || typeof getState !== "function") {
+            return null;
+        }
+
+        try {
+            return getState(resourceUrl);
+        } catch {
+            return null;
+        }
+    }
+
     function completeSample(image) {
         const sample = imageStarts.get(image);
         if (!sample) {
@@ -58,10 +72,10 @@
         const resourceMilliseconds = resource && Number.isFinite(resource.duration)
             ? Math.max(0, resource.duration)
             : null;
-        const prefetched = !!resource &&
-            Number.isFinite(resource.responseEnd) &&
-            resource.responseEnd > 0 &&
-            resource.responseEnd <= sample.startedAt;
+        const prefetched = sample.prefetchState?.known === true &&
+            sample.prefetchState?.completed === true &&
+            Number.isFinite(sample.prefetchState?.completedAt) &&
+            sample.prefetchState.completedAt <= sample.startedAt;
 
         pendingSamples.push({
             sequence: sample.sequence,
@@ -86,7 +100,8 @@
         sequence++;
         imageStarts.set(image, {
             sequence,
-            startedAt: performance.now()
+            startedAt: performance.now(),
+            prefetchState: currentPrefetchState(image)
         });
 
         if (image.complete && image.naturalWidth > 0) {
