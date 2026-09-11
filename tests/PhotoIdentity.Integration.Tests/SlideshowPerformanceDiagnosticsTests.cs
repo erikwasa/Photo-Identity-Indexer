@@ -83,13 +83,23 @@ public sealed class SlideshowPerformanceDiagnosticsTests
                 content: null);
             reset.EnsureSuccessStatusCode();
 
-            using HttpResponseMessage sample = await client.PostAsJsonAsync(
-                "/api/slideshows/diagnostics/playback",
+            SlideshowBrowserPlaybackTimingBatchRequest batch = new(
+            [
                 new SlideshowBrowserPlaybackTimingRequest(
                     Sequence: 3,
                     PresentationMilliseconds: 125.5,
                     ResourceMilliseconds: 40.25,
-                    Prefetched: true));
+                    Prefetched: true),
+                new SlideshowBrowserPlaybackTimingRequest(
+                    Sequence: 4,
+                    PresentationMilliseconds: 80,
+                    ResourceMilliseconds: null,
+                    Prefetched: false),
+            ]);
+
+            using HttpResponseMessage sample = await client.PostAsJsonAsync(
+                "/api/slideshows/diagnostics/playback",
+                batch);
             Assert.Equal(HttpStatusCode.NoContent, sample.StatusCode);
 
             ArchiveThroughputDiagnosticsResponse diagnostics =
@@ -100,18 +110,25 @@ public sealed class SlideshowPerformanceDiagnosticsTests
             ArchiveThroughputStageMetricResponse presentation = Assert.Single(
                 diagnostics.Stages,
                 stage => stage.Name == ArchiveThroughputMetricNames.SlideshowBrowserImagePresentation);
-            Assert.Equal(1, presentation.Count);
-            Assert.Equal(125.5, presentation.TotalMilliseconds, precision: 3);
+            Assert.Equal(2, presentation.Count);
+            Assert.Equal(205.5, presentation.TotalMilliseconds, precision: 3);
 
-            ArchiveThroughputStageMetricResponse position = Assert.Single(
+            ArchiveThroughputStageMetricResponse position3 = Assert.Single(
                 diagnostics.Stages,
                 stage => stage.Name ==
                     ArchiveThroughputMetricNames.SlideshowBrowserImagePresentationPositionPrefix + "03");
-            Assert.Equal(125.5, position.TotalMilliseconds, precision: 3);
+            Assert.Equal(125.5, position3.TotalMilliseconds, precision: 3);
+
+            ArchiveThroughputStageMetricResponse position4 = Assert.Single(
+                diagnostics.Stages,
+                stage => stage.Name ==
+                    ArchiveThroughputMetricNames.SlideshowBrowserImagePresentationPositionPrefix + "04");
+            Assert.Equal(80, position4.TotalMilliseconds, precision: 3);
 
             ArchiveThroughputStageMetricResponse resource = Assert.Single(
                 diagnostics.Stages,
                 stage => stage.Name == ArchiveThroughputMetricNames.SlideshowBrowserImageResource);
+            Assert.Equal(1, resource.Count);
             Assert.Equal(40.25, resource.TotalMilliseconds, precision: 3);
 
             ArchiveThroughputCounterMetricResponse prefetchHit = Assert.Single(
@@ -119,13 +136,21 @@ public sealed class SlideshowPerformanceDiagnosticsTests
                 counter => counter.Name == ArchiveThroughputMetricNames.SlideshowBrowserPrefetchHits);
             Assert.Equal(1, prefetchHit.Value);
 
+            ArchiveThroughputCounterMetricResponse prefetchMiss = Assert.Single(
+                diagnostics.Counters,
+                counter => counter.Name == ArchiveThroughputMetricNames.SlideshowBrowserPrefetchMisses);
+            Assert.Equal(1, prefetchMiss.Value);
+
             using HttpResponseMessage invalid = await client.PostAsJsonAsync(
                 "/api/slideshows/diagnostics/playback",
-                new SlideshowBrowserPlaybackTimingRequest(
-                    Sequence: 51,
-                    PresentationMilliseconds: 1,
-                    ResourceMilliseconds: null,
-                    Prefetched: false));
+                new SlideshowBrowserPlaybackTimingBatchRequest(
+                [
+                    new SlideshowBrowserPlaybackTimingRequest(
+                        Sequence: 51,
+                        PresentationMilliseconds: 1,
+                        ResourceMilliseconds: null,
+                        Prefetched: false),
+                ]));
             Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
         }
         finally
