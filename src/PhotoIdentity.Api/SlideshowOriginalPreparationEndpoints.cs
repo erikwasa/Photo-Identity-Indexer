@@ -11,6 +11,9 @@ public sealed record SlideshowBrowserPlaybackTimingRequest(
     double? ResourceMilliseconds,
     bool Prefetched);
 
+public sealed record SlideshowBrowserPlaybackTimingBatchRequest(
+    IReadOnlyList<SlideshowBrowserPlaybackTimingRequest>? Samples);
+
 public static class SlideshowOriginalPreparationEndpoints
 {
     public static IEndpointRouteBuilder MapSlideshowOriginalPreparationEndpoints(
@@ -27,46 +30,60 @@ public static class SlideshowOriginalPreparationEndpoints
     }
 
     private static IResult RecordBrowserPlaybackTiming(
-        SlideshowBrowserPlaybackTimingRequest request,
+        SlideshowBrowserPlaybackTimingBatchRequest request,
         ArchiveThroughputMetrics metrics)
     {
         const double maximumMilliseconds = 120_000d;
-        if (request.Sequence is < 1 or > 50 ||
-            !double.IsFinite(request.PresentationMilliseconds) ||
-            request.PresentationMilliseconds < 0d ||
-            request.PresentationMilliseconds > maximumMilliseconds ||
-            (request.ResourceMilliseconds is double resourceMilliseconds &&
-                (!double.IsFinite(resourceMilliseconds) ||
-                 resourceMilliseconds < 0d ||
-                 resourceMilliseconds > maximumMilliseconds)))
+        if (request.Samples is null || request.Samples.Count is < 1 or > 50)
         {
-            return Results.BadRequest(new
+            return BadBrowserTimingRequest();
+        }
+
+        foreach (SlideshowBrowserPlaybackTimingRequest sample in request.Samples)
+        {
+            if (sample.Sequence is < 1 or > 50 ||
+                !double.IsFinite(sample.PresentationMilliseconds) ||
+                sample.PresentationMilliseconds < 0d ||
+                sample.PresentationMilliseconds > maximumMilliseconds ||
+                (sample.ResourceMilliseconds is double resourceMilliseconds &&
+                    (!double.IsFinite(resourceMilliseconds) ||
+                     resourceMilliseconds < 0d ||
+                     resourceMilliseconds > maximumMilliseconds)))
             {
-                error = "The slideshow browser timing sample is outside the supported diagnostic bounds.",
-            });
+                return BadBrowserTimingRequest();
+            }
         }
 
-        TimeSpan presentation = TimeSpan.FromMilliseconds(request.PresentationMilliseconds);
-        metrics.RecordStage(ArchiveThroughputMetricNames.SlideshowBrowserImagePresentation, presentation);
-        metrics.RecordStage(
-            ArchiveThroughputMetricNames.SlideshowBrowserImagePresentationPositionPrefix +
-            request.Sequence.ToString("D2", CultureInfo.InvariantCulture),
-            presentation);
-
-        if (request.ResourceMilliseconds is double measuredResourceMilliseconds)
+        foreach (SlideshowBrowserPlaybackTimingRequest sample in request.Samples)
         {
+            TimeSpan presentation = TimeSpan.FromMilliseconds(sample.PresentationMilliseconds);
+            metrics.RecordStage(ArchiveThroughputMetricNames.SlideshowBrowserImagePresentation, presentation);
             metrics.RecordStage(
-                ArchiveThroughputMetricNames.SlideshowBrowserImageResource,
-                TimeSpan.FromMilliseconds(measuredResourceMilliseconds));
-        }
+                ArchiveThroughputMetricNames.SlideshowBrowserImagePresentationPositionPrefix +
+                sample.Sequence.ToString("D2", CultureInfo.InvariantCulture),
+                presentation);
 
-        metrics.RecordCounter(
-            request.Prefetched
-                ? ArchiveThroughputMetricNames.SlideshowBrowserPrefetchHits
-                : ArchiveThroughputMetricNames.SlideshowBrowserPrefetchMisses);
+            if (sample.ResourceMilliseconds is double measuredResourceMilliseconds)
+            {
+                metrics.RecordStage(
+                    ArchiveThroughputMetricNames.SlideshowBrowserImageResource,
+                    TimeSpan.FromMilliseconds(measuredResourceMilliseconds));
+            }
+
+            metrics.RecordCounter(
+                sample.Prefetched
+                    ? ArchiveThroughputMetricNames.SlideshowBrowserPrefetchHits
+                    : ArchiveThroughputMetricNames.SlideshowBrowserPrefetchMisses);
+        }
 
         return Results.NoContent();
     }
+
+    private static IResult BadBrowserTimingRequest() =>
+        Results.BadRequest(new
+        {
+            error = "The slideshow browser timing samples are outside the supported diagnostic bounds.",
+        });
 
     private static async Task<IResult> StartAsync(
         SlideshowOriginalPreparationRequest request,
