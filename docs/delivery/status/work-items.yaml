@@ -1520,3 +1520,14 @@ work_items:
   - Real-phone M22 acceptance observed slow saved-collection loading, roughly 20-second startup for an already-prepared one-photo slideshow, and slow image-to-image transitions that appeared to worsen through playback.
   - PostgreSQL migration may improve some query costs, but WI-0108 explicitly owns both database and database-independent slideshow latency so these findings are not assumed fixed by cutover alone.
   evidence: []
+- id: WI-0109
+  title: Migrate work-item status to bounded canonical shards
+  milestone: M00
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0109-sharded-work-item-documentation.md
+  blockers:
+  - WI-0057
+  blocker_notes:
+  - WI-0057 established the active/archive logical split; this follow-up makes bounded per-item storage and automatic terminal archival the normal model.
+  evidence: []
