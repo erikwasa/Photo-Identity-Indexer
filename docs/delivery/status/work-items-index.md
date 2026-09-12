@@ -24,7 +24,7 @@ Current work items: **19**. Archived terminal items: **89**.
 | [WI-0094](../work-items/WI-0094-read-only-slideshow-library.md) Add a read-only slideshow library with standalone original preparation | M22 | in_review | ai-agent | [YAML](work-items/active/WI-0094.yaml) |
 | [WI-0095](../work-items/WI-0095-model-download-retry.md) Retry transient governed-model download interruptions | M22 | in_review | ai-agent | [YAML](work-items/active/WI-0095.yaml) |
 | [WI-0096](../work-items/WI-0096-slideshow-preparation-quiescence.md) Wait for slideshow preparation cancellation to quiesce | M22 | in_review | ai-agent | [YAML](work-items/active/WI-0096.yaml) |
-| [WI-0107](../work-items/WI-0107-m22-slideshow-acceptance-gaps.md) Close final M22 slideshow launch and prepared-state acceptance gaps | M22 | ready | unassigned | [YAML](work-items/active/WI-0107.yaml) |
+| [WI-0107](../work-items/WI-0107-m22-slideshow-acceptance-gaps.md) Close final M22 slideshow launch and prepared-state acceptance gaps | M22 | in_review | ai-agent | [YAML](work-items/active/WI-0107.yaml) |
 
 Historical items stay queryable without opening the archive directory:
 
