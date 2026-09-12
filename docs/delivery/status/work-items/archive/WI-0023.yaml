@@ -1,0 +1,21 @@
+id: WI-0023
+title: Process the full archive
+milestone: M12
+status: completed
+owner: unassigned
+document: ../work-items/WI-0023-full-archive.md
+completed_at: 2026-09-12
+verified_at: 2026-09-12
+verified_by: maintainer
+last_updated_at: 2026-09-12
+blockers:
+- WI-0022
+- WI-0041
+- WI-0042
+- WI-0053
+blocker_notes:
+- Superseded by M24/WI-0106, which completed production archive catch-up and verified subsequent incremental processing on the local PostgreSQL catalogue.
+- The original separate batch plan is retired rather than repeated.
+evidence:
+- type: documentation
+  value: docs/delivery/work-items/WI-0106-postgresql-operations-and-archive-catchup.md
