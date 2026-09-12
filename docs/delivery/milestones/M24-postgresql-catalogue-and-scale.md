@@ -19,7 +19,7 @@ The architectural decision is recorded in [ADR-0009](../../decisions/ADR-0009-po
 - Preserve current semantics before introducing optional PostgreSQL-specific acceleration.
 - Keep each migration slice independently testable and avoid a big-bang rewrite.
 - Add low-overhead metrics to the application rather than requiring repeated manual workload comparisons.
-- Keep the existing SQLite catalogue as a read-only rollback artifact until PostgreSQL cutover is accepted.
+- Keep the existing SQLite catalogue as a read-only rollback artifact until PostgreSQL cutover and operational stabilization are accepted.
 - Do not mix M22 functional acceptance work into this milestone; slideshow performance findings discovered during M22 acceptance are tracked here only when they are performance/scale concerns.
 - Do not assume PostgreSQL alone fixes database-independent repeated hashing, file I/O, browser serving or UI work.
 
@@ -59,19 +59,33 @@ Real-phone M22 acceptance on 2026-09-02 established the following performance ba
 
 Known implementation hypotheses include expensive Smart Collection snapshot/current-state evaluation and repeated full-file SHA-256 verification when already-local originals are served. These hypotheses must be measured and corrected without weakening immutable revision safety. Comparative SQLite/PostgreSQL benchmark runs are not required.
 
+## Closeout evidence (2026-09-12)
+
+M24 acceptance was completed against the real maintainer catalogue rather than synthetic comparative benchmarks:
+
+- PostgreSQL is the normal launcher-selected authoritative catalogue and `/health` reports PostgreSQL `ready` at schema version 23.
+- The accepted catalogue was backed up with a custom-format logical dump and restored into an isolated PostgreSQL database with schema/table/count/constraint verification.
+- The named-volume catalogue survived both controlled container/service restart and an actual Windows/PC restart.
+- The final Windows-restart pass reused the existing Podman machine and volume; `verify-postgres.ps1` passed PostgreSQL protocol checks plus all 29 persistence and 7 runtime/composition acceptance tests before normal launcher startup.
+- Sustained catch-up processed the remaining 452-image backlog over approximately 57 minutes to `16,442 / 16,442` analysed with zero failed images and bounded diagnostics. A worker-resilience defect discovered during an earlier Podman/WSL interruption was corrected in PR #309 so a transient catalogue outage no longer terminates the whole API through identity-regeneration background work.
+- A seven-photo daily-style increment moved the catalogue to `16,449 / 16,449` current/analysed, produced exactly seven analysis attempts, seven automatic place-enrichment assignments and Review-visible faces without reprocessing the completed archive.
+- After the real PC restart, `/health`, Archive, Smart Collections and Review retained the accepted state with zero pending, failed or unverified images.
+
+PostgreSQL is therefore accepted as the sole writable production authority. The preserved pre-cutover SQLite snapshot has completed its active stabilization/rollback role; closeout leaves it physically untouched so it can be retained as a historical migration artifact or handled later under normal backup/data-retention policy.
+
 ## Exit criteria
 
-- Normal application startup uses PostgreSQL as the authoritative catalogue.
-- The maintainer's existing SQLite catalogue can be migrated repeatably with stable identifiers, relationships and review/identity history preserved.
-- No normal API or hosted-service runtime path depends on SQLite authoritative writes.
-- A database lock/contention event cannot terminate the whole application.
-- Match regeneration no longer reloads invariant evidence for every target and progresses in bounded resumable batches.
-- Settings, Face Gallery and common review interactions no longer perform catalogue-size-dependent work that blocks the whole page/action unnecessarily.
-- The slideshow library, slideshow startup and repeated image navigation no longer exhibit the identified avoidable catalogue-scale/file-verification latency; an unchanged prepared original is not fully re-hashed on every display.
-- Low-overhead metrics expose background throughput, failures and key API/database/slideshow timing without storing personal filenames, image content or embeddings.
-- PostgreSQL startup, persistent storage, backup, restore and upgrade procedures are documented for the Podman/WSL2 operator environment.
-- The real archive can continue analysis for long-running catch-up without the prior host-shutdown/contention failure mode.
-- After catch-up, a small set of newly added photos can be synchronized, analyzed, enriched and reviewed without requiring a full-archive maintenance cycle.
+- [x] Normal application startup uses PostgreSQL as the authoritative catalogue.
+- [x] The maintainer's existing SQLite catalogue can be migrated repeatably with stable identifiers, relationships and review/identity history preserved.
+- [x] No normal API or hosted-service runtime path depends on SQLite authoritative writes.
+- [x] A database lock/contention event cannot terminate the whole application.
+- [x] Match regeneration no longer reloads invariant evidence for every target and progresses in bounded resumable batches.
+- [x] Settings, Face Gallery and common review interactions no longer perform catalogue-size-dependent work that blocks the whole page/action unnecessarily.
+- [x] The slideshow library, slideshow startup and repeated image navigation no longer exhibit the identified avoidable catalogue-scale/file-verification latency; an unchanged prepared original is not fully re-hashed on every display.
+- [x] Low-overhead metrics expose background throughput, failures and key API/database/slideshow timing without storing personal filenames, image content or embeddings.
+- [x] PostgreSQL startup, persistent storage, backup, restore and upgrade procedures are documented for the Podman/WSL2 operator environment.
+- [x] The real archive can continue analysis for long-running catch-up without the prior host-shutdown/contention failure mode.
+- [x] After catch-up, a small set of newly added photos can be synchronized, analyzed, enriched and reviewed without requiring a full-archive maintenance cycle.
 
 ## Risks
 
