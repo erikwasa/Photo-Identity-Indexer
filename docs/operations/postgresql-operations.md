@@ -60,6 +60,8 @@ Pop-Location
 
 Then start Photo Identity through the production launcher and verify `/health`, Archive status, a known Smart Collection and representative Review state. A PC restart can be accepted with the same sequence after Windows/Podman are back up.
 
+The maintainer accepted the container/service restart half of this check on 2026-09-12: the service was stopped and started, `verify-postgres.ps1 -SkipContainerStart` passed, and normal Photo Identity use remained healthy afterward. Keep the combined work-item criterion open until an actual PC restart has also been observed.
+
 ## Routine logical backup
 
 Use the repository backup wrapper rather than copying the Podman volume or PostgreSQL data directory:
@@ -68,11 +70,30 @@ Use the repository backup wrapper rather than copying the Podman volume or Postg
 .\backup-postgres-catalogue.ps1
 ```
 
-The script identifies a unique database containing Photo Identity catalogue markers. If multiple migrated/rehearsal databases remain in the server, select the accepted production authority explicitly:
+If multiple migrated/rehearsal databases remain in the server, select the accepted production authority explicitly:
 
 ```powershell
 .\backup-postgres-catalogue.ps1 -DatabaseName <production-database-name>
 ```
+
+Do not inspect PostgreSQL's physical data files to decide which database is production. Database names and server activity are the supported operational level; PostgreSQL's internal relation files and OID directories are not a safe authority-identification mechanism.
+
+### Identifying the active production database when rehearsals remain
+
+When several retained rehearsal databases all contain valid Photo Identity schema markers, identify the active catalogue from PostgreSQL activity rather than guessing from the timestamped names.
+
+With Photo Identity running, capture aggregate database activity:
+
+```powershell
+Push-Location .\deploy\postgres
+$container = (podman compose ps -q postgres).Trim()
+podman exec $container sh -lc 'psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT datname AS database, xact_commit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, stats_reset FROM pg_stat_database WHERE datname NOT IN (''template0'', ''template1'') ORDER BY datname;"'
+Pop-Location
+```
+
+Use Photo Identity normally for a short observation window (for example Review, Archive and a Smart Collection), then run the same query again. The production catalogue should show a materially larger increase in transaction/read counters than untouched rehearsal copies. Stop Photo Identity before using the identified database for WI-0106 backup/restore acceptance.
+
+On the maintainer installation this method identified the accepted active authority unambiguously after direct launcher-derived name resolution proved unreliable with the private environment-variable value shape. The operational backup then used explicit `-DatabaseName`; no connection string or credential needed to be printed or stored in documentation.
 
 By default backups are written beneath `%LOCALAPPDATA%\PhotoIdentity\backups\postgresql`. The backup is a `pg_dump` custom-format file copied byte-for-byte from the container, plus a JSON report containing its SHA-256 and source database name. Neither file contains the PostgreSQL password or connection string, but the dump contains the private catalogue and must be protected as sensitive local data.
 
@@ -116,6 +137,8 @@ podman exec -e "VERIFY_DATABASE=$verifyDb" $container sh -lc 'dropdb -U "$POSTGR
 Pop-Location
 ```
 
+The maintainer completed this acceptance successfully on 2026-09-12 from a stopped production source. The custom-format dump was hash-recorded, restored into an isolated database, and passed schema/table/count/constraint comparison before that isolated database was explicitly removed.
+
 Keep the verified backup and its reports through the M24 operational stabilization window. Do not retire the preserved pre-cutover SQLite rollback snapshot until WI-0106 acceptance explicitly records that decision.
 
 ## PostgreSQL 18 service upgrades
@@ -150,7 +173,7 @@ Do not use a destructive volume reset for a production authentication or migrati
 
 ## Sustained archive catch-up acceptance
 
-Backup/restore and restart acceptance are only the first half of WI-0106. After they pass, resume the real archive through **Advance archive** and let it operate long enough to expose degradation rather than only completing a short smoke test.
+Backup/restore and container restart acceptance are complete enough to proceed with the next WI-0106 phase. Resume the real archive through **Advance archive** and let it operate long enough to expose degradation rather than only completing a short smoke test. The pending PC-restart observation can be completed before final closeout and does not require delaying catch-up.
 
 Use these privacy-safe operational endpoints while the run is active:
 
