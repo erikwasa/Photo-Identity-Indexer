@@ -16,6 +16,8 @@ WI-0106 now has successful live backup/restore evidence. Because several retaine
 
 The PostgreSQL Compose service was subsequently stopped and started with Photo Identity quiesced. `verify-postgres.ps1 -SkipContainerStart` passed and normal application use remained healthy afterward, so container/service restart persistence is accepted. The combined work-item restart criterion remains open until an actual PC restart is also observed.
 
+The first real PostgreSQL-backed catch-up pass is healthy. Initial synchronization discovered 304 additional source images. After synchronization, analysed images advanced from 15,730 to 15,792 while the unverified backlog moved from 712 to 649, with zero failed images. Advancement moved from the stale historical SQLite-lock blocked state through `syncing` to `running`; PostgreSQL stayed ready, transient hydration returned to zero in-progress, and aggregate diagnostics identified bounded persistence/hash work plus one analysis-session initialization cost rather than progressive database degradation. The progress/failure-metrics acceptance criterion is therefore satisfied, while the separate extended-duration catch-up criterion remains open for a longer run or completion of the remaining backlog.
+
 The no-argument backup database resolver is not a blocker for M24 acceptance. On this maintainer installation the private launcher environment value has a wrapper shape that does not expose the database name to the generic parser reliably, so the accepted operational path uses explicit `-DatabaseName` after identifying the active authority from server activity. Do not continue connection-string unwrapping work unless it becomes a separate maintainability goal.
 
 Consolidated real-phone M22 acceptance still has two separate functional gaps tracked by WI-0107: direct originating-gesture fullscreen launch and durable/revalidated prepared-original receipt state. Do not mix those functional corrections into M24 WI-0106.
@@ -26,11 +28,10 @@ A separate Collections / Library navigation gap remains outside this M24 thread.
 
 For the M24 thread:
 
-1. Resume the real archive through **Advance archive** and let catch-up run long enough to expose sustained operational degradation rather than only a short smoke test.
-2. While it runs, observe `/health`, `/api/archive/status`, `/api/archive/storage` and `/api/archive/diagnostics/throughput`. Acceptance is continuous progress, healthy PostgreSQL state, normal hydration release and diagnostics sufficient to understand any stall without per-photo tracing; it is not a SQLite/PostgreSQL benchmark.
-3. If catch-up remains stable, add a small real source increment and verify normal synchronization, analysis, enrichment and review without full regeneration.
-4. Before WI-0106 closeout, perform one actual Windows/PC restart and repeat the PostgreSQL/launcher health and representative catalogue checks to finish the combined restart criterion.
-5. Reconcile the remaining WI-0106 acceptance evidence, decide when the preserved pre-cutover SQLite rollback snapshot can be retired under policy, and close M24 only after all operational exit criteria pass.
+1. Keep the current **Advance archive** catch-up running and capture another health/status/storage/throughput checkpoint after substantially more backlog has been processed (or when catch-up completes). The acceptance question is continued forward progress with PostgreSQL healthy and no recurrence of lock/host-shutdown failure, not a SQLite/PostgreSQL performance comparison.
+2. If that longer-run checkpoint remains healthy, mark the extended catch-up criterion complete and add a small real source increment. Verify normal synchronization, analysis, enrichment and review without full regeneration.
+3. Before WI-0106 closeout, perform one actual Windows/PC restart and repeat the PostgreSQL/launcher health and representative catalogue checks to finish the combined restart criterion.
+4. Reconcile the remaining WI-0106 acceptance evidence, decide when the preserved pre-cutover SQLite rollback snapshot can be retired under policy, and close M24 only after all operational exit criteria pass.
 
 ## Relevant files
 
