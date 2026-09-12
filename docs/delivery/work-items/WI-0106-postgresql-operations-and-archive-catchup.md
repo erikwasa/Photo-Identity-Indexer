@@ -55,7 +55,12 @@ The first real catch-up pass then replaced the stale pre-cutover advancement sta
 - Managed hydration remained bounded: one transient hydration was observed, then `hydrationsInProgress` returned to 0 with managed hydrated bytes back at 39,055,576 and no managed download in progress at the final snapshot.
 - Aggregate diagnostics were sufficient to understand the run without per-photo tracing. By the final snapshot they recorded 64 analysis attempts, analysis-result persistence averaging about 3.94 ms, source hashing averaging about 7.48 ms, bounded per-subject hash-read counts, and one 20.28 s analysis-session initialization cost rather than progressive database degradation.
 
-This is strong early sustained-catch-up evidence and closes the diagnostics-observability criterion. The separate extended-duration catch-up criterion remains open until a longer run (or completion of the remaining backlog) demonstrates that progress continues without lock/host-shutdown failure.
+This closes the diagnostics-observability criterion, but the subsequent longer run exposed a real operational failure that keeps sustained catch-up open:
+
+- PostgreSQL connectivity first failed with a forcibly closed socket and then `127.0.0.1:5432` actively refused new connections.
+- `ArchiveAdvancementHostedService` caught its failure and attempted to persist a blocked recovery state; that persistence also failed while PostgreSQL was unavailable, but the archive worker was designed to continue retrying.
+- `IdentityMatchRegenerationHostedService` did not have the equivalent outer unexpected-failure boundary. Its repository open failure escaped `ExecuteAsync`, and the default .NET `BackgroundServiceExceptionBehavior=StopHost` stopped the entire Photo Identity API.
+- The corrective slice adds the same retry-without-host-shutdown behavior already used by other long-lived workers and a regression test proving a transient repository failure does not fault the hosted service. This protects the application from a brief catalogue interruption, but it does not by itself explain why the PostgreSQL/Podman endpoint disappeared; container/service diagnostics must still be reviewed and the long catch-up rerun.
 
 After catch-up is stable, a small real daily-style source increment must still prove synchronization, analysis, enrichment and review without unnecessary full regeneration.
 
@@ -63,7 +68,7 @@ After catch-up is stable, a small real daily-style source increment must still p
 - [ ] Normal operator startup makes PostgreSQL readiness/failure understandable.
 - [ ] Persistent catalogue data survives container and PC restart. (Container/service restart accepted 2026-09-12; PC restart still pending.)
 - [x] Backup plus restore into an isolated PostgreSQL database is successfully verified.
-- [ ] Full-archive catch-up can run for an extended period without the prior SQLite lock/host-shutdown failure. (Initial PostgreSQL catch-up is healthy and advancing; longer-run evidence still pending.)
+- [ ] Full-archive catch-up can run for an extended period without the prior SQLite lock/host-shutdown failure. (Initial PostgreSQL progress was healthy; a later PostgreSQL endpoint interruption exposed a fatal worker-resilience gap. Corrective retry behavior and root-cause diagnostics are pending retest.)
 - [x] Progress/failure metrics are sufficient to diagnose stalls without verbose per-photo tracing.
 - [ ] A small daily-style increment can be synchronized, analyzed, enriched and reviewed after the catch-up workflow.
 - [ ] Maintainer accepts PostgreSQL as the production catalogue and the preserved SQLite rollback snapshot can be retired according to documented policy.
