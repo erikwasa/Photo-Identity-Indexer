@@ -21,6 +21,7 @@ public static class SlideshowOriginalPreparationEndpoints
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/slideshows/original-preparation");
         group.MapPost("", StartAsync);
+        group.MapPost("/revalidate", RevalidateAsync);
         group.MapGet("/{sessionId:guid}", GetStatus);
         group.MapPost("/{sessionId:guid}/retry", Retry);
         group.MapDelete("/{sessionId:guid}", EndAsync);
@@ -121,6 +122,42 @@ public static class SlideshowOriginalPreparationEndpoints
         {
             return Results.Conflict(new { error = exception.Message });
         }
+    }
+
+    private static async Task<IResult> RevalidateAsync(
+        SlideshowOriginalPreparationRequest request,
+        CollectionOriginalAccessService originals,
+        CancellationToken cancellationToken)
+    {
+        if (!TryRevisionIds(request.RevisionIds, out AssetRevisionId[] revisionIds))
+        {
+            return Results.BadRequest(new
+            {
+                error = "The slideshow preparation revalidation request contains an invalid revision identifier.",
+            });
+        }
+
+        int ready = 0;
+        foreach (AssetRevisionId revisionId in revisionIds)
+        {
+            CollectionOriginalAccessSnapshot? status = await originals.GetStatusAsync(
+                revisionId,
+                cancellationToken);
+            if (status?.State != CollectionOriginalAccessService.ReadyState)
+            {
+                return Results.Ok(new SlideshowOriginalRevalidationResponse(
+                    false,
+                    ready,
+                    revisionIds.Length));
+            }
+
+            ready++;
+        }
+
+        return Results.Ok(new SlideshowOriginalRevalidationResponse(
+            true,
+            ready,
+            revisionIds.Length));
     }
 
     private static IResult GetStatus(

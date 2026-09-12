@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components;
@@ -9,11 +10,17 @@ namespace PhotoIdentity.Web.Pages;
 public partial class Slideshows : IAsyncDisposable
 {
     internal const string PreparationBookmarksStorageKey =
-        "photoidentity.slideshow.library.preparations.v1";
+        "photoidentity.slideshow.library.preparations.v2";
+    internal const string PreparationReceiptsStorageKey =
+        "photoidentity.slideshow.library.prepared.v1";
 
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(750);
 
     private readonly Dictionary<string, SlideshowOriginalPreparationResponse> _preparations =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, string[]> _preparationRevisionIds =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, SlideshowPreparationReceipt> _receipts =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CancellationTokenSource> _polling =
         new(StringComparer.OrdinalIgnoreCase);
@@ -60,6 +67,7 @@ public partial class Slideshows : IAsyncDisposable
         }
 
         await RestorePreparationBookmarksAsync();
+        await RestorePreparationReceiptsAsync();
         await InvokeAsync(StateHasChanged);
     }
 
@@ -104,16 +112,18 @@ public partial class Slideshows : IAsyncDisposable
         }
     }
 
-    private void StartSlideshow(SlideshowLibraryCollectionResponse collection)
+    private async Task StartSlideshowAsync(SlideshowLibraryCollectionResponse collection)
     {
         if (IsBusy(collection.Id))
         {
             return;
         }
 
-        string returnUrl = Uri.EscapeDataString("/slideshows");
-        Navigation.NavigateTo(
-            $"/slideshow/{Uri.EscapeDataString(collection.Id)}?return={returnUrl}");
+        _ = await SlideshowLibraryLaunch.RequestFullscreenAndNavigateAsync(
+            JS,
+            Navigation,
+            collection.Id,
+            "/slideshows");
     }
 
     private async Task PrepareOriginalsAsync(SlideshowLibraryCollectionResponse collection)
@@ -122,6 +132,9 @@ public partial class Slideshows : IAsyncDisposable
         {
             return;
         }
+
+        _receipts.Remove(collection.Id);
+        await PersistPreparationReceiptsAsync();
 
         try
         {
@@ -142,14 +155,18 @@ public partial class Slideshows : IAsyncDisposable
                     cancellationToken: _lifetime.Token)
                 ?? throw new InvalidOperationException("The slideshow snapshot response was empty.");
 
-            SlideshowOriginalPreparationRequest request = new(
-                snapshot.Items.Select(item => item.RevisionId).ToArray());
+            SlideshowPreparationReceipt receipt = SlideshowPreparationReceipt.FromSnapshot(snapshot);
+            string[] revisionIds = receipt.GetRevisionIds();
+            _preparationRevisionIds[collection.Id] = revisionIds;
+
+            SlideshowOriginalPreparationRequest request = new(revisionIds);
             using HttpResponseMessage preparationResponse = await Http.PostAsJsonAsync(
                 "api/slideshows/original-preparation",
                 request,
                 _lifetime.Token);
             if (!preparationResponse.IsSuccessStatusCode)
             {
+                _preparationRevisionIds.Remove(collection.Id);
                 SetLocalFailure(
                     collection.Id,
                     $"Original preparation could not start. Status {(int)preparationResponse.StatusCode}.");
@@ -170,6 +187,7 @@ public partial class Slideshows : IAsyncDisposable
         }
         catch (Exception exception)
         {
+            _preparationRevisionIds.Remove(collection.Id);
             SetLocalFailure(
                 collection.Id,
                 $"Original preparation could not start: {exception.Message}");
@@ -252,6 +270,7 @@ public partial class Slideshows : IAsyncDisposable
         }
 
         _preparations.Remove(collectionId);
+        _preparationRevisionIds.Remove(collectionId);
         await PersistPreparationBookmarksAsync();
         StateHasChanged();
     }
@@ -308,6 +327,7 @@ public partial class Slideshows : IAsyncDisposable
                     await InvokeAsync(async () =>
                     {
                         _preparations.Remove(collectionId);
+                        _preparationRevisionIds.Remove(collectionId);
                         await PersistPreparationBookmarksAsync();
                         StateHasChanged();
                     });
@@ -394,14 +414,15 @@ public partial class Slideshows : IAsyncDisposable
             }
         }
 
-        _preparations[collectionId] = status with
+        _preparations[collectionId] = ReadyPreparation(status.Total);
+        if (_preparationRevisionIds.TryGetValue(collectionId, out string[]? revisionIds))
         {
-            SessionId = string.Empty,
-            Message = "Originals are prepared and can be reused by a later slideshow.",
-            NoProgressWarning = false,
-            CanRetry = false,
-        };
+            _receipts[collectionId] = new SlideshowPreparationReceipt(revisionIds);
+        }
+
+        _preparationRevisionIds.Remove(collectionId);
         await PersistPreparationBookmarksAsync();
+        await PersistPreparationReceiptsAsync();
     }
 
     private async Task RestorePreparationBookmarksAsync()
@@ -423,10 +444,10 @@ public partial class Slideshows : IAsyncDisposable
             return;
         }
 
-        Dictionary<string, string>? bookmarks;
+        Dictionary<string, SlideshowPreparationBookmark>? bookmarks;
         try
         {
-            bookmarks = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            bookmarks = JsonSerializer.Deserialize<Dictionary<string, SlideshowPreparationBookmark>>(json);
         }
         catch (JsonException)
         {
@@ -439,12 +460,15 @@ public partial class Slideshows : IAsyncDisposable
             return;
         }
 
-        foreach ((string collectionId, string sessionText) in bookmarks)
+        foreach ((string collectionId, SlideshowPreparationBookmark bookmark) in bookmarks)
         {
-            if (!Guid.TryParse(sessionText, out Guid sessionId) || sessionId == Guid.Empty)
+            if (!Guid.TryParse(bookmark.SessionId, out Guid sessionId) || sessionId == Guid.Empty)
             {
                 continue;
             }
+
+            _preparationRevisionIds[collectionId] =
+                new SlideshowPreparationReceipt(bookmark.RevisionIds ?? []).GetRevisionIds();
 
             try
             {
@@ -453,6 +477,7 @@ public partial class Slideshows : IAsyncDisposable
                     _lifetime.Token);
                 if (!response.IsSuccessStatusCode)
                 {
+                    _preparationRevisionIds.Remove(collectionId);
                     continue;
                 }
 
@@ -478,22 +503,147 @@ public partial class Slideshows : IAsyncDisposable
             catch
             {
                 // A stale bookmark is discarded below.
+                _preparationRevisionIds.Remove(collectionId);
             }
         }
 
         await PersistPreparationBookmarksAsync();
     }
 
+    private async Task RestorePreparationReceiptsAsync()
+    {
+        string? json;
+        try
+        {
+            json = await JS.InvokeAsync<string?>(
+                "localStorage.getItem",
+                PreparationReceiptsStorageKey);
+        }
+        catch (JSException)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return;
+        }
+
+        Dictionary<string, SlideshowPreparationReceipt>? receipts;
+        try
+        {
+            receipts = JsonSerializer.Deserialize<Dictionary<string, SlideshowPreparationReceipt>>(json);
+        }
+        catch (JsonException)
+        {
+            receipts = null;
+        }
+
+        if (receipts is null)
+        {
+            await RemovePreparationReceiptsAsync();
+            return;
+        }
+
+        foreach ((string collectionId, SlideshowPreparationReceipt receipt) in receipts)
+        {
+            _receipts[collectionId] = receipt;
+        }
+
+        foreach (string collectionId in _receipts.Keys.ToArray())
+        {
+            if (!Collections.Any(collection =>
+                    string.Equals(collection.Id, collectionId, StringComparison.OrdinalIgnoreCase)))
+            {
+                _receipts.Remove(collectionId);
+                continue;
+            }
+
+            if (IsServerPreparationActive(collectionId))
+            {
+                continue;
+            }
+
+            SlideshowPreparationReceipt receipt = _receipts[collectionId];
+            try
+            {
+                using HttpResponseMessage snapshotResponse = await Http.PostAsync(
+                    $"api/smart-collections/{Uri.EscapeDataString(collectionId)}/slideshow-snapshot",
+                    content: null,
+                    _lifetime.Token);
+                if (snapshotResponse.StatusCode == HttpStatusCode.NotFound)
+                {
+                    _receipts.Remove(collectionId);
+                    continue;
+                }
+
+                if (!snapshotResponse.IsSuccessStatusCode)
+                {
+                    continue;
+                }
+
+                SmartCollectionSlideshowSnapshotResponse snapshot =
+                    await snapshotResponse.Content.ReadFromJsonAsync<SmartCollectionSlideshowSnapshotResponse>(
+                        cancellationToken: _lifetime.Token)
+                    ?? throw new InvalidOperationException("The slideshow snapshot response was empty.");
+                if (!receipt.MatchesSnapshot(snapshot))
+                {
+                    _receipts.Remove(collectionId);
+                    _preparations.Remove(collectionId);
+                    continue;
+                }
+
+                string[] revisionIds = receipt.GetRevisionIds();
+                using HttpResponseMessage validationResponse = await Http.PostAsJsonAsync(
+                    "api/slideshows/original-preparation/revalidate",
+                    new SlideshowOriginalPreparationRequest(revisionIds),
+                    _lifetime.Token);
+                if (!validationResponse.IsSuccessStatusCode)
+                {
+                    continue;
+                }
+
+                SlideshowOriginalRevalidationResponse validation =
+                    await validationResponse.Content.ReadFromJsonAsync<SlideshowOriginalRevalidationResponse>(
+                        cancellationToken: _lifetime.Token)
+                    ?? throw new InvalidOperationException("The prepared-original revalidation response was empty.");
+                if (!validation.Reusable || validation.Ready != revisionIds.Length || validation.Total != revisionIds.Length)
+                {
+                    _receipts.Remove(collectionId);
+                    _preparations.Remove(collectionId);
+                    continue;
+                }
+
+                _preparations[collectionId] = ReadyPreparation(validation.Total);
+            }
+            catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+            {
+                return;
+            }
+            catch
+            {
+                // Keep the receipt for a future page load, but do not display stale prepared state
+                // when the application cannot currently revalidate it.
+                _preparations.Remove(collectionId);
+            }
+        }
+
+        await PersistPreparationReceiptsAsync();
+    }
+
     private async Task PersistPreparationBookmarksAsync()
     {
-        Dictionary<string, string> bookmarks = _preparations
+        Dictionary<string, SlideshowPreparationBookmark> bookmarks = _preparations
             .Where(pair =>
                 pair.Value.State is "preparing" or "failed" &&
                 Guid.TryParse(pair.Value.SessionId, out Guid parsed) &&
-                parsed != Guid.Empty)
+                parsed != Guid.Empty &&
+                _preparationRevisionIds.ContainsKey(pair.Key))
             .ToDictionary(
                 pair => pair.Key,
-                pair => pair.Value.SessionId,
+                pair => new SlideshowPreparationBookmark(
+                    pair.Value.SessionId,
+                    _preparationRevisionIds[pair.Key]),
                 StringComparer.OrdinalIgnoreCase);
 
         try
@@ -516,6 +666,28 @@ public partial class Slideshows : IAsyncDisposable
         }
     }
 
+    private async Task PersistPreparationReceiptsAsync()
+    {
+        try
+        {
+            if (_receipts.Count == 0)
+            {
+                await RemovePreparationReceiptsAsync();
+            }
+            else
+            {
+                await JS.InvokeVoidAsync(
+                    "localStorage.setItem",
+                    PreparationReceiptsStorageKey,
+                    JsonSerializer.Serialize(_receipts));
+            }
+        }
+        catch (JSException)
+        {
+            // The preparation itself remains valid even when browser-local persistence is unavailable.
+        }
+    }
+
     private async Task RemovePreparationBookmarksAsync()
     {
         try
@@ -523,6 +695,19 @@ public partial class Slideshows : IAsyncDisposable
             await JS.InvokeVoidAsync(
                 "localStorage.removeItem",
                 PreparationBookmarksStorageKey);
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    private async Task RemovePreparationReceiptsAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "localStorage.removeItem",
+                PreparationReceiptsStorageKey);
         }
         catch (JSException)
         {
@@ -559,6 +744,26 @@ public partial class Slideshows : IAsyncDisposable
             message,
             false);
     }
+
+    private static SlideshowOriginalPreparationResponse ReadyPreparation(int total) =>
+        new(
+            string.Empty,
+            "ready",
+            total,
+            total,
+            0,
+            0,
+            0,
+            0,
+            "ready",
+            DateTimeOffset.UtcNow,
+            0,
+            false,
+            false,
+            0,
+            0,
+            "Originals are prepared and can be reused by a later slideshow.",
+            false);
 
     private SlideshowOriginalPreparationResponse? PreparationFor(string collectionId) =>
         _preparations.GetValueOrDefault(collectionId);
