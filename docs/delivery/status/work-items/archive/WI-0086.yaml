@@ -1,20 +1,25 @@
 id: WI-0086
 title: Prepare and retain slideshow originals for best-quality playback
 milestone: M22
-status: in_review
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0086-slideshow-original-preparation.md
 started_at: 2026-08-29
-last_updated_at: 2026-08-29
+completed_at: 2026-09-13
+verified_at: 2026-09-13
+verified_by: maintainer
+last_updated_at: 2026-09-13
 branch: agent/WI-0086-slideshow-original-preparation
 blockers:
 - WI-0042
 - WI-0083
 - WI-0084
 blocker_notes:
-- WI-0042 and the M22 snapshot/playback dependencies are implemented; M22 predecessors remain in_review only because consolidated maintainer acceptance is deferred.
+- WI-0042 and the M22 snapshot/playback dependencies were implemented; M22 predecessors remained in_review only because consolidated maintainer acceptance was deferred.
 evidence:
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/220
 - type: workflow
   value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33270895553
+- type: verification
+  value: '2026-09-13 consolidated M22 maintainer acceptance: Prepare originals succeeds after PR #315, and previously accepted best-quality preparation behavior remains accepted.'

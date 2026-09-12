@@ -64,16 +64,23 @@ V1 starts from saved Smart Collections only. Transient/unsaved Smart Collection 
 
 WI-0083 and WI-0082 can be implemented independently. WI-0084 depends on the snapshot contract. WI-0085 depends on both working playback and the supported mobile access path. WI-0086 depends on the snapshot/playback lifecycle plus WI-0042's bounded-original semantics.
 
-## Current maintainer acceptance status
+## Maintainer acceptance — completed 2026-09-13
 
-Consolidated real-phone acceptance on 2026-09-02 passed the implemented slideshow behavior except for two functional gaps tracked by WI-0107:
+Consolidated real-phone acceptance on 2026-09-02 passed the implemented slideshow behavior except for two functional gaps that were assigned to WI-0107: direct fullscreen acquisition from the read-only slideshow library and persistence/revalidation of successful standalone prepared-original state across slideshow navigation.
 
-- pressing **Start slideshow** from the read-only slideshow library must enter fullscreen from that initiating user gesture without an intermediate application step;
-- after successful standalone original preparation, returning from slideshow playback must still show **Originals prepared** when the exact prepared set remains reusable, while downgrading the state if the originals are no longer reusable or collection membership changed.
+PR #314 corrected those two gaps. During targeted follow-up, standalone **Prepare originals** then exposed a browser-format boundary bug: a local immutable-revision-verified original whose media type was not directly browser-renderable caused the whole preparation session to fail even though the normal viewer already had a durable proxy fallback. PR #315 corrected that boundary so preparation reasons about local verified originals while browser presentation falls back to the durable proxy for unsupported formats.
 
-The same acceptance session found three material performance problems: slow saved Smart Collection loading, long slideshow startup even for an immediately reopened already-prepared one-photo collection, and slow image-to-image transitions that appear to worsen during playback. Those findings are explicitly tracked by M24 WI-0108 and are not additional WI-0107 scope.
+On 2026-09-13 the maintainer confirmed on the supported phone/browser that:
 
-After WI-0107 is implemented, only these two corrected behaviors require targeted real-phone re-verification; the already-passed M22 behavior does not need to be repeated unless the corrective implementation touches it materially.
+- the previously failing **Prepare originals** operation completes successfully;
+- **Start slideshow** enters fullscreen directly from the initiating tap with no intermediate application **Enter fullscreen** step; and
+- after successful preparation, starting the slideshow, deliberately exiting, and returning to `/slideshows` restores **Originals prepared** while the exact prepared set remains reusable.
+
+The optional manual stale-receipt downgrade scenario was not performed at maintainer direction. Automated revalidation coverage verifies that the prepared state is removed/downgraded when membership changes or a prepared original becomes online-only/non-reusable, and that automated evidence is accepted for milestone closeout.
+
+The performance findings originally observed during M22 acceptance were tracked separately under M24 WI-0108 and are already completed; they are not unresolved M22 scope.
+
+All M22 work items are therefore completed and the milestone is accepted.
 
 ## Defaults retained by this milestone
 

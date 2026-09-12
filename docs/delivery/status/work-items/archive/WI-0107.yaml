@@ -1,0 +1,30 @@
+id: WI-0107
+title: Close final M22 slideshow launch and prepared-state acceptance gaps
+milestone: M22
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0107-m22-slideshow-acceptance-gaps.md
+started_at: 2026-09-12
+completed_at: 2026-09-13
+verified_at: 2026-09-13
+verified_by: maintainer
+last_updated_at: 2026-09-13
+branch: codex/WI-0107-slideshow-acceptance
+blockers: []
+blocker_notes:
+- Consolidated real-phone M22 acceptance passed the remaining slideshow behavior but found two functional gaps. PR #314 corrected direct fullscreen launch and prepared-state persistence/revalidation.
+- Follow-up real-phone verification found that a verified browser-unsupported original could still fail Prepare originals. PR #315 corrected preparation/playback fallback so browser-unsupported prepared media uses the existing durable proxy path.
+- Performance observations from the same acceptance are tracked in completed M24 WI-0108 and did not expand this corrective M22 slice.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/314
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34720144232
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/315
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34722798766
+- type: merge_commit
+  value: b43f083cb72b917a73a1473bcdaac32a98377a7a
+- type: verification
+  value: '2026-09-13 maintainer real-phone acceptance: Prepare originals succeeds; Start slideshow enters fullscreen directly without an intermediate application fullscreen step; Originals prepared survives deliberate slideshow exit and return when the exact prepared set remains reusable. The manual stale-receipt downgrade scenario was not performed; automated revalidation coverage is retained for that path.'

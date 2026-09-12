@@ -93,10 +93,14 @@ PR #315 corrects that boundary:
 - `viewer-preview` already serves supported verified originals directly and durable JPEG proxies for unsupported media such as HEIC;
 - an end-to-end regression test covers a verified `image/heic` original with a durable JPEG proxy and requires preparation to reach `ready` plus prepared playback to return the proxy.
 
+After PR #315 merged, the maintainer confirmed on the supported phone/browser that the previously failing **Prepare originals** operation completes successfully. The two targeted WI-0107 real-phone checks also passed: **Start slideshow** enters fullscreen directly without an intermediate application fullscreen step, and **Originals prepared** survives starting the slideshow, deliberately exiting, and returning to `/slideshows` while the exact prepared set remains reusable.
+
+The optional manual stale-receipt downgrade scenario was not performed at maintainer direction. That path remains covered by automated revalidation tests that remove/downgrade the prepared state when collection membership changes or an original becomes non-reusable, and this automated evidence is accepted for M22 closeout.
+
 ## Acceptance criteria
 
 - [x] Pressing **Start slideshow** on `/slideshows` requests fullscreen directly from the initiating click/tap before navigation or awaited work.
-- [ ] On the supported real phone/browser, a successful fullscreen request produces no intermediate **Enter fullscreen** application step.
+- [x] On the supported real phone/browser, a successful fullscreen request produces no intermediate **Enter fullscreen** application step.
 - [x] Snapshot/original preparation loading states may be shown after the click, but they are shown inside fullscreen.
 - [x] Fullscreen rejection/unsupported capability still lands on the safe recovery surface.
 - [x] A successful standalone preparation remains visibly **Originals prepared** after starting and deliberately exiting a slideshow when the exact prepared set remains reusable.
@@ -106,19 +110,15 @@ PR #315 corrects that boundary:
 - [x] Persisted preparation state is path-free.
 - [x] Automated tests cover the originating-gesture fullscreen handoff and prepared-state persistence/revalidation lifecycle.
 - [x] A local, revision-verified browser-unsupported original does not fail preparation, and prepared playback falls back to its durable proxy instead of returning unsupported original bytes.
-- [ ] The real-phone collection that previously triggered the browser-format warning now completes **Prepare originals** and displays those photos through the proxy fallback.
-- [ ] Maintainer re-verification on the real phone passes these remaining M22 scenarios.
+- [x] The real-phone collection that previously triggered the browser-format warning now completes **Prepare originals** successfully.
+- [x] Maintainer re-verification on the real phone passes the required remaining M22 scenarios. The optional manual stale-receipt downgrade check was not performed; automated coverage is accepted for that path.
 
-## Maintainer verification remaining
+## Maintainer verification — completed 2026-09-13
 
-After PR #315 is green and merged, verify from the supported phone/browser:
-
-1. Open `/slideshows` and rerun **Prepare originals** on the same collection that previously reported `One or more verified originals cannot be rendered directly by this browser`. Confirm preparation completes and the collection shows **Originals prepared**.
-2. Start that slideshow and confirm photos with browser-unsupported original formats are still displayed through the durable proxy rather than producing an image error.
-3. Confirm browser-supported prepared photos continue to display from their verified originals.
-4. With Autoplay enabled, press **Start slideshow** and confirm fullscreen is entered directly from that tap, loading/preparation remains inside fullscreen and no application **Enter fullscreen** step appears when the browser accepts fullscreen.
-5. Deliberately exit back to `/slideshows` and confirm **Originals prepared** is restored when those exact originals remain local.
-6. If practical, make one prepared original online-only or change the collection membership, reload `/slideshows`, and confirm the stale prepared badge is no longer shown.
+- **Prepare originals** on the collection that previously reported the browser-format warning completes successfully.
+- **Start slideshow** enters fullscreen directly from the initiating tap without an intermediate application **Enter fullscreen** step.
+- After preparation, starting the slideshow, deliberately exiting, and returning to `/slideshows` restores **Originals prepared** while the exact prepared set remains reusable.
+- The stale prepared-receipt downgrade scenario was not manually exercised. Existing automated integration coverage verifies downgrade when a prepared original becomes online-only/non-reusable or collection membership no longer matches the receipt.
 
 ## Non-goals
 

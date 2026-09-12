@@ -1,19 +1,24 @@
 id: WI-0092
 title: Add slideshow manual-navigation and orientation preferences
 milestone: M22
-status: in_review
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0092-slideshow-input-orientation-settings.md
 started_at: 2026-08-30
-last_updated_at: 2026-08-31
+completed_at: 2026-09-13
+verified_at: 2026-09-13
+verified_by: maintainer
+last_updated_at: 2026-09-13
 branch: agent/WI-0092-slideshow-input-orientation-settings
 blockers:
 - WI-0084
 - WI-0085
 blocker_notes:
-- WI-0084 and WI-0085 are implemented/merged; this follow-up was approved after the 2026-08-30 real-phone M22 maintainer review.
+- WI-0084 and WI-0085 were implemented/merged; this follow-up was approved after the 2026-08-30 real-phone M22 maintainer review.
 evidence:
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/223
 - type: workflow
   value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33337946497
+- type: verification
+  value: '2026-09-13 consolidated M22 maintainer acceptance: previously accepted manual-navigation and orientation behavior remains accepted; final WI-0107 re-verification passed after PR #315.'
