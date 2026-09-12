@@ -15,16 +15,16 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M08 | Multi-model local evaluation | completed |
 | M15 | Operator documentation and system guide | completed |
 | M16 | Face detection recall | completed |
-| M09 | Azure VM pilot without identities | ready |
-| M10 | Azure checkpointing | proposed |
-| M11 | Production model selection | proposed |
-| M12 | Full archive processing | proposed |
-| M13 | Ongoing local synchronisation | proposed |
+| M09 | Azure VM pilot without identities | completed |
+| M10 | Azure checkpointing | completed |
+| M11 | Production model selection | completed |
+| M12 | Full archive processing | completed |
+| M13 | Ongoing local synchronisation | completed |
 | M14 | Collection-ready API | completed |
 | M17 | Identity review automation | completed |
-| M18 | Operator application experience | ready |
+| M18 | Operator application experience | completed |
 | M19 | Photo metadata and semantic collections | completed |
-| M20 | Operator polish and archive throughput | in_progress |
+| M20 | Operator polish and archive throughput | completed |
 | M21 | Reliability and recognition quality | ready |
 | M22 | Protected Smart Collection slideshow | in_progress |
 | M23 | Source-copy lifecycle and privacy exclusion | ready |
