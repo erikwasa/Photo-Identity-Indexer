@@ -49,6 +49,16 @@ If one or more prepared originals have actually become unavailable/online-only o
 
 The receipt must not contain source paths, filenames or other private source locators.
 
+### Browser-unsupported prepared originals
+
+Preparation readiness and browser decode support are separate concerns.
+
+- A `ready` original means its authoritative bytes are local and verified against the immutable catalogue revision.
+- Browser renderability must not turn that verified state into a preparation failure.
+- During prepared playback, browser-supported media should use the verified original.
+- If a verified original uses a media type the browser cannot render directly, playback should use the existing durable viewer/review proxy fallback rather than fail the entire prepared session or send unsupported bytes to the browser.
+- Storage admission, hydration ownership, revision verification and receipt revalidation continue to reason about the authoritative original; the proxy is only the browser presentation fallback.
+
 ## Implementation — 2026-09-12
 
 The corrective slice keeps the existing slideshow lifecycle and hydration ownership boundaries intact:
@@ -62,6 +72,27 @@ The corrective slice keeps the existing slideshow lifecycle and hydration owners
 
 Focused automated coverage verifies the fullscreen-before-navigation ordering, safe navigation after fullscreen interop rejection, path-free/set-matching receipt behavior, and server revalidation downgrade after an original becomes online-only.
 
+## Real-phone follow-up — 2026-09-13
+
+After PR #314 merged, maintainer verification found a third acceptance blocker while running standalone **Prepare originals**:
+
+```text
+Preparation needs attention
+One or more verified originals cannot be rendered directly by this browser. Continue with available/proxy images instead.
+Required additional bytes: 24403558
+Available managed capacity: 49960944424
+```
+
+The capacity figures show that storage admission was not the blocker. The preparation service reached a locally verified original whose media type was not directly browser-renderable and incorrectly treated `CanView=false` as a fatal preparation error.
+
+PR #315 corrects that boundary:
+
+- locally verified originals are accepted as prepared regardless of browser decode support;
+- immediately hydrated originals are likewise accepted once they reach verified `ready` state;
+- the active-session prepared-original endpoint preserves the session/lease/verification check, then redirects browser-unsupported media to the existing `viewer-preview` path;
+- `viewer-preview` already serves supported verified originals directly and durable JPEG proxies for unsupported media such as HEIC;
+- an end-to-end regression test covers a verified `image/heic` original with a durable JPEG proxy and requires preparation to reach `ready` plus prepared playback to return the proxy.
+
 ## Acceptance criteria
 
 - [x] Pressing **Start slideshow** on `/slideshows` requests fullscreen directly from the initiating click/tap before navigation or awaited work.
@@ -74,16 +105,20 @@ Focused automated coverage verifies the fullscreen-before-navigation ordering, s
 - [x] Successful standalone preparation still releases temporary slideshow-preparation protection and does not become a permanent offline pin.
 - [x] Persisted preparation state is path-free.
 - [x] Automated tests cover the originating-gesture fullscreen handoff and prepared-state persistence/revalidation lifecycle.
-- [ ] Maintainer re-verification on the real phone passes these two remaining M22 scenarios.
+- [x] A local, revision-verified browser-unsupported original does not fail preparation, and prepared playback falls back to its durable proxy instead of returning unsupported original bytes.
+- [ ] The real-phone collection that previously triggered the browser-format warning now completes **Prepare originals** and displays those photos through the proxy fallback.
+- [ ] Maintainer re-verification on the real phone passes these remaining M22 scenarios.
 
 ## Maintainer verification remaining
 
-After the corrective PR is green and merged, verify from the supported phone/browser:
+After PR #315 is green and merged, verify from the supported phone/browser:
 
-1. Open `/slideshows`, choose a collection with Autoplay enabled and press **Start slideshow**. Confirm fullscreen is entered directly from that tap, loading/preparation remains inside fullscreen and no application **Enter fullscreen** step appears when the browser accepts fullscreen.
-2. Return to `/slideshows`, run **Prepare originals** to completion and confirm **Originals prepared**.
-3. Start that slideshow, deliberately exit back to `/slideshows`, and confirm **Originals prepared** is restored when those exact originals remain local.
-4. If practical, make one prepared original online-only or change the collection membership, reload `/slideshows`, and confirm the stale prepared badge is no longer shown.
+1. Open `/slideshows` and rerun **Prepare originals** on the same collection that previously reported `One or more verified originals cannot be rendered directly by this browser`. Confirm preparation completes and the collection shows **Originals prepared**.
+2. Start that slideshow and confirm photos with browser-unsupported original formats are still displayed through the durable proxy rather than producing an image error.
+3. Confirm browser-supported prepared photos continue to display from their verified originals.
+4. With Autoplay enabled, press **Start slideshow** and confirm fullscreen is entered directly from that tap, loading/preparation remains inside fullscreen and no application **Enter fullscreen** step appears when the browser accepts fullscreen.
+5. Deliberately exit back to `/slideshows` and confirm **Originals prepared** is restored when those exact originals remain local.
+6. If practical, make one prepared original online-only or change the collection membership, reload `/slideshows`, and confirm the stale prepared badge is no longer shown.
 
 ## Non-goals
 
