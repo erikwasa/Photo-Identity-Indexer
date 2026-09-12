@@ -30,17 +30,28 @@ M24 operational acceptance occurs after WI-0108 has addressed the slideshow-libr
 
 The first WI-0106 slice establishes the production operations boundary without changing catalogue schema or application semantics:
 
-- `backup-postgres-catalogue.ps1` creates a binary-safe custom-format `pg_dump`, copies it to protected host storage, and writes a SHA-256 report without credentials or connection strings. After live use exposed multiple retained rehearsal databases, the follow-up selection rule uses the production launcher's PostgreSQL connection only to resolve the configured database name; the connection string itself is never printed or persisted. An explicit `-DatabaseName` remains available, with unique schema-marker discovery only as a fallback when no PostgreSQL launcher configuration is available.
+- `backup-postgres-catalogue.ps1` creates a binary-safe custom-format `pg_dump`, copies it to protected host storage, and writes a SHA-256 report without credentials or connection strings. It supports explicit `-DatabaseName` selection when multiple migrated/rehearsal catalogues remain in the same PostgreSQL service.
+- The attempted no-argument launcher-derived database selection is not required for acceptance. Live use showed the maintainer's private launcher environment value has a wrapper shape that the generic parser cannot use to recover the database name reliably; the accepted operational path therefore uses explicit database selection rather than guessing or continuing to unwrap private configuration.
 - `verify-postgres-backup-restore.ps1` requires explicit application-stop acknowledgement, verifies the backup hash, creates a uniquely named isolated database, restores with `pg_restore --single-transaction`, and compares the current schema version, complete public-table set, exact table row counts and constraint validation state with the stopped production source.
 - The isolated restore database is deliberately retained after verification for maintainer inspection; cleanup is an explicit operator action against the exact verification database name.
 - `docs/operations/postgresql-operations.md` defines normal startup/shutdown, restart persistence checks, logical backup/restore, PostgreSQL 18 same-major update rules, major-version migration boundaries, failure diagnosis, sustained catch-up evidence and the final daily-style increment gate.
 
-This slice intentionally does not claim the live acceptance criteria before the maintainer runs them against the accepted production catalogue.
+## Live acceptance progress (2026-09-12)
+
+The maintainer completed the first production operations acceptance pass from merged `main`:
+
+- Multiple retained rehearsal databases made schema-marker-only discovery ambiguous. Rather than infer production from private launcher-string formatting, the maintainer compared PostgreSQL database activity before and after real Photo Identity UI use. `photoidentity_rehearsal_20260910_214641_a808bde` showed the dominant activity increase (+1,243 committed transactions, +3,465,666 tuples returned and +414,091 tuples fetched during the observation window), while the other retained rehearsal databases moved only marginally. That database was therefore selected explicitly as the active production authority for the stopped backup.
+- With Photo Identity stopped, `backup-postgres-catalogue.ps1 -DatabaseName ...` created `photoidentity-postgresql-20260912-015606.dump` with SHA-256 `9b15dde0bfa4521d62a549850aca8f68c06d9c5db59846c51676e9970c7fdf1f`.
+- `verify-postgres-backup-restore.ps1 -ApplicationStopped` restored that exact dump into isolated database `photoidentity_restore_20260911235701_ede110` and passed the schema-version, complete public-table set, exact row-count and validated-constraint comparisons against the stopped source.
+- The maintainer reviewed the successful result and removed only the isolated verification database, leaving the production catalogue and verified backup intact.
+- With Photo Identity still stopped, the PostgreSQL Compose service was stopped and started again. `verify-postgres.ps1 -SkipContainerStart` succeeded and normal Photo Identity use remained healthy afterward, proving the named-volume catalogue survives container/service restart. An actual Windows/PC restart remains to be observed before the combined restart criterion is marked complete.
+
+The next acceptance phase is sustained real-archive catch-up using the existing aggregate health/archive/throughput diagnostics. The old SQLite comparative benchmark is not part of this acceptance. After catch-up is stable, a small real daily-style source increment must still prove synchronization, analysis, enrichment and review without unnecessary full regeneration.
 
 ## Acceptance criteria
 - [ ] Normal operator startup makes PostgreSQL readiness/failure understandable.
-- [ ] Persistent catalogue data survives container and PC restart.
-- [ ] Backup plus restore into an isolated PostgreSQL database is successfully verified.
+- [ ] Persistent catalogue data survives container and PC restart. (Container/service restart accepted 2026-09-12; PC restart still pending.)
+- [x] Backup plus restore into an isolated PostgreSQL database is successfully verified.
 - [ ] Full-archive catch-up can run for an extended period without the prior SQLite lock/host-shutdown failure.
 - [ ] Progress/failure metrics are sufficient to diagnose stalls without verbose per-photo tracing.
 - [ ] A small daily-style increment can be synchronized, analyzed, enriched and reviewed after the catch-up workflow.
