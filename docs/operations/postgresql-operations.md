@@ -191,7 +191,7 @@ Long-lived background workers should treat a brief catalogue interruption as ret
 
 ## Sustained archive catch-up acceptance
 
-Backup/restore and container restart acceptance are complete enough to proceed with the next WI-0106 phase. Resume the real archive through **Advance archive** and let it operate long enough to expose degradation rather than only completing a short smoke test. The pending PC-restart observation can be completed before final closeout and does not require delaying catch-up.
+Backup/restore and container restart acceptance are complete enough to exercise the next WI-0106 phase, but sustained catch-up is not yet accepted. The first PostgreSQL-backed run made healthy progress; a later longer run then hit the unexpected PostgreSQL disconnect described above and the API stopped because identity-match regeneration lacked a worker-level retry boundary. Diagnose the service interruption, merge the resilience correction, then rerun **Advance archive** long enough to prove continued progress across the same operational window.
 
 Use these privacy-safe operational endpoints while the run is active:
 
