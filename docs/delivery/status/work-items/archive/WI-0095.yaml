@@ -1,0 +1,26 @@
+id: WI-0095
+title: Retry transient governed-model download interruptions
+milestone: M22
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0095-model-download-retry.md
+started_at: 2026-09-01
+completed_at: 2026-09-13
+verified_at: 2026-09-13
+verified_by: maintainer
+last_updated_at: 2026-09-13
+branch: agent/WI-0095-model-download-retry
+blockers: []
+blocker_notes:
+- Main workflow #1356 failed only in package verification because a governed model HTTP response ended prematurely. PR #226 was rebased after WI-0096, passed combined PR validation, merged, and post-merge main workflow #1366 passed. The item remained in_review only as part of consolidated M22 closeout.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/226
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33554309892
+- type: merge_commit
+  value: e1944e3003c8d234a65ce2eab17f9ef9fa9aa754
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/33555903485
+- type: verification
+  value: 2026-09-13 consolidated M22 maintainer acceptance and closeout.
