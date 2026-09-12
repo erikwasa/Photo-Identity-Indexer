@@ -24,7 +24,7 @@ public sealed class SlideshowLibraryAcceptanceTests
             "/slideshows");
 
         Assert.Null(notice);
-        Assert.Equal(["fullscreen", "navigate"], events);
+        Assert.Equal(new[] { "fullscreen", "navigate" }, events);
         Assert.Equal(
             $"/slideshow/{collectionId}?return=%2Fslideshows",
             navigation.LastRelativeUri);
@@ -45,7 +45,7 @@ public sealed class SlideshowLibraryAcceptanceTests
             "/slideshows");
 
         Assert.NotNull(notice);
-        Assert.Equal(["fullscreen", "navigate"], events);
+        Assert.Equal(new[] { "fullscreen", "navigate" }, events);
         Assert.NotNull(navigation.LastRelativeUri);
     }
 
