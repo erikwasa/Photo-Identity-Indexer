@@ -215,12 +215,22 @@ public static class SlideshowOriginalPreparationEndpoints
                 cancellationToken);
         }
 
-        return original is null
-            ? Results.NotFound(new
+        if (original is null)
+        {
+            return Results.NotFound(new
             {
                 error = "The prepared original is unavailable, no longer verified, or is not part of this active slideshow session.",
-            })
-            : Results.File(original.Stream, original.ContentType, enableRangeProcessing: true);
+            });
+        }
+
+        if (!BrowserImageContentTypes.CanRender(original.ContentType))
+        {
+            await original.Stream.DisposeAsync();
+            return Results.Redirect(
+                $"/api/collections/photos/{Uri.EscapeDataString(parsedRevisionId.ToString())}/viewer-preview");
+        }
+
+        return Results.File(original.Stream, original.ContentType, enableRangeProcessing: true);
     }
 
     private static SlideshowOriginalPreparationResponse ToResponse(
