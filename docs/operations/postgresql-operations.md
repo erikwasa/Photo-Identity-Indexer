@@ -185,6 +185,16 @@ podman logs --since 4h $container
 Pop-Location
 ```
 
+If `podman compose ps` itself fails with `unable to connect to Podman socket` / `connection actively refused`, the failure is above PostgreSQL: the Podman machine/control plane is unavailable. Capture the local runtime view before recovery:
+
+```powershell
+podman system connection list
+podman machine list
+wsl --list --verbose
+```
+
+Then start the existing Podman machine rather than initializing a new one. Once Podman is reachable again, run `./verify-postgres.ps1` from the repository root; it will bring up the existing Compose service as needed and verify the persisted catalogue path. Only after the machine is reachable can container state, restart count and PostgreSQL logs distinguish whether the database container itself also restarted. The Compose `restart: unless-stopped` policy cannot recover anything while the Podman machine/runtime itself is unavailable.
+
 The Compose service is configured with `restart: unless-stopped`, so a database/container failure may already have recovered by the time the application crash is noticed. Container state, restart count and PostgreSQL logs distinguish a server restart from an application-only fault and can expose shutdown/recovery/fatal-server messages. If the container did not restart and the PostgreSQL log has no interruption, investigate Podman/WSL localhost forwarding next.
 
 Long-lived background workers should treat a brief catalogue interruption as retryable at the worker boundary rather than letting one exception stop the entire API. Archive advancement and automatic place enrichment already follow that rule; WI-0106 extends it to identity-match regeneration after the sustained catch-up run exposed the missing boundary. Retrying the application worker does not replace root-cause investigation when PostgreSQL/Podman interruptions recur.
