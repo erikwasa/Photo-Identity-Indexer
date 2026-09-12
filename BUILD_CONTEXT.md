@@ -12,11 +12,11 @@ The production launcher selects PostgreSQL as the single authoritative catalogue
 
 WI-0108 closed with measured evidence rather than speculative PostgreSQL/hash optimization. The bounded prefetch correction reduced one representative 11-photo phone run from 39 to 12 preview opens, 50 to 13 collection API requests and 22 to 6 original hash reads while producing 10/11 prefetch hits and no progressive latency growth.
 
-WI-0106 now has successful live backup/restore evidence. Because several retained rehearsal databases contain valid Photo Identity schemas, the maintainer identified the active production catalogue from PostgreSQL activity during real UI use rather than guessing from names or private connection-string formatting. With Photo Identity stopped, a custom-format production backup was created and hash-recorded, restored into an isolated database, and verified by schema version, complete public-table set, exact row counts and constraint validation. The isolated verification database was then explicitly removed while the verified backup/report were retained.
+WI-0106 has successful live backup/restore evidence and accepted container/service restart persistence. The active production database was identified from server activity, backed up explicitly, restored into an isolated database with exact schema/table/count verification, and the verification database was removed after review while the verified backup was retained. The combined restart criterion remains open only for an actual Windows/PC restart.
 
-The PostgreSQL Compose service was subsequently stopped and started with Photo Identity quiesced. `verify-postgres.ps1 -SkipContainerStart` passed and normal application use remained healthy afterward, so container/service restart persistence is accepted. The combined work-item restart criterion remains open until an actual PC restart is also observed.
+The first PostgreSQL-backed catch-up checkpoint showed real progress: synchronization discovered 304 additional source images, analysed images advanced from 15,730 to 15,792, the post-sync unverified backlog dropped from 712 to 649, failed images remained zero, hydration stayed bounded, and aggregate diagnostics were sufficient to explain stage costs without per-photo tracing. The metrics-observability criterion is accepted.
 
-The first real PostgreSQL-backed catch-up pass is healthy. Initial synchronization discovered 304 additional source images. After synchronization, analysed images advanced from 15,730 to 15,792 while the unverified backlog moved from 712 to 649, with zero failed images. Advancement moved from the stale historical SQLite-lock blocked state through `syncing` to `running`; PostgreSQL stayed ready, transient hydration returned to zero in-progress, and aggregate diagnostics identified bounded persistence/hash work plus one analysis-session initialization cost rather than progressive database degradation. The progress/failure-metrics acceptance criterion is therefore satisfied, while the separate extended-duration catch-up criterion remains open for a longer run or completion of the remaining backlog.
+A later longer catch-up run exposed a new operational failure. PostgreSQL connectivity was first forcibly closed and then `127.0.0.1:5432` refused connections. The archive worker caught its own failure and tried to persist recovery state, but `IdentityMatchRegenerationHostedService` let its repository connection failure escape. Because the host uses the default `BackgroundServiceExceptionBehavior=StopHost`, that one worker fault shut down the entire API. The current corrective slice adds an outer retry boundary to the identity-regeneration worker plus a regression test so a transient catalogue interruption no longer stops Photo Identity. This application-resilience correction does not explain why the PostgreSQL endpoint disappeared; inspect Podman/container state and logs separately before rerunning sustained catch-up.
 
 The no-argument backup database resolver is not a blocker for M24 acceptance. On this maintainer installation the private launcher environment value has a wrapper shape that does not expose the database name to the generic parser reliably, so the accepted operational path uses explicit `-DatabaseName` after identifying the active authority from server activity. Do not continue connection-string unwrapping work unless it becomes a separate maintainability goal.
 
@@ -28,15 +28,19 @@ A separate Collections / Library navigation gap remains outside this M24 thread.
 
 For the M24 thread:
 
-1. Keep the current **Advance archive** catch-up running and capture another health/status/storage/throughput checkpoint after substantially more backlog has been processed (or when catch-up completes). The acceptance question is continued forward progress with PostgreSQL healthy and no recurrence of lock/host-shutdown failure, not a SQLite/PostgreSQL performance comparison.
-2. If that longer-run checkpoint remains healthy, mark the extended catch-up criterion complete and add a small real source increment. Verify normal synchronization, analysis, enrichment and review without full regeneration.
-3. Before WI-0106 closeout, perform one actual Windows/PC restart and repeat the PostgreSQL/launcher health and representative catalogue checks to finish the combined restart criterion.
-4. Reconcile the remaining WI-0106 acceptance evidence, decide when the preserved pre-cutover SQLite rollback snapshot can be retired under policy, and close M24 only after all operational exit criteria pass.
+1. Inspect the PostgreSQL Compose container state/restart count and recent PostgreSQL logs around the catch-up crash to determine whether the database process restarted, Podman/WSL connectivity disappeared, or another service event occurred.
+2. Merge the identity-regeneration hosted-worker resilience correction after green CI.
+3. Start PostgreSQL/Photo Identity through the normal supported path, confirm `/health` is PostgreSQL-ready, and rerun sustained **Advance archive** catch-up. A short PostgreSQL interruption must no longer stop the API; the underlying service interruption still needs classification if it recurs.
+4. After sustained catch-up passes, add a small real source increment and verify synchronization, analysis, enrichment and review without full regeneration.
+5. Before WI-0106 closeout, perform one actual Windows/PC restart and repeat the PostgreSQL/launcher health and representative catalogue checks.
+6. Reconcile the remaining WI-0106 acceptance evidence, decide when the preserved pre-cutover SQLite rollback snapshot can be retired under policy, and close M24 only after all operational exit criteria pass.
 
 ## Relevant files
 
 - docs/delivery/work-items/WI-0106-postgresql-operations-and-archive-catchup.md
 - docs/operations/postgresql-operations.md
+- src/PhotoIdentity.Api/IdentityMatchRegenerationHostedService.cs
+- tests/PhotoIdentity.Integration.Tests/IdentityMatchRegenerationHostedServiceResilienceTests.cs
 - docs/operations/postgresql-local-runtime.md
 - docs/operations/postgresql-catalogue-cutover.md
 - backup-postgres-catalogue.ps1
