@@ -1,9 +1,15 @@
 id: WI-0106
 title: Operationalize PostgreSQL and resume full-archive catch-up
 milestone: M24
-status: proposed
-owner: unassigned
+status: completed
+owner: human
 document: ../work-items/WI-0106-postgresql-operations-and-archive-catchup.md
+started_at: 2026-09-12
+completed_at: 2026-09-12
+verified_at: 2026-09-12
+verified_by: human
+last_updated_at: 2026-09-12
+branch: codex/m24-wi0106-final-closeout
 blockers:
 - WI-0102
 - WI-0103
@@ -13,4 +19,6 @@ blockers:
 blocker_notes:
 - Final M24 acceptance is sustained real-archive catch-up followed by a small daily-style increment, not a comparative database benchmark.
 - WI-0108 must also close the slideshow-library/start/playback latency carried forward from M22 acceptance.
-evidence: []
+evidence:
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/312
