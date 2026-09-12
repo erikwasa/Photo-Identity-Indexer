@@ -294,13 +294,9 @@ public sealed class SlideshowOriginalPreparationService
                     switch (status.State)
                     {
                         case CollectionOriginalAccessService.ReadyState:
-                            if (!status.CanView)
-                            {
-                                session.Fail(
-                                    "One or more verified originals cannot be rendered directly by this browser. Continue with available/proxy images instead.");
-                                return;
-                            }
-
+                            // Ready means the immutable original is local and verified. Whether the
+                            // browser can decode its media type is a playback concern: the viewer
+                            // preview path falls back to the durable review proxy when necessary.
                             ready.Add(revision.RevisionId);
                             break;
 
@@ -374,8 +370,7 @@ public sealed class SlideshowOriginalPreparationService
                         {
                             downloading++;
                         }
-                        else if (requested.State == CollectionOriginalAccessService.ReadyState &&
-                                 requested.CanView)
+                        else if (requested.State == CollectionOriginalAccessService.ReadyState)
                         {
                             ready.Add(revision.RevisionId);
                         }
