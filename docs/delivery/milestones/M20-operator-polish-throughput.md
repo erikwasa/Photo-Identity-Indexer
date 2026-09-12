@@ -9,79 +9,32 @@ depends_on: [M18, M19]
 
 ## Outcome
 
-Photo Identity is easier to operate during large archive runs and less visually noisy during normal review. The milestone captures the concrete follow-up feedback from the 2026-08-19 M19 maintainer pass plus the first successful archive-metadata run after WI-0072.
-
-The milestone focuses on six areas:
-
-- responsive UI/navigation polish and clearer archive state;
-- filtering Face Review by the current top suggested person;
-- operator-configurable GeoNames background timing through the launcher settings file;
-- materially improving archive-processing throughput without weakening bounded hydration, immutable revision verification or resumability;
-- simplifying Photo Details so common information is prominent while editing controls and secondary metadata stay collapsed until needed;
-- versioning metadata extraction so existing catalogue rows can be reprocessed when supported fields expand.
+Photo Identity is easier to operate during large archive runs and less visually noisy during normal review. The milestone combines operator polish from the M19 maintainer pass with measured archive-throughput work.
 
 ## Work items
 
-- [WI-0073](../work-items/WI-0073-ui-navigation-polish.md) — fix card containment, hidden-person presentation/order, dismissible menus, favorite select type-ahead, archive return context and archive progress wording.
-- [WI-0074](../work-items/WI-0074-face-review-suggested-person-filter.md) — filter the Face Review queue by the current rank-one suggested canonical person while preserving existing queue semantics/navigation.
-- [WI-0075](../work-items/WI-0075-geonames-timing-settings.md) — make automatic GeoNames timing settings accepted and documented in the launcher settings file, with the conservative default retained unless explicitly overridden.
-- [WI-0076](../work-items/WI-0076-archive-throughput.md) — profile and improve archive processing throughput, prioritizing model-session reuse, repeated full-file verification reads, batching and bounded OneDrive prefetch opportunities.
-- [WI-0077](../work-items/WI-0077-photo-viewer-simplification.md) — reduce visible Photo Details metadata and make Location read-first/edit-on-demand.
-- [WI-0078](../work-items/WI-0078-versioned-metadata-refresh.md) — version the metadata extraction contract and make existing rows eligible for bounded re-inspection when the supported metadata set changes.
+- [WI-0073](../work-items/WI-0073-ui-navigation-polish.md) — responsive UI/navigation polish and clearer archive state.
+- [WI-0074](../work-items/WI-0074-face-review-suggested-person-filter.md) — filter Face Review by the current top suggested person.
+- [WI-0075](../work-items/WI-0075-geonames-timing-settings.md) — operator-configurable GeoNames background timing.
+- [WI-0076](../work-items/WI-0076-archive-throughput.md) — measure and materially improve archive-processing throughput.
+- [WI-0077](../work-items/WI-0077-photo-viewer-simplification.md) — simplify Photo Details and location editing.
+- [WI-0078](../work-items/WI-0078-versioned-metadata-refresh.md) — version metadata extraction and refresh stale rows.
 
-## Final maintainer verification — 2026-08-26
+## Maintainer verification
 
-The authoritative final checklist result is [M20-maintainer-verification-2026-08-26.md](M20-maintainer-verification-2026-08-26.md).
+The interactive/operator acceptance for WI-0073, WI-0074, WI-0075, WI-0077 and WI-0078 passed on 2026-08-26. The detailed checklist remains in [M20-maintainer-verification-2026-08-26.md](M20-maintainer-verification-2026-08-26.md).
 
-The maintainer reported **PASS** for all planned interactive/operator verification after the corrective PRs and PR #205 were merged:
+WI-0076 was measured separately. Diagnostics identified per-image detector/embedder initialization as the dominant local cost. PRs #210 and #211 established measurement and fixed the online-only derivative lifecycle; PR #212 safely reused the analysis session. On the same 155-image local corpus, throughput improved from about 359 images/hour to about 1,925 images/hour, with one model initialization and 154 reuses instead of 155 initializations. The online-only scenario also completed with balanced bounded hydration/release.
 
-- WI-0073 corrective Face Review, Smart Collection, Maintain People and archive-state behavior passed;
-- WI-0074's previously accepted suggested-person filtering remained regression-free;
-- WI-0075 corrected below-30000 GeoNames timing overrides and effective diagnostics passed;
-- WI-0077 compact metadata/location presentation and edit/read behavior passed;
-- WI-0078's previously accepted real-catalogue stale metadata refresh remained regression-free;
-- the related M19 WI-0072/WI-0064/WI-0065 real-media/live-provider checks also passed, allowing M19 to close.
-
-These items are accepted for completion. **WI-0076 remains the only unfinished M20 item.** Its existing PR #200 and representative throughput verification remain separate from the acceptance pass above.
-
-Three new issues reported after the successful checklist are not treated as M20 acceptance failures. They are tracked under [M21 — Reliability and recognition quality](M21-reliability-recognition-quality.md): critical included-folder sync timeout/scaling (WI-0079), high-priority detected-face clarity (WI-0080), and medium-priority suggestion-accuracy degradation (WI-0081).
-
-## Existing-image metadata backfill
-
-WI-0072 deliberately retains the explicit `POST /api/photo-metadata/backfill` operation for catalogue revisions that predate automatic archive metadata inspection. Backfill reads only originals that are already local, verifies them against the immutable revision and never requests OneDrive hydration merely for metadata.
-
-WI-0078 closes the historical stale-row gap with a durable extraction-contract version so default backfill can select both missing and stale rows, while retaining an explicit force/repair mode for current-version rows. The maintainer verified this behavior against the real catalogue.
-
-## Archive-performance baseline
-
-The maintainer observed roughly **100 images/hour** during the first successful archive-metadata run. Repository inspection shows several plausible sources of avoidable overhead that WI-0076 must measure before changing concurrency:
-
-- bounded archive advancement deliberately advances at most one governed step at a time;
-- active analysis is resumed with `maxAttemptsPerInvocation: 1`;
-- every `ArchiveAnalysisCoordinator.StartAsync`/`ResumeAsync` invocation originally created and disposed a `LocalInspectionJobHandler`, which constructs detector and embedder model objects;
-- exact-original status/open operations may SHA-256 the same local file multiple times across metadata inspection, analysis, proxy generation and release checks;
-- hydration admission already has a bounded concurrency policy, but the advancement loop generally prepares one pending revision at a time;
-- the 500 ms active-loop delay contributes latency but is unlikely to explain the observed throughput by itself.
-
-PR #200 implements the first isolated WI-0076 session-reuse slice, but it remains separate from the newly reported **Sync included folders** timeout/scaling problem in WI-0079. Do not assume they share a cause without measurement.
-
-## Verification strategy
-
-Each work item has focused automated coverage plus a maintainer browser/operator check. Archive throughput changes require before/after measurements on the same representative media set and must preserve:
-
-- immutable revision/hash safety;
-- bounded OneDrive hydration byte/concurrency limits;
-- restart/resume and idempotency;
-- correct metadata, face analysis, derivatives and review proxies;
-- responsive UI while archive processing is active.
+Lower-value duplicate-hash, prefetch and loop-delay ideas remain possible future optimizations but are not required to close the measured M20 bottleneck. M24/WI-0106 later demonstrated sustained production catch-up and incremental operation on the real PostgreSQL catalogue.
 
 ## Exit criteria
 
 - [x] Known card/menu/hidden/archive-state and archive-return navigation issues are fixed without regressing previously verified M19 behavior.
 - [x] Face Review can filter by current top suggested person and preserves that queue scope through Face Details navigation.
 - [x] GeoNames automatic timing can be supplied through `PhotoIdentity.launcher.json`, lower supported overrides are honored, and effective pacing is operator-visible.
-- [ ] Archive throughput has a measured stage breakdown and a documented before/after improvement on representative hardware/data without weakening safety contracts.
+- [x] Archive throughput has a measured stage breakdown and a documented before/after improvement on representative hardware/data without weakening safety contracts.
 - [x] Photo Details keeps secondary photographic metadata inside collapsed `All metadata` and presents Location in a read-first mode with an explicit Edit action.
 - [x] Existing metadata rows carry an extraction-contract version and stale rows can be safely reprocessed to obtain fields added by newer readers.
 
-M20 remains active only for WI-0076.
+M20 is complete.
