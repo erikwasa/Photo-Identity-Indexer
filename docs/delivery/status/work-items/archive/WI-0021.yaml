@@ -1,0 +1,18 @@
+id: WI-0021
+title: Add Azure checkpointing
+milestone: M10
+status: completed
+owner: unassigned
+document: ../work-items/WI-0021-azure-checkpointing.md
+completed_at: 2026-09-12
+verified_at: 2026-09-12
+verified_by: maintainer
+last_updated_at: 2026-09-12
+blockers:
+- WI-0020
+blocker_notes:
+- Retired without implementation. ADR-0010 removes Azure execution from the planned production strategy, so Azure-specific checkpointing is no longer needed.
+- Completed is used as the terminal administrative closeout state because milestone status has no separate retired/cancelled state.
+evidence:
+- type: architecture_decision
+  value: docs/decisions/ADR-0010-local-production-execution.md
