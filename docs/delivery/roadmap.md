@@ -26,7 +26,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M19 | Photo metadata and semantic collections | completed |
 | M20 | Operator polish and archive throughput | completed |
 | M21 | Reliability and recognition quality | ready |
-| M22 | Protected Smart Collection slideshow | in_progress |
+| M22 | Protected Smart Collection slideshow | completed |
 | M23 | Source-copy lifecycle and privacy exclusion | ready |
 | M24 | PostgreSQL catalogue migration and archive-scale operation | completed |
 
