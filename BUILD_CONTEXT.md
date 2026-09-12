@@ -12,9 +12,11 @@ The production launcher selects PostgreSQL as the single authoritative catalogue
 
 WI-0108 closed with measured evidence rather than speculative PostgreSQL/hash optimization. The bounded prefetch correction reduced one representative 11-photo phone run from 39 to 12 preview opens, 50 to 13 collection API requests and 22 to 6 original hash reads while producing 10/11 prefetch hits and no progressive latency growth.
 
-WI-0106 is now implementing the production operations boundary. The active first slice adds a binary-safe PostgreSQL logical-backup wrapper, an isolated restore verifier that compares schema/table counts against a stopped production source, and a production operations runbook covering startup/restart, persistent volume ownership, controlled shutdown, PostgreSQL 18 updates, failure recovery, sustained archive catch-up and the final daily-style increment gate.
+WI-0106 now has successful live backup/restore evidence. Because several retained rehearsal databases contain valid Photo Identity schemas, the maintainer identified the active production catalogue from PostgreSQL activity during real UI use rather than guessing from names or private connection-string formatting. With Photo Identity stopped, a custom-format production backup was created and hash-recorded, restored into an isolated database, and verified by schema version, complete public-table set, exact row counts and constraint validation. The isolated verification database was then explicitly removed while the verified backup/report were retained.
 
-The restore verifier intentionally retains its isolated verification database until the maintainer has inspected the report. Production backup/restore acceptance therefore remains a live verification step after this slice merges; no script claims acceptance merely because it was added to the repository.
+The PostgreSQL Compose service was subsequently stopped and started with Photo Identity quiesced. `verify-postgres.ps1 -SkipContainerStart` passed and normal application use remained healthy afterward, so container/service restart persistence is accepted. The combined work-item restart criterion remains open until an actual PC restart is also observed.
+
+The no-argument backup database resolver is not a blocker for M24 acceptance. On this maintainer installation the private launcher environment value has a wrapper shape that does not expose the database name to the generic parser reliably, so the accepted operational path uses explicit `-DatabaseName` after identifying the active authority from server activity. Do not continue connection-string unwrapping work unless it becomes a separate maintainability goal.
 
 Consolidated real-phone M22 acceptance still has two separate functional gaps tracked by WI-0107: direct originating-gesture fullscreen launch and durable/revalidated prepared-original receipt state. Do not mix those functional corrections into M24 WI-0106.
 
@@ -24,13 +26,11 @@ A separate Collections / Library navigation gap remains outside this M24 thread.
 
 For the M24 thread:
 
-1. Merge the WI-0106 PostgreSQL operations tooling/runbook slice after green CI.
-2. Stop Photo Identity, create a fresh production PostgreSQL backup and run isolated restore verification from that exact backup.
-3. Review the restore JSON evidence, then remove only the isolated verification database documented by the report.
-4. Verify database/container restart persistence and normal launcher recovery.
-5. Resume sustained real-archive catch-up and observe `/health`, `/api/archive/status`, `/api/archive/storage` and `/api/archive/diagnostics/throughput` long enough to expose operational degradation rather than only a short smoke run.
-6. After catch-up is stable, add a small real source increment and verify synchronization, analysis, enrichment and review without full regeneration.
-7. Reconcile WI-0106 acceptance evidence and close M24 only after those operational exit criteria pass.
+1. Resume the real archive through **Advance archive** and let catch-up run long enough to expose sustained operational degradation rather than only a short smoke test.
+2. While it runs, observe `/health`, `/api/archive/status`, `/api/archive/storage` and `/api/archive/diagnostics/throughput`. Acceptance is continuous progress, healthy PostgreSQL state, normal hydration release and diagnostics sufficient to understand any stall without per-photo tracing; it is not a SQLite/PostgreSQL benchmark.
+3. If catch-up remains stable, add a small real source increment and verify normal synchronization, analysis, enrichment and review without full regeneration.
+4. Before WI-0106 closeout, perform one actual Windows/PC restart and repeat the PostgreSQL/launcher health and representative catalogue checks to finish the combined restart criterion.
+5. Reconcile the remaining WI-0106 acceptance evidence, decide when the preserved pre-cutover SQLite rollback snapshot can be retired under policy, and close M24 only after all operational exit criteria pass.
 
 ## Relevant files
 
