@@ -5,6 +5,7 @@
 - [README and project orientation](../README.md)
 - [Build context](../BUILD_CONTEXT.md) — current development/verification handoff only
 - [Local operator guide](operations/local-operator-guide.md)
+- [PostgreSQL operations](operations/postgresql-operations.md)
 - [Operations documentation map](operations/index.md)
 - [Testing and CI strategy](operations/testing-and-ci-strategy.md)
 - [Architecture overview](architecture/overview.md)
@@ -18,10 +19,11 @@ Formal delivery lifecycle status is kept in the canonical YAML registries. They 
 
 - [Operations documentation map](operations/index.md)
 - [Local operator guide](operations/local-operator-guide.md)
+- [PostgreSQL operations](operations/postgresql-operations.md)
 - [Testing and CI strategy](operations/testing-and-ci-strategy.md)
 - [Review-proxy serving and bounded originals](operations/review-proxy-serving.md)
 - [Bounded archive acceptance](operations/bounded-archive-acceptance.md)
-- [SQLite persistence operations](operations/sqlite-persistence.md)
+- [SQLite persistence compatibility/history](operations/sqlite-persistence.md)
 
 ## Architecture
 
@@ -55,17 +57,17 @@ Formal delivery lifecycle status is kept in the canonical YAML registries. They 
 - [Candidate models](models/candidate-models.md)
 - [Model manifests and governance](models/model-governance.md)
 
-## Azure — optional and deferred
+## Azure — historical reference
 
 - [Tenant and identity constraints](azure/constraints.md)
 - [Identity-free execution](azure/identity-free-execution.md)
 - [Cost controls](azure/cost-controls.md)
 
-Azure is not required for version 1 or the accepted local permanent-catalogue workflow. It remains an optional later scale-out/experiment path.
+Azure documentation is retained as historical design/reference material. [ADR-0010](decisions/ADR-0010-local-production-execution.md) establishes maintainer-controlled local hardware as the current production execution strategy; no active milestone depends on Azure.
 
 ## Delivery
 
-- [Local-first delivery strategy](delivery/local-first-plan.md)
+- [Local production strategy](delivery/local-first-plan.md)
 - [Roadmap](delivery/roadmap.md)
 - [Milestones](delivery/milestones/)
 - [Work items](delivery/work-items/)
