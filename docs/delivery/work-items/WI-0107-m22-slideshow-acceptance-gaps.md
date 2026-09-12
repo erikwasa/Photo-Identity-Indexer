@@ -49,19 +49,41 @@ If one or more prepared originals have actually become unavailable/online-only o
 
 The receipt must not contain source paths, filenames or other private source locators.
 
+## Implementation — 2026-09-12
+
+The corrective slice keeps the existing slideshow lifecycle and hydration ownership boundaries intact:
+
+- `/slideshows` now uses the same originating-gesture fullscreen handoff already used by the Smart Collections workspace. The fullscreen request is the first asynchronous browser action from the Start slideshow click/tap and navigation follows only after that request completes or throws. A rejection still navigates to the slideshow, where the existing fullscreen recovery surface remains authoritative.
+- Standalone preparation now records the exact immutable revision-ID set while its temporary server session is active. Active browser-local bookmarks were versioned so a preparation that completes after navigation can still produce the final receipt.
+- A successful preparation still ends the server preparation session immediately, releasing slideshow-preparation protection. The persistent browser receipt contains only immutable revision IDs; it does not retain a lease, source path, filename or original URL.
+- When `/slideshows` is recreated, a receipt is not shown as ready immediately. The page creates a fresh snapshot for that saved collection, requires the exact revision set to match, then calls a non-hydrating revalidation endpoint. That endpoint reports reusable only when every recorded revision is still local and revision-verified.
+- Changed collection membership, an online-only/released original, hash mismatch or another non-ready original removes the current prepared badge. A transient inability to revalidate does not display stale success; the receipt is retained only so a later page load can try again.
+- No permanent offline pinning, hydration-policy change or slideshow performance work is included.
+
+Focused automated coverage verifies the fullscreen-before-navigation ordering, safe navigation after fullscreen interop rejection, path-free/set-matching receipt behavior, and server revalidation downgrade after an original becomes online-only.
+
 ## Acceptance criteria
 
-- [ ] Pressing **Start slideshow** on `/slideshows` requests fullscreen directly from the initiating click/tap before navigation or awaited work.
+- [x] Pressing **Start slideshow** on `/slideshows` requests fullscreen directly from the initiating click/tap before navigation or awaited work.
 - [ ] On the supported real phone/browser, a successful fullscreen request produces no intermediate **Enter fullscreen** application step.
-- [ ] Snapshot/original preparation loading states may be shown after the click, but they are shown inside fullscreen.
-- [ ] Fullscreen rejection/unsupported capability still lands on the safe recovery surface.
-- [ ] A successful standalone preparation remains visibly **Originals prepared** after starting and deliberately exiting a slideshow when the exact prepared set remains reusable.
-- [ ] The prepared-state representation survives recreation of the `/slideshows` component in the same browser/device profile.
-- [ ] The prepared-state representation is revalidated and is removed/downgraded when the relevant originals are no longer reusable or collection membership has changed.
-- [ ] Successful standalone preparation still releases temporary slideshow-preparation protection and does not become a permanent offline pin.
-- [ ] Persisted preparation state is path-free.
-- [ ] Automated tests cover the originating-gesture fullscreen handoff and prepared-state persistence/revalidation lifecycle.
+- [x] Snapshot/original preparation loading states may be shown after the click, but they are shown inside fullscreen.
+- [x] Fullscreen rejection/unsupported capability still lands on the safe recovery surface.
+- [x] A successful standalone preparation remains visibly **Originals prepared** after starting and deliberately exiting a slideshow when the exact prepared set remains reusable.
+- [x] The prepared-state representation survives recreation of the `/slideshows` component in the same browser/device profile.
+- [x] The prepared-state representation is revalidated and is removed/downgraded when the relevant originals are no longer reusable or collection membership has changed.
+- [x] Successful standalone preparation still releases temporary slideshow-preparation protection and does not become a permanent offline pin.
+- [x] Persisted preparation state is path-free.
+- [x] Automated tests cover the originating-gesture fullscreen handoff and prepared-state persistence/revalidation lifecycle.
 - [ ] Maintainer re-verification on the real phone passes these two remaining M22 scenarios.
+
+## Maintainer verification remaining
+
+After the corrective PR is green and merged, verify from the supported phone/browser:
+
+1. Open `/slideshows`, choose a collection with Autoplay enabled and press **Start slideshow**. Confirm fullscreen is entered directly from that tap, loading/preparation remains inside fullscreen and no application **Enter fullscreen** step appears when the browser accepts fullscreen.
+2. Return to `/slideshows`, run **Prepare originals** to completion and confirm **Originals prepared**.
+3. Start that slideshow, deliberately exit back to `/slideshows`, and confirm **Originals prepared** is restored when those exact originals remain local.
+4. If practical, make one prepared original online-only or change the collection membership, reload `/slideshows`, and confirm the stale prepared badge is no longer shown.
 
 ## Non-goals
 
