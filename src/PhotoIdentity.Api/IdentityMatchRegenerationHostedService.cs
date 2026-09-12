@@ -59,6 +59,9 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
             }
             catch (Exception exception)
             {
+                // A brief catalogue/service interruption must not escape BackgroundService and
+                // trigger the host's default StopHost behavior. Durable run/target state remains
+                // the authority; retry from that state after the normal idle delay.
                 _logger.LogError(
                     exception,
                     "Identity match regeneration failed unexpectedly; retrying without stopping Photo Identity.");
