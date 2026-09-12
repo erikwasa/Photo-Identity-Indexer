@@ -1,0 +1,19 @@
+id: WI-0020
+title: Run Azure VM pilot
+milestone: M09
+status: completed
+owner: unassigned
+document: ../work-items/WI-0020-azure-pilot.md
+completed_at: 2026-09-12
+verified_at: 2026-09-12
+verified_by: maintainer
+last_updated_at: 2026-09-12
+blockers:
+- WI-0018
+- WI-0032
+blocker_notes:
+- Retired without implementation. ADR-0010 establishes maintainer-controlled local hardware as the production execution strategy, so an Azure VM pilot is no longer planned.
+- Completed is used as the terminal administrative closeout state because milestone status has no separate retired/cancelled state.
+evidence:
+- type: architecture_decision
+  value: docs/decisions/ADR-0010-local-production-execution.md

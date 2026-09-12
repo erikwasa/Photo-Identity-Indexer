@@ -9,13 +9,19 @@ affected_modules: [infra/azure, PhotoIdentity.Worker]
 
 # WI-0021: Add Azure checkpointing
 
-## Objective
+## Historical objective
 
-Make interrupted Azure jobs recoverable using durable VM-local result retrieval or private Blob storage with narrowly scoped short-lived SAS access.
+The original plan was to make temporary Azure jobs recoverable using durable VM-local result retrieval or private Blob storage with narrowly scoped short-lived SAS access.
 
-## Acceptance criteria
+## Retirement — 2026-09-12
 
-- [ ] Abrupt termination loses only bounded work.
-- [ ] Credentials never appear in logs or result bundles.
-- [ ] Temporary cloud data can be deleted safely.
-- [ ] The worker still has no permanent cloud identity.
+This work item is retired without implementation. ADR-0010 removes Azure from the planned production execution path, so Azure-specific checkpoint storage is no longer required. Local restart/resume, PostgreSQL persistence and backup/restore are governed by the current local architecture instead.
+
+The canonical status is an administrative closeout and does not claim the historical Azure acceptance criteria were executed.
+
+## Historical acceptance criteria
+
+- Abrupt termination loses only bounded work.
+- Credentials never appear in logs or result bundles.
+- Temporary cloud data can be deleted safely.
+- The worker still has no permanent cloud identity.

@@ -9,19 +9,21 @@ affected_modules: [PhotoIdentity.Transfer.Bundles, PhotoIdentity.Worker, docs/az
 
 # WI-0020: Run Azure VM pilot
 
-## Objective
+## Historical objective
 
-When Azure access returns, run a small identity-free processing bundle on a temporary VM and compare it with the already-proven local path.
+The original plan was to run a small identity-free processing bundle on a temporary Azure VM and compare it with the proven local path.
 
-## Acceptance criteria
+## Retirement — 2026-09-12
 
-- [ ] Azure access is confirmed before any resource is created.
-- [ ] The VM receives only explicit job bundles and pinned model files.
-- [ ] No OneDrive credential, canonical database, person record or human label enters Azure.
-- [ ] Result hashes and model provenance match the job contract.
-- [ ] Local and Azure outputs agree within documented numerical tolerance.
-- [ ] Actual runtime and cost are recorded and the VM is deallocated.
+This work item is retired without implementation. [ADR-0010](../../decisions/ADR-0010-local-production-execution.md) establishes maintainer-controlled local hardware as the production execution strategy. The accepted local archive workflow and M24 archive-scale operation remove the need for an Azure pilot.
 
-## Scheduling policy
+The canonical status closes this item administratively; it does not assert that the historical Azure acceptance checks below were performed.
 
-This item is deliberately blocked by the local workflow and documentation validation. Lack of Azure access must not delay WI-0027 through WI-0032 or WI-0025.
+## Historical acceptance criteria
+
+- Azure access is confirmed before any resource is created.
+- The VM receives only explicit job bundles and pinned model files.
+- No OneDrive credential, canonical database, person record or human label enters Azure.
+- Result hashes and model provenance match the job contract.
+- Local and Azure outputs agree within documented numerical tolerance.
+- Actual runtime and cost are recorded and the VM is deallocated.

@@ -1,0 +1,21 @@
+id: WI-0046
+title: Simplify the application around Review and Library
+milestone: M18
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0046-simplified-application-shell.md
+completed_at: 2026-09-12
+verified_at: 2026-09-12
+verified_by: maintainer
+last_updated_at: 2026-09-12
+blockers:
+- WI-0025
+- WI-0045
+- WI-0048
+blocker_notes:
+- Lifecycle status was stale. The implementation shipped in WI-0046 PR #125 and was integrated to main through the merged M18 PR #129; the work-item document already records all acceptance criteria as satisfied.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/125
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/129

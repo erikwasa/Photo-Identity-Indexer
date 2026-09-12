@@ -9,13 +9,21 @@ affected_modules: [PhotoIdentity.Source.OneDriveSync, PhotoIdentity.Cli]
 
 # WI-0024: Add ongoing local synchronisation
 
-## Objective
+## Historical objective
 
-Periodically scan the local OneDrive folder, detect new and changed files, queue hydration and processing, and rematch unknown faces after new exemplars.
+The original plan was to add a separately scheduled periodic local OneDrive scan that automatically discovered new and changed files, queued processing and refreshed matching.
 
-## Acceptance criteria
+## Retirement — 2026-09-12
 
-- [ ] New photos are found without direct cloud API access.
-- [ ] Changed files create new revisions.
-- [ ] Reconciled moves preserve canonical labels.
-- [ ] Backup and restore of canonical data are documented and tested.
+This separate work item is retired. Current archive advancement already synchronizes included local OneDrive coverage and processes newly discovered photos incrementally. M24/WI-0106 verified a real small increment without full-catalogue regeneration.
+
+A continuously scheduled watcher is not currently required. If unattended scheduling becomes useful later, it should be newly scoped against the current PostgreSQL/archive-advancement architecture rather than reviving this older item.
+
+The canonical status is an administrative closeout and does not claim the original autonomous-periodic-scan contract was implemented.
+
+## Historical acceptance criteria
+
+- New photos are found without direct cloud API access.
+- Changed files create new revisions.
+- Reconciled moves preserve canonical labels.
+- Backup and restore of canonical data are documented and tested.

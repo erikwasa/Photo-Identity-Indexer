@@ -1,6 +1,6 @@
 # Portable processing bundles
 
-Portable bundles separate canonical local identity data from disposable processing compute. They can be used on another local machine or on temporary Azure compute without granting access to personal OneDrive or the canonical SQLite catalogue.
+Portable bundles separate canonical local identity data from isolated processing compute. They can be used for offline transfer or another explicitly trusted local processing environment without granting access to Personal OneDrive or the authoritative PostgreSQL catalogue.
 
 ## Trust boundary
 
@@ -84,14 +84,14 @@ Bundle content can be reduced according to the processing purpose:
 
 Choose the least revealing profile that still supports the accepted task. All profiles remain sensitive.
 
-## Optional Azure scale-out
+## Current execution strategy
 
-Azure is disposable compute, not a control plane. It receives explicit job bundles, uses no managed identity or service principal for OneDrive, and returns result bundles for local validation and import.
+ADR-0010 establishes local production execution. Portable bundles no longer imply a planned Azure scale-out path. The earlier Azure use described by ADR-0004 is historical and the associated M09/M10 work is retired.
 
-Deleting the Azure resource must not remove canonical state. The Windows catalogue and review history remain sufficient to recreate later bundles.
+A future remote/cloud processing target would require a new architecture decision covering trust, transfer, recovery and operating cost before portable bundles are used that way.
 
 ## Retention
 
-Delete temporary transfer archives and remote copies after validated import and required diagnostics. Keep private bundles outside Git and protect them as biometric processing data.
+Delete temporary transfer archives and remote/local copies after validated import and required diagnostics. Keep private bundles outside Git and protect them as biometric processing data.
 
-See [Architecture overview](overview.md), [Module boundaries](module-boundaries.md), [Canonical data model](data-model.md) and the [Glossary](../glossary.md).
+See [Architecture overview](overview.md), [Module boundaries](module-boundaries.md), [Canonical data model](data-model.md), [ADR-0010](../decisions/ADR-0010-local-production-execution.md) and the [Glossary](../glossary.md).

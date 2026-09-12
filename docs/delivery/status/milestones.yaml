@@ -96,25 +96,25 @@ milestones:
   - WI-0038
 - id: M09
   title: Azure VM pilot without identities
-  status: ready
+  status: completed
   document: ../milestones/M09-azure-pilot.md
   work_items:
   - WI-0020
 - id: M10
   title: Azure checkpointing
-  status: proposed
+  status: completed
   document: ../milestones/M10-checkpointing.md
   work_items:
   - WI-0021
 - id: M11
   title: Production model selection
-  status: proposed
+  status: completed
   document: ../milestones/M11-model-selection.md
   work_items:
   - WI-0022
 - id: M12
   title: Full archive processing
-  status: proposed
+  status: completed
   document: ../milestones/M12-full-archive.md
   work_items:
   - WI-0041
@@ -124,7 +124,7 @@ milestones:
   - WI-0023
 - id: M13
   title: Ongoing local synchronisation
-  status: proposed
+  status: completed
   document: ../milestones/M13-ongoing-sync.md
   work_items:
   - WI-0024
@@ -145,7 +145,7 @@ milestones:
   - WI-0047
 - id: M18
   title: Operator application experience
-  status: ready
+  status: completed
   document: ../milestones/M18-application-experience.md
   work_items:
   - WI-0046
@@ -174,7 +174,7 @@ milestones:
   - WI-0072
 - id: M20
   title: Operator polish and archive throughput
-  status: in_progress
+  status: completed
   document: ../milestones/M20-operator-polish-throughput.md
   work_items:
   - WI-0073

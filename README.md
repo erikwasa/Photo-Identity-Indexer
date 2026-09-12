@@ -2,7 +2,9 @@
 
 Photo Identity Indexer is a private, local-first system for detecting, reviewing and finding people in a personal photo archive.
 
-The Windows computer is the trusted control plane. It owns the SQLite catalogue, people, append-only human review history and derived artefacts; runs the CLI, worker, API and browser UI; and can perform the complete workflow without Azure. Optional Azure compute is limited to explicit portable processing bundles and never authenticates to personal OneDrive.
+The maintainer-controlled Windows computer is the trusted application/control environment. It runs the application and model processing, accesses Personal OneDrive through the Windows sync client, and keeps personal photos and derived biometric data under local control. PostgreSQL running on the maintainer's hardware is the sole writable production catalogue.
+
+The current strategy is local production execution. Historical portable-bundle/Azure material remains in the repository as reference, but Azure is not a planned processing target; see [ADR-0010](docs/decisions/ADR-0010-local-production-execution.md).
 
 ## Start here
 
@@ -13,23 +15,24 @@ Use these references when you need more detail:
 - [Documentation index](docs/index.md)
 - [Build context](BUILD_CONTEXT.md) for the immediate development/verification handoff
 - [Architecture overview](docs/architecture/overview.md)
+- [PostgreSQL operations](docs/operations/postgresql-operations.md)
 - [Local evaluation and multi-model workflow](docs/operations/local-evaluation.md)
-- [SQLite backup, restore and concurrency policy](docs/operations/sqlite-persistence.md)
 - [Security and privacy](docs/architecture/security-and-privacy.md)
 - [Delivery roadmap](docs/delivery/roadmap.md)
 
 ## Development status
 
-`BUILD_CONTEXT.md` contains only the current focus and next concrete step. Formal work-item lifecycle status, dependencies and completion evidence are maintained in [`docs/delivery/status/work-items.yaml`](docs/delivery/status/work-items.yaml).
+`BUILD_CONTEXT.md` contains only the current focus and next concrete step. Formal work-item lifecycle status, dependencies and completion evidence are maintained through the canonical work-item shards under [`docs/delivery/status/work-items/`](docs/delivery/status/work-items/).
 
 ## Prerequisites
 
 - Windows
-- .NET 10 SDK
+- .NET 10 SDK for development/source verification
 - PowerShell 7 or Windows PowerShell
-- Local disk space for SQLite, crops, embeddings, publish output and reports
-- A trusted private network for optional Pixel browser access
-- Personal photos and all generated biometric data kept outside the repository
+- Podman/WSL2 PostgreSQL runtime for the accepted production catalogue
+- Local disk space for PostgreSQL, derivatives, analysis output, packages and backups
+- A trusted private network for supported phone/browser access
+- Personal photos and generated biometric data kept outside the repository
 
 ## Verify the repository
 
@@ -40,28 +43,34 @@ From the repository root:
 ./test.ps1
 ./verify-local.ps1 -InstallModels
 ./verify-review.ps1 -Mode Smoke -Configuration Release
+./verify-postgres.ps1
 ```
 
-Expected success signals are a Release build, passing automated tests, verified model hashes, valid living documentation and a passing disposable hosted-application smoke test.
+The living documentation gate is also expected to pass:
 
-## Supported local workflow
+```powershell
+dotnet run --project tools/PhotoIdentity.Docs -- validate
+dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+```
 
-The accepted workflow is:
+## Supported production workflow
 
-1. stage a local or OneDrive-synchronised source outside the repository;
-2. process immutable photo revisions with the governed detector and SFace embedder;
-3. review faces and maintain people through the local browser application;
-4. regenerate ranked suggestions for one exact embedding-model revision;
-5. export and evaluate deterministic reviewed-catalogue splits;
-6. optionally process the same revisions with another pinned model revision;
-7. browse collections and request neutral manifests; and
-8. stop writers before backing up the SQLite catalogue and referenced artefacts.
+The accepted production workflow is:
 
-The [local operator guide](docs/operations/local-operator-guide.md) is the authoritative normal operating path. Other documents explain individual subsystems rather than duplicating that sequence.
+1. configure the Personal OneDrive-synchronised archive outside the repository;
+2. synchronize included archive coverage through the local application;
+3. process immutable revisions with the governed detector and SFace embedder using bounded original hydration;
+4. review faces and maintain people through the local browser application;
+5. regenerate or apply governed identity suggestions;
+6. browse Smart Collections, photo details and slideshow surfaces from the same production catalogue;
+7. continue with small incremental archive updates rather than rebuilding the catalogue; and
+8. back up and verify the PostgreSQL catalogue using the documented stopped-application procedure.
+
+The [local operator guide](docs/operations/local-operator-guide.md) is the authoritative normal operating path. Other documents explain individual subsystems or retained historical experiments.
 
 ## Privacy boundary
 
-Do not commit personal photos, names, face crops, embeddings, SQLite catalogues, model binaries, credentials, tokens, real evaluation manifests, reports or private paths.
+Do not commit personal photos, names, face crops, embeddings, catalogues, model binaries, credentials, tokens, real evaluation manifests, reports or private paths.
 
 The browser application is unauthenticated. Bind it only to localhost or a trusted private network, restrict any firewall rule to the intended private profile, and never expose it to the public internet.
 

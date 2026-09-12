@@ -4,31 +4,28 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M24 substantive implementation and acceptance are complete. WI-0106 now needs formal lifecycle reconciliation and milestone closeout.**
+**Post-M24 housekeeping is reconciling stale delivery status and the production execution strategy before returning to M22.**
 
-PostgreSQL is the accepted single writable production catalogue. WI-0106 has passed backup/restore verification, container restart persistence, sustained full-archive catch-up, a seven-photo daily-style increment with analysis/enrichment/Review visibility, and an actual Windows restart.
+The production system is local: PostgreSQL on maintainer-controlled hardware is the sole writable catalogue, Personal OneDrive is accessed through the Windows sync client, and normal model/archive processing runs locally. ADR-0010 supersedes the earlier disposable-Azure strategy.
 
-After the real PC restart, the existing Podman machine and retained PostgreSQL volume were reused. `verify-postgres.ps1` started the Compose service, passed PostgreSQL protocol checks, built Release successfully, passed all 29 persistence tests and all 7 runtime/composition integration tests. The normal launcher selected PostgreSQL, `/health` returned PostgreSQL `ready` at schema 23, archive totals remained `16,449 / 16,449` current/analysed with zero pending, failed or unverified images, and representative Smart Collection, Review and Archive state remained intact.
+Housekeeping closes the stale implemented M18 items WI-0046/WI-0048, closes M20/WI-0076 from its measured benchmark evidence, retires M09-M11 Azure planning, closes M12/WI-0023 as superseded by M24 production catch-up, and retires M13/WI-0024 as separate periodic-sync roadmap work.
 
-The preserved pre-cutover SQLite snapshot has completed its active M24 rollback/stabilization role. It is not modified by this closeout and may remain as an offline historical migration artifact.
-
-Separate M22 functional gaps remain under WI-0107. WI-0076 also remains outside this M24 closeout.
+M23 remains intentionally deferred.
 
 ## Next concrete step
 
-1. Use `PhotoIdentity.Docs` on the closeout branch to transition WI-0106 through `start`, `review` and `complete` with human verification evidence. Do not hand-edit generated work-item views.
-2. Run `PhotoIdentity.Docs generate`, `validate` and `generate --check`; completion should move WI-0106 from the active shard directory to the archive and refresh deterministic generated views.
-3. Mark M24 completed in `docs/delivery/status/milestones.yaml` after WI-0106 is terminal and record milestone closeout evidence.
-4. Merge the closeout PR after CI and documentation checks are green.
+After the housekeeping PR is merged, return to **M22 WI-0107**. It owns the two remaining slideshow acceptance gaps: direct fullscreen acquisition from the initiating Start slideshow gesture and persistence/revalidation of successful standalone prepared-original state across slideshow navigation.
+
+After WI-0107 is implemented, run the focused real-phone M22 re-verification and close the consolidated M22 items if those two scenarios pass.
 
 ## Relevant files
 
-- docs/delivery/work-items/WI-0106-postgresql-operations-and-archive-catchup.md
-- docs/delivery/milestones/M24-postgresql-catalogue-and-scale.md
-- docs/delivery/status/work-items/active/WI-0106.yaml
+- docs/decisions/ADR-0010-local-production-execution.md
+- docs/delivery/local-first-plan.md
 - docs/delivery/status/milestones.yaml
-- tools/PhotoIdentity.Docs/README.md
-- docs/operations/postgresql-operations.md
+- docs/delivery/status/work-items-index.md
+- docs/delivery/work-items/WI-0107-m22-slideshow-acceptance-gaps.md
+- docs/delivery/milestones/M22-protected-smart-collection-slideshow.md
 
 ## Repository validation
 
@@ -38,6 +35,6 @@ Separate M22 functional gaps remain under WI-0107. WI-0076 also remains outside 
     dotnet run --project tools/PhotoIdentity.Docs -- generate --check
     ./verify-review.ps1 -Mode Smoke -Configuration Release
 
-Live PostgreSQL verification:
+Production PostgreSQL verification when runtime changes require it:
 
     ./verify-postgres.ps1

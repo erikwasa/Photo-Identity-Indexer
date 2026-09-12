@@ -1,0 +1,21 @@
+id: WI-0022
+title: Select production models
+milestone: M11
+status: completed
+owner: unassigned
+document: ../work-items/WI-0022-model-selection.md
+completed_at: 2026-09-12
+verified_at: 2026-09-12
+verified_by: maintainer
+last_updated_at: 2026-09-12
+blockers:
+- WI-0021
+- WI-0030
+blocker_notes:
+- Retired without executing the original Azure-dependent acceptance contract. The production archive configuration already governs CenterFace and SFace from accepted local evidence, and ADR-0010 removes Azure consistency/cost evidence as a production gate.
+- Completed is used as the terminal administrative closeout state because milestone status has no separate retired/cancelled state.
+evidence:
+- type: architecture_decision
+  value: docs/decisions/ADR-0010-local-production-execution.md
+- type: documentation
+  value: docs/architecture/identity-matching.md
