@@ -15,7 +15,8 @@
 - Keep the solution a modular monolith until an accepted ADR says otherwise.
 - Core/domain code must not expose EF Core, OpenCV, ONNX Runtime, Azure SDK or Microsoft Graph types.
 - Personal OneDrive is accessed through the Windows sync client, not Microsoft Graph.
-- Azure is disposable optional compute. It receives portable bundles and has no OneDrive credentials, managed identity or service principal.
+- Production model execution and archive processing run on maintainer-controlled local hardware; ADR-0010 supersedes the earlier disposable-Azure strategy.
+- PostgreSQL is the sole writable production catalogue. SQLite support is compatibility/migration/rollback tooling unless a future ADR changes that authority boundary.
 - Canonical people and identity assignments are model-independent and auditable. ADR-0006 permits opt-in canonical automatic assignments with exact-model/policy provenance.
 - Original photos are read-only and must not be modified.
 - The permanent archive uses one stable source identity with bounded local materialization; see ADR-0007.
@@ -27,17 +28,17 @@
 - A contract change must be explicit and documented.
 - Avoid unrelated refactoring.
 - Keep model preprocessing beside the relevant adapter.
-- Keep Azure scripts outside recognition modules.
+- Do not revive Azure/cloud execution work from historical documents; a future remote-compute path requires a new ADR and newly scoped work.
 
 ## Privacy
 
-Never commit personal photos, face crops, embeddings, biometric datasets, model binaries, credentials, tokens, SAS URLs, private paths or large generated logs.
+Never commit personal photos, face crops, embeddings, biometric datasets, model binaries, credentials, tokens, private paths or large generated logs.
 
 ## Status workflow
 
-Canonical machine/audit status is stored one work item per YAML file under `docs/delivery/status/work-items/`. Non-terminal items live in `active/WI-XXXX.yaml`; `completed` and `cancelled` items live in `archive/WI-XXXX.yaml`. `registry.yaml` contains only schema/status metadata. `PhotoIdentity.Docs` combines active and archived shards for validation, blockers, milestone status and work selection.
+Canonical machine/audit status is stored one work item per YAML file under `docs/delivery/status/work-items/`. Non-terminal items live in `active/WI-XXXX.yaml`; terminal items live in `archive/WI-XXXX.yaml`. `registry.yaml` contains only schema/status metadata. `PhotoIdentity.Docs` combines active and archived shards for validation, blockers, milestone status and work selection.
 
-`docs/delivery/status/work-items.yaml` and `docs/delivery/status/work-items-index.md` are deterministic generated current-work/discovery views. They are not editable sources of truth. Lifecycle commands update only the target canonical shard; completing or cancelling an item moves that shard to the archive automatically.
+`docs/delivery/status/work-items.yaml` and `docs/delivery/status/work-items-index.md` are deterministic generated current-work/discovery views. They are not editable sources of truth. Lifecycle commands update only the target canonical shard; completing an item moves that shard to the archive automatically.
 
 Do not load archive files during normal handoff work. Use `show` when a specific historical item is needed, and use lifecycle commands rather than hand-editing status when the required command is available.
 
@@ -54,10 +55,10 @@ dotnet run --project tools/PhotoIdentity.Docs -- review WI-0005
 - `in_progress` → actively implemented
 - `blocked` → cannot proceed; blockers required
 - `in_review` → implementation complete; verification pending
-- `completed` → acceptance criteria verified with evidence
-- `cancelled` → no longer planned; reason required
+- `completed` → acceptance criteria verified or an explicit administrative closeout is documented with evidence
+- `cancelled` → no longer planned when a supported lifecycle path records the reason
 
-Before work, mark the item `in_progress`. After implementation, add evidence and mark it `in_review`. Mark it `completed` only after required verification passes.
+Before work, mark the item `in_progress`. After implementation, add evidence and mark it `in_review`. Mark it `completed` only after required verification passes or an explicit retirement/supersession decision is documented without claiming unperformed acceptance work.
 
 ## Testing and pull-request validation
 
