@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Worker;
 
@@ -21,6 +22,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
     private readonly IIdentityMatchEvidenceVersionReader _evidence;
     private readonly TimeProvider _timeProvider;
     private readonly ArchiveThroughputMetrics _metrics;
+    private readonly ILogger<IdentityMatchRegenerationHostedService> _logger;
 
     public IdentityMatchRegenerationHostedService(
         IIdentityMatchRegenerationRepository runs,
@@ -29,7 +31,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         IIdentityAutoAssignmentService autoAssignment,
         IIdentityMatchEvidenceVersionReader evidence,
         TimeProvider timeProvider,
-        ArchiveThroughputMetrics metrics)
+        ArchiveThroughputMetrics metrics,
+        ILogger<IdentityMatchRegenerationHostedService>? logger = null)
     {
         _runs = runs;
         _scorer = scorer;
@@ -38,6 +41,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         _evidence = evidence;
         _timeProvider = timeProvider;
         _metrics = metrics;
+        _logger = logger ?? NullLogger<IdentityMatchRegenerationHostedService>.Instance;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -52,6 +56,16 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
                 break;
+            }
+            catch (Exception exception)
+            {
+                // A brief catalogue/service interruption must not escape BackgroundService and
+                // trigger the host's default StopHost behavior. Durable run/target state remains
+                // the authority; retry from that state after the normal idle delay.
+                _logger.LogError(
+                    exception,
+                    "Identity match regeneration failed unexpectedly; retrying without stopping Photo Identity.");
+                worked = false;
             }
 
             await Task.Delay(worked ? ActiveDelay : IdleDelay, stoppingToken);

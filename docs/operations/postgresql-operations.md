@@ -171,9 +171,37 @@ Use `/health` and `./verify-postgres.ps1` to classify failures before changing c
 
 Do not use a destructive volume reset for a production authentication or migration failure. Preserve the cluster and use the latest verified logical backup when a genuine restore is required.
 
+### Unexpected PostgreSQL disconnect during normal operation
+
+If application logs show an existing PostgreSQL socket being forcibly closed and then new connections to `127.0.0.1:5432` being actively refused, preserve the container evidence before restarting components:
+
+```powershell
+Push-Location .\deploy\postgres
+podman compose ps -a
+$container = (podman compose ps -a -q postgres).Trim()
+podman inspect $container --format '{{json .State}}'
+podman inspect $container --format '{{.RestartCount}}'
+podman logs --since 4h $container
+Pop-Location
+```
+
+If `podman compose ps` itself fails with `unable to connect to Podman socket` / `connection actively refused`, the failure is above PostgreSQL: the Podman machine/control plane is unavailable. Capture the local runtime view before recovery:
+
+```powershell
+podman system connection list
+podman machine list
+wsl --list --verbose
+```
+
+Then start the existing Podman machine rather than initializing a new one. Once Podman is reachable again, run `./verify-postgres.ps1` from the repository root; it will bring up the existing Compose service as needed and verify the persisted catalogue path. Only after the machine is reachable can container state, restart count and PostgreSQL logs distinguish whether the database container itself also restarted. The Compose `restart: unless-stopped` policy cannot recover anything while the Podman machine/runtime itself is unavailable.
+
+The Compose service is configured with `restart: unless-stopped`, so a database/container failure may already have recovered by the time the application crash is noticed. Container state, restart count and PostgreSQL logs distinguish a server restart from an application-only fault and can expose shutdown/recovery/fatal-server messages. If the container did not restart and the PostgreSQL log has no interruption, investigate Podman/WSL localhost forwarding next.
+
+Long-lived background workers should treat a brief catalogue interruption as retryable at the worker boundary rather than letting one exception stop the entire API. Archive advancement and automatic place enrichment already follow that rule; WI-0106 extends it to identity-match regeneration after the sustained catch-up run exposed the missing boundary. Retrying the application worker does not replace root-cause investigation when PostgreSQL/Podman interruptions recur.
+
 ## Sustained archive catch-up acceptance
 
-Backup/restore and container restart acceptance are complete enough to proceed with the next WI-0106 phase. Resume the real archive through **Advance archive** and let it operate long enough to expose degradation rather than only completing a short smoke test. The pending PC-restart observation can be completed before final closeout and does not require delaying catch-up.
+Backup/restore and container restart acceptance are complete enough to exercise the next WI-0106 phase, but sustained catch-up is not yet accepted. The first PostgreSQL-backed run made healthy progress; a later longer run then hit the unexpected PostgreSQL disconnect described above and the API stopped because identity-match regeneration lacked a worker-level retry boundary. Diagnose the service interruption, merge the resilience correction, then rerun **Advance archive** long enough to prove continued progress across the same operational window.
 
 Use these privacy-safe operational endpoints while the run is active:
 
