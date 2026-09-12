@@ -44,7 +44,7 @@ The maintainer completed the first production operations acceptance pass from me
 - With Photo Identity stopped, `backup-postgres-catalogue.ps1 -DatabaseName ...` created `photoidentity-postgresql-20260912-015606.dump` with SHA-256 `9b15dde0bfa4521d62a549850aca8f68c06d9c5db59846c51676e9970c7fdf1f`.
 - `verify-postgres-backup-restore.ps1 -ApplicationStopped` restored that exact dump into isolated database `photoidentity_restore_20260911235701_ede110` and passed the schema-version, complete public-table set, exact row-count and validated-constraint comparisons against the stopped source.
 - The maintainer reviewed the successful result and removed only the isolated verification database, leaving the production catalogue and verified backup intact.
-- With Photo Identity still stopped, the PostgreSQL Compose service was stopped and started again. `verify-postgres.ps1 -SkipContainerStart` succeeded and normal Photo Identity use remained healthy afterward, proving the named-volume catalogue survives container/service restart. An actual Windows/PC restart remains to be observed before the combined restart criterion is marked complete.
+- With Photo Identity still stopped, the PostgreSQL Compose service was stopped and started again. `verify-postgres.ps1 -SkipContainerStart` succeeded and normal Photo Identity use remained healthy afterward, proving the named-volume catalogue survives container/service restart.
 
 The first real catch-up pass then replaced the stale pre-cutover advancement state (`blocked` with `SQLite Error 6: 'database table is locked'.`) with active PostgreSQL-backed synchronization and processing:
 
@@ -77,13 +77,27 @@ The maintainer then exercised a real daily-style increment from reset diagnostic
 
 This completes the daily-style increment criterion: the seven-photo increment synchronized, analyzed, enriched and surfaced for review without full-catalogue regeneration.
 
-An actual Windows/PC restart and final production-authority/SQLite-retirement decision remain before WI-0106/M24 closeout.
+## Final restart and production-authority acceptance (2026-09-12)
+
+The maintainer then performed an actual Windows/PC restart with Photo Identity stopped. After Windows returned:
+
+- `podman machine list` showed the existing `podman-machine-default` WSL machine running; no new machine or volume was created.
+- `verify-postgres.ps1` started the retained PostgreSQL Compose container from the existing persistent volume, passed authenticated in-container access and Windows-localhost PostgreSQL protocol checks, built the Release solution with zero warnings/errors, passed all 29 PostgreSQL persistence tests, and passed all 7 PostgreSQL runtime/composition integration tests.
+- `Start-PhotoIdentity.ps1 -ConfigurationPath "$env:LOCALAPPDATA\PhotoIdentity\launcher.json"` started the normal installed application and reported `Catalogue provider: postgresql`.
+- `/health` reported `status: ok`, schema version 23, `catalogueProvider: postgresql`, and PostgreSQL `status: ready`.
+- `/api/archive/status` preserved the accepted steady state after reboot: `currentImages=16,449`, `analysedImages=16,449`, `pendingImages=0`, `failedImages=0`, `unverifiedSourceImages=0`.
+- `podman compose ps` showed the existing PostgreSQL 18 service running and published at `0.0.0.0:5432`.
+- The maintainer verified representative Smart Collection, Review and Archive state remained intact after the reboot.
+
+This completes the combined container/PC persistence criterion and demonstrates that normal operator startup provides an understandable PostgreSQL readiness path. PostgreSQL is accepted as the sole writable production catalogue after migration, backup/restore verification, sustained catch-up, daily-style operation and real-PC restart persistence.
+
+The preserved pre-cutover SQLite snapshot has therefore completed its M24 stabilization/rollback role and may be retired from the active rollback requirement. This closeout does **not** delete or modify that file; it may still be retained as an offline historical migration artifact or removed later under the maintainer's normal backup/data-retention policy.
 
 ## Acceptance criteria
-- [ ] Normal operator startup makes PostgreSQL readiness/failure understandable.
-- [ ] Persistent catalogue data survives container and PC restart. (Container/service restart accepted 2026-09-12; PC restart still pending.)
+- [x] Normal operator startup makes PostgreSQL readiness/failure understandable. (Accepted after the real-PC restart: normal `verify-postgres.ps1` plus launcher startup restored a healthy PostgreSQL-selected runtime with clear verification output.)
+- [x] Persistent catalogue data survives container and PC restart. (Container/service restart and an actual Windows restart both preserved the accepted production state.)
 - [x] Backup plus restore into an isolated PostgreSQL database is successfully verified.
 - [x] Full-archive catch-up can run for an extended period without the prior SQLite lock/host-shutdown failure. (Accepted 2026-09-12 after PR #309: the 452-image remaining backlog reached zero over an approximately 57-minute run with PostgreSQL ready and zero failed images.)
 - [x] Progress/failure metrics are sufficient to diagnose stalls without verbose per-photo tracing.
 - [x] A small daily-style increment can be synchronized, analyzed, enriched and reviewed after the catch-up workflow. (Accepted 2026-09-12: seven new images produced seven successful analysis jobs, seven enrichment assignments and Review-visible faces without reprocessing the existing archive.)
-- [ ] Maintainer accepts PostgreSQL as the production catalogue and the preserved SQLite rollback snapshot can be retired according to documented policy.
+- [x] Maintainer accepts PostgreSQL as the production catalogue and the preserved SQLite rollback snapshot can be retired according to documented policy. (PostgreSQL remains the sole writable authority; the pre-cutover SQLite snapshot is no longer required for active rollback and is left physically untouched by this closeout.)
