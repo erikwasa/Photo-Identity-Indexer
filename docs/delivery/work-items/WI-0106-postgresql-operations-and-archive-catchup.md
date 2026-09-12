@@ -60,7 +60,8 @@ This closes the diagnostics-observability criterion, but the subsequent longer r
 - PostgreSQL connectivity first failed with a forcibly closed socket and then `127.0.0.1:5432` actively refused new connections.
 - `ArchiveAdvancementHostedService` caught its failure and attempted to persist a blocked recovery state; that persistence also failed while PostgreSQL was unavailable, but the archive worker was designed to continue retrying.
 - `IdentityMatchRegenerationHostedService` did not have the equivalent outer unexpected-failure boundary. Its repository open failure escaped `ExecuteAsync`, and the default .NET `BackgroundServiceExceptionBehavior=StopHost` stopped the entire Photo Identity API.
-- The corrective slice adds the same retry-without-host-shutdown behavior already used by other long-lived workers and a regression test proving a transient repository failure does not fault the hosted service. This protects the application from a brief catalogue interruption, but it does not by itself explain why the PostgreSQL/Podman endpoint disappeared; container/service diagnostics must still be reviewed and the long catch-up rerun.
+- Follow-up host diagnostics then showed the failure was above PostgreSQL: both `podman system connection` endpoints pointed at `127.0.0.1:60828`, that control socket actively refused connections, `podman-machine-default` was stopped, and `wsl --list --verbose` showed the Podman machine plus all other WSL distributions stopped. PostgreSQL therefore became unavailable because the Podman/WSL runtime disappeared underneath it; Compose `restart: unless-stopped` cannot recover a container while the container runtime itself is down.
+- The corrective slice adds the same retry-without-host-shutdown behavior already used by other long-lived workers and a regression test proving a transient repository failure does not fault the hosted service. This protects the application from a brief catalogue interruption, but it does not by itself explain why the Podman/WSL machine stopped. The existing machine must be started and the persisted PostgreSQL catalogue re-verified before catch-up is rerun.
 
 After catch-up is stable, a small real daily-style source increment must still prove synchronization, analysis, enrichment and review without unnecessary full regeneration.
 
@@ -68,7 +69,7 @@ After catch-up is stable, a small real daily-style source increment must still p
 - [ ] Normal operator startup makes PostgreSQL readiness/failure understandable.
 - [ ] Persistent catalogue data survives container and PC restart. (Container/service restart accepted 2026-09-12; PC restart still pending.)
 - [x] Backup plus restore into an isolated PostgreSQL database is successfully verified.
-- [ ] Full-archive catch-up can run for an extended period without the prior SQLite lock/host-shutdown failure. (Initial PostgreSQL progress was healthy; a later PostgreSQL endpoint interruption exposed a fatal worker-resilience gap. Corrective retry behavior and root-cause diagnostics are pending retest.)
+- [ ] Full-archive catch-up can run for an extended period without the prior SQLite lock/host-shutdown failure. (Initial PostgreSQL progress was healthy; a later Podman/WSL runtime stop removed PostgreSQL availability and exposed a fatal worker-resilience gap. Corrective retry behavior and runtime recovery are pending retest.)
 - [x] Progress/failure metrics are sufficient to diagnose stalls without verbose per-photo tracing.
 - [ ] A small daily-style increment can be synchronized, analyzed, enriched and reviewed after the catch-up workflow.
 - [ ] Maintainer accepts PostgreSQL as the production catalogue and the preserved SQLite rollback snapshot can be retired according to documented policy.
