@@ -21,3 +21,8 @@ public sealed record SlideshowOriginalPreparationResponse(
     long AvailableManagedCapacity,
     string? Message,
     bool CanContinueWithAvailable);
+
+public sealed record SlideshowOriginalRevalidationResponse(
+    bool Reusable,
+    int Ready,
+    int Total);
