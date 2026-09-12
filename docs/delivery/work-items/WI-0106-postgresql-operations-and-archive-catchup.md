@@ -46,13 +46,24 @@ The maintainer completed the first production operations acceptance pass from me
 - The maintainer reviewed the successful result and removed only the isolated verification database, leaving the production catalogue and verified backup intact.
 - With Photo Identity still stopped, the PostgreSQL Compose service was stopped and started again. `verify-postgres.ps1 -SkipContainerStart` succeeded and normal Photo Identity use remained healthy afterward, proving the named-volume catalogue survives container/service restart. An actual Windows/PC restart remains to be observed before the combined restart criterion is marked complete.
 
-The next acceptance phase is sustained real-archive catch-up using the existing aggregate health/archive/throughput diagnostics. The old SQLite comparative benchmark is not part of this acceptance. After catch-up is stable, a small real daily-style source increment must still prove synchronization, analysis, enrichment and review without unnecessary full regeneration.
+The first real catch-up pass then replaced the stale pre-cutover advancement state (`blocked` with `SQLite Error 6: 'database table is locked'.`) with active PostgreSQL-backed synchronization and processing:
+
+- `/health` remained `status: ok`, `catalogueProvider: postgresql`, PostgreSQL `status: ready`, schema version 23 throughout the captured run.
+- Initial synchronization discovered 304 additional source images, taking `currentImages` from 16,138 to 16,442 and `unverifiedSourceImages` from 408 to 712 before analysis resumed.
+- During active catch-up, `analysedImages` advanced from 15,730 to 15,792 (+62), while the post-sync unverified backlog dropped from 712 to 649 (-63). `failedImages` remained 0 and the final snapshot had only one pending image.
+- Advancement progressed through `syncing` into `running`, and successive single-job analysis runs completed successfully.
+- Managed hydration remained bounded: one transient hydration was observed, then `hydrationsInProgress` returned to 0 with managed hydrated bytes back at 39,055,576 and no managed download in progress at the final snapshot.
+- Aggregate diagnostics were sufficient to understand the run without per-photo tracing. By the final snapshot they recorded 64 analysis attempts, analysis-result persistence averaging about 3.94 ms, source hashing averaging about 7.48 ms, bounded per-subject hash-read counts, and one 20.28 s analysis-session initialization cost rather than progressive database degradation.
+
+This is strong early sustained-catch-up evidence and closes the diagnostics-observability criterion. The separate extended-duration catch-up criterion remains open until a longer run (or completion of the remaining backlog) demonstrates that progress continues without lock/host-shutdown failure.
+
+After catch-up is stable, a small real daily-style source increment must still prove synchronization, analysis, enrichment and review without unnecessary full regeneration.
 
 ## Acceptance criteria
 - [ ] Normal operator startup makes PostgreSQL readiness/failure understandable.
 - [ ] Persistent catalogue data survives container and PC restart. (Container/service restart accepted 2026-09-12; PC restart still pending.)
 - [x] Backup plus restore into an isolated PostgreSQL database is successfully verified.
-- [ ] Full-archive catch-up can run for an extended period without the prior SQLite lock/host-shutdown failure.
-- [ ] Progress/failure metrics are sufficient to diagnose stalls without verbose per-photo tracing.
+- [ ] Full-archive catch-up can run for an extended period without the prior SQLite lock/host-shutdown failure. (Initial PostgreSQL catch-up is healthy and advancing; longer-run evidence still pending.)
+- [x] Progress/failure metrics are sufficient to diagnose stalls without verbose per-photo tracing.
 - [ ] A small daily-style increment can be synchronized, analyzed, enriched and reviewed after the catch-up workflow.
 - [ ] Maintainer accepts PostgreSQL as the production catalogue and the preserved SQLite rollback snapshot can be retired according to documented policy.
