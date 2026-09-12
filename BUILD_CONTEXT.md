@@ -16,6 +16,8 @@ The first PostgreSQL catch-up pass proved forward progress and aggregate diagnos
 
 After #309 merged, the maintainer recovered the existing Podman machine and Compose service, reran `verify-postgres.ps1`, started Photo Identity normally, and completed a fresh sustained catch-up run. From a reset baseline of 452 unverified images (`15,990 / 16,442` analysed), the approximately 57-minute run reached `16,442 / 16,442` analysed with `unverifiedSourceImages=0`, `pendingImages=0`, `failedImages=0` and PostgreSQL continuously `ready`. Diagnostics recorded exactly 452 analysis attempts, bounded hash reads and low single-digit-millisecond result persistence. Hydration returned to zero in progress. The sustained full-archive catch-up criterion is accepted.
 
+A subsequent daily-style increment added seven real source images without full regeneration. The catalogue moved from `16,442 / 16,442` to `16,449 / 16,449` current/analysed images, with zero unverified, pending or failed images. The latest analysis run contained exactly seven jobs and diagnostics recorded exactly seven analysis attempts, so the already-complete archive was not unnecessarily reprocessed. Six face-review derivative revisions were generated, generation-2 place enrichment reported seven candidates and seven assignments, and the maintainer confirmed the new faces are visible in the normal Review experience. Hydration returned to zero in progress and PostgreSQL remained ready. The complete daily-style synchronization/analysis/enrichment/review criterion is accepted.
+
 The no-argument backup database resolver is not a blocker for M24 acceptance. On this maintainer installation the private launcher environment value has a wrapper shape that does not expose the database name to the generic parser reliably, so the accepted operational path uses explicit `-DatabaseName` after identifying the active authority from server activity. Do not continue connection-string unwrapping work unless it becomes a separate maintainability goal.
 
 Consolidated real-phone M22 acceptance still has two separate functional gaps tracked by WI-0107: direct originating-gesture fullscreen launch and durable/revalidated prepared-original receipt state. Do not mix those functional corrections into M24 WI-0106.
@@ -26,11 +28,9 @@ A separate Collections / Library navigation gap remains outside this M24 thread.
 
 For the M24 thread:
 
-1. Add a **small real daily-style source increment** (for example a few newly synced phone/OneDrive photos) without regenerating the full archive.
-2. Run the normal synchronization/Advance archive path and verify the new items are discovered, analysed, enriched where applicable, and available for review while the already-complete archive is not unnecessarily reprocessed.
-3. Capture `/health`, `/api/archive/status`, `/api/archive/storage` and `/api/archive/diagnostics/throughput` before/after the increment as acceptance evidence.
-4. Before WI-0106 closeout, perform one actual Windows/PC restart and repeat PostgreSQL/launcher health plus representative catalogue checks to finish the combined restart criterion.
-5. Reconcile the remaining WI-0106 acceptance evidence, decide when the preserved pre-cutover SQLite rollback snapshot can be retired under policy, and close M24 only after all operational exit criteria pass.
+1. Perform one actual Windows/PC restart. After Windows returns, start the existing Podman machine/Compose service through the normal supported path, run `verify-postgres.ps1`, start Photo Identity, verify `/health`, and inspect representative Archive/Smart Collection/Review state.
+2. If restart persistence passes, reconcile the remaining WI-0106 acceptance evidence and decide when the preserved pre-cutover SQLite rollback snapshot can be retired under policy.
+3. Close WI-0106/M24 only after the restart and final production-authority/rollback-snapshot acceptance are recorded.
 
 ## Relevant files
 

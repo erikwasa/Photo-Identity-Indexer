@@ -63,7 +63,21 @@ After PR #309 merged, the maintainer restarted the existing Podman machine and C
 - The approximately 57-minute run recorded 452 analysis attempts, matching the 452-image baseline backlog. Analysis-result persistence averaged about 5.21 ms and analysis source hashing about 10.03 ms. Analysis, original-open and source-verification hash reads were each exactly one per subject; original-status reads stayed bounded at two per subject.
 - Hydration did not accumulate: the final snapshot had `hydrationsInProgress=0`, `managedDownloadingBytes=0`, and managed hydrated bytes returned to 39,055,576. The final advancement state was `waiting` only for a OneDrive-managed download/release transition after the analysis backlog had already reached zero.
 
-This accepts the sustained full-archive catch-up criterion. The next acceptance gate is a small real daily-style source increment proving normal synchronization, analysis, enrichment and review without full regeneration. An actual Windows/PC restart and final production-authority/SQLite-retirement decision also remain before WI-0106/M24 closeout.
+This accepts the sustained full-archive catch-up criterion.
+
+The maintainer then exercised a real daily-style increment from reset diagnostics generation 2 without full regeneration:
+
+- Baseline was the fully caught-up catalogue: `currentImages=16,442`, `analysedImages=16,442`, `unverifiedSourceImages=0`, `pendingImages=0`, `failedImages=0`, with advancement explicitly paused and PostgreSQL `ready` at schema 23.
+- Seven newly synced source images were discovered. Final totals were `currentImages=16,449` and `analysedImages=16,449`, with `unverifiedSourceImages=0`, `pendingImages=0`, `failedImages=0`.
+- The latest analysis run contained exactly seven jobs and completed with seven succeeded, zero failed and zero cancelled jobs. Aggregate diagnostics also recorded exactly seven analysis attempts, demonstrating that the already-complete 16,442-image catalogue was not unnecessarily reprocessed.
+- Analysis result persistence averaged about 3.57 ms and source hashing about 1.50 ms. Analysis/original-open/synchronization hash reads were each one per new subject; original-status stayed bounded at two reads per subject.
+- Six face-review derivative revisions were generated, hydration ended with zero in progress and zero managed downloading bytes, and PostgreSQL remained `ready`.
+- Generation-2 enrichment counters recorded seven candidates and seven assignments across the normal background enrichment cycle, proving that all seven new photos flowed through automatic place enrichment.
+- The maintainer confirmed the new faces are available through the normal Review experience.
+
+This completes the daily-style increment criterion: the seven-photo increment synchronized, analyzed, enriched and surfaced for review without full-catalogue regeneration.
+
+An actual Windows/PC restart and final production-authority/SQLite-retirement decision remain before WI-0106/M24 closeout.
 
 ## Acceptance criteria
 - [ ] Normal operator startup makes PostgreSQL readiness/failure understandable.
@@ -71,5 +85,5 @@ This accepts the sustained full-archive catch-up criterion. The next acceptance 
 - [x] Backup plus restore into an isolated PostgreSQL database is successfully verified.
 - [x] Full-archive catch-up can run for an extended period without the prior SQLite lock/host-shutdown failure. (Accepted 2026-09-12 after PR #309: the 452-image remaining backlog reached zero over an approximately 57-minute run with PostgreSQL ready and zero failed images.)
 - [x] Progress/failure metrics are sufficient to diagnose stalls without verbose per-photo tracing.
-- [ ] A small daily-style increment can be synchronized, analyzed, enriched and reviewed after the catch-up workflow.
+- [x] A small daily-style increment can be synchronized, analyzed, enriched and reviewed after the catch-up workflow. (Accepted 2026-09-12: seven new images produced seven successful analysis jobs, seven enrichment assignments and Review-visible faces without reprocessing the existing archive.)
 - [ ] Maintainer accepts PostgreSQL as the production catalogue and the preserved SQLite rollback snapshot can be retired according to documented policy.
