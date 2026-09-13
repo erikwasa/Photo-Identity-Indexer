@@ -4,32 +4,27 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M00 Repository and architecture and M22 Protected Smart Collection slideshow are completed.**
+**M25 Face discovery and cluster-assisted identity review is active.**
 
-The 2026-09-13 M00 closeout reconciles two stale maintenance records with repository state:
+WI-0110 is implementing the first low-risk discovery slice: start from one review face, find the nearest eligible faces under one exact embedding revision, and reuse existing audited bulk-review semantics without changing canonical identity thresholds or introducing persistent clusters.
 
-- WI-0070 is complete. The current PR gate has timing evidence, two isolated required integration shards, shared generic API-host isolation, `PublishedMinimum` PR review smoke, comprehensive `main` review verification, path-aware launcher/package PR checks and comprehensive deployment verification on `main`.
-- WI-0071 is complete. PR #193 / workflow #1196 restored the final quarantined API integration test; `.github/flaky-integration-tests.txt` now has no active entries, and generic endpoint tests inherit the worker-disabled compatibility host by default without retries.
-
-M22 remains completed and accepted after PRs #314-#316. M23 remains intentionally deferred. The production execution strategy remains local under ADR-0010.
+The production execution strategy remains local under ADR-0010, PostgreSQL remains the sole writable production catalogue, M23 remains intentionally deferred, and WI-0081 remains the separate quality investigation that gates any later expansion of automatic identity assignment.
 
 ## Next concrete step
 
-After the M00 closeout PR merges, the only non-terminal work is M21 WI-0081 and the intentionally deferred M23 source-copy lifecycle/privacy work. The recommended next substantive task is WI-0081: measure the reported identity-suggestion accuracy degradation before changing ranking, thresholds, reference selection or models.
+Finish PR #319 verification for WI-0110. After automated CI is green, perform representative Windows/mobile-browser verification against the real catalogue: open an eligible face, use `Find similar faces`, confirm deterministic similarity ordering and practical latency, toggle Unknown rediscovery, select a subset with exceptions, and bulk-assign that subset. Record verification evidence before completing WI-0110.
 
 ## Relevant files
 
-- docs/delivery/milestones/M00-repository.md
-- docs/delivery/work-items/WI-0070-pr-validation-streamlining.md
-- docs/delivery/work-items/WI-0071-stabilize-quarantined-integration-tests.md
-- docs/delivery/status/work-items/archive/WI-0070.yaml
-- docs/delivery/status/work-items/archive/WI-0071.yaml
-- docs/delivery/status/milestones.yaml
-- docs/delivery/status/work-items-index.md
-- .github/workflows/build.yml
-- .github/flaky-integration-tests.txt
-- tests/PhotoIdentity.Integration.Tests/PhotoIdentityApiTestFactory.cs
-- docs/delivery/work-items/WI-0081-suggestion-accuracy-degradation.md
+- docs/delivery/milestones/M25-face-discovery-and-cluster-assisted-review.md
+- docs/delivery/work-items/WI-0110-similar-face-explorer.md
+- docs/delivery/status/work-items/active/WI-0110.yaml
+- src/PhotoIdentity.Core/Review/ISimilarFaceRepository.cs
+- src/PhotoIdentity.Persistence.Postgres/PostgresSimilarFaceRepository.cs
+- src/PhotoIdentity.Api/SimilarFaceEndpoints.cs
+- src/PhotoIdentity.Web/Pages/SimilarFaces.razor
+- tests/PhotoIdentity.Persistence.Tests/PostgresSimilarFaceRepositoryTests.cs
+- tests/PhotoIdentity.Integration.Tests/SimilarFaceApplicationTests.cs
 
 ## Repository validation
 
