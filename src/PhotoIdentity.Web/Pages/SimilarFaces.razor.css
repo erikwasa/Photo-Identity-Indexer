@@ -74,6 +74,75 @@
     font-size: 1rem;
 }
 
+.bulk-action-bar {
+    position: fixed;
+    left: 50%;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    z-index: 40;
+    transform: translateX(-50%);
+    display: grid;
+    width: min(92rem, calc(100% - 2rem));
+    grid-template-columns: minmax(10rem, auto) minmax(12rem, 1fr) repeat(4, auto);
+    align-items: end;
+    gap: 0.65rem;
+    padding: 0.8rem;
+    background: rgba(255, 253, 248, 0.98);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: 0 20px 55px rgba(23, 38, 41, 0.24);
+    backdrop-filter: blur(18px);
+}
+
+.bulk-action-bar > * {
+    min-width: 0;
+}
+
+.bulk-action-summary {
+    align-self: center;
+    min-width: 10rem;
+}
+
+.bulk-action-summary strong,
+.bulk-action-summary span {
+    display: block;
+}
+
+.bulk-action-summary span {
+    margin-top: 0.15rem;
+    color: var(--muted);
+    font-size: 0.78rem;
+}
+
+.bulk-action-bar .button {
+    white-space: nowrap;
+}
+
+.bulk-action-spacer {
+    height: 7.5rem;
+}
+
+@media (max-width: 960px) {
+    .bulk-action-bar {
+        max-height: min(70vh, 32rem);
+        grid-template-columns: 1fr 1fr;
+        overflow-y: auto;
+    }
+
+    .bulk-action-summary,
+    .bulk-action-bar > div:nth-child(2) {
+        grid-column: 1 / -1;
+    }
+
+    .bulk-action-bar .button {
+        width: 100%;
+        white-space: normal;
+    }
+
+    .bulk-action-spacer {
+        height: 12rem;
+    }
+}
+
 @media (max-width: 760px) {
     .similar-source-panel,
     .similar-person-panel {
@@ -82,5 +151,16 @@
 
     .similar-source-image {
         width: min(14rem, 100%);
+    }
+}
+
+@media (max-width: 680px) {
+    .bulk-action-bar {
+        grid-template-columns: 1fr;
+    }
+
+    .bulk-action-summary,
+    .bulk-action-bar > div:nth-child(2) {
+        grid-column: auto;
     }
 }

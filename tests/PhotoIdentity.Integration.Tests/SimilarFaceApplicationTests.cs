@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
+using PhotoIdentity.Web;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
@@ -71,7 +72,10 @@ public sealed class SimilarFaceApplicationTests
             Assert.Equal(20, fake.Limit);
 
             PersonId personId = PersonId.New();
-            string[] selectedSubset = [response.Items[0].Face.Id];
+            string[] selectedSubset = SimilarFaceBulkSelection.BuildFaceIds(
+                [response.Items[0].Face.Id],
+                SimilarFaceBulkSelection.AssignAction,
+                CreateResponse(sourceFaceId, CatalogueReviewStates.Unreviewed));
             using HttpResponseMessage previewMessage = await client.PostAsJsonAsync(
                 "/api/review/bulk/preview",
                 new BulkReviewPreviewRequest(selectedSubset, BulkReviewActionKinds.Assign, personId.ToString()));
@@ -92,8 +96,9 @@ public sealed class SimilarFaceApplicationTests
             await commitMessage.EnsureSuccessWithDiagnosticBodyAsync("bulk commit from similar-face result");
             BulkReviewCommitResponse committed = Assert.IsType<BulkReviewCommitResponse>(
                 await commitMessage.Content.ReadFromJsonAsync<BulkReviewCommitResponse>());
-            Assert.Equal(1, committed.AffectedCount);
-            Assert.Equal([firstFaceId], bulk.CommittedFaceIds);
+            Assert.Equal(2, committed.AffectedCount);
+            Assert.Contains(firstFaceId, bulk.CommittedFaceIds);
+            Assert.Contains(sourceFaceId, bulk.CommittedFaceIds);
             Assert.DoesNotContain(unknownFaceId, bulk.CommittedFaceIds);
 
             using HttpResponseMessage invalid = await client.GetAsync(
@@ -133,6 +138,16 @@ public sealed class SimilarFaceApplicationTests
         ActiveActionId: state == CatalogueReviewStates.Unknown ? 1 : null,
         RevisionId: AssetRevisionId.New(),
         BoundingBoxJson: "[0.1,0.1,0.5,0.5]");
+
+    private static ReviewFaceResponse CreateResponse(FaceOccurrenceId id, string state) => new(
+        id.ToString(),
+        $"/api/review/faces/{id}/image",
+        "source.jpg",
+        FaceOrdinal: 0,
+        Confidence: 0.95,
+        State: state,
+        Person: null,
+        CreatedAtUtc: new DateTimeOffset(2026, 9, 13, 12, 0, 0, TimeSpan.Zero));
 
     private sealed class FakeSimilarFaceRepository : ISimilarFaceRepository
     {
