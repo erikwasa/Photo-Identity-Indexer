@@ -1,0 +1,11 @@
+id: WI-0117
+title: Evaluate multi-evidence automatic identity assignment
+milestone: M25
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0117-multi-evidence-auto-assignment-evaluation.md
+blockers:
+- WI-0081
+- WI-0116
+blocker_notes: []
+evidence: []

@@ -1,0 +1,10 @@
+id: WI-0113
+title: Define provisional face clusters and evaluate clustering algorithms
+milestone: M25
+status: ready
+owner: unassigned
+document: ../work-items/WI-0113-provisional-cluster-model-and-algorithm-evaluation.md
+blockers:
+- WI-0103
+blocker_notes: []
+evidence: []

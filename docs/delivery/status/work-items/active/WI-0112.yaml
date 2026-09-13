@@ -1,0 +1,11 @@
+id: WI-0112
+title: Add suggested-person grouped review workspace
+milestone: M25
+status: ready
+owner: unassigned
+document: ../work-items/WI-0112-suggested-person-review-workspace.md
+blockers:
+- WI-0043
+- WI-0060
+blocker_notes: []
+evidence: []

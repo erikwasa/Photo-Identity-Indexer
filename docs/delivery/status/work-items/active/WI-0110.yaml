@@ -1,0 +1,11 @@
+id: WI-0110
+title: Add similar-face explorer for immediate identity discovery
+milestone: M25
+status: ready
+owner: unassigned
+document: ../work-items/WI-0110-similar-face-explorer.md
+blockers:
+- WI-0060
+- WI-0103
+blocker_notes: []
+evidence: []

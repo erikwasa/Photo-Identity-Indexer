@@ -1,0 +1,11 @@
+id: WI-0115
+title: Add cluster-based People-to-identify review workspace
+milestone: M25
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0115-cluster-discovery-review-workspace.md
+blockers:
+- WI-0114
+- WI-0060
+blocker_notes: []
+evidence: []

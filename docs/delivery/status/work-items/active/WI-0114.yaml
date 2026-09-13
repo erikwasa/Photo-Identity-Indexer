@@ -1,0 +1,10 @@
+id: WI-0114
+title: Implement scalable incremental provisional face clustering
+milestone: M25
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0114-scalable-incremental-face-clustering.md
+blockers:
+- WI-0113
+blocker_notes: []
+evidence: []

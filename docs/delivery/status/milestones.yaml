@@ -233,3 +233,16 @@ milestones:
   - WI-0105
   - WI-0106
   - WI-0108
+- id: M25
+  title: Face discovery and cluster-assisted identity review
+  status: ready
+  document: ../milestones/M25-face-discovery-and-cluster-assisted-review.md
+  work_items:
+  - WI-0110
+  - WI-0111
+  - WI-0112
+  - WI-0113
+  - WI-0114
+  - WI-0115
+  - WI-0116
+  - WI-0117

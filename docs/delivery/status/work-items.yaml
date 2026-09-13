@@ -76,3 +76,89 @@ work_items:
   - WI-0090
   blocker_notes: []
   evidence: []
+- id: WI-0110
+  title: Add similar-face explorer for immediate identity discovery
+  milestone: M25
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0110-similar-face-explorer.md
+  blockers:
+  - WI-0060
+  - WI-0103
+  blocker_notes: []
+  evidence: []
+- id: WI-0111
+  title: Coalesce identity changes into bounded follow-up regeneration
+  milestone: M25
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0111-event-driven-match-regeneration.md
+  blockers:
+  - WI-0045
+  - WI-0103
+  blocker_notes: []
+  evidence: []
+- id: WI-0112
+  title: Add suggested-person grouped review workspace
+  milestone: M25
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0112-suggested-person-review-workspace.md
+  blockers:
+  - WI-0043
+  - WI-0060
+  blocker_notes: []
+  evidence: []
+- id: WI-0113
+  title: Define provisional face clusters and evaluate clustering algorithms
+  milestone: M25
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0113-provisional-cluster-model-and-algorithm-evaluation.md
+  blockers:
+  - WI-0103
+  blocker_notes: []
+  evidence: []
+- id: WI-0114
+  title: Implement scalable incremental provisional face clustering
+  milestone: M25
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0114-scalable-incremental-face-clustering.md
+  blockers:
+  - WI-0113
+  blocker_notes: []
+  evidence: []
+- id: WI-0115
+  title: Add cluster-based People-to-identify review workspace
+  milestone: M25
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0115-cluster-discovery-review-workspace.md
+  blockers:
+  - WI-0114
+  - WI-0060
+  blocker_notes: []
+  evidence: []
+- id: WI-0116
+  title: Add cluster-assisted known-person advisory evidence
+  milestone: M25
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0116-cluster-assisted-known-person-evidence.md
+  blockers:
+  - WI-0114
+  - WI-0043
+  blocker_notes: []
+  evidence: []
+- id: WI-0117
+  title: Evaluate multi-evidence automatic identity assignment
+  milestone: M25
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0117-multi-evidence-auto-assignment-evaluation.md
+  blockers:
+  - WI-0081
+  - WI-0116
+  blocker_notes: []
+  evidence: []
