@@ -12,7 +12,7 @@ Current work items: **14**. Archived terminal items: **102**.
 | [WI-0089](../work-items/WI-0089-source-copy-exclusion-boundary.md) Add durable source-copy exclusion and access enforcement | M23 | ready | unassigned | [YAML](work-items/active/WI-0089.yaml) |
 | [WI-0090](../work-items/WI-0090-exclusion-purge-service.md) Purge excluded photo data and derivatives safely | M23 | proposed | unassigned | [YAML](work-items/active/WI-0090.yaml) |
 | [WI-0091](../work-items/WI-0091-archive-lifecycle-review.md) Add archive lifecycle review and exclusion workflows | M23 | proposed | unassigned | [YAML](work-items/active/WI-0091.yaml) |
-| [WI-0110](../work-items/WI-0110-similar-face-explorer.md) Add similar-face explorer for immediate identity discovery | M25 | ready | unassigned | [YAML](work-items/active/WI-0110.yaml) |
+| [WI-0110](../work-items/WI-0110-similar-face-explorer.md) Add similar-face explorer for immediate identity discovery | M25 | in_progress | ai-agent | [YAML](work-items/active/WI-0110.yaml) |
 | [WI-0111](../work-items/WI-0111-event-driven-match-regeneration.md) Coalesce identity changes into bounded follow-up regeneration | M25 | ready | unassigned | [YAML](work-items/active/WI-0111.yaml) |
 | [WI-0112](../work-items/WI-0112-suggested-person-review-workspace.md) Add suggested-person grouped review workspace | M25 | ready | unassigned | [YAML](work-items/active/WI-0112.yaml) |
 | [WI-0113](../work-items/WI-0113-provisional-cluster-model-and-algorithm-evaluation.md) Define provisional face clusters and evaluate clustering algorithms | M25 | ready | unassigned | [YAML](work-items/active/WI-0113.yaml) |
