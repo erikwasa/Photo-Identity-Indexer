@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
