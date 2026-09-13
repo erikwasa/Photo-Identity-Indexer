@@ -31,6 +31,7 @@ public static class ProvisionalFaceClusterPolicies
 
 public sealed record ProvisionalFaceClusterEvidenceVersion(
     long ReviewActionId,
+    long ReviewMutationVersion,
     long EmbeddingId);
 
 public sealed record ProvisionalFaceClusterRun(
