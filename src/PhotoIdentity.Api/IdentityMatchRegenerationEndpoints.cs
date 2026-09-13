@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
@@ -32,6 +33,7 @@ public static class IdentityMatchRegenerationEndpoints
         IIdentityMatchRegenerationRepository repository,
         IIdentitySuggestionPolicyRepository policyRepository,
         IIdentityMatchEvidenceVersionReader evidenceReader,
+        IConfiguration configuration,
         string? modelId,
         string? modelHash,
         CancellationToken cancellationToken)
@@ -49,6 +51,14 @@ public static class IdentityMatchRegenerationEndpoints
             parsedModelId,
             parsedModelHash,
             cancellationToken);
+        ReviewIdentityMatchEvidenceVersion currentEvidence = await evidenceReader.ReadAsync(
+            parsedModelId,
+            parsedModelHash,
+            cancellationToken);
+        IdentityMatchFollowUpConfiguration followUp =
+            IdentityMatchFollowUpConfiguration.FromConfiguration(configuration);
+        FollowUpSummary followUpSummary = SummarizeFollowUp(run, currentEvidence, followUp);
+
         if (run is null)
         {
             return Results.Ok(new
@@ -70,26 +80,21 @@ public static class IdentityMatchRegenerationEndpoints
                 CompletedAtUtc = (DateTimeOffset?)null,
                 UpdatedAtUtc = (DateTimeOffset?)null,
                 Error = (string?)null,
+                AutomaticFollowUpEnabled = followUp.Enabled,
+                AutomaticFollowUpStatus = followUpSummary.Status,
+                AutomaticFollowUpQueuedAfterActiveRun = followUpSummary.QueuedAfterActiveRun,
+                AutomaticFollowUpDelayMilliseconds = (int)followUp.CoalesceDelay.TotalMilliseconds,
             });
         }
 
-        ReviewIdentityMatchEvidenceVersion currentEvidence = await evidenceReader.ReadAsync(
-            parsedModelId,
-            parsedModelHash,
-            cancellationToken);
-        ReviewIdentityMatchEvidenceVersion expectedEvidence =
-            string.Equals(run.Status, ReviewIdentityMatchRegenerationStatuses.Completed, StringComparison.Ordinal)
-                ? ReviewIdentityMatchEvidenceVersions.ExpectedAfterAutomaticAssignments(
-                    run.EvidenceVersion,
-                    run.AutomaticallyAssignedCount)
-                : run.EvidenceVersion;
+        ReviewIdentityMatchEvidenceVersion expectedEvidence = ExpectedEvidence(run);
         bool evidenceMatches = currentEvidence == expectedEvidence;
         bool stale = string.Equals(run.Status, ReviewIdentityMatchRegenerationStatuses.Stale, StringComparison.Ordinal)
             || string.Equals(run.Status, ReviewIdentityMatchRegenerationStatuses.Failed, StringComparison.Ordinal)
             || !evidenceMatches
             || (!run.IsActive && run.PolicyVersion != policy.Version);
 
-        return Results.Ok(ToResponse(run, stale));
+        return Results.Ok(ToResponse(run, stale, followUp, followUpSummary));
     }
 
     private static async Task<IResult> StartAsync(
@@ -125,7 +130,11 @@ public static class IdentityMatchRegenerationEndpoints
                 request.Actor,
                 timeProvider.GetUtcNow(),
                 cancellationToken);
-            return Results.Accepted(value: ToResponse(run, stale: false));
+            return Results.Accepted(value: ToResponse(
+                run,
+                stale: false,
+                new IdentityMatchFollowUpConfiguration(enabled: false),
+                new FollowUpSummary("running", QueuedAfterActiveRun: false)));
         }
         catch (InvalidOperationException exception) when (
             exception.Message.Contains("already", StringComparison.OrdinalIgnoreCase))
@@ -138,7 +147,11 @@ public static class IdentityMatchRegenerationEndpoints
         }
     }
 
-    private static object ToResponse(ReviewIdentityMatchRegenerationRun run, bool stale) => new
+    private static object ToResponse(
+        ReviewIdentityMatchRegenerationRun run,
+        bool stale,
+        IdentityMatchFollowUpConfiguration followUp,
+        FollowUpSummary followUpSummary) => new
     {
         RunId = run.Id,
         ModelId = run.ModelId.ToString(),
@@ -158,7 +171,41 @@ public static class IdentityMatchRegenerationEndpoints
         run.CompletedAtUtc,
         run.UpdatedAtUtc,
         run.Error,
+        AutomaticFollowUpEnabled = followUp.Enabled,
+        AutomaticFollowUpStatus = followUpSummary.Status,
+        AutomaticFollowUpQueuedAfterActiveRun = followUpSummary.QueuedAfterActiveRun,
+        AutomaticFollowUpDelayMilliseconds = (int)followUp.CoalesceDelay.TotalMilliseconds,
     };
+
+    private static FollowUpSummary SummarizeFollowUp(
+        ReviewIdentityMatchRegenerationRun? run,
+        ReviewIdentityMatchEvidenceVersion currentEvidence,
+        IdentityMatchFollowUpConfiguration configuration)
+    {
+        if (!configuration.Enabled)
+        {
+            return new("disabled", QueuedAfterActiveRun: false);
+        }
+
+        ReviewIdentityMatchEvidenceVersion expected = run is null
+            ? new ReviewIdentityMatchEvidenceVersion(0, 0, 0, 0)
+            : ExpectedEvidence(run);
+        bool changed = currentEvidence != expected;
+        if (run?.IsActive == true)
+        {
+            return new("running", QueuedAfterActiveRun: changed);
+        }
+
+        return new(changed ? "queued" : "current", QueuedAfterActiveRun: false);
+    }
+
+    private static ReviewIdentityMatchEvidenceVersion ExpectedEvidence(
+        ReviewIdentityMatchRegenerationRun run) =>
+        string.Equals(run.Status, ReviewIdentityMatchRegenerationStatuses.Completed, StringComparison.Ordinal)
+            ? ReviewIdentityMatchEvidenceVersions.ExpectedAfterAutomaticAssignments(
+                run.EvidenceVersion,
+                run.AutomaticallyAssignedCount)
+            : run.EvidenceVersion;
 
     private static bool TryModelRevision(
         string? modelId,
@@ -186,6 +233,8 @@ public static class IdentityMatchRegenerationEndpoints
     }
 
     private static IResult BadRequest(string message) => Results.BadRequest(new { error = message });
+
+    private sealed record FollowUpSummary(string Status, bool QueuedAfterActiveRun);
 
     public sealed record StartIdentityMatchRegenerationRequest(string Actor);
 }
