@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Private WI-0113 face-clustering evaluator.
 
-Input is the pseudonymized biometric export produced by PhotoIdentity.ClusterEvaluation.
-The input and generated reports are private operator data and must not be committed.
+Consumes only the pseudonymized local export produced by
+PhotoIdentity.ClusterEvaluation. Input and reports remain private operator data.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import math
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import numpy as np
 from sklearn.cluster import DBSCAN, HDBSCAN
@@ -47,17 +47,18 @@ class CandidateResult:
     metrics: Metrics
 
 
-def parse_csv_numbers(value: str, cast: type) -> list[Any]:
-    items = [cast(item.strip()) for item in value.split(",") if item.strip()]
-    if not items:
+def parse_grid(value: str, cast: type) -> list[Any]:
+    result = [cast(item.strip()) for item in value.split(",") if item.strip()]
+    if not result:
         raise argparse.ArgumentTypeError("parameter grid cannot be empty")
-    return items
+    return result
 
 
 def load_sample(path: Path) -> tuple[dict[str, Any], np.ndarray, list[str | None], list[str]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if payload.get("schemaVersion") != 1:
         raise ValueError("unsupported cluster-evaluation export schema")
+
     faces = payload.get("faces") or []
     if len(faces) < 2:
         raise ValueError("at least two exported faces are required")
@@ -67,25 +68,27 @@ def load_sample(path: Path) -> tuple[dict[str, Any], np.ndarray, list[str | None
         raise ValueError("embeddings must be a rectangular non-empty matrix")
     if not np.isfinite(embeddings).all():
         raise ValueError("embeddings contain non-finite values")
+
     norms = np.linalg.norm(embeddings, axis=1)
     if np.any(norms <= 0):
         raise ValueError("embeddings contain a zero vector")
     embeddings = embeddings / norms[:, None]
 
-    labels = [face.get("groundTruthLabel") for face in faces]
+    truth = [face.get("groundTruthLabel") for face in faces]
     photo_groups = [str(face["photoGroup"]) for face in faces]
-    return payload, embeddings, labels, photo_groups
+    return payload, embeddings, truth, photo_groups
 
 
 def connected_components(adjacency: list[set[int]], minimum_cluster_size: int) -> np.ndarray:
     labels = np.full(len(adjacency), -1, dtype=int)
     visited: set[int] = set()
     cluster_id = 0
+
     for start in range(len(adjacency)):
         if start in visited:
             continue
-        stack = [start]
         component: list[int] = []
+        stack = [start]
         visited.add(start)
         while stack:
             node = stack.pop()
@@ -94,10 +97,12 @@ def connected_components(adjacency: list[set[int]], minimum_cluster_size: int) -
                 if neighbor not in visited:
                     visited.add(neighbor)
                     stack.append(neighbor)
+
         if len(component) >= minimum_cluster_size:
             for node in component:
                 labels[node] = cluster_id
             cluster_id += 1
+
     return labels
 
 
@@ -111,19 +116,22 @@ def mutual_neighbor_graph(
     point_count = distances.shape[0]
     k = min(neighbor_count, point_count - 1)
     ordered = np.argsort(distances, axis=1, kind="stable")
-    neighbors = [set(row[1 : k + 1].tolist()) for row in ordered]
-    adjacency = [set() for _ in range(point_count)]
 
+    # Never assume the point itself is the first zero-distance item: exact duplicate
+    # embeddings may sort before it. Explicitly remove self before taking the k nearest.
+    neighbors: list[set[int]] = []
+    for index, row in enumerate(ordered):
+        nearest = [int(candidate) for candidate in row if int(candidate) != index][:k]
+        neighbors.append(set(nearest))
+
+    adjacency = [set() for _ in range(point_count)]
     for left in range(point_count):
         for right in sorted(neighbors[left]):
-            if right <= left:
-                continue
-            if left not in neighbors[right]:
+            if right <= left or left not in neighbors[right]:
                 continue
             if distances[left, right] > maximum_distance:
                 continue
-            shared = len(neighbors[left].intersection(neighbors[right]))
-            if shared < minimum_shared_neighbors:
+            if len(neighbors[left].intersection(neighbors[right])) < minimum_shared_neighbors:
                 continue
             adjacency[left].add(right)
             adjacency[right].add(left)
@@ -153,35 +161,33 @@ def evaluate(labels: np.ndarray, truth: list[str | None], photo_groups: list[str
             if labels[index] == cluster_id and truth[index] is not None
         ]
         comparable_cluster_pairs += choose2(len(members))
-        for left_pos, left in enumerate(members):
-            for right in members[left_pos + 1 :]:
+        for left_position, left in enumerate(members):
+            for right in members[left_position + 1 :]:
                 if truth[left] != truth[right]:
                     false_merge_pairs += 1
                     if photo_groups[left] == photo_groups[right]:
                         same_photo_conflicts += 1
 
-    by_identity: dict[str, list[int]] = {}
+    identities: dict[str, list[int]] = {}
     for index, value in enumerate(truth):
         if value is not None:
-            by_identity.setdefault(value, []).append(index)
+            identities.setdefault(value, []).append(index)
 
     false_split_pairs = 0
     same_identity_pairs = 0
-    for members in by_identity.values():
+    for members in identities.values():
         same_identity_pairs += choose2(len(members))
-        for left_pos, left in enumerate(members):
-            for right in members[left_pos + 1 :]:
-                same_cluster = labels[left] >= 0 and labels[left] == labels[right]
-                if not same_cluster:
+        for left_position, left in enumerate(members):
+            for right in members[left_position + 1 :]:
+                if not (labels[left] >= 0 and labels[left] == labels[right]):
                     false_split_pairs += 1
 
     face_count = len(labels)
     clustered_faces = int(np.count_nonzero(clustered))
-    noise_faces = face_count - clustered_faces
     return Metrics(
         cluster_count=len(cluster_ids),
         clustered_faces=clustered_faces,
-        noise_faces=noise_faces,
+        noise_faces=face_count - clustered_faces,
         coverage=clustered_faces / face_count,
         labeled_coverage=(clustered_labeled / len(labeled_indices)) if labeled_indices else 0.0,
         false_merge_pairs=false_merge_pairs,
@@ -214,13 +220,14 @@ def candidate_sort_key(candidate: CandidateResult) -> tuple[Any, ...]:
 def render_markdown(report: dict[str, Any]) -> str:
     selected = report["selectedCandidate"]
     metrics = selected["metrics"]
+    face_count = report["sample"]["faceCount"]
     lines = [
         "# Private provisional face-cluster evaluation",
         "",
-        "> PRIVATE: this report is derived from biometric evaluation data. Do not commit it.",
+        "> PRIVATE: this report is derived from local evaluation data. Do not commit it.",
         "",
         f"- Exact model: `{report['sample']['modelId']}` / `{report['sample']['modelHash']}`",
-        f"- Faces: {report['sample']['faceCount']}",
+        f"- Faces: {face_count}",
         f"- Assigned labels: {report['sample']['assignedLabelCount']}",
         f"- Unknown faces: {report['sample']['unknownFaceCount']}",
         f"- Pairwise cosine-distance calculation: {report['benchmark']['pairwiseDistanceSeconds']:.3f} s",
@@ -233,16 +240,14 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- False-merge rate: **{metrics['false_merge_rate']:.6f}**",
         f"- False-split rate: {metrics['false_split_rate']:.6f}",
         f"- Labeled coverage: {metrics['labeled_coverage']:.3f}",
-        f"- Noise rate: {metrics['noise_faces'] / report['sample']['faceCount']:.3f}",
+        f"- Noise rate: {metrics['noise_faces'] / face_count:.3f}",
         f"- Same-photo conflicting merges: **{metrics['same_photo_conflicts']}**",
         "",
-        "## Interpretation",
+        "False merges are the primary selection risk. The displayed candidate is a recommendation for maintainer inspection, not an automatic production-policy decision.",
         "",
-        "False merges are the primary selection risk. The evaluator therefore orders candidates by false-merge count/rate before coverage or split rate. The displayed candidate is a recommendation for maintainer inspection, not an automatic production-policy decision.",
+        "Unknown faces participate as unlabeled points. They affect coverage/noise but are excluded from identity-labelled false-merge and false-split denominators.",
         "",
-        "Unknown faces participate as unlabeled points when present. They affect coverage/noise but are excluded from identity-labelled false-merge/false-split denominators.",
-        "",
-        "Age, pose, and image-quality stratification is not inferred from embeddings. Record those observations manually if the private reviewed sample contains enough known variation.",
+        "Age, pose, and image-quality variation must be recorded from the local reviewed sample; the evaluator does not infer those attributes from embeddings.",
         "",
         "## Candidate table",
         "",
@@ -250,18 +255,20 @@ def render_markdown(report: dict[str, Any]) -> str:
         "|---|---|---:|---:|---:|---:|---:|",
     ]
     for candidate in report["candidates"][:30]:
-        cm = candidate["metrics"]
+        candidate_metrics = candidate["metrics"]
         lines.append(
             f"| {candidate['algorithm']} | `{json.dumps(candidate['parameters'], sort_keys=True)}` | "
-            f"{cm['false_merge_pairs']} | {cm['false_split_rate']:.4f} | "
-            f"{cm['labeled_coverage']:.3f} | {cm['noise_faces']} | {cm['cluster_count']} |"
+            f"{candidate_metrics['false_merge_pairs']} | {candidate_metrics['false_split_rate']:.4f} | "
+            f"{candidate_metrics['labeled_coverage']:.3f} | {candidate_metrics['noise_faces']} | "
+            f"{candidate_metrics['cluster_count']} |"
         )
+
     lines.extend(
         [
             "",
             "## WI-0114 scaling decision",
             "",
-            "The benchmark projection is diagnostic only. Record the maintainer decision after reviewing measured local timings: use PostgreSQL exact/vector-neighbour search if it meets the interactive/incremental budget; introduce ANN indexing only if measured exact-neighbour retrieval does not.",
+            "The scale projection is diagnostic only. Record the maintainer decision from measured local timings: keep exact PostgreSQL/vector-neighbour retrieval when it meets the incremental budget; introduce ANN only when measurement justifies it.",
             "",
         ]
     )
@@ -269,7 +276,9 @@ def render_markdown(report: dict[str, Any]) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Evaluate conservative provisional face clustering on a private reviewed sample.")
+    parser = argparse.ArgumentParser(
+        description="Evaluate conservative provisional face clustering on a private reviewed sample."
+    )
     parser.add_argument("sample", type=Path)
     parser.add_argument("--report-json", type=Path, default=Path("private/cluster-evaluation/report.json"))
     parser.add_argument("--report-md", type=Path, default=Path("private/cluster-evaluation/report.md"))
@@ -284,15 +293,15 @@ def main() -> int:
 
     payload, embeddings, truth, photo_groups = load_sample(args.sample)
 
-    start = time.perf_counter()
+    started = time.perf_counter()
     distances = pairwise_distances(embeddings, metric="cosine", n_jobs=-1)
     distances = np.clip(distances, 0.0, 2.0)
-    pairwise_seconds = time.perf_counter() - start
+    pairwise_seconds = time.perf_counter() - started
 
     candidates: list[CandidateResult] = []
-    min_samples_values = parse_csv_numbers(args.min_samples, int)
+    min_samples_values = parse_grid(args.min_samples, int)
 
-    for eps in parse_csv_numbers(args.dbscan_eps, float):
+    for eps in parse_grid(args.dbscan_eps, float):
         for min_samples in min_samples_values:
             labels = DBSCAN(eps=eps, min_samples=min_samples, metric="precomputed").fit_predict(distances)
             candidates.append(
@@ -303,7 +312,7 @@ def main() -> int:
                 )
             )
 
-    for minimum_cluster_size in parse_csv_numbers(args.hdbscan_min_cluster_size, int):
+    for minimum_cluster_size in parse_grid(args.hdbscan_min_cluster_size, int):
         for min_samples in min_samples_values:
             if min_samples > embeddings.shape[0]:
                 continue
@@ -313,7 +322,6 @@ def main() -> int:
                 metric="precomputed",
                 cluster_selection_method="eom",
                 allow_single_cluster=False,
-                copy=True,
             ).fit_predict(distances)
             candidates.append(
                 CandidateResult(
@@ -323,13 +331,13 @@ def main() -> int:
                 )
             )
 
-    for k in parse_csv_numbers(args.graph_k, int):
-        for maximum_distance in parse_csv_numbers(args.graph_max_distance, float):
-            for minimum_shared in parse_csv_numbers(args.graph_min_shared, int):
+    for neighbor_count in parse_grid(args.graph_k, int):
+        for maximum_distance in parse_grid(args.graph_max_distance, float):
+            for minimum_shared in parse_grid(args.graph_min_shared, int):
                 for minimum_cluster_size in (2, 3, 4):
                     labels = mutual_neighbor_graph(
                         distances,
-                        k,
+                        neighbor_count,
                         maximum_distance,
                         minimum_shared,
                         minimum_cluster_size,
@@ -338,7 +346,7 @@ def main() -> int:
                         CandidateResult(
                             "mutual-neighbor-graph",
                             {
-                                "neighborCount": k,
+                                "neighborCount": neighbor_count,
                                 "maximumDistance": maximum_distance,
                                 "minimumSharedNeighbors": minimum_shared,
                                 "minimumClusterSize": minimum_cluster_size,
@@ -356,6 +364,7 @@ def main() -> int:
     measured_pairs = face_count * face_count
     expected_pairs = args.expected_face_count * args.expected_face_count
     projected_seconds = pairwise_seconds * (expected_pairs / measured_pairs) if measured_pairs else math.inf
+
     report = {
         "schemaVersion": 1,
         "sample": {
@@ -365,7 +374,7 @@ def main() -> int:
             "assignedLabelCount": payload["assignedLabelCount"],
             "unknownFaceCount": payload["unknownFaceCount"],
         },
-        "selectionRule": "minimize false-merge pairs/rate first, then maximize labeled coverage and minimize false splits/noise",
+        "selectionRule": "minimize false-merge pairs/rate first, then maximize labelled coverage and minimize false splits/noise",
         "selectedCandidate": asdict(selected),
         "benchmark": {
             "pairwiseDistanceSeconds": pairwise_seconds,
@@ -375,9 +384,9 @@ def main() -> int:
             "annDecision": "maintainer-verification-required",
         },
         "variationAnalysis": {
-            "age": "manual-private-sample-observation-required",
-            "pose": "manual-private-sample-observation-required",
-            "imageQuality": "manual-private-sample-observation-required",
+            "age": "manual-local-sample-observation-required",
+            "pose": "manual-local-sample-observation-required",
+            "imageQuality": "manual-local-sample-observation-required",
         },
         "candidates": [asdict(candidate) for candidate in candidates],
     }
