@@ -131,7 +131,7 @@ internal static class Program
 
         if (!Path.IsPathRooted(outputPath))
         {
-            string normalized = outputPath.Replace('\\', '/').TrimStart('./');
+            string normalized = outputPath.Replace('\\', '/').TrimStart('.', '/');
             bool underIgnoredPrivateRoot =
                 normalized.StartsWith("private/", StringComparison.OrdinalIgnoreCase) ||
                 normalized.StartsWith("data/", StringComparison.OrdinalIgnoreCase) ||
@@ -205,8 +205,8 @@ internal static class Program
         Console.WriteLine("PhotoIdentity.ClusterEvaluation - private reviewed-sample exporter");
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine("  dotnet run --project tools/PhotoIdentity.ClusterEvaluation -- \\");
-        Console.WriteLine("    --model-id <id> --model-hash <sha256> [--max-faces 5000] \\");
+        Console.WriteLine("  dotnet run --project tools/PhotoIdentity.ClusterEvaluation --");
+        Console.WriteLine("    --model-id <id> --model-hash <sha256> [--max-faces 5000]");
         Console.WriteLine("    [--output private/cluster-evaluation/sample.json] [--exclude-unknown] [--force]");
         Console.WriteLine();
         Console.WriteLine($"Connection string is read only from {ConnectionStringEnvironmentVariable}.");
