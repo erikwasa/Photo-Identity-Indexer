@@ -1,3 +1,4 @@
+using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 
 namespace PhotoIdentity.Core.Clustering;
