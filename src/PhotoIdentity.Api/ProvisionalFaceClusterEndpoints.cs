@@ -2,6 +2,7 @@ using PhotoIdentity.Core.Clustering;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
+using PhotoIdentity.Persistence.Postgres;
 
 namespace PhotoIdentity.Api;
 
@@ -21,8 +22,7 @@ public static class ProvisionalFaceClusterEndpoints
         IServiceProvider services,
         CancellationToken cancellationToken)
     {
-        IProvisionalFaceClusterRepository? repository =
-            services.GetService<IProvisionalFaceClusterRepository>();
+        IProvisionalFaceClusterRepository? repository = ResolveRepository(services);
         IIdentityMatchModelRepository? models = services.GetService<IIdentityMatchModelRepository>();
         if (repository is null || models is null)
         {
@@ -45,8 +45,7 @@ public static class ProvisionalFaceClusterEndpoints
         bool includeUnknown = false,
         CancellationToken cancellationToken = default)
     {
-        IProvisionalFaceClusterRepository? repository =
-            services.GetService<IProvisionalFaceClusterRepository>();
+        IProvisionalFaceClusterRepository? repository = ResolveRepository(services);
         if (repository is null)
         {
             return PostgreSqlRequired();
@@ -104,8 +103,7 @@ public static class ProvisionalFaceClusterEndpoints
         string? modelHash,
         CancellationToken cancellationToken)
     {
-        IProvisionalFaceClusterRepository? repository =
-            services.GetService<IProvisionalFaceClusterRepository>();
+        IProvisionalFaceClusterRepository? repository = ResolveRepository(services);
         if (repository is null)
         {
             return PostgreSqlRequired();
@@ -152,8 +150,7 @@ public static class ProvisionalFaceClusterEndpoints
         int maximumGroups = 500,
         CancellationToken cancellationToken = default)
     {
-        IProvisionalFaceClusterRepository? repository =
-            services.GetService<IProvisionalFaceClusterRepository>();
+        IProvisionalFaceClusterRepository? repository = ResolveRepository(services);
         if (repository is null)
         {
             return PostgreSqlRequired();
@@ -180,6 +177,19 @@ public static class ProvisionalFaceClusterEndpoints
         {
             return BadRequest(exception.Message);
         }
+    }
+
+    private static IProvisionalFaceClusterRepository? ResolveRepository(IServiceProvider services)
+    {
+        IProvisionalFaceClusterRepository? registered =
+            services.GetService<IProvisionalFaceClusterRepository>();
+        if (registered is not null)
+        {
+            return registered;
+        }
+
+        PostgresCatalogueDatabase? database = services.GetService<PostgresCatalogueDatabase>();
+        return database is null ? null : new PostgresProvisionalFaceClusterRepository(database);
     }
 
     private static object ToResponse(ProvisionalFaceClusterRun run, bool current) => new
