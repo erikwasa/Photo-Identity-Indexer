@@ -1,0 +1,34 @@
+id: WI-0070
+title: Streamline pull-request validation and stabilize integration tests
+milestone: M00
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0070-pr-validation-streamlining.md
+started_at: 2026-08-18
+completed_at: 2026-09-13
+verified_at: 2026-09-13
+verified_by: ai-agent
+last_updated_at: 2026-09-13
+branch: agent/WI-0070-integration-shards
+blockers:
+- WI-0069
+blocker_notes:
+- Slice 1 merged through PR #176; later slices established isolated integration shards, shared generic API-host isolation, path-aware deployment checks and a reduced published-runtime PR smoke profile.
+- The 2026-09-13 closeout audit confirmed the remaining acceptance criteria are represented by the current build workflow and shared integration-test host architecture.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/176
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32178207171
+- type: merge_commit
+  value: ca17c5fb01981480d9c7d79b53ef75383415fe04
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/177
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/180
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32190714702
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/32191240132
+- type: verification
+  value: '2026-09-13 repository audit: generic API integration tests inherit the shared worker-disabled host by default; deterministic integration coverage runs in two isolated required shards; PR review smoke uses PublishedMinimum while main uses Comprehensive; launcher/package verification is path-aware on PRs and comprehensive on main; the work-item history records three independent successful PR samples below the six-minute target without retries.'

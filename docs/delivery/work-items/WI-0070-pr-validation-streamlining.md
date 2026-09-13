@@ -84,15 +84,15 @@ The detailed strategy document should carry rationale and examples. `AGENTS.md` 
 ## Acceptance criteria
 
 - [x] CI exposes enough timing data to identify slow test assemblies and the dominant slow integration classes/tests without reconstructing timestamps manually.
-- [ ] Generic API integration tests use a shared host setup that disables irrelevant production hosted services by default; worker-specific tests explicitly opt in or exercise worker cycles directly.
+- [x] Generic API integration tests use a shared host setup that disables irrelevant production hosted services by default; worker-specific tests explicitly opt in or exercise worker cycles directly.
 - [x] The remaining transient HTTP 500 failure class has improved diagnostics and a documented root cause or narrowly tracked stabilization follow-up. WI-0071 owns the remaining ad-hoc API-host cases and their quarantine exit evidence.
 - [x] Integration coverage is partitioned into isolated sequential shards/processes so the required PR critical path no longer waits for the entire host-heavy assembly serially in one process.
 - [x] In-process xUnit parallelism remains disabled for host-heavy integration tests unless later evidence demonstrates a safe replacement architecture.
 - [x] Any temporarily quarantined flaky tests are visible in CI, tracked, non-silently retried, and have a documented condition for returning to the required gate. `.github/flaky-integration-tests.txt` is the canonical temporary list; WI-0071 requires a stabilization change plus three consecutive clean diagnostic runs before restoration.
-- [ ] Published review smoke on PRs is reduced to behavior that adds unique signal beyond integration tests, while comprehensive published-app coverage remains on `main` or another explicit full gate.
-- [ ] Launcher/package checks no longer run on unrelated PR changes unless evidence shows keeping them unconditional is cheaper/safer than path-aware gating.
-- [ ] A comprehensive `main` gate retains the meaningful integration, published application, launcher and package coverage moved off the fast PR path.
-- [ ] At least three representative successful PR runs show the required validation critical path at or below 6 minutes, or the work item records measured evidence for the remaining blocker and a follow-up needed to reach that target.
+- [x] Published review smoke on PRs is reduced to behavior that adds unique signal beyond integration tests, while comprehensive published-app coverage remains on `main` or another explicit full gate.
+- [x] Launcher/package checks no longer run on unrelated PR changes unless evidence shows keeping them unconditional is cheaper/safer than path-aware gating.
+- [x] A comprehensive `main` gate retains the meaningful integration, published application, launcher and package coverage moved off the fast PR path.
+- [x] At least three representative successful PR runs show the required validation critical path at or below 6 minutes, or the work item records measured evidence for the remaining blocker and a follow-up needed to reach that target.
 - [x] Runner-minute impact is recorded as well as wall-clock impact so speed is not achieved by an unreasonable multiplication of expensive Windows jobs.
 - [x] A durable testing/CI strategy document is added and linked from the repository documentation index where appropriate.
 - [x] `AGENTS.md` contains concise rules for test-layer choice, host-heavy integration tests, flaky-test handling, and PR descriptions/CI-impact reporting.
@@ -144,3 +144,14 @@ The detailed strategy document should carry rationale and examples. `AGENTS.md` 
 - Slice 2 uses five Windows jobs on full PR validation instead of Slice 1's three. Based on observed job spans, #1118 consumed roughly 19–20 Windows runner-minutes versus roughly 14–15 in the three-job Slice 1 shape. The wall-clock improvement is useful but the runner-cost increase is material; Slice 3 should reclaim some of that by making launcher/package/published-runtime work conditional or reusable rather than adding more integration runners.
 - The main `build-and-test` job no longer runs deterministic integration coverage serially. It retains true fast tests, the small flaky diagnostic lane, documentation validation, published review smoke and mixed-media verification.
 - The timing summarizer reads TRX `TestMethod.className` definitions instead of inferring class names from theory display text, avoiding incorrect grouping for parameterized cases.
+
+### Closeout — 2026-09-13
+
+The remaining unchecked acceptance criteria were audited against current `main` after WI-0071's final quarantine restoration:
+
+- `PhotoIdentityApiTestFactory.cs` provides the shared worker-disabled compatibility foundation for generic endpoint tests; worker-specific coverage can explicitly opt back in.
+- `.github/workflows/build.yml` runs deterministic integration coverage in two isolated required Windows jobs, uses `PublishedMinimum` review smoke on pull requests and `Comprehensive` on `main`, and makes launcher/package verification path-aware for PRs while always enabling it for `main`.
+- PR #180 / workflow #1134 measured the unrelated-path fast gate at about 3m37s and roughly 9.9 Windows runner-minutes. Subsequent independent PRs #182 and #186 supplied the second and third successful sub-six-minute samples recorded by this work item.
+- WI-0071 completed the temporary quarantine contract without adding unconditional retries; all tracked cases are back in required coverage.
+
+No additional CI architecture change is required for WI-0070. Future validation regressions should be opened as new maintenance work with fresh measurements rather than keeping this foundational item indefinitely active.

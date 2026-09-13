@@ -2,7 +2,7 @@ schema_version: 1
 milestones:
 - id: M00
   title: Repository and architecture
-  status: in_progress
+  status: completed
   document: ../milestones/M00-repository.md
   work_items:
   - WI-0001
