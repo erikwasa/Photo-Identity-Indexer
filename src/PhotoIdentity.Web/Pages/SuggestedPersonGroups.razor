@@ -1,0 +1,311 @@
+@page "/suggestion-groups"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Suggested people · Photo Identity</PageTitle>
+
+<section class="hero">
+    <div>
+        <p class="eyebrow">Identity suggestions</p>
+        <h1>Review by suggested person</h1>
+        <p>Browse pending rank-1 suggestions as person-oriented review groups. A group is only a review shortcut: each face still keeps its own score, margin, audit history, and decision.</p>
+    </div>
+</section>
+
+<section class="review-filter-panel" aria-labelledby="suggested-group-model-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Exact model revision</p>
+            <h2 id="suggested-group-model-heading">Suggestion model</h2>
+        </div>
+        @if (SelectedModel is ReviewModelRevisionFilterResponse selected)
+        {
+            <span class="model-summary">@selected.ModelId · @HashPrefix(selected.ModelHash)</span>
+        }
+    </div>
+
+    <div class="group-model-row">
+        <div>
+            <label class="field-label" for="suggested-group-model">Model revision</label>
+            <select id="suggested-group-model"
+                    @bind="SelectedModelIndex"
+                    @bind:after="ChangeModelAsync"
+                    disabled="@(Loading || Models.Count == 0)">
+                @for (int index = 0; index < Models.Count; index++)
+                {
+                    ReviewModelRevisionFilterResponse model = Models[index];
+                    <option value="@index">@ModelLabel(model)</option>
+                }
+            </select>
+        </div>
+        <button class="button secondary"
+                disabled="@(Loading || SelectedModel is null)"
+                @onclick="RefreshAsync">
+            Refresh groups
+        </button>
+    </div>
+</section>
+
+<section class="group-guidance" aria-label="Grouped review guidance">
+    <strong>Review the evidence, not the group.</strong>
+    <span>Select only obvious matches after opening a group. Remove exceptions from the selection; open an incorrect face suggestion in Details to reject that face-person pair without rejecting the face itself.</span>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+
+@if (Loading && Groups.Count == 0)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading suggested-person groups…</p>
+    </section>
+}
+else if (Models.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No suggestion model is available</h2>
+        <p>Generate exact-model identity suggestions before using grouped review.</p>
+    </section>
+}
+else if (Groups.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No pending suggested-person groups</h2>
+        <p>This exact model revision has no pending rank-1 suggestions on currently unreviewed faces.</p>
+    </section>
+}
+else
+{
+    <div class="gallery-summary" role="status">
+        <span>@Total group@(Total == 1 ? "" : "s")</span>
+        <span>@Groups.Count loaded</span>
+    </div>
+
+    <section class="suggested-group-grid" aria-label="Suggested person review groups">
+        @foreach (ReviewSuggestedPersonGroupResponse group in Groups)
+        {
+            <article class="suggested-group-card" @key="group.Person.Id">
+                <header class="group-heading">
+                    <div>
+                        <p class="eyebrow">Suggested person</p>
+                        <h2>@group.Person.DisplayName</h2>
+                    </div>
+                    @if (group.IsFavorite)
+                    {
+                        <span class="favorite-badge" aria-label="Favorite person">★ Favorite</span>
+                    }
+                </header>
+
+                <div class="representative-strip" aria-label="Representative pending suggestions">
+                    @foreach (string imageUrl in group.RepresentativeImageUrls)
+                    {
+                        <img src="@imageUrl" alt="Representative suggested face" loading="lazy" />
+                    }
+                </div>
+
+                <dl class="group-metrics">
+                    <div>
+                        <dt>Pending</dt>
+                        <dd>@group.PendingCount</dd>
+                    </div>
+                    <div class="confidence-high">
+                        <dt>High</dt>
+                        <dd>@group.HighCount</dd>
+                    </div>
+                    <div class="confidence-medium">
+                        <dt>Medium</dt>
+                        <dd>@group.MediumCount</dd>
+                    </div>
+                    <div class="confidence-low">
+                        <dt>Low</dt>
+                        <dd>@group.LowCount</dd>
+                    </div>
+                </dl>
+
+                <p class="group-evidence">
+                    Strongest score <strong>@group.StrongestScore.ToString("F4")</strong>
+                    · strongest margin <strong>@MarginLabel(group.StrongestMargin)</strong>
+                </p>
+
+                <a class="button primary full-width" href="@BuildReviewUrl(group.Person.Id)">
+                    Review @group.PendingCount suggestion@(group.PendingCount == 1 ? "" : "s")
+                </a>
+            </article>
+        }
+    </section>
+
+    @if (LoadingMore)
+    {
+        <div class="infinite-loading" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <span>Loading more groups…</span>
+        </div>
+    }
+    else if (HasMore)
+    {
+        <div class="load-more-row">
+            <button class="button secondary" @onclick="LoadMoreAsync">Load more groups</button>
+        </div>
+    }
+    else
+    {
+        <p class="end-of-queue">End of suggested-person groups.</p>
+    }
+}
+
+@code {
+    private const int PageSize = 30;
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelId")]
+    public string? QueryModelId { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelHash")]
+    public string? QueryModelHash { get; set; }
+
+    private IReadOnlyList<ReviewModelRevisionFilterResponse> Models { get; set; } = [];
+    private List<ReviewSuggestedPersonGroupResponse> Groups { get; } = [];
+    private string SelectedModelIndex { get; set; } = "";
+    private int Total { get; set; }
+    private bool Loading { get; set; }
+    private bool LoadingMore { get; set; }
+    private string? Error { get; set; }
+
+    private ReviewModelRevisionFilterResponse? SelectedModel =>
+        int.TryParse(SelectedModelIndex, out int index) && index >= 0 && index < Models.Count
+            ? Models[index]
+            : null;
+
+    private bool HasMore => Groups.Count < Total;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Models.Count == 0)
+        {
+            await LoadModelsAsync();
+        }
+
+        ResolveQueryModel();
+        await LoadGroupsAsync(reset: true);
+    }
+
+    private async Task LoadModelsAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            ReviewFilterOptionsResponse options = await Http.GetFromJsonAsync<ReviewFilterOptionsResponse>(
+                "api/review/filters") ?? new ReviewFilterOptionsResponse([], []);
+            Models = options.ModelRevisions;
+            SelectedModelIndex = Models.Count > 0 ? "0" : "";
+        }
+        catch (Exception exception)
+        {
+            Error = $"Suggestion models could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private void ResolveQueryModel()
+    {
+        if (string.IsNullOrWhiteSpace(QueryModelId) || string.IsNullOrWhiteSpace(QueryModelHash))
+        {
+            return;
+        }
+
+        int index = Models
+            .Select((model, index) => (model, index))
+            .Where(item =>
+                string.Equals(item.model.ModelId, QueryModelId, StringComparison.Ordinal) &&
+                string.Equals(item.model.ModelHash, QueryModelHash, StringComparison.OrdinalIgnoreCase))
+            .Select(item => item.index)
+            .DefaultIfEmpty(-1)
+            .First();
+        if (index >= 0)
+        {
+            SelectedModelIndex = index.ToString();
+        }
+    }
+
+    private async Task ChangeModelAsync() => await LoadGroupsAsync(reset: true);
+
+    private async Task RefreshAsync() => await LoadGroupsAsync(reset: true);
+
+    private async Task LoadMoreAsync() => await LoadGroupsAsync(reset: false);
+
+    private async Task LoadGroupsAsync(bool reset)
+    {
+        if (SelectedModel is not ReviewModelRevisionFilterResponse model)
+        {
+            Groups.Clear();
+            Total = 0;
+            return;
+        }
+
+        if (reset)
+        {
+            Loading = true;
+            Groups.Clear();
+        }
+        else
+        {
+            LoadingMore = true;
+        }
+
+        Error = null;
+        try
+        {
+            int offset = reset ? 0 : Groups.Count;
+            string url =
+                $"api/review/suggestion-faces/groups?modelId={Uri.EscapeDataString(model.ModelId)}" +
+                $"&modelHash={Uri.EscapeDataString(model.ModelHash)}" +
+                $"&offset={offset}&limit={PageSize}";
+            ReviewSuggestedPersonGroupPageResponse page =
+                await Http.GetFromJsonAsync<ReviewSuggestedPersonGroupPageResponse>(url)
+                ?? new ReviewSuggestedPersonGroupPageResponse([], offset, PageSize, 0);
+
+            if (reset)
+            {
+                Groups.Clear();
+            }
+            Groups.AddRange(page.Items);
+            Total = page.Total;
+        }
+        catch (Exception exception)
+        {
+            Error = $"Suggested-person groups could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+            LoadingMore = false;
+        }
+    }
+
+    private string BuildReviewUrl(string personId)
+    {
+        ReviewModelRevisionFilterResponse model = SelectedModel
+            ?? throw new InvalidOperationException("A suggestion model must be selected.");
+        return "/?state=unreviewed" +
+            "&sort=confidence-group" +
+            "&confidenceGroup=all" +
+            $"&modelId={Uri.EscapeDataString(model.ModelId)}" +
+            $"&modelHash={Uri.EscapeDataString(model.ModelHash)}" +
+            $"&suggestedPersonId={Uri.EscapeDataString(personId)}";
+    }
+
+    private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
+        $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+
+    private static string HashPrefix(string hash) => hash[..Math.Min(12, hash.Length)];
+
+    private static string MarginLabel(double? margin) => margin is double value
+        ? value.ToString("F4")
+        : "—";
+}
