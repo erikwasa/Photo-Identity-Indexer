@@ -113,8 +113,8 @@ else if (Result is not null)
 {
     <section class="bulk-action-bar" aria-label="Similar face bulk review actions">
         <div class="bulk-action-summary">
-            <strong>@SelectedCount selected</strong>
-            <span>Only unreviewed faces are eligible for bulk decisions.</span>
+            <strong>@SelectedCount similar face@(SelectedCount == 1 ? "" : "s") selected</strong>
+            <span>@BulkSelectionGuidance</span>
         </div>
 
         <div>
@@ -131,7 +131,7 @@ else if (Result is not null)
         <button class="button primary"
                 disabled="@(BulkBusy || string.IsNullOrWhiteSpace(BulkPersonId))"
                 @onclick="ExecuteAssignBulkAsync">
-            Assign selected
+            @(AssignIncludesSource ? "Assign selected + source" : "Assign selected")
         </button>
         <button class="button secondary" disabled="@BulkBusy" @onclick="ExecuteUnknownBulkAsync">
             Unknown
@@ -171,9 +171,9 @@ else if (Result is not null)
 
 @code {
     private const string Actor = "local-reviewer";
-    private const string AssignAction = "assign";
-    private const string UnknownAction = "unknown";
-    private const string RejectAction = "reject";
+    private const string AssignAction = SimilarFaceBulkSelection.AssignAction;
+    private const string UnknownAction = SimilarFaceBulkSelection.UnknownAction;
+    private const string RejectAction = SimilarFaceBulkSelection.RejectAction;
     private const int ResultLimit = 100;
 
     [Parameter, EditorRequired]
@@ -190,6 +190,7 @@ else if (Result is not null)
 
     private IReadOnlyList<SimilarFaceModelResponse> Models { get; set; } = [];
     private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+    private ReviewFaceResponse? SourceFace { get; set; }
     private SimilarFacePageResponse? Result { get; set; }
     private HashSet<string> SelectedFaceIds { get; } = new(StringComparer.Ordinal);
     private string SelectedModelIndex { get; set; } = "";
@@ -206,6 +207,11 @@ else if (Result is not null)
             : null;
 
     private int SelectedCount => SelectedFaceIds.Count;
+    private bool AssignIncludesSource => SimilarFaceBulkSelection.IncludesSource(AssignAction, SourceFace);
+    private int AssignFaceCount => SelectedCount + (AssignIncludesSource && !SelectedFaceIds.Contains(Id) ? 1 : 0);
+    private string BulkSelectionGuidance => AssignIncludesSource
+        ? $"Assign includes the unreviewed source face too ({AssignFaceCount} total). Unknown and False detection affect selected results only."
+        : "Bulk actions affect selected result faces only; the source face is already reviewed.";
     private string SourceImageUrl => $"/api/review/faces/{Uri.EscapeDataString(Id)}/image";
     private string SourceDetailsUrl => $"/faces/{Uri.EscapeDataString(Id)}";
 
@@ -219,6 +225,7 @@ else if (Result is not null)
             Models = await Http.GetFromJsonAsync<SimilarFaceModelResponse[]>(
                 "api/review/match-regeneration/models") ?? [];
             People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+            await LoadSourceFaceAsync();
             ResolveSelectedModel();
             if (SelectedModel is not null)
             {
@@ -238,6 +245,14 @@ else if (Result is not null)
         {
             Loading = false;
         }
+    }
+
+    private async Task LoadSourceFaceAsync()
+    {
+        ReviewFaceDetailsResponse details = await Http.GetFromJsonAsync<ReviewFaceDetailsResponse>(
+            $"api/review/faces/{Uri.EscapeDataString(Id)}")
+            ?? throw new InvalidOperationException("The source face response was empty.");
+        SourceFace = details.Face;
     }
 
     private void ResolveSelectedModel()
@@ -346,7 +361,7 @@ else if (Result is not null)
             return;
         }
 
-        string[] faceIds = SelectedFaceIds.OrderBy(id => id, StringComparer.Ordinal).ToArray();
+        string[] faceIds = SimilarFaceBulkSelection.BuildFaceIds(SelectedFaceIds, action, SourceFace);
         BulkBusy = true;
         Error = null;
         Message = null;
@@ -361,7 +376,7 @@ else if (Result is not null)
             if (preview.SkippedCount != 0 || preview.AffectedCount != faceIds.Length)
             {
                 throw new InvalidOperationException(
-                    "The selected faces changed before the bulk action could be committed. Review the current results and try again.");
+                    "The selected faces or source face changed before the bulk action could be committed. Review the current results and try again.");
             }
 
             using HttpResponseMessage commitResponse = await Http.PostAsJsonAsync(
@@ -379,6 +394,7 @@ else if (Result is not null)
                 ?? throw new InvalidOperationException("The bulk commit response was empty.");
 
             ClearSelection();
+            await LoadSourceFaceAsync();
             await LoadSimilarAsync();
             Message = action switch
             {
