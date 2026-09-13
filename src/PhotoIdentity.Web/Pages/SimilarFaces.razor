@@ -185,6 +185,9 @@ else if (Result is not null)
     [Parameter, SupplyParameterFromQuery(Name = "modelHash")]
     public string? ModelHash { get; set; }
 
+    [Parameter, SupplyParameterFromQuery(Name = "includeUnknown")]
+    public bool IncludeUnknown { get; set; }
+
     private IReadOnlyList<SimilarFaceModelResponse> Models { get; set; } = [];
     private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
     private SimilarFacePageResponse? Result { get; set; }
@@ -192,7 +195,6 @@ else if (Result is not null)
     private string SelectedModelIndex { get; set; } = "";
     private string BulkPersonId { get; set; } = "";
     private string NewPersonName { get; set; } = "";
-    private bool IncludeUnknown { get; set; }
     private bool Loading { get; set; } = true;
     private bool BulkBusy { get; set; }
     private string? Error { get; set; }
@@ -297,7 +299,10 @@ else if (Result is not null)
         SimilarFaceModelResponse? model = SelectedModel;
         string returnUrl = model is null
             ? $"/faces/{Uri.EscapeDataString(Id)}/similar"
-            : $"/faces/{Uri.EscapeDataString(Id)}/similar?modelId={Uri.EscapeDataString(model.ModelId)}&modelHash={Uri.EscapeDataString(model.ModelHash)}";
+            : $"/faces/{Uri.EscapeDataString(Id)}/similar" +
+              $"?modelId={Uri.EscapeDataString(model.ModelId)}" +
+              $"&modelHash={Uri.EscapeDataString(model.ModelHash)}" +
+              $"&includeUnknown={IncludeUnknown.ToString().ToLowerInvariant()}";
         return $"/faces/{Uri.EscapeDataString(faceId)}?returnUrl={Uri.EscapeDataString(returnUrl)}";
     }
 
@@ -426,14 +431,12 @@ else if (Result is not null)
         }
     }
 
-    private async Task AssignAsync((string FaceId, string PersonId) request)
-    {
-        await PostFaceActionAsync(
+    private Task AssignAsync((string FaceId, string PersonId) request) =>
+        PostFaceActionAsync(
             request.FaceId,
             "assign",
             new AssignFaceRequest(request.PersonId, Actor),
             "Face assignment saved.");
-    }
 
     private Task MarkUnknownAsync(string faceId) =>
         PostFaceActionAsync(faceId, "unknown", new ReviewFaceActionRequest(Actor), "Face marked as Unknown.");
@@ -444,7 +447,11 @@ else if (Result is not null)
     private Task UndoAsync(string faceId) =>
         PostFaceActionAsync(faceId, "undo", new ReviewFaceActionRequest(Actor), "Latest face decision undone.");
 
-    private async Task PostFaceActionAsync(string faceId, string action, object payload, string successMessage)
+    private async Task PostFaceActionAsync<TPayload>(
+        string faceId,
+        string action,
+        TPayload payload,
+        string successMessage)
     {
         BulkBusy = true;
         Error = null;
