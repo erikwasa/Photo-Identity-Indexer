@@ -6,21 +6,19 @@ This file is intentionally a short handoff for the next development or verificat
 
 **M25 Face discovery and cluster-assisted identity review is active.**
 
-WI-0110 similar-face discovery is complete. WI-0111 bounded follow-up regeneration, WI-0112 suggested-person grouped review, and WI-0113 provisional-cluster model/algorithm evaluation are implemented/merged and remain `in_review` pending one combined maintainer acceptance session.
+WI-0110 similar-face discovery is complete. WI-0111 bounded follow-up regeneration and WI-0112 suggested-person grouped review have both passed maintainer verification. WI-0113 provisional-cluster model/algorithm evaluation has also passed its private reviewed-sample verification and now has a selected conservative production policy. All three remain `in_review` only until separate one-work-item closeout PRs move them to `completed`.
 
-WI-0113 merged in PR #325 with CI run #1755 green. It defines provisional clusters as exact-model, policy-versioned derived evidence, adds a bounded PostgreSQL reviewed-sample exporter with private pseudonymized output, and adds local DBSCAN/HDBSCAN/mutual-neighbour evaluation tooling. No production clustering threshold or ANN choice may be recorded until the maintainer runs the private reviewed sample.
+WI-0113 merged in PR #325 with CI run #1755 green. The 2026-09-13 private evaluation used 5,000 reviewed faces, 107 assigned identity labels and 1,294 canonical Unknown faces. It selected DBSCAN with `eps=0.30` and `min_samples=3`: 0/443,525 false-merge pairs, false-split rate 0.687251, labelled coverage 0.542, noise rate 0.579 and zero same-photo conflicting merges. Pairwise cosine distance took 0.528 seconds at 5,000 faces and projects to 2.111 seconds at 10,000 faces. Age/pose/image-quality variation was not established from the available sample metadata and remains a later quality-validation limitation.
+
+The WI-0114 neighbour-search decision is exact-first: begin with bounded exact PostgreSQL/vector-neighbour retrieval and keep ANN optional. Introduce ANN only if measured production incremental retrieval fails the required runtime budget; the private pairwise benchmark is diagnostic, not a direct PostgreSQL latency guarantee.
 
 PostgreSQL remains the sole writable production catalogue. WI-0081 remains the separate suggestion-quality investigation that gates later automatic identity-assignment expansion.
 
 ## Next concrete step
 
-Run the combined maintainer verification for WI-0111, WI-0112, and WI-0113 against the current PostgreSQL catalogue.
+Merge the verification-handoff documentation PR, then close WI-0111, WI-0112 and WI-0113 through separate lifecycle PRs so each terminal transition has isolated evidence. After WI-0113 is completed, WI-0114 can be prepared using the selected DBSCAN policy and exact-first neighbour-search decision.
 
-- WI-0111: make a qualifying manual identity assignment without pressing Regenerate; observe automatic `queued` -> `running` -> `current`, verify review remains responsive, verify no recursive second run, then restart with automatic follow-up disabled and confirm explicit regeneration still works.
-- WI-0112: open `Suggested groups`, choose the production exact model, review a person with multiple pending suggestions, accept only a subset, leave/remove an exception, reject one incorrect face-person suggestion from Details, confirm group counts update, and repeat the key subset-selection flow on mobile/touch.
-- WI-0113: export a private reviewed exact-model sample, run DBSCAN/HDBSCAN/mutual-neighbour evaluation, inspect false merges and same-photo conflicts first, record the conservative selected policy plus age/pose/image-quality observations, and decide from measured local timing whether WI-0114 should use exact PostgreSQL/vector-neighbour retrieval or introduce ANN.
-
-Do not mark any of WI-0111/WI-0112/WI-0113 completed until their maintainer evidence is recorded. Do not start WI-0114 until the WI-0113 production-policy and exact-vs-ANN decision are recorded.
+Do not combine the three terminal work-item transitions into one PR. Do not add ANN to WI-0114 unless measured production retrieval justifies it.
 
 ## Relevant files
 
