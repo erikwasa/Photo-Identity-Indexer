@@ -13,7 +13,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class SimilarFaceApplicationTests
 {
     [Fact]
-    public async Task Similar_face_endpoint_preserves_exact_model_scope_and_unknown_opt_in()
+    public async Task Similar_face_endpoint_preserves_scope_and_selected_subset_flows_into_existing_bulk_review()
     {
         string directory = Path.Combine(Path.GetTempPath(), $"photoidentity-similar-api-{Guid.NewGuid():N}");
         Directory.CreateDirectory(directory);
@@ -38,10 +38,15 @@ public sealed class SimilarFaceApplicationTests
                         new CatalogueSimilarFace(CreateFace(firstFaceId, CatalogueReviewStates.Unreviewed), 0.9876),
                         new CatalogueSimilarFace(CreateFace(unknownFaceId, CatalogueReviewStates.Unknown), 0.8765),
                     ]));
+            FakeBulkReviewRepository bulk = new();
 
             await using PhotoIdentityApiTestFactory factory = new(
                 databasePath,
-                builder => builder.ConfigureServices(services => services.AddSingleton<ISimilarFaceRepository>(fake)));
+                builder => builder.ConfigureServices(services =>
+                {
+                    services.AddSingleton<ISimilarFaceRepository>(fake);
+                    services.AddSingleton<IBulkReviewRepository>(bulk);
+                }));
             using HttpClient client = factory.CreateClient();
 
             string endpoint =
@@ -64,6 +69,32 @@ public sealed class SimilarFaceApplicationTests
             Assert.Equal(modelHash, fake.ModelHash);
             Assert.True(fake.IncludeUnknown);
             Assert.Equal(20, fake.Limit);
+
+            PersonId personId = PersonId.New();
+            string[] selectedSubset = [response.Items[0].Face.Id];
+            using HttpResponseMessage previewMessage = await client.PostAsJsonAsync(
+                "/api/review/bulk/preview",
+                new BulkReviewPreviewRequest(selectedSubset, BulkReviewActionKinds.Assign, personId.ToString()));
+            await previewMessage.EnsureSuccessWithDiagnosticBodyAsync("bulk preview from similar-face result");
+            BulkReviewPreviewResponse preview = Assert.IsType<BulkReviewPreviewResponse>(
+                await previewMessage.Content.ReadFromJsonAsync<BulkReviewPreviewResponse>());
+
+            using HttpResponseMessage commitMessage = await client.PostAsJsonAsync(
+                "/api/review/bulk/commit",
+                new BulkReviewCommitRequest(
+                    selectedSubset,
+                    BulkReviewActionKinds.Assign,
+                    personId.ToString(),
+                    preview.AffectedCount,
+                    preview.PreviewToken,
+                    Confirm: true,
+                    Actor: "test"));
+            await commitMessage.EnsureSuccessWithDiagnosticBodyAsync("bulk commit from similar-face result");
+            BulkReviewCommitResponse committed = Assert.IsType<BulkReviewCommitResponse>(
+                await commitMessage.Content.ReadFromJsonAsync<BulkReviewCommitResponse>());
+            Assert.Equal(1, committed.AffectedCount);
+            Assert.Equal([firstFaceId], bulk.CommittedFaceIds);
+            Assert.DoesNotContain(unknownFaceId, bulk.CommittedFaceIds);
 
             using HttpResponseMessage invalid = await client.GetAsync(
                 $"/api/review/faces/{sourceFaceId}/similar?modelId={modelId}&modelHash=bad");
@@ -133,6 +164,56 @@ public sealed class SimilarFaceApplicationTests
             IncludeUnknown = includeUnknown;
             Limit = limit;
             return Task.FromResult<CatalogueSimilarFaceQueryResult?>(_result);
+        }
+    }
+
+    private sealed class FakeBulkReviewRepository : IBulkReviewRepository
+    {
+        public IReadOnlyList<FaceOccurrenceId> CommittedFaceIds { get; private set; } = [];
+
+        public Task<BulkReviewPreview> PreviewAsync(
+            IReadOnlyCollection<FaceOccurrenceId> faceOccurrenceIds,
+            string action,
+            PersonId? personId,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ReviewPerson? person = personId is PersonId id
+                ? new ReviewPerson(id, "Candidate person")
+                : null;
+            return Task.FromResult(new BulkReviewPreview(
+                action,
+                faceOccurrenceIds.Count,
+                faceOccurrenceIds.Count,
+                SkippedCount: 0,
+                PreviewToken: "similar-face-preview",
+                person));
+        }
+
+        public Task<BulkReviewResult> CommitAsync(
+            IReadOnlyCollection<FaceOccurrenceId> faceOccurrenceIds,
+            string action,
+            PersonId? personId,
+            int expectedAffectedCount,
+            string previewToken,
+            string actor,
+            DateTimeOffset createdAtUtc,
+            string? note = null,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Assert.Equal("similar-face-preview", previewToken);
+            Assert.Equal(expectedAffectedCount, faceOccurrenceIds.Count);
+            CommittedFaceIds = faceOccurrenceIds.OrderBy(id => id.ToString(), StringComparer.Ordinal).ToArray();
+            ReviewPerson? person = personId is PersonId id
+                ? new ReviewPerson(id, "Candidate person")
+                : null;
+            return Task.FromResult(new BulkReviewResult(
+                action,
+                faceOccurrenceIds.Count,
+                faceOccurrenceIds.Count,
+                person,
+                createdAtUtc));
         }
     }
 }
