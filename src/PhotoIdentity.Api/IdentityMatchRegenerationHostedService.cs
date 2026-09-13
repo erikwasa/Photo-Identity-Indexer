@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Worker;
@@ -35,7 +36,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         TimeProvider timeProvider,
         ArchiveThroughputMetrics metrics,
         ILogger<IdentityMatchRegenerationHostedService>? logger = null,
-        IIdentityMatchFollowUpPlanner? followUpPlanner = null)
+        IIdentityMatchModelRepository? models = null,
+        IConfiguration? configuration = null)
     {
         _runs = runs;
         _scorer = scorer;
@@ -45,7 +47,15 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         _timeProvider = timeProvider;
         _metrics = metrics;
         _logger = logger ?? NullLogger<IdentityMatchRegenerationHostedService>.Instance;
-        _followUpPlanner = followUpPlanner ?? DisabledIdentityMatchFollowUpPlanner.Instance;
+        _followUpPlanner = models is null
+            ? DisabledIdentityMatchFollowUpPlanner.Instance
+            : new IdentityMatchFollowUpPlanner(
+                models,
+                runs,
+                evidence,
+                policies,
+                timeProvider,
+                IdentityMatchFollowUpConfiguration.FromConfiguration(configuration));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
