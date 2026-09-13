@@ -1,0 +1,142 @@
+.group-model-row {
+    display: flex;
+    gap: 1rem;
+    align-items: end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.group-model-row > div {
+    min-width: min(100%, 22rem);
+    flex: 1 1 22rem;
+}
+
+.group-model-row select {
+    width: 100%;
+}
+
+.group-guidance {
+    display: grid;
+    gap: 0.35rem;
+    margin: 1rem 0 1.25rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+    background: var(--surface);
+}
+
+.group-guidance span,
+.group-evidence {
+    color: var(--muted);
+}
+
+.suggested-group-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+    gap: 1rem;
+}
+
+.suggested-group-card {
+    display: grid;
+    align-content: start;
+    gap: 0.9rem;
+    padding: 1rem;
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    background: var(--surface);
+    min-width: 0;
+}
+
+.group-heading {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.group-heading h2 {
+    margin: 0.1rem 0 0;
+    overflow-wrap: anywhere;
+}
+
+.favorite-badge {
+    flex: 0 0 auto;
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.representative-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.35rem;
+    min-height: 4.5rem;
+}
+
+.representative-strip img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 0.65rem;
+    background: var(--surface-strong);
+}
+
+.group-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.4rem;
+    margin: 0;
+}
+
+.group-metrics > div {
+    min-width: 0;
+    padding: 0.55rem 0.35rem;
+    text-align: center;
+    border: 1px solid var(--line);
+    border-radius: 0.65rem;
+}
+
+.group-metrics dt {
+    font-size: 0.72rem;
+    color: var(--muted);
+}
+
+.group-metrics dd {
+    margin: 0.15rem 0 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.group-evidence {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.load-more-row {
+    display: flex;
+    justify-content: center;
+    margin: 1.25rem 0;
+}
+
+@media (max-width: 680px) {
+    .suggested-group-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .group-model-row {
+        align-items: stretch;
+    }
+
+    .group-model-row .button {
+        width: 100%;
+    }
+
+    .suggested-group-card {
+        padding: 0.85rem;
+    }
+
+    .group-heading {
+        align-items: center;
+    }
+}

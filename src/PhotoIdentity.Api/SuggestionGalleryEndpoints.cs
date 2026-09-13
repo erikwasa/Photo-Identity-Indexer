@@ -1,6 +1,8 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
+using PhotoIdentity.Persistence.Postgres;
+using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -12,9 +14,55 @@ public static class SuggestionGalleryEndpoints
     public static IEndpointRouteBuilder MapSuggestionGalleryEndpoints(this IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/review/suggestion-faces");
+        group.MapGet("/groups", GetGroupsAsync);
         group.MapGet("", GetFacesAsync);
         group.MapGet("/{id}", GetFaceAsync);
         return endpoints;
+    }
+
+    private static async Task<IResult> GetGroupsAsync(
+        IServiceProvider services,
+        IConfiguration configuration,
+        string? modelId,
+        string? modelHash,
+        int offset = 0,
+        int limit = 30,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryModelRevision(modelId, modelHash, out ModelId parsedModelId, out Sha256Digest parsedModelHash))
+        {
+            return BadRequest("An exact suggestion model revision is required.");
+        }
+
+        try
+        {
+            IIdentitySuggestionPolicyRepository policyRepository = services
+                .GetRequiredService<IIdentitySuggestionPolicyRepository>();
+            ISuggestedPersonGroupRepository repository =
+                CataloguePersistenceComposition.ResolveProvider(configuration) == CatalogueProviderKind.Postgres
+                    ? new PostgresSuggestedPersonGroupRepository(
+                        services.GetRequiredService<PostgresCatalogueDatabase>(),
+                        policyRepository)
+                    : new SqliteSuggestedPersonGroupRepository(
+                        services.GetRequiredService<SqliteCatalogueDatabase>(),
+                        policyRepository);
+
+            ReviewSuggestedPersonGroupPage page = await repository.GetGroupsAsync(
+                parsedModelId,
+                parsedModelHash,
+                offset,
+                limit,
+                cancellationToken);
+            return Results.Ok(new ReviewSuggestedPersonGroupPageResponse(
+                page.Items.Select(ToResponse).ToArray(),
+                page.Offset,
+                page.Limit,
+                page.Total));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
     }
 
     private static async Task<IResult> GetFacesAsync(
@@ -138,6 +186,22 @@ public static class SuggestionGalleryEndpoints
             return BadRequest(exception.Message);
         }
     }
+
+    private static ReviewSuggestedPersonGroupResponse ToResponse(ReviewSuggestedPersonGroup group) =>
+        new(
+            new ReviewPersonResponse(
+                group.Person.Id.ToString(),
+                group.Person.DisplayName,
+                IsFavorite: group.IsFavorite),
+            group.PendingCount,
+            group.HighCount,
+            group.MediumCount,
+            group.LowCount,
+            group.StrongestScore,
+            group.StrongestMargin,
+            group.IsFavorite,
+            group.RepresentativeFaceIds.Select(id => id.ToString()).ToArray(),
+            group.RepresentativeFaceIds.Select(id => $"/api/review/faces/{id}/image").ToArray());
 
     private static ReviewFaceResponse ToResponse(
         ReviewSuggestionGalleryFace face,
