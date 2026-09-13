@@ -1,26 +1,40 @@
+using System.Numerics;
+
 namespace PhotoIdentity.Core.Clustering;
 
 /// <summary>
 /// Deterministic exact cosine-distance DBSCAN used by the initial M25 production policy.
-/// Pairwise work is quadratic, matching the WI-0113 evaluation semantics, but memory stays
-/// bounded by the face cap and an explicit sparse-neighbour edge budget rather than retaining a
-/// dense distance matrix. Inputs are sorted by stable face-occurrence ID before cluster expansion.
+/// Pairwise work is quadratic, matching the WI-0113 evaluation semantics, while normalized SIMD
+/// dot products and bounded parallel row chunks avoid the much slower scalar reference path.
+/// Memory stays bounded by the face cap and an explicit sparse-neighbour edge budget rather than
+/// retaining a dense distance matrix. Inputs are sorted by stable face-occurrence ID before
+/// cluster expansion.
 /// </summary>
 public sealed class ProvisionalFaceDbscanClusterer
 {
     public const int DefaultMaximumUndirectedNeighborEdges = 2_000_000;
+    private const int PairwiseRowChunkSize = 64;
 
     private readonly int _maximumUndirectedNeighborEdges;
+    private readonly int _maximumDegreeOfParallelism;
 
     public ProvisionalFaceDbscanClusterer(
-        int maximumUndirectedNeighborEdges = DefaultMaximumUndirectedNeighborEdges)
+        int maximumUndirectedNeighborEdges = DefaultMaximumUndirectedNeighborEdges,
+        int? maximumDegreeOfParallelism = null)
     {
         if (maximumUndirectedNeighborEdges < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(maximumUndirectedNeighborEdges));
         }
 
+        int degree = maximumDegreeOfParallelism ?? Math.Max(1, Environment.ProcessorCount - 1);
+        if (degree < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumDegreeOfParallelism));
+        }
+
         _maximumUndirectedNeighborEdges = maximumUndirectedNeighborEdges;
+        _maximumDegreeOfParallelism = degree;
     }
 
     public async Task<ProvisionalFaceClusterComputation> ComputeAsync(
@@ -62,41 +76,81 @@ public sealed class ProvisionalFaceDbscanClusterer
                 "All embeddings in one provisional clustering run must have the same dimensions.");
         }
 
+        float[][] normalized = ordered
+            .Select(face => Normalize(face.Embedding))
+            .ToArray();
+        var forwardNeighbours = new List<int>[ordered.Count];
+        for (int index = 0; index < forwardNeighbours.Length; index++)
+        {
+            forwardNeighbours[index] = [];
+        }
+
+        int undirectedEdgeCount = 0;
+        int overflow = 0;
+        ParallelOptions parallelOptions = new()
+        {
+            CancellationToken = cancellationToken,
+            MaxDegreeOfParallelism = _maximumDegreeOfParallelism,
+        };
+
+        for (int chunkStart = 0; chunkStart < ordered.Count; chunkStart += PairwiseRowChunkSize)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int chunkEnd = Math.Min(ordered.Count, chunkStart + PairwiseRowChunkSize);
+            Parallel.For(chunkStart, chunkEnd, parallelOptions, left =>
+            {
+                float[] leftVector = normalized[left];
+                List<int> local = forwardNeighbours[left];
+                for (int right = left + 1; right < normalized.Length; right++)
+                {
+                    if (Volatile.Read(ref overflow) != 0)
+                    {
+                        break;
+                    }
+
+                    float similarity = Dot(leftVector, normalized[right]);
+                    double distance = Math.Clamp(1d - similarity, 0d, 2d);
+                    if (distance > eps)
+                    {
+                        continue;
+                    }
+
+                    int edgeCount = Interlocked.Increment(ref undirectedEdgeCount);
+                    if (edgeCount > _maximumUndirectedNeighborEdges)
+                    {
+                        Volatile.Write(ref overflow, 1);
+                        break;
+                    }
+
+                    local.Add(right);
+                }
+            });
+
+            if (Volatile.Read(ref overflow) != 0)
+            {
+                throw new InvalidOperationException(
+                    $"Provisional clustering exceeded the bounded neighbour budget of {_maximumUndirectedNeighborEdges:N0} exact edges. " +
+                    "Do not silently weaken the DBSCAN policy; measure the production workload before changing retrieval/indexing strategy.");
+            }
+
+            if (reportProgress is not null)
+            {
+                await reportProgress(chunkEnd, cancellationToken);
+            }
+        }
+
         var neighbours = new List<int>[ordered.Count];
         for (int index = 0; index < ordered.Count; index++)
         {
             neighbours[index] = [index];
         }
 
-        int undirectedEdgeCount = 0;
-        for (int left = 0; left < ordered.Count; left++)
+        for (int left = 0; left < forwardNeighbours.Length; left++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            for (int right = left + 1; right < ordered.Count; right++)
+            foreach (int right in forwardNeighbours[left])
             {
-                double similarity = ordered[left].Embedding.CosineSimilarity(ordered[right].Embedding);
-                double distance = Math.Clamp(1d - similarity, 0d, 2d);
-                if (distance > eps)
-                {
-                    continue;
-                }
-
-                undirectedEdgeCount++;
-                if (undirectedEdgeCount > _maximumUndirectedNeighborEdges)
-                {
-                    throw new InvalidOperationException(
-                        $"Provisional clustering exceeded the bounded neighbour budget of {_maximumUndirectedNeighborEdges:N0} exact edges. " +
-                        "Do not silently weaken the DBSCAN policy; measure the production workload before changing retrieval/indexing strategy.");
-                }
-
                 neighbours[left].Add(right);
                 neighbours[right].Add(left);
-            }
-
-            if (reportProgress is not null &&
-                (left == ordered.Count - 1 || (left + 1) % 64 == 0))
-            {
-                await reportProgress(left + 1, cancellationToken);
             }
         }
 
@@ -222,5 +276,37 @@ public sealed class ProvisionalFaceDbscanClusterer
             keys.Count,
             noiseCount,
             memberships);
+    }
+
+    private static float[] Normalize(PhotoIdentity.Core.Recognition.EmbeddingVector embedding)
+    {
+        float[] values = embedding.ToArray();
+        float inverseNorm = (float)(1d / embedding.L2Norm);
+        for (int index = 0; index < values.Length; index++)
+        {
+            values[index] *= inverseNorm;
+        }
+
+        return values;
+    }
+
+    private static float Dot(float[] left, float[] right)
+    {
+        int vectorWidth = Vector<float>.Count;
+        int index = 0;
+        float sum = 0;
+        for (; index <= left.Length - vectorWidth; index += vectorWidth)
+        {
+            sum += Vector.Dot(
+                new Vector<float>(left, index),
+                new Vector<float>(right, index));
+        }
+
+        for (; index < left.Length; index++)
+        {
+            sum += left[index] * right[index];
+        }
+
+        return sum;
     }
 }
