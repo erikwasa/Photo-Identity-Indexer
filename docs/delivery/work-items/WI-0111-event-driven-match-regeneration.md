@@ -28,7 +28,7 @@ Automatic follow-up defaults on and can be disabled with `PhotoIdentity__Identit
 
 The existing regeneration API/page now distinguishes automatic follow-up state as `queued`, `running`, `current` or `disabled` while preserving the existing stale flag for policy/evidence validity. A queued state keeps the page polling until the bounded run starts and completes.
 
-Maintainer acceptance is deliberately deferred. On 2026-09-13 the maintainer asked to continue with WI-0112 and perform the WI-0111 Windows acceptance together with the next work-item verification. Until that pass is recorded, WI-0111 remains `in_review` and must not be marked completed.
+Maintainer acceptance is deliberately deferred. The maintainer requested one combined Windows acceptance session for WI-0111, WI-0112 and WI-0113. Until that pass is recorded, WI-0111 remains `in_review` and must not be marked completed.
 
 ## In scope
 
@@ -63,4 +63,4 @@ Maintainer acceptance is deliberately deferred. On 2026-09-13 the maintainer ask
 
 ## Verification requirements
 
-Automated integration coverage for scheduler/run-state semantics plus human Windows verification of a manual assignment followed by visible queued/completed matching without an explicit regenerate click. The human pass is deferred by maintainer request and should be performed together with WI-0112 verification before WI-0111 is completed.
+Automated integration coverage for scheduler/run-state semantics plus human Windows verification of a manual assignment followed by visible queued/completed matching without an explicit regenerate click, review responsiveness while the run is active, convergence without a recursive second run, and disabled-mode explicit regeneration. Perform that human pass in the combined WI-0111/WI-0112/WI-0113 maintainer session before WI-0111 is completed.
