@@ -17,8 +17,8 @@ The repository has an enforceable structure, living documentation, initial ADRs,
 - [WI-0002](../work-items/WI-0002-solution-skeleton.md) — establish the .NET solution skeleton.
 - [WI-0003](../work-items/WI-0003-core-types.md) — establish core domain types and dependency boundaries.
 - [WI-0004](../work-items/WI-0004-docs-tooling.md) — add documentation/status tooling.
-- [WI-0057](../work-items/WI-0057-delivery-status-lifecycle.md) — establish explicit work-item lifecycle/status maintenance.
-- [WI-0069](../work-items/WI-0069-streamline-local-verification.md) — remove redundant local/CI verification work.
+- [WI-0057](../work-items/WI-0057-work-item-registry-archive.md) — establish explicit work-item lifecycle/status maintenance.
+- [WI-0069](../work-items/WI-0069-ci-runtime-optimization.md) — remove redundant local/CI verification work.
 - [WI-0070](../work-items/WI-0070-pr-validation-streamlining.md) — streamline pull-request validation while retaining comprehensive coverage.
 - [WI-0071](../work-items/WI-0071-stabilize-quarantined-integration-tests.md) — eliminate transient API-host quarantine and restore all tracked tests to required coverage.
 - [WI-0109](../work-items/WI-0109-sharded-work-item-documentation.md) — migrate work-item status to bounded canonical shards with automatic terminal archival.
