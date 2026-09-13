@@ -78,6 +78,10 @@
             </button>
         </div>
 
+        @if (Face.State != "rejected")
+        {
+            <a class="details-link" href="@SimilarFacesUrl">Find similar faces →</a>
+        }
         <a class="details-link" href="@ResolvedDetailsUrl">Details and audit history →</a>
     </div>
 </article>
@@ -125,6 +129,8 @@
     private string ResolvedDetailsUrl => string.IsNullOrWhiteSpace(DetailsUrl)
         ? $"/faces/{Uri.EscapeDataString(Face.Id)}"
         : DetailsUrl;
+
+    private string SimilarFacesUrl => $"/faces/{Uri.EscapeDataString(Face.Id)}/similar";
 
     private string FaceImageAlt => Face.TargetBox is null
         ? "Detected face"

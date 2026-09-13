@@ -1,0 +1,86 @@
+.similar-source-panel,
+.similar-person-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 1.4fr);
+    gap: 1.5rem;
+    align-items: start;
+    margin: 1.5rem 0;
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    background: var(--surface);
+}
+
+.similar-source-image {
+    display: block;
+    width: min(18rem, 100%);
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 0.85rem;
+    background: var(--surface-muted);
+}
+
+.similar-controls {
+    display: grid;
+    gap: 1.25rem;
+}
+
+.similar-unknown-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    cursor: pointer;
+}
+
+.similar-unknown-toggle input {
+    margin-top: 0.2rem;
+}
+
+.similar-unknown-toggle span {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.similar-unknown-toggle small {
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.similar-face-result {
+    min-width: 0;
+}
+
+.similarity-evidence {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: baseline;
+    margin-bottom: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 0.65rem;
+    background: var(--surface-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.similarity-evidence span {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.similarity-evidence strong {
+    font-size: 1rem;
+}
+
+@media (max-width: 760px) {
+    .similar-source-panel,
+    .similar-person-panel {
+        grid-template-columns: 1fr;
+    }
+
+    .similar-source-image {
+        width: min(14rem, 100%);
+    }
+}

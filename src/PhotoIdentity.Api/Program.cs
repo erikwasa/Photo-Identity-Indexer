@@ -75,6 +75,7 @@ public partial class Program
             postgresCatalogueDatabase = CataloguePersistenceComposition.AddPostgres(
                 builder.Services,
                 postgresConnectionString);
+            builder.Services.AddSingleton<ISimilarFaceRepository, PostgresSimilarFaceRepository>();
         }
         else
         {
@@ -277,6 +278,7 @@ public partial class Program
             postgres = postgresHealth,
         }));
         app.MapReviewEndpoints();
+        app.MapSimilarFaceEndpoints();
         app.MapReviewSuggestionEndpoints();
         app.MapSuggestionGalleryEndpoints();
         app.MapIdentitySuggestionPolicyEndpoints();

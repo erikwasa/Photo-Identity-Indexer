@@ -1,0 +1,505 @@
+@page "/faces/{Id}/similar"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Similar faces · Photo Identity</PageTitle>
+
+<a class="back-link" href="@SourceDetailsUrl">← Back to face details</a>
+
+<section class="details-header">
+    <div>
+        <p class="eyebrow">Identity discovery</p>
+        <h1>Find similar faces</h1>
+        <p>Similarity is advisory model evidence, not an identity decision. Select only faces you recognise as the same person.</p>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="notice success" role="status">@Message</div>
+}
+
+<section class="similar-source-panel" aria-labelledby="similar-source-heading">
+    <div>
+        <p class="eyebrow">Source face</p>
+        <h2 id="similar-source-heading">Search from this face</h2>
+        <img class="similar-source-image"
+             src="@SourceImageUrl"
+             alt="Source face used for similarity search" />
+    </div>
+
+    <div class="similar-controls">
+        <div>
+            <label class="field-label" for="similar-model">Embedding model</label>
+            <select id="similar-model"
+                    @bind="SelectedModelIndex"
+                    @bind:after="ModelChangedAsync"
+                    disabled="@(Loading || Models.Count == 0)">
+                @for (int index = 0; index < Models.Count; index++)
+                {
+                    SimilarFaceModelResponse model = Models[index];
+                    <option value="@index">@ModelLabel(model)</option>
+                }
+            </select>
+        </div>
+
+        <label class="similar-unknown-toggle">
+            <input type="checkbox"
+                   @bind="IncludeUnknown"
+                   @bind:after="ReloadAsync"
+                   disabled="@Loading" />
+            <span>
+                <strong>Include Unknown faces</strong>
+                <small>Rediscovery only. Their canonical Unknown state is not changed and they cannot be bulk-selected here.</small>
+            </span>
+        </label>
+    </div>
+</section>
+
+@if (Loading)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Finding similar faces…</p>
+    </section>
+}
+else if (Result is not null)
+{
+    <div class="gallery-summary" role="status">
+        <span>@Result.Items.Count result@(Result.Items.Count == 1 ? "" : "s")</span>
+        <span>@Result.ScannedFaceCount eligible face@(Result.ScannedFaceCount == 1 ? "" : "s") scanned</span>
+        <span>@Result.QueryElapsedMilliseconds ms</span>
+    </div>
+
+    @if (Result.Items.Count == 0)
+    {
+        <section class="empty-state compact">
+            <h2>No similar eligible faces</h2>
+            <p>Try another exact model revision, or include Unknown faces for intentional rediscovery.</p>
+        </section>
+    }
+    else
+    {
+        <section class="face-grid" aria-label="Similar face results">
+            @foreach (SimilarFaceResponse item in Result.Items)
+            {
+                <div class="similar-face-result" @key="item.Face.Id">
+                    <div class="similarity-evidence">
+                        <span>Cosine similarity</span>
+                        <strong>@item.Similarity.ToString("F4")</strong>
+                    </div>
+                    <FaceCard Face="item.Face"
+                              People="People"
+                              DetailsUrl="@CandidateDetailsUrl(item.Face.Id)"
+                              Selectable="@(item.Face.State == "unreviewed")"
+                              Selected="@SelectedFaceIds.Contains(item.Face.Id)"
+                              SelectionDisabled="@BulkBusy"
+                              SelectionChanged="SetFaceSelection"
+                              AssignRequested="AssignAsync"
+                              UnknownRequested="MarkUnknownAsync"
+                              RejectRequested="RejectAsync"
+                              UndoRequested="UndoAsync" />
+                </div>
+            }
+        </section>
+    }
+}
+
+@if (SelectedCount > 0)
+{
+    <section class="bulk-action-bar" aria-label="Similar face bulk review actions">
+        <div class="bulk-action-summary">
+            <strong>@SelectedCount selected</strong>
+            <span>Only unreviewed faces are eligible for bulk decisions.</span>
+        </div>
+
+        <div>
+            <label class="field-label" for="similar-bulk-person">Assign to</label>
+            <select id="similar-bulk-person" @bind="BulkPersonId" disabled="@(BulkBusy || People.Count == 0)">
+                <option value="">Choose a person</option>
+                @foreach (ReviewPersonResponse person in People)
+                {
+                    <option value="@person.Id">@PersonLabel(person)</option>
+                }
+            </select>
+        </div>
+
+        <button class="button primary"
+                disabled="@(BulkBusy || string.IsNullOrWhiteSpace(BulkPersonId))"
+                @onclick="ExecuteAssignBulkAsync">
+            Assign selected
+        </button>
+        <button class="button secondary" disabled="@BulkBusy" @onclick="ExecuteUnknownBulkAsync">
+            Unknown
+        </button>
+        <button class="button danger" disabled="@BulkBusy" @onclick="ExecuteRejectBulkAsync">
+            False detection
+        </button>
+        <button class="button secondary" disabled="@BulkBusy" @onclick="ClearSelection">
+            Clear
+        </button>
+    </section>
+    <div class="bulk-action-spacer" aria-hidden="true"></div>
+}
+
+<section class="similar-person-panel" aria-labelledby="similar-person-heading">
+    <div>
+        <p class="eyebrow">Identity</p>
+        <h2 id="similar-person-heading">Create a person before bulk assignment</h2>
+    </div>
+    <form class="person-creator" @onsubmit="CreatePersonAsync" @onsubmit:preventDefault>
+        <label class="field-label" for="similar-new-person">Display name</label>
+        <div class="inline-field">
+            <input id="similar-new-person"
+                   maxlength="200"
+                   autocomplete="off"
+                   placeholder="Display name"
+                   @bind="NewPersonName"
+                   @bind:event="oninput" />
+            <button type="submit"
+                    class="button primary"
+                    disabled="@(BulkBusy || string.IsNullOrWhiteSpace(NewPersonName))">
+                Create
+            </button>
+        </div>
+    </form>
+</section>
+
+@code {
+    private const string Actor = "local-reviewer";
+    private const string AssignAction = "assign";
+    private const string UnknownAction = "unknown";
+    private const string RejectAction = "reject";
+    private const int ResultLimit = 100;
+
+    [Parameter, EditorRequired]
+    public string Id { get; set; } = "";
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelId")]
+    public string? ModelId { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "modelHash")]
+    public string? ModelHash { get; set; }
+
+    [Parameter, SupplyParameterFromQuery(Name = "includeUnknown")]
+    public bool IncludeUnknown { get; set; }
+
+    private IReadOnlyList<SimilarFaceModelResponse> Models { get; set; } = [];
+    private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+    private SimilarFacePageResponse? Result { get; set; }
+    private HashSet<string> SelectedFaceIds { get; } = new(StringComparer.Ordinal);
+    private string SelectedModelIndex { get; set; } = "";
+    private string BulkPersonId { get; set; } = "";
+    private string NewPersonName { get; set; } = "";
+    private bool Loading { get; set; } = true;
+    private bool BulkBusy { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    private SimilarFaceModelResponse? SelectedModel =>
+        int.TryParse(SelectedModelIndex, out int index) && index >= 0 && index < Models.Count
+            ? Models[index]
+            : null;
+
+    private int SelectedCount => SelectedFaceIds.Count;
+    private string SourceImageUrl => $"/api/review/faces/{Uri.EscapeDataString(Id)}/image";
+    private string SourceDetailsUrl => $"/faces/{Uri.EscapeDataString(Id)}";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        Loading = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            Models = await Http.GetFromJsonAsync<SimilarFaceModelResponse[]>(
+                "api/review/match-regeneration/models") ?? [];
+            People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+            ResolveSelectedModel();
+            if (SelectedModel is not null)
+            {
+                await LoadSimilarAsync();
+            }
+            else
+            {
+                Result = null;
+                Error = "No embedding model revision is available for similarity search.";
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private void ResolveSelectedModel()
+    {
+        int index = Models
+            .Select((model, index) => (model, index))
+            .Where(item => string.Equals(item.model.ModelId, ModelId, StringComparison.Ordinal) &&
+                           string.Equals(item.model.ModelHash, ModelHash, StringComparison.Ordinal))
+            .Select(item => item.index)
+            .DefaultIfEmpty(Models.Count == 0 ? -1 : 0)
+            .First();
+        SelectedModelIndex = index >= 0 ? index.ToString() : "";
+    }
+
+    private async Task ModelChangedAsync()
+    {
+        ClearSelection();
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        Loading = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            await LoadSimilarAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task LoadSimilarAsync()
+    {
+        SimilarFaceModelResponse model = SelectedModel
+            ?? throw new InvalidOperationException("Choose an embedding model revision.");
+        string endpoint =
+            $"api/review/faces/{Uri.EscapeDataString(Id)}/similar" +
+            $"?modelId={Uri.EscapeDataString(model.ModelId)}" +
+            $"&modelHash={Uri.EscapeDataString(model.ModelHash)}" +
+            $"&includeUnknown={IncludeUnknown.ToString().ToLowerInvariant()}" +
+            $"&limit={ResultLimit}";
+        Result = await Http.GetFromJsonAsync<SimilarFacePageResponse>(endpoint)
+            ?? throw new InvalidOperationException("The similar-face response was empty.");
+
+        HashSet<string> currentIds = Result.Items.Select(item => item.Face.Id).ToHashSet(StringComparer.Ordinal);
+        SelectedFaceIds.RemoveWhere(id => !currentIds.Contains(id));
+    }
+
+    private string CandidateDetailsUrl(string faceId)
+    {
+        SimilarFaceModelResponse? model = SelectedModel;
+        string returnUrl = model is null
+            ? $"/faces/{Uri.EscapeDataString(Id)}/similar"
+            : $"/faces/{Uri.EscapeDataString(Id)}/similar" +
+              $"?modelId={Uri.EscapeDataString(model.ModelId)}" +
+              $"&modelHash={Uri.EscapeDataString(model.ModelHash)}" +
+              $"&includeUnknown={IncludeUnknown.ToString().ToLowerInvariant()}";
+        return $"/faces/{Uri.EscapeDataString(faceId)}?returnUrl={Uri.EscapeDataString(returnUrl)}";
+    }
+
+    private void SetFaceSelection((string FaceId, bool Selected, bool Range) change)
+    {
+        if (BulkBusy)
+        {
+            return;
+        }
+
+        if (change.Selected)
+        {
+            SelectedFaceIds.Add(change.FaceId);
+        }
+        else
+        {
+            SelectedFaceIds.Remove(change.FaceId);
+        }
+        Message = null;
+    }
+
+    private void ClearSelection()
+    {
+        SelectedFaceIds.Clear();
+        Message = null;
+    }
+
+    private Task ExecuteAssignBulkAsync() => ExecuteBulkAsync(AssignAction);
+    private Task ExecuteUnknownBulkAsync() => ExecuteBulkAsync(UnknownAction);
+    private Task ExecuteRejectBulkAsync() => ExecuteBulkAsync(RejectAction);
+
+    private async Task ExecuteBulkAsync(string action)
+    {
+        if (BulkBusy || SelectedCount == 0)
+        {
+            return;
+        }
+        if (action == AssignAction && string.IsNullOrWhiteSpace(BulkPersonId))
+        {
+            Error = "Choose a person before assigning selected faces.";
+            return;
+        }
+
+        string[] faceIds = SelectedFaceIds.OrderBy(id => id, StringComparer.Ordinal).ToArray();
+        BulkBusy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage previewResponse = await Http.PostAsJsonAsync(
+                "api/review/bulk/preview",
+                new BulkReviewPreviewRequest(faceIds, action, action == AssignAction ? BulkPersonId : null));
+            await RequireSuccessAsync(previewResponse);
+            BulkReviewPreviewResponse preview = await previewResponse.Content.ReadFromJsonAsync<BulkReviewPreviewResponse>()
+                ?? throw new InvalidOperationException("The bulk preview response was empty.");
+            if (preview.SkippedCount != 0 || preview.AffectedCount != faceIds.Length)
+            {
+                throw new InvalidOperationException(
+                    "The selected faces changed before the bulk action could be committed. Review the current results and try again.");
+            }
+
+            using HttpResponseMessage commitResponse = await Http.PostAsJsonAsync(
+                "api/review/bulk/commit",
+                new BulkReviewCommitRequest(
+                    faceIds,
+                    action,
+                    action == AssignAction ? BulkPersonId : null,
+                    preview.AffectedCount,
+                    preview.PreviewToken,
+                    Confirm: true,
+                    Actor));
+            await RequireSuccessAsync(commitResponse);
+            BulkReviewCommitResponse committed = await commitResponse.Content.ReadFromJsonAsync<BulkReviewCommitResponse>()
+                ?? throw new InvalidOperationException("The bulk commit response was empty.");
+
+            ClearSelection();
+            await LoadSimilarAsync();
+            Message = action switch
+            {
+                AssignAction => $"Assigned {committed.AffectedCount} face{(committed.AffectedCount == 1 ? "" : "s")} to {committed.Person?.DisplayName}.",
+                UnknownAction => $"Marked {committed.AffectedCount} face{(committed.AffectedCount == 1 ? "" : "s")} as Unknown.",
+                _ => $"Marked {committed.AffectedCount} face{(committed.AffectedCount == 1 ? "" : "s")} as false detections.",
+            };
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            BulkBusy = false;
+        }
+    }
+
+    private async Task CreatePersonAsync()
+    {
+        if (BulkBusy || string.IsNullOrWhiteSpace(NewPersonName))
+        {
+            return;
+        }
+
+        BulkBusy = true;
+        Error = null;
+        Message = null;
+        string displayName = NewPersonName.Trim();
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/review/people",
+                new CreatePersonRequest(displayName));
+            await RequireSuccessAsync(response);
+            ReviewPersonResponse created = await response.Content.ReadFromJsonAsync<ReviewPersonResponse>()
+                ?? throw new InvalidOperationException("The person creation response was empty.");
+            People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+            BulkPersonId = created.Id;
+            NewPersonName = "";
+            Message = $"Created {created.DisplayName}; it is selected for bulk assignment.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            BulkBusy = false;
+        }
+    }
+
+    private Task AssignAsync((string FaceId, string PersonId) request) =>
+        PostFaceActionAsync(
+            request.FaceId,
+            "assign",
+            new AssignFaceRequest(request.PersonId, Actor),
+            "Face assignment saved.");
+
+    private Task MarkUnknownAsync(string faceId) =>
+        PostFaceActionAsync(faceId, "unknown", new ReviewFaceActionRequest(Actor), "Face marked as Unknown.");
+
+    private Task RejectAsync(string faceId) =>
+        PostFaceActionAsync(faceId, "reject", new ReviewFaceActionRequest(Actor), "False detection saved.");
+
+    private Task UndoAsync(string faceId) =>
+        PostFaceActionAsync(faceId, "undo", new ReviewFaceActionRequest(Actor), "Latest face decision undone.");
+
+    private async Task PostFaceActionAsync<TPayload>(
+        string faceId,
+        string action,
+        TPayload payload,
+        string successMessage)
+    {
+        BulkBusy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/review/faces/{Uri.EscapeDataString(faceId)}/{action}",
+                payload);
+            await RequireSuccessAsync(response);
+            await LoadSimilarAsync();
+            Message = successMessage;
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            BulkBusy = false;
+        }
+    }
+
+    private static string ModelLabel(SimilarFaceModelResponse model) =>
+        $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} faces";
+
+    private static string HashPrefix(string hash) =>
+        string.IsNullOrEmpty(hash) ? "—" : hash[..Math.Min(12, hash.Length)];
+
+    private static string PersonLabel(ReviewPersonResponse person) =>
+        person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
+
+    private static async Task RequireSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string detail = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(detail)
+                ? $"The review action failed with status {(int)response.StatusCode}."
+                : detail);
+    }
+
+    private sealed record SimilarFaceModelResponse(
+        string ModelId,
+        string ModelHash,
+        int FaceCount);
+}
