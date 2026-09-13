@@ -62,13 +62,16 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 policies,
                 timeProvider,
                 IdentityMatchFollowUpConfiguration.FromConfiguration(configuration));
-        _provisionalClustering = postgresCatalogueDatabase is null
-            ? null
-            : new ProvisionalFaceClusteringWorker(
+
+        bool postgresSelected = configuration is not null &&
+            CataloguePersistenceComposition.ResolveProvider(configuration) == CatalogueProviderKind.Postgres;
+        _provisionalClustering = postgresSelected && postgresCatalogueDatabase is not null
+            ? new ProvisionalFaceClusteringWorker(
                 new PostgresProvisionalFaceClusterRepository(postgresCatalogueDatabase),
                 new ProvisionalFaceDbscanClusterer(),
                 timeProvider,
-                _logger);
+                _logger)
+            : null;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
