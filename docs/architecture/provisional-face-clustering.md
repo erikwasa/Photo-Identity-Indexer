@@ -1,6 +1,6 @@
 # Provisional face clustering
 
-Status: WI-0113 evaluation contract. Production persistence/execution is deferred to WI-0114.
+Status: WI-0113 evaluated contract. Production persistence/execution is deferred to WI-0114.
 
 ## Boundary
 
@@ -78,10 +78,25 @@ The exporter intentionally writes no source paths, filenames, crop paths, person
 
 See `tools/cluster-evaluation/README.md` for the reproducible local procedure.
 
-## Production-policy decision gate
+## Selected initial production policy
 
-WI-0113 implementation does **not** preselect a clustering threshold from synthetic data. The algorithm/policy decision must be recorded only after the maintainer runs the private reviewed sample and inspects the actual false merges, false splits, noise, coverage, and available age/pose/image-quality variation.
+Maintainer evaluation on 2026-09-13 used a private sample of 5,000 reviewed faces with 107 assigned identity labels and 1,294 canonical Unknown faces. The selected conservative policy is **DBSCAN with `eps=0.30` and `min_samples=3`**.
 
-The same gate applies to neighbour-search infrastructure for WI-0114. The current catalogue stores vectors as validated exact-model byte arrays and existing similar-face discovery performs bounded exact scans. The WI-0113 private run records pairwise-distance timing and a scale projection, but that projection is diagnostic rather than sufficient by itself.
+Measured quality for that candidate:
 
-For WI-0114, PostgreSQL exact/vector-neighbour search should remain the default if measured local retrieval meets the required incremental budget. An ANN index/dependency is justified only if measured exact-neighbour retrieval at the expected archive scale does not. That decision must be recorded with the private evaluation result before WI-0114 implementation begins.
+- false-merge pairs: **0 / 443,525**,
+- false-merge rate: **0.000000**,
+- false-split rate: **0.687251**,
+- labelled coverage: **0.542**,
+- noise rate: **0.579**,
+- same-photo conflicting merges: **0**.
+
+The policy intentionally accepts substantial split/noise cost to preserve the primary safety goal of avoiding false merges. Noise remains derived and non-canonical; canonical Unknown remains unchanged and may participate only as unlabeled discovery evidence.
+
+Age, pose and image-quality variation were not established from the available sample metadata. This limitation must remain visible and should be revisited when later cluster-review work has suitable labelled examples; it is not inferred from embeddings.
+
+## Neighbour-search decision for WI-0114
+
+The private evaluator measured 0.528 seconds for the 5,000-face pairwise cosine-distance calculation and projects approximately **2.111 seconds at 10,000 faces** under its quadratic diagnostic model.
+
+That benchmark is not a direct PostgreSQL query benchmark, so it must not be treated as a latency guarantee. It nevertheless provides no evidence that ANN complexity is required at the expected initial archive scale. WI-0114 should therefore start with **bounded exact PostgreSQL/vector-neighbour retrieval**, preserve deterministic exact-model semantics, and keep ANN optional. Introduce an ANN index/dependency only if measured production incremental retrieval fails the required runtime budget.
