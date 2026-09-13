@@ -102,6 +102,7 @@ public static class IdentityMatchRegenerationEndpoints
         IIdentityMatchRegenerationRepository repository,
         IIdentitySuggestionPolicyRepository policyRepository,
         TimeProvider timeProvider,
+        IConfiguration configuration,
         string? modelId,
         string? modelHash,
         CancellationToken cancellationToken)
@@ -120,6 +121,8 @@ public static class IdentityMatchRegenerationEndpoints
             parsedModelId,
             parsedModelHash,
             cancellationToken);
+        IdentityMatchFollowUpConfiguration followUp =
+            IdentityMatchFollowUpConfiguration.FromConfiguration(configuration);
 
         try
         {
@@ -133,8 +136,10 @@ public static class IdentityMatchRegenerationEndpoints
             return Results.Accepted(value: ToResponse(
                 run,
                 stale: false,
-                new IdentityMatchFollowUpConfiguration(enabled: false),
-                new FollowUpSummary("running", QueuedAfterActiveRun: false)));
+                followUp,
+                new FollowUpSummary(
+                    followUp.Enabled ? "running" : "disabled",
+                    QueuedAfterActiveRun: false)));
         }
         catch (InvalidOperationException exception) when (
             exception.Message.Contains("already", StringComparison.OrdinalIgnoreCase))
