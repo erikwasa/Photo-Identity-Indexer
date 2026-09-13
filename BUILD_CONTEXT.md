@@ -6,32 +6,28 @@ This file is intentionally a short handoff for the next development or verificat
 
 **M25 Face discovery and cluster-assisted identity review is active.**
 
-WI-0110 has passed its first real-catalogue discovery verification and is in a narrow corrective slice. On 2026-09-13 the maintainer searched from a representative face and received 100 results from 9,847 eligible faces in 151 ms; the first 20 results were correct. Exact-model search, Unknown rediscovery, subset review and the remaining requested desktop/mobile checks behaved as expected.
-
-Two findings remain before WI-0110 can complete: the Similar Faces bulk bar must stay fixed in the viewport like ordinary Review, and Assign must include the unreviewed source face in the same audited preview/commit transaction. Unknown/reject actions must remain explicit-selection-only, and an already-reviewed source must never be silently rewritten.
+WI-0110 similar-face discovery is accepted and complete after PRs #319 and #320 plus maintainer Windows/mobile verification. The bounded exact PostgreSQL scan remains the accepted implementation at the measured archive scale.
 
 The production execution strategy remains local under ADR-0010, PostgreSQL remains the sole writable production catalogue, M23 remains intentionally deferred, and WI-0081 remains the separate quality investigation that gates any later expansion of automatic identity assignment.
 
 ## Next concrete step
 
-Finish and verify the WI-0110 corrective PR. Recheck that the Similar Faces bulk controls remain visible while scrolling and that assigning selected matches also assigns an unreviewed source face while preserving stale-state revalidation. The measured 151 ms exact scan over 9,847 eligible faces is practical, so no pgvector/ANN change is warranted in this work item.
+Start WI-0111: coalesce qualifying identity-evidence changes into a later durable exact-model match-regeneration run. Preserve the existing fixed evidence/model snapshot, stale-run behavior and no-same-run-cascade invariant; do not trigger one full regeneration per review click.
 
-After that verification passes, complete WI-0110 and proceed to WI-0111 event-driven bounded follow-up regeneration.
+The implementation should build on the existing regeneration repository/hosted-service state machine, add durable coalescing/restart semantics and an operator-visible queued/running/current state, then verify a manual assignment produces a later completed regeneration without an explicit regenerate click.
 
 ## Relevant files
 
 - docs/delivery/milestones/M25-face-discovery-and-cluster-assisted-review.md
-- docs/delivery/work-items/WI-0110-similar-face-explorer.md
-- docs/delivery/status/work-items/active/WI-0110.yaml
-- src/PhotoIdentity.Core/Review/ISimilarFaceRepository.cs
-- src/PhotoIdentity.Persistence.Postgres/PostgresSimilarFaceRepository.cs
-- src/PhotoIdentity.Api/SimilarFaceEndpoints.cs
-- src/PhotoIdentity.Web/SimilarFaceBulkSelection.cs
-- src/PhotoIdentity.Web/Pages/SimilarFaces.razor
-- src/PhotoIdentity.Web/Pages/SimilarFaces.razor.css
-- tests/PhotoIdentity.Persistence.Tests/PostgresSimilarFaceRepositoryTests.cs
-- tests/PhotoIdentity.Integration.Tests/SimilarFaceApplicationTests.cs
-- tests/PhotoIdentity.Integration.Tests/SimilarFaceBulkSelectionTests.cs
+- docs/delivery/work-items/WI-0111-event-driven-match-regeneration.md
+- docs/delivery/status/work-items/active/WI-0111.yaml
+- docs/decisions/ADR-0006-automatic-identity-assignment.md
+- src/PhotoIdentity.Core/Review/IIdentityMatchRegenerationRepository.cs
+- src/PhotoIdentity.Core/Review/IIdentityMatchRegenerationExecution.cs
+- src/PhotoIdentity.Persistence.Postgres/PostgresIdentityMatchRegenerationRepository.cs
+- src/PhotoIdentity.Persistence.Postgres/PostgresCatalogueDatabase.IdentityRegenerationSchema.cs
+- src/PhotoIdentity.Api/IdentityMatchRegenerationEndpoints.cs
+- src/PhotoIdentity.Api/IdentityMatchRegenerationHostedService.cs
 
 ## Repository validation
 
