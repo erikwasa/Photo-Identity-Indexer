@@ -19,13 +19,13 @@ public sealed class ProvisionalFaceClusterContractsTests
             MinimumSharedNeighbors: 1);
 
         Assert.Same(valid, valid.Validate());
-        Assert.Throws<ArgumentException>(() => valid with { Version = "" }.Validate());
-        Assert.Throws<ArgumentException>(() => valid with { Algorithm = " " }.Validate());
-        Assert.Throws<ArgumentOutOfRangeException>(() => valid with { MinimumClusterSize = 1 }.Validate());
-        Assert.Throws<ArgumentOutOfRangeException>(() => valid with { MinimumSamples = 0 }.Validate());
-        Assert.Throws<ArgumentOutOfRangeException>(() => valid with { DistanceThreshold = 2.01 }.Validate());
-        Assert.Throws<ArgumentOutOfRangeException>(() => valid with { MutualNeighborCount = 0 }.Validate());
-        Assert.Throws<ArgumentOutOfRangeException>(() => valid with { MinimumSharedNeighbors = -1 }.Validate());
+        Assert.Throws<ArgumentException>(() => (valid with { Version = "" }).Validate());
+        Assert.Throws<ArgumentException>(() => (valid with { Algorithm = " " }).Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => (valid with { MinimumClusterSize = 1 }).Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => (valid with { MinimumSamples = 0 }).Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => (valid with { DistanceThreshold = 2.01 }).Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => (valid with { MutualNeighborCount = 0 }).Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => (valid with { MinimumSharedNeighbors = -1 }).Validate());
     }
 
     [Fact]
