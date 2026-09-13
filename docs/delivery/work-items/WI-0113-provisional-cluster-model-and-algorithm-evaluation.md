@@ -52,7 +52,7 @@ The catalogue contains many unreviewed faces that may strongly resemble one anot
 
 ## Implementation status
 
-Implementation is complete pending the local reviewed-sample verification and policy decision:
+Implementation is merged in PR #325 (`c25b1a6457185c6b34b20301fa98ed7054ae5063`) and CI run #1755 (`34773907029`) passed. WI-0113 is therefore `in_review`, not completed, pending the local reviewed-sample verification and measured production-policy decision.
 
 - Core defines exact-model/policy provenance, Core/Border/Noise member semantics, and the non-canonical cluster boundary.
 - PostgreSQL exposes a bounded exact-model reviewed sample without source or display metadata.
@@ -61,8 +61,8 @@ Implementation is complete pending the local reviewed-sample verification and po
 - The architecture document defines deterministic derived-run replacement, canonical review-state precedence, Unknown/noise handling, conflict evidence, and the measured decision gate for WI-0114 neighbour search.
 - Core and PostgreSQL tests protect policy validation, exact-model scoping, reviewed-state eligibility, bounded export and deterministic ordering.
 
-The maintainer will run the local reviewed-sample pass together with the deferred WI-0111/WI-0112 verification before WI-0113 is completed. No production clustering threshold or ANN decision is claimed before that evidence exists.
+The maintainer will run the local reviewed-sample pass in the same acceptance session as WI-0111 and WI-0112. No production clustering threshold or ANN decision is claimed before that evidence exists, and WI-0114 remains blocked until the selected policy and neighbour-search decision are recorded.
 
 ## Verification requirements
 
-Reproducible local evaluation tooling/tests plus a documented private reviewed-sample result sufficient to justify the selected clustering semantics.
+Run the private exact-model exporter and evaluator against the current PostgreSQL catalogue, inspect false merges and same-photo conflicts before accepting the evaluator's suggested candidate, record aggregate false-merge/split/noise/coverage results plus age/pose/image-quality observations, and record whether measured local scaling supports exact PostgreSQL/vector-neighbour retrieval or justifies ANN. Keep the sample, embeddings, mappings and per-face reports private and uncommitted.
