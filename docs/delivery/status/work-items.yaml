@@ -76,27 +76,6 @@ work_items:
   - WI-0090
   blocker_notes: []
   evidence: []
-- id: WI-0111
-  title: Coalesce identity changes into bounded follow-up regeneration
-  milestone: M25
-  status: in_review
-  owner: ai-agent
-  document: ../work-items/WI-0111-event-driven-match-regeneration.md
-  started_at: 2026-09-13
-  last_updated_at: 2026-09-13
-  branch: agent/WI-0111-follow-up-regeneration
-  blockers:
-  - WI-0045
-  - WI-0103
-  blocker_notes:
-  - Maintainer requested on 2026-09-13 that the human Windows acceptance pass be deferred and performed together with the next work item; implementation and CI are complete, but WI-0111 must not be marked completed until that verification is recorded.
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/322
-  - type: workflow
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34765459515
-  - type: merge_commit
-    value: 4b46912f4736fddc7db430c0fed3453774101eef
 - id: WI-0112
   title: Add suggested-person grouped review workspace
   milestone: M25
