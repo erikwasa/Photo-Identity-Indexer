@@ -52,7 +52,7 @@ The catalogue contains many unreviewed faces that may strongly resemble one anot
 
 ## Implementation status
 
-Implementation is merged in PR #325 (`c25b1a6457185c6b34b20301fa98ed7054ae5063`) and CI run #1755 (`34773907029`) passed. Maintainer verification then passed on 2026-09-13 using a private reviewed exact-model sample; WI-0113 remains `in_review` only until its separate lifecycle closeout PR moves the canonical shard to `completed`.
+WI-0113 is complete. Implementation merged in PR #325 (`c25b1a6457185c6b34b20301fa98ed7054ae5063`) with CI run #1755 (`34773907029`) passing, and maintainer verification passed on 2026-09-13 using a private reviewed exact-model sample. PR #326 recorded the measured production-policy and neighbour-search decision.
 
 - Core defines exact-model/policy provenance, Core/Border/Noise member semantics, and the non-canonical cluster boundary.
 - PostgreSQL exposes a bounded exact-model reviewed sample without source or display metadata.
