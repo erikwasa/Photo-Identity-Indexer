@@ -1,14 +1,13 @@
 namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
-/// Promotes identity-match regeneration control state into fresh PostgreSQL catalogue
-/// initialization so offline SQLite imports can discover and preserve that authoritative state
-/// before any runtime repository is invoked.
+/// Promotes runtime-owned derived-work control tables into fresh PostgreSQL catalogue
+/// initialization so schema discovery sees the complete authoritative catalogue before any
+/// repository is invoked.
 ///
-/// The regeneration repository retains its CREATE IF NOT EXISTS guard for compatibility with
-/// PostgreSQL catalogues initialized by earlier M24 development builds. WI-0102 migration targets
-/// are required to be fresh databases, so extending the current migration definition here makes
-/// the complete current schema visible before the importer performs schema discovery.
+/// Repositories retain CREATE IF NOT EXISTS guards for compatibility with PostgreSQL catalogues
+/// initialized by earlier development builds. Extending the current migration definition here
+/// also keeps fresh databases complete without requiring a repository call first.
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase
 {
@@ -78,16 +77,25 @@ public sealed partial class PostgresCatalogueDatabase
         }
 
         Migration current = Migrations[currentMigrationIndex];
-        if (current.Sql.Contains(
+        string sql = current.Sql;
+        if (!sql.Contains(
                 "identity_match_regeneration_runs",
                 StringComparison.OrdinalIgnoreCase))
         {
-            return;
+            sql += Environment.NewLine + IdentityMatchRegenerationSchema;
         }
 
-        Migrations[currentMigrationIndex] = current with
+        if (!sql.Contains(
+                "provisional_face_cluster_runs",
+                StringComparison.OrdinalIgnoreCase))
         {
-            Sql = current.Sql + Environment.NewLine + IdentityMatchRegenerationSchema,
-        };
+            sql += Environment.NewLine +
+                PostgresProvisionalFaceClusterRepository.ProvisionalFaceClusterSchema.Sql;
+        }
+
+        if (!string.Equals(sql, current.Sql, StringComparison.Ordinal))
+        {
+            Migrations[currentMigrationIndex] = current with { Sql = sql };
+        }
     }
 }
