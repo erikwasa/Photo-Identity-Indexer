@@ -6,17 +6,19 @@ This file is intentionally a short handoff for the next development or verificat
 
 **M25 Face discovery and cluster-assisted identity review is active.**
 
-WI-0110 similar-face discovery is complete. WI-0111 bounded follow-up regeneration and WI-0112 suggested-person grouped review are implemented/merged and remain `in_review` because the maintainer deferred their human acceptance pass.
+WI-0110 similar-face discovery is complete. WI-0111 bounded follow-up regeneration and WI-0112 suggested-person grouped review have both passed maintainer verification. WI-0113 provisional-cluster model/algorithm evaluation has also passed its private reviewed-sample verification and now has a selected conservative production policy. All three remain `in_review` only until separate one-work-item closeout PRs move them to `completed`.
 
-WI-0113 provisional-cluster model/algorithm evaluation is now the active implementation item on `agent/WI-0113-cluster-evaluation`. It defines provisional clusters as exact-model, policy-versioned derived evidence, adds a bounded PostgreSQL reviewed-sample exporter with private pseudonymized output, and adds local DBSCAN/HDBSCAN/mutual-neighbour evaluation tooling. No production clustering threshold or ANN choice may be recorded until the maintainer runs the private reviewed sample.
+WI-0113 merged in PR #325 with CI run #1755 green. The 2026-09-13 private evaluation used 5,000 reviewed faces, 107 assigned identity labels and 1,294 canonical Unknown faces. It selected DBSCAN with `eps=0.30` and `min_samples=3`: 0/443,525 false-merge pairs, false-split rate 0.687251, labelled coverage 0.542, noise rate 0.579 and zero same-photo conflicting merges. Pairwise cosine distance took 0.528 seconds at 5,000 faces and projects to 2.111 seconds at 10,000 faces. Age/pose/image-quality variation was not established from the available sample metadata and remains a later quality-validation limitation.
+
+The WI-0114 neighbour-search decision is exact-first: begin with bounded exact PostgreSQL/vector-neighbour retrieval and keep ANN optional. Introduce ANN only if measured production incremental retrieval fails the required runtime budget; the private pairwise benchmark is diagnostic, not a direct PostgreSQL latency guarantee.
 
 PostgreSQL remains the sole writable production catalogue. WI-0081 remains the separate suggestion-quality investigation that gates later automatic identity-assignment expansion.
 
 ## Next concrete step
 
-Get WI-0113 CI green, then mark it `in_review` rather than completed. After merge, run one combined maintainer verification session for WI-0111, WI-0112, and WI-0113.
+Merge the verification-handoff documentation PR, then close WI-0111, WI-0112 and WI-0113 through separate lifecycle PRs so each terminal transition has isolated evidence. After WI-0113 is completed, WI-0114 can be prepared using the selected DBSCAN policy and exact-first neighbour-search decision.
 
-The WI-0113 private pass must record the chosen conservative algorithm/policy from measured false-merge/split/noise/coverage results and decide whether exact PostgreSQL/vector-neighbour retrieval is sufficient for WI-0114 or an ANN index is justified. Do not start WI-0114 before that decision is recorded.
+Do not combine the three terminal work-item transitions into one PR. Do not add ANN to WI-0114 unless measured production retrieval justifies it.
 
 ## Relevant files
 
@@ -24,9 +26,8 @@ The WI-0113 private pass must record the chosen conservative algorithm/policy fr
 - docs/delivery/work-items/WI-0112-suggested-person-review-workspace.md
 - docs/delivery/work-items/WI-0113-provisional-cluster-model-and-algorithm-evaluation.md
 - docs/architecture/provisional-face-clustering.md
-- src/PhotoIdentity.Core/Clustering/ProvisionalFaceClusterContracts.cs
-- src/PhotoIdentity.Core/Clustering/IProvisionalClusterEvaluationRepository.cs
-- src/PhotoIdentity.Persistence.Postgres/PostgresProvisionalClusterEvaluationRepository.cs
+- src/PhotoIdentity.Web/Pages/MatchRegeneration.razor
+- src/PhotoIdentity.Web/Pages/SuggestedPersonGroups.razor
 - tools/PhotoIdentity.ClusterEvaluation/Program.cs
 - tools/cluster-evaluation/evaluate.py
 - tools/cluster-evaluation/README.md
