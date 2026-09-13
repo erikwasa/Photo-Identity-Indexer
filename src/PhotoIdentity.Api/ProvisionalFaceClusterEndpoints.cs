@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using PhotoIdentity.Core.Clustering;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
@@ -181,6 +182,13 @@ public static class ProvisionalFaceClusterEndpoints
 
     private static IProvisionalFaceClusterRepository? ResolveRepository(IServiceProvider services)
     {
+        IConfiguration? configuration = services.GetService<IConfiguration>();
+        if (configuration is null ||
+            CataloguePersistenceComposition.ResolveProvider(configuration) != CatalogueProviderKind.Postgres)
+        {
+            return null;
+        }
+
         IProvisionalFaceClusterRepository? registered =
             services.GetService<IProvisionalFaceClusterRepository>();
         if (registered is not null)
