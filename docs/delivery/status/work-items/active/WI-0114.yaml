@@ -1,9 +1,12 @@
 id: WI-0114
 title: Implement scalable incremental provisional face clustering
 milestone: M25
-status: proposed
-owner: unassigned
+status: in_progress
+owner: ai-agent
 document: ../work-items/WI-0114-scalable-incremental-face-clustering.md
+started_at: 2026-09-14
+last_updated_at: 2026-09-14
+branch: agent/WI-0114-provisional-clustering
 blockers:
 - WI-0113
 blocker_notes: []
