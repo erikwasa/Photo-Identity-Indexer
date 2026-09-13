@@ -1,0 +1,11 @@
+id: WI-0111
+title: Coalesce identity changes into bounded follow-up regeneration
+milestone: M25
+status: ready
+owner: unassigned
+document: ../work-items/WI-0111-event-driven-match-regeneration.md
+blockers:
+- WI-0045
+- WI-0103
+blocker_notes: []
+evidence: []
