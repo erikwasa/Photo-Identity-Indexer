@@ -30,6 +30,7 @@ work_items:
   blockers:
   - WI-0041
   blocker_notes: []
+  evidence: []
 - id: WI-0088
   title: Reconcile exact unambiguous source moves for included photos
   milestone: M23
@@ -40,6 +41,7 @@ work_items:
   - WI-0041
   - WI-0087
   blocker_notes: []
+  evidence: []
 - id: WI-0089
   title: Add durable source-copy exclusion and access enforcement
   milestone: M23
@@ -50,6 +52,7 @@ work_items:
   - WI-0041
   - WI-0042
   blocker_notes: []
+  evidence: []
 - id: WI-0090
   title: Purge excluded photo data and derivatives safely
   milestone: M23
@@ -59,6 +62,7 @@ work_items:
   blockers:
   - WI-0089
   blocker_notes: []
+  evidence: []
 - id: WI-0091
   title: Add archive lifecycle review and exclusion workflows
   milestone: M23
@@ -71,6 +75,7 @@ work_items:
   - WI-0089
   - WI-0090
   blocker_notes: []
+  evidence: []
 - id: WI-0111
   title: Coalesce identity changes into bounded follow-up regeneration
   milestone: M25
@@ -133,6 +138,7 @@ work_items:
   blockers:
   - WI-0113
   blocker_notes: []
+  evidence: []
 - id: WI-0115
   title: Add cluster-based People-to-identify review workspace
   milestone: M25
@@ -143,6 +149,7 @@ work_items:
   - WI-0114
   - WI-0060
   blocker_notes: []
+  evidence: []
 - id: WI-0116
   title: Add cluster-assisted known-person advisory evidence
   milestone: M25
@@ -153,6 +160,7 @@ work_items:
   - WI-0114
   - WI-0043
   blocker_notes: []
+  evidence: []
 - id: WI-0117
   title: Evaluate multi-evidence automatic identity assignment
   milestone: M25
@@ -163,3 +171,4 @@ work_items:
   - WI-0081
   - WI-0116
   blocker_notes: []
+  evidence: []
