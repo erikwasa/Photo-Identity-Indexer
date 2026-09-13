@@ -1,0 +1,26 @@
+id: WI-0111
+title: Coalesce identity changes into bounded follow-up regeneration
+milestone: M25
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0111-event-driven-match-regeneration.md
+started_at: 2026-09-13
+completed_at: 2026-09-13
+verified_at: 2026-09-13
+verified_by: maintainer
+last_updated_at: 2026-09-13
+branch: agent/WI-0111-follow-up-regeneration
+blockers:
+- WI-0045
+- WI-0103
+blocker_notes:
+- Maintainer intentionally deferred the human Windows acceptance pass until the combined WI-0111/WI-0112/WI-0113 verification session; that verification completed successfully on 2026-09-13 and acceptance is complete.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/322
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34765459515
+- type: merge_commit
+  value: 4b46912f4736fddc7db430c0fed3453774101eef
+- type: human_verification
+  value: 2026-09-13 combined maintainer Windows verification confirmed qualifying identity changes automatically coalesce into bounded queued/running/current regeneration, review stays responsive, scheduling converges without a recursive second run, and disabled automatic follow-up still permits explicit regeneration.
