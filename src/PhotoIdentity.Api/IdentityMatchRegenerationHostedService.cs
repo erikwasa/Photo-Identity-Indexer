@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using PhotoIdentity.Core.Review;
 using PhotoIdentity.Worker;
@@ -7,7 +8,8 @@ namespace PhotoIdentity.Api;
 /// <summary>
 /// Advances durable identity regeneration work in bounded batches so browser requests only
 /// enqueue or inspect work. Each target still commits independently, preserving durable restart
-/// and reclaim semantics while avoiding a scheduler delay between every target.
+/// and reclaim semantics while avoiding a scheduler delay between every target. Qualifying
+/// identity-evidence changes may also enqueue a later coalesced run through the same controller.
 /// </summary>
 public sealed class IdentityMatchRegenerationHostedService : BackgroundService
 {
@@ -23,6 +25,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
     private readonly TimeProvider _timeProvider;
     private readonly ArchiveThroughputMetrics _metrics;
     private readonly ILogger<IdentityMatchRegenerationHostedService> _logger;
+    private readonly IIdentityMatchFollowUpPlanner _followUpPlanner;
 
     public IdentityMatchRegenerationHostedService(
         IIdentityMatchRegenerationRepository runs,
@@ -32,7 +35,9 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         IIdentityMatchEvidenceVersionReader evidence,
         TimeProvider timeProvider,
         ArchiveThroughputMetrics metrics,
-        ILogger<IdentityMatchRegenerationHostedService>? logger = null)
+        ILogger<IdentityMatchRegenerationHostedService>? logger = null,
+        IIdentityMatchModelRepository? models = null,
+        IConfiguration? configuration = null)
     {
         _runs = runs;
         _scorer = scorer;
@@ -42,6 +47,15 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         _timeProvider = timeProvider;
         _metrics = metrics;
         _logger = logger ?? NullLogger<IdentityMatchRegenerationHostedService>.Instance;
+        _followUpPlanner = models is null
+            ? DisabledIdentityMatchFollowUpPlanner.Instance
+            : new IdentityMatchFollowUpPlanner(
+                models,
+                runs,
+                evidence,
+                policies,
+                timeProvider,
+                IdentityMatchFollowUpConfiguration.FromConfiguration(configuration));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -76,10 +90,12 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
     {
         using IDisposable timing = _metrics.Measure(
             ArchiveThroughputMetricNames.IdentityRegenerationCycle);
+
+        bool followUpStarted = await _followUpPlanner.TryStartDueAsync(cancellationToken);
         ReviewIdentityMatchRegenerationRun? run = await _runs.GetNextActiveAsync(cancellationToken);
         if (run is null)
         {
-            return false;
+            return followUpStarted;
         }
 
         int processedInBatch = 0;

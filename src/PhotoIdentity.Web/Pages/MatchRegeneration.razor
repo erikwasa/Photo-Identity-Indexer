@@ -119,6 +119,11 @@ else if (State is MatchRegenerationStateResponse state)
             </div>
         </dl>
 
+        <p class="regeneration-note">
+            <strong>Automatic follow-up: @FollowUpLabel(state).</strong>
+            @FollowUpDescription(state)
+        </p>
+
         @if (!string.IsNullOrWhiteSpace(state.Error))
         {
             <div class="notice error" role="alert">@state.Error</div>
@@ -128,7 +133,7 @@ else if (State is MatchRegenerationStateResponse state)
             <button class="button primary"
                     disabled="@(Starting || state.IsActive)"
                     @onclick="StartAsync">
-                @(state.IsStale ? "Regenerate suggestions" : state.Status == "not-run" ? "Generate suggestions" : "Regenerate again")
+                @(state.AutomaticFollowUpStatus == "queued" ? "Regenerate now" : state.IsStale ? "Regenerate suggestions" : state.Status == "not-run" ? "Generate suggestions" : "Regenerate again")
             </button>
             <a class="button secondary" href="@FacesUrl">Open refreshed Faces queue</a>
         </div>
@@ -210,7 +215,7 @@ else if (State is MatchRegenerationStateResponse state)
             MatchRegenerationStateResponse? state = await Http.GetFromJsonAsync<MatchRegenerationStateResponse>(
                 BuildApiUrl(model));
             State = state ?? throw new InvalidOperationException("The regeneration state response was empty.");
-            if (State.IsActive)
+            if (ShouldPoll(State))
             {
                 EnsurePolling();
             }
@@ -280,7 +285,7 @@ else if (State is MatchRegenerationStateResponse state)
                     StateHasChanged();
                 });
 
-                if (State?.IsActive != true)
+                if (!ShouldPoll(State))
                 {
                     break;
                 }
@@ -290,6 +295,9 @@ else if (State is MatchRegenerationStateResponse state)
         {
         }
     }
+
+    private static bool ShouldPoll(MatchRegenerationStateResponse? state) =>
+        state?.IsActive == true || string.Equals(state?.AutomaticFollowUpStatus, "queued", StringComparison.Ordinal);
 
     private void StopPolling()
     {
@@ -313,20 +321,33 @@ else if (State is MatchRegenerationStateResponse state)
     private static string BuildApiUrl(RegenerationModelResponse model) =>
         $"api/review/match-regeneration?modelId={Uri.EscapeDataString(model.ModelId)}&modelHash={Uri.EscapeDataString(model.ModelHash)}";
 
-    private static string StatusHeading(MatchRegenerationStateResponse state) => state.Status switch
+    private static string StatusHeading(MatchRegenerationStateResponse state)
     {
-        "pending" => "Regeneration queued",
-        "running" => "Regeneration in progress",
-        "completed" when !state.IsStale => "Suggestions are current",
-        "stale" => "Suggestions need regeneration",
-        "failed" => "Regeneration stopped",
-        "not-run" => "No tracked regeneration yet",
-        _ when state.IsStale => "Suggestions need regeneration",
-        _ => "Regeneration state",
-    };
+        if (!state.IsActive && state.AutomaticFollowUpStatus == "queued")
+        {
+            return "Follow-up regeneration queued";
+        }
+
+        return state.Status switch
+        {
+            "pending" => "Regeneration queued",
+            "running" => "Regeneration in progress",
+            "completed" when !state.IsStale => "Suggestions are current",
+            "stale" => "Suggestions need regeneration",
+            "failed" => "Regeneration stopped",
+            "not-run" => "No tracked regeneration yet",
+            _ when state.IsStale => "Suggestions need regeneration",
+            _ => "Regeneration state",
+        };
+    }
 
     private static string StatusDescription(MatchRegenerationStateResponse state)
     {
+        if (!state.IsActive && state.AutomaticFollowUpStatus == "queued")
+        {
+            return "Identity evidence changed. A bounded regeneration will start automatically after the coalescing window unless you start it now.";
+        }
+
         if (state.IsActive)
         {
             return "Suggestions are being scored in short durable steps. Progress survives an application restart.";
@@ -340,13 +361,40 @@ else if (State is MatchRegenerationStateResponse state)
         return "The latest tracked regeneration completed against the current identity evidence and policy.";
     }
 
-    private static string StateLabel(MatchRegenerationStateResponse state) => state.IsActive
-        ? state.Status == "pending" ? "Queued" : "Running"
-        : state.IsStale ? "Stale" : "Current";
+    private static string FollowUpLabel(MatchRegenerationStateResponse state) => state.AutomaticFollowUpStatus switch
+    {
+        "queued" => "queued",
+        "running" when state.AutomaticFollowUpQueuedAfterActiveRun => "running; another pass is queued if current evidence invalidates this run",
+        "running" => "running",
+        "current" => "current",
+        _ => "disabled",
+    };
 
-    private static string StateClass(MatchRegenerationStateResponse state) => state.IsActive
-        ? "active"
-        : state.IsStale ? "stale" : "current";
+    private static string FollowUpDescription(MatchRegenerationStateResponse state) => state.AutomaticFollowUpStatus switch
+    {
+        "queued" => $"Changes are coalesced for {state.AutomaticFollowUpDelayMilliseconds / 1000.0:0.#} seconds before a run starts.",
+        "running" when state.AutomaticFollowUpQueuedAfterActiveRun => "The current run keeps its fixed evidence snapshot; a later pass can pick up the newer evidence.",
+        "running" => "The current regeneration is the active bounded pass.",
+        "current" => "No newer identity evidence needs another automatic pass.",
+        _ => "Automatic follow-up is off; explicit regeneration remains available.",
+    };
+
+    private static string StateLabel(MatchRegenerationStateResponse state)
+    {
+        if (!state.IsActive && state.AutomaticFollowUpStatus == "queued")
+        {
+            return "Queued";
+        }
+
+        return state.IsActive
+            ? state.Status == "pending" ? "Queued" : "Running"
+            : state.IsStale ? "Stale" : "Current";
+    }
+
+    private static string StateClass(MatchRegenerationStateResponse state) =>
+        state.IsActive || state.AutomaticFollowUpStatus == "queued"
+            ? "active"
+            : state.IsStale ? "stale" : "current";
 
     private static double ProgressPercent(MatchRegenerationStateResponse state) =>
         state.TargetCount <= 0
@@ -395,5 +443,9 @@ else if (State is MatchRegenerationStateResponse state)
         DateTimeOffset? StartedAtUtc,
         DateTimeOffset? CompletedAtUtc,
         DateTimeOffset? UpdatedAtUtc,
-        string? Error);
+        string? Error,
+        bool AutomaticFollowUpEnabled,
+        string AutomaticFollowUpStatus,
+        bool AutomaticFollowUpQueuedAfterActiveRun,
+        int AutomaticFollowUpDelayMilliseconds);
 }
