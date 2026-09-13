@@ -5,7 +5,7 @@ milestone: M25
 status_source: ../status/work-items.yaml
 depends_on: [WI-0043, WI-0060]
 related_adrs: [ADR-0006]
-affected_modules: [PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Integration.Tests]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Integration.Tests]
 ---
 
 # WI-0112: Add suggested-person grouped review workspace
@@ -17,6 +17,18 @@ Let the operator process existing ranked identity suggestions by suggested perso
 ## Why
 
 The current review queue can filter/order by confidence, and bulk suggestion acceptance already exists, but discovering and processing all faces suggested for one person still requires more queue navigation than necessary. Grouping by suggested identity provides immediate review-effort reduction without changing recognition semantics or introducing clustering.
+
+## Implementation status
+
+PR #324 implements a bounded `Suggested groups` discovery surface over the existing suggestion/review workflow. The grouping query is exact-model scoped and includes only currently unreviewed faces whose rank-1 suggestion is still `pending`; an assigned/Unknown/false-detection face or a rejected face-person suggestion therefore disappears from the group without creating another identity state.
+
+Each group exposes pending count, High/Medium/Low distribution from the same persisted exact-model confidence policy, strongest score/margin, favorite-person status and up to four deterministic representative faces. Ordering is deterministic: favorite people first, then strongest available confidence category, pending count, strongest score, display name and person ID.
+
+Opening a group deep-links into the existing Faces workspace with the exact model revision and suggested-person filter. That intentionally reuses the proven paged member loading, per-face score/margin evidence, touch-friendly checkbox selection, `Select loaded`, exception removal and audited bulk suggestion acceptance. Incorrect face-person suggestions continue to use the existing suggestion-rejection action from Face Details; they are not conflated with the face-level `False detection` decision.
+
+The summary page never writes canonical review state and never accepts a whole group automatically. There is no schema, recognition-score, threshold or clustering change. PostgreSQL is the production query implementation; SQLite carries the same read-only contract for compatibility/integration coverage.
+
+Human acceptance is intentionally deferred until this PR is merged and will be performed in the same maintainer session as the deferred WI-0111 Windows verification.
 
 ## In scope
 
@@ -49,4 +61,4 @@ The current review queue can filter/order by confidence, and bulk suggestion acc
 
 ## Verification requirements
 
-Automated API/persistence integration coverage plus human Windows and mobile-browser verification against a person with multiple pending suggestions and at least one intentional exception.
+Automated API/persistence integration coverage plus human Windows and mobile-browser verification against a person with multiple pending suggestions and at least one intentional exception. Perform that human pass together with the deferred WI-0111 verification before either work item is marked completed.
