@@ -36,7 +36,46 @@ public sealed record IdentityMatchFollowUpState(
     DateTimeOffset? DueAtUtc,
     bool QueuedAfterActiveRun);
 
-public sealed class IdentityMatchFollowUpPlanner
+public interface IIdentityMatchFollowUpPlanner
+{
+    Task<bool> TryStartDueAsync(CancellationToken cancellationToken = default);
+
+    Task<IdentityMatchFollowUpState> GetStateAsync(
+        ModelId modelId,
+        Sha256Digest modelHash,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class DisabledIdentityMatchFollowUpPlanner : IIdentityMatchFollowUpPlanner
+{
+    public static DisabledIdentityMatchFollowUpPlanner Instance { get; } = new();
+
+    private DisabledIdentityMatchFollowUpPlanner()
+    {
+    }
+
+    public Task<bool> TryStartDueAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(false);
+    }
+
+    public Task<IdentityMatchFollowUpState> GetStateAsync(
+        ModelId modelId,
+        Sha256Digest modelHash,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(new IdentityMatchFollowUpState(
+            Enabled: false,
+            Status: "disabled",
+            LatestQualifyingChangeAtUtc: null,
+            DueAtUtc: null,
+            QueuedAfterActiveRun: false));
+    }
+}
+
+public sealed class IdentityMatchFollowUpPlanner : IIdentityMatchFollowUpPlanner
 {
     public const string RequestedBy = "identity-matcher:follow-up";
     private static readonly ReviewIdentityMatchEvidenceVersion ZeroEvidence = new(0, 0, 0, 0);
