@@ -18,6 +18,7 @@
   <Project Path="tests/PhotoIdentity.Persistence.Tests/PhotoIdentity.Persistence.Tests.csproj" />
   <Project Path="tests/PhotoIdentity.Recognition.Tests/PhotoIdentity.Recognition.Tests.csproj" />
   <Project Path="tests/PhotoIdentity.Source.Tests/PhotoIdentity.Source.Tests.csproj" />
+  <Project Path="tools/PhotoIdentity.ClusterEvaluation/PhotoIdentity.ClusterEvaluation.csproj" />
   <Project Path="tools/PhotoIdentity.Docs/PhotoIdentity.Docs.csproj" />
   <Project Path="tools/PhotoIdentity.Models/PhotoIdentity.Models.csproj" />
   <Project Path="tools/PhotoIdentity.ReviewVerification/PhotoIdentity.ReviewVerification.csproj" />
