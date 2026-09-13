@@ -28,7 +28,7 @@ Opening a group deep-links into the existing Faces workspace with the exact mode
 
 The summary page never writes canonical review state and never accepts a whole group automatically. There is no schema, recognition-score, threshold or clustering change. PostgreSQL is the production query implementation; SQLite carries the same read-only contract for compatibility/integration coverage.
 
-Human acceptance is intentionally deferred until this PR is merged and will be performed in the same maintainer session as the deferred WI-0111 Windows verification.
+Human acceptance is intentionally deferred to the combined maintainer session for WI-0111, WI-0112 and WI-0113. WI-0112 remains `in_review` until the desktop and touch/mobile subset-review path is verified against real pending suggestions.
 
 ## In scope
 
@@ -61,4 +61,4 @@ Human acceptance is intentionally deferred until this PR is merged and will be p
 
 ## Verification requirements
 
-Automated API/persistence integration coverage plus human Windows and mobile-browser verification against a person with multiple pending suggestions and at least one intentional exception. Perform that human pass together with the deferred WI-0111 verification before either work item is marked completed.
+Automated API/persistence integration coverage plus human verification against a person with multiple pending suggestions and at least one intentional exception. On desktop, verify group summaries, bounded member loading, selective acceptance, durable rejection and count refresh. Repeat the key subset-selection/acceptance flow from a mobile/touch browser layout. Perform that pass in the combined WI-0111/WI-0112/WI-0113 maintainer session before WI-0112 is completed.
