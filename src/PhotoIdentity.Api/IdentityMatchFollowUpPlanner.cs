@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
@@ -8,6 +9,10 @@ public sealed class IdentityMatchFollowUpConfiguration
 {
     public const int DefaultCoalesceDelayMilliseconds = 30_000;
     public const int MaximumCoalesceDelayMilliseconds = 600_000;
+    public const string EnabledConfigurationKey =
+        "PhotoIdentity:IdentityMatchRegeneration:AutomaticFollowUpEnabled";
+    public const string DelayConfigurationKey =
+        "PhotoIdentity:IdentityMatchRegeneration:AutomaticFollowUpDelayMilliseconds";
 
     public IdentityMatchFollowUpConfiguration(
         bool? enabled = null,
@@ -27,12 +32,49 @@ public sealed class IdentityMatchFollowUpConfiguration
 
     public bool Enabled { get; }
     public TimeSpan CoalesceDelay { get; }
+
+    public static IdentityMatchFollowUpConfiguration FromConfiguration(
+        IConfiguration? configuration)
+    {
+        if (configuration is null)
+        {
+            return new IdentityMatchFollowUpConfiguration();
+        }
+
+        bool? enabled = ParseOptionalBool(configuration[EnabledConfigurationKey], EnabledConfigurationKey);
+        int? delay = ParseOptionalInt(configuration[DelayConfigurationKey], DelayConfigurationKey);
+        return new IdentityMatchFollowUpConfiguration(enabled, delay);
+    }
+
+    private static bool? ParseOptionalBool(string? value, string key)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return bool.TryParse(value, out bool parsed)
+            ? parsed
+            : throw new InvalidOperationException($"Configuration '{key}' must be true or false.");
+    }
+
+    private static int? ParseOptionalInt(string? value, string key)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return int.TryParse(value, out int parsed)
+            ? parsed
+            : throw new InvalidOperationException($"Configuration '{key}' must be an integer number of milliseconds.");
+    }
 }
 
 public sealed record IdentityMatchFollowUpState(
     bool Enabled,
     string Status,
-    DateTimeOffset? LatestQualifyingChangeAtUtc,
+    DateTimeOffset? ChangeDetectedAtUtc,
     DateTimeOffset? DueAtUtc,
     bool QueuedAfterActiveRun);
 
@@ -69,12 +111,18 @@ public sealed class DisabledIdentityMatchFollowUpPlanner : IIdentityMatchFollowU
         return Task.FromResult(new IdentityMatchFollowUpState(
             Enabled: false,
             Status: "disabled",
-            LatestQualifyingChangeAtUtc: null,
+            ChangeDetectedAtUtc: null,
             DueAtUtc: null,
             QueuedAfterActiveRun: false));
     }
 }
 
+/// <summary>
+/// Converts durable evidence-version drift into a debounced later regeneration. The durable
+/// mismatch, rather than the in-memory debounce timestamp, is the queue authority: after restart
+/// the mismatch is rediscovered and cannot be lost. Completed automatic assignments are included
+/// in the expected post-run evidence version so they do not recursively trigger another run.
+/// </summary>
 public sealed class IdentityMatchFollowUpPlanner : IIdentityMatchFollowUpPlanner
 {
     public const string RequestedBy = "identity-matcher:follow-up";
@@ -82,22 +130,24 @@ public sealed class IdentityMatchFollowUpPlanner : IIdentityMatchFollowUpPlanner
 
     private readonly IIdentityMatchModelRepository _models;
     private readonly IIdentityMatchRegenerationRepository _runs;
-    private readonly IIdentityMatchFollowUpEvidenceRepository _followUpEvidence;
+    private readonly IIdentityMatchEvidenceVersionReader _evidence;
     private readonly IIdentitySuggestionPolicyRepository _policies;
     private readonly TimeProvider _timeProvider;
     private readonly IdentityMatchFollowUpConfiguration _configuration;
+    private readonly object _gate = new();
+    private readonly Dictionary<ModelKey, PendingObservation> _pending = [];
 
     public IdentityMatchFollowUpPlanner(
         IIdentityMatchModelRepository models,
         IIdentityMatchRegenerationRepository runs,
-        IIdentityMatchFollowUpEvidenceRepository followUpEvidence,
+        IIdentityMatchEvidenceVersionReader evidence,
         IIdentitySuggestionPolicyRepository policies,
         TimeProvider timeProvider,
         IdentityMatchFollowUpConfiguration configuration)
     {
         _models = models ?? throw new ArgumentNullException(nameof(models));
         _runs = runs ?? throw new ArgumentNullException(nameof(runs));
-        _followUpEvidence = followUpEvidence ?? throw new ArgumentNullException(nameof(followUpEvidence));
+        _evidence = evidence ?? throw new ArgumentNullException(nameof(evidence));
         _policies = policies ?? throw new ArgumentNullException(nameof(policies));
         _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
@@ -118,18 +168,21 @@ public sealed class IdentityMatchFollowUpPlanner : IIdentityMatchFollowUpPlanner
                 model.ModelId,
                 model.ModelHash,
                 cancellationToken);
-            if (latest?.IsActive == true)
+            ReviewIdentityMatchEvidenceVersion current = await _evidence.ReadAsync(
+                model.ModelId,
+                model.ModelHash,
+                cancellationToken);
+            ReviewIdentityMatchEvidenceVersion expected = ExpectedEvidence(latest);
+            ModelKey key = new(model.ModelId.ToString(), model.ModelHash.ToString());
+
+            if (current == expected)
             {
+                ClearObservation(key);
                 continue;
             }
 
-            ReviewIdentityMatchEvidenceVersion baseline = latest?.EvidenceVersion ?? ZeroEvidence;
-            DateTimeOffset? latestChange = await _followUpEvidence.GetLatestQualifyingChangeAsync(
-                model.ModelId,
-                model.ModelHash,
-                baseline,
-                cancellationToken);
-            if (latestChange is null || latestChange.Value + _configuration.CoalesceDelay > now)
+            PendingObservation observation = Observe(key, current, now);
+            if (latest?.IsActive == true || observation.DueAtUtc > now)
             {
                 continue;
             }
@@ -147,6 +200,7 @@ public sealed class IdentityMatchFollowUpPlanner : IIdentityMatchFollowUpPlanner
                     RequestedBy,
                     now,
                     cancellationToken);
+                ClearObservation(key);
                 return true;
             }
             catch (InvalidOperationException exception) when (
@@ -164,40 +218,95 @@ public sealed class IdentityMatchFollowUpPlanner : IIdentityMatchFollowUpPlanner
         Sha256Digest modelHash,
         CancellationToken cancellationToken = default)
     {
+        if (!_configuration.Enabled)
+        {
+            return new(false, "disabled", null, null, QueuedAfterActiveRun: false);
+        }
+
+        DateTimeOffset now = _timeProvider.GetUtcNow();
         ReviewIdentityMatchRegenerationRun? latest = await _runs.GetLatestAsync(
             modelId,
             modelHash,
             cancellationToken);
-        ReviewIdentityMatchEvidenceVersion baseline = latest?.EvidenceVersion ?? ZeroEvidence;
-        DateTimeOffset? latestChange = await _followUpEvidence.GetLatestQualifyingChangeAsync(
+        ReviewIdentityMatchEvidenceVersion current = await _evidence.ReadAsync(
             modelId,
             modelHash,
-            baseline,
             cancellationToken);
-        DateTimeOffset? dueAt = latestChange is DateTimeOffset changed
-            ? changed + _configuration.CoalesceDelay
-            : null;
+        ReviewIdentityMatchEvidenceVersion expected = ExpectedEvidence(latest);
+        ModelKey key = new(modelId.ToString(), modelHash.ToString());
 
-        if (!_configuration.Enabled)
+        if (current == expected)
         {
-            return new(false, "disabled", latestChange, dueAt, QueuedAfterActiveRun: false);
-        }
-
-        if (latest?.IsActive == true)
-        {
+            ClearObservation(key);
             return new(
                 true,
-                "running",
-                latestChange,
-                dueAt,
-                QueuedAfterActiveRun: latestChange is not null);
+                latest?.IsActive == true ? "running" : "current",
+                null,
+                null,
+                QueuedAfterActiveRun: false);
         }
 
-        if (latestChange is not null)
-        {
-            return new(true, "queued", latestChange, dueAt, QueuedAfterActiveRun: false);
-        }
-
-        return new(true, "current", null, null, QueuedAfterActiveRun: false);
+        PendingObservation observation = Observe(key, current, now);
+        return new(
+            true,
+            latest?.IsActive == true ? "running" : "queued",
+            observation.DetectedAtUtc,
+            observation.DueAtUtc,
+            QueuedAfterActiveRun: latest?.IsActive == true);
     }
+
+    private ReviewIdentityMatchEvidenceVersion ExpectedEvidence(
+        ReviewIdentityMatchRegenerationRun? latest)
+    {
+        if (latest is null)
+        {
+            return ZeroEvidence;
+        }
+
+        return string.Equals(
+            latest.Status,
+            ReviewIdentityMatchRegenerationStatuses.Completed,
+            StringComparison.Ordinal)
+            ? ReviewIdentityMatchEvidenceVersions.ExpectedAfterAutomaticAssignments(
+                latest.EvidenceVersion,
+                latest.AutomaticallyAssignedCount)
+            : latest.EvidenceVersion;
+    }
+
+    private PendingObservation Observe(
+        ModelKey key,
+        ReviewIdentityMatchEvidenceVersion evidence,
+        DateTimeOffset now)
+    {
+        lock (_gate)
+        {
+            if (_pending.TryGetValue(key, out PendingObservation? existing) &&
+                existing.Evidence == evidence)
+            {
+                return existing;
+            }
+
+            PendingObservation observed = new(
+                evidence,
+                now,
+                now + _configuration.CoalesceDelay);
+            _pending[key] = observed;
+            return observed;
+        }
+    }
+
+    private void ClearObservation(ModelKey key)
+    {
+        lock (_gate)
+        {
+            _pending.Remove(key);
+        }
+    }
+
+    private readonly record struct ModelKey(string ModelId, string ModelHash);
+
+    private sealed record PendingObservation(
+        ReviewIdentityMatchEvidenceVersion Evidence,
+        DateTimeOffset DetectedAtUtc,
+        DateTimeOffset DueAtUtc);
 }
