@@ -20,7 +20,7 @@ A new manual assignment can immediately become valuable exemplar evidence, but t
 
 ## Implementation status
 
-PR #322 implements the bounded follow-up scheduler around the existing regeneration controller rather than adding another matching engine or queue table.
+PR #322 is merged and implements the bounded follow-up scheduler around the existing regeneration controller rather than adding another matching engine or queue table. CI run #1738 passed.
 
 The durable queued condition is an exact-model identity-evidence version newer than the latest run's expected evidence. Completed automatic assignments are folded into that expected post-run version, so a run does not recursively schedule another run merely because it created automatic assignments. A 30-second default process-local debounce coalesces bursts; after restart the durable evidence mismatch is rediscovered even though the debounce clock restarts.
 
@@ -28,7 +28,7 @@ Automatic follow-up defaults on and can be disabled with `PhotoIdentity__Identit
 
 The existing regeneration API/page now distinguishes automatic follow-up state as `queued`, `running`, `current` or `disabled` while preserving the existing stale flag for policy/evidence validity. A queued state keeps the page polling until the bounded run starts and completes.
 
-Human Windows acceptance remains pending: make a manual assignment, observe queued state without pressing Regenerate, wait for automatic completion/current state, then verify the disabled configuration leaves manual regeneration available.
+Maintainer acceptance is deliberately deferred. On 2026-09-13 the maintainer asked to continue with WI-0112 and perform the WI-0111 Windows acceptance together with the next work-item verification. Until that pass is recorded, WI-0111 remains `in_review` and must not be marked completed.
 
 ## In scope
 
@@ -63,4 +63,4 @@ Human Windows acceptance remains pending: make a manual assignment, observe queu
 
 ## Verification requirements
 
-Automated integration coverage for scheduler/run-state semantics plus human Windows verification of a manual assignment followed by visible queued/completed matching without an explicit regenerate click.
+Automated integration coverage for scheduler/run-state semantics plus human Windows verification of a manual assignment followed by visible queued/completed matching without an explicit regenerate click. The human pass is deferred by maintainer request and should be performed together with WI-0112 verification before WI-0111 is completed.
