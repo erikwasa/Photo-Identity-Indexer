@@ -5,7 +5,7 @@ milestone: M25
 status_source: ../status/work-items.yaml
 depends_on: [WI-0045, WI-0103]
 related_adrs: [ADR-0006]
-affected_modules: [PhotoIdentity.Api, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Web, PhotoIdentity.Integration.Tests]
+affected_modules: [PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Integration.Tests]
 ---
 
 # WI-0111: Coalesce identity changes into bounded follow-up regeneration
@@ -17,6 +17,18 @@ Remove the operator's need to remember a separate `Regenerate matches` maintenan
 ## Why
 
 A new manual assignment can immediately become valuable exemplar evidence, but the current fixed-snapshot design intentionally does not let it affect an already-running regeneration. Requiring a later manual regeneration leaves useful evidence idle and makes newly identified people difficult to propagate through a large backlog.
+
+## Implementation status
+
+PR #322 implements the bounded follow-up scheduler around the existing regeneration controller rather than adding another matching engine or queue table.
+
+The durable queued condition is an exact-model identity-evidence version newer than the latest run's expected evidence. Completed automatic assignments are folded into that expected post-run version, so a run does not recursively schedule another run merely because it created automatic assignments. A 30-second default process-local debounce coalesces bursts; after restart the durable evidence mismatch is rediscovered even though the debounce clock restarts.
+
+Automatic follow-up defaults on and can be disabled with `PhotoIdentity__IdentityMatchRegeneration__AutomaticFollowUpEnabled=false`. The coalescing interval can be configured with `PhotoIdentity__IdentityMatchRegeneration__AutomaticFollowUpDelayMilliseconds` from 0 through 600000 milliseconds. Explicit regeneration remains available when automatic follow-up is disabled.
+
+The existing regeneration API/page now distinguishes automatic follow-up state as `queued`, `running`, `current` or `disabled` while preserving the existing stale flag for policy/evidence validity. A queued state keeps the page polling until the bounded run starts and completes.
+
+Human Windows acceptance remains pending: make a manual assignment, observe queued state without pressing Regenerate, wait for automatic completion/current state, then verify the disabled configuration leaves manual regeneration available.
 
 ## In scope
 
