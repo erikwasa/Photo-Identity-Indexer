@@ -21,7 +21,7 @@ public static class ProvisionalFaceClusterPolicies
 {
     public const int MaximumFacesPerRun = 20000;
 
-    public static ProvisionalFaceClusterPolicy InitialDbscan { get; } = new(
+    public static ProvisionalFaceClusterPolicy InitialDbscan { get; } = new ProvisionalFaceClusterPolicy(
         Version: "m25-dbscan-v1",
         Algorithm: "dbscan-cosine",
         MinimumClusterSize: 3,
