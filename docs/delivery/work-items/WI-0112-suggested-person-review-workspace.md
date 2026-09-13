@@ -28,7 +28,7 @@ Opening a group deep-links into the existing Faces workspace with the exact mode
 
 The summary page never writes canonical review state and never accepts a whole group automatically. There is no schema, recognition-score, threshold or clustering change. PostgreSQL is the production query implementation; SQLite carries the same read-only contract for compatibility/integration coverage.
 
-Human acceptance is intentionally deferred to the combined maintainer session for WI-0111, WI-0112 and WI-0113. WI-0112 remains `in_review` until the desktop and touch/mobile subset-review path is verified against real pending suggestions.
+Maintainer acceptance passed on 2026-09-13 in the combined WI-0111/WI-0112/WI-0113 verification session. The real-catalogue desktop flow verified group summaries, selective subset acceptance with exceptions preserved, durable incorrect-match rejection and refreshed counts; the key subset-selection/acceptance flow also passed on mobile/touch.
 
 ## In scope
 
@@ -50,15 +50,15 @@ Human acceptance is intentionally deferred to the combined maintainer session fo
 
 ## Acceptance criteria
 
-- [ ] The operator can browse pending rank-1 suggestions grouped by suggested person for one exact model revision.
-- [ ] Each group exposes count and useful confidence summary information plus representative faces.
-- [ ] Opening a group provides bounded member loading and existing score/margin evidence per face.
-- [ ] The operator can select/accept a subset and remove exceptions without accepting the whole group.
-- [ ] Incorrect suggestions can be rejected and remain durable negative face-person evidence.
-- [ ] Group counts/content update predictably after accept/reject/review actions.
-- [ ] The workflow remains usable on touch/mobile layouts.
-- [ ] Automated coverage protects exact-model scoping, pending/rejected eligibility, paging and grouped bulk-review semantics.
+- [x] The operator can browse pending rank-1 suggestions grouped by suggested person for one exact model revision.
+- [x] Each group exposes count and useful confidence summary information plus representative faces.
+- [x] Opening a group provides bounded member loading and existing score/margin evidence per face.
+- [x] The operator can select/accept a subset and remove exceptions without accepting the whole group.
+- [x] Incorrect suggestions can be rejected and remain durable negative face-person evidence.
+- [x] Group counts/content update predictably after accept/reject/review actions.
+- [x] The workflow remains usable on touch/mobile layouts.
+- [x] Automated coverage protects exact-model scoping, pending/rejected eligibility, paging and grouped bulk-review semantics.
 
 ## Verification requirements
 
-Automated API/persistence integration coverage plus human verification against a person with multiple pending suggestions and at least one intentional exception. On desktop, verify group summaries, bounded member loading, selective acceptance, durable rejection and count refresh. Repeat the key subset-selection/acceptance flow from a mobile/touch browser layout. Perform that pass in the combined WI-0111/WI-0112/WI-0113 maintainer session before WI-0112 is completed.
+Completed 2026-09-13. Automated API/persistence coverage protects exact-model scoping, pending/rejected eligibility, paging and grouped bulk-review semantics. Maintainer real-catalogue verification confirmed desktop group summaries, bounded member review, selective subset acceptance with an exception left untouched, durable incorrect face-person rejection and count refresh, plus successful mobile/touch subset selection and acceptance.
