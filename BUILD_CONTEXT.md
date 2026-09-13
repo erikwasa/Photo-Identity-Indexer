@@ -6,36 +6,30 @@ This file is intentionally a short handoff for the next development or verificat
 
 **M25 Face discovery and cluster-assisted identity review is active.**
 
-WI-0110 similar-face discovery is accepted and complete. WI-0111 bounded follow-up regeneration is implemented and merged in PR #322 with green CI, but remains `in_review` because the maintainer deferred the required Windows acceptance pass until the WI-0112 verification session.
+WI-0110 similar-face discovery is complete. WI-0111 bounded follow-up regeneration and WI-0112 suggested-person grouped review are implemented/merged and remain `in_review` because the maintainer deferred their human acceptance pass.
 
-WI-0112 suggested-person grouped review is implemented in PR #324. The new surface groups current unreviewed/pending exact-model rank-1 suggestions by person, exposes bounded confidence/count/representative summaries, and then reuses the existing filtered Faces workspace for member paging, subset selection, exceptions and audited suggestion decisions. It does not add clustering, automatic group acceptance, schema changes or threshold/scoring changes.
+WI-0113 provisional-cluster model/algorithm evaluation is now the active implementation item on `agent/WI-0113-cluster-evaluation`. It defines provisional clusters as exact-model, policy-versioned derived evidence, adds a bounded PostgreSQL reviewed-sample exporter with private pseudonymized output, and adds local DBSCAN/HDBSCAN/mutual-neighbour evaluation tooling. No production clustering threshold or ANN choice may be recorded until the maintainer runs the private reviewed sample.
 
-The production execution strategy remains local under ADR-0010, PostgreSQL remains the sole writable production catalogue, M23 remains intentionally deferred, and WI-0081 remains the separate quality investigation that gates any later expansion of automatic identity assignment.
+PostgreSQL remains the sole writable production catalogue. WI-0081 remains the separate suggestion-quality investigation that gates later automatic identity-assignment expansion.
 
 ## Next concrete step
 
-Finish CI for PR #324, merge the WI-0111 deferred-verification bookkeeping PR #323 first, retarget #324 to `main`, and merge #324 once its final CI is green.
+Get WI-0113 CI green, then mark it `in_review` rather than completed. After merge, run one combined maintainer verification session for WI-0111, WI-0112, and WI-0113.
 
-After #324 merges, run one combined maintainer verification session:
-
-- WI-0111: make a manual identity assignment without pressing Regenerate and observe automatic `queued` → `running` → `current`, then verify disabled mode still permits explicit regeneration.
-- WI-0112: open `Suggested groups`, choose the production exact model, review a person with multiple pending suggestions, accept only a subset, leave/remove an exception, reject one incorrect face-person suggestion from Details, confirm group counts update, and repeat the key subset flow on mobile/touch.
-
-Do not mark WI-0111 or WI-0112 completed until that human evidence is recorded.
+The WI-0113 private pass must record the chosen conservative algorithm/policy from measured false-merge/split/noise/coverage results and decide whether exact PostgreSQL/vector-neighbour retrieval is sufficient for WI-0114 or an ANN index is justified. Do not start WI-0114 before that decision is recorded.
 
 ## Relevant files
 
 - docs/delivery/work-items/WI-0111-event-driven-match-regeneration.md
 - docs/delivery/work-items/WI-0112-suggested-person-review-workspace.md
-- docs/delivery/status/work-items/active/WI-0111.yaml
-- docs/delivery/status/work-items/active/WI-0112.yaml
-- src/PhotoIdentity.Core/Review/ISuggestedPersonGroupRepository.cs
-- src/PhotoIdentity.Persistence.Postgres/PostgresSuggestedPersonGroupRepository.cs
-- src/PhotoIdentity.Persistence.Sqlite/SqliteSuggestedPersonGroupRepository.cs
-- src/PhotoIdentity.Api/SuggestionGalleryEndpoints.cs
-- src/PhotoIdentity.Web/Pages/SuggestedPersonGroups.razor
-- src/PhotoIdentity.Web/Components/ReviewWorkspace.razor
-- tests/PhotoIdentity.Integration.Tests/SuggestedPersonGroupApplicationTests.cs
+- docs/delivery/work-items/WI-0113-provisional-cluster-model-and-algorithm-evaluation.md
+- docs/architecture/provisional-face-clustering.md
+- src/PhotoIdentity.Core/Clustering/ProvisionalFaceClusterContracts.cs
+- src/PhotoIdentity.Core/Clustering/IProvisionalClusterEvaluationRepository.cs
+- src/PhotoIdentity.Persistence.Postgres/PostgresProvisionalClusterEvaluationRepository.cs
+- tools/PhotoIdentity.ClusterEvaluation/Program.cs
+- tools/cluster-evaluation/evaluate.py
+- tools/cluster-evaluation/README.md
 
 ## Repository validation
 
