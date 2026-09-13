@@ -11,6 +11,46 @@ namespace PhotoIdentity_Integration_Tests;
 
 public sealed class PostgresRuntimeApplicationTests
 {
+    private const string TestModelHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+    [Fact]
+    public async Task Provisional_clustering_endpoint_rejects_SQLite_selected_provider()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "PhotoIdentity.Integration.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string sqlitePath = Path.Combine(directory, "catalogue.db");
+
+        try
+        {
+            await using PhotoIdentityApiTestFactory factory = new(
+                sqlitePath,
+                builder => builder.UseSetting("PhotoIdentity:CatalogueProvider", "sqlite"));
+            using HttpClient client = factory.CreateClient();
+            using HttpResponseMessage response = await client.GetAsync(
+                $"/api/review/provisional-clusters?modelId=test-model&modelHash={TestModelHash}");
+
+            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+            using JsonDocument problem = JsonDocument.Parse(
+                await response.Content.ReadAsStringAsync());
+            Assert.Equal(
+                "Provisional clustering is available only when PostgreSQL is the selected catalogue provider.",
+                problem.RootElement.GetProperty("detail").GetString());
+            Assert.IsType<SqliteCatalogueDatabase>(
+                factory.Services.GetRequiredService<SqliteCatalogueDatabase>());
+            Assert.Null(factory.Services.GetService<PostgresCatalogueDatabase>());
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
     [Fact]
     public async Task PostgreSQL_selected_host_starts_without_registering_or_creating_SQLite_catalogue_WhenLivePostgresIsConfigured()
     {
@@ -73,6 +113,14 @@ public sealed class PostgresRuntimeApplicationTests
             Assert.Equal(
                 "ready",
                 health.RootElement.GetProperty("postgres").GetProperty("status").GetString());
+
+            using HttpResponseMessage clustering = await client.GetAsync(
+                $"/api/review/provisional-clusters?modelId=test-model&modelHash={TestModelHash}");
+            Assert.Equal(HttpStatusCode.OK, clustering.StatusCode);
+            using JsonDocument clusterState = JsonDocument.Parse(
+                await clustering.Content.ReadAsStringAsync());
+            Assert.Equal("not-run", clusterState.RootElement.GetProperty("status").GetString());
+            Assert.Equal("m25-dbscan-v1", clusterState.RootElement.GetProperty("policyVersion").GetString());
 
             Assert.Null(factory.Services.GetService<SqliteCatalogueDatabase>());
             Assert.IsType<PostgresCatalogueDatabase>(
