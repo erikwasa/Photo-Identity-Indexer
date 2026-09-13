@@ -55,7 +55,11 @@ The web run exposes target, processed-target, suggested-target, suggestion, auto
 
 Canonical review decisions, suggestion decisions, person merges or new exact-model embeddings change the run's identity-evidence version. If any of those changes while a run is active, the worker stops the run as stale instead of silently changing exemplar evidence halfway through scoring. A policy-version change likewise prevents finalization under different thresholds. After the final target, the worker revalidates evidence and policy, removes obsolete rankings, then applies automatic assignment once for the complete fixed-snapshot result. This preserves the same-run non-cascade invariant: automatic assignments cannot become exemplars until a later regeneration.
 
-The `Regenerate matches` web workspace selects an exact model revision, shows current/stale/queued/running/completed state and durable progress, and links back to the confidence-group Faces queue after completion. Review reads remain available while scoring proceeds because regeneration uses short per-target transactions.
+WI-0111 adds bounded automatic follow-up around this same controller rather than a second matching engine. For each exact model revision, the latest run's evidence snapshot is compared with the current monotonic evidence version. A mismatch is the durable queued condition: if the application restarts, the mismatch remains in the catalogue and is rediscovered. A short configurable debounce (30 seconds by default) is process-local and only coalesces bursts of review changes before the existing durable `StartAsync` path snapshots the next run. No separate per-click regeneration job is created.
+
+A completed run's expected evidence includes the review and suggestion-review actions created by its own automatic assignments. Therefore those automatic decisions do not immediately schedule another run by themselves. If genuinely newer evidence appears during an active run, the existing stale-run rules remain authoritative; automatic follow-up waits for the active run to stop before starting a later fixed-snapshot pass. Automatic follow-up can be disabled with `PhotoIdentity__IdentityMatchRegeneration__AutomaticFollowUpEnabled=false`, and its debounce can be changed with `PhotoIdentity__IdentityMatchRegeneration__AutomaticFollowUpDelayMilliseconds`. Explicit regeneration remains available regardless of that toggle.
+
+The `Regenerate matches` web workspace selects an exact model revision, shows current/stale/queued/running/completed state and durable progress, and links back to the confidence-group Faces queue after completion. Review reads remain available while scoring proceeds because regeneration uses short per-target transactions. Automatic follow-up state is presented separately as `queued`, `running`, `current` or `disabled`; policy-only staleness therefore does not falsely claim that an automatic follow-up is queued.
 
 The explicit Unknown-inclusive scope is an internal future-safe boundary rather than an automatic rematch workflow.
 
@@ -117,6 +121,8 @@ The completed FP32-versus-INT8 comparison used the earlier YuNet detector popula
 - Regeneration uses a fixed exemplar snapshot before automatic assignments are applied.
 - Browser-triggered regeneration is durable, restart-safe and does not depend on one long HTTP request or transaction.
 - An active browser regeneration becomes stale if identity evidence changes before finalization.
+- Automatic follow-up is driven by durable evidence-version drift and coalesces changes before starting the existing bounded controller.
+- A completed run's own automatic assignments do not recursively schedule another run; they can become exemplars only in a genuinely later run triggered by newer evidence or explicit operator action.
 - Manual correction supersedes an automatic assignment and changes later exemplar evidence.
 - Rejected face-person pairs remain excluded.
 - Unknown and rejected faces do not become exemplars or person-collection evidence.
