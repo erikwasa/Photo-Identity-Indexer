@@ -5,7 +5,7 @@ milestone: M25
 status_source: ../status/work-items.yaml
 depends_on: [WI-0060, WI-0103]
 related_adrs: []
-affected_modules: [PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Integration.Tests]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Persistence.Tests, PhotoIdentity.Integration.Tests]
 ---
 
 # WI-0110: Add similar-face explorer for immediate identity discovery
