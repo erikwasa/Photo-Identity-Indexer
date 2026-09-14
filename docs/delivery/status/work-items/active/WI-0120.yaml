@@ -6,5 +6,6 @@ owner: unassigned
 document: ../work-items/WI-0120-target-count-diversity-selector.md
 blockers:
 - WI-0119
+- WI-0083
 blocker_notes: []
 evidence: []
