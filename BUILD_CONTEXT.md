@@ -8,7 +8,9 @@ This file is intentionally a short handoff for the next development or verificat
 
 WI-0110 similar-face discovery, WI-0111 bounded follow-up regeneration, WI-0112 suggested-person grouped review, WI-0113 provisional-cluster model/algorithm evaluation, and WI-0114 scalable incremental provisional face clustering are complete after implementation, CI, corrective live-PostgreSQL fixes, and maintainer verification.
 
-WI-0115 cluster-based People-to-identify review is now in implementation on `agent/WI-0115-cluster-review-workspace`. The current slice adds a bounded cluster-card/member workflow, selective assignment through the existing audited bulk-review API, Person creation handoff, durable face-to-face `not same` discovery evidence, and replacement clustering that respects that evidence without changing the accepted DBSCAN policy.
+WI-0115 cluster-based People-to-identify review was implemented and merged through PR #334, and maintainer Windows/real-catalogue/mobile acceptance completed successfully on 2026-09-14. The accepted slice provides a bounded cluster-card/member workflow, selective assignment through the existing audited bulk-review API, Person creation handoff, durable face-to-face `not same` discovery evidence, and replacement clustering that respects that evidence without changing the accepted DBSCAN policy. The real catalogue produced predominantly pure clusters containing the same person, so intentional false merges were comparatively difficult to find during acceptance.
+
+Post-acceptance usability feedback identified the anchor-face GUID dropdown as disconnected from the displayed faces. The follow-up branch `agent/WI-0115-anchor-selection-polish` makes the first displayed member the default anchor, marks the anchor directly on its face card, and adds a touch-friendly `Make anchor` action to other member cards. This is non-blocking interaction polish; the maintainer plans to recheck it together with a later work item rather than reopen WI-0115 core acceptance.
 
 The selected production policy remains DBSCAN with `eps=0.30` and `min_samples=3`. WI-0114 uses bounded exact in-process cosine comparisons over an exact-model PostgreSQL snapshot, with a 20,000-face cap and 2,000,000 retained-neighbour-edge safety budget. WI-0115 additionally bounds relevant durable not-same evidence per run. ANN remains optional and should be introduced only if measured production runtime exceeds the required budget.
 
@@ -18,17 +20,7 @@ PostgreSQL remains the sole writable production catalogue. WI-0081 remains the s
 
 ## Next concrete step
 
-Finish automated/CI validation for WI-0115, then perform maintainer Windows and real/mobile-browser acceptance on the real catalogue before closing the work item.
-
-Representative acceptance should confirm:
-
-1. `People to identify` shows useful provisional groups with representative faces and explicit derived status.
-2. Opening a group loads a bounded member set with photo-context links and remains usable at mobile width/touch.
-3. Selecting only obvious members and assigning them to an existing/new Person uses canonical audited review actions while unselected members remain unreviewed.
-4. Recording `not same as anchor` for an intentional exception writes durable discovery evidence, queues a replacement run, and the replacement grouping respects that conflict.
-5. Canonical Person/Unknown/rejection history is not rewritten merely because grouping or negative discovery feedback changed.
-
-Do not start WI-0116 cluster-assisted known-person scoring until WI-0115 implementation, CI, and maintainer acceptance are complete.
+Merge the WI-0115 anchor-selection polish after CI, then archive WI-0115 as completed using the already-passed maintainer acceptance evidence. After that lifecycle update, assess and proceed with WI-0116 cluster-assisted known-person scoring. The anchor-selection polish can be visually rechecked together with that later work rather than blocking WI-0115 closure.
 
 ## Relevant files
 
