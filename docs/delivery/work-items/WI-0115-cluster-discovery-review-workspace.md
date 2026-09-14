@@ -59,3 +59,7 @@ Maintainer usability feedback after acceptance identified the GUID-oriented anch
 Automated API/Web/persistence coverage plus human Windows and real/mobile-browser verification using clusters with correct members and intentional exceptions.
 
 Maintainer verification completed successfully on 2026-09-14 against the local PostgreSQL-backed application. The operator confirmed the cluster-card/member workflow, selective canonical assignment, preservation of unselected review state, negative discovery feedback/reclustering behavior, canonical-history preservation, and mobile-width interaction. The real catalogue produced predominantly pure clusters containing the same person, so finding an intentional false merge for the anchor scenario required additional searching; this was recorded as useful quality evidence rather than a failure of the workflow.
+
+## Completion
+
+WI-0115 was accepted by the maintainer on 2026-09-14 after PR #334 and its successful CI run. Follow-up PR #336, merged on 2026-09-15, replaced the GUID-oriented anchor selector with direct face-card anchor selection. That polish does not reopen acceptance; its interaction can be visually rechecked together with a later work item.
