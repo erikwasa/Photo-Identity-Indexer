@@ -117,11 +117,6 @@ public interface IProvisionalFaceClusterRepository
         int maximumFaces = ProvisionalFaceClusterPolicies.MaximumFacesPerRun,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<ProvisionalFaceNotSameConstraint>> ReadNotSameConstraintsAsync(
-        ProvisionalFaceClusterRun run,
-        int maximumConstraints = ProvisionalFaceClusterPolicies.MaximumNotSameConstraintsPerRun,
-        CancellationToken cancellationToken = default);
-
     Task ReportProgressAsync(
         Guid runId,
         int processedTargetCount,
