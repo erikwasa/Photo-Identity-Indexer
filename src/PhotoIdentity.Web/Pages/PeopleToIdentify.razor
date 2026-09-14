@@ -18,9 +18,9 @@
             <p class="eyebrow">Exact model revision</p>
             <h2 id="cluster-model-heading">Cluster scope</h2>
         </div>
-        @if (SelectedModel is ProvisionalClusterModelResponse selected)
+        @if (SelectedModel is ProvisionalClusterModelResponse selectedModel)
         {
-            <span class="model-summary">@selected.ModelId · @HashPrefix(selected.ModelHash)</span>
+            <span class="model-summary">@selectedModel.ModelId · @HashPrefix(selectedModel.ModelHash)</span>
         }
     </div>
 
