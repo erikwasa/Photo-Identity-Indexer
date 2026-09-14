@@ -1,6 +1,6 @@
 # Provisional face clustering
 
-Status: WI-0114 production implementation candidate. Maintainer acceptance remains pending.
+Status: WI-0114 production clustering accepted; WI-0115 cluster-assisted review integration in progress.
 
 ## Boundary
 
@@ -42,10 +42,14 @@ False merges are the primary clustering risk. The production boundary must fail 
 Strong conflict evidence identified by WI-0113 includes:
 
 - two reviewed faces assigned to different canonical people,
-- an explicit durable not-same face/identity constraint if a future work item introduces one,
+- an explicit durable not-same face/identity constraint,
 - same-photo co-occurrence between two different reviewed identities where the detections are reliable.
 
-The initial WI-0114 production population contains only Unreviewed faces plus explicitly included canonical Unknown faces. Assigned and Rejected faces are filtered before clustering, so reviewed-person conflicts and same-photo conflicts between differently assigned reviewed identities cannot become provisional memberships in this implementation. Existing rejected identity suggestions remain durable negative face-person evidence but are not generalized into arbitrary face-face not-same edges, matching the WI-0113 contract. If a later work item expands clustering input to reviewed identities or introduces explicit face-face constraints, that work must add conflict-edge enforcement before those faces can participate.
+The initial WI-0114 production population contains only Unreviewed faces plus explicitly included canonical Unknown faces. Assigned and Rejected faces are filtered before clustering, so reviewed-person conflicts and same-photo conflicts between differently assigned reviewed identities cannot become provisional memberships in this implementation. Existing rejected identity suggestions remain durable negative face-person evidence but are not generalized into arbitrary face-face not-same edges, matching the WI-0113 contract.
+
+WI-0115 introduces explicit face-to-face `not same` discovery evidence. The evidence is canonicalized as an unordered pair of face occurrence IDs and is durable independently of any run-scoped cluster key. Before recording feedback, the review repository verifies that the anchor and selected exception faces still belong to the same current provisional cluster. Recording the constraint does not reject either face, mark either face Unknown, create a Person, or rewrite review history.
+
+A replacement clustering run applies all relevant durable not-same pairs after the selected DBSCAN density result. Each conflicting derived component is deterministically partitioned in stable face-ID order so that no surviving partition contains an explicit conflict pair. A resulting partition smaller than the selected minimum cluster size becomes derived Noise. The implementation does not increase `eps`, lower `min_samples`, or otherwise weaken the accepted policy to preserve a group after negative feedback.
 
 ## Selected initial production policy
 
@@ -70,12 +74,13 @@ The private WI-0113 evaluator measured 0.528 seconds for the 5,000-face pairwise
 
 That benchmark is not a direct PostgreSQL query benchmark, so it is not treated as a latency guarantee. It nevertheless provided no evidence that ANN complexity was required at the expected initial archive scale. WI-0114 therefore uses a bounded exact approach: PostgreSQL supplies one exact-model snapshot and the Core clusterer performs deterministic exact cosine comparisons in process. ANN remains optional and should be introduced only if measured production retrieval/computation exceeds the required runtime budget.
 
-The initial implementation has two explicit safety bounds:
+The initial implementation has explicit safety bounds:
 
 - at most **20,000 faces** in one run,
-- at most **2,000,000 undirected neighbour edges** retained by the exact DBSCAN computation.
+- at most **2,000,000 undirected neighbour edges** retained by the exact DBSCAN computation,
+- at most **100,000 relevant durable not-same constraints** loaded for one clustering run.
 
-The pairwise scan uses normalized SIMD dot products and bounded parallel row chunks. It does not retain a dense distance matrix. Exceeding either bound fails the run instead of silently changing `eps`, `min_samples`, or cluster semantics.
+The pairwise scan uses normalized SIMD dot products and bounded parallel row chunks. It does not retain a dense distance matrix. Exceeding any configured bound fails the run instead of silently changing `eps`, `min_samples`, cluster semantics, or negative-evidence handling.
 
 ## Durable production run model
 
@@ -85,18 +90,21 @@ WI-0114 persists three derived structures in PostgreSQL:
 - membership rows containing only run-scoped face membership, derived cluster key and Core/Border/Noise role,
 - a current-scope pointer identifying the published replacement for one exact model/policy/`includeUnknown` scope.
 
+WI-0115 additionally persists face-to-face not-same constraints as durable discovery evidence. Source run/key metadata is retained only for audit context; the pair itself is independent of disposable cluster IDs and remains applicable to later replacement runs while both faces participate.
+
 A deterministic rebuild follows this sequence:
 
 1. Capture one exact model revision, immutable clustering policy and current review/embedding evidence version.
 2. Count the eligible population and reject a run above the face bound.
 3. Persist a durable Pending run before computation starts.
-4. Re-read the same bounded snapshot after restart if necessary and mark the run Stale if its captured evidence no longer matches.
-5. Compute DBSCAN deterministically after sorting by stable face-occurrence ID.
-6. Re-check the evidence version before publishing.
-7. Write all derived memberships and atomically move the current-scope pointer to the replacement run.
-8. Supersede the previously current run only after the replacement is complete.
+4. Re-read the same bounded snapshot after restart if necessary and mark the run Stale if its captured canonical/embedding evidence no longer matches.
+5. Read bounded not-same evidence relevant to the eligible face snapshot.
+6. Compute DBSCAN deterministically after sorting by stable face-occurrence ID, then apply deterministic conflict partitioning.
+7. Re-check the canonical/embedding evidence version before publishing.
+8. Write all derived memberships and atomically move the current-scope pointer to the replacement run.
+9. Supersede the previously current run only after the replacement is complete.
 
-Cluster keys are disposable and run-scoped. No production path updates canonical people, person labels, review actions, Unknown state, rejection history or suggestion decisions.
+Cluster keys are disposable and run-scoped. No production path updates canonical people, person labels, review actions, Unknown state, rejection history or suggestion decisions merely because clustering ran or a not-same pair was recorded.
 
 ## Incremental refresh semantics
 
@@ -106,20 +114,33 @@ Because every replacement rebuilds the eligible snapshot, newly analysed faces a
 
 Review reversals also change the captured review mutation version, so reversing an earlier decision invalidates affected derived evidence predictably even when no new review-action row is inserted.
 
+WI-0115 not-same feedback explicitly queues a replacement run for the same exact model/policy scope after the durable constraint is recorded. If an equivalent run is active, it is stopped conservatively and replaced so a run that began before the constraint cannot publish a grouping that ignores the new conflict evidence.
+
+## Cluster review workspace
+
+The `People to identify` workspace is a review projection over the current provisional run, not a second identity system. It exposes bounded, size-prioritized cluster cards with representative faces, member/Core/Border counts, Core-share evidence and explicit provisional/derived labelling. Opening a card loads a bounded member subset and links every member back to existing face/photo context.
+
+Canonical assignment from this workspace reuses the existing audited bulk-review preview/commit API. The operator chooses the member subset explicitly and may assign it to an existing Person or create a Person first; unselected and borderline members remain unreviewed. The workspace never interprets a cluster as permission to assign every member automatically.
+
+`Not same as anchor` records discovery evidence only. It is deliberately separate from false-detection rejection, canonical Unknown and identity-suggestion rejection. This preserves the distinction between “these are valid faces that should not be grouped together” and canonical review decisions about what each face represents.
+
 ## Provider boundary and scheduling
 
-Provisional clustering is PostgreSQL-only. The API resolves the repository only when `PhotoIdentity:CatalogueProvider` selects PostgreSQL; a SQLite-selected host returns HTTP 409 for provisional-clustering endpoints and does not run the clustering worker. This keeps PostgreSQL as the sole production authority and prevents cross-provider writes.
+Provisional clustering and cluster review are PostgreSQL-only. The API resolves the repositories only when `PhotoIdentity:CatalogueProvider` selects PostgreSQL; a SQLite-selected host returns HTTP 409 for provisional-clustering endpoints and does not run the clustering worker. This keeps PostgreSQL as the sole production authority and prevents cross-provider writes.
 
 The clustering worker is advanced by the existing identity-regeneration hosted service only when no identity-regeneration run is active. This keeps clustering lower priority than review matching and avoids a second competing background loop. An interrupted active clustering run remains durable and is resumed from its captured snapshot after process restart.
 
 ## Operator diagnostics
 
-The API exposes `/api/review/provisional-clusters` diagnostic/control endpoints for:
+The API exposes `/api/review/provisional-clusters` diagnostic/control and review endpoints for:
 
 - exact model revisions,
 - latest run status and progress,
 - explicitly starting a run with or without Unknown participation,
-- current group summaries containing only run ID, derived cluster key and aggregate member/Core/Border counts.
+- current aggregate group summaries,
+- paged current review-group cards with representative face image URLs,
+- bounded member loading for one current group,
+- durable not-same feedback that queues replacement clustering.
 
 Operational state includes target/progress/cluster/noise counts, timestamps and a bounded failure message. The worker does not log face IDs, filenames, source paths, crop data, embeddings or personal labels.
 
@@ -127,13 +148,13 @@ Operational state includes target/progress/cluster/noise counts, timestamps and 
 
 Automated coverage is split intentionally:
 
-- Core tests prove deterministic selected-policy behavior, retry of previous Noise faces after denser evidence arrives, and fail-closed neighbour-budget behavior.
-- PostgreSQL persistence tests exercise durable restart, atomic replacement, new-embedding refresh, exact-model isolation, explicit Unknown inclusion, Rejected/Assigned exclusion, review-reversal invalidation and canonical review-history preservation when a live test PostgreSQL connection is supplied.
-- Integration tests assert the catalogue-provider boundary; the PostgreSQL endpoint path is exercised when the live PostgreSQL test connection is available.
+- Core tests prove deterministic selected-policy behavior, retry of previous Noise faces after denser evidence arrives, fail-closed neighbour-budget behavior, and deterministic enforcement of durable not-same conflicts without weakening DBSCAN parameters.
+- PostgreSQL persistence tests exercise durable restart, atomic replacement, new-embedding refresh, exact-model isolation, explicit Unknown inclusion, Rejected/Assigned exclusion, review-reversal invalidation, current review-group/member projections, durable negative feedback and canonical review-history preservation when a live test PostgreSQL connection is supplied.
+- Integration tests assert the catalogue-provider boundary and canonical bulk-review behavior; the PostgreSQL cluster-review endpoint path is exercised when the live PostgreSQL test connection is available.
 
 `verify-postgres.ps1` is the repository's explicit local entry point for the live PostgreSQL test suite because it supplies `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING` only to the child verification process. GitHub CI without that environment variable still builds the live tests but intentionally skips their database bodies.
 
-Final WI-0114 acceptance also requires a maintainer runtime check on the real catalogue: complete a provisional run, add/analyse a small new photo batch, observe a replacement run and updated discovery groups, and confirm canonical assignments/Unknown/rejection history did not change as a side effect.
+Final WI-0115 acceptance requires maintainer runtime verification on the real catalogue: browse representative groups, open a group with correct members plus at least one intentional exception, selectively assign only obvious members, record not-same feedback for an exception and observe replacement grouping, then repeat the representative flow at mobile width/touch without canonical history being rewritten for unselected members.
 
 ## WI-0113 evaluation method
 
