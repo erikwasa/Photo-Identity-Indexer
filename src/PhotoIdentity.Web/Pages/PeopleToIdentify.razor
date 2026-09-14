@@ -120,10 +120,10 @@
                 @if (advisory.Candidate is ProvisionalClusterKnownPersonCandidateResponse candidate)
                 {
                     <dl class="cluster-advisory-metrics">
-                        <div><dt>Qualifying support</dt><dd>@candidate.SupportCount / @advisory.MemberCount (@candidate.SupportShare.ToString("P0"))</dd></div>
+                        <div><dt>Qualifying support</dt><dd>@candidate.SupportCount independent content vote@(candidate.SupportCount == 1 ? "" : "s") (@candidate.SupportShare.ToString("P0"))</dd></div>
                         <div><dt>Ordinary evidence</dt><dd>@candidate.OrdinaryHighCount High · @candidate.OrdinaryMediumCount Medium</dd></div>
                         <div><dt>Rank-1 scores</dt><dd>@candidate.MinimumScore.ToString("F2")–@candidate.MaximumScore.ToString("F2") · median @candidate.MedianScore.ToString("F2")</dd></div>
-                        <div><dt>Evidence coverage</dt><dd>@advisory.RankedEvidenceCount / @advisory.MemberCount (@advisory.RankedEvidenceCoverage.ToString("P0"))</dd></div>
+                        <div><dt>Evidence coverage</dt><dd>@advisory.RankedEvidenceCount independent content group@(advisory.RankedEvidenceCount == 1 ? "" : "s") (@advisory.RankedEvidenceCoverage.ToString("P0"))</dd></div>
                     </dl>
                 }
 
