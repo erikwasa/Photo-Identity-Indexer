@@ -49,7 +49,7 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepository 
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
 
-        (Guid RunId, FaceOccurrenceId[] FaceIds, int CoreCount)? scope = await ReadScopeAsync(
+        (Guid RunId, FaceOccurrenceId[] FaceIds, int CoreCount, int IndependentMemberCount)? scope = await ReadScopeAsync(
             connection,
             transaction,
             modelId,
@@ -87,6 +87,7 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepository 
             includeUnknown,
             derivedClusterKey,
             scope.Value.FaceIds.Length,
+            scope.Value.IndependentMemberCount,
             scope.Value.CoreCount,
             internalConflictCount,
             identityPolicy,
@@ -94,7 +95,7 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepository 
             _timeProvider.GetUtcNow());
     }
 
-    private static async Task<(Guid RunId, FaceOccurrenceId[] FaceIds, int CoreCount)?> ReadScopeAsync(
+    private static async Task<(Guid RunId, FaceOccurrenceId[] FaceIds, int CoreCount, int IndependentMemberCount)?> ReadScopeAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         ModelId modelId,
@@ -111,10 +112,15 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepository 
             SELECT
                 current_scope.run_id,
                 member.face_occurrence_id,
-                member.role
+                member.role,
+                asset_revision.content_sha256
             FROM provisional_face_cluster_current AS current_scope
             INNER JOIN provisional_face_cluster_members AS member
                 ON member.run_id = current_scope.run_id
+            INNER JOIN face_occurrences AS face
+                ON face.id = member.face_occurrence_id
+            INNER JOIN asset_revisions AS asset_revision
+                ON asset_revision.id = face.asset_revision_id
             WHERE current_scope.model_id = @model_id
               AND current_scope.model_hash = @model_hash
               AND current_scope.policy_version = @policy_version
@@ -134,6 +140,7 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepository 
         Guid? runId = null;
         int coreCount = 0;
         List<FaceOccurrenceId> faceIds = [];
+        HashSet<string> independentContentGroups = new(StringComparer.Ordinal);
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
@@ -143,11 +150,12 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepository 
             {
                 coreCount++;
             }
+            independentContentGroups.Add(reader.GetString(3));
         }
 
         return runId is null || faceIds.Count == 0
             ? null
-            : (runId.Value, faceIds.ToArray(), coreCount);
+            : (runId.Value, faceIds.ToArray(), coreCount, independentContentGroups.Count);
     }
 
     private static async Task<int> CountInternalConflictsAsync(
@@ -186,6 +194,7 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepository 
             """
             SELECT
                 ranking.face_occurrence_id,
+                asset_revision.content_sha256,
                 suggestion.suggested_person_id,
                 COALESCE(person.display_name, 'Unnamed person') AS display_name,
                 suggestion.score,
@@ -196,6 +205,10 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepository 
             INNER JOIN people AS person
                 ON person.id = suggestion.suggested_person_id
                AND person.merged_into_person_id IS NULL
+            INNER JOIN face_occurrences AS face
+                ON face.id = ranking.face_occurrence_id
+            INNER JOIN asset_revisions AS asset_revision
+                ON asset_revision.id = face.asset_revision_id
             WHERE ranking.face_occurrence_id = ANY(@face_ids)
               AND ranking.model_id = @model_id
               AND ranking.model_hash = @model_hash
@@ -227,10 +240,11 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepository 
         {
             result.Add(new(
                 FaceOccurrenceId.From(reader.GetGuid(0)),
-                PersonId.From(reader.GetGuid(1)),
-                reader.GetString(2),
-                reader.GetDouble(3),
-                reader.IsDBNull(4) ? null : reader.GetDouble(4)));
+                reader.GetString(1),
+                PersonId.From(reader.GetGuid(2)),
+                reader.GetString(3),
+                reader.GetDouble(4),
+                reader.IsDBNull(5) ? null : reader.GetDouble(5)));
         }
         return result;
     }
