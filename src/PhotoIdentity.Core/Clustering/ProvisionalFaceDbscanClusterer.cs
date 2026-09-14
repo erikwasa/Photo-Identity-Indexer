@@ -37,14 +37,23 @@ public sealed class ProvisionalFaceDbscanClusterer
         _maximumDegreeOfParallelism = degree;
     }
 
+    public Task<ProvisionalFaceClusterComputation> ComputeAsync(
+        IReadOnlyList<ProvisionalFaceClusterInputFace> faces,
+        ProvisionalFaceClusterPolicy policy,
+        Func<int, CancellationToken, Task>? reportProgress = null,
+        CancellationToken cancellationToken = default) =>
+        ComputeAsync(faces, policy, [], reportProgress, cancellationToken);
+
     public async Task<ProvisionalFaceClusterComputation> ComputeAsync(
         IReadOnlyList<ProvisionalFaceClusterInputFace> faces,
         ProvisionalFaceClusterPolicy policy,
+        IReadOnlyCollection<ProvisionalFaceNotSameConstraint> notSameConstraints,
         Func<int, CancellationToken, Task>? reportProgress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(faces);
         ArgumentNullException.ThrowIfNull(policy);
+        ArgumentNullException.ThrowIfNull(notSameConstraints);
         policy.Validate();
 
         if (!string.Equals(policy.Algorithm, "dbscan-cosine", StringComparison.Ordinal))
@@ -237,6 +246,8 @@ public sealed class ProvisionalFaceDbscanClusterer
             }
         }
 
+        ApplyNotSameConstraints(ordered, labels, notSameConstraints, policy.MinimumClusterSize);
+
         Dictionary<int, string> keys = labels
             .Select((label, index) => new { label, index })
             .Where(item => item.label >= 0)
@@ -276,6 +287,98 @@ public sealed class ProvisionalFaceDbscanClusterer
             keys.Count,
             noiseCount,
             memberships);
+    }
+
+    private static void ApplyNotSameConstraints(
+        IReadOnlyList<ProvisionalFaceClusterInputFace> ordered,
+        int[] labels,
+        IReadOnlyCollection<ProvisionalFaceNotSameConstraint> constraints,
+        int minimumClusterSize)
+    {
+        if (constraints.Count == 0)
+        {
+            return;
+        }
+
+        Dictionary<Guid, int> indexByFace = ordered
+            .Select((face, index) => (face.FaceOccurrenceId.Value, index))
+            .ToDictionary(item => item.Value, item => item.index);
+        HashSet<(int Left, int Right)> constrainedPairs = [];
+        foreach (ProvisionalFaceNotSameConstraint constraint in constraints)
+        {
+            if (!indexByFace.TryGetValue(constraint.LeftFaceOccurrenceId.Value, out int left) ||
+                !indexByFace.TryGetValue(constraint.RightFaceOccurrenceId.Value, out int right) ||
+                left == right)
+            {
+                continue;
+            }
+
+            constrainedPairs.Add(left < right ? (left, right) : (right, left));
+        }
+
+        if (constrainedPairs.Count == 0)
+        {
+            return;
+        }
+
+        List<int[]> sourceClusters = labels
+            .Select((label, index) => new { label, index })
+            .Where(item => item.label >= 0)
+            .GroupBy(item => item.label, item => item.index)
+            .OrderBy(group => group.Min(index => ordered[index].FaceOccurrenceId.Value))
+            .Select(group => group
+                .OrderBy(index => ordered[index].FaceOccurrenceId.Value)
+                .ToArray())
+            .ToList();
+
+        Array.Fill(labels, -1);
+        int nextLabel = 0;
+        foreach (int[] sourceCluster in sourceClusters)
+        {
+            List<List<int>> partitions = [];
+            foreach (int member in sourceCluster)
+            {
+                List<int>? compatible = partitions.FirstOrDefault(partition =>
+                    partition.All(existing => !IsConstrained(member, existing, constrainedPairs)));
+                if (compatible is null)
+                {
+                    compatible = [];
+                    partitions.Add(compatible);
+                }
+
+                compatible.Add(member);
+            }
+
+            foreach (List<int> partition in partitions)
+            {
+                if (partition.Count < minimumClusterSize)
+                {
+                    continue;
+                }
+
+                foreach (int member in partition)
+                {
+                    labels[member] = nextLabel;
+                }
+
+                nextLabel++;
+            }
+        }
+    }
+
+    private static bool IsConstrained(
+        int first,
+        int second,
+        HashSet<(int Left, int Right)> constrainedPairs)
+    {
+        if (first == second)
+        {
+            return false;
+        }
+
+        return first < second
+            ? constrainedPairs.Contains((first, second))
+            : constrainedPairs.Contains((second, first));
     }
 
     private static float[] Normalize(PhotoIdentity.Core.Recognition.EmbeddingVector embedding)
