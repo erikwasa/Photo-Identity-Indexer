@@ -6,5 +6,6 @@ owner: unassigned
 document: ../work-items/WI-0119-anchor-context-generation.md
 blockers:
 - WI-0118
+- WI-0050
 blocker_notes: []
 evidence: []
