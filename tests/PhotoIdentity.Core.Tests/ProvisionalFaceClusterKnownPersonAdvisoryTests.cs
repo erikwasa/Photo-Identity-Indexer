@@ -18,6 +18,7 @@ public sealed class ProvisionalFaceClusterKnownPersonAdvisoryTests
     {
         ProvisionalFaceClusterKnownPersonAdvisory result = Evaluate(
             memberCount: 4,
+            independentMemberCount: 4,
             coreCount: 4,
             internalConflictCount: 0,
             Evidence(1, Alice, "Alice", 0.66, 0.08),
@@ -40,6 +41,7 @@ public sealed class ProvisionalFaceClusterKnownPersonAdvisoryTests
     {
         ProvisionalFaceClusterKnownPersonAdvisory result = Evaluate(
             memberCount: 4,
+            independentMemberCount: 4,
             coreCount: 4,
             internalConflictCount: 0,
             Evidence(1, Alice, "Alice", 0.95, 0.50),
@@ -53,10 +55,31 @@ public sealed class ProvisionalFaceClusterKnownPersonAdvisoryTests
     }
 
     [Fact]
+    public void Exact_duplicate_content_does_not_inflate_independent_support()
+    {
+        ProvisionalFaceClusterKnownPersonAdvisory result = Evaluate(
+            memberCount: 4,
+            independentMemberCount: 2,
+            coreCount: 4,
+            internalConflictCount: 0,
+            Evidence(1, Alice, "Alice", 0.66, 0.08, "same-content"),
+            Evidence(2, Alice, "Alice", 0.64, 0.06, "same-content"),
+            Evidence(3, Alice, "Alice", 0.61, 0.04, "same-content"),
+            Evidence(4, Bob, "Bob", 0.45, 0.02, "other-content"));
+
+        Assert.Equal(ProvisionalFaceClusterKnownPersonAdvisoryStatuses.Insufficient, result.Status);
+        Assert.Equal(Alice, result.Candidate!.PersonId);
+        Assert.Equal(1, result.Candidate.SupportCount);
+        Assert.Equal(0.5, result.Candidate.SupportShare, 6);
+        Assert.Equal(2, result.IndependentMemberCount);
+    }
+
+    [Fact]
     public void Mixed_cluster_with_competing_qualifying_votes_fails_closed()
     {
         ProvisionalFaceClusterKnownPersonAdvisory result = Evaluate(
             memberCount: 5,
+            independentMemberCount: 5,
             coreCount: 5,
             internalConflictCount: 0,
             Evidence(1, Alice, "Alice", 0.68, 0.08),
@@ -76,6 +99,7 @@ public sealed class ProvisionalFaceClusterKnownPersonAdvisoryTests
     {
         ProvisionalFaceClusterKnownPersonAdvisory result = Evaluate(
             memberCount: 3,
+            independentMemberCount: 3,
             coreCount: 3,
             internalConflictCount: 1,
             Evidence(1, Alice, "Alice", 0.66, 0.08),
@@ -89,6 +113,7 @@ public sealed class ProvisionalFaceClusterKnownPersonAdvisoryTests
 
     private static ProvisionalFaceClusterKnownPersonAdvisory Evaluate(
         int memberCount,
+        int independentMemberCount,
         int coreCount,
         int internalConflictCount,
         params ProvisionalFaceClusterKnownPersonMemberEvidence[] evidence) =>
@@ -100,6 +125,7 @@ public sealed class ProvisionalFaceClusterKnownPersonAdvisoryTests
             includeUnknown: false,
             "cluster-001",
             memberCount,
+            independentMemberCount,
             coreCount,
             internalConflictCount,
             IdentityPolicy(),
@@ -111,8 +137,10 @@ public sealed class ProvisionalFaceClusterKnownPersonAdvisoryTests
         PersonId person,
         string displayName,
         double score,
-        double? margin) => new(
+        double? margin,
+        string? evidenceGroup = null) => new(
             FaceOccurrenceId.From(Guid.Parse($"00000000-0000-0000-0000-{face:000000000000}")),
+            evidenceGroup ?? $"content-{face}",
             person,
             displayName,
             score,
