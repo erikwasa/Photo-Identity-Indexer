@@ -13,6 +13,7 @@ public static class ProvisionalFaceClusterKnownPersonAdvisoryStatuses
 
 public sealed record ProvisionalFaceClusterKnownPersonMemberEvidence(
     FaceOccurrenceId FaceOccurrenceId,
+    string EvidenceGroup,
     PersonId SuggestedPersonId,
     string SuggestedPersonDisplayName,
     double Score,
@@ -40,6 +41,7 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisory(
     string AdvisoryPolicyVersion,
     int IdentitySuggestionPolicyVersion,
     int MemberCount,
+    int IndependentMemberCount,
     int CoreCount,
     int InternalConflictCount,
     int RankedEvidenceCount,
@@ -51,7 +53,7 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisory(
     DateTimeOffset EvaluatedAtUtc)
 {
     public double CoreShare => MemberCount == 0 ? 0 : (double)CoreCount / MemberCount;
-    public double RankedEvidenceCoverage => MemberCount == 0 ? 0 : (double)RankedEvidenceCount / MemberCount;
+    public double RankedEvidenceCoverage => IndependentMemberCount == 0 ? 0 : (double)RankedEvidenceCount / IndependentMemberCount;
     public bool CanonicalAssignmentAllowed => false;
 }
 
@@ -79,6 +81,7 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
         bool includeUnknown,
         string derivedClusterKey,
         int memberCount,
+        int independentMemberCount,
         int coreCount,
         int internalConflictCount,
         ReviewIdentitySuggestionPolicy identitySuggestionPolicy,
@@ -94,6 +97,10 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
         if (memberCount < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(memberCount));
+        }
+        if (independentMemberCount < 1 || independentMemberCount > memberCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(independentMemberCount));
         }
         if (coreCount < 0 || coreCount > memberCount)
         {
@@ -114,6 +121,7 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
 
         foreach (ProvisionalFaceClusterKnownPersonMemberEvidence item in ranked)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(item.EvidenceGroup);
             if (!double.IsFinite(item.Score) || item.Score < -1 || item.Score > 1)
             {
                 throw new ArgumentOutOfRangeException(nameof(evidence), "Suggestion scores must be finite cosine similarities.");
@@ -131,7 +139,12 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
 
         ProvisionalFaceClusterKnownPersonCandidate[] candidates = qualifying
             .GroupBy(item => new { item.SuggestedPersonId, item.SuggestedPersonDisplayName })
-            .Select(group => BuildCandidate(group.Key.SuggestedPersonId, group.Key.SuggestedPersonDisplayName, group.ToArray(), memberCount, identitySuggestionPolicy))
+            .Select(group => BuildCandidate(
+                group.Key.SuggestedPersonId,
+                group.Key.SuggestedPersonDisplayName,
+                DeduplicateEvidenceGroups(group),
+                independentMemberCount,
+                identitySuggestionPolicy))
             .OrderByDescending(candidate => candidate.SupportCount)
             .ThenByDescending(candidate => candidate.MedianScore)
             .ThenBy(candidate => candidate.PersonId.ToString(), StringComparer.Ordinal)
@@ -145,17 +158,17 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
         if (candidate is null)
         {
             status = ProvisionalFaceClusterKnownPersonAdvisoryStatuses.Insufficient;
-            explanation = $"No member has rank-1 evidence at or above the ordinary Medium threshold ({identitySuggestionPolicy.MediumScoreThreshold:F2}).";
+            explanation = $"No independent exact-content group has rank-1 evidence at or above the ordinary Medium threshold ({identitySuggestionPolicy.MediumScoreThreshold:F2}).";
         }
         else if (candidate.SupportCount < MinimumSupportCount)
         {
             status = ProvisionalFaceClusterKnownPersonAdvisoryStatuses.Insufficient;
-            explanation = $"{candidate.DisplayName} has {candidate.SupportCount} independent qualifying vote(s); {MinimumSupportCount} are required.";
+            explanation = $"{candidate.DisplayName} has {candidate.SupportCount} independent exact-content qualifying vote(s); {MinimumSupportCount} are required.";
         }
         else if (candidate.SupportShare < MinimumSupportShare)
         {
             status = ProvisionalFaceClusterKnownPersonAdvisoryStatuses.Insufficient;
-            explanation = $"{candidate.DisplayName} has {candidate.SupportShare:P0} qualifying support across the cluster; at least {MinimumSupportShare:P0} is required.";
+            explanation = $"{candidate.DisplayName} has {candidate.SupportShare:P0} qualifying support across independent exact-content evidence; at least {MinimumSupportShare:P0} is required.";
         }
         else if (internalConflictCount > 0)
         {
@@ -171,12 +184,12 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
                  (competitor.SupportCount > MaximumCompetingSupportCount || competitor.SupportShare > MaximumCompetingSupportShare))
         {
             status = ProvisionalFaceClusterKnownPersonAdvisoryStatuses.Ambiguous;
-            explanation = $"Competing support for {competitor.DisplayName} is too strong ({competitor.SupportCount} vote(s), {competitor.SupportShare:P0} of members).";
+            explanation = $"Competing support for {competitor.DisplayName} is too strong ({competitor.SupportCount} independent vote(s), {competitor.SupportShare:P0} of independent evidence).";
         }
         else
         {
             status = ProvisionalFaceClusterKnownPersonAdvisoryStatuses.Strong;
-            explanation = $"{candidate.SupportCount} independent members ({candidate.SupportShare:P0}) favor {candidate.DisplayName} at or above the ordinary Medium threshold, with no material competing or cluster-conflict signal.";
+            explanation = $"{candidate.SupportCount} independent exact-content groups ({candidate.SupportShare:P0}) favor {candidate.DisplayName} at or above the ordinary Medium threshold, with no material competing or cluster-conflict signal.";
         }
 
         return new(
@@ -189,10 +202,11 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
             Version,
             identitySuggestionPolicy.Version,
             memberCount,
+            independentMemberCount,
             coreCount,
             internalConflictCount,
-            ranked.Length,
-            qualifying.Length,
+            ranked.Select(item => item.EvidenceGroup).Distinct(StringComparer.Ordinal).Count(),
+            qualifying.Select(item => item.EvidenceGroup).Distinct(StringComparer.Ordinal).Count(),
             status,
             explanation,
             candidate,
@@ -216,11 +230,21 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
         ValidateShare(MaximumCompetingSupportShare, nameof(MaximumCompetingSupportShare));
     }
 
+    private static IReadOnlyList<ProvisionalFaceClusterKnownPersonMemberEvidence> DeduplicateEvidenceGroups(
+        IEnumerable<ProvisionalFaceClusterKnownPersonMemberEvidence> support) =>
+        support
+            .GroupBy(item => item.EvidenceGroup, StringComparer.Ordinal)
+            .Select(group => group
+                .OrderByDescending(item => item.Score)
+                .ThenBy(item => item.FaceOccurrenceId.ToString(), StringComparer.Ordinal)
+                .First())
+            .ToArray();
+
     private static ProvisionalFaceClusterKnownPersonCandidate BuildCandidate(
         PersonId personId,
         string displayName,
         IReadOnlyList<ProvisionalFaceClusterKnownPersonMemberEvidence> support,
-        int memberCount,
+        int independentMemberCount,
         ReviewIdentitySuggestionPolicy identitySuggestionPolicy)
     {
         double[] scores = support.Select(item => item.Score).OrderBy(value => value).ToArray();
@@ -237,7 +261,7 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
             personId,
             displayName,
             support.Count,
-            (double)support.Count / memberCount,
+            (double)support.Count / independentMemberCount,
             highCount,
             support.Count - highCount,
             scores[0],
