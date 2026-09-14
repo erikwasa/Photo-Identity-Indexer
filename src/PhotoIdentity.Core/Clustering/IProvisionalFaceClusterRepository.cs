@@ -20,6 +20,7 @@ public static class ProvisionalFaceClusterRunStatuses
 public static class ProvisionalFaceClusterPolicies
 {
     public const int MaximumFacesPerRun = 20000;
+    public const int MaximumNotSameConstraintsPerRun = 100000;
 
     public static ProvisionalFaceClusterPolicy InitialDbscan { get; } = new ProvisionalFaceClusterPolicy(
         Version: "m25-dbscan-v1",
@@ -114,6 +115,11 @@ public interface IProvisionalFaceClusterRepository
     Task<IReadOnlyList<ProvisionalFaceClusterInputFace>> ReadInputSnapshotAsync(
         ProvisionalFaceClusterRun run,
         int maximumFaces = ProvisionalFaceClusterPolicies.MaximumFacesPerRun,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<ProvisionalFaceNotSameConstraint>> ReadNotSameConstraintsAsync(
+        ProvisionalFaceClusterRun run,
+        int maximumConstraints = ProvisionalFaceClusterPolicies.MaximumNotSameConstraintsPerRun,
         CancellationToken cancellationToken = default);
 
     Task ReportProgressAsync(
