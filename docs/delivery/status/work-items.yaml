@@ -88,7 +88,7 @@ work_items:
   blockers:
   - WI-0113
   blocker_notes:
-  - 'Implementation is complete in PR #330 and CI build #1782 is green. Maintainer acceptance remains pending: run verify-postgres.ps1 so the live PostgreSQL test bodies execute, then verify on the real catalogue that a newly analysed batch causes a replacement provisional-cluster run without changing canonical Person assignments, Unknown decisions, or rejection history.'
+  - 'Implementation is complete in PR #330 and CI build #1782 is green. Initial maintainer live PostgreSQL acceptance on 2026-09-14 exposed a malformed ReadLatestAsync SQL concatenation before the first provisional cluster run could start; corrective PR #331 adds the missing query delimiter. Rerun verify-postgres.ps1 after the corrective slice, then verify on the real catalogue that a newly analysed batch causes a replacement provisional-cluster run without changing canonical Person assignments, Unknown decisions, or rejection history.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/330
@@ -96,6 +96,10 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34791332956
   - type: implementation_commit
     value: 598d87479348e4512c66fe52bd8265e066d385d1
+  - type: maintainer_verification
+    value: '2026-09-14 verify-postgres.ps1 reached the live WI-0114 PostgreSQL test and failed in ReadLatestAsync with PostgreSQL 42601 syntax error near run; corrective slice required before runtime acceptance can continue.'
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/331
 - id: WI-0115
   title: Add cluster-based People-to-identify review workspace
   milestone: M25
