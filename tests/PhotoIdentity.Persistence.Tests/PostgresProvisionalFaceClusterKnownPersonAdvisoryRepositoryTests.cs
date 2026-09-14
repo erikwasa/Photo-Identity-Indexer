@@ -48,7 +48,12 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepositoryT
             string otherModelHashValue = new('b', 64);
             ModelId modelId = new(modelIdValue);
             Sha256Digest modelHash = new(modelHashValue);
-            Guid revisionId = await SeedRevisionAsync(testBuilder.ConnectionString, now);
+            Guid[] revisionIds = new Guid[4];
+            for (int index = 0; index < revisionIds.Length; index++)
+            {
+                revisionIds[index] = await SeedRevisionAsync(testBuilder.ConnectionString, now, index);
+            }
+
             FaceOccurrenceId[] faces = Enumerable.Range(1, 4)
                 .Select(index => FaceOccurrenceId.From(Guid.Parse($"00000000-0000-0000-0000-{index:D12}")))
                 .ToArray();
@@ -57,7 +62,7 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepositoryT
             {
                 await SeedFaceAsync(
                     testBuilder.ConnectionString,
-                    revisionId,
+                    revisionIds[index],
                     faces[index],
                     index,
                     [1f, 0f],
@@ -117,6 +122,7 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepositoryT
             Assert.Equal(ProvisionalFaceClusterKnownPersonAdvisoryStatuses.Strong, advisory.Status);
             Assert.Equal(PersonId.From(alice), advisory.Candidate!.PersonId);
             Assert.Equal(3, advisory.Candidate.SupportCount);
+            Assert.Equal(4, advisory.IndependentMemberCount);
             Assert.Equal(4, advisory.RankedEvidenceCount);
             Assert.Equal(3, advisory.QualifyingEvidenceCount);
             Assert.Equal(clusterPolicy.Version, advisory.ClusterPolicyVersion);
@@ -158,20 +164,24 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepositoryT
         }
     }
 
-    private static async Task<Guid> SeedRevisionAsync(string connectionString, DateTimeOffset now)
+    private static async Task<Guid> SeedRevisionAsync(
+        string connectionString,
+        DateTimeOffset now,
+        int index)
     {
         Guid sourceId = Guid.NewGuid();
         Guid assetId = Guid.NewGuid();
         Guid revisionId = Guid.NewGuid();
+        char hashCharacter = (char)('c' + index);
         await using NpgsqlConnection connection = new(connectionString);
         await connection.OpenAsync();
         await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText =
             """
             INSERT INTO sources (id, kind, root_locator, created_at_utc)
-            VALUES (@source_id, 'test', 'cluster-advisory-root', @now);
+            VALUES (@source_id, 'test', @root_locator, @now);
             INSERT INTO assets (id, source_id, source_key, created_at_utc)
-            VALUES (@asset_id, @source_id, 'private/cluster-advisory.jpg', @now);
+            VALUES (@asset_id, @source_id, @source_key, @now);
             INSERT INTO asset_revisions (
                 id, asset_id, content_sha256, size_bytes, observed_at_utc,
                 media_type, width, height)
@@ -182,7 +192,9 @@ public sealed class PostgresProvisionalFaceClusterKnownPersonAdvisoryRepositoryT
         command.Parameters.AddWithValue("source_id", sourceId);
         command.Parameters.AddWithValue("asset_id", assetId);
         command.Parameters.AddWithValue("revision_id", revisionId);
-        command.Parameters.AddWithValue("revision_hash", new string('c', 64));
+        command.Parameters.AddWithValue("root_locator", $"cluster-advisory-root-{index}");
+        command.Parameters.AddWithValue("source_key", $"private/cluster-advisory-{index}.jpg");
+        command.Parameters.AddWithValue("revision_hash", new string(hashCharacter, 64));
         command.Parameters.AddWithValue("now", now);
         await command.ExecuteNonQueryAsync();
         return revisionId;
