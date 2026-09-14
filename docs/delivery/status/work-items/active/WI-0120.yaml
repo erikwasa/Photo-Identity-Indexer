@@ -1,0 +1,10 @@
+id: WI-0120
+title: Add target-count and diversity selection for Creative Collections
+milestone: M26
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0120-target-count-diversity-selector.md
+blockers:
+- WI-0119
+blocker_notes: []
+evidence: []
