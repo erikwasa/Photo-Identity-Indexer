@@ -246,3 +246,11 @@ milestones:
   - WI-0115
   - WI-0116
   - WI-0117
+- id: M26
+  title: Creative Collections
+  status: ready
+  document: ../milestones/M26-creative-collections.md
+  work_items:
+  - WI-0118
+  - WI-0119
+  - WI-0120
