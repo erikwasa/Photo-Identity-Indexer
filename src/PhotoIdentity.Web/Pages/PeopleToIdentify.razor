@@ -137,21 +137,16 @@
             </div>
 
             <div class="cluster-not-same-actions">
-                <label>
+                <div class="cluster-anchor-summary">
                     <span class="field-label">Anchor face</span>
-                    <select @bind="AnchorFaceId" disabled="@Busy">
-                        @foreach (ProvisionalClusterReviewMemberResponse member in Members)
-                        {
-                            <option value="@member.FaceId">@ShortFace(member.FaceId) · @member.Role</option>
-                        }
-                    </select>
-                </label>
+                    <strong>The face marked “Anchor” below is the comparison reference.</strong>
+                </div>
                 <button class="button danger"
                         disabled="@(Busy || NotSameSelectionCount == 0 || string.IsNullOrWhiteSpace(AnchorFaceId))"
                         @onclick="RecordNotSameAsync">
                     Not same as anchor (@NotSameSelectionCount)
                 </button>
-                <p>Select the faces that clearly do not belong with the anchor. The selected faces are not rejected or assigned; only a durable discovery constraint is recorded.</p>
+                <p>The top face is the default anchor. To change it, use “Make anchor” on the face you want as the reference. Select only the faces that clearly do not belong with the anchor; those faces are not rejected or assigned.</p>
             </div>
         </div>
 
@@ -165,7 +160,8 @@
                 @foreach (ProvisionalClusterReviewMemberResponse member in Members)
                 {
                     bool selected = SelectedFaceIds.Contains(member.FaceId);
-                    <article class="cluster-member-card @(selected ? "selected" : "")" @key="member.FaceId">
+                    bool anchor = string.Equals(member.FaceId, AnchorFaceId, StringComparison.Ordinal);
+                    <article class="cluster-member-card @(selected ? "selected" : "") @(anchor ? "anchor" : "")" @key="member.FaceId">
                         <label class="cluster-member-select">
                             <input type="checkbox"
                                    checked="@selected"
@@ -176,11 +172,20 @@
                         <img src="@member.ImageUrl" alt="Cluster member face" loading="lazy" />
                         <div class="cluster-member-meta">
                             <span class="member-role @member.Role">@member.Role</span>
-                            @if (string.Equals(member.FaceId, AnchorFaceId, StringComparison.Ordinal))
+                            @if (anchor)
                             {
                                 <span class="anchor-badge">Anchor</span>
                             }
                         </div>
+                        @if (!anchor)
+                        {
+                            <button class="button secondary full-width cluster-anchor-action"
+                                    disabled="@Busy"
+                                    aria-label="Make this face the anchor"
+                                    @onclick="() => SetAnchor(member.FaceId)">
+                                Make anchor
+                            </button>
+                        }
                         <a class="button secondary full-width" href="@member.DetailsUrl">Open photo context</a>
                     </article>
                 }
@@ -427,9 +432,7 @@ else
                 await Http.GetFromJsonAsync<ProvisionalClusterReviewMemberResponse[]>(
                     $"api/review/provisional-clusters/review-groups/{key}/members?{ScopeQuery(model)}&limit={MemberLimit}") ?? [];
             Members.AddRange(members);
-            AnchorFaceId = Members.FirstOrDefault(member => string.Equals(member.Role, "core", StringComparison.Ordinal))?.FaceId
-                ?? Members.FirstOrDefault()?.FaceId
-                ?? "";
+            AnchorFaceId = Members.FirstOrDefault()?.FaceId ?? "";
         }
         catch (Exception exception)
         {
@@ -461,6 +464,15 @@ else
             SelectedFaceIds.Remove(faceId);
         }
         Message = null;
+    }
+
+    private void SetAnchor(string faceId)
+    {
+        if (Members.Any(member => string.Equals(member.FaceId, faceId, StringComparison.Ordinal)))
+        {
+            AnchorFaceId = faceId;
+            Message = null;
+        }
     }
 
     private void SelectCoreMembers()
@@ -628,8 +640,6 @@ else
         person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
 
     private static string CoreShareLabel(double value) => $"{value:P0}";
-
-    private static string ShortFace(string faceId) => faceId[..Math.Min(8, faceId.Length)];
 
     private static string RunStatusLabel(ProvisionalClusterRunResponse run)
     {
