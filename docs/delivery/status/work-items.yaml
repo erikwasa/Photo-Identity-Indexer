@@ -112,3 +112,36 @@ work_items:
   - WI-0116
   blocker_notes: []
   evidence: []
+- id: WI-0118
+  title: Prototype timestamp-first photo moment clustering
+  milestone: M26
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0118-moment-clustering.md
+  blockers:
+  - WI-0050
+  - WI-0101
+  blocker_notes: []
+  evidence: []
+- id: WI-0119
+  title: Generate Creative Collection anchors and moment context
+  milestone: M26
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0119-anchor-context-generation.md
+  blockers:
+  - WI-0118
+  - WI-0050
+  blocker_notes: []
+  evidence: []
+- id: WI-0120
+  title: Add target-count and diversity selection for Creative Collections
+  milestone: M26
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0120-target-count-diversity-selector.md
+  blockers:
+  - WI-0119
+  - WI-0083
+  blocker_notes: []
+  evidence: []

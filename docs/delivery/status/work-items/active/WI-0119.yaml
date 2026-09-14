@@ -1,0 +1,11 @@
+id: WI-0119
+title: Generate Creative Collection anchors and moment context
+milestone: M26
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0119-anchor-context-generation.md
+blockers:
+- WI-0118
+- WI-0050
+blocker_notes: []
+evidence: []
