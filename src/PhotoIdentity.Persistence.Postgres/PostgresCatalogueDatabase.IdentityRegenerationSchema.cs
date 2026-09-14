@@ -93,6 +93,14 @@ public sealed partial class PostgresCatalogueDatabase
                 PostgresProvisionalFaceClusterRepository.ProvisionalFaceClusterSchema.Sql;
         }
 
+        if (!sql.Contains(
+                "provisional_face_not_same_constraints",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            sql += Environment.NewLine +
+                PostgresProvisionalFaceClusterReviewRepository.ProvisionalFaceClusterReviewSchema.Sql;
+        }
+
         if (!string.Equals(sql, current.Sql, StringComparison.Ordinal))
         {
             Migrations[currentMigrationIndex] = current with { Sql = sql };
