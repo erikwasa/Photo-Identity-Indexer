@@ -1,0 +1,42 @@
+name: WI-0114 PostgreSQL corrective patch
+
+on:
+  push:
+    branches:
+      - agent/WI-0114-postgres-readlatest-fix
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out corrective branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/WI-0114-postgres-readlatest-fix
+          persist-credentials: true
+
+      - name: Apply focused SQL assembly fix
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("src/PhotoIdentity.Persistence.Postgres/PostgresProvisionalFaceClusterRepository.cs")
+          text = path.read_text(encoding="utf-8")
+          old = '            """ +\n            (activeOnly\n'
+          new = '            """ + "\\n" +\n            (activeOnly\n'
+          if text.count(old) != 1:
+              raise SystemExit("Expected exactly one ReadLatestAsync concatenation boundary.")
+          path.write_text(text.replace(old, new), encoding="utf-8")
+
+      - name: Commit focused fix and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/wi0114-postgres-hotfix.yml
+          git add src/PhotoIdentity.Persistence.Postgres/PostgresProvisionalFaceClusterRepository.cs
+          git commit -m "Fix WI-0114 PostgreSQL latest-run query"
+          git push origin HEAD:agent/WI-0114-postgres-readlatest-fix
