@@ -136,13 +136,15 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
         ProvisionalFaceClusterKnownPersonMemberEvidence[] qualifying = ranked
             .Where(item => item.Score >= identitySuggestionPolicy.MediumScoreThreshold)
             .ToArray();
+        ProvisionalFaceClusterKnownPersonMemberEvidence[] independentQualifying =
+            DeduplicateEvidenceGroups(qualifying);
 
-        ProvisionalFaceClusterKnownPersonCandidate[] candidates = qualifying
+        ProvisionalFaceClusterKnownPersonCandidate[] candidates = independentQualifying
             .GroupBy(item => new { item.SuggestedPersonId, item.SuggestedPersonDisplayName })
             .Select(group => BuildCandidate(
                 group.Key.SuggestedPersonId,
                 group.Key.SuggestedPersonDisplayName,
-                DeduplicateEvidenceGroups(group),
+                group.ToArray(),
                 independentMemberCount,
                 identitySuggestionPolicy))
             .OrderByDescending(candidate => candidate.SupportCount)
@@ -206,7 +208,7 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
             coreCount,
             internalConflictCount,
             ranked.Select(item => item.EvidenceGroup).Distinct(StringComparer.Ordinal).Count(),
-            qualifying.Select(item => item.EvidenceGroup).Distinct(StringComparer.Ordinal).Count(),
+            independentQualifying.Length,
             status,
             explanation,
             candidate,
@@ -230,12 +232,13 @@ public sealed record ProvisionalFaceClusterKnownPersonAdvisoryPolicy(
         ValidateShare(MaximumCompetingSupportShare, nameof(MaximumCompetingSupportShare));
     }
 
-    private static IReadOnlyList<ProvisionalFaceClusterKnownPersonMemberEvidence> DeduplicateEvidenceGroups(
+    private static ProvisionalFaceClusterKnownPersonMemberEvidence[] DeduplicateEvidenceGroups(
         IEnumerable<ProvisionalFaceClusterKnownPersonMemberEvidence> support) =>
         support
             .GroupBy(item => item.EvidenceGroup, StringComparer.Ordinal)
             .Select(group => group
                 .OrderByDescending(item => item.Score)
+                .ThenBy(item => item.SuggestedPersonId.ToString(), StringComparer.Ordinal)
                 .ThenBy(item => item.FaceOccurrenceId.ToString(), StringComparer.Ordinal)
                 .First())
             .ToArray();
