@@ -1,0 +1,33 @@
+id: WI-0115
+title: Add cluster-based People-to-identify review workspace
+milestone: M25
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0115-cluster-discovery-review-workspace.md
+started_at: 2026-09-14
+completed_at: 2026-09-15
+verified_at: 2026-09-14
+verified_by: maintainer
+last_updated_at: 2026-09-15
+branch: agent/WI-0115-cluster-review-workspace
+blockers:
+- WI-0114
+- WI-0060
+blocker_notes:
+- Maintainer acceptance completed successfully on 2026-09-14 against the local PostgreSQL-backed application. Cluster cards, bounded member review, selective assignment, unselected-state preservation, negative discovery feedback/reclustering, canonical-history preservation, and mobile-width interaction were verified. The real catalogue produced predominantly pure single-person clusters, so false merges were comparatively difficult to find.
+- Post-acceptance feedback identified the GUID-oriented anchor selector as awkward. PR #336 replaced it with first-visible-face default anchoring and per-card Make anchor actions. The maintainer requested that this interaction polish be visually rechecked together with a later work item rather than reopening WI-0115 acceptance.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/334
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34894965224
+- type: merge_commit
+  value: 1841a61f9c35c13efc477e326c7749c27eda4366
+- type: maintainer_verification
+  value: 2026-09-14 local PostgreSQL/real-catalogue/mobile acceptance passed; cluster workflow and negative-feedback safety behavior verified, with predominantly pure clusters observed.
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/336
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34902887107
+- type: merge_commit
+  value: 104116eb8e44caf4f04c0b30cebee42779ed1e92
