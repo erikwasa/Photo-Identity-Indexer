@@ -88,7 +88,7 @@ work_items:
   blockers:
   - WI-0113
   blocker_notes:
-  - Implementation is complete in PR #330 and CI build #1782 is green. Maintainer acceptance remains pending: run verify-postgres.ps1 so the live PostgreSQL test bodies execute, then verify on the real catalogue that a newly analysed batch causes a replacement provisional-cluster run without changing canonical Person assignments, Unknown decisions, or rejection history.
+  - 'Implementation is complete in PR #330 and CI build #1782 is green. Maintainer acceptance remains pending: run verify-postgres.ps1 so the live PostgreSQL test bodies execute, then verify on the real catalogue that a newly analysed batch causes a replacement provisional-cluster run without changing canonical Person assignments, Unknown decisions, or rejection history.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/330
