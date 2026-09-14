@@ -53,6 +53,41 @@ public sealed record ProvisionalClusterReviewMemberResponse(
     string ImageUrl,
     string DetailsUrl);
 
+public sealed record ProvisionalClusterKnownPersonCandidateResponse(
+    string PersonId,
+    string DisplayName,
+    int SupportCount,
+    double SupportShare,
+    int OrdinaryHighCount,
+    int OrdinaryMediumCount,
+    double MinimumScore,
+    double MedianScore,
+    double MaximumScore,
+    double? MedianMargin);
+
+public sealed record ProvisionalClusterKnownPersonAdvisoryResponse(
+    string ClusterRunId,
+    string ModelId,
+    string ModelHash,
+    string ClusterPolicyVersion,
+    bool IncludeUnknown,
+    string DerivedClusterKey,
+    string AdvisoryPolicyVersion,
+    int IdentitySuggestionPolicyVersion,
+    int MemberCount,
+    int CoreCount,
+    double CoreShare,
+    int InternalConflictCount,
+    int RankedEvidenceCount,
+    double RankedEvidenceCoverage,
+    int QualifyingEvidenceCount,
+    string Status,
+    string Explanation,
+    bool CanonicalAssignmentAllowed,
+    ProvisionalClusterKnownPersonCandidateResponse? Candidate,
+    ProvisionalClusterKnownPersonCandidateResponse? CompetingCandidate,
+    DateTimeOffset EvaluatedAtUtc);
+
 public sealed record ProvisionalClusterNotSameRequest(
     string AnchorFaceId,
     IReadOnlyList<string> OtherFaceIds,
