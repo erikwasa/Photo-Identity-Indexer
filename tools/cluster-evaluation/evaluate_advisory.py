@@ -19,7 +19,9 @@ from sklearn.cluster import DBSCAN
 from sklearn.metrics import pairwise_distances
 
 
-def load_sample(path: Path) -> tuple[dict[str, Any], np.ndarray, list[str | None]]:
+def load_sample(
+    path: Path,
+) -> tuple[dict[str, Any], np.ndarray, list[str | None], list[str]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if payload.get("schemaVersion") != 1:
         raise ValueError("unsupported cluster-evaluation export schema")
@@ -34,7 +36,8 @@ def load_sample(path: Path) -> tuple[dict[str, Any], np.ndarray, list[str | None
         raise ValueError("embeddings contain a zero vector")
     embeddings = embeddings / norms[:, None]
     truth = [face.get("groundTruthLabel") for face in faces]
-    return payload, embeddings, truth
+    content_groups = [str(face.get("contentGroup") or face["photoGroup"]) for face in faces]
+    return payload, embeddings, truth, content_groups
 
 
 def top_known_person_evidence(
@@ -67,6 +70,7 @@ def classify_cluster(
     members: list[int],
     core_indices: set[int],
     evidence: list[tuple[str, float, float | None] | None],
+    content_groups: list[str],
     *,
     medium_score: float,
     minimum_support_count: int,
@@ -75,24 +79,42 @@ def classify_cluster(
     maximum_competing_count: int,
     maximum_competing_share: float,
 ) -> dict[str, Any]:
-    qualifying = [
-        item for index in members
-        if (item := evidence[index]) is not None and item[1] >= medium_score
-    ]
-    votes = Counter(item[0] for item in qualifying)
+    independent_groups = sorted({content_groups[index] for index in members})
+    qualifying_by_group: dict[str, list[tuple[str, float, float | None]]] = defaultdict(list)
+    ranked_groups: set[str] = set()
+
+    for index in members:
+        item = evidence[index]
+        if item is None:
+            continue
+        group = content_groups[index]
+        ranked_groups.add(group)
+        if item[1] >= medium_score:
+            qualifying_by_group[group].append(item)
+
+    independent_qualifying: list[tuple[str, float, float | None]] = []
+    for group in sorted(qualifying_by_group):
+        candidates = sorted(
+            qualifying_by_group[group],
+            key=lambda item: (-item[1], item[0]),
+        )
+        independent_qualifying.append(candidates[0])
+
+    votes = Counter(item[0] for item in independent_qualifying)
     ordered_people = sorted(votes, key=lambda person: (-votes[person], person))
     candidate = ordered_people[0] if ordered_people else None
     competitor = ordered_people[1] if len(ordered_people) > 1 else None
     candidate_count = votes[candidate] if candidate else 0
     competitor_count = votes[competitor] if competitor else 0
-    candidate_share = candidate_count / len(members)
-    competitor_share = competitor_count / len(members)
+    denominator = len(independent_groups)
+    candidate_share = candidate_count / denominator
+    competitor_share = competitor_count / denominator
     core_share = sum(1 for index in members if index in core_indices) / len(members)
 
     if candidate is None:
-        status, reason = "insufficient", "no Medium-or-better rank-1 evidence"
+        status, reason = "insufficient", "no independent exact-content Medium-or-better rank-1 evidence"
     elif candidate_count < minimum_support_count:
-        status, reason = "insufficient", "too few independent supporting members"
+        status, reason = "insufficient", "too few independent exact-content supporting votes"
     elif candidate_share < minimum_support_share:
         status, reason = "insufficient", "candidate support share below policy"
     elif core_share < minimum_core_share:
@@ -102,9 +124,11 @@ def classify_cluster(
     ):
         status, reason = "ambiguous", "material competing-person support"
     else:
-        status, reason = "strong", "multiple independent members agree without material competition"
+        status, reason = "strong", "multiple independent exact-content groups agree without material competition"
 
-    candidate_scores = sorted(item[1] for item in qualifying if item[0] == candidate) if candidate else []
+    candidate_scores = sorted(
+        item[1] for item in independent_qualifying if item[0] == candidate
+    ) if candidate else []
     return {
         "status": status,
         "reason": reason,
@@ -116,13 +140,14 @@ def classify_cluster(
         "competitorSupportCount": competitor_count,
         "competitorSupportShare": competitor_share,
         "coreShare": core_share,
-        "rankedEvidenceCount": sum(1 for index in members if evidence[index] is not None),
-        "qualifyingEvidenceCount": len(qualifying),
+        "independentMemberCount": denominator,
+        "rankedEvidenceCount": len(ranked_groups),
+        "qualifyingEvidenceCount": len(independent_qualifying),
     }
 
 
 def evaluate(args: argparse.Namespace) -> dict[str, Any]:
-    payload, embeddings, truth = load_sample(args.sample)
+    payload, embeddings, truth, content_groups = load_sample(args.sample)
     distances = np.clip(pairwise_distances(embeddings, metric="cosine", n_jobs=-1), 0.0, 2.0)
     similarities = 1.0 - distances
     dbscan = DBSCAN(
@@ -136,7 +161,6 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
 
     cluster_ids = sorted(int(value) for value in np.unique(labels) if value >= 0)
     statuses = Counter()
-    strong_total = 0
     correct_strong = 0
     false_person_proposals = 0
     evaluable_strong = 0
@@ -153,6 +177,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             members,
             core_indices,
             evidence,
+            content_groups,
             medium_score=args.medium_score_threshold,
             minimum_support_count=args.minimum_support_count,
             minimum_support_share=args.minimum_support_share,
@@ -161,10 +186,9 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             maximum_competing_share=args.maximum_competing_support_share,
         )
         statuses[result["status"]] += 1
-        if result["status"] == "strong":
-            strong_total += 1
 
-        labelled_members = [truth[index] for index in members if truth[index] is not None]
+        labelled_indices = [index for index in members if truth[index] is not None]
+        labelled_members = [truth[index] for index in labelled_indices]
         distinct_truth = sorted(set(labelled_members))
         mixed = len(distinct_truth) > 1
         if mixed:
@@ -180,9 +204,8 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             else:
                 false_person_proposals += 1
 
-        # A conservative recall opportunity requires at least the policy's minimum number
-        # of reviewed members and one unambiguous reviewed identity in the discovered cluster.
-        if len(labelled_members) >= args.minimum_support_count and len(distinct_truth) == 1:
+        labelled_content_groups = {content_groups[index] for index in labelled_indices}
+        if len(labelled_content_groups) >= args.minimum_support_count and len(distinct_truth) == 1:
             opportunity_clusters += 1
             baseline_face_reviews += len(labelled_members)
             if result["status"] == "strong" and result["candidate"] == distinct_truth[0]:
@@ -204,6 +227,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             "faceCount": payload["faceCount"],
             "assignedLabelCount": payload["assignedLabelCount"],
             "unknownFaceCount": payload["unknownFaceCount"],
+            "contentGroupCount": len(set(content_groups)),
         },
         "clusterPolicy": {
             "algorithm": "dbscan",
@@ -218,6 +242,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             "minimumCoreShare": args.minimum_core_share,
             "maximumCompetingSupportCount": args.maximum_competing_support_count,
             "maximumCompetingSupportShare": args.maximum_competing_support_share,
+            "independenceUnit": "exact-content-group",
         },
         "results": {
             "clusterCount": len(cluster_ids),
@@ -240,9 +265,11 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         },
         "notes": [
             "Ground truth uses only pseudonymized reviewed Person labels; Unknown faces remain unlabeled.",
+            "Each exact-content group can cast at most one qualifying advisory vote; duplicate source copies do not multiply support.",
+            "Older schema-1 samples without contentGroup fall back to photoGroup, so re-exporting is recommended for WI-0116 acceptance.",
             "A strong proposal is counted correct only when every reviewed member in that cluster has one identity and the proposal matches it.",
             "Per-face known-person evidence is simulated by best similarity to another reviewed exemplar of each Person; the target face itself is excluded.",
-            "Production not-same constraints are not present in the WI-0113 export; their fail-closed behavior is covered by automated production tests.",
+            "Production not-same constraints are not present in the private export; their fail-closed behavior is covered by automated production tests.",
             "Review-effort numbers are comparative estimates, not observed operator timing.",
         ],
     }
@@ -259,6 +286,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         f"- Exact model: `{report['sample']['modelId']}` / `{report['sample']['modelHash']}`",
         f"- Faces: {report['sample']['faceCount']}",
+        f"- Independent exact-content groups: {report['sample']['contentGroupCount']}",
         f"- Production cluster policy: DBSCAN eps={c['eps']}, min_samples={c['minSamples']}",
         f"- Advisory policy: `{p['version']}`; Medium threshold={p['ordinaryMediumScoreThreshold']:.2f}, minimum support={p['minimumSupportCount']} / {p['minimumSupportShare']:.0%}",
         "",
@@ -278,6 +306,8 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Estimated cluster-assisted tasks: {r['estimatedClusterAssistedReviewTasks']}",
         f"- Estimated actions saved: **{r['estimatedReviewActionsSaved']}**",
         f"- Estimated compression: **{r['estimatedReviewCompression']:.2f}x**",
+        "",
+        "Each exact-content group casts at most one qualifying advisory vote, so exact duplicate copies cannot inflate support.",
         "",
         "A strong proposal is considered correct only when all reviewed members of the discovered cluster share one identity and the advisory candidate matches it. Mixed-cluster strong proposals therefore count as false-person proposals.",
         "",
