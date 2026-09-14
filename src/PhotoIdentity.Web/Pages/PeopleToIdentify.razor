@@ -76,7 +76,7 @@
 
 <section class="group-guidance" aria-label="Cluster review guidance">
     <strong>Clusters are not people.</strong>
-    <span>Assign only selected faces. Use “Not same as anchor” for clear false merges; that feedback is durable discovery evidence and queues a replacement cluster run.</span>
+    <span>Assign only selected faces. Known-person cluster support is advisory only. Use “Not same as anchor” for clear false merges; that feedback is durable discovery evidence and queues a replacement cluster run.</span>
 </section>
 
 @if (!string.IsNullOrWhiteSpace(Error))
@@ -104,6 +104,39 @@
                 <button class="button secondary" disabled="@(Busy || SelectedFaceIds.Count == 0)" @onclick="ClearSelection">Clear</button>
             </div>
         </div>
+
+        @if (KnownPersonAdvisory is ProvisionalClusterKnownPersonAdvisoryResponse advisory)
+        {
+            <section class="cluster-advisory-panel @advisory.Status" aria-label="Cluster-assisted known-person evidence">
+                <div class="cluster-advisory-heading">
+                    <div>
+                        <p class="eyebrow">Advisory known-person evidence</p>
+                        <h3>@AdvisoryTitle(advisory)</h3>
+                    </div>
+                    <span class="cluster-advisory-status @advisory.Status">@AdvisoryStatusLabel(advisory.Status)</span>
+                </div>
+                <p>@advisory.Explanation</p>
+
+                @if (advisory.Candidate is ProvisionalClusterKnownPersonCandidateResponse candidate)
+                {
+                    <dl class="cluster-advisory-metrics">
+                        <div><dt>Qualifying support</dt><dd>@candidate.SupportCount / @advisory.MemberCount (@candidate.SupportShare.ToString("P0"))</dd></div>
+                        <div><dt>Ordinary evidence</dt><dd>@candidate.OrdinaryHighCount High · @candidate.OrdinaryMediumCount Medium</dd></div>
+                        <div><dt>Rank-1 scores</dt><dd>@candidate.MinimumScore.ToString("F2")–@candidate.MaximumScore.ToString("F2") · median @candidate.MedianScore.ToString("F2")</dd></div>
+                        <div><dt>Evidence coverage</dt><dd>@advisory.RankedEvidenceCount / @advisory.MemberCount (@advisory.RankedEvidenceCoverage.ToString("P0"))</dd></div>
+                    </dl>
+                }
+
+                @if (advisory.CompetingCandidate is ProvisionalClusterKnownPersonCandidateResponse competitor)
+                {
+                    <p class="cluster-advisory-competition"><strong>Competing evidence:</strong> @competitor.DisplayName has @competitor.SupportCount qualifying vote@(competitor.SupportCount == 1 ? "" : "s") (@competitor.SupportShare.ToString("P0")).</p>
+                }
+
+                <p class="cluster-advisory-boundary">
+                    Advisory only: this result cannot create a canonical assignment. Ordinary per-face rank, score and margin evidence remains separate. Provenance: cluster @advisory.ClusterPolicyVersion, advisory @advisory.AdvisoryPolicyVersion, suggestion policy v@advisory.IdentitySuggestionPolicyVersion.
+                </p>
+            </section>
+        }
 
         <div class="cluster-actions-panel">
             <div class="cluster-assign-actions">
@@ -290,6 +323,7 @@ else
     private HashSet<string> SelectedFaceIds { get; } = new(StringComparer.Ordinal);
     private ProvisionalClusterRunResponse? Run { get; set; }
     private ProvisionalClusterReviewGroupResponse? SelectedGroup { get; set; }
+    private ProvisionalClusterKnownPersonAdvisoryResponse? KnownPersonAdvisory { get; set; }
     private string SelectedModelIndex { get; set; } = "";
     private bool IncludeUnknown { get; set; }
     private int Total { get; set; }
@@ -336,6 +370,7 @@ else
     private async Task ScopeChangedAsync()
     {
         SelectedGroup = null;
+        KnownPersonAdvisory = null;
         Members.Clear();
         ClearSelection();
         await RefreshAsync();
@@ -425,6 +460,7 @@ else
         try
         {
             SelectedGroup = group;
+            KnownPersonAdvisory = null;
             Members.Clear();
             ClearSelection();
             string key = Uri.EscapeDataString(group.DerivedClusterKey);
@@ -433,6 +469,7 @@ else
                     $"api/review/provisional-clusters/review-groups/{key}/members?{ScopeQuery(model)}&limit={MemberLimit}") ?? [];
             Members.AddRange(members);
             AnchorFaceId = Members.FirstOrDefault()?.FaceId ?? "";
+            await LoadKnownPersonAdvisoryAsync(model, group.DerivedClusterKey);
         }
         catch (Exception exception)
         {
@@ -444,9 +481,19 @@ else
         }
     }
 
+    private async Task LoadKnownPersonAdvisoryAsync(
+        ProvisionalClusterModelResponse model,
+        string derivedClusterKey)
+    {
+        string key = Uri.EscapeDataString(derivedClusterKey);
+        KnownPersonAdvisory = await Http.GetFromJsonAsync<ProvisionalClusterKnownPersonAdvisoryResponse>(
+            $"api/review/provisional-clusters/review-groups/{key}/known-person-advisory?{ScopeQuery(model)}");
+    }
+
     private void CloseGroup()
     {
         SelectedGroup = null;
+        KnownPersonAdvisory = null;
         Members.Clear();
         ClearSelection();
         AnchorFaceId = "";
@@ -534,6 +581,10 @@ else
 
             Members.RemoveAll(member => SelectedFaceIds.Contains(member.FaceId));
             ClearSelection();
+            if (SelectedModel is ProvisionalClusterModelResponse model && SelectedGroup is ProvisionalClusterReviewGroupResponse group)
+            {
+                await LoadKnownPersonAdvisoryAsync(model, group.DerivedClusterKey);
+            }
             Message = $"Assigned {committed.AffectedCount} face{(committed.AffectedCount == 1 ? "" : "s")} to {committed.Person?.DisplayName}. Unselected members remain unreviewed.";
         }
         catch (Exception exception)
@@ -609,6 +660,7 @@ else
                 ?? throw new InvalidOperationException("The not-same response was empty.");
 
             SelectedGroup = null;
+            KnownPersonAdvisory = null;
             Members.Clear();
             ClearSelection();
             AnchorFaceId = "";
@@ -640,6 +692,18 @@ else
         person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
 
     private static string CoreShareLabel(double value) => $"{value:P0}";
+
+    private static string AdvisoryTitle(ProvisionalClusterKnownPersonAdvisoryResponse advisory) =>
+        advisory.Candidate is null
+            ? "No qualifying known-person consensus"
+            : $"Candidate: {advisory.Candidate.DisplayName}";
+
+    private static string AdvisoryStatusLabel(string status) => status switch
+    {
+        "strong" => "Strong support",
+        "ambiguous" => "Ambiguous",
+        _ => "Insufficient",
+    };
 
     private static string RunStatusLabel(ProvisionalClusterRunResponse run)
     {
