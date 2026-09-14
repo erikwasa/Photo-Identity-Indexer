@@ -4,11 +4,11 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M25 Face discovery and cluster-assisted identity review is active.**
+**M25 Face discovery and cluster-assisted identity review is ready for the next work item.**
 
-WI-0110 similar-face discovery, WI-0111 bounded follow-up regeneration, WI-0112 suggested-person grouped review, and WI-0113 provisional-cluster model/algorithm evaluation are complete after implementation, CI, and maintainer verification.
+WI-0110 similar-face discovery, WI-0111 bounded follow-up regeneration, WI-0112 suggested-person grouped review, WI-0113 provisional-cluster model/algorithm evaluation, and WI-0114 scalable incremental provisional face clustering are complete after implementation, CI, corrective live-PostgreSQL fixes, and maintainer verification.
 
-WI-0114 scalable incremental provisional face clustering is implemented in PR #330 and is now `in_review`. CI build #1782 (`34791332956`) is green after adding explicit catalogue-provider integration coverage and production/verification documentation. Maintainer acceptance still requires the live PostgreSQL suite plus a real-catalogue incremental-refresh check before WI-0114 is completed.
+WI-0114 final acceptance passed on 2026-09-14. `verify-postgres.ps1` succeeded after corrective PRs #331 and #332. On the real catalogue, new analysis evidence replaced cluster run `09a848a0-4e62-42ba-8330-44fa2c7ec0be` with `7b6c56d8-1fae-43c5-a776-8d16149b6655`; target count increased from 5,183 to 5,191, cluster count remained 60, noise count increased from 4,792 to 4,800, and canonical Assigned/Unknown/Rejected totals remained exactly 10,185/4,116/643.
 
 The selected production policy remains DBSCAN with `eps=0.30` and `min_samples=3`. WI-0114 uses bounded exact in-process cosine comparisons over an exact-model PostgreSQL snapshot, with a 20,000-face cap and 2,000,000 retained-neighbour-edge safety budget. ANN remains optional and should be introduced only if measured production runtime exceeds the required budget.
 
@@ -18,27 +18,25 @@ PostgreSQL remains the sole writable production catalogue. WI-0081 remains the s
 
 ## Next concrete step
 
-Verify WI-0114 from PR #330:
+Prepare and implement WI-0115 cluster-based People-to-identify review workspace as a separate work item after the WI-0114 closeout PR is merged.
 
-1. Run `./verify-postgres.ps1` so the live PostgreSQL persistence/integration test bodies execute.
-2. On the real PostgreSQL catalogue, complete a provisional cluster run for the current exact embedding model with `includeUnknown=false`; record run/target/cluster/noise counts.
-3. Add/analyse a small new photo batch and confirm a replacement cluster run becomes current, the discovery population/groups update, and canonical Person/Unknown/rejection state does not change solely because clustering ran.
-4. Optionally verify the separate explicit `includeUnknown=true` scope while canonical Unknown remains unchanged.
+Preserve the WI-0114 boundaries when designing WI-0115:
 
-Do not start WI-0115 until WI-0114 maintainer acceptance is recorded and WI-0114 is completed.
+1. Treat provisional cluster membership as disposable derived evidence, never as identity truth.
+2. Keep exact model/policy provenance visible enough for review behavior to remain auditable.
+3. Do not automatically assign people or rewrite canonical Unknown/rejection state from cluster membership.
+4. Keep cluster review bounded and usable for the real ~5k unreviewed-face population.
+5. Do not expand into WI-0116 cluster-assisted known-person scoring in the same PR.
 
 ## Relevant files
 
-- docs/delivery/work-items/WI-0114-scalable-incremental-face-clustering.md
-- docs/delivery/status/work-items/active/WI-0114.yaml
+- docs/delivery/work-items/WI-0115-cluster-discovery-review-workspace.md
+- docs/delivery/status/work-items/active/WI-0115.yaml
 - docs/architecture/provisional-face-clustering.md
 - src/PhotoIdentity.Core/Clustering/ProvisionalFaceDbscanClusterer.cs
 - src/PhotoIdentity.Persistence.Postgres/PostgresProvisionalFaceClusterRepository.cs
 - src/PhotoIdentity.Api/ProvisionalFaceClusteringWorker.cs
 - src/PhotoIdentity.Api/ProvisionalFaceClusterEndpoints.cs
-- tests/PhotoIdentity.Core.Tests/ProvisionalFaceDbscanClustererTests.cs
-- tests/PhotoIdentity.Persistence.Tests/PostgresProvisionalFaceClusterRepositoryTests.cs
-- tests/PhotoIdentity.Integration.Tests/PostgresRuntimeApplicationTests.cs
 
 ## Repository validation
 
