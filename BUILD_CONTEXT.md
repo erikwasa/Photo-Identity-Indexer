@@ -8,26 +8,37 @@ This file is intentionally a short handoff for the next development or verificat
 
 WI-0110 similar-face discovery, WI-0111 bounded follow-up regeneration, WI-0112 suggested-person grouped review, and WI-0113 provisional-cluster model/algorithm evaluation are complete after implementation, CI, and maintainer verification.
 
-The 2026-09-13 WI-0113 private evaluation used 5,000 reviewed faces, 107 assigned identity labels and 1,294 canonical Unknown faces. It selected DBSCAN with `eps=0.30` and `min_samples=3`: 0/443,525 false-merge pairs, false-split rate 0.687251, labelled coverage 0.542, noise rate 0.579 and zero same-photo conflicting merges. Pairwise cosine distance took 0.528 seconds at 5,000 faces and projects to 2.111 seconds at 10,000 faces. Age/pose/image-quality variation was not established from the available sample metadata and remains a later quality-validation limitation.
+WI-0114 scalable incremental provisional face clustering is implemented in PR #330 and is now `in_review`. CI build #1782 (`34791332956`) is green after adding explicit catalogue-provider integration coverage and production/verification documentation. Maintainer acceptance still requires the live PostgreSQL suite plus a real-catalogue incremental-refresh check before WI-0114 is completed.
 
-The WI-0114 neighbour-search decision is exact-first: begin with bounded exact PostgreSQL/vector-neighbour retrieval and keep ANN optional. Introduce ANN only if measured production incremental retrieval fails the required runtime budget; the private pairwise benchmark is diagnostic, not a direct PostgreSQL latency guarantee.
+The selected production policy remains DBSCAN with `eps=0.30` and `min_samples=3`. WI-0114 uses bounded exact in-process cosine comparisons over an exact-model PostgreSQL snapshot, with a 20,000-face cap and 2,000,000 retained-neighbour-edge safety budget. ANN remains optional and should be introduced only if measured production runtime exceeds the required budget.
+
+Provisional clusters remain derived/non-canonical evidence. Default input is Unreviewed; canonical Unknown participates only through explicit `includeUnknown`; Assigned and Rejected faces are excluded. Cluster runs must never rewrite canonical Person assignments, Unknown decisions, rejection history, suggestions, or review audit history.
 
 PostgreSQL remains the sole writable production catalogue. WI-0081 remains the separate suggestion-quality investigation that gates later automatic identity-assignment expansion.
 
 ## Next concrete step
 
-Prepare and implement WI-0114: scalable incremental provisional face clustering. Use the selected DBSCAN `eps=0.30` / `min_samples=3` policy as the initial exact-model clustering policy, preserve provisional clusters as derived/non-canonical evidence, and start with bounded exact PostgreSQL/vector-neighbour retrieval.
+Verify WI-0114 from PR #330:
 
-Do not add ANN unless measured production retrieval justifies it. Preserve the WI-0113 safety boundary: false merges remain the primary risk, canonical Unknown must never be rewritten, and cluster rebuilds must not mutate canonical review history.
+1. Run `./verify-postgres.ps1` so the live PostgreSQL persistence/integration test bodies execute.
+2. On the real PostgreSQL catalogue, complete a provisional cluster run for the current exact embedding model with `includeUnknown=false`; record run/target/cluster/noise counts.
+3. Add/analyse a small new photo batch and confirm a replacement cluster run becomes current, the discovery population/groups update, and canonical Person/Unknown/rejection state does not change solely because clustering ran.
+4. Optionally verify the separate explicit `includeUnknown=true` scope while canonical Unknown remains unchanged.
+
+Do not start WI-0115 until WI-0114 maintainer acceptance is recorded and WI-0114 is completed.
 
 ## Relevant files
 
 - docs/delivery/work-items/WI-0114-scalable-incremental-face-clustering.md
 - docs/delivery/status/work-items/active/WI-0114.yaml
 - docs/architecture/provisional-face-clustering.md
-- tools/PhotoIdentity.ClusterEvaluation/Program.cs
-- tools/cluster-evaluation/evaluate.py
-- tools/cluster-evaluation/README.md
+- src/PhotoIdentity.Core/Clustering/ProvisionalFaceDbscanClusterer.cs
+- src/PhotoIdentity.Persistence.Postgres/PostgresProvisionalFaceClusterRepository.cs
+- src/PhotoIdentity.Api/ProvisionalFaceClusteringWorker.cs
+- src/PhotoIdentity.Api/ProvisionalFaceClusterEndpoints.cs
+- tests/PhotoIdentity.Core.Tests/ProvisionalFaceDbscanClustererTests.cs
+- tests/PhotoIdentity.Persistence.Tests/PostgresProvisionalFaceClusterRepositoryTests.cs
+- tests/PhotoIdentity.Integration.Tests/PostgresRuntimeApplicationTests.cs
 
 ## Repository validation
 
@@ -36,3 +47,4 @@ Do not add ANN unless measured production retrieval justifies it. Preserve the W
     dotnet run --project tools/PhotoIdentity.Docs -- validate
     dotnet run --project tools/PhotoIdentity.Docs -- generate --check
     ./verify-review.ps1 -Mode Smoke -Configuration Release
+    ./verify-postgres.ps1

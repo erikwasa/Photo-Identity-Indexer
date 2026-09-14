@@ -12,7 +12,7 @@ Current work items: **10**. Archived terminal items: **106**.
 | [WI-0089](../work-items/WI-0089-source-copy-exclusion-boundary.md) Add durable source-copy exclusion and access enforcement | M23 | ready | unassigned | [YAML](work-items/active/WI-0089.yaml) |
 | [WI-0090](../work-items/WI-0090-exclusion-purge-service.md) Purge excluded photo data and derivatives safely | M23 | proposed | unassigned | [YAML](work-items/active/WI-0090.yaml) |
 | [WI-0091](../work-items/WI-0091-archive-lifecycle-review.md) Add archive lifecycle review and exclusion workflows | M23 | proposed | unassigned | [YAML](work-items/active/WI-0091.yaml) |
-| [WI-0114](../work-items/WI-0114-scalable-incremental-face-clustering.md) Implement scalable incremental provisional face clustering | M25 | proposed | unassigned | [YAML](work-items/active/WI-0114.yaml) |
+| [WI-0114](../work-items/WI-0114-scalable-incremental-face-clustering.md) Implement scalable incremental provisional face clustering | M25 | in_review | ai-agent | [YAML](work-items/active/WI-0114.yaml) |
 | [WI-0115](../work-items/WI-0115-cluster-discovery-review-workspace.md) Add cluster-based People-to-identify review workspace | M25 | proposed | unassigned | [YAML](work-items/active/WI-0115.yaml) |
 | [WI-0116](../work-items/WI-0116-cluster-assisted-known-person-evidence.md) Add cluster-assisted known-person advisory evidence | M25 | proposed | unassigned | [YAML](work-items/active/WI-0116.yaml) |
 | [WI-0117](../work-items/WI-0117-multi-evidence-auto-assignment-evaluation.md) Evaluate multi-evidence automatic identity assignment | M25 | proposed | unassigned | [YAML](work-items/active/WI-0117.yaml) |

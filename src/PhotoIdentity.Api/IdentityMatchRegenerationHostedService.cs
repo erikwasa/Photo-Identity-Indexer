@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using PhotoIdentity.Core.Clustering;
 using PhotoIdentity.Core.Review;
+using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
@@ -10,6 +12,8 @@ namespace PhotoIdentity.Api;
 /// enqueue or inspect work. Each target still commits independently, preserving durable restart
 /// and reclaim semantics while avoiding a scheduler delay between every target. Qualifying
 /// identity-evidence changes may also enqueue a later coalesced run through the same controller.
+/// PostgreSQL provisional clustering runs only from idle identity cycles so expensive exact
+/// clustering remains lower priority than review matching.
 /// </summary>
 public sealed class IdentityMatchRegenerationHostedService : BackgroundService
 {
@@ -26,6 +30,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
     private readonly ArchiveThroughputMetrics _metrics;
     private readonly ILogger<IdentityMatchRegenerationHostedService> _logger;
     private readonly IIdentityMatchFollowUpPlanner _followUpPlanner;
+    private readonly ProvisionalFaceClusteringWorker? _provisionalClustering;
 
     public IdentityMatchRegenerationHostedService(
         IIdentityMatchRegenerationRepository runs,
@@ -37,7 +42,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         ArchiveThroughputMetrics metrics,
         ILogger<IdentityMatchRegenerationHostedService>? logger = null,
         IIdentityMatchModelRepository? models = null,
-        IConfiguration? configuration = null)
+        IConfiguration? configuration = null,
+        PostgresCatalogueDatabase? postgresCatalogueDatabase = null)
     {
         _runs = runs;
         _scorer = scorer;
@@ -56,6 +62,16 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 policies,
                 timeProvider,
                 IdentityMatchFollowUpConfiguration.FromConfiguration(configuration));
+
+        bool postgresSelected = configuration is not null &&
+            CataloguePersistenceComposition.ResolveProvider(configuration) == CatalogueProviderKind.Postgres;
+        _provisionalClustering = postgresSelected && postgresCatalogueDatabase is not null
+            ? new ProvisionalFaceClusteringWorker(
+                new PostgresProvisionalFaceClusterRepository(postgresCatalogueDatabase),
+                new ProvisionalFaceDbscanClusterer(),
+                timeProvider,
+                _logger)
+            : null;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -95,7 +111,9 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         ReviewIdentityMatchRegenerationRun? run = await _runs.GetNextActiveAsync(cancellationToken);
         if (run is null)
         {
-            return followUpStarted;
+            bool clusteringWorked = _provisionalClustering is not null &&
+                await _provisionalClustering.AdvanceOnceAsync(cancellationToken);
+            return followUpStarted || clusteringWorked;
         }
 
         int processedInBatch = 0;

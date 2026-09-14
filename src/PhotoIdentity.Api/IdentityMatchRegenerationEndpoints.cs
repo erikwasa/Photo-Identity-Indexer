@@ -13,6 +13,7 @@ public static class IdentityMatchRegenerationEndpoints
         group.MapGet("/models", ListModelsAsync);
         group.MapGet("", GetAsync);
         group.MapPost("", StartAsync);
+        endpoints.MapProvisionalFaceClusterEndpoints();
         return endpoints;
     }
 
