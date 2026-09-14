@@ -57,9 +57,13 @@ public sealed class ProvisionalFaceClusteringWorker
                 return true;
             }
 
+            IReadOnlyList<ProvisionalFaceNotSameConstraint> notSameConstraints =
+                await _repository.ReadNotSameConstraintsAsync(run, cancellationToken: cancellationToken);
+
             ProvisionalFaceClusterComputation computation = await _clusterer.ComputeAsync(
                 faces,
                 run.Policy,
+                notSameConstraints,
                 (processed, token) => _repository.ReportProgressAsync(
                     run.Id,
                     processed,
