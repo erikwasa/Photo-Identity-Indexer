@@ -61,6 +61,8 @@ PR #330 implements the selected `m25-dbscan-v1` policy as durable PostgreSQL-der
 
 Automated coverage includes deterministic/noise-retry/fail-closed Core tests, live PostgreSQL persistence coverage for restart/rebuild/refresh/exact-model/Unknown/Rejected/Assigned/reversal/canonical-history semantics, and an API provider-boundary integration test. The live PostgreSQL test bodies are intentionally gated by `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING`, so normal GitHub CI proves they compile while `verify-postgres.ps1` is the explicit local live-database acceptance entry point.
 
+Initial maintainer execution of `verify-postgres.ps1` after PR #330 reached the live WI-0114 PostgreSQL test and exposed a malformed `ReadLatestAsync` SQL concatenation before the first provisional cluster run could be created. Corrective PR #331 adds the missing query delimiter; live acceptance must be rerun after that corrective slice before real-catalogue runtime verification continues.
+
 ## Verification requirements
 
 Before WI-0114 is completed, the maintainer should verify both layers:
