@@ -1,0 +1,35 @@
+id: WI-0114
+title: Implement scalable incremental provisional face clustering
+milestone: M25
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0114-scalable-incremental-face-clustering.md
+started_at: 2026-09-14
+completed_at: 2026-09-14
+verified_at: 2026-09-14
+verified_by: maintainer
+last_updated_at: 2026-09-14
+branch: agent/WI-0114-provisional-clustering
+blockers:
+- WI-0113
+blocker_notes:
+- Maintainer acceptance completed successfully on 2026-09-14 after corrective PRs #331 and #332. The live PostgreSQL acceptance suite passed, and real-catalogue incremental verification replaced run 09a848a0-4e62-42ba-8330-44fa2c7ec0be with 7b6c56d8-1fae-43c5-a776-8d16149b6655 after new analysis evidence arrived. Target count increased from 5183 to 5191, cluster count remained 60, noise count increased from 4792 to 4800, and canonical Assigned/Unknown/Rejected totals remained exactly 10185/4116/643.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/330
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34791332956
+- type: implementation_commit
+  value: 598d87479348e4512c66fe52bd8265e066d385d1
+- type: maintainer_verification
+  value: 2026-09-14 initial verify-postgres.ps1 reached the live WI-0114 PostgreSQL test and exposed the ReadLatestAsync SQL delimiter defect; corrective slice required.
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/331
+- type: merge_commit
+  value: 9fcdd0db485015133abe75be568bed61620f4908
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/332
+- type: merge_commit
+  value: 9e57167ff6b06e516a5c11e96a257fe292d224d7
+- type: maintainer_verification
+  value: 2026-09-14 final acceptance passed; verify-postgres.ps1 succeeded and real-catalogue incremental clustering replaced run 09a848a0-4e62-42ba-8330-44fa2c7ec0be with 7b6c56d8-1fae-43c5-a776-8d16149b6655, target count 5183 to 5191, cluster count 60 to 60, noise count 4792 to 4800, canonical Assigned 10185, Unknown 4116, Rejected 643 unchanged.
