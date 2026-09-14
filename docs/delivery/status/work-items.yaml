@@ -97,7 +97,7 @@ work_items:
   - type: implementation_commit
     value: 598d87479348e4512c66fe52bd8265e066d385d1
   - type: maintainer_verification
-    value: '2026-09-14 verify-postgres.ps1 reached the live WI-0114 PostgreSQL test and failed in ReadLatestAsync with PostgreSQL 42601 syntax error near run; corrective slice required before runtime acceptance can continue.'
+    value: 2026-09-14 verify-postgres.ps1 reached the live WI-0114 PostgreSQL test and failed in ReadLatestAsync with PostgreSQL 42601 syntax error near run; corrective slice required before runtime acceptance can continue.
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/331
 - id: WI-0115
