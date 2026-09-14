@@ -121,7 +121,7 @@ internal static class Program
         }
 
         return new PrivateEvaluationExport(
-            2,
+            1,
             options.ModelId.ToString(),
             options.ModelHash.ToString(),
             DateTimeOffset.UtcNow,
