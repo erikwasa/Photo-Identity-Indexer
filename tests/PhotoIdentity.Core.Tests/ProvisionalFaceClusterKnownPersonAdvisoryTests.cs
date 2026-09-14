@@ -23,7 +23,7 @@ public sealed class ProvisionalFaceClusterKnownPersonAdvisoryTests
             Evidence(1, Alice, "Alice", 0.66, 0.08),
             Evidence(2, Alice, "Alice", 0.64, 0.06),
             Evidence(3, Alice, "Alice", 0.61, 0.04),
-            Evidence(4, Bob, "Bob", 0.55, 0.02));
+            Evidence(4, Bob, "Bob", 0.45, 0.02));
 
         Assert.Equal(ProvisionalFaceClusterKnownPersonAdvisoryStatuses.Strong, result.Status);
         Assert.NotNull(result.Candidate);
