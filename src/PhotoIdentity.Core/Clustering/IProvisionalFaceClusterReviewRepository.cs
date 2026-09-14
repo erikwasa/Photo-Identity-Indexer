@@ -45,7 +45,15 @@ public sealed record ProvisionalFaceClusterReviewMember(
     FaceOccurrenceId FaceOccurrenceId,
     ProvisionalFaceClusterMemberRole Role);
 
-public interface IProvisionalFaceClusterReviewRepository
+public interface IProvisionalFaceClusterConstraintSource
+{
+    Task<IReadOnlyList<ProvisionalFaceNotSameConstraint>> ListNotSameConstraintsAsync(
+        IReadOnlyCollection<FaceOccurrenceId> eligibleFaceOccurrenceIds,
+        int maximumConstraints = ProvisionalFaceClusterPolicies.MaximumNotSameConstraintsPerRun,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IProvisionalFaceClusterReviewRepository : IProvisionalFaceClusterConstraintSource
 {
     Task<ProvisionalFaceClusterReviewGroupPage> ListCurrentGroupsAsync(
         ModelId modelId,
