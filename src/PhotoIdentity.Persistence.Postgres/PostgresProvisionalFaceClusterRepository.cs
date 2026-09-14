@@ -252,10 +252,12 @@ public sealed class PostgresProvisionalFaceClusterRepository : IProvisionalFaceC
                     ON current_scope.run_id = run.id
                 ORDER BY current_scope.updated_at_utc, run.id;
                 """;
-            await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
+            await using (NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
             {
-                currentRuns.Add(ReadRun(reader));
+                while (await reader.ReadAsync(cancellationToken))
+                {
+                    currentRuns.Add(ReadRun(reader));
+                }
             }
 
             await transaction.CommitAsync(cancellationToken);
@@ -671,15 +673,17 @@ public sealed class PostgresProvisionalFaceClusterRepository : IProvisionalFaceC
         command.Parameters.AddWithValue("maximum_groups", maximumGroups);
 
         List<ProvisionalFaceClusterGroupSummary> result = [];
-        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
+        await using (NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
         {
-            result.Add(new(
-                reader.GetGuid(0),
-                reader.GetString(1),
-                reader.GetInt32(2),
-                reader.GetInt32(3),
-                reader.GetInt32(4)));
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                result.Add(new(
+                    reader.GetGuid(0),
+                    reader.GetString(1),
+                    reader.GetInt32(2),
+                    reader.GetInt32(3),
+                    reader.GetInt32(4)));
+            }
         }
 
         await transaction.CommitAsync(cancellationToken);
