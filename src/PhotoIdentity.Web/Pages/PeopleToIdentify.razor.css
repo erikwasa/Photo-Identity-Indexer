@@ -5,7 +5,8 @@
 .cluster-create-person,
 .cluster-not-same-actions,
 .cluster-run-summary > div,
-.cluster-run-metrics {
+.cluster-run-metrics,
+.cluster-advisory-heading {
     display: flex;
     gap: 0.75rem;
     align-items: end;
@@ -55,7 +56,8 @@
 .cluster-status,
 .provisional-badge,
 .member-role,
-.anchor-badge {
+.anchor-badge,
+.cluster-advisory-status {
     display: inline-flex;
     align-items: center;
     border-radius: 999px;
@@ -156,6 +158,62 @@
     cursor: pointer;
 }
 
+.cluster-advisory-panel {
+    display: grid;
+    gap: 0.8rem;
+    margin: 1rem 0;
+    padding: 1rem;
+    border: 1px solid var(--border, #d7d7d7);
+    border-radius: 0.9rem;
+    background: color-mix(in srgb, currentColor 3%, var(--surface, #fff));
+}
+
+.cluster-advisory-panel.strong {
+    border-width: 2px;
+}
+
+.cluster-advisory-heading {
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.cluster-advisory-heading h3,
+.cluster-advisory-panel p {
+    margin: 0;
+}
+
+.cluster-advisory-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.6rem;
+    margin: 0;
+}
+
+.cluster-advisory-metrics > div {
+    padding: 0.65rem;
+    border-radius: 0.65rem;
+    background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.cluster-advisory-metrics dt {
+    font-size: 0.75rem;
+    opacity: 0.75;
+}
+
+.cluster-advisory-metrics dd {
+    margin: 0.15rem 0 0;
+    font-weight: 700;
+}
+
+.cluster-advisory-competition,
+.cluster-advisory-boundary {
+    font-size: 0.9rem;
+}
+
+.cluster-advisory-boundary {
+    opacity: 0.78;
+}
+
 .cluster-actions-panel {
     display: grid;
     gap: 0.9rem;
@@ -234,7 +292,8 @@
     .cluster-selection-summary,
     .cluster-assign-actions,
     .cluster-create-person,
-    .cluster-not-same-actions {
+    .cluster-not-same-actions,
+    .cluster-advisory-heading {
         align-items: stretch;
     }
 
@@ -244,6 +303,10 @@
     .cluster-create-person > *,
     .cluster-not-same-actions > * {
         width: 100%;
+    }
+
+    .cluster-advisory-metrics {
+        grid-template-columns: 1fr;
     }
 
     .cluster-member-grid {
