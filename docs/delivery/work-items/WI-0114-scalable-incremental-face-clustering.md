@@ -34,16 +34,16 @@ Implement the clustering semantics selected by WI-0113 as bounded, restart-safe,
 
 ## Acceptance criteria
 
-- [ ] Provisional cluster state is persisted with exact embedding model and clustering-policy provenance.
-- [ ] A full rebuild is deterministic for unchanged inputs/policy and replaces derived cluster state without rewriting canonical review history.
-- [ ] Processing is bounded and restart-safe on archive-scale face counts.
-- [ ] Newly analysed eligible faces can be incorporated without requiring a destructive canonical reset.
-- [ ] Previously noise/unclustered faces can be retried when new evidence makes a dense group possible.
-- [ ] Canonical Unknown faces are included only through explicit discovery policy and remain canonically Unknown until a later human action.
-- [ ] Rejected false detections are excluded from clustering.
-- [ ] Relevant negative/conflict evidence prevents prohibited memberships according to the WI-0113 contract.
-- [ ] Run progress/failure metrics expose operational state without personal filenames, crops or embeddings.
-- [ ] Integration coverage proves rebuild, incremental update, restart, exact-model isolation and canonical-state preservation.
+- [x] Provisional cluster state is persisted with exact embedding model and clustering-policy provenance.
+- [x] A full rebuild is deterministic for unchanged inputs/policy and replaces derived cluster state without rewriting canonical review history.
+- [x] Processing is bounded and restart-safe on archive-scale face counts.
+- [x] Newly analysed eligible faces can be incorporated without requiring a destructive canonical reset.
+- [x] Previously noise/unclustered faces can be retried when new evidence makes a dense group possible.
+- [x] Canonical Unknown faces are included only through explicit discovery policy and remain canonically Unknown until a later human action.
+- [x] Rejected false detections are excluded from clustering.
+- [x] Relevant negative/conflict evidence prevents prohibited memberships according to the WI-0113 contract.
+- [x] Run progress/failure metrics expose operational state without personal filenames, crops or embeddings.
+- [x] Integration coverage proves rebuild, incremental update, restart, exact-model isolation and canonical-state preservation.
 
 ## Implementation handoff
 
@@ -61,16 +61,18 @@ PR #330 implements the selected `m25-dbscan-v1` policy as durable PostgreSQL-der
 
 Automated coverage includes deterministic/noise-retry/fail-closed Core tests, live PostgreSQL persistence coverage for restart/rebuild/refresh/exact-model/Unknown/Rejected/Assigned/reversal/canonical-history semantics, and an API provider-boundary integration test. The live PostgreSQL test bodies are intentionally gated by `PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING`, so normal GitHub CI proves they compile while `verify-postgres.ps1` is the explicit local live-database acceptance entry point.
 
-Initial maintainer execution of `verify-postgres.ps1` after PR #330 reached the live WI-0114 PostgreSQL test and exposed a malformed `ReadLatestAsync` SQL concatenation before the first provisional cluster run could be created. Corrective PR #331 adds the missing query delimiter; live acceptance must be rerun after that corrective slice before real-catalogue runtime verification continues.
+Maintainer live verification exposed two PostgreSQL-only runtime defects after PR #330: malformed SQL concatenation in `ReadLatestAsync` and Npgsql reader lifetime ordering in `ListCurrentGroupsAsync`/`TryStartNextRefreshAsync`. Corrective PRs #331 and #332 fixed those issues. The final `verify-postgres.ps1` rerun on merged `main` passed successfully.
 
-## Verification requirements
+## Verification
 
-Before WI-0114 is completed, the maintainer should verify both layers:
+Maintainer acceptance completed successfully on 2026-09-14.
 
-1. Run `./verify-postgres.ps1` from the PR branch and confirm the live PostgreSQL suite passes. This exercises the database-backed WI-0114 tests rather than only compiling their skipped CI bodies.
-2. On the real PostgreSQL catalogue, start/observe a provisional cluster run for the current exact embedding model with `includeUnknown=false`; record the run ID, target count, cluster count and noise count. Then add/analyse a small new photo batch and confirm a replacement run becomes current, the target/discovery groups update as expected, and no canonical Person assignment, Unknown decision or rejection history changes solely because clustering ran.
-3. Optionally start the explicit `includeUnknown=true` scope and confirm its target population increases when canonical Unknown faces exist while those faces remain canonically Unknown.
+1. `./verify-postgres.ps1` passed after corrective PRs #331 and #332, exercising the live PostgreSQL WI-0114 persistence/runtime paths.
+2. Real-catalogue `includeUnknown=false` clustering started from run `09a848a0-4e62-42ba-8330-44fa2c7ec0be` with 5,183 targets, 60 clusters and 4,792 Noise faces.
+3. After a small new analysed photo batch, replacement run `7b6c56d8-1fae-43c5-a776-8d16149b6655` became current with 5,191 targets, 60 clusters and 4,800 Noise faces. The eight newly eligible faces were therefore incorporated without a destructive canonical reset; unchanged cluster count is acceptable because new faces may remain Noise or join existing groups.
+4. Canonical review totals were identical before and after clustering: Assigned 10,185; Unknown 4,116; Rejected 643. Clustering therefore did not rewrite canonical Person assignment, Unknown or rejection state.
+5. Representative derived groups remained available through `/groups`, including a 107-member group with 88 Core/19 Border and a 60-member group with 33 Core/27 Border, confirming persisted current-run membership summaries are queryable without exposing sensitive face data.
 
-The operator API is `/api/review/provisional-clusters`. The status response exposes `runId`, `status`, `isActive`, `isCurrent`, `targetCount`, `processedTargetCount`, `clusterCount`, `noiseCount`, timestamps and a non-sensitive error field. `/groups` exposes only derived cluster keys and aggregate member/Core/Border counts.
+The optional `includeUnknown=true` manual runtime check was not required because the live PostgreSQL integration coverage already exercises explicit Unknown inclusion while preserving canonical Unknown state.
 
-Human runtime verification remains required before checking the acceptance boxes and marking the work item completed.
+WI-0114 is complete.
