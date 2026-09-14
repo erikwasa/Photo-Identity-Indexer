@@ -40,18 +40,22 @@ Explicit `not same` feedback is stored as durable canonicalized face-to-face dis
 
 The review workspace is PostgreSQL-only with the same provider boundary as production provisional clustering. Group cards are ordered primarily by size and then by Core share, expose representative faces and explicit derived/provisional labelling, and member loading is bounded. Source-photo context remains available through the existing face-details route.
 
+Maintainer usability feedback after acceptance identified the GUID-oriented anchor dropdown as unnecessarily disconnected from the face cards. The follow-up polish defaults the anchor to the first displayed member, marks that card directly, and lets the operator choose another anchor with a `Make anchor` action on the desired face. This is a post-acceptance interaction improvement; the maintainer plans to recheck the smoother anchor selection together with a later work item rather than reopening the core WI-0115 acceptance gate.
+
 ## Acceptance criteria
 
-- [ ] The operator can browse provisional candidate identities as cluster cards rather than only individual face cards.
-- [ ] Cluster cards show representative faces, member count and clear provisional/derived status.
-- [ ] Opening a cluster provides bounded member loading and original-photo context needed to detect mistakes.
-- [ ] The operator can select obvious members, remove exceptions and assign/create a person through canonical audited review actions.
-- [ ] Borderline members can remain unreviewed instead of being forced into the canonical assignment.
-- [ ] The operator can record that faces/groups should not be clustered together, and later clustering respects that evidence according to the accepted clustering contract.
-- [ ] Cluster changes caused by review do not rewrite or delete canonical history.
-- [ ] The representative workflow is usable on a mobile-width touch interface without thousands of individual queue actions.
-- [ ] Automated coverage protects cluster membership eligibility, bulk review handoff, negative feedback and post-review refresh behavior.
+- [x] The operator can browse provisional candidate identities as cluster cards rather than only individual face cards.
+- [x] Cluster cards show representative faces, member count and clear provisional/derived status.
+- [x] Opening a cluster provides bounded member loading and original-photo context needed to detect mistakes.
+- [x] The operator can select obvious members, remove exceptions and assign/create a person through canonical audited review actions.
+- [x] Borderline members can remain unreviewed instead of being forced into the canonical assignment.
+- [x] The operator can record that faces/groups should not be clustered together, and later clustering respects that evidence according to the accepted clustering contract.
+- [x] Cluster changes caused by review do not rewrite or delete canonical history.
+- [x] The representative workflow is usable on a mobile-width touch interface without thousands of individual queue actions.
+- [x] Automated coverage protects cluster membership eligibility, bulk review handoff, negative feedback and post-review refresh behavior.
 
 ## Verification requirements
 
 Automated API/Web/persistence coverage plus human Windows and real/mobile-browser verification using clusters with correct members and intentional exceptions.
+
+Maintainer verification completed successfully on 2026-09-14 against the local PostgreSQL-backed application. The operator confirmed the cluster-card/member workflow, selective canonical assignment, preservation of unselected review state, negative discovery feedback/reclustering behavior, canonical-history preservation, and mobile-width interaction. The real catalogue produced predominantly pure clusters containing the same person, so finding an intentional false merge for the anchor scenario required additional searching; this was recorded as useful quality evidence rather than a failure of the workflow.

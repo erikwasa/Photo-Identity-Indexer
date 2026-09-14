@@ -15,9 +15,15 @@
 .cluster-scope-row > div,
 .cluster-assign-actions label,
 .cluster-create-person label,
-.cluster-not-same-actions label {
+.cluster-not-same-actions label,
+.cluster-anchor-summary {
     min-width: min(100%, 18rem);
     flex: 1 1 16rem;
+}
+
+.cluster-anchor-summary {
+    display: grid;
+    gap: 0.2rem;
 }
 
 .cluster-unknown-toggle {
@@ -195,6 +201,10 @@
     border-color: currentColor;
 }
 
+.cluster-member-card.anchor {
+    box-shadow: 0 0 0 2px currentColor;
+}
+
 .cluster-member-card > img {
     aspect-ratio: 1;
 }
@@ -205,6 +215,10 @@
     align-items: center;
     min-height: 2.4rem;
     font-weight: 600;
+}
+
+.cluster-anchor-action {
+    min-height: 2.4rem;
 }
 
 .cluster-bounded-note {
