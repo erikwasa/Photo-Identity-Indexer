@@ -70,7 +70,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 new PostgresProvisionalFaceClusterRepository(postgresCatalogueDatabase),
                 new ProvisionalFaceDbscanClusterer(),
                 timeProvider,
-                _logger)
+                _logger,
+                new PostgresProvisionalFaceClusterReviewRepository(postgresCatalogueDatabase))
             : null;
     }
 
