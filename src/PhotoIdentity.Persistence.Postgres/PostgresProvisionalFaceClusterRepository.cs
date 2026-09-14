@@ -881,7 +881,7 @@ public sealed class PostgresProvisionalFaceClusterRepository : IProvisionalFaceC
               AND run.model_hash = @model_hash
               AND run.policy_version = @policy_version
               AND run.include_unknown = @include_unknown
-            """ +
+            """ + "\n" +
             (activeOnly
                 ? "AND run.status IN (@pending, @running)\n"
                 : string.Empty) +
