@@ -1,0 +1,660 @@
+@page "/people-to-identify"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>People to identify · Photo Identity</PageTitle>
+
+<section class="hero cluster-review-hero">
+    <div>
+        <p class="eyebrow">Provisional discovery</p>
+        <h1>People to identify</h1>
+        <p>Review repeated unassigned faces as provisional groups. Groups are discovery evidence only: choose the obvious members you want to assign and leave uncertain faces unreviewed.</p>
+    </div>
+</section>
+
+<section class="review-filter-panel" aria-labelledby="cluster-model-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Exact model revision</p>
+            <h2 id="cluster-model-heading">Cluster scope</h2>
+        </div>
+        @if (SelectedModel is ProvisionalClusterModelResponse selectedModel)
+        {
+            <span class="model-summary">@selectedModel.ModelId · @HashPrefix(selectedModel.ModelHash)</span>
+        }
+    </div>
+
+    <div class="cluster-scope-row">
+        <div>
+            <label class="field-label" for="cluster-model">Model revision</label>
+            <select id="cluster-model"
+                    @bind="SelectedModelIndex"
+                    @bind:after="ScopeChangedAsync"
+                    disabled="@(Busy || Models.Count == 0)">
+                @for (int index = 0; index < Models.Count; index++)
+                {
+                    ProvisionalClusterModelResponse model = Models[index];
+                    <option value="@index">@ModelLabel(model)</option>
+                }
+            </select>
+        </div>
+        <label class="cluster-unknown-toggle">
+            <input type="checkbox"
+                   @bind="IncludeUnknown"
+                   @bind:after="ScopeChangedAsync"
+                   disabled="@Busy" />
+            <span>Include canonical Unknown faces</span>
+        </label>
+        <button class="button secondary" disabled="@(Busy || SelectedModel is null)" @onclick="RefreshAsync">
+            Refresh
+        </button>
+    </div>
+</section>
+
+@if (Run is not null)
+{
+    <section class="cluster-run-summary" aria-live="polite">
+        <div>
+            <span class="cluster-status @Run.Status">@RunStatusLabel(Run)</span>
+            <strong>@Run.ClusterCount provisional group@(Run.ClusterCount == 1 ? "" : "s")</strong>
+        </div>
+        <div class="cluster-run-metrics">
+            <span>@Run.TargetCount target faces</span>
+            <span>@Run.NoiseCount noise</span>
+            <span>@Run.PolicyVersion</span>
+        </div>
+        @if (Run.IsActive)
+        {
+            <p>Replacement clustering is running: @Run.ProcessedTargetCount / @Run.TargetCount processed. Existing groups remain provisional until the replacement is published.</p>
+        }
+        else if (!Run.IsCurrent && !string.Equals(Run.Status, "not-run", StringComparison.Ordinal))
+        {
+            <p>This grouping is no longer current. Refresh after the replacement run completes before making further split decisions.</p>
+        }
+    </section>
+}
+
+<section class="group-guidance" aria-label="Cluster review guidance">
+    <strong>Clusters are not people.</strong>
+    <span>Assign only selected faces. Use “Not same as anchor” for clear false merges; that feedback is durable discovery evidence and queues a replacement cluster run.</span>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="notice success" role="status">@Message</div>
+}
+
+@if (SelectedGroup is ProvisionalClusterReviewGroupResponse selectedGroup)
+{
+    <section class="cluster-member-workspace" aria-labelledby="cluster-member-heading">
+        <div class="cluster-member-header">
+            <div>
+                <button class="link-button" @onclick="CloseGroup">← Back to groups</button>
+                <p class="eyebrow">Provisional group</p>
+                <h2 id="cluster-member-heading">@selectedGroup.DerivedClusterKey</h2>
+                <p>@selectedGroup.MemberCount members · @selectedGroup.CoreCount core · @selectedGroup.BorderCount border · @CoreShareLabel(selectedGroup.CoreShare) core support</p>
+            </div>
+            <div class="cluster-selection-summary">
+                <strong>@SelectedFaceIds.Count selected</strong>
+                <button class="button secondary" disabled="@Busy" @onclick="SelectCoreMembers">Select core</button>
+                <button class="button secondary" disabled="@(Busy || SelectedFaceIds.Count == 0)" @onclick="ClearSelection">Clear</button>
+            </div>
+        </div>
+
+        <div class="cluster-actions-panel">
+            <div class="cluster-assign-actions">
+                <label>
+                    <span class="field-label">Assign selected to</span>
+                    <select @bind="BulkPersonId" disabled="@Busy">
+                        <option value="">Choose a person…</option>
+                        @foreach (ReviewPersonResponse person in People)
+                        {
+                            <option value="@person.Id">@PersonLabel(person)</option>
+                        }
+                    </select>
+                </label>
+                <button class="button primary"
+                        disabled="@(Busy || SelectedFaceIds.Count == 0 || string.IsNullOrWhiteSpace(BulkPersonId))"
+                        @onclick="AssignSelectedAsync">
+                    Assign selected
+                </button>
+            </div>
+
+            <div class="cluster-create-person">
+                <label>
+                    <span class="field-label">New person</span>
+                    <input @bind="NewPersonName" placeholder="Display name" disabled="@Busy" />
+                </label>
+                <button class="button secondary"
+                        disabled="@(Busy || string.IsNullOrWhiteSpace(NewPersonName))"
+                        @onclick="CreatePersonAsync">
+                    Create person
+                </button>
+            </div>
+
+            <div class="cluster-not-same-actions">
+                <label>
+                    <span class="field-label">Anchor face</span>
+                    <select @bind="AnchorFaceId" disabled="@Busy">
+                        @foreach (ProvisionalClusterReviewMemberResponse member in Members)
+                        {
+                            <option value="@member.FaceId">@ShortFace(member.FaceId) · @member.Role</option>
+                        }
+                    </select>
+                </label>
+                <button class="button danger"
+                        disabled="@(Busy || NotSameSelectionCount == 0 || string.IsNullOrWhiteSpace(AnchorFaceId))"
+                        @onclick="RecordNotSameAsync">
+                    Not same as anchor (@NotSameSelectionCount)
+                </button>
+                <p>Select the faces that clearly do not belong with the anchor. The selected faces are not rejected or assigned; only a durable discovery constraint is recorded.</p>
+            </div>
+        </div>
+
+        @if (Members.Count == 0 && Busy)
+        {
+            <div class="empty-state"><div class="spinner" aria-hidden="true"></div><p>Loading cluster members…</p></div>
+        }
+        else
+        {
+            <div class="cluster-member-grid">
+                @foreach (ProvisionalClusterReviewMemberResponse member in Members)
+                {
+                    bool selected = SelectedFaceIds.Contains(member.FaceId);
+                    <article class="cluster-member-card @(selected ? "selected" : "")" @key="member.FaceId">
+                        <label class="cluster-member-select">
+                            <input type="checkbox"
+                                   checked="@selected"
+                                   disabled="@Busy"
+                                   @onchange="args => SetSelected(member.FaceId, args.Value is bool value && value)" />
+                            <span>Select</span>
+                        </label>
+                        <img src="@member.ImageUrl" alt="Cluster member face" loading="lazy" />
+                        <div class="cluster-member-meta">
+                            <span class="member-role @member.Role">@member.Role</span>
+                            @if (string.Equals(member.FaceId, AnchorFaceId, StringComparison.Ordinal))
+                            {
+                                <span class="anchor-badge">Anchor</span>
+                            }
+                        </div>
+                        <a class="button secondary full-width" href="@member.DetailsUrl">Open photo context</a>
+                    </article>
+                }
+            </div>
+
+            @if (selectedGroup.MemberCount > Members.Count)
+            {
+                <p class="cluster-bounded-note">Showing the first @Members.Count of @selectedGroup.MemberCount members. Large groups are intentionally bounded; review this subset and refresh after canonical actions before continuing.</p>
+            }
+        }
+    </section>
+}
+else if (Busy && Groups.Count == 0)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading provisional identity groups…</p>
+    </section>
+}
+else if (Models.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No embedding model is available</h2>
+        <p>Analyse faces with an embedding model before using provisional identity discovery.</p>
+    </section>
+}
+else if (Run is null || string.Equals(Run.Status, "not-run", StringComparison.Ordinal))
+{
+    <section class="empty-state">
+        <h2>No provisional clustering run exists</h2>
+        <p>Run provisional clustering for this exact model revision before using People to identify.</p>
+    </section>
+}
+else if (Groups.Count == 0)
+{
+    <section class="empty-state">
+        <h2>No provisional groups</h2>
+        <p>The current run contains no multi-face candidate groups in this scope.</p>
+    </section>
+}
+else
+{
+    <div class="gallery-summary" role="status">
+        <span>@Total group@(Total == 1 ? "" : "s")</span>
+        <span>@Groups.Count loaded</span>
+    </div>
+
+    <section class="cluster-group-grid" aria-label="Provisional people to identify">
+        @foreach (ProvisionalClusterReviewGroupResponse group in Groups)
+        {
+            <article class="cluster-group-card" @key="group.DerivedClusterKey">
+                <header>
+                    <div>
+                        <p class="eyebrow">Provisional identity</p>
+                        <h2>@group.MemberCount face@(group.MemberCount == 1 ? "" : "s")</h2>
+                    </div>
+                    <span class="provisional-badge">Derived</span>
+                </header>
+
+                <div class="cluster-representatives" aria-label="Representative faces">
+                    @foreach (string imageUrl in group.RepresentativeImageUrls)
+                    {
+                        <img src="@imageUrl" alt="Representative cluster face" loading="lazy" />
+                    }
+                </div>
+
+                <dl class="cluster-group-metrics">
+                    <div><dt>Core</dt><dd>@group.CoreCount</dd></div>
+                    <div><dt>Border</dt><dd>@group.BorderCount</dd></div>
+                    <div><dt>Core support</dt><dd>@CoreShareLabel(group.CoreShare)</dd></div>
+                </dl>
+
+                <button class="button primary full-width" disabled="@Busy" @onclick="() => OpenGroupAsync(group)">
+                    Review members
+                </button>
+            </article>
+        }
+    </section>
+
+    @if (HasMore)
+    {
+        <div class="load-more-row">
+            <button class="button secondary" disabled="@Busy" @onclick="LoadMoreAsync">Load more groups</button>
+        </div>
+    }
+    else
+    {
+        <p class="end-of-queue">End of provisional groups.</p>
+    }
+}
+
+@code {
+    private const int GroupPageSize = 30;
+    private const int MemberLimit = 200;
+    private const string Actor = "web:cluster-review";
+    private const string AssignAction = "assign";
+
+    private IReadOnlyList<ProvisionalClusterModelResponse> Models { get; set; } = [];
+    private IReadOnlyList<ReviewPersonResponse> People { get; set; } = [];
+    private List<ProvisionalClusterReviewGroupResponse> Groups { get; } = [];
+    private List<ProvisionalClusterReviewMemberResponse> Members { get; } = [];
+    private HashSet<string> SelectedFaceIds { get; } = new(StringComparer.Ordinal);
+    private ProvisionalClusterRunResponse? Run { get; set; }
+    private ProvisionalClusterReviewGroupResponse? SelectedGroup { get; set; }
+    private string SelectedModelIndex { get; set; } = "";
+    private bool IncludeUnknown { get; set; }
+    private int Total { get; set; }
+    private bool Busy { get; set; }
+    private string BulkPersonId { get; set; } = "";
+    private string NewPersonName { get; set; } = "";
+    private string AnchorFaceId { get; set; } = "";
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    private ProvisionalClusterModelResponse? SelectedModel =>
+        int.TryParse(SelectedModelIndex, out int index) && index >= 0 && index < Models.Count
+            ? Models[index]
+            : null;
+
+    private bool HasMore => Groups.Count < Total;
+    private int NotSameSelectionCount => SelectedFaceIds.Count(faceId => !string.Equals(faceId, AnchorFaceId, StringComparison.Ordinal));
+
+    protected override async Task OnInitializedAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            Models = await Http.GetFromJsonAsync<ProvisionalClusterModelResponse[]>(
+                "api/review/provisional-clusters/models") ?? [];
+            People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+            SelectedModelIndex = Models.Count > 0 ? "0" : "";
+            if (SelectedModel is not null)
+            {
+                await LoadScopeAsync(resetGroups: true);
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ScopeChangedAsync()
+    {
+        SelectedGroup = null;
+        Members.Clear();
+        ClearSelection();
+        await RefreshAsync();
+    }
+
+    private async Task RefreshAsync()
+    {
+        if (SelectedModel is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            await LoadScopeAsync(resetGroups: true);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task LoadScopeAsync(bool resetGroups)
+    {
+        ProvisionalClusterModelResponse model = SelectedModel
+            ?? throw new InvalidOperationException("Choose an embedding model revision.");
+        string scope = ScopeQuery(model);
+        Run = await Http.GetFromJsonAsync<ProvisionalClusterRunResponse>(
+            $"api/review/provisional-clusters?{scope}");
+        await LoadGroupsAsync(resetGroups);
+    }
+
+    private async Task LoadGroupsAsync(bool reset)
+    {
+        ProvisionalClusterModelResponse model = SelectedModel
+            ?? throw new InvalidOperationException("Choose an embedding model revision.");
+        if (reset)
+        {
+            Groups.Clear();
+        }
+
+        int offset = reset ? 0 : Groups.Count;
+        ProvisionalClusterReviewGroupPageResponse page =
+            await Http.GetFromJsonAsync<ProvisionalClusterReviewGroupPageResponse>(
+                $"api/review/provisional-clusters/review-groups?{ScopeQuery(model)}&offset={offset}&limit={GroupPageSize}")
+            ?? new ProvisionalClusterReviewGroupPageResponse([], offset, GroupPageSize, 0);
+        if (reset)
+        {
+            Groups.Clear();
+        }
+        Groups.AddRange(page.Items);
+        Total = page.Total;
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            await LoadGroupsAsync(reset: false);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task OpenGroupAsync(ProvisionalClusterReviewGroupResponse group)
+    {
+        ProvisionalClusterModelResponse model = SelectedModel
+            ?? throw new InvalidOperationException("Choose an embedding model revision.");
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            SelectedGroup = group;
+            Members.Clear();
+            ClearSelection();
+            string key = Uri.EscapeDataString(group.DerivedClusterKey);
+            ProvisionalClusterReviewMemberResponse[] members =
+                await Http.GetFromJsonAsync<ProvisionalClusterReviewMemberResponse[]>(
+                    $"api/review/provisional-clusters/review-groups/{key}/members?{ScopeQuery(model)}&limit={MemberLimit}") ?? [];
+            Members.AddRange(members);
+            AnchorFaceId = Members.FirstOrDefault(member => string.Equals(member.Role, "core", StringComparison.Ordinal))?.FaceId
+                ?? Members.FirstOrDefault()?.FaceId
+                ?? "";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void CloseGroup()
+    {
+        SelectedGroup = null;
+        Members.Clear();
+        ClearSelection();
+        AnchorFaceId = "";
+        Error = null;
+    }
+
+    private void SetSelected(string faceId, bool selected)
+    {
+        if (selected)
+        {
+            SelectedFaceIds.Add(faceId);
+        }
+        else
+        {
+            SelectedFaceIds.Remove(faceId);
+        }
+        Message = null;
+    }
+
+    private void SelectCoreMembers()
+    {
+        SelectedFaceIds.Clear();
+        foreach (ProvisionalClusterReviewMemberResponse member in Members.Where(member =>
+                     string.Equals(member.Role, "core", StringComparison.Ordinal)))
+        {
+            SelectedFaceIds.Add(member.FaceId);
+        }
+        Message = null;
+    }
+
+    private void ClearSelection()
+    {
+        SelectedFaceIds.Clear();
+        Message = null;
+    }
+
+    private async Task AssignSelectedAsync()
+    {
+        if (SelectedFaceIds.Count == 0 || string.IsNullOrWhiteSpace(BulkPersonId))
+        {
+            return;
+        }
+
+        string[] faceIds = SelectedFaceIds.ToArray();
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage previewResponse = await Http.PostAsJsonAsync(
+                "api/review/bulk/preview",
+                new BulkReviewPreviewRequest(faceIds, AssignAction, BulkPersonId));
+            await RequireSuccessAsync(previewResponse);
+            BulkReviewPreviewResponse preview = await previewResponse.Content.ReadFromJsonAsync<BulkReviewPreviewResponse>()
+                ?? throw new InvalidOperationException("The bulk preview response was empty.");
+            if (preview.SkippedCount != 0 || preview.AffectedCount != faceIds.Length)
+            {
+                throw new InvalidOperationException(
+                    "One or more selected faces changed review state. Refresh this group before assigning.");
+            }
+
+            using HttpResponseMessage commitResponse = await Http.PostAsJsonAsync(
+                "api/review/bulk/commit",
+                new BulkReviewCommitRequest(
+                    faceIds,
+                    AssignAction,
+                    BulkPersonId,
+                    preview.AffectedCount,
+                    preview.PreviewToken,
+                    Confirm: true,
+                    Actor,
+                    "Assigned from provisional cluster review."));
+            await RequireSuccessAsync(commitResponse);
+            BulkReviewCommitResponse committed = await commitResponse.Content.ReadFromJsonAsync<BulkReviewCommitResponse>()
+                ?? throw new InvalidOperationException("The bulk commit response was empty.");
+
+            Members.RemoveAll(member => SelectedFaceIds.Contains(member.FaceId));
+            ClearSelection();
+            Message = $"Assigned {committed.AffectedCount} face{(committed.AffectedCount == 1 ? "" : "s")} to {committed.Person?.DisplayName}. Unselected members remain unreviewed.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task CreatePersonAsync()
+    {
+        if (string.IsNullOrWhiteSpace(NewPersonName))
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        Message = null;
+        string displayName = NewPersonName.Trim();
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/review/people",
+                new CreatePersonRequest(displayName));
+            await RequireSuccessAsync(response);
+            ReviewPersonResponse created = await response.Content.ReadFromJsonAsync<ReviewPersonResponse>()
+                ?? throw new InvalidOperationException("The person creation response was empty.");
+            People = await Http.GetFromJsonAsync<ReviewPersonResponse[]>("api/review/people") ?? [];
+            BulkPersonId = created.Id;
+            NewPersonName = "";
+            Message = $"Created {created.DisplayName}; it is selected for assignment.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RecordNotSameAsync()
+    {
+        if (SelectedGroup is null || SelectedModel is not ProvisionalClusterModelResponse model || string.IsNullOrWhiteSpace(AnchorFaceId))
+        {
+            return;
+        }
+
+        string[] otherFaceIds = SelectedFaceIds
+            .Where(faceId => !string.Equals(faceId, AnchorFaceId, StringComparison.Ordinal))
+            .ToArray();
+        if (otherFaceIds.Length == 0)
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            string key = Uri.EscapeDataString(SelectedGroup.DerivedClusterKey);
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/review/provisional-clusters/review-groups/{key}/not-same?{ScopeQuery(model)}",
+                new ProvisionalClusterNotSameRequest(AnchorFaceId, otherFaceIds, Actor));
+            await RequireSuccessAsync(response);
+            ProvisionalClusterNotSameResponse result = await response.Content.ReadFromJsonAsync<ProvisionalClusterNotSameResponse>()
+                ?? throw new InvalidOperationException("The not-same response was empty.");
+
+            SelectedGroup = null;
+            Members.Clear();
+            ClearSelection();
+            AnchorFaceId = "";
+            await LoadScopeAsync(resetGroups: true);
+            Message = result.Message;
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private string ScopeQuery(ProvisionalClusterModelResponse model) =>
+        $"modelId={Uri.EscapeDataString(model.ModelId)}" +
+        $"&modelHash={Uri.EscapeDataString(model.ModelHash)}" +
+        $"&includeUnknown={IncludeUnknown.ToString().ToLowerInvariant()}";
+
+    private static string ModelLabel(ProvisionalClusterModelResponse model) =>
+        $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+
+    private static string HashPrefix(string hash) =>
+        string.IsNullOrEmpty(hash) ? "—" : hash[..Math.Min(12, hash.Length)];
+
+    private static string PersonLabel(ReviewPersonResponse person) =>
+        person.IsFavorite ? $"★ {person.DisplayName}" : person.DisplayName;
+
+    private static string CoreShareLabel(double value) => $"{value:P0}";
+
+    private static string ShortFace(string faceId) => faceId[..Math.Min(8, faceId.Length)];
+
+    private static string RunStatusLabel(ProvisionalClusterRunResponse run)
+    {
+        if (run.IsCurrent)
+        {
+            return "Current";
+        }
+        if (run.IsActive)
+        {
+            return run.Status == "pending" ? "Queued" : "Refreshing";
+        }
+        return run.Status;
+    }
+
+    private static async Task RequireSuccessAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        string detail = await response.Content.ReadAsStringAsync();
+        throw new InvalidOperationException(
+            string.IsNullOrWhiteSpace(detail)
+                ? $"The review action failed with status {(int)response.StatusCode}."
+                : detail);
+    }
+}

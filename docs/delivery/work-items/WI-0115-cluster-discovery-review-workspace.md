@@ -32,6 +32,14 @@ Turn provisional face clusters into a practical operator workflow that represent
 - Treating cluster IDs as canonical people.
 - Changing known-person suggestion scoring.
 
+## Implementation notes
+
+The implementation reuses the existing audited bulk-review preview/commit path for canonical Person assignment. Provisional cluster membership never writes identity state directly, and unselected members remain unreviewed.
+
+Explicit `not same` feedback is stored as durable canonicalized face-to-face discovery constraints. A feedback action validates that the anchor and selected exceptions still belong to the same current derived cluster, stores the constraints without changing face review state, and queues a replacement run for the same exact model/policy scope. The clustering worker applies those constraints after the selected DBSCAN density result by deterministically partitioning any conflicting derived component; undersized partitions fall back to derived Noise rather than weakening the selected clustering policy.
+
+The review workspace is PostgreSQL-only with the same provider boundary as production provisional clustering. Group cards are ordered primarily by size and then by Core share, expose representative faces and explicit derived/provisional labelling, and member loading is bounded. Source-photo context remains available through the existing face-details route.
+
 ## Acceptance criteria
 
 - [ ] The operator can browse provisional candidate identities as cluster cards rather than only individual face cards.

@@ -16,6 +16,9 @@ public static class ProvisionalFaceClusterEndpoints
         group.MapGet("", GetAsync);
         group.MapPost("", StartAsync);
         group.MapGet("/groups", ListGroupsAsync);
+        group.MapGet("/review-groups", ListReviewGroupsAsync);
+        group.MapGet("/review-groups/{derivedClusterKey}/members", ListReviewGroupMembersAsync);
+        group.MapPost("/review-groups/{derivedClusterKey}/not-same", RecordNotSameAsync);
         return endpoints;
     }
 
@@ -180,6 +183,238 @@ public static class ProvisionalFaceClusterEndpoints
         }
     }
 
+    private static async Task<IResult> ListReviewGroupsAsync(
+        IServiceProvider services,
+        string? modelId,
+        string? modelHash,
+        bool includeUnknown = false,
+        int offset = 0,
+        int limit = 30,
+        CancellationToken cancellationToken = default)
+    {
+        IProvisionalFaceClusterReviewRepository? repository = ResolveReviewRepository(services);
+        if (repository is null)
+        {
+            return PostgreSqlRequired();
+        }
+
+        if (!TryModelRevision(modelId, modelHash, out ModelId parsedModelId, out Sha256Digest parsedModelHash))
+        {
+            return BadRequest("An exact embedding model revision is required.");
+        }
+
+        try
+        {
+            ProvisionalFaceClusterReviewGroupPage page = await repository.ListCurrentGroupsAsync(
+                parsedModelId,
+                parsedModelHash,
+                ProvisionalFaceClusterPolicies.InitialDbscan.Version,
+                includeUnknown,
+                offset,
+                limit,
+                cancellationToken);
+            return Results.Ok(new
+            {
+                Items = page.Items.Select(group => new
+                {
+                    group.RunId,
+                    group.DerivedClusterKey,
+                    group.MemberCount,
+                    group.CoreCount,
+                    group.BorderCount,
+                    group.CoreShare,
+                    Status = "provisional",
+                    RepresentativeFaceIds = group.RepresentativeFaceIds.Select(face => face.ToString()).ToArray(),
+                    RepresentativeImageUrls = group.RepresentativeFaceIds
+                        .Select(face => $"/api/review/faces/{face}/image")
+                        .ToArray(),
+                }).ToArray(),
+                page.Offset,
+                page.Limit,
+                page.Total,
+            });
+        }
+        catch (ArgumentOutOfRangeException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+    }
+
+    private static async Task<IResult> ListReviewGroupMembersAsync(
+        string derivedClusterKey,
+        IServiceProvider services,
+        string? modelId,
+        string? modelHash,
+        bool includeUnknown = false,
+        int offset = 0,
+        int limit = 200,
+        CancellationToken cancellationToken = default)
+    {
+        IProvisionalFaceClusterReviewRepository? repository = ResolveReviewRepository(services);
+        if (repository is null)
+        {
+            return PostgreSqlRequired();
+        }
+
+        if (!TryModelRevision(modelId, modelHash, out ModelId parsedModelId, out Sha256Digest parsedModelHash))
+        {
+            return BadRequest("An exact embedding model revision is required.");
+        }
+
+        try
+        {
+            IReadOnlyList<ProvisionalFaceClusterReviewMember> members = await repository.ListCurrentGroupMembersAsync(
+                parsedModelId,
+                parsedModelHash,
+                ProvisionalFaceClusterPolicies.InitialDbscan.Version,
+                includeUnknown,
+                derivedClusterKey,
+                offset,
+                limit,
+                cancellationToken);
+            return Results.Ok(members.Select(member => new
+            {
+                member.RunId,
+                member.DerivedClusterKey,
+                FaceId = member.FaceOccurrenceId.ToString(),
+                Role = member.Role.ToString().ToLowerInvariant(),
+                ImageUrl = $"/api/review/faces/{member.FaceOccurrenceId}/image",
+                DetailsUrl = $"/faces/{member.FaceOccurrenceId}",
+            }));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+    }
+
+    private static async Task<IResult> RecordNotSameAsync(
+        string derivedClusterKey,
+        RecordProvisionalFaceNotSameRequest request,
+        IServiceProvider services,
+        TimeProvider timeProvider,
+        string? modelId,
+        string? modelHash,
+        bool includeUnknown = false,
+        CancellationToken cancellationToken = default)
+    {
+        IProvisionalFaceClusterReviewRepository? reviewRepository = ResolveReviewRepository(services);
+        IProvisionalFaceClusterRepository? clusterRepository = ResolveRepository(services);
+        if (reviewRepository is null || clusterRepository is null)
+        {
+            return PostgreSqlRequired();
+        }
+
+        if (!TryModelRevision(modelId, modelHash, out ModelId parsedModelId, out Sha256Digest parsedModelHash))
+        {
+            return BadRequest("An exact embedding model revision is required.");
+        }
+        if (request is null || string.IsNullOrWhiteSpace(request.Actor))
+        {
+            return BadRequest("A review actor is required.");
+        }
+        if (!Guid.TryParse(request.AnchorFaceId, out Guid anchorGuid))
+        {
+            return BadRequest("A valid anchor face is required.");
+        }
+
+        List<FaceOccurrenceId> others = [];
+        foreach (string faceId in request.OtherFaceIds ?? [])
+        {
+            if (!Guid.TryParse(faceId, out Guid parsed))
+            {
+                return BadRequest($"Face '{faceId}' is not a valid face occurrence identifier.");
+            }
+            others.Add(FaceOccurrenceId.From(parsed));
+        }
+
+        try
+        {
+            int recorded = await reviewRepository.RecordNotSameAsync(
+                parsedModelId,
+                parsedModelHash,
+                ProvisionalFaceClusterPolicies.InitialDbscan.Version,
+                includeUnknown,
+                derivedClusterKey,
+                FaceOccurrenceId.From(anchorGuid),
+                others,
+                request.Actor,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
+
+            bool refreshQueued = await QueueConstraintRefreshAsync(
+                clusterRepository,
+                parsedModelId,
+                parsedModelHash,
+                includeUnknown,
+                request.Actor,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
+
+            return Results.Accepted(value: new
+            {
+                RecordedCount = recorded,
+                RefreshQueued = refreshQueued,
+                Message = refreshQueued
+                    ? "Not-same evidence recorded and a replacement provisional-cluster run was queued."
+                    : "Not-same evidence recorded; an equivalent replacement run is already active.",
+            });
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Results.Conflict(new { error = exception.Message });
+        }
+    }
+
+    private static async Task<bool> QueueConstraintRefreshAsync(
+        IProvisionalFaceClusterRepository repository,
+        ModelId modelId,
+        Sha256Digest modelHash,
+        bool includeUnknown,
+        string actor,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        ProvisionalFaceClusterPolicy policy = ProvisionalFaceClusterPolicies.InitialDbscan;
+        ProvisionalFaceClusterRun? latest = await repository.GetLatestAsync(
+            modelId,
+            modelHash,
+            policy.Version,
+            includeUnknown,
+            cancellationToken);
+
+        if (latest is { IsActive: true })
+        {
+            await repository.MarkFailedAsync(
+                latest.Id,
+                "Superseded by explicit not-same discovery feedback; replacement clustering is required.",
+                now,
+                cancellationToken);
+        }
+
+        try
+        {
+            _ = await repository.StartAsync(
+                modelId,
+                modelHash,
+                policy,
+                includeUnknown,
+                actor,
+                now,
+                cancellationToken);
+            return true;
+        }
+        catch (InvalidOperationException exception) when (
+            exception.Message.Contains("active", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+    }
+
     private static IProvisionalFaceClusterRepository? ResolveRepository(IServiceProvider services)
     {
         IConfiguration? configuration = services.GetService<IConfiguration>();
@@ -198,6 +433,26 @@ public static class ProvisionalFaceClusterEndpoints
 
         PostgresCatalogueDatabase? database = services.GetService<PostgresCatalogueDatabase>();
         return database is null ? null : new PostgresProvisionalFaceClusterRepository(database);
+    }
+
+    private static IProvisionalFaceClusterReviewRepository? ResolveReviewRepository(IServiceProvider services)
+    {
+        IConfiguration? configuration = services.GetService<IConfiguration>();
+        if (configuration is null ||
+            CataloguePersistenceComposition.ResolveProvider(configuration) != CatalogueProviderKind.Postgres)
+        {
+            return null;
+        }
+
+        IProvisionalFaceClusterReviewRepository? registered =
+            services.GetService<IProvisionalFaceClusterReviewRepository>();
+        if (registered is not null)
+        {
+            return registered;
+        }
+
+        PostgresCatalogueDatabase? database = services.GetService<PostgresCatalogueDatabase>();
+        return database is null ? null : new PostgresProvisionalFaceClusterReviewRepository(database);
     }
 
     private static object ToResponse(ProvisionalFaceClusterRun run, bool current) => new
@@ -257,4 +512,9 @@ public static class ProvisionalFaceClusterEndpoints
     private static IResult BadRequest(string message) => Results.BadRequest(new { error = message });
 
     public sealed record StartProvisionalFaceClusterRequest(string Actor, bool IncludeUnknown = false);
+
+    public sealed record RecordProvisionalFaceNotSameRequest(
+        string AnchorFaceId,
+        IReadOnlyList<string> OtherFaceIds,
+        string Actor);
 }

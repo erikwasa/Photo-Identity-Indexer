@@ -1,0 +1,242 @@
+.cluster-scope-row,
+.cluster-member-header,
+.cluster-selection-summary,
+.cluster-assign-actions,
+.cluster-create-person,
+.cluster-not-same-actions,
+.cluster-run-summary > div,
+.cluster-run-metrics {
+    display: flex;
+    gap: 0.75rem;
+    align-items: end;
+    flex-wrap: wrap;
+}
+
+.cluster-scope-row > div,
+.cluster-assign-actions label,
+.cluster-create-person label,
+.cluster-not-same-actions label {
+    min-width: min(100%, 18rem);
+    flex: 1 1 16rem;
+}
+
+.cluster-unknown-toggle {
+    display: inline-flex;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.65rem 0;
+}
+
+.cluster-run-summary {
+    margin: 1rem 0;
+    padding: 1rem;
+    border: 1px solid var(--border, #d7d7d7);
+    border-radius: 0.9rem;
+    background: var(--surface, #fff);
+}
+
+.cluster-run-summary > div {
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cluster-run-metrics {
+    justify-content: flex-end;
+    font-size: 0.9rem;
+    opacity: 0.85;
+}
+
+.cluster-status,
+.provisional-badge,
+.member-role,
+.anchor-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    background: color-mix(in srgb, currentColor 9%, transparent);
+}
+
+.cluster-group-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 1rem;
+}
+
+.cluster-group-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1rem;
+    border: 1px solid var(--border, #d7d7d7);
+    border-radius: 1rem;
+    background: var(--surface, #fff);
+}
+
+.cluster-group-card header,
+.cluster-member-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.cluster-group-card h2 {
+    margin: 0;
+}
+
+.cluster-representatives {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.35rem;
+    aspect-ratio: 3 / 1;
+}
+
+.cluster-representatives img,
+.cluster-member-card > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 0.65rem;
+    background: #ececec;
+}
+
+.cluster-group-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin: 0;
+}
+
+.cluster-group-metrics > div {
+    padding: 0.55rem;
+    border-radius: 0.65rem;
+    background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.cluster-group-metrics dt {
+    font-size: 0.75rem;
+    opacity: 0.75;
+}
+
+.cluster-group-metrics dd {
+    margin: 0.15rem 0 0;
+    font-weight: 700;
+}
+
+.cluster-member-workspace {
+    margin-top: 1rem;
+}
+
+.cluster-member-header {
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.cluster-selection-summary {
+    align-items: center;
+}
+
+.link-button {
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.cluster-actions-panel {
+    display: grid;
+    gap: 0.9rem;
+    margin: 1rem 0;
+    padding: 1rem;
+    border: 1px solid var(--border, #d7d7d7);
+    border-radius: 0.9rem;
+    background: var(--surface, #fff);
+}
+
+.cluster-assign-actions,
+.cluster-create-person,
+.cluster-not-same-actions {
+    align-items: end;
+}
+
+.cluster-not-same-actions p {
+    flex: 1 1 100%;
+    margin: 0;
+    font-size: 0.9rem;
+    opacity: 0.82;
+}
+
+.cluster-member-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+    gap: 0.8rem;
+}
+
+.cluster-member-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.65rem;
+    border: 2px solid transparent;
+    border-radius: 0.9rem;
+    background: var(--surface, #fff);
+    box-shadow: 0 0 0 1px var(--border, #d7d7d7);
+}
+
+.cluster-member-card.selected {
+    border-color: currentColor;
+}
+
+.cluster-member-card > img {
+    aspect-ratio: 1;
+}
+
+.cluster-member-select {
+    display: inline-flex;
+    gap: 0.45rem;
+    align-items: center;
+    min-height: 2.4rem;
+    font-weight: 600;
+}
+
+.cluster-bounded-note {
+    margin-top: 1rem;
+    padding: 0.8rem;
+    border-radius: 0.7rem;
+    background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+@media (max-width: 700px) {
+    .cluster-scope-row,
+    .cluster-member-header,
+    .cluster-selection-summary,
+    .cluster-assign-actions,
+    .cluster-create-person,
+    .cluster-not-same-actions {
+        align-items: stretch;
+    }
+
+    .cluster-scope-row > *,
+    .cluster-selection-summary > *,
+    .cluster-assign-actions > *,
+    .cluster-create-person > *,
+    .cluster-not-same-actions > * {
+        width: 100%;
+    }
+
+    .cluster-member-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cluster-group-grid {
+        grid-template-columns: 1fr;
+    }
+}

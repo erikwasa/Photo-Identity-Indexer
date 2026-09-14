@@ -17,17 +17,20 @@ public sealed class ProvisionalFaceClusteringWorker
     private readonly ProvisionalFaceDbscanClusterer _clusterer;
     private readonly TimeProvider _timeProvider;
     private readonly ILogger _logger;
+    private readonly IProvisionalFaceClusterConstraintSource? _constraintSource;
 
     public ProvisionalFaceClusteringWorker(
         IProvisionalFaceClusterRepository repository,
         ProvisionalFaceDbscanClusterer clusterer,
         TimeProvider timeProvider,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        IProvisionalFaceClusterConstraintSource? constraintSource = null)
     {
         _repository = repository;
         _clusterer = clusterer;
         _timeProvider = timeProvider;
         _logger = logger ?? NullLogger.Instance;
+        _constraintSource = constraintSource;
     }
 
     public async Task<bool> AdvanceOnceAsync(CancellationToken cancellationToken = default)
@@ -57,9 +60,16 @@ public sealed class ProvisionalFaceClusteringWorker
                 return true;
             }
 
+            IReadOnlyList<ProvisionalFaceNotSameConstraint> notSameConstraints = _constraintSource is null
+                ? []
+                : await _constraintSource.ListNotSameConstraintsAsync(
+                    faces.Select(face => face.FaceOccurrenceId).ToArray(),
+                    cancellationToken: cancellationToken);
+
             ProvisionalFaceClusterComputation computation = await _clusterer.ComputeAsync(
                 faces,
                 run.Policy,
+                notSameConstraints,
                 (processed, token) => _repository.ReportProgressAsync(
                     run.Id,
                     processed,

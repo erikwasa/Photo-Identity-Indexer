@@ -20,6 +20,7 @@ public static class ProvisionalFaceClusterRunStatuses
 public static class ProvisionalFaceClusterPolicies
 {
     public const int MaximumFacesPerRun = 20000;
+    public const int MaximumNotSameConstraintsPerRun = 100000;
 
     public static ProvisionalFaceClusterPolicy InitialDbscan { get; } = new ProvisionalFaceClusterPolicy(
         Version: "m25-dbscan-v1",
