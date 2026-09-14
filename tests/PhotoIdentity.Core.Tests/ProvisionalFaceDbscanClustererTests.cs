@@ -65,6 +65,40 @@ public sealed class ProvisionalFaceDbscanClustererTests
     }
 
     [Fact]
+    public async Task Durable_not_same_evidence_partitions_false_merge_without_changing_policy()
+    {
+        ProvisionalFaceClusterInputFace[] faces = Enumerable.Range(1, 6)
+            .Select(index => Face(
+                [1f, 0f],
+                Guid.Parse($"00000000-0000-0000-0000-{index:D12}")))
+            .ToArray();
+        ProvisionalFaceNotSameConstraint[] constraints =
+        [
+            ProvisionalFaceNotSameConstraint.Create(faces[0].FaceOccurrenceId, faces[3].FaceOccurrenceId),
+            ProvisionalFaceNotSameConstraint.Create(faces[0].FaceOccurrenceId, faces[4].FaceOccurrenceId),
+            ProvisionalFaceNotSameConstraint.Create(faces[0].FaceOccurrenceId, faces[5].FaceOccurrenceId),
+        ];
+        ProvisionalFaceDbscanClusterer clusterer = new();
+
+        ProvisionalFaceClusterComputation result = await clusterer.ComputeAsync(
+            faces,
+            ProvisionalFaceClusterPolicies.InitialDbscan,
+            constraints);
+
+        Assert.Equal(2, result.ClusterCount);
+        Assert.Equal(0, result.NoiseCount);
+        string firstKey = Assert.Single(
+            result.Memberships,
+            member => member.FaceOccurrenceId == faces[0].FaceOccurrenceId).DerivedClusterKey!;
+        Assert.All(
+            result.Memberships.Where(member =>
+                member.FaceOccurrenceId == faces[3].FaceOccurrenceId ||
+                member.FaceOccurrenceId == faces[4].FaceOccurrenceId ||
+                member.FaceOccurrenceId == faces[5].FaceOccurrenceId),
+            member => Assert.NotEqual(firstKey, member.DerivedClusterKey));
+    }
+
+    [Fact]
     public async Task Neighbour_edge_budget_fails_closed_instead_of_weakening_policy()
     {
         ProvisionalFaceDbscanClusterer clusterer = new(maximumUndirectedNeighborEdges: 1);
@@ -80,9 +114,9 @@ public sealed class ProvisionalFaceDbscanClustererTests
         Assert.Contains("bounded neighbour budget", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static ProvisionalFaceClusterInputFace Face(float[] embedding) =>
+    private static ProvisionalFaceClusterInputFace Face(float[] embedding, Guid? faceId = null) =>
         new(
-            FaceOccurrenceId.New(),
+            faceId is Guid id ? FaceOccurrenceId.From(id) : FaceOccurrenceId.New(),
             AssetRevisionId.New(),
             "unreviewed",
             new EmbeddingVector(embedding));
