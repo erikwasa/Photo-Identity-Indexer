@@ -4,6 +4,8 @@ milestone: M26
 status: ready
 owner: unassigned
 document: ../work-items/WI-0118-moment-clustering.md
-blockers: []
+blockers:
+- WI-0050
+- WI-0101
 blocker_notes: []
 evidence: []
