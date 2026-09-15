@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from statistics import median
@@ -190,10 +190,20 @@ def evaluate_scenario(
     unknown_high = unknown_medium_or_higher = 0
 
     for target, label in enumerate(truth):
+        true_reference_count = None
         if label is None:
             unknown_total += 1
         else:
             known_total += 1
+            true_reference_count = len(reference_indices(
+                target,
+                labelled_by_person[label],
+                content_groups,
+                duplicate_resistant,
+            ))
+            if true_reference_count == 0:
+                known_no_reference += 1
+                continue
 
         ranked = rank_target(
             target,
@@ -206,8 +216,6 @@ def evaluate_scenario(
             labelled_by_person,
         )
         if not ranked:
-            if label is not None:
-                known_no_reference += 1
             continue
 
         top_person, top_score = ranked[0]
@@ -248,15 +256,6 @@ def evaluate_scenario(
                 medium_or_higher_correct += 1
             if label is None:
                 unknown_medium_or_higher += 1
-
-        true_reference_count = None
-        if label is not None:
-            true_reference_count = len(reference_indices(
-                target,
-                labelled_by_person[label],
-                content_groups,
-                duplicate_resistant,
-            ))
 
         records.append({
             "target": target,
@@ -304,6 +303,7 @@ def summarize_records(records: list[dict[str, Any]], indices: list[int]) -> dict
     if not chosen:
         return {"count": 0, "top1Accuracy": None, "highCount": 0, "highPrecision": None}
     high = [record for record in chosen if record["confidenceGroup"] == "high"]
+    margins = [record["margin"] for record in chosen if record["margin"] is not None]
     return {
         "count": len(chosen),
         "top1Accuracy": sum(1 for record in chosen if record["correct"]) / len(chosen),
@@ -312,9 +312,7 @@ def summarize_records(records: list[dict[str, Any]], indices: list[int]) -> dict
             sum(1 for record in high if record["correct"]) / len(high) if high else None
         ),
         "medianTopScore": median(record["topScore"] for record in chosen),
-        "medianMargin": median(
-            record["margin"] for record in chosen if record["margin"] is not None
-        ) if any(record["margin"] is not None for record in chosen) else None,
+        "medianMargin": median(margins) if margins else None,
     }
 
 
@@ -432,9 +430,7 @@ def segmentation(
             continue
         count = (record_by_target.get(target) or {}).get("trueReferenceCount")
         if count is None:
-            reference_buckets["no-ranking"].append(target)
-        elif count <= 0:
-            reference_buckets["0"].append(target)
+            reference_buckets["no-usable-holdout-reference"].append(target)
         elif count == 1:
             reference_buckets["1"].append(target)
         elif count <= 4:
@@ -472,7 +468,10 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     payload, faces, embeddings = load_sample(args.sample)
     policy = policy_from(payload)
     truth = [face.get("groundTruthLabel") for face in faces]
-    content_groups = [str(face.get("contentGroup") or face.get("photoGroup") or f"row-{i}") for i, face in enumerate(faces)]
+    content_groups = [
+        str(face.get("contentGroup") or face.get("photoGroup") or f"row-{index}")
+        for index, face in enumerate(faces)
+    ]
 
     labelled_by_person: dict[str, list[int]] = defaultdict(list)
     for index, label in enumerate(truth):
@@ -546,6 +545,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         "notes": [
             "Production-equivalent max-exemplar reproduces the current best-exemplar-per-person ranking rule with only the target face removed.",
             "Duplicate-resistant scenarios also remove every reference from the target's exact-content group so duplicate copies cannot make holdout accuracy look better than it is.",
+            "Known targets without another usable reference for their true Person are reported separately and excluded from top-k accuracy denominators.",
             "Unknown reviewed faces have no person ground truth; High/Medium emission rates on them are conservative false-positive-risk indicators, not proof that every emitted identity is wrong.",
             "Detector confidence and normalized face area are queue-composition proxies, not direct measures of embedding quality.",
             "Review chronology quartiles help distinguish an actual matcher regression from later review queues containing harder faces.",
@@ -573,13 +573,15 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Ranking scenarios",
         "",
-        "| Scenario | Top-1 | Top-3 | Top-5 | High precision | High coverage | Unknown High emission |",
-        "|---|---:|---:|---:|---:|---:|---:|",
+        "| Scenario | Evaluable known | No holdout ref | Top-1 | Top-3 | Top-5 | High precision | High coverage | Unknown High emission |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for scenario in report["scenarios"].values():
         lines.append(
-            "| {name} | {top1} | {top3} | {top5} | {highp} | {highc} | {unknown} |".format(
+            "| {name} | {evaluable} | {missing} | {top1} | {top3} | {top5} | {highp} | {highc} | {unknown} |".format(
                 name=scenario["name"],
+                evaluable=scenario["knownEvaluable"],
+                missing=scenario["knownWithoutUsableReference"],
                 top1=pct(scenario["top1Accuracy"]),
                 top3=pct(scenario["top3Accuracy"]),
                 top5=pct(scenario["top5Accuracy"]),
