@@ -101,8 +101,6 @@ def evidence_group(row: dict[str, Any], fallback: str) -> str:
 
 
 def split_name(target: dict[str, Any], index: int) -> str:
-    # Split by exact-content group so an image and its exact copies cannot land in both
-    # policy-selection and holdout-validation partitions.
     key = evidence_group(target, f"target-{index}")
     bucket = hashlib.sha256(key.encode("utf-8")).digest()[0] % 5
     return "selection" if bucket < 3 else "holdout"
@@ -132,8 +130,6 @@ def top_independent_scores(
     references: list[dict[str, Any]],
     limit: int = 4,
 ) -> list[float]:
-    if indices.size == 0:
-        return []
     best_by_group: dict[str, float] = {}
     for reference_index in indices:
         score = float(similarities[int(reference_index)])
@@ -232,32 +228,48 @@ def rank_targets(
     return records
 
 
-def add_cluster_evidence(
+def add_cluster_evidence_for_split(
+    split: str,
     records: list[dict[str, Any]],
-    targets: list[dict[str, Any]],
     target_embeddings: np.ndarray,
     policy: dict[str, Any],
     cluster_eps: float,
     cluster_min_samples: int,
 ) -> dict[str, Any]:
+    split_records = [record for record in records if record["split"] == split]
+    target_indices = [int(record["target"]) for record in split_records]
+    if len(target_indices) < cluster_min_samples:
+        return {
+            "split": split,
+            "clusterCount": 0,
+            "noiseTargetCount": len(target_indices),
+            "strongTargetSpecificEvidenceCount": 0,
+        }
+
+    vectors = target_embeddings[np.asarray(target_indices, dtype=np.int64)]
     clustering = DBSCAN(
         eps=cluster_eps,
         min_samples=cluster_min_samples,
         metric="cosine",
         algorithm="brute",
         n_jobs=-1,
-    ).fit(target_embeddings)
-    cluster_labels = [int(value) for value in clustering.labels_]
-    core = {int(value) for value in clustering.core_sample_indices_}
-    record_by_target = {int(record["target"]): record for record in records}
+    ).fit(vectors)
+
+    record_by_target = {int(record["target"]): record for record in split_records}
+    local_to_target = {local: target for local, target in enumerate(target_indices)}
+    core_targets = {
+        local_to_target[int(local)]
+        for local in clustering.core_sample_indices_
+    }
     members_by_cluster: dict[int, list[int]] = defaultdict(list)
-    for target_index, cluster_id in enumerate(cluster_labels):
-        if cluster_id >= 0 and target_index in record_by_target:
-            members_by_cluster[cluster_id].append(target_index)
+    for local, raw_cluster_id in enumerate(clustering.labels_):
+        cluster_id = int(raw_cluster_id)
+        if cluster_id >= 0:
+            members_by_cluster[cluster_id].append(local_to_target[local])
 
     strong_target_count = 0
     for cluster_id, members in members_by_cluster.items():
-        core_share = sum(1 for member in members if member in core) / len(members)
+        core_share = sum(1 for member in members if member in core_targets) / len(members)
         for target_index in members:
             target_record = record_by_target[target_index]
             target_group = target_record["contentGroup"]
@@ -281,10 +293,7 @@ def add_cluster_evidence(
                 if previous is None or member_record["topScore"] > previous["topScore"]:
                     votes_by_group[group] = member_record
 
-            votes = Counter(
-                str(member_record["topPerson"])
-                for member_record in votes_by_group.values()
-            )
+            votes = Counter(str(item["topPerson"]) for item in votes_by_group.values())
             ordered = sorted(votes, key=lambda person: (-votes[person], person))
             candidate = ordered[0] if ordered else None
             competitor = ordered[1] if len(ordered) > 1 else None
@@ -301,37 +310,75 @@ def add_cluster_evidence(
                 and competitor_count <= DEFAULT_MAX_CLUSTER_COMPETING_COUNT
                 and competitor_share <= DEFAULT_MAX_CLUSTER_COMPETING_SHARE
             )
-            target_record["clusterId"] = cluster_id
-            target_record["clusterCandidate"] = candidate
-            target_record["clusterSupportCount"] = candidate_count
-            target_record["clusterSupportShare"] = candidate_share
-            target_record["clusterCompetingCount"] = competitor_count
-            target_record["clusterCompetingShare"] = competitor_share
-            target_record["clusterCoreShare"] = core_share
-            target_record["strongClusterEvidence"] = strong
+            target_record.update({
+                "clusterId": f"{split}:{cluster_id}",
+                "clusterCandidate": candidate,
+                "clusterSupportCount": candidate_count,
+                "clusterSupportShare": candidate_share,
+                "clusterCompetingCount": competitor_count,
+                "clusterCompetingShare": competitor_share,
+                "clusterCoreShare": core_share,
+                "strongClusterEvidence": strong,
+            })
             if strong:
                 strong_target_count += 1
 
-    for record in records:
-        if "clusterId" not in record:
-            record.update({
-                "clusterId": None,
-                "clusterCandidate": None,
-                "clusterSupportCount": 0,
-                "clusterSupportShare": 0.0,
-                "clusterCompetingCount": 0,
-                "clusterCompetingShare": 0.0,
-                "clusterCoreShare": 0.0,
-                "strongClusterEvidence": False,
-            })
+    clustered_targets = {
+        member
+        for members in members_by_cluster.values()
+        for member in members
+    }
+    for target_index in target_indices:
+        if target_index in clustered_targets:
+            continue
+        record_by_target[target_index].update({
+            "clusterId": None,
+            "clusterCandidate": None,
+            "clusterSupportCount": 0,
+            "clusterSupportShare": 0.0,
+            "clusterCompetingCount": 0,
+            "clusterCompetingShare": 0.0,
+            "clusterCoreShare": 0.0,
+            "strongClusterEvidence": False,
+        })
 
+    return {
+        "split": split,
+        "clusterCount": len(members_by_cluster),
+        "noiseTargetCount": sum(1 for value in clustering.labels_ if int(value) < 0),
+        "strongTargetSpecificEvidenceCount": strong_target_count,
+    }
+
+
+def add_cluster_evidence(
+    records: list[dict[str, Any]],
+    target_embeddings: np.ndarray,
+    policy: dict[str, Any],
+    cluster_eps: float,
+    cluster_min_samples: int,
+) -> dict[str, Any]:
+    per_split = {
+        split: add_cluster_evidence_for_split(
+            split,
+            records,
+            target_embeddings,
+            policy,
+            cluster_eps,
+            cluster_min_samples,
+        )
+        for split in ("selection", "holdout")
+    }
     return {
         "algorithm": "dbscan",
         "eps": cluster_eps,
         "minSamples": cluster_min_samples,
-        "clusterCount": len(members_by_cluster),
-        "noiseTargetCount": sum(1 for value in cluster_labels if value < 0),
-        "strongTargetSpecificEvidenceCount": strong_target_count,
+        "splitIsolation": True,
+        "perSplit": per_split,
+        "clusterCount": sum(item["clusterCount"] for item in per_split.values()),
+        "noiseTargetCount": sum(item["noiseTargetCount"] for item in per_split.values()),
+        "strongTargetSpecificEvidenceCount": sum(
+            item["strongTargetSpecificEvidenceCount"] for item in per_split.values()
+        ),
         "targetEvidenceExcludesTargetAndSameExactContent": True,
         "internalNotSameEvidenceIncludedInPrivateExport": False,
     }
@@ -426,7 +473,7 @@ def metric_counts(records: list[dict[str, Any]], assigned: list[dict[str, Any]])
         "knownPrecision": correct_known / len(known_assigned) if known_assigned else 0.0,
         "knownCoverage": len(known_assigned) / known_targets if known_targets else 0.0,
         "unknownAssignmentRate": unknown_assigned / unknown_targets if unknown_targets else 0.0,
-        "estimatedReviewActionsSaved": total,
+        "grossReviewActionsAvoided": total,
     }
 
 
@@ -502,7 +549,7 @@ def shortlist_rules(
     return [item[4] for item in ranked[:limit]]
 
 
-def segment_name(record: dict[str, Any]) -> list[str]:
+def segment_names(record: dict[str, Any]) -> list[str]:
     names = ["all"]
     confidence = record.get("detectorConfidence")
     area = record.get("faceAreaFraction")
@@ -518,20 +565,18 @@ def segment_name(record: dict[str, Any]) -> list[str]:
 
 def quality_segments(
     records: list[dict[str, Any]],
-    rule: CandidateRule | None,
+    rule: CandidateRule,
     policy: dict[str, Any],
 ) -> dict[str, Any]:
     holdout = [record for record in records if record["split"] == "holdout"]
     buckets: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for record in holdout:
-        for name in segment_name(record):
+        for name in segment_names(record):
             buckets[name].append(record)
     result: dict[str, Any] = {}
     for name, selected in sorted(buckets.items()):
         baseline = [record for record in selected if record["currentHigh"]]
-        additions = [] if rule is None else [
-            record for record in selected if expansion_matches(record, rule, policy)
-        ]
+        additions = [record for record in selected if expansion_matches(record, rule, policy)]
         assigned = {int(record["target"]): record for record in baseline}
         for record in additions:
             assigned[int(record["target"])] = record
@@ -558,7 +603,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- Reference identities: {sample['referenceLabelCount']}",
         f"- Selection / holdout targets: {sample['selectionTargetCount']} / {sample['holdoutTargetCount']}",
         "",
-        "The deterministic split hashes exact-content groups, so an image and its exact copies stay in one partition. All ranking is duplicate-resistant: the target's exact-content group is removed from production references before policy evaluation.",
+        "The deterministic split hashes exact-content groups, so an image and its exact copies stay in one partition. Ranking is duplicate-resistant, and DBSCAN/clustering evidence is constructed independently inside each partition.",
         "",
         "## Current High baseline",
         "",
@@ -591,11 +636,7 @@ def render_markdown(report: dict[str, Any]) -> str:
             f"{pct(metrics['conservativePrecision'])} |"
         )
 
-    lines.extend([
-        "",
-        "## Holdout validation of automatically shortlisted candidates",
-        "",
-    ])
+    lines.extend(["", "## Holdout validation of automatically shortlisted candidates", ""])
     if not report["shortlist"]:
         lines.append("No candidate preserved the selection-split guardrails, so no expansion candidate was promoted to holdout validation.")
     else:
@@ -617,7 +658,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Cluster evidence",
         "",
-        f"- DBSCAN: eps `{cluster['eps']}`, min samples `{cluster['minSamples']}`; clusters **{cluster['clusterCount']}**, noise targets **{cluster['noiseTargetCount']}**.",
+        f"- DBSCAN: eps `{cluster['eps']}`, min samples `{cluster['minSamples']}`; partition-isolated clusters **{cluster['clusterCount']}**, noise targets **{cluster['noiseTargetCount']}**.",
         f"- Targets with target-specific Strong cluster corroboration before requiring agreement with their own rank-1 Person: **{cluster['strongTargetSpecificEvidenceCount']}**.",
         "- Target-specific cluster votes exclude the target itself and every member from the same exact-content group.",
         "- The private export does not contain durable `not same` constraints. Production cluster evidence already fails closed on those constraints, so this evaluator is intentionally more permissive on that dimension rather than crediting unavailable negative evidence.",
@@ -685,7 +726,6 @@ def main() -> int:
         raise ValueError("one or more targets could not be ranked against the reference population")
     cluster = add_cluster_evidence(
         records,
-        targets,
         target_embeddings,
         policy,
         args.cluster_eps,
@@ -767,6 +807,7 @@ def main() -> int:
             "holdoutTargetCount": holdout_count,
             "splitProcedure": "sha256(exact-content-group) mod 5; buckets 0-2 selection, 3-4 holdout",
             "duplicateResistantRanking": True,
+            "clusterEvidenceBuiltSeparatelyPerSplit": True,
         },
         "productionSuggestionPolicy": policy,
         "baseline": baseline,
@@ -786,6 +827,7 @@ def main() -> int:
             "Current High semantics are evaluated with duplicate-resistant references to avoid exact-content leakage during policy selection.",
             "Candidate policies only add Medium-or-better targets beyond current High; they never remove current High assignments in the simulation.",
             "Multi-reference evidence counts independent exact-content reference groups and therefore cannot be inflated by exact source copies.",
+            "Selection and holdout DBSCAN runs are isolated; cluster structure and votes do not cross the policy-selection boundary.",
             "Cluster corroboration is target-specific: votes from the target and its exact-content group are removed before evaluating support.",
             "Private export lacks durable not-same cluster constraints; production already fails closed on them, so the private simulation is more permissive on that dimension.",
             "Holdout metrics are emitted only for candidates selected by predeclared selection-split guardrails.",
