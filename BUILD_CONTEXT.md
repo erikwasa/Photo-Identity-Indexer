@@ -6,30 +6,31 @@ This file is intentionally a short handoff for the next development or verificat
 
 **M25 Face discovery and cluster-assisted identity review is in progress on WI-0117. WI-0110 through WI-0116 are complete.**
 
-WI-0081 accepted the current max-exemplar matcher and current High score+margin policy after private evaluation: duplicate-resistant top-1 was 96.491%, conservative High precision 99.844%, known High coverage 49.709% and reviewed-Unknown High emission 0.121%. Quality problems were concentrated in weak/small faces and sparse identities; centroid and cap-8 reference reduction regressed materially. The corrected exact-content audit found no cross-label near-duplicate contamination signal.
+WI-0081 accepted the current max-exemplar matcher and current High score+margin policy after private evaluation: duplicate-resistant top-1 was 96.491%, conservative High precision 99.844%, known High coverage 49.709% and reviewed-Unknown High emission 0.121%. Centroid and cap-8 reference reduction regressed materially.
 
 WI-0116 accepted Strong cluster-assisted advisory evidence at 41/41 correct evaluable proposals with 0 false-person proposals. Cluster evidence remains derived/non-canonical and production `not same` evidence fails closed.
 
-WI-0117 `Evaluate multi-evidence automatic identity assignment` is now active on `agent/WI-0117-multi-evidence-evaluation`. The first slice is evaluation-only: `tools/cluster-evaluation/evaluate_auto_assignment.py` reuses the WI-0081 private exact-model export, evaluates current High against multi-reference, Strong-cluster and combined candidate expansions, and does not change production thresholds or canonical assignment behavior.
+WI-0117 private evaluation is complete. On 5,747 untouched holdout targets, the selected `cluster-plus-2x-0.50-margin-0.05` candidate added 50 assignments, all 50 correct known, with 0 additional wrong-known and 0 additional reviewed-Unknown assignments. Known coverage increased from 48.195% to 49.406%. Multi-reference-only expansion was unsafe and is explicitly rejected.
 
-Policy selection is split deterministically by exact-content group (60% selection / 40% holdout). Ranking removes same-content references, and DBSCAN/cluster votes are constructed independently inside each partition. Candidate expansion is limited to Medium-or-better targets and is shortlisted only when selection-split false-assignment/Unknown guardrails are preserved.
+The accepted production candidate is `m25-multi-evidence-auto-v1`: retain current High auto-assignment unchanged, and optionally add only Medium-or-better rank-1 candidates with margin >=0.05, at least 2 independent exact-content references to the same Person at cosine >=0.50, and target-specific Strong WI-0116 cluster corroboration from a fresh completed `m25-dbscan-v1` include-Unknown run. Same-content target evidence is excluded and `not same`/material competing-person evidence fails closed.
 
-PostgreSQL remains the sole writable production catalogue. ADR-0006 fixed-snapshot/no-same-run-cascade, exact-policy provenance and manual supersession rules remain mandatory if any broader policy is later accepted.
+Implementation is active on `agent/WI-0117-multi-evidence-production`. The new exact-model multi-evidence policy is separately versioned, default-disabled, and subordinate to the existing ordinary automatic-assignment master toggle. Candidate evidence is read before any canonical accepts so same-run cascading remains prohibited. Canonical decisions use the normal suggestion acceptance/history boundary with a distinct actor and detailed model/policy/cluster/reference provenance.
+
+PostgreSQL remains the sole writable production catalogue.
 
 ## Next concrete step
 
-Merge the WI-0117 evaluation tooling after CI, then run `evaluate_auto_assignment.py` privately against the existing `private/cluster-evaluation/sample.json`. Record only aggregate baseline/selection/holdout/quality results. Do not implement broader production automatic assignment unless the private holdout demonstrates an acceptable precision, Unknown-rejection and review-effort trade-off.
-
-If no candidate preserves those guardrails, close WI-0117 with current High-only automatic assignment unchanged.
+Finish CI and production verification for `m25-multi-evidence-auto-v1`. Required checks are: policy default-off/versioning, fresh-cluster and independent-reference gates, `not same` fail-closed behavior, exact provenance, fixed-snapshot/no-cascade, operator opt-in, and manual correction/undo. Do not mark WI-0117 complete until human Windows verification of opt-in plus correction/undo passes.
 
 ## Relevant files
 
 - docs/delivery/work-items/WI-0117-multi-evidence-auto-assignment-evaluation.md
 - docs/delivery/status/work-items/active/WI-0117.yaml
 - tools/cluster-evaluation/evaluate_auto_assignment.py
-- tools/cluster-evaluation/README.md
+- src/PhotoIdentity.Core/Review/IIdentityMultiEvidenceAutoAssignmentPolicyRepository.cs
+- src/PhotoIdentity.Persistence.Postgres/PostgresIdentityMultiEvidenceAutoAssignmentPolicyRepository.cs
 - src/PhotoIdentity.Persistence.Postgres/PostgresIdentityAutoAssignmentService.cs
-- src/PhotoIdentity.Core/Clustering/ProvisionalFaceClusterKnownPersonAdvisory.cs
+- src/PhotoIdentity.Web/Components/MultiEvidenceAutoAssignmentSettings.razor
 - docs/decisions/ADR-0006-canonical-auto-assignment.md
 
 ## Repository validation
