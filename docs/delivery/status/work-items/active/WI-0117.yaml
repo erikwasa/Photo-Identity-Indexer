@@ -1,15 +1,19 @@
 id: WI-0117
 title: Evaluate multi-evidence automatic identity assignment
 milestone: M25
-status: in_progress
+status: in_review
 owner: ai-agent
 document: ../work-items/WI-0117-multi-evidence-auto-assignment-evaluation.md
 started_at: 2026-09-15
 last_updated_at: 2026-09-15
-branch: agent/WI-0117-multi-evidence-evaluation
+branch: agent/WI-0117-multi-evidence-production
 blockers:
 - WI-0081
 - WI-0116
 blocker_notes:
-- WI-0081 and WI-0116 are complete. Start with private evaluation only; do not broaden production auto-assignment semantics before evidence preserves accepted precision and Unknown-rejection guardrails.
-evidence: []
+- Private selection/holdout evaluation accepted m25-multi-evidence-auto-v1 for an opt-in production slice. Production CI is green; completion now requires maintainer Windows opt-in plus representative correction/undo verification.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/343
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/35026925180
