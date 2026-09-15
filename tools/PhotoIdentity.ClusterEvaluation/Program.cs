@@ -1,6 +1,7 @@
 using System.Text.Json;
 using PhotoIdentity.Core.Clustering;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Persistence.Postgres;
 
 namespace PhotoIdentity.ClusterEvaluation;
@@ -29,11 +30,23 @@ internal static class Program
                     options.ModelHash,
                     options.MaximumFaces,
                     options.IncludeUnknown);
+            IReadOnlyList<ProvisionalClusterEvaluationFace> references =
+                await repository.ReadConfirmedReferenceSampleAsync(
+                    options.ModelId,
+                    options.ModelHash,
+                    options.MaximumReferences);
 
             if (sample.Count == 0)
             {
                 throw new InvalidOperationException("No reviewed faces with an exact-model embedding matched the requested sample.");
             }
+            if (references.Count == 0)
+            {
+                throw new InvalidOperationException("No confirmed production references matched the requested exact model revision.");
+            }
+
+            ReviewIdentitySuggestionPolicy policy = await new PostgresIdentitySuggestionPolicyRepository(database)
+                .GetAsync(options.ModelId, options.ModelHash);
 
             string outputPath = ValidateOutputPath(options.OutputPath);
             if (File.Exists(outputPath) && !options.Force)
@@ -42,7 +55,7 @@ internal static class Program
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-            PrivateEvaluationExport export = BuildExport(sample, options);
+            PrivateEvaluationExport export = BuildExport(sample, references, options, policy);
             JsonSerializerOptions jsonOptions = new()
             {
                 WriteIndented = true,
@@ -50,8 +63,12 @@ internal static class Program
             };
             await File.WriteAllTextAsync(outputPath, JsonSerializer.Serialize(export, jsonOptions));
 
-            Console.WriteLine($"Exported {sample.Count} reviewed faces to {outputPath}");
-            Console.WriteLine($"Assigned labels: {export.AssignedLabelCount}; Unknown faces: {export.UnknownFaceCount}");
+            Console.WriteLine($"Exported {sample.Count} reviewed targets and {references.Count} confirmed production references to {outputPath}");
+            Console.WriteLine($"Target assigned labels: {export.AssignedLabelCount}; Unknown targets: {export.UnknownFaceCount}");
+            Console.WriteLine($"Reference labels: {export.ReferenceLabelCount}");
+            Console.WriteLine(
+                $"Suggestion policy v{export.SuggestionPolicy.Version}: High={export.SuggestionPolicy.HighScoreThreshold:F2} " +
+                $"margin={export.SuggestionPolicy.HighMarginThreshold:F2}; Medium={export.SuggestionPolicy.MediumScoreThreshold:F2}");
             Console.WriteLine("The export contains biometric embeddings. Keep it private and do not commit it.");
             return 0;
         }
@@ -66,9 +83,12 @@ internal static class Program
 
     private static PrivateEvaluationExport BuildExport(
         IReadOnlyList<ProvisionalClusterEvaluationFace> sample,
-        ExportOptions options)
+        IReadOnlyList<ProvisionalClusterEvaluationFace> references,
+        ExportOptions options,
+        ReviewIdentitySuggestionPolicy policy)
     {
-        string[] personIds = sample
+        ProvisionalClusterEvaluationFace[] allRows = sample.Concat(references).ToArray();
+        string[] personIds = allRows
             .Where(face => face.PersonId is not null)
             .Select(face => face.PersonId!.Value.ToString())
             .Distinct(StringComparer.Ordinal)
@@ -78,7 +98,16 @@ internal static class Program
             .Select((personId, index) => (personId, label: $"person-{index + 1:D4}"))
             .ToDictionary(pair => pair.personId, pair => pair.label, StringComparer.Ordinal);
 
-        string[] photoIds = sample
+        string[] faceIds = allRows
+            .Select(face => face.FaceOccurrenceId.ToString())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+        Dictionary<string, string> faceLabels = faceIds
+            .Select((faceId, index) => (faceId, label: $"face-{index + 1:D6}"))
+            .ToDictionary(pair => pair.faceId, pair => pair.label, StringComparer.Ordinal);
+
+        string[] photoIds = allRows
             .Select(face => face.AssetRevisionId.ToString())
             .Distinct(StringComparer.Ordinal)
             .OrderBy(value => value, StringComparer.Ordinal)
@@ -87,7 +116,7 @@ internal static class Program
             .Select((assetRevisionId, index) => (assetRevisionId, label: $"photo-{index + 1:D6}"))
             .ToDictionary(pair => pair.assetRevisionId, pair => pair.label, StringComparer.Ordinal);
 
-        string[] contentHashes = sample
+        string[] contentHashes = allRows
             .Select(face => face.ContentHash.ToString())
             .Distinct(StringComparer.Ordinal)
             .OrderBy(value => value, StringComparer.Ordinal)
@@ -96,40 +125,69 @@ internal static class Program
             .Select((contentHash, index) => (contentHash, label: $"content-{index + 1:D6}"))
             .ToDictionary(pair => pair.contentHash, pair => pair.label, StringComparer.Ordinal);
 
-        List<PrivateEvaluationFace> faces = new(sample.Count);
-        int unknownCount = 0;
-        for (int index = 0; index < sample.Count; index++)
-        {
-            ProvisionalClusterEvaluationFace face = sample[index];
-            string? label = null;
-            if (face.PersonId is not null)
-            {
-                label = labels[face.PersonId.Value.ToString()];
-            }
-            else
-            {
-                unknownCount++;
-            }
+        IReadOnlyList<PrivateEvaluationFace> faces = ProjectRows(
+            sample, labels, faceLabels, photoGroups, contentGroups);
+        IReadOnlyList<PrivateEvaluationFace> referenceFaces = ProjectRows(
+            references, labels, faceLabels, photoGroups, contentGroups);
+        int unknownCount = sample.Count(face => face.PersonId is null);
+        int assignedLabelCount = sample
+            .Where(face => face.PersonId is not null)
+            .Select(face => face.PersonId!.Value.ToString())
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        int referenceLabelCount = references
+            .Select(face => face.PersonId?.ToString())
+            .Where(value => value is not null)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
 
-            faces.Add(new PrivateEvaluationFace(
-                $"face-{index + 1:D6}",
-                photoGroups[face.AssetRevisionId.ToString()],
-                contentGroups[face.ContentHash.ToString()],
-                face.ReviewState,
-                label,
-                face.Embedding.ToArray()));
-        }
-
+        // Schema 1 is intentionally retained because all WI-0081 additions are optional/additive;
+        // the accepted WI-0113/WI-0116 evaluators continue to consume only the existing Faces field.
         return new PrivateEvaluationExport(
             1,
             options.ModelId.ToString(),
             options.ModelHash.ToString(),
             DateTimeOffset.UtcNow,
             ProvisionalFaceClusterSemantics.CanonicalDefinition,
+            new PrivateSuggestionPolicy(
+                policy.Version,
+                policy.AutoAssignEnabled,
+                policy.HighScoreThreshold,
+                policy.HighMarginThreshold,
+                policy.MediumScoreThreshold,
+                policy.UpdatedAtUtc),
+            new PrivateSampleSelection(
+                options.MaximumFaces,
+                options.MaximumReferences,
+                options.IncludeUnknown,
+                "face-occurrence-id-ascending"),
             faces.Count,
-            labels.Count,
+            assignedLabelCount,
             unknownCount,
-            faces);
+            referenceFaces.Count,
+            referenceLabelCount,
+            faces,
+            referenceFaces);
+    }
+
+    private static IReadOnlyList<PrivateEvaluationFace> ProjectRows(
+        IReadOnlyList<ProvisionalClusterEvaluationFace> rows,
+        IReadOnlyDictionary<string, string> labels,
+        IReadOnlyDictionary<string, string> faceLabels,
+        IReadOnlyDictionary<string, string> photoGroups,
+        IReadOnlyDictionary<string, string> contentGroups)
+    {
+        return rows.Select(face => new PrivateEvaluationFace(
+            faceLabels[face.FaceOccurrenceId.ToString()],
+            photoGroups[face.AssetRevisionId.ToString()],
+            contentGroups[face.ContentHash.ToString()],
+            face.ReviewState,
+            face.PersonId is null ? null : labels[face.PersonId.Value.ToString()],
+            face.Embedding.ToArray(),
+            face.DetectorConfidence,
+            face.FaceAreaFraction,
+            face.ReviewedAtUtc,
+            face.ReviewedPersonHasMergeHistory)).ToArray();
     }
 
     private static string ValidateOutputPath(string outputPath)
@@ -192,18 +250,26 @@ internal static class Program
         string modelId = Required(values, "--model-id");
         string modelHash = Required(values, "--model-hash");
         string output = values.GetValueOrDefault("--output") ?? "private/cluster-evaluation/sample.json";
-        int maximumFaces = values.TryGetValue("--max-faces", out string? maximumFacesText)
-            ? int.Parse(maximumFacesText!, System.Globalization.CultureInfo.InvariantCulture)
-            : 5000;
+        int maximumFaces = ParseBound(values, "--max-faces", 5000);
+        int maximumReferences = ParseBound(values, "--max-references", 20000);
 
         return new ExportOptions(
             new ModelId(modelId.Trim()),
             new Sha256Digest(modelHash.Trim().ToLowerInvariant()),
             maximumFaces,
+            maximumReferences,
             includeUnknown,
             output,
             force);
     }
+
+    private static int ParseBound(
+        IReadOnlyDictionary<string, string?> values,
+        string key,
+        int defaultValue) =>
+        values.TryGetValue(key, out string? text)
+            ? int.Parse(text!, System.Globalization.CultureInfo.InvariantCulture)
+            : defaultValue;
 
     private static string Required(IReadOnlyDictionary<string, string?> values, string key) =>
         values.TryGetValue(key, out string? value) && !string.IsNullOrWhiteSpace(value)
@@ -216,9 +282,13 @@ internal static class Program
         Console.WriteLine();
         Console.WriteLine("Usage:");
         Console.WriteLine("  dotnet run --project tools/PhotoIdentity.ClusterEvaluation --");
-        Console.WriteLine("    --model-id <id> --model-hash <sha256> [--max-faces 5000]");
+        Console.WriteLine("    --model-id <id> --model-hash <sha256> [--max-faces 5000] [--max-references 20000]");
         Console.WriteLine("    [--output private/cluster-evaluation/sample.json] [--exclude-unknown] [--force]");
         Console.WriteLine();
+        Console.WriteLine("Faces remains the backward-compatible reviewed target sample. referenceFaces separately carries");
+        Console.WriteLine("the exact production confirmed-reference population, including legacy confirmed labels.");
+        Console.WriteLine("The export also includes suggestion policy, detector confidence, normalized face area, review time");
+        Console.WriteLine("and merge-history audit metadata. No names, actors or source paths are exported.");
         Console.WriteLine($"Connection string is read only from {ConnectionStringEnvironmentVariable}.");
     }
 
@@ -226,6 +296,7 @@ internal static class Program
         ModelId ModelId,
         Sha256Digest ModelHash,
         int MaximumFaces,
+        int MaximumReferences,
         bool IncludeUnknown,
         string OutputPath,
         bool Force);
@@ -236,10 +307,29 @@ internal static class Program
         string ModelHash,
         DateTimeOffset GeneratedAtUtc,
         string ClusterContract,
+        PrivateSuggestionPolicy SuggestionPolicy,
+        PrivateSampleSelection SampleSelection,
         int FaceCount,
         int AssignedLabelCount,
         int UnknownFaceCount,
-        IReadOnlyList<PrivateEvaluationFace> Faces);
+        int ReferenceFaceCount,
+        int ReferenceLabelCount,
+        IReadOnlyList<PrivateEvaluationFace> Faces,
+        IReadOnlyList<PrivateEvaluationFace> ReferenceFaces);
+
+    private sealed record PrivateSuggestionPolicy(
+        int Version,
+        bool AutoAssignEnabled,
+        double HighScoreThreshold,
+        double HighMarginThreshold,
+        double MediumScoreThreshold,
+        DateTimeOffset UpdatedAtUtc);
+
+    private sealed record PrivateSampleSelection(
+        int MaximumFaces,
+        int MaximumReferences,
+        bool IncludeUnknown,
+        string Ordering);
 
     private sealed record PrivateEvaluationFace(
         string Id,
@@ -247,5 +337,9 @@ internal static class Program
         string ContentGroup,
         string ReviewState,
         string? GroundTruthLabel,
-        float[] Embedding);
+        float[] Embedding,
+        double? DetectorConfidence,
+        double? FaceAreaFraction,
+        DateTimeOffset? ReviewedAtUtc,
+        bool ReviewedPersonHasMergeHistory);
 }

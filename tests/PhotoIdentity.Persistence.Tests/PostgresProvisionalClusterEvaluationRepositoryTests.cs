@@ -12,7 +12,7 @@ namespace PhotoIdentity.Persistence.Tests;
 public sealed class PostgresProvisionalClusterEvaluationRepositoryTests
 {
     [Fact]
-    public async Task Reviewed_sample_is_exact_model_bounded_and_excludes_unreviewed_or_rejected_faces_when_live_postgres_is_configured()
+    public async Task Private_evaluation_samples_separate_reviewed_targets_from_production_confirmed_references_when_live_postgres_is_configured()
     {
         string? adminConnectionString = Environment.GetEnvironmentVariable(
             "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING");
@@ -57,6 +57,7 @@ public sealed class PostgresProvisionalClusterEvaluationRepositoryTests
             FaceOccurrenceId rejected = await SeedFaceAsync(testBuilder.ConnectionString, revisionId, 4, [0.8f, 0.2f], modelIdValue, modelHashValue, now.AddSeconds(4));
             FaceOccurrenceId unreviewed = await SeedFaceAsync(testBuilder.ConnectionString, revisionId, 5, [0.7f, 0.3f], modelIdValue, modelHashValue, now.AddSeconds(5));
             FaceOccurrenceId otherModel = await SeedFaceAsync(testBuilder.ConnectionString, revisionId, 6, [1f, 0f], "other-model", new string('f', 64), now.AddSeconds(6));
+            FaceOccurrenceId legacyConfirmed = await SeedFaceAsync(testBuilder.ConnectionString, revisionId, 7, [0.95f, 0.1f], modelIdValue, modelHashValue, now.AddSeconds(7));
 
             IReviewActionRepository review = new PostgresReviewActionRepository(database);
             ReviewPerson personA = await review.CreatePersonAsync("Person A", now.AddMinutes(1));
@@ -67,6 +68,11 @@ public sealed class PostgresProvisionalClusterEvaluationRepositoryTests
             await review.MarkUnknownAsync(unknown, "cluster-eval:test", now.AddMinutes(6));
             await review.RejectAsync(rejected, "cluster-eval:test", now.AddMinutes(7));
             await review.AssignAsync(otherModel, personA.Id, "cluster-eval:test", now.AddMinutes(8));
+            await SeedConfirmedLabelAsync(
+                testBuilder.ConnectionString,
+                legacyConfirmed,
+                personA.Id,
+                now.AddMinutes(9));
 
             PostgresProvisionalClusterEvaluationRepository repository = new(database);
             IReadOnlyList<ProvisionalClusterEvaluationFace> withUnknown =
@@ -80,9 +86,31 @@ public sealed class PostgresProvisionalClusterEvaluationRepositoryTests
             Assert.Contains(withUnknown, face => face.FaceOccurrenceId == assignedA2 && face.PersonId == personA.Id);
             Assert.Contains(withUnknown, face => face.FaceOccurrenceId == assignedB && face.PersonId == personB.Id);
             Assert.Contains(withUnknown, face => face.FaceOccurrenceId == unknown && face.PersonId is null && face.ReviewState == CatalogueReviewStates.Unknown);
+            Assert.DoesNotContain(withUnknown, face => face.FaceOccurrenceId == legacyConfirmed);
             Assert.DoesNotContain(withUnknown, face => face.FaceOccurrenceId == rejected || face.FaceOccurrenceId == unreviewed || face.FaceOccurrenceId == otherModel);
             Assert.All(withUnknown, face => Assert.Equal(revisionId.ToString("D"), face.AssetRevisionId.ToString()));
             Assert.All(withUnknown, face => Assert.Equal(2, face.Embedding.Dimensions));
+            Assert.All(withUnknown, face => Assert.Equal(0.90, face.DetectorConfidence));
+            Assert.All(withUnknown, face => Assert.Equal(0.25, face.FaceAreaFraction));
+            Assert.All(withUnknown, face => Assert.False(face.ReviewedPersonHasMergeHistory));
+            ProvisionalClusterEvaluationFace assignedA1Export = Assert.Single(
+                withUnknown,
+                face => face.FaceOccurrenceId == assignedA1);
+            Assert.Equal(now.AddMinutes(3), assignedA1Export.ReviewedAtUtc);
+
+            IReadOnlyList<ProvisionalClusterEvaluationFace> references =
+                await repository.ReadConfirmedReferenceSampleAsync(modelId, modelHash, maximumFaces: 100);
+            Assert.Equal(4, references.Count);
+            Assert.Contains(references, face => face.FaceOccurrenceId == assignedA1 && face.PersonId == personA.Id);
+            Assert.Contains(references, face => face.FaceOccurrenceId == assignedA2 && face.PersonId == personA.Id);
+            Assert.Contains(references, face => face.FaceOccurrenceId == assignedB && face.PersonId == personB.Id);
+            ProvisionalClusterEvaluationFace legacyReference = Assert.Single(
+                references,
+                face => face.FaceOccurrenceId == legacyConfirmed);
+            Assert.Equal(personA.Id, legacyReference.PersonId);
+            Assert.Equal(CatalogueReviewStates.Assigned, legacyReference.ReviewState);
+            Assert.Equal(now.AddMinutes(9), legacyReference.ReviewedAtUtc);
+            Assert.DoesNotContain(references, face => face.FaceOccurrenceId == unknown || face.FaceOccurrenceId == rejected || face.FaceOccurrenceId == unreviewed || face.FaceOccurrenceId == otherModel);
 
             IReadOnlyList<ProvisionalClusterEvaluationFace> assignedOnly =
                 await repository.ReadReviewedSampleAsync(modelId, modelHash, maximumFaces: 2, includeUnknown: false);
@@ -94,6 +122,8 @@ public sealed class PostgresProvisionalClusterEvaluationRepositoryTests
             Assert.Empty(wrongRevision);
             await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
                 () => repository.ReadReviewedSampleAsync(modelId, modelHash, maximumFaces: 0));
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+                () => repository.ReadConfirmedReferenceSampleAsync(modelId, modelHash, maximumFaces: 20001));
         }
         finally
         {
@@ -144,6 +174,30 @@ public sealed class PostgresProvisionalClusterEvaluationRepositoryTests
         command.Parameters.AddWithValue("now", now);
         await command.ExecuteNonQueryAsync();
         return revisionId;
+    }
+
+    private static async Task SeedConfirmedLabelAsync(
+        string connectionString,
+        FaceOccurrenceId faceOccurrenceId,
+        PersonId personId,
+        DateTimeOffset assignedAtUtc)
+    {
+        await using NpgsqlConnection connection = new(connectionString);
+        await connection.OpenAsync();
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO person_labels (
+                person_id, face_occurrence_id, label_kind,
+                assigned_by, assigned_at_utc, note)
+            VALUES (
+                @person_id, @face_occurrence_id, 'confirmed',
+                'cluster-eval:legacy', @assigned_at_utc, NULL);
+            """;
+        command.Parameters.AddWithValue("person_id", Guid.Parse(personId.ToString()));
+        command.Parameters.AddWithValue("face_occurrence_id", Guid.Parse(faceOccurrenceId.ToString()));
+        command.Parameters.AddWithValue("assigned_at_utc", assignedAtUtc);
+        await command.ExecuteNonQueryAsync();
     }
 
     private static async Task<FaceOccurrenceId> SeedFaceAsync(
