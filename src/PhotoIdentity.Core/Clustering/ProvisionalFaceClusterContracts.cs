@@ -93,6 +93,8 @@ public static class ProvisionalFaceClusterSemantics
 /// with a local synthetic label by the export tool before writing a sample file.
 /// ContentHash is used only to pseudonymize exact-content groups so duplicate source
 /// copies cannot be mistaken for independent evidence during local evaluation.
+/// Optional detector/geometry/review metadata supports private WI-0081 segmentation;
+/// it remains derived evidence and is never used to change production suggestions.
 /// </summary>
 public sealed record ProvisionalClusterEvaluationFace(
     FaceOccurrenceId FaceOccurrenceId,
@@ -100,4 +102,8 @@ public sealed record ProvisionalClusterEvaluationFace(
     Sha256Digest ContentHash,
     string ReviewState,
     PersonId? PersonId,
-    EmbeddingVector Embedding);
+    EmbeddingVector Embedding,
+    double? DetectorConfidence = null,
+    double? FaceAreaFraction = null,
+    DateTimeOffset? ReviewedAtUtc = null,
+    bool ReviewedPersonWasMerged = false);
