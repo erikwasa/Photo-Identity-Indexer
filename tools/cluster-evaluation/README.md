@@ -6,9 +6,9 @@ This tooling supports private reviewed-data evaluation for WI-0113, WI-0116 and 
 
 The exported JSON contains face embeddings and is biometric/private data. Keep the sample and generated reports under `private/`, `data/`, or another location outside the repository. Never commit them.
 
-The C# exporter intentionally omits source paths, filenames, crop paths, person names, and raw catalogue identifiers from the file. Canonical person IDs are converted to deterministic local labels such as `person-0001`; face and photo IDs are similarly replaced with local sample labels.
+The C# exporter intentionally omits source paths, filenames, crop paths, person names, policy actors, and raw catalogue identifiers from the file. Canonical person IDs are converted to deterministic local labels such as `person-0001`; face and photo IDs are similarly replaced with local sample labels.
 
-For WI-0081 the backward-compatible export also includes the exact suggestion policy plus detector confidence, normalized face area, review time and whether a reviewed assignment originally referenced a subsequently merged Person. These fields are private derived evaluation metadata; they do not change production state.
+For WI-0081 the backward-compatible export also includes the exact suggestion policy plus detector confidence, normalized face area, review time and whether the current reviewed Person has merge history. These fields are private derived evaluation metadata; they do not change production state.
 
 ## 1. Export one exact-model reviewed sample
 
@@ -31,7 +31,7 @@ dotnet run --project tools/PhotoIdentity.ClusterEvaluation -- `
 
 Assigned faces are labelled by canonical person for evaluation. Canonical Unknown faces are included by default as unlabeled discovery/risk-probe rows; pass `--exclude-unknown` only for a controlled comparison. Rejected and unreviewed faces are not used as ground-truth rows in this reviewed sample.
 
-The exporter resolves an assignment that still points at a merged Person to the current merge target for private ground truth and records that a merge was encountered. The report can therefore detect stale merge-related review evidence without exposing names or IDs.
+Person maintenance consolidates review actions onto the surviving merge target. The exporter therefore flags reviewed faces whose current Person has absorbed at least one Person merge. This makes merge-heavy identities visible as an audit segment without exposing names or IDs; it does not claim which individual face originally belonged to a merged source Person.
 
 ## 2. Create an isolated Python environment
 
@@ -107,11 +107,12 @@ The report includes:
 - current top-1/top-3/top-5 accuracy on reviewed assigned faces with usable holdout references;
 - current High/Medium precision and High coverage under the exact persisted suggestion policy;
 - High/Medium emission rates on reviewed Unknown faces as a conservative false-positive-risk signal;
+- genuine, best-impostor and genuine-minus-impostor score distributions and threshold overlap;
 - segmentation by detector confidence, normalized face area, true-identity reference-set size and review chronology quartile;
-- exact-content duplication/cross-label contamination, merged-Person ground-truth encounters and reference concentration;
+- exact-content duplication/cross-label contamination, identities with merge history and reference concentration;
 - before/after deltas for centroid and bounded quality-diverse reference strategies.
 
-Unknown faces have no labelled identity, so an emitted suggestion is a risk indicator rather than proof of an incorrect identity. Detector confidence and face area are queue-composition proxies, not direct embedding-quality labels. If the export is truncated by `--max-faces`, record that selection caveat. If more than one embedding model hash is present historically, repeat the workflow separately for each model revision rather than pooling revisions.
+Known faces with no remaining same-Person holdout reference are reported separately rather than counted as matching failures. Unknown faces have no labelled identity, so an emitted suggestion is a risk indicator rather than proof of an incorrect identity. Detector confidence and face area are queue-composition proxies, not direct embedding-quality labels. If the export is truncated by `--max-faces`, record that selection caveat. If more than one embedding model hash is present historically, repeat the workflow separately for each model revision rather than pooling revisions.
 
 Do **not** tune production thresholds merely to improve one aggregate metric. A candidate mitigation should improve or preserve false-positive-sensitive measures, especially High precision and Unknown High emission, and should be selected by the maintainer before production behavior changes.
 
