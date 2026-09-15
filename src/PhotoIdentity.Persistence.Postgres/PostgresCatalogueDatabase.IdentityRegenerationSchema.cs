@@ -101,6 +101,14 @@ public sealed partial class PostgresCatalogueDatabase
                 PostgresProvisionalFaceClusterReviewRepository.ProvisionalFaceClusterReviewSchema.Sql;
         }
 
+        if (!sql.Contains(
+                "identity_multi_evidence_auto_assignment_policies",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            sql += Environment.NewLine +
+                PostgresIdentityMultiEvidenceAutoAssignmentPolicyRepository.MultiEvidencePolicySchema.Sql;
+        }
+
         if (!string.Equals(sql, current.Sql, StringComparison.Ordinal))
         {
             Migrations[currentMigrationIndex] = current with { Sql = sql };
