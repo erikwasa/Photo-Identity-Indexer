@@ -86,7 +86,7 @@ The private report records Strong / Ambiguous / Insufficient advisory counts, fa
 
 ## 5. WI-0081 suggestion-accuracy investigation
 
-Run the new evaluator against the same exact-model export:
+Run the suggestion evaluator against the same exact-model export:
 
 ```powershell
 python tools/cluster-evaluation/evaluate_suggestions.py `
@@ -99,13 +99,13 @@ python tools/cluster-evaluation/evaluate_suggestions.py `
 The evaluator performs four read-only leave-one-out comparisons. All scenarios rank the reviewed targets against `referenceFaces` rather than assuming the target sample is the production reference population:
 
 - **production-reference max exemplar** uses the same exact-model confirmed reference population and best-exemplar-per-Person aggregation as production matching, with the target itself removed;
-- **duplicate-resistant max exemplar** additionally removes every reference from the target's exact-content group so duplicate copies cannot inflate holdout accuracy;
+- **duplicate-resistant max exemplar** additionally removes every reference from the target's exact-content group so the same image content cannot inflate holdout accuracy;
 - **duplicate-resistant centroid** compares one normalized per-Person prototype instead of an unbounded nearest exemplar set;
 - **duplicate-resistant quality-diverse cap** compares a bounded per-Person reference set selected by detector confidence/face area plus embedding diversity.
 
 Historical target-specific rejected-Person filters are intentionally not replayed in the holdout evaluator. Reviewed targets are being used to measure identity evidence/reference behavior, not to reconstruct their past interaction state. This distinction is recorded in every report.
 
-The duplicate-resistant max-exemplar result is the primary WI-0081 baseline. The production-reference row is retained because the difference between it and the duplicate-resistant baseline is itself evidence about duplicate/reference leakage.
+The duplicate-resistant max-exemplar result is the primary WI-0081 baseline. The production-reference row is retained because the difference between it and the duplicate-resistant baseline is evidence about exact-image-content leakage into the holdout.
 
 The report includes:
 
@@ -114,8 +114,25 @@ The report includes:
 - High/Medium emission rates on reviewed Unknown targets as a conservative false-positive-risk signal;
 - genuine, best-impostor and genuine-minus-impostor score distributions and threshold overlap;
 - segmentation by detector confidence, normalized face area, true-identity reference-set size and review chronology quartile;
-- production-reference exact-content duplication/cross-label contamination, identities with merge history and reference concentration;
+- merge-history representation and reference concentration;
 - before/after deltas for centroid and bounded quality-diverse reference strategies.
+
+### Corrected exact-content source-copy audit
+
+The initial WI-0081 report grouped references by `contentGroup`. A `contentGroup` identifies exact source-image content, so all faces in one ordinary group photo share that value. Counting every content group with multiple face rows as a duplicate therefore overstates duplicate/cross-label contamination.
+
+Use the dedicated source-content audit for duplication evidence:
+
+```powershell
+python tools/cluster-evaluation/audit_suggestion_content.py `
+  private/cluster-evaluation/sample.json `
+  --report-json private/cluster-evaluation/suggestion-content-audit.json `
+  --report-md private/cluster-evaluation/suggestion-content-audit.md
+```
+
+This audit treats exact content as repeated only when one `contentGroup` spans more than one pseudonymized `photoGroup` (asset revision). It separately reports same-identity reference evidence repeated across those exact-content source copies. It also counts cross-label near-duplicate face-pair candidates only when references come from different photo revisions of the same exact content and have cosine similarity at least `0.95`. Those pairs are review candidates, not automatic proof of an incorrect label.
+
+The `duplicateReferenceContentGroups`, `crossLabelDuplicateReferenceGroups`, and `assignedUnknownMixedTargetContentGroups` fields emitted by the original `evaluate_suggestions.py` report should therefore not be interpreted as source-copy contamination evidence. They are retained only for backward compatibility with already-generated private reports.
 
 Known faces with no remaining same-Person holdout reference are reported separately rather than counted as matching failures. Unknown faces have no labelled identity, so an emitted suggestion is a risk indicator rather than proof of an incorrect identity. Detector confidence and face area are queue-composition proxies, not direct embedding-quality labels. If either target/reference bound truncates the catalogue, record that selection caveat. If more than one embedding model hash is present historically, repeat the workflow separately for each model revision rather than pooling revisions.
 
@@ -123,6 +140,6 @@ Do **not** tune production thresholds merely to improve one aggregate metric. A 
 
 ## 6. Record decisions without committing private data
 
-For WI-0113, record the selected clustering policy and aggregate evaluation conclusion. For WI-0116, record only aggregate advisory precision/recall/review-effort results and the maintainer decision about whether the initial advisory thresholds are acceptable. For WI-0081, record only aggregate baseline/segmentation/mitigation findings and the selected implementation direction.
+For WI-0113, record the selected clustering policy and aggregate evaluation conclusion. For WI-0116, record only aggregate advisory precision/recall/review-effort results and the maintainer decision about whether the initial advisory thresholds are acceptable. For WI-0081, record only aggregate baseline/segmentation/mitigation findings, the corrected source-content audit, and the selected implementation direction.
 
 The committed repository may contain non-personal aggregate metrics and policy conclusions, but never the sample, embeddings, crops, face/person mappings, or private per-face/per-cluster reports.
