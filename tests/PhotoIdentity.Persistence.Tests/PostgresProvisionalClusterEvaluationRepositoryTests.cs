@@ -85,7 +85,7 @@ public sealed class PostgresProvisionalClusterEvaluationRepositoryTests
             Assert.All(withUnknown, face => Assert.Equal(2, face.Embedding.Dimensions));
             Assert.All(withUnknown, face => Assert.Equal(0.90, face.DetectorConfidence));
             Assert.All(withUnknown, face => Assert.Equal(0.25, face.FaceAreaFraction));
-            Assert.All(withUnknown, face => Assert.False(face.ReviewedPersonWasMerged));
+            Assert.All(withUnknown, face => Assert.False(face.ReviewedPersonHasMergeHistory));
             ProvisionalClusterEvaluationFace assignedA1Export = Assert.Single(
                 withUnknown.Where(face => face.FaceOccurrenceId == assignedA1));
             Assert.Equal(now.AddMinutes(3), assignedA1Export.ReviewedAtUtc);
