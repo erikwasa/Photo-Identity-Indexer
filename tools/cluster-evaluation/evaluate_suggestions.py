@@ -24,20 +24,41 @@ DEFAULT_HIGH_MARGIN = 0.10
 DEFAULT_MEDIUM_SCORE = 0.50
 
 
-def load_sample(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], np.ndarray]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if payload.get("schemaVersion") != 1:
-        raise ValueError("unsupported cluster-evaluation export schema")
-    faces = payload.get("faces") or []
-    if len(faces) < 3:
-        raise ValueError("at least three exported reviewed faces are required")
-    embeddings = np.asarray([face["embedding"] for face in faces], dtype=np.float64)
+def normalized_embeddings(rows: list[dict[str, Any]]) -> np.ndarray:
+    embeddings = np.asarray([row["embedding"] for row in rows], dtype=np.float64)
     if embeddings.ndim != 2 or embeddings.shape[1] == 0 or not np.isfinite(embeddings).all():
         raise ValueError("embeddings must be a finite rectangular matrix")
     norms = np.linalg.norm(embeddings, axis=1)
     if np.any(norms <= 0):
         raise ValueError("embeddings contain a zero vector")
-    return payload, faces, embeddings / norms[:, None]
+    return embeddings / norms[:, None]
+
+
+def load_sample(
+    path: Path,
+) -> tuple[dict[str, Any], list[dict[str, Any]], np.ndarray, list[dict[str, Any]], np.ndarray]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("schemaVersion") != 1:
+        raise ValueError("unsupported cluster-evaluation export schema")
+    targets = payload.get("faces") or []
+    if len(targets) < 3:
+        raise ValueError("at least three exported reviewed target faces are required")
+
+    references = payload.get("referenceFaces")
+    if references is None:
+        references = [face for face in targets if face.get("groundTruthLabel") is not None]
+    if len(references) < 2:
+        raise ValueError("at least two confirmed production references are required")
+    if any(reference.get("groundTruthLabel") is None for reference in references):
+        raise ValueError("production reference rows must have a ground-truth Person label")
+
+    return (
+        payload,
+        targets,
+        normalized_embeddings(targets),
+        references,
+        normalized_embeddings(references),
+    )
 
 
 def read_policy(payload: dict[str, Any]) -> dict[str, Any]:
@@ -53,21 +74,27 @@ def read_policy(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def reference_indices(
-    target: int,
+    target: dict[str, Any],
     candidates: Iterable[int],
-    content_groups: list[str],
+    references: list[dict[str, Any]],
     duplicate_resistant: bool,
 ) -> list[int]:
-    target_group = content_groups[target]
-    return [
-        index for index in candidates
-        if index != target and (not duplicate_resistant or content_groups[index] != target_group)
-    ]
+    target_id = target.get("id")
+    target_content = target.get("contentGroup")
+    result: list[int] = []
+    for index in candidates:
+        reference = references[index]
+        if reference.get("id") == target_id:
+            continue
+        if duplicate_resistant and reference.get("contentGroup") == target_content:
+            continue
+        result.append(index)
+    return result
 
 
-def quality_key(face: dict[str, Any], index: int) -> tuple[float, float, int]:
-    confidence = face.get("detectorConfidence")
-    area = face.get("faceAreaFraction")
+def quality_key(reference: dict[str, Any], index: int) -> tuple[float, float, int]:
+    confidence = reference.get("detectorConfidence")
+    area = reference.get("faceAreaFraction")
     return (
         float(confidence) if confidence is not None else -1.0,
         float(area) if area is not None else -1.0,
@@ -78,21 +105,21 @@ def quality_key(face: dict[str, Any], index: int) -> tuple[float, float, int]:
 def select_quality_diverse(
     indices: list[int],
     cap: int,
-    faces: list[dict[str, Any]],
-    embeddings: np.ndarray,
+    references: list[dict[str, Any]],
+    reference_embeddings: np.ndarray,
 ) -> list[int]:
     if len(indices) <= cap:
         return indices
-    first = max(indices, key=lambda index: quality_key(faces[index], index))
+    first = max(indices, key=lambda index: quality_key(references[index], index))
     selected = [first]
     remaining = set(indices) - {first}
     while remaining and len(selected) < cap:
-        selected_matrix = embeddings[selected]
+        selected_matrix = reference_embeddings[selected]
         best_index = max(
             sorted(remaining),
             key=lambda index: (
-                -float(np.max(selected_matrix @ embeddings[index])),
-                *quality_key(faces[index], index),
+                -float(np.max(selected_matrix @ reference_embeddings[index])),
+                *quality_key(references[index], index),
             ),
         )
         selected.append(best_index)
@@ -101,32 +128,31 @@ def select_quality_diverse(
 
 
 def rank_target(
-    target: int,
+    target: dict[str, Any],
+    target_vector: np.ndarray,
     strategy: str,
     duplicate_resistant: bool,
     cap: int,
-    faces: list[dict[str, Any]],
-    embeddings: np.ndarray,
-    content_groups: list[str],
+    references: list[dict[str, Any]],
+    reference_embeddings: np.ndarray,
     by_person: dict[str, list[int]],
 ) -> list[tuple[str, float]]:
-    target_vector = embeddings[target]
     ranked: list[tuple[str, float]] = []
     for person, person_indices in by_person.items():
-        usable = reference_indices(target, person_indices, content_groups, duplicate_resistant)
+        usable = reference_indices(target, person_indices, references, duplicate_resistant)
         if not usable:
             continue
         if strategy == "max-exemplar":
-            score = float(np.max(embeddings[usable] @ target_vector))
+            score = float(np.max(reference_embeddings[usable] @ target_vector))
         elif strategy == "centroid":
-            centroid = np.mean(embeddings[usable], axis=0)
+            centroid = np.mean(reference_embeddings[usable], axis=0)
             norm = float(np.linalg.norm(centroid))
             if norm <= 0 or not math.isfinite(norm):
                 continue
             score = float((centroid / norm) @ target_vector)
         elif strategy == "quality-diverse-cap":
-            curated = select_quality_diverse(usable, cap, faces, embeddings)
-            score = float(np.max(embeddings[curated] @ target_vector))
+            curated = select_quality_diverse(usable, cap, references, reference_embeddings)
+            score = float(np.max(reference_embeddings[curated] @ target_vector))
         else:
             raise ValueError(f"unknown ranking strategy: {strategy}")
         if math.isfinite(score):
@@ -150,10 +176,10 @@ def evaluate_scenario(
     strategy: str,
     duplicate_resistant: bool,
     cap: int,
-    faces: list[dict[str, Any]],
-    embeddings: np.ndarray,
-    truth: list[str | None],
-    content_groups: list[str],
+    targets: list[dict[str, Any]],
+    target_embeddings: np.ndarray,
+    references: list[dict[str, Any]],
+    reference_embeddings: np.ndarray,
     by_person: dict[str, list[int]],
     policy: dict[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -161,7 +187,8 @@ def evaluate_scenario(
     known_targets = known_without_reference = 0
     unknown_targets = unknown_ranked = 0
 
-    for target, label in enumerate(truth):
+    for target_index, target in enumerate(targets):
+        label = target.get("groundTruthLabel")
         true_reference_count = None
         if label is None:
             unknown_targets += 1
@@ -169,8 +196,8 @@ def evaluate_scenario(
             known_targets += 1
             true_reference_count = len(reference_indices(
                 target,
-                by_person[label],
-                content_groups,
+                by_person.get(str(label), []),
+                references,
                 duplicate_resistant,
             ))
             if true_reference_count == 0:
@@ -179,12 +206,12 @@ def evaluate_scenario(
 
         ranked = rank_target(
             target,
+            target_embeddings[target_index],
             strategy,
             duplicate_resistant,
             cap,
-            faces,
-            embeddings,
-            content_groups,
+            references,
+            reference_embeddings,
             by_person,
         )
         if not ranked:
@@ -208,7 +235,7 @@ def evaluate_scenario(
                     best_impostor_score = score
 
         records.append({
-            "target": target,
+            "target": target_index,
             "truth": label,
             "topPerson": top_person,
             "topScore": top_score,
@@ -368,13 +395,13 @@ def numeric_buckets(
     return result
 
 
-def chronology_buckets(faces: list[dict[str, Any]], truth: list[str | None]) -> dict[str, list[int]]:
+def chronology_buckets(targets: list[dict[str, Any]]) -> dict[str, list[int]]:
     dated: list[tuple[datetime, int]] = []
-    for index, face in enumerate(faces):
-        if truth[index] is None or not face.get("reviewedAtUtc"):
+    for index, target in enumerate(targets):
+        if target.get("groundTruthLabel") is None or not target.get("reviewedAtUtc"):
             continue
         try:
-            value = str(face["reviewedAtUtc"]).replace("Z", "+00:00")
+            value = str(target["reviewedAtUtc"]).replace("Z", "+00:00")
             dated.append((datetime.fromisoformat(value), index))
         except ValueError:
             continue
@@ -388,27 +415,23 @@ def chronology_buckets(faces: list[dict[str, Any]], truth: list[str | None]) -> 
     return result
 
 
-def segment(
-    faces: list[dict[str, Any]],
-    truth: list[str | None],
-    records: list[dict[str, Any]],
-) -> dict[str, Any]:
+def segment(targets: list[dict[str, Any]], records: list[dict[str, Any]]) -> dict[str, Any]:
     confidence = numeric_buckets(
-        [face.get("detectorConfidence") for face in faces],
+        [target.get("detectorConfidence") for target in targets],
         [("lt-0.70", None, 0.70), ("0.70-0.85", 0.70, 0.85),
          ("0.85-0.95", 0.85, 0.95), ("gte-0.95", 0.95, None)],
     )
     area = numeric_buckets(
-        [face.get("faceAreaFraction") for face in faces],
+        [target.get("faceAreaFraction") for target in targets],
         [("lt-0.5pct", None, 0.005), ("0.5-2pct", 0.005, 0.02),
          ("2-8pct", 0.02, 0.08), ("gte-8pct", 0.08, None)],
     )
     record_by_target = {record["target"]: record for record in records}
     reference: dict[str, list[int]] = defaultdict(list)
-    for target, label in enumerate(truth):
-        if label is None:
+    for target_index, target in enumerate(targets):
+        if target.get("groundTruthLabel") is None:
             continue
-        count = (record_by_target.get(target) or {}).get("trueReferenceCount")
+        count = (record_by_target.get(target_index) or {}).get("trueReferenceCount")
         key = (
             "no-usable-holdout-reference" if count is None else
             "1" if count == 1 else
@@ -416,7 +439,7 @@ def segment(
             "5-9" if count <= 9 else
             "10-plus"
         )
-        reference[key].append(target)
+        reference[key].append(target_index)
     return {
         "detectorConfidence": {name: summarize(records, indices) for name, indices in confidence.items()},
         "faceAreaFraction": {name: summarize(records, indices) for name, indices in area.items()},
@@ -425,47 +448,52 @@ def segment(
         },
         "reviewChronology": {
             name: summarize(records, indices)
-            for name, indices in chronology_buckets(faces, truth).items()
+            for name, indices in chronology_buckets(targets).items()
         },
     }
 
 
 def contamination_audit(
-    faces: list[dict[str, Any]],
-    truth: list[str | None],
-    content_groups: list[str],
-    by_person: dict[str, list[int]],
+    targets: list[dict[str, Any]],
+    references: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    by_content: dict[str, list[int]] = defaultdict(list)
-    for index, group in enumerate(content_groups):
-        by_content[group].append(index)
-    duplicate_groups = [indices for indices in by_content.values() if len(indices) > 1]
+    refs_by_content: dict[str, list[int]] = defaultdict(list)
+    by_person: dict[str, list[int]] = defaultdict(list)
+    for index, reference in enumerate(references):
+        refs_by_content[str(reference.get("contentGroup") or f"ref-{index}")].append(index)
+        by_person[str(reference["groundTruthLabel"])].append(index)
+    duplicate_reference_groups = [indices for indices in refs_by_content.values() if len(indices) > 1]
+
+    target_by_content: dict[str, list[int]] = defaultdict(list)
+    for index, target in enumerate(targets):
+        target_by_content[str(target.get("contentGroup") or f"target-{index}")].append(index)
+    mixed_target_groups = 0
+    for indices in target_by_content.values():
+        labels = [targets[index].get("groundTruthLabel") for index in indices]
+        if any(label is None for label in labels) and any(label is not None for label in labels):
+            mixed_target_groups += 1
+
     sizes = sorted(len(indices) for indices in by_person.values())
     assigned = sum(sizes)
     top_count = max(1, math.ceil(len(sizes) * 0.10)) if sizes else 0
     top_share = sum(sorted(sizes, reverse=True)[:top_count]) / assigned if assigned else 0.0
+    merge_labels = {
+        str(reference["groundTruthLabel"]) for reference in references
+        if reference.get("reviewedPersonHasMergeHistory", reference.get("reviewedPersonWasMerged", False))
+    }
     return {
-        "contentGroups": len(by_content),
-        "duplicateContentGroups": len(duplicate_groups),
-        "facesInDuplicateContentGroups": sum(len(indices) for indices in duplicate_groups),
-        "crossLabelDuplicateContentGroups": sum(
-            1 for indices in duplicate_groups
-            if len({truth[index] for index in indices if truth[index] is not None}) > 1
+        "referenceContentGroups": len(refs_by_content),
+        "duplicateReferenceContentGroups": len(duplicate_reference_groups),
+        "referencesInDuplicateContentGroups": sum(len(indices) for indices in duplicate_reference_groups),
+        "crossLabelDuplicateReferenceGroups": sum(
+            1 for indices in duplicate_reference_groups
+            if len({references[index]["groundTruthLabel"] for index in indices}) > 1
         ),
-        "assignedUnknownMixedDuplicateGroups": sum(
-            1 for indices in duplicate_groups
-            if any(truth[index] is None for index in indices)
-            and any(truth[index] is not None for index in indices)
+        "assignedUnknownMixedTargetContentGroups": mixed_target_groups,
+        "identitiesWithMergeHistory": len(merge_labels),
+        "referenceFacesForIdentitiesWithMergeHistory": sum(
+            1 for reference in references if str(reference["groundTruthLabel"]) in merge_labels
         ),
-        "reviewedFacesWhosePersonHasMergeHistory": sum(
-            1 for face in faces
-            if face.get("reviewedPersonHasMergeHistory", face.get("reviewedPersonWasMerged", False))
-        ),
-        "identitiesWithMergeHistory": len({
-            truth[index] for index, face in enumerate(faces)
-            if truth[index] is not None
-            and face.get("reviewedPersonHasMergeHistory", face.get("reviewedPersonWasMerged", False))
-        }),
         "identityCount": len(sizes),
         "referenceCountMedian": median(sizes) if sizes else 0,
         "referenceCountMaximum": max(sizes) if sizes else 0,
@@ -478,22 +506,16 @@ def metric_delta(candidate: dict[str, Any], baseline: dict[str, Any], key: str) 
 
 
 def evaluate(args: argparse.Namespace) -> dict[str, Any]:
-    payload, faces, embeddings = load_sample(args.sample)
+    payload, targets, target_embeddings, references, reference_embeddings = load_sample(args.sample)
     policy = read_policy(payload)
-    truth = [face.get("groundTruthLabel") for face in faces]
-    content_groups = [
-        str(face.get("contentGroup") or face.get("photoGroup") or f"row-{index}")
-        for index, face in enumerate(faces)
-    ]
     by_person: dict[str, list[int]] = defaultdict(list)
-    for index, label in enumerate(truth):
-        if label is not None:
-            by_person[str(label)].append(index)
+    for index, reference in enumerate(references):
+        by_person[str(reference["groundTruthLabel"])].append(index)
     if len(by_person) < 2:
-        raise ValueError("at least two reviewed identities are required")
+        raise ValueError("at least two confirmed reference identities are required")
 
     definitions = [
-        ("production-equivalent-max", "max-exemplar", False),
+        ("production-reference-max", "max-exemplar", False),
         ("duplicate-resistant-max", "max-exemplar", True),
         ("duplicate-resistant-centroid", "centroid", True),
         ("duplicate-resistant-quality-diverse-cap", "quality-diverse-cap", True),
@@ -502,8 +524,16 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
     records: dict[str, list[dict[str, Any]]] = {}
     for name, strategy, duplicate_resistant in definitions:
         scenarios[name], records[name] = evaluate_scenario(
-            name, strategy, duplicate_resistant, args.reference_cap,
-            faces, embeddings, truth, content_groups, by_person, policy,
+            name,
+            strategy,
+            duplicate_resistant,
+            args.reference_cap,
+            targets,
+            target_embeddings,
+            references,
+            reference_embeddings,
+            by_person,
+            policy,
         )
 
     baseline_name = "duplicate-resistant-max"
@@ -515,16 +545,18 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         "sample": {
             "modelId": payload.get("modelId"),
             "modelHash": payload.get("modelHash"),
-            "faceCount": payload.get("faceCount", len(faces)),
-            "assignedLabelCount": payload.get("assignedLabelCount", len(by_person)),
-            "unknownFaceCount": payload.get("unknownFaceCount", sum(1 for value in truth if value is None)),
+            "targetFaceCount": payload.get("faceCount", len(targets)),
+            "targetAssignedLabelCount": payload.get("assignedLabelCount"),
+            "unknownTargetCount": payload.get("unknownFaceCount"),
+            "referenceFaceCount": payload.get("referenceFaceCount", len(references)),
+            "referenceLabelCount": payload.get("referenceLabelCount", len(by_person)),
             "sampleSelection": payload.get("sampleSelection"),
         },
         "productionSuggestionPolicy": policy,
-        "contaminationAudit": contamination_audit(faces, truth, content_groups, by_person),
+        "contaminationAudit": contamination_audit(targets, references),
         "scenarios": scenarios,
         "baselineScoreBehavior": score_behavior(records[baseline_name], policy),
-        "baselineSegmentation": segment(faces, truth, records[baseline_name]),
+        "baselineSegmentation": segment(targets, records[baseline_name]),
         "mitigationComparison": {
             "baseline": baseline_name,
             "centroid": {
@@ -542,8 +574,9 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             },
         },
         "notes": [
-            "Production-equivalent max-exemplar reproduces the current best-exemplar-per-Person ranking rule with only the target face removed.",
-            "Duplicate-resistant scenarios also remove every reference from the target's exact-content group.",
+            "production-reference-max uses the same exact-model confirmed reference population and best-exemplar-per-Person aggregation as production matching.",
+            "Historical target-specific rejected-Person filters are intentionally not replayed because reviewed holdouts measure identity evidence rather than past interaction state.",
+            "Duplicate-resistant scenarios remove every reference from the target's exact-content group so duplicate copies cannot inflate holdout accuracy.",
             "Known targets without another usable same-Person reference are reported separately and excluded from top-k denominators.",
             "Genuine score is the score for the reviewed Person; best-impostor score is the highest score from any other reviewed Person.",
             "Unknown-face High/Medium emission is a conservative false-positive-risk signal, not labelled impostor truth.",
@@ -551,7 +584,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             "Review chronology quartiles help distinguish matcher drift from a later, harder review queue.",
             "Centroid and bounded quality-diverse references are offline comparisons only and do not alter production behavior.",
             "Evaluate different embedding model hashes separately rather than pooling revisions.",
-            "If maximumFaces truncates the reviewed corpus, record that selection caveat when interpreting the report.",
+            "If target or reference bounds truncate the catalogue, record that selection caveat when interpreting the report.",
         ],
     }
 
@@ -572,9 +605,10 @@ def render_markdown(report: dict[str, Any]) -> str:
         "> PRIVATE: derived from local biometric/review data. Do not commit this report.",
         "",
         f"- Exact model: `{sample['modelId']}` / `{sample['modelHash']}`",
-        f"- Faces: {sample['faceCount']}",
-        f"- Reviewed identities: {sample['assignedLabelCount']}",
-        f"- Reviewed Unknown faces: {sample['unknownFaceCount']}",
+        f"- Reviewed targets: {sample['targetFaceCount']}",
+        f"- Confirmed production references: {sample['referenceFaceCount']}",
+        f"- Reference identities: {sample['referenceLabelCount']}",
+        f"- Reviewed Unknown targets: {sample['unknownTargetCount']}",
         "",
         "## Ranking scenarios",
         "",
@@ -611,10 +645,10 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Reference / contamination audit",
         "",
-        f"- Duplicate exact-content groups: **{audit['duplicateContentGroups']}** ({audit['facesInDuplicateContentGroups']} faces)",
-        f"- Cross-label duplicate groups: **{audit['crossLabelDuplicateContentGroups']}**",
-        f"- Assigned/Unknown mixed duplicate groups: **{audit['assignedUnknownMixedDuplicateGroups']}**",
-        f"- Identities with merge history: **{audit['identitiesWithMergeHistory']}** ({audit['reviewedFacesWhosePersonHasMergeHistory']} reviewed faces)",
+        f"- Duplicate reference exact-content groups: **{audit['duplicateReferenceContentGroups']}** ({audit['referencesInDuplicateContentGroups']} references)",
+        f"- Cross-label duplicate reference groups: **{audit['crossLabelDuplicateReferenceGroups']}**",
+        f"- Assigned/Unknown mixed target content groups: **{audit['assignedUnknownMixedTargetContentGroups']}**",
+        f"- Identities with merge history: **{audit['identitiesWithMergeHistory']}** ({audit['referenceFacesForIdentitiesWithMergeHistory']} references)",
         f"- Median / maximum references per identity: **{audit['referenceCountMedian']} / {audit['referenceCountMaximum']}**",
         f"- Reference share held by largest 10% of identities: **{pct(audit['topTenPercentIdentityReferenceShare'])}**",
         "",
@@ -635,9 +669,9 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Interpretation constraints",
         "",
-        "The production-equivalent row can be optimistic when an exact duplicate of the target is a confirmed reference. Use the duplicate-resistant row as the primary WI-0081 accuracy baseline.",
+        "The production-reference row can be optimistic when an exact duplicate of the target is a confirmed reference. Use the duplicate-resistant row as the primary WI-0081 accuracy baseline.",
         "",
-        "Unknown-face emission is a conservative risk signal rather than labelled impostor truth. Inspect the JSON segmentation before selecting a mitigation. Do not change production thresholds or ranking solely from this report.",
+        "Historical target-specific rejected-Person filters are not replayed. Unknown-face emission is a conservative risk signal rather than labelled impostor truth. Inspect the JSON segmentation before selecting a mitigation and do not change production behavior solely from one aggregate metric.",
         "",
     ])
     return "\n".join(lines)
