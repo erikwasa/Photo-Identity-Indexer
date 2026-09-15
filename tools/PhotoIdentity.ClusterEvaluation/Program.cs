@@ -132,8 +132,10 @@ internal static class Program
                 face.ReviewedPersonWasMerged));
         }
 
+        // Schema 1 is intentionally retained because all WI-0081 additions are optional/additive;
+        // the accepted WI-0116 evaluator can continue consuming the same private sample format.
         return new PrivateEvaluationExport(
-            2,
+            1,
             options.ModelId.ToString(),
             options.ModelHash.ToString(),
             DateTimeOffset.UtcNow,
@@ -243,8 +245,8 @@ internal static class Program
         Console.WriteLine("    --model-id <id> --model-hash <sha256> [--max-faces 5000]");
         Console.WriteLine("    [--output private/cluster-evaluation/sample.json] [--exclude-unknown] [--force]");
         Console.WriteLine();
-        Console.WriteLine("Schema v2 includes the exact suggestion policy plus detector confidence, normalized face area,");
-        Console.WriteLine("review time and merged-person audit metadata for WI-0081. No names or source paths are exported.");
+        Console.WriteLine("The backward-compatible schema now also includes the exact suggestion policy plus detector confidence,");
+        Console.WriteLine("normalized face area, review time and merged-person audit metadata for WI-0081. No names or source paths are exported.");
         Console.WriteLine($"Connection string is read only from {ConnectionStringEnvironmentVariable}.");
     }
 
