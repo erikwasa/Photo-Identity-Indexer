@@ -94,7 +94,8 @@ public sealed class PostgresProvisionalClusterEvaluationRepositoryTests
             Assert.All(withUnknown, face => Assert.Equal(0.25, face.FaceAreaFraction));
             Assert.All(withUnknown, face => Assert.False(face.ReviewedPersonHasMergeHistory));
             ProvisionalClusterEvaluationFace assignedA1Export = Assert.Single(
-                withUnknown.Where(face => face.FaceOccurrenceId == assignedA1));
+                withUnknown,
+                face => face.FaceOccurrenceId == assignedA1);
             Assert.Equal(now.AddMinutes(3), assignedA1Export.ReviewedAtUtc);
 
             IReadOnlyList<ProvisionalClusterEvaluationFace> references =
@@ -104,7 +105,8 @@ public sealed class PostgresProvisionalClusterEvaluationRepositoryTests
             Assert.Contains(references, face => face.FaceOccurrenceId == assignedA2 && face.PersonId == personA.Id);
             Assert.Contains(references, face => face.FaceOccurrenceId == assignedB && face.PersonId == personB.Id);
             ProvisionalClusterEvaluationFace legacyReference = Assert.Single(
-                references.Where(face => face.FaceOccurrenceId == legacyConfirmed));
+                references,
+                face => face.FaceOccurrenceId == legacyConfirmed);
             Assert.Equal(personA.Id, legacyReference.PersonId);
             Assert.Equal(CatalogueReviewStates.Assigned, legacyReference.ReviewState);
             Assert.Equal(now.AddMinutes(9), legacyReference.ReviewedAtUtc);
