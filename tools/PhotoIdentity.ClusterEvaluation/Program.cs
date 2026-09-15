@@ -146,7 +146,6 @@ internal static class Program
                 policy.HighScoreThreshold,
                 policy.HighMarginThreshold,
                 policy.MediumScoreThreshold,
-                policy.UpdatedBy,
                 policy.UpdatedAtUtc),
             new PrivateSampleSelection(
                 options.MaximumFaces,
@@ -246,7 +245,7 @@ internal static class Program
         Console.WriteLine("    [--output private/cluster-evaluation/sample.json] [--exclude-unknown] [--force]");
         Console.WriteLine();
         Console.WriteLine("The backward-compatible schema now also includes the exact suggestion policy plus detector confidence,");
-        Console.WriteLine("normalized face area, review time and merged-person audit metadata for WI-0081. No names or source paths are exported.");
+        Console.WriteLine("normalized face area, review time and merged-person audit metadata for WI-0081. No names, actors or source paths are exported.");
         Console.WriteLine($"Connection string is read only from {ConnectionStringEnvironmentVariable}.");
     }
 
@@ -277,7 +276,6 @@ internal static class Program
         double HighScoreThreshold,
         double HighMarginThreshold,
         double MediumScoreThreshold,
-        string UpdatedBy,
         DateTimeOffset UpdatedAtUtc);
 
     private sealed record PrivateSampleSelection(
