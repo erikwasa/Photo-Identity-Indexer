@@ -1,0 +1,256 @@
+@inject HttpClient Http
+
+<section class="review-filter-panel" aria-labelledby="multi-evidence-settings-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Identity automation</p>
+            <h2 id="multi-evidence-settings-heading">Multi-evidence automatic assignment</h2>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="notice error" role="alert">@Error</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <div class="notice success" role="status">@Message</div>
+    }
+
+    @if (LoadingOptions)
+    {
+        <div class="empty-state compact" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <p>Loading multi-evidence settings…</p>
+        </div>
+    }
+    else if (PolicyOptions.ModelRevisions.Count == 0)
+    {
+        <div class="empty-state compact">
+            <p>No exact suggestion-model revisions are available yet.</p>
+        </div>
+    }
+    else
+    {
+        <label class="field-label" for="multi-evidence-model">Exact model revision</label>
+        <select id="multi-evidence-model"
+                @bind="SelectedModelIndex"
+                @bind:after="ChangeModelAsync"
+                disabled="@Busy">
+            @for (int index = 0; index < PolicyOptions.ModelRevisions.Count; index++)
+            {
+                ReviewModelRevisionFilterResponse model = PolicyOptions.ModelRevisions[index];
+                <option value="@index">@ModelLabel(model)</option>
+            }
+        </select>
+
+        @if (LoadingPolicy)
+        {
+            <div class="empty-state compact" aria-live="polite">
+                <div class="spinner" aria-hidden="true"></div>
+                <p>Loading multi-evidence policy…</p>
+            </div>
+        }
+        else if (Policy is IdentityMultiEvidenceAutoAssignmentPolicyResponse policy)
+        {
+            <form @onsubmit="SaveAsync" @onsubmit:preventDefault>
+                <label class="field-label" for="multi-evidence-enabled">
+                    <input id="multi-evidence-enabled"
+                           type="checkbox"
+                           @bind="Enabled"
+                           disabled="@Busy" />
+                    Allow the evaluated multi-evidence rule to expand future automatic assignment
+                </label>
+
+                <div class="notice warning">
+                    This is an additional opt-in gate. The ordinary “Automatically assign qualifying High suggestions” setting must also be enabled. Multi-evidence assignment fails closed unless a fresh @policy.ClusterPolicyVersion cluster run including Unknown faces is available.
+                </div>
+
+                <dl class="details-list">
+                    <div>
+                        <dt>Policy</dt>
+                        <dd>@policy.AlgorithmPolicyVersion</dd>
+                    </div>
+                    <div>
+                        <dt>Target evidence</dt>
+                        <dd>Medium-or-better score (at least @policy.MinimumTargetScore.ToString("0.00")) and rank gap ≥ @policy.MinimumTargetMargin.ToString("0.00")</dd>
+                    </div>
+                    <div>
+                        <dt>Reference support</dt>
+                        <dd>At least @policy.MinimumIndependentReferenceCount independent exact-content reference groups at cosine ≥ @policy.MinimumReferenceScore.ToString("0.00")</dd>
+                    </div>
+                    <div>
+                        <dt>Cluster support</dt>
+                        <dd>Strong target-specific known-person advisory with no material competitor or explicit not-same conflict</dd>
+                    </div>
+                </dl>
+
+                <div class="card-actions">
+                    <button type="submit" class="button primary" disabled="@Busy">Save multi-evidence policy</button>
+                    <a class="button secondary" href="/match-regeneration">Regenerate matches</a>
+                </div>
+
+                <p class="field-help">Configuration version @policy.Version · updated by @policy.UpdatedBy · @policy.ModelId · @HashPrefix(policy.ModelHash)</p>
+            </form>
+        }
+    }
+</section>
+
+@code {
+    private const string PolicyActor = "local-reviewer";
+
+    [Parameter]
+    public int RefreshVersion { get; set; }
+
+    private ReviewFilterOptionsResponse PolicyOptions { get; set; } = new([], []);
+    private IdentityMultiEvidenceAutoAssignmentPolicyResponse? Policy { get; set; }
+    private string SelectedModelIndex { get; set; } = "0";
+    private bool Enabled { get; set; }
+    private bool LoadingOptions { get; set; } = true;
+    private bool LoadingPolicy { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+    private int LoadedRefreshVersion { get; set; } = -1;
+
+    private ReviewModelRevisionFilterResponse? SelectedModel =>
+        int.TryParse(SelectedModelIndex, out int index) &&
+        index >= 0 && index < PolicyOptions.ModelRevisions.Count
+            ? PolicyOptions.ModelRevisions[index]
+            : null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (LoadedRefreshVersion == RefreshVersion)
+        {
+            return;
+        }
+
+        LoadedRefreshVersion = RefreshVersion;
+        Message = null;
+        await LoadOptionsAsync();
+    }
+
+    private async Task LoadOptionsAsync()
+    {
+        LoadingOptions = true;
+        Error = null;
+        Policy = null;
+        try
+        {
+            PolicyOptions = await Http.GetFromJsonAsync<ReviewFilterOptionsResponse>("api/review/filters")
+                ?? new ReviewFilterOptionsResponse([], []);
+            if (PolicyOptions.ModelRevisions.Count == 0)
+            {
+                return;
+            }
+
+            if (!int.TryParse(SelectedModelIndex, out int selectedIndex) ||
+                selectedIndex < 0 || selectedIndex >= PolicyOptions.ModelRevisions.Count)
+            {
+                SelectedModelIndex = "0";
+            }
+
+            await LoadPolicyAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            LoadingOptions = false;
+        }
+    }
+
+    private async Task ChangeModelAsync()
+    {
+        Message = null;
+        Error = null;
+        Policy = null;
+        await LoadPolicyAsync();
+    }
+
+    private async Task LoadPolicyAsync()
+    {
+        ReviewModelRevisionFilterResponse? model = SelectedModel;
+        if (model is null)
+        {
+            Error = "An exact suggestion model revision is required.";
+            return;
+        }
+
+        LoadingPolicy = true;
+        try
+        {
+            Policy = await Http.GetFromJsonAsync<IdentityMultiEvidenceAutoAssignmentPolicyResponse>(PolicyUrl(model));
+            if (Policy is null)
+            {
+                Error = "The multi-evidence policy response was empty.";
+                return;
+            }
+
+            Enabled = Policy.Enabled;
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            LoadingPolicy = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        ReviewModelRevisionFilterResponse? model = SelectedModel;
+        if (model is null)
+        {
+            Error = "An exact suggestion model revision is required.";
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            UpdateIdentityMultiEvidenceAutoAssignmentPolicyRequest request = new(Enabled, PolicyActor);
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(PolicyUrl(model), request);
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Policy = await response.Content.ReadFromJsonAsync<IdentityMultiEvidenceAutoAssignmentPolicyResponse>();
+            if (Policy is null)
+            {
+                Error = "The saved multi-evidence policy response was empty.";
+                return;
+            }
+
+            Enabled = Policy.Enabled;
+            Message = $"Multi-evidence policy version {Policy.Version} saved for {Policy.ModelId} · {HashPrefix(Policy.ModelHash)}.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private static string PolicyUrl(ReviewModelRevisionFilterResponse model) =>
+        $"api/review/suggestion-policy/multi-evidence?modelId={Uri.EscapeDataString(model.ModelId)}" +
+        $"&modelHash={Uri.EscapeDataString(model.ModelHash)}";
+
+    private static string ModelLabel(ReviewModelRevisionFilterResponse model) =>
+        $"{model.ModelId} · {HashPrefix(model.ModelHash)} · {model.FaceCount} face{(model.FaceCount == 1 ? "" : "s")}";
+
+    private static string HashPrefix(string hash) =>
+        hash[..Math.Min(12, hash.Length)];
+}
