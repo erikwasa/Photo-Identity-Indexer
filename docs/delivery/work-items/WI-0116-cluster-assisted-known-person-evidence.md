@@ -50,18 +50,24 @@ Private evaluation reuses the pseudonymized WI-0113 exact-model export. Export s
 
 ## Acceptance criteria
 
-- [ ] Cluster-assisted identity evidence has explicit exact-model/clustering-policy provenance and is regenerable.
-- [ ] A cluster can receive advisory support for a known person only when multiple independent exact-content groups provide qualifying evidence under the accepted rule; duplicate copies cannot inflate support.
-- [ ] Competing-person support or internal cluster conflict prevents a high cluster-assisted confidence classification according to explicit rules.
-- [ ] Existing per-face rank/score/margin evidence remains available and is not overwritten by cluster-level evidence.
-- [ ] Rejected face-person pairs and recorded cluster conflicts are respected.
-- [ ] The UI explains cluster-assisted support as advisory evidence rather than a confirmed identity.
-- [ ] No cluster-assisted result creates a canonical assignment in this work item.
-- [ ] Private reviewed evaluation reports precision/recall/review-effort impact relative to the current per-face suggestion workflow.
-- [ ] Automated coverage protects mixed-cluster fail-closed behavior, duplicate-resistant support, and exact-model/policy isolation.
+- [x] Cluster-assisted identity evidence has explicit exact-model/clustering-policy provenance and is regenerable.
+- [x] A cluster can receive advisory support for a known person only when multiple independent exact-content groups provide qualifying evidence under the accepted rule; duplicate copies cannot inflate support.
+- [x] Competing-person support or internal cluster conflict prevents a high cluster-assisted confidence classification according to explicit rules.
+- [x] Existing per-face rank/score/margin evidence remains available and is not overwritten by cluster-level evidence.
+- [x] Rejected face-person pairs and recorded cluster conflicts are respected.
+- [x] The UI explains cluster-assisted support as advisory evidence rather than a confirmed identity.
+- [x] No cluster-assisted result creates a canonical assignment in this work item.
+- [x] Private reviewed evaluation reports precision/recall/review-effort impact relative to the current per-face suggestion workflow.
+- [x] Automated coverage protects mixed-cluster fail-closed behavior, duplicate-resistant support, and exact-model/policy isolation.
 
 ## Verification requirements
 
 Automated scoring/persistence/API coverage plus private reviewed-sample evaluation and human review verification of coherent, ambiguous and intentionally mixed clusters.
 
 For maintainer acceptance, run the private evaluator using the production exact-model sample, retain the report outside the repository, and record only aggregate/non-personal findings. In the web application inspect representative `Strong`, `Ambiguous` and `Insufficient` groups when available. Confirm the advisory panel never changes Person selection or review state by itself, support counts are described as independent exact-content evidence, ordinary per-face evidence is still available, and the WI-0115 card-based anchor selection remains usable while reviewing the same group.
+
+## Completion
+
+WI-0116 was accepted by the maintainer on 2026-09-15 after PR #338 and successful CI run #1828. `verify-postgres.ps1` passed, the advisory UI preserved ordinary per-face evidence and canonical review state, and the deferred WI-0115 `Make anchor` interaction was verified.
+
+The private reviewed-data evaluation reported 41 Strong, 25 Ambiguous and 17 Insufficient clusters. All 41 evaluable Strong proposals were correct, yielding 0 false-person proposals and 100.000% proposal precision. Pure reviewed opportunity recall was 63.077% (41/65), and 0 of 2 mixed reviewed clusters were classified Strong. Estimated review effort fell from 839 baseline individual face-review actions to 123 cluster-assisted tasks, a 6.82x compression with 716 estimated actions saved. These aggregate results support the initial advisory thresholds without changing the existing automatic High threshold or enabling canonical assignment from cluster evidence.
