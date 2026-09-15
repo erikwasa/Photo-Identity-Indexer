@@ -13,14 +13,15 @@ public sealed record ReviewIdentityMultiEvidenceAutoAssignmentPolicy(
     string ClusterPolicyVersion,
     bool ClusterIncludeUnknown)
 {
-    public static ReviewIdentityMultiEvidenceAutoAssignmentPolicy Initial { get; } = new(
-        Version: "m25-multi-evidence-auto-v1",
-        MinimumTargetScore: 0.50,
-        MinimumTargetMargin: 0.05,
-        MinimumIndependentReferenceCount: 2,
-        MinimumReferenceScore: 0.50,
-        ClusterPolicyVersion: ProvisionalFaceClusterPolicies.InitialDbscan.Version,
-        ClusterIncludeUnknown: true).Validate();
+    public static ReviewIdentityMultiEvidenceAutoAssignmentPolicy Initial { get; } =
+        new ReviewIdentityMultiEvidenceAutoAssignmentPolicy(
+            Version: "m25-multi-evidence-auto-v1",
+            MinimumTargetScore: 0.50,
+            MinimumTargetMargin: 0.05,
+            MinimumIndependentReferenceCount: 2,
+            MinimumReferenceScore: 0.50,
+            ClusterPolicyVersion: ProvisionalFaceClusterPolicies.InitialDbscan.Version,
+            ClusterIncludeUnknown: true).Validate();
 
     public ReviewIdentityMultiEvidenceAutoAssignmentPolicy Validate()
     {
