@@ -70,6 +70,7 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
             SELECT
                 face_occurrences.id,
                 face_occurrences.asset_revision_id,
+                asset_revisions.content_sha256,
                 latest_action.action_kind,
                 latest_action.person_id,
                 matching_embeddings.dimensions,
@@ -78,6 +79,8 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
             FROM matching_embeddings
             INNER JOIN face_occurrences
                 ON face_occurrences.id = matching_embeddings.face_occurrence_id
+            INNER JOIN asset_revisions
+                ON asset_revisions.id = face_occurrences.asset_revision_id
             INNER JOIN latest_action
                 ON latest_action.face_occurrence_id = face_occurrences.id
                AND latest_action.row_number = 1
@@ -97,16 +100,16 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            string reviewState = reader.GetString(2) switch
+            string reviewState = reader.GetString(3) switch
             {
                 CatalogueReviewActionKinds.Assign => CatalogueReviewStates.Assigned,
                 CatalogueReviewActionKinds.Unknown => CatalogueReviewStates.Unknown,
                 string unexpected => throw new DataException(
                     $"Unexpected review state '{unexpected}' in cluster-evaluation sample."),
             };
-            PersonId? personId = reader.IsDBNull(3)
+            PersonId? personId = reader.IsDBNull(4)
                 ? null
-                : PersonId.From(reader.GetGuid(3));
+                : PersonId.From(reader.GetGuid(4));
             if (reviewState == CatalogueReviewStates.Assigned && personId is null)
             {
                 throw new DataException("Assigned evaluation face is missing its canonical person identifier.");
@@ -115,9 +118,10 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
             result.Add(new ProvisionalClusterEvaluationFace(
                 FaceOccurrenceId.From(reader.GetGuid(0)),
                 AssetRevisionId.From(reader.GetGuid(1)),
+                new Sha256Digest(reader.GetString(2)),
                 reviewState,
                 personId,
-                ReadVector(reader, 4, 5, 6)));
+                ReadVector(reader, 5, 6, 7)));
         }
 
         return result;
@@ -138,7 +142,7 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
         }
 
         float[] values = new float[dimensions];
-        for (int index = 0; index < dimensions; index++)
+        for (int index = 0; index < values.Length; index++)
         {
             int bits = BinaryPrimitives.ReadInt32LittleEndian(
                 bytes.AsSpan(index * sizeof(float), sizeof(float)));

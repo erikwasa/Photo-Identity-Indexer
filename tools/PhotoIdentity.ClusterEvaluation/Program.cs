@@ -87,6 +87,15 @@ internal static class Program
             .Select((assetRevisionId, index) => (assetRevisionId, label: $"photo-{index + 1:D6}"))
             .ToDictionary(pair => pair.assetRevisionId, pair => pair.label, StringComparer.Ordinal);
 
+        string[] contentHashes = sample
+            .Select(face => face.ContentHash.ToString())
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+        Dictionary<string, string> contentGroups = contentHashes
+            .Select((contentHash, index) => (contentHash, label: $"content-{index + 1:D6}"))
+            .ToDictionary(pair => pair.contentHash, pair => pair.label, StringComparer.Ordinal);
+
         List<PrivateEvaluationFace> faces = new(sample.Count);
         int unknownCount = 0;
         for (int index = 0; index < sample.Count; index++)
@@ -105,6 +114,7 @@ internal static class Program
             faces.Add(new PrivateEvaluationFace(
                 $"face-{index + 1:D6}",
                 photoGroups[face.AssetRevisionId.ToString()],
+                contentGroups[face.ContentHash.ToString()],
                 face.ReviewState,
                 label,
                 face.Embedding.ToArray()));
@@ -234,6 +244,7 @@ internal static class Program
     private sealed record PrivateEvaluationFace(
         string Id,
         string PhotoGroup,
+        string ContentGroup,
         string ReviewState,
         string? GroundTruthLabel,
         float[] Embedding);

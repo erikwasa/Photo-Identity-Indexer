@@ -18,6 +18,7 @@ public static class ProvisionalFaceClusterEndpoints
         group.MapGet("/groups", ListGroupsAsync);
         group.MapGet("/review-groups", ListReviewGroupsAsync);
         group.MapGet("/review-groups/{derivedClusterKey}/members", ListReviewGroupMembersAsync);
+        group.MapGet("/review-groups/{derivedClusterKey}/known-person-advisory", GetKnownPersonAdvisoryAsync);
         group.MapPost("/review-groups/{derivedClusterKey}/not-same", RecordNotSameAsync);
         return endpoints;
     }
@@ -167,14 +168,13 @@ public static class ProvisionalFaceClusterEndpoints
 
         try
         {
-            IReadOnlyList<ProvisionalFaceClusterGroupSummary> groups =
-                await repository.ListCurrentGroupsAsync(
-                    parsedModelId,
-                    parsedModelHash,
-                    ProvisionalFaceClusterPolicies.InitialDbscan.Version,
-                    includeUnknown,
-                    maximumGroups,
-                    cancellationToken);
+            IReadOnlyList<ProvisionalFaceClusterGroupSummary> groups = await repository.ListCurrentGroupsAsync(
+                parsedModelId,
+                parsedModelHash,
+                ProvisionalFaceClusterPolicies.InitialDbscan.Version,
+                includeUnknown,
+                maximumGroups,
+                cancellationToken);
             return Results.Ok(groups);
         }
         catch (ArgumentOutOfRangeException exception)
@@ -281,6 +281,71 @@ public static class ProvisionalFaceClusterEndpoints
                 ImageUrl = $"/api/review/faces/{member.FaceOccurrenceId}/image",
                 DetailsUrl = $"/faces/{member.FaceOccurrenceId}",
             }));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+    }
+
+    private static async Task<IResult> GetKnownPersonAdvisoryAsync(
+        string derivedClusterKey,
+        IServiceProvider services,
+        string? modelId,
+        string? modelHash,
+        bool includeUnknown = false,
+        CancellationToken cancellationToken = default)
+    {
+        IProvisionalFaceClusterKnownPersonAdvisoryRepository? repository =
+            ResolveKnownPersonAdvisoryRepository(services);
+        if (repository is null)
+        {
+            return PostgreSqlRequired();
+        }
+
+        if (!TryModelRevision(modelId, modelHash, out ModelId parsedModelId, out Sha256Digest parsedModelHash))
+        {
+            return BadRequest("An exact embedding model revision is required.");
+        }
+
+        try
+        {
+            ProvisionalFaceClusterKnownPersonAdvisory? advisory = await repository.GetCurrentAsync(
+                parsedModelId,
+                parsedModelHash,
+                ProvisionalFaceClusterPolicies.InitialDbscan.Version,
+                includeUnknown,
+                derivedClusterKey,
+                cancellationToken);
+            if (advisory is null)
+            {
+                return Results.NotFound(new { error = "The requested current provisional cluster was not found." });
+            }
+
+            return Results.Ok(new
+            {
+                advisory.ClusterRunId,
+                ModelId = advisory.ModelId.ToString(),
+                ModelHash = advisory.ModelHash.ToString(),
+                advisory.ClusterPolicyVersion,
+                advisory.IncludeUnknown,
+                advisory.DerivedClusterKey,
+                advisory.AdvisoryPolicyVersion,
+                advisory.IdentitySuggestionPolicyVersion,
+                advisory.MemberCount,
+                advisory.CoreCount,
+                advisory.CoreShare,
+                advisory.InternalConflictCount,
+                advisory.RankedEvidenceCount,
+                advisory.RankedEvidenceCoverage,
+                advisory.QualifyingEvidenceCount,
+                advisory.Status,
+                advisory.Explanation,
+                advisory.CanonicalAssignmentAllowed,
+                Candidate = ToAdvisoryCandidate(advisory.Candidate),
+                CompetingCandidate = ToAdvisoryCandidate(advisory.CompetingCandidate),
+                advisory.EvaluatedAtUtc,
+            });
         }
         catch (ArgumentException exception)
         {
@@ -417,15 +482,12 @@ public static class ProvisionalFaceClusterEndpoints
 
     private static IProvisionalFaceClusterRepository? ResolveRepository(IServiceProvider services)
     {
-        IConfiguration? configuration = services.GetService<IConfiguration>();
-        if (configuration is null ||
-            CataloguePersistenceComposition.ResolveProvider(configuration) != CatalogueProviderKind.Postgres)
+        if (!UsesPostgres(services))
         {
             return null;
         }
 
-        IProvisionalFaceClusterRepository? registered =
-            services.GetService<IProvisionalFaceClusterRepository>();
+        IProvisionalFaceClusterRepository? registered = services.GetService<IProvisionalFaceClusterRepository>();
         if (registered is not null)
         {
             return registered;
@@ -437,15 +499,12 @@ public static class ProvisionalFaceClusterEndpoints
 
     private static IProvisionalFaceClusterReviewRepository? ResolveReviewRepository(IServiceProvider services)
     {
-        IConfiguration? configuration = services.GetService<IConfiguration>();
-        if (configuration is null ||
-            CataloguePersistenceComposition.ResolveProvider(configuration) != CatalogueProviderKind.Postgres)
+        if (!UsesPostgres(services))
         {
             return null;
         }
 
-        IProvisionalFaceClusterReviewRepository? registered =
-            services.GetService<IProvisionalFaceClusterReviewRepository>();
+        IProvisionalFaceClusterReviewRepository? registered = services.GetService<IProvisionalFaceClusterReviewRepository>();
         if (registered is not null)
         {
             return registered;
@@ -454,6 +513,60 @@ public static class ProvisionalFaceClusterEndpoints
         PostgresCatalogueDatabase? database = services.GetService<PostgresCatalogueDatabase>();
         return database is null ? null : new PostgresProvisionalFaceClusterReviewRepository(database);
     }
+
+    private static IProvisionalFaceClusterKnownPersonAdvisoryRepository? ResolveKnownPersonAdvisoryRepository(
+        IServiceProvider services)
+    {
+        if (!UsesPostgres(services))
+        {
+            return null;
+        }
+
+        IProvisionalFaceClusterKnownPersonAdvisoryRepository? registered =
+            services.GetService<IProvisionalFaceClusterKnownPersonAdvisoryRepository>();
+        if (registered is not null)
+        {
+            return registered;
+        }
+
+        PostgresCatalogueDatabase? database = services.GetService<PostgresCatalogueDatabase>();
+        if (database is null)
+        {
+            return null;
+        }
+
+        IIdentitySuggestionPolicyRepository policies =
+            services.GetService<IIdentitySuggestionPolicyRepository>()
+            ?? new PostgresIdentitySuggestionPolicyRepository(database, services.GetService<TimeProvider>());
+        return new PostgresProvisionalFaceClusterKnownPersonAdvisoryRepository(
+            database,
+            policies,
+            services.GetService<TimeProvider>());
+    }
+
+    private static bool UsesPostgres(IServiceProvider services)
+    {
+        IConfiguration? configuration = services.GetService<IConfiguration>();
+        return configuration is not null &&
+               CataloguePersistenceComposition.ResolveProvider(configuration) == CatalogueProviderKind.Postgres;
+    }
+
+    private static object? ToAdvisoryCandidate(ProvisionalFaceClusterKnownPersonCandidate? candidate) =>
+        candidate is null
+            ? null
+            : new
+            {
+                PersonId = candidate.PersonId.ToString(),
+                candidate.DisplayName,
+                candidate.SupportCount,
+                candidate.SupportShare,
+                candidate.OrdinaryHighCount,
+                candidate.OrdinaryMediumCount,
+                candidate.MinimumScore,
+                candidate.MedianScore,
+                candidate.MaximumScore,
+                candidate.MedianMargin,
+            };
 
     private static object ToResponse(ProvisionalFaceClusterRun run, bool current) => new
     {

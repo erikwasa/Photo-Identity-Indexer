@@ -1,6 +1,6 @@
 # Private provisional face-cluster evaluation
 
-This tooling exists only for WI-0113 evaluation. It does not create production clusters or canonical identity assignments.
+This tooling supports the private reviewed-data evaluation for WI-0113 and WI-0116. It never creates production clusters or canonical identity assignments.
 
 ## Privacy boundary
 
@@ -36,9 +36,9 @@ py -m venv private/cluster-evaluation/.venv
 python -m pip install -r tools/cluster-evaluation/requirements.txt
 ```
 
-The evaluator uses scikit-learn's DBSCAN and HDBSCAN implementations plus a conservative mutual-neighbour graph implementation. All algorithms receive the same precomputed cosine-distance matrix.
+The evaluators use scikit-learn over the exported exact-model embeddings.
 
-## 3. Evaluate
+## 3. WI-0113 clustering-policy evaluation
 
 ```powershell
 python tools/cluster-evaluation/evaluate.py `
@@ -50,25 +50,44 @@ python tools/cluster-evaluation/evaluate.py `
 
 The default grid intentionally explores conservative neighbourhoods. Override the comma-separated grids when the first pass shows that the useful decision boundary lies elsewhere.
 
-The report separates:
+The WI-0113 report separates false merges, false splits, coverage/noise, same-photo conflicts and rough scaling cost. Unknown faces affect discovery coverage/noise but are excluded from identity-labelled false-merge/false-split denominators because `Unknown` is not a person identity.
 
-- false-merge pairs and false-merge rate (primary risk),
-- false-split pairs/rate,
-- total and labelled coverage,
-- noise/singleton rate and cluster-size distribution,
-- same-photo merges between different reviewed identities,
-- the measured pairwise cosine-distance time and a rough quadratic projection to the expected archive scale.
+## 4. WI-0116 cluster-assisted known-person advisory evaluation
 
-Unknown faces affect discovery coverage/noise but are excluded from identity-labelled false-merge/false-split denominators because `Unknown` is not a person identity.
+Use the same private sample to evaluate the fixed production DBSCAN policy together with the initial advisory rule:
 
-## 4. Record the WI-0113 decision
+```powershell
+python tools/cluster-evaluation/evaluate_advisory.py `
+  private/cluster-evaluation/sample.json `
+  --report-json private/cluster-evaluation/advisory-report.json `
+  --report-md private/cluster-evaluation/advisory-report.md
+```
 
-Do not automatically copy the evaluator's first-ranked candidate into production. Inspect the private report, especially every false merge and same-photo conflict. Record:
+The WI-0116 evaluator intentionally fixes clustering to the production defaults (`eps=0.30`, `min_samples=3`) and evaluates advisory identity evidence separately from canonical assignment. For each sample face it simulates ordinary known-person ranking by taking the best cosine similarity to another reviewed exemplar of each Person; the target face itself is excluded so a face cannot vote for itself.
 
-- the chosen algorithm and policy/thresholds,
-- why its false-merge risk is acceptable relative to split/noise cost,
-- observations across age, pose, and image-quality variation present in the sample,
-- the handling policy for Unknown/noise/outliers,
-- whether measured local neighbour-query cost supports exact PostgreSQL/vector search for WI-0114 or justifies an ANN index.
+The committed production advisory rule starts conservatively:
 
-The committed repository may contain the resulting non-personal policy conclusion and aggregate metrics, but never the sample, embeddings, crops, face/person mappings, or any private per-face report.
+- a member vote must meet the existing ordinary Medium score threshold (default `0.50`),
+- at least 3 independent members must favor the same Person,
+- those votes must cover at least 60% of the discovered cluster,
+- Core members must cover at least 60% of the cluster,
+- a competing Person with more than 1 qualifying vote or more than 20% cluster support makes the result ambiguous,
+- production `not same` evidence also forces ambiguity/fail-closed behavior; the WI-0113 export does not contain those constraints, so that path is covered by automated production tests instead.
+
+The private report records:
+
+- Strong / Ambiguous / Insufficient advisory counts,
+- false-person proposals and conservative proposal precision,
+- recall over pure reviewed clusters with enough labelled members to form a policy opportunity,
+- how many reviewed mixed clusters incorrectly reach Strong,
+- an estimated review-task compression relative to reviewing those opportunity faces one-by-one.
+
+A Strong proposal counts as correct only when every reviewed member in that discovered cluster has one canonical identity and the advisory candidate matches it. This deliberately penalizes mixed-cluster proposals instead of crediting a majority vote.
+
+The evaluator does not alter the production suggestion thresholds and does not evaluate or enable automatic assignment. Review-effort figures are comparative action-count estimates rather than measured operator time.
+
+## 5. Record decisions without committing private data
+
+For WI-0113, record the selected clustering policy and aggregate evaluation conclusion. For WI-0116, record only aggregate advisory precision/recall/review-effort results and the maintainer decision about whether the initial advisory thresholds are acceptable.
+
+The committed repository may contain non-personal aggregate metrics and policy conclusions, but never the sample, embeddings, crops, face/person mappings, or private per-face/per-cluster reports.

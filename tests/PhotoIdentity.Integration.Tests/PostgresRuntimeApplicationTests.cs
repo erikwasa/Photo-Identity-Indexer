@@ -38,6 +38,11 @@ public sealed class PostgresRuntimeApplicationTests
             Assert.Equal(
                 "Provisional clustering is available only when PostgreSQL is the selected catalogue provider.",
                 problem.RootElement.GetProperty("detail").GetString());
+
+            using HttpResponseMessage advisory = await client.GetAsync(
+                $"/api/review/provisional-clusters/review-groups/test-cluster/known-person-advisory?modelId=test-model&modelHash={TestModelHash}");
+            Assert.Equal(HttpStatusCode.Conflict, advisory.StatusCode);
+
             Assert.IsType<SqliteCatalogueDatabase>(
                 factory.Services.GetRequiredService<SqliteCatalogueDatabase>());
             Assert.Null(factory.Services.GetService<PostgresCatalogueDatabase>());
@@ -121,6 +126,10 @@ public sealed class PostgresRuntimeApplicationTests
                 await clustering.Content.ReadAsStringAsync());
             Assert.Equal("not-run", clusterState.RootElement.GetProperty("status").GetString());
             Assert.Equal("m25-dbscan-v1", clusterState.RootElement.GetProperty("policyVersion").GetString());
+
+            using HttpResponseMessage advisory = await client.GetAsync(
+                $"/api/review/provisional-clusters/review-groups/test-cluster/known-person-advisory?modelId=test-model&modelHash={TestModelHash}");
+            Assert.Equal(HttpStatusCode.NotFound, advisory.StatusCode);
 
             Assert.Null(factory.Services.GetService<SqliteCatalogueDatabase>());
             Assert.IsType<PostgresCatalogueDatabase>(
