@@ -83,6 +83,12 @@ public sealed class PostgresProvisionalClusterEvaluationRepositoryTests
             Assert.DoesNotContain(withUnknown, face => face.FaceOccurrenceId == rejected || face.FaceOccurrenceId == unreviewed || face.FaceOccurrenceId == otherModel);
             Assert.All(withUnknown, face => Assert.Equal(revisionId.ToString("D"), face.AssetRevisionId.ToString()));
             Assert.All(withUnknown, face => Assert.Equal(2, face.Embedding.Dimensions));
+            Assert.All(withUnknown, face => Assert.Equal(0.90, face.DetectorConfidence));
+            Assert.All(withUnknown, face => Assert.Equal(0.25, face.FaceAreaFraction));
+            Assert.All(withUnknown, face => Assert.False(face.ReviewedPersonWasMerged));
+            ProvisionalClusterEvaluationFace assignedA1Export = Assert.Single(
+                withUnknown.Where(face => face.FaceOccurrenceId == assignedA1));
+            Assert.Equal(now.AddMinutes(3), assignedA1Export.ReviewedAtUtc);
 
             IReadOnlyList<ProvisionalClusterEvaluationFace> assignedOnly =
                 await repository.ReadReviewedSampleAsync(modelId, modelHash, maximumFaces: 2, includeUnknown: false);
