@@ -4,36 +4,37 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M25 Face discovery and cluster-assisted identity review is proposed, with WI-0110 through WI-0116 complete.**
+**M25 Face discovery and cluster-assisted identity review is ready, with WI-0110 through WI-0116 complete and WI-0117 now unblocked.**
 
-WI-0116 `Add cluster-assisted known-person advisory evidence` was implemented in PR #338 and accepted by the maintainer on 2026-09-15. The final CI run #1828 passed. `verify-postgres.ps1` passed locally, and the web review confirmed that advisory evidence does not preselect a Person or faces, ordinary per-face evidence remains available, canonical Assigned/Unknown/Rejected totals remain unchanged from merely viewing advisory evidence, and the deferred WI-0115 direct `Make anchor` interaction works as intended.
+WI-0116 `Add cluster-assisted known-person advisory evidence` was implemented in PR #338 and accepted by the maintainer on 2026-09-15. Private maintainer evaluation produced 41 Strong, 25 Ambiguous and 17 Insufficient clusters. All 41 evaluable Strong proposals were correct, with 0 false-person proposals and 100.000% proposal precision; pure reviewed opportunity recall was 63.077% (41/65), none of the 2 mixed reviewed clusters reached Strong, and estimated review compression was 6.82x.
 
-The accepted advisory policy `m25-cluster-known-person-v1` combines only current exact-model rank-1 suggestion evidence with one current provisional cluster. A qualifying vote must meet the existing ordinary Medium threshold. Strong support requires at least 3 independent exact-content evidence groups for one Person, at least 60% support across independent content groups and at least 60% Core membership. Duplicate exact-content copies cannot inflate support. More than 1 qualifying competing independent vote, more than 20% competing support, or current internal `not same` evidence fails closed to Ambiguous. Advisory evidence is read-only and cannot create canonical assignments.
+WI-0081 `Investigate degraded identity suggestion accuracy` is complete. The 2026-09-15 private exact-model evaluation covered 14,469 reviewed targets, 10,353 production references and 160 identities. Duplicate-resistant max-exemplar ranking measured 96.491% top-1 / 98.468% top-3 / 98.924% top-5, with 99.844% conservative High precision, 49.709% known High coverage and 0.121% reviewed-Unknown High emission. Degradation was concentrated in weak/small faces and sparse identities rather than monotonic catalogue-size decay. Centroid and cap-8 reference reductions regressed materially.
 
-Private maintainer evaluation produced 41 Strong, 25 Ambiguous and 17 Insufficient clusters. All 41 evaluable Strong proposals were correct: 0 false-person proposals and 100.000% proposal precision. Pure reviewed opportunity recall was 63.077% (41/65). None of the 2 mixed reviewed clusters reached Strong. Estimated review effort was 839 baseline individual actions versus 123 cluster-assisted tasks, for 716 estimated actions saved and 6.82x compression. Only these aggregate findings are recorded; private samples and reports remain uncommitted.
+The corrected exact-content audit found 416 reference content groups spanning multiple photo revisions and 0 cross-label near-duplicate candidates at cosine >=0.95 (maximum cross-label similarity 0.4317). The maintainer selected keeping the current max-exemplar ranking and current High score+margin policy unchanged. Future quality-aware handling of weak/small faces or sparse identities must preserve the accepted false-positive guardrails.
 
-WI-0117 `Evaluate multi-evidence automatic identity assignment` remains proposed and must not start yet. Its declared dependencies are WI-0116 and WI-0081; WI-0116 is complete, but WI-0081 `Investigate degraded identity suggestion accuracy` is still ready/incomplete. WI-0117 explicitly requires WI-0081 to resolve the existing suggestion-accuracy concern before any production automatic-assignment semantics are broadened. Because no M25 work item is currently ready or active, the milestone lifecycle correctly resolves to `proposed`.
+WI-0117 `Evaluate multi-evidence automatic identity assignment` has both declared dependencies satisfied: WI-0081 and WI-0116 are complete. It remains a proposed work item, but dependency readiness now makes M25 ready. WI-0117 is explicitly an evaluation gate: broader automatic assignment is optional and may close with current automation unchanged if private evidence does not demonstrate an acceptable precision/unknown-rejection/review-effort trade-off.
 
 PostgreSQL remains the sole writable production catalogue. Provisional clusters and cluster-assisted identity evidence remain derived/non-canonical.
 
 ## Next concrete step
 
-If continuing toward M25 automatic-assignment evaluation, start WI-0081 first. Quantify current suggestion accuracy on reviewed catalogue evidence, segment failures and audit reference/ranking behavior before changing thresholds or production suggestion semantics. Only after WI-0081 is accepted should WI-0117 be reassessed and potentially started.
+Reassess and start WI-0117 if continuing M25. Define private candidate multi-evidence rules that combine independent exemplar and cluster support, compare them against the accepted current High policy, and fail closed unless false assignment/Unknown rejection guardrails are preserved. Do not broaden production automatic-assignment semantics before the private evaluation supports it.
 
 If M25 automation is intentionally deferred, M26 Creative Collections has WI-0118 `Prototype timestamp-first photo moment clustering` ready as an independent next direction.
 
 ## Relevant files
 
-- docs/delivery/work-items/WI-0081-suggestion-accuracy-degradation.md
-- docs/delivery/status/work-items/active/WI-0081.yaml
 - docs/delivery/work-items/WI-0117-multi-evidence-auto-assignment-evaluation.md
 - docs/delivery/status/work-items/active/WI-0117.yaml
+- docs/delivery/work-items/WI-0081-suggestion-accuracy-degradation.md
+- docs/delivery/status/work-items/archive/WI-0081.yaml
 - docs/delivery/work-items/WI-0116-cluster-assisted-known-person-evidence.md
 - docs/delivery/status/work-items/archive/WI-0116.yaml
 - src/PhotoIdentity.Core/Clustering/ProvisionalFaceClusterKnownPersonAdvisory.cs
 - src/PhotoIdentity.Persistence.Postgres/PostgresProvisionalFaceClusterKnownPersonAdvisoryRepository.cs
 - src/PhotoIdentity.Api/ProvisionalFaceClusterEndpoints.cs
-- src/PhotoIdentity.Web/Pages/PeopleToIdentify.razor
+- tools/cluster-evaluation/evaluate_suggestions.py
+- tools/cluster-evaluation/audit_suggestion_content.py
 - tools/cluster-evaluation/evaluate_advisory.py
 
 ## Repository validation
