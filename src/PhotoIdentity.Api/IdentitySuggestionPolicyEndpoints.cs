@@ -1,6 +1,7 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Review;
+using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -12,6 +13,8 @@ public static class IdentitySuggestionPolicyEndpoints
         RouteGroupBuilder group = endpoints.MapGroup("/api/review/suggestion-policy");
         group.MapGet("", GetAsync);
         group.MapPut("", UpdateAsync);
+        group.MapGet("/multi-evidence", GetMultiEvidenceAsync);
+        group.MapPut("/multi-evidence", UpdateMultiEvidenceAsync);
         return endpoints;
     }
 
@@ -69,6 +72,75 @@ public static class IdentitySuggestionPolicyEndpoints
         }
     }
 
+    private static async Task<IResult> GetMultiEvidenceAsync(
+        IServiceProvider services,
+        string? modelId,
+        string? modelHash,
+        CancellationToken cancellationToken)
+    {
+        if (!TryModelRevision(modelId, modelHash, out ModelId parsedModelId, out Sha256Digest parsedModelHash))
+        {
+            return BadRequest("An exact suggestion model revision is required.");
+        }
+
+        PostgresCatalogueDatabase? database = services.GetService<PostgresCatalogueDatabase>();
+        if (database is null)
+        {
+            return BadRequest("Multi-evidence automatic assignment requires the PostgreSQL catalogue.");
+        }
+
+        PostgresIdentityMultiEvidenceAutoAssignmentPolicyRepository repository = new(
+            database,
+            services.GetService<TimeProvider>());
+        ReviewIdentityMultiEvidenceAutoAssignmentConfiguration configuration = await repository.GetAsync(
+            parsedModelId,
+            parsedModelHash,
+            cancellationToken);
+        return Results.Ok(ToMultiEvidenceResponse(parsedModelId, parsedModelHash, configuration));
+    }
+
+    private static async Task<IResult> UpdateMultiEvidenceAsync(
+        UpdateIdentityMultiEvidenceAutoAssignmentPolicyRequest request,
+        IServiceProvider services,
+        string? modelId,
+        string? modelHash,
+        CancellationToken cancellationToken)
+    {
+        if (!TryModelRevision(modelId, modelHash, out ModelId parsedModelId, out Sha256Digest parsedModelHash))
+        {
+            return BadRequest("An exact suggestion model revision is required.");
+        }
+
+        if (request is null || string.IsNullOrWhiteSpace(request.Actor))
+        {
+            return BadRequest("A policy update actor is required.");
+        }
+
+        PostgresCatalogueDatabase? database = services.GetService<PostgresCatalogueDatabase>();
+        if (database is null)
+        {
+            return BadRequest("Multi-evidence automatic assignment requires the PostgreSQL catalogue.");
+        }
+
+        try
+        {
+            PostgresIdentityMultiEvidenceAutoAssignmentPolicyRepository repository = new(
+                database,
+                services.GetService<TimeProvider>());
+            ReviewIdentityMultiEvidenceAutoAssignmentConfiguration configuration = await repository.UpdateAsync(
+                parsedModelId,
+                parsedModelHash,
+                request.Enabled,
+                request.Actor,
+                cancellationToken);
+            return Results.Ok(ToMultiEvidenceResponse(parsedModelId, parsedModelHash, configuration));
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+    }
+
     private static IdentitySuggestionPolicyResponse ToResponse(
         ModelId modelId,
         Sha256Digest modelHash,
@@ -83,6 +155,29 @@ public static class IdentitySuggestionPolicyEndpoints
             policy.MediumScoreThreshold,
             policy.UpdatedBy,
             policy.UpdatedAtUtc);
+
+    private static IdentityMultiEvidenceAutoAssignmentPolicyResponse ToMultiEvidenceResponse(
+        ModelId modelId,
+        Sha256Digest modelHash,
+        ReviewIdentityMultiEvidenceAutoAssignmentConfiguration configuration)
+    {
+        ReviewIdentityMultiEvidenceAutoAssignmentPolicy policy =
+            ReviewIdentityMultiEvidenceAutoAssignmentPolicy.Initial;
+        return new(
+            modelId.ToString(),
+            modelHash.ToString(),
+            configuration.Version,
+            configuration.Enabled,
+            configuration.AlgorithmPolicyVersion,
+            policy.MinimumTargetScore,
+            policy.MinimumTargetMargin,
+            policy.MinimumIndependentReferenceCount,
+            policy.MinimumReferenceScore,
+            policy.ClusterPolicyVersion,
+            policy.ClusterIncludeUnknown,
+            configuration.UpdatedBy,
+            configuration.UpdatedAtUtc);
+    }
 
     private static bool TryModelRevision(
         string? modelId,
