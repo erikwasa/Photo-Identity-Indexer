@@ -10,7 +10,9 @@ using PhotoIdentity.Core.Review;
 namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
-/// Reads a bounded, exact-model reviewed sample for local clustering and suggestion-quality evaluation.
+/// Reads bounded exact-model private evaluation samples. Reviewed targets and production
+/// confirmed references are exposed separately so suggestion evaluation can reproduce the
+/// production reference population without changing the clustering-evaluation target set.
 /// No source paths, person names, crops, or other presentation metadata leave this repository.
 /// </summary>
 public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisionalClusterEvaluationRepository
@@ -31,12 +33,7 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
         bool includeUnknown = true,
         CancellationToken cancellationToken = default)
     {
-        if (maximumFaces is < 1 or > MaximumExportFaces)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(maximumFaces),
-                $"Evaluation sample size must be between 1 and {MaximumExportFaces}.");
-        }
+        ValidateMaximumFaces(maximumFaces);
 
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlCommand command = connection.CreateCommand();
@@ -120,11 +117,131 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
             ORDER BY face_occurrences.id
             LIMIT @maximum_faces;
             """;
-        command.Parameters.AddWithValue("model_id", modelId.ToString());
-        command.Parameters.AddWithValue("model_hash", modelHash.ToString());
+        AddModelParameters(command, modelId, modelHash);
         command.Parameters.AddWithValue("include_unknown", includeUnknown);
         command.Parameters.AddWithValue("maximum_faces", maximumFaces);
+        return await ReadFacesAsync(command, cancellationToken);
+    }
 
+    public async Task<IReadOnlyList<ProvisionalClusterEvaluationFace>> ReadConfirmedReferenceSampleAsync(
+        ModelId modelId,
+        Sha256Digest modelHash,
+        int maximumFaces = MaximumExportFaces,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateMaximumFaces(maximumFaces);
+
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            WITH latest_review AS (
+                SELECT
+                    review_actions.face_occurrence_id,
+                    review_actions.action_kind,
+                    review_actions.person_id,
+                    review_actions.created_at_utc,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY review_actions.face_occurrence_id
+                        ORDER BY review_actions.id DESC) AS row_number
+                FROM review_actions
+                WHERE review_actions.action_kind IN ('assign', 'unknown', 'reject')
+                  AND review_actions.reversed_at_utc IS NULL
+            ),
+            confirmed_faces AS (
+                SELECT
+                    latest_review.face_occurrence_id,
+                    latest_review.person_id,
+                    latest_review.created_at_utc AS assigned_at_utc
+                FROM latest_review
+                WHERE latest_review.row_number = 1
+                  AND latest_review.action_kind = 'assign'
+                  AND latest_review.person_id IS NOT NULL
+                UNION ALL
+                SELECT
+                    label.face_occurrence_id,
+                    label.person_id,
+                    label.assigned_at_utc
+                FROM person_labels AS label
+                WHERE label.label_kind = 'confirmed'
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM review_actions AS action
+                      WHERE action.face_occurrence_id = label.face_occurrence_id)
+            ),
+            matching_embeddings AS (
+                SELECT
+                    face_crops.face_occurrence_id,
+                    embeddings.dimensions,
+                    embeddings.l2_norm,
+                    embeddings.vector_blob,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY face_crops.face_occurrence_id
+                        ORDER BY embeddings.created_at_utc DESC, embeddings.id DESC) AS row_number
+                FROM face_crops
+                INNER JOIN embeddings
+                    ON embeddings.face_crop_id = face_crops.id
+                WHERE embeddings.model_id = @model_id
+                  AND embeddings.model_hash = @model_hash
+            ),
+            latest_observation AS (
+                SELECT
+                    face_observations.face_occurrence_id,
+                    face_observations.confidence,
+                    face_observations.bounding_box_json,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY face_observations.face_occurrence_id
+                        ORDER BY
+                            face_observations.observed_at_utc DESC,
+                            face_observations.detector_model_id,
+                            face_observations.detector_model_hash) AS row_number
+                FROM face_observations
+            )
+            SELECT
+                face_occurrences.id,
+                face_occurrences.asset_revision_id,
+                asset_revisions.content_sha256,
+                'assign' AS action_kind,
+                confirmed_faces.person_id,
+                matching_embeddings.dimensions,
+                matching_embeddings.l2_norm,
+                matching_embeddings.vector_blob,
+                latest_observation.confidence,
+                latest_observation.bounding_box_json,
+                asset_revisions.width,
+                asset_revisions.height,
+                confirmed_faces.assigned_at_utc,
+                EXISTS (
+                    SELECT 1
+                    FROM person_maintenance_actions AS maintenance
+                    WHERE maintenance.action_kind = 'merge'
+                      AND maintenance.target_person_id = confirmed_faces.person_id
+                ) AS reviewed_person_has_merge_history
+            FROM confirmed_faces
+            INNER JOIN matching_embeddings
+                ON matching_embeddings.face_occurrence_id = confirmed_faces.face_occurrence_id
+               AND matching_embeddings.row_number = 1
+            INNER JOIN face_occurrences
+                ON face_occurrences.id = confirmed_faces.face_occurrence_id
+            INNER JOIN asset_revisions
+                ON asset_revisions.id = face_occurrences.asset_revision_id
+            INNER JOIN people AS person
+                ON person.id = confirmed_faces.person_id
+            LEFT JOIN latest_observation
+                ON latest_observation.face_occurrence_id = face_occurrences.id
+               AND latest_observation.row_number = 1
+            WHERE person.merged_into_person_id IS NULL
+            ORDER BY face_occurrences.id
+            LIMIT @maximum_faces;
+            """;
+        AddModelParameters(command, modelId, modelHash);
+        command.Parameters.AddWithValue("maximum_faces", maximumFaces);
+        return await ReadFacesAsync(command, cancellationToken);
+    }
+
+    private static async Task<IReadOnlyList<ProvisionalClusterEvaluationFace>> ReadFacesAsync(
+        NpgsqlCommand command,
+        CancellationToken cancellationToken)
+    {
         List<ProvisionalClusterEvaluationFace> result = [];
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
@@ -134,7 +251,7 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
                 CatalogueReviewActionKinds.Assign => CatalogueReviewStates.Assigned,
                 CatalogueReviewActionKinds.Unknown => CatalogueReviewStates.Unknown,
                 string unexpected => throw new DataException(
-                    $"Unexpected review state '{unexpected}' in cluster-evaluation sample."),
+                    $"Unexpected review state '{unexpected}' in private evaluation sample."),
             };
             PersonId? personId = reader.IsDBNull(4)
                 ? null
@@ -164,6 +281,25 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
         }
 
         return result;
+    }
+
+    private static void ValidateMaximumFaces(int maximumFaces)
+    {
+        if (maximumFaces is < 1 or > MaximumExportFaces)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumFaces),
+                $"Evaluation sample size must be between 1 and {MaximumExportFaces}.");
+        }
+    }
+
+    private static void AddModelParameters(
+        NpgsqlCommand command,
+        ModelId modelId,
+        Sha256Digest modelHash)
+    {
+        command.Parameters.AddWithValue("model_id", modelId.ToString());
+        command.Parameters.AddWithValue("model_hash", modelHash.ToString());
     }
 
     private static double? TryReadFaceAreaFraction(
