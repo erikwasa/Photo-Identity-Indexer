@@ -87,7 +87,7 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
                 face_occurrences.asset_revision_id,
                 asset_revisions.content_sha256,
                 latest_action.action_kind,
-                COALESCE(reviewed_person.merged_into_person_id, latest_action.person_id) AS canonical_person_id,
+                latest_action.person_id,
                 matching_embeddings.dimensions,
                 matching_embeddings.l2_norm,
                 matching_embeddings.vector_blob,
@@ -96,7 +96,12 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
                 asset_revisions.width,
                 asset_revisions.height,
                 latest_action.created_at_utc,
-                (reviewed_person.merged_into_person_id IS NOT NULL) AS reviewed_person_was_merged
+                EXISTS (
+                    SELECT 1
+                    FROM person_maintenance_actions AS maintenance
+                    WHERE maintenance.action_kind = 'merge'
+                      AND maintenance.target_person_id = latest_action.person_id
+                ) AS reviewed_person_has_merge_history
             FROM matching_embeddings
             INNER JOIN face_occurrences
                 ON face_occurrences.id = matching_embeddings.face_occurrence_id
@@ -105,8 +110,6 @@ public sealed class PostgresProvisionalClusterEvaluationRepository : IProvisiona
             INNER JOIN latest_action
                 ON latest_action.face_occurrence_id = face_occurrences.id
                AND latest_action.row_number = 1
-            LEFT JOIN people AS reviewed_person
-                ON reviewed_person.id = latest_action.person_id
             LEFT JOIN latest_observation
                 ON latest_observation.face_occurrence_id = face_occurrences.id
                AND latest_observation.row_number = 1
