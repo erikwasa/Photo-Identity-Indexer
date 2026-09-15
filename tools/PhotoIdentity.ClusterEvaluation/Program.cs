@@ -1,6 +1,7 @@
 using System.Text.Json;
 using PhotoIdentity.Core.Clustering;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Review;
 using PhotoIdentity.Persistence.Postgres;
 
 namespace PhotoIdentity.ClusterEvaluation;
@@ -35,6 +36,9 @@ internal static class Program
                 throw new InvalidOperationException("No reviewed faces with an exact-model embedding matched the requested sample.");
             }
 
+            ReviewIdentitySuggestionPolicy policy = await new PostgresIdentitySuggestionPolicyRepository(database)
+                .GetAsync(options.ModelId, options.ModelHash);
+
             string outputPath = ValidateOutputPath(options.OutputPath);
             if (File.Exists(outputPath) && !options.Force)
             {
@@ -42,7 +46,7 @@ internal static class Program
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-            PrivateEvaluationExport export = BuildExport(sample, options);
+            PrivateEvaluationExport export = BuildExport(sample, options, policy);
             JsonSerializerOptions jsonOptions = new()
             {
                 WriteIndented = true,
@@ -52,6 +56,9 @@ internal static class Program
 
             Console.WriteLine($"Exported {sample.Count} reviewed faces to {outputPath}");
             Console.WriteLine($"Assigned labels: {export.AssignedLabelCount}; Unknown faces: {export.UnknownFaceCount}");
+            Console.WriteLine(
+                $"Suggestion policy v{export.SuggestionPolicy.Version}: High={export.SuggestionPolicy.HighScoreThreshold:F2} " +
+                $"margin={export.SuggestionPolicy.HighMarginThreshold:F2}; Medium={export.SuggestionPolicy.MediumScoreThreshold:F2}");
             Console.WriteLine("The export contains biometric embeddings. Keep it private and do not commit it.");
             return 0;
         }
@@ -66,7 +73,8 @@ internal static class Program
 
     private static PrivateEvaluationExport BuildExport(
         IReadOnlyList<ProvisionalClusterEvaluationFace> sample,
-        ExportOptions options)
+        ExportOptions options,
+        ReviewIdentitySuggestionPolicy policy)
     {
         string[] personIds = sample
             .Where(face => face.PersonId is not null)
@@ -117,15 +125,31 @@ internal static class Program
                 contentGroups[face.ContentHash.ToString()],
                 face.ReviewState,
                 label,
-                face.Embedding.ToArray()));
+                face.Embedding.ToArray(),
+                face.DetectorConfidence,
+                face.FaceAreaFraction,
+                face.ReviewedAtUtc,
+                face.ReviewedPersonWasMerged));
         }
 
         return new PrivateEvaluationExport(
-            1,
+            2,
             options.ModelId.ToString(),
             options.ModelHash.ToString(),
             DateTimeOffset.UtcNow,
             ProvisionalFaceClusterSemantics.CanonicalDefinition,
+            new PrivateSuggestionPolicy(
+                policy.Version,
+                policy.AutoAssignEnabled,
+                policy.HighScoreThreshold,
+                policy.HighMarginThreshold,
+                policy.MediumScoreThreshold,
+                policy.UpdatedBy,
+                policy.UpdatedAtUtc),
+            new PrivateSampleSelection(
+                options.MaximumFaces,
+                options.IncludeUnknown,
+                "face-occurrence-id-ascending"),
             faces.Count,
             labels.Count,
             unknownCount,
@@ -219,6 +243,8 @@ internal static class Program
         Console.WriteLine("    --model-id <id> --model-hash <sha256> [--max-faces 5000]");
         Console.WriteLine("    [--output private/cluster-evaluation/sample.json] [--exclude-unknown] [--force]");
         Console.WriteLine();
+        Console.WriteLine("Schema v2 includes the exact suggestion policy plus detector confidence, normalized face area,");
+        Console.WriteLine("review time and merged-person audit metadata for WI-0081. No names or source paths are exported.");
         Console.WriteLine($"Connection string is read only from {ConnectionStringEnvironmentVariable}.");
     }
 
@@ -236,10 +262,26 @@ internal static class Program
         string ModelHash,
         DateTimeOffset GeneratedAtUtc,
         string ClusterContract,
+        PrivateSuggestionPolicy SuggestionPolicy,
+        PrivateSampleSelection SampleSelection,
         int FaceCount,
         int AssignedLabelCount,
         int UnknownFaceCount,
         IReadOnlyList<PrivateEvaluationFace> Faces);
+
+    private sealed record PrivateSuggestionPolicy(
+        int Version,
+        bool AutoAssignEnabled,
+        double HighScoreThreshold,
+        double HighMarginThreshold,
+        double MediumScoreThreshold,
+        string UpdatedBy,
+        DateTimeOffset UpdatedAtUtc);
+
+    private sealed record PrivateSampleSelection(
+        int MaximumFaces,
+        bool IncludeUnknown,
+        string Ordering);
 
     private sealed record PrivateEvaluationFace(
         string Id,
@@ -247,5 +289,9 @@ internal static class Program
         string ContentGroup,
         string ReviewState,
         string? GroundTruthLabel,
-        float[] Embedding);
+        float[] Embedding,
+        double? DetectorConfidence,
+        double? FaceAreaFraction,
+        DateTimeOffset? ReviewedAtUtc,
+        bool ReviewedPersonWasMerged);
 }
