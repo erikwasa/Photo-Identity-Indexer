@@ -129,7 +129,7 @@ internal static class Program
                 face.DetectorConfidence,
                 face.FaceAreaFraction,
                 face.ReviewedAtUtc,
-                face.ReviewedPersonWasMerged));
+                face.ReviewedPersonHasMergeHistory));
         }
 
         // Schema 1 is intentionally retained because all WI-0081 additions are optional/additive;
@@ -245,7 +245,7 @@ internal static class Program
         Console.WriteLine("    [--output private/cluster-evaluation/sample.json] [--exclude-unknown] [--force]");
         Console.WriteLine();
         Console.WriteLine("The backward-compatible schema now also includes the exact suggestion policy plus detector confidence,");
-        Console.WriteLine("normalized face area, review time and merged-person audit metadata for WI-0081. No names, actors or source paths are exported.");
+        Console.WriteLine("normalized face area, review time and merge-history audit metadata for WI-0081. No names, actors or source paths are exported.");
         Console.WriteLine($"Connection string is read only from {ConnectionStringEnvironmentVariable}.");
     }
 
@@ -293,5 +293,5 @@ internal static class Program
         double? DetectorConfidence,
         double? FaceAreaFraction,
         DateTimeOffset? ReviewedAtUtc,
-        bool ReviewedPersonWasMerged);
+        bool ReviewedPersonHasMergeHistory);
 }
