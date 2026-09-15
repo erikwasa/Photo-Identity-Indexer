@@ -225,12 +225,16 @@ def evaluate_scenario(
         correct = label is not None and top_person == label
 
         true_rank = None
+        genuine_score = None
+        best_impostor_score = None
         if label is not None:
             known_evaluable += 1
-            for rank, (person, _) in enumerate(ranked, start=1):
+            for rank, (person, score) in enumerate(ranked, start=1):
                 if person == label:
                     true_rank = rank
-                    break
+                    genuine_score = score
+                elif best_impostor_score is None:
+                    best_impostor_score = score
             if true_rank == 1:
                 top1 += 1
             if true_rank is not None and true_rank <= 3:
@@ -267,6 +271,8 @@ def evaluate_scenario(
             "correct": correct,
             "trueRank": true_rank,
             "trueReferenceCount": true_reference_count,
+            "genuineScore": genuine_score,
+            "bestImpostorScore": best_impostor_score,
         })
 
     metrics = {
@@ -313,6 +319,66 @@ def summarize_records(records: list[dict[str, Any]], indices: list[int]) -> dict
         ),
         "medianTopScore": median(record["topScore"] for record in chosen),
         "medianMargin": median(margins) if margins else None,
+    }
+
+
+def distribution(values: list[float]) -> dict[str, Any]:
+    if not values:
+        return {"count": 0}
+    array = np.asarray(values, dtype=np.float64)
+    return {
+        "count": len(values),
+        "min": float(np.min(array)),
+        "p05": float(np.quantile(array, 0.05)),
+        "p25": float(np.quantile(array, 0.25)),
+        "median": float(np.quantile(array, 0.50)),
+        "p75": float(np.quantile(array, 0.75)),
+        "p95": float(np.quantile(array, 0.95)),
+        "max": float(np.max(array)),
+    }
+
+
+def score_behavior(
+    records: list[dict[str, Any]],
+    policy: dict[str, Any],
+) -> dict[str, Any]:
+    known = [
+        record for record in records
+        if record["truth"] is not None and record["genuineScore"] is not None
+    ]
+    paired = [record for record in known if record["bestImpostorScore"] is not None]
+    genuine = [float(record["genuineScore"]) for record in known]
+    impostor = [float(record["bestImpostorScore"]) for record in paired]
+    genuine_minus_impostor = [
+        float(record["genuineScore"] - record["bestImpostorScore"])
+        for record in paired
+    ]
+    false_ordering = sum(
+        1 for record in paired
+        if float(record["bestImpostorScore"]) >= float(record["genuineScore"])
+    )
+    return {
+        "genuineScore": distribution(genuine),
+        "bestImpostorScore": distribution(impostor),
+        "genuineMinusBestImpostor": distribution(genuine_minus_impostor),
+        "pairedTargetCount": len(paired),
+        "impostorOutranksOrTiesGenuineRate": false_ordering / len(paired) if paired else 0.0,
+        "genuineBelowMediumRate": (
+            sum(1 for score in genuine if score < policy["mediumScoreThreshold"]) / len(genuine)
+            if genuine else 0.0
+        ),
+        "genuineBelowHighScoreRate": (
+            sum(1 for score in genuine if score < policy["highScoreThreshold"]) / len(genuine)
+            if genuine else 0.0
+        ),
+        "bestImpostorAtOrAboveMediumRate": (
+            sum(1 for score in impostor if score >= policy["mediumScoreThreshold"]) / len(impostor)
+            if impostor else 0.0
+        ),
+        "bestImpostorAtOrAboveHighScoreRate": (
+            sum(1 for score in impostor if score >= policy["highScoreThreshold"]) / len(impostor)
+            if impostor else 0.0
+        ),
     }
 
 
@@ -504,7 +570,8 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         metrics[name] = scenario_metrics
         records[name] = scenario_records
 
-    baseline = metrics["duplicate-resistant-max"]
+    baseline_name = "duplicate-resistant-max"
+    baseline = metrics[baseline_name]
     centroid = metrics["duplicate-resistant-centroid"]
     capped = metrics["duplicate-resistant-quality-diverse-cap"]
 
@@ -521,13 +588,14 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
         "productionSuggestionPolicy": policy,
         "contaminationAudit": contamination_audit(faces, truth, content_groups, labelled_by_person),
         "scenarios": metrics,
+        "baselineScoreBehavior": score_behavior(records[baseline_name], policy),
         "baselineSegmentation": segmentation(
             faces,
             truth,
-            records["duplicate-resistant-max"],
+            records[baseline_name],
         ),
         "mitigationComparison": {
-            "baseline": "duplicate-resistant-max",
+            "baseline": baseline_name,
             "centroid": {
                 "top1AccuracyDelta": delta(centroid, baseline, "top1Accuracy"),
                 "highSuggestionPrecisionDelta": delta(centroid, baseline, "highSuggestionPrecision"),
@@ -546,6 +614,7 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
             "Production-equivalent max-exemplar reproduces the current best-exemplar-per-person ranking rule with only the target face removed.",
             "Duplicate-resistant scenarios also remove every reference from the target's exact-content group so duplicate copies cannot make holdout accuracy look better than it is.",
             "Known targets without another usable reference for their true Person are reported separately and excluded from top-k accuracy denominators.",
+            "Genuine score is the score assigned to the target's reviewed Person; best-impostor score is the highest score from any other reviewed Person.",
             "Unknown reviewed faces have no person ground truth; High/Medium emission rates on them are conservative false-positive-risk indicators, not proof that every emitted identity is wrong.",
             "Detector confidence and normalized face area are queue-composition proxies, not direct measures of embedding quality.",
             "Review chronology quartiles help distinguish an actual matcher regression from later review queues containing harder faces.",
@@ -558,6 +627,10 @@ def evaluate(args: argparse.Namespace) -> dict[str, Any]:
 
 def pct(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.3%}"
+
+
+def score(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.4f}"
 
 
 def render_markdown(report: dict[str, Any]) -> str:
@@ -573,7 +646,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         "",
         "## Ranking scenarios",
         "",
-        "| Scenario | Evaluable known | No holdout ref | Top-1 | Top-3 | Top-5 | High precision | High coverage | Unknown High emission |",
+        "| Scenario | Evaluable known | No holdout ref | Top-1 | Top-3 | Top-5 | Conservative High precision | High coverage | Unknown High emission |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for scenario in report["scenarios"].values():
@@ -590,6 +663,23 @@ def render_markdown(report: dict[str, Any]) -> str:
                 unknown=pct(scenario["unknownHighEmissionRate"]),
             )
         )
+
+    behavior = report["baselineScoreBehavior"]
+    genuine = behavior["genuineScore"]
+    impostor = behavior["bestImpostorScore"]
+    gap = behavior["genuineMinusBestImpostor"]
+    lines.extend([
+        "",
+        "## Duplicate-resistant genuine / impostor behavior",
+        "",
+        f"- Genuine score median / p05 / p95: **{score(genuine.get('median'))} / {score(genuine.get('p05'))} / {score(genuine.get('p95'))}**",
+        f"- Best-impostor score median / p05 / p95: **{score(impostor.get('median'))} / {score(impostor.get('p05'))} / {score(impostor.get('p95'))}**",
+        f"- Genuine-minus-impostor median / p05: **{score(gap.get('median'))} / {score(gap.get('p05'))}**",
+        f"- Best impostor outranks or ties genuine: **{behavior['impostorOutranksOrTiesGenuineRate']:.3%}**",
+        f"- Genuine below Medium threshold: **{behavior['genuineBelowMediumRate']:.3%}**",
+        f"- Best impostor at/above Medium threshold: **{behavior['bestImpostorAtOrAboveMediumRate']:.3%}**",
+        f"- Best impostor at/above High score threshold: **{behavior['bestImpostorAtOrAboveHighScoreRate']:.3%}**",
+    ])
 
     audit = report["contaminationAudit"]
     lines.extend([
