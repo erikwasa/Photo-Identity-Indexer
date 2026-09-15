@@ -153,12 +153,13 @@ public sealed class PostgresIdentityMultiEvidenceAutoAssignmentTests
             Assert.Equal(
                 PostgresIdentityAutoAssignmentService.MultiEvidenceAutomaticActor,
                 targetAssignment.Actor);
+            string note = Assert.IsType<string>(targetAssignment.Note);
             Assert.Contains(
                 ReviewIdentityMultiEvidenceAutoAssignmentPolicy.Initial.Version,
-                targetAssignment.Note,
+                note,
                 StringComparison.Ordinal);
-            Assert.Contains("independent-reference-support-count=2", targetAssignment.Note, StringComparison.Ordinal);
-            Assert.Contains(clusterRun.Id.ToString(), targetAssignment.Note, StringComparison.Ordinal);
+            Assert.Contains("independent-reference-support-count=2", note, StringComparison.Ordinal);
+            Assert.Contains(clusterRun.Id.ToString(), note, StringComparison.Ordinal);
         }
         finally
         {
