@@ -5,7 +5,7 @@ milestone: M21
 status_source: ../status/work-items.yaml
 depends_on: [WI-0016, WI-0043]
 related_adrs: [ADR-0006]
-affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Worker, PhotoIdentity.Web]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Worker, PhotoIdentity.Web]
 ---
 
 # WI-0081: Investigate degraded identity suggestion accuracy
@@ -58,6 +58,18 @@ Do not compensate by simply lowering/raising a threshold or changing model setti
 - Preserve auditable provenance for suggestions and assignments.
 - False-positive risk matters more than making every face receive a confident suggestion.
 - Any proposed mitigation must be evaluated against both accuracy and abstention/uncertainty behavior.
+
+## Investigation workflow
+
+The first implementation slice extends the existing privacy-safe reviewed-sample workflow rather than adding a second source of identity truth. `PhotoIdentity.ClusterEvaluation` exports one bounded exact-model reviewed sample with pseudonymized Person/photo/content groups. For WI-0081 it also records the exact persisted suggestion policy, detector confidence, normalized face area, review time and whether an assignment originally referenced a subsequently merged Person. Person names, source paths, crop paths, raw catalogue identifiers and policy actor data are not exported.
+
+`tools/cluster-evaluation/evaluate_suggestions.py` evaluates the sample locally without writing production suggestions or assignments. It reproduces the current best-exemplar-per-Person ranking as a production-equivalent reference, then uses a duplicate-resistant leave-one-out baseline that excludes every reference from the target's exact-content group. Reviewed identities that have no remaining same-Person holdout reference are reported separately rather than counted as matching failures.
+
+The report covers top-1/top-3/top-5 accuracy, current High/Medium policy behavior, conservative suggestion emission on reviewed Unknown faces, genuine-vs-best-impostor score distributions and overlap, exact-content/merge contamination, reference concentration, and segmentation by detector confidence, normalized face area, true-Person reference-set size and review chronology. Model revisions are evaluated separately by exact model hash rather than pooling incompatible evidence.
+
+Two non-model reference/ranking mitigation families are compared offline against the duplicate-resistant current ranking: a normalized per-Person centroid and a bounded quality/diversity-selected reference set. Before/after deltas include top-1 accuracy, High precision/coverage and reviewed-Unknown High emission so an apparent accuracy gain cannot silently trade for greater false-positive risk.
+
+This slice intentionally does **not** change production thresholds, reference construction, ranking, auto-assignment or review semantics. WI-0081 remains incomplete until the private catalogue evaluation is run, aggregate findings are recorded, and the maintainer selects an implementation direction.
 
 ## Investigation acceptance criteria
 
