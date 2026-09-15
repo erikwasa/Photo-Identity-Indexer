@@ -1,0 +1,27 @@
+id: WI-0116
+title: Add cluster-assisted known-person advisory evidence
+milestone: M25
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0116-cluster-assisted-known-person-evidence.md
+started_at: 2026-09-15
+completed_at: 2026-09-15
+verified_at: 2026-09-15
+verified_by: maintainer
+last_updated_at: 2026-09-15
+branch: agent/WI-0116-cluster-known-person-advisory
+blockers:
+- WI-0114
+- WI-0043
+blocker_notes:
+- Maintainer verification passed on 2026-09-15 against the local PostgreSQL-backed application. The advisory panel displayed correctly, did not preselect a Person or faces, preserved ordinary per-face evidence, left canonical Assigned/Unknown/Rejected totals unchanged, and the deferred WI-0115 Make anchor interaction was verified.
+- Private reviewed-data evaluation produced 41 Strong, 25 Ambiguous and 17 Insufficient clusters. All 41 evaluable Strong proposals were correct, with 0 false-person proposals, 100.000% proposal precision, 63.077% pure-opportunity recall (41/65), and 0 of 2 mixed reviewed clusters classified Strong. Estimated review compression was 6.82x, reducing 839 baseline individual review actions to 123 estimated cluster-assisted tasks (716 actions saved).
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/338
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/34908896152
+- type: merge_commit
+  value: 48d7dbc541c0f05704b1569003374c626ae52e8f
+- type: maintainer_verification
+  value: 2026-09-15 verify-postgres PASS; UI advisory/canonical-safety/anchor checks PASS; private evaluation 41/41 Strong correct, 0 false-person proposals, 0/2 mixed Strong, 63.077% opportunity recall, 6.82x estimated review compression.
