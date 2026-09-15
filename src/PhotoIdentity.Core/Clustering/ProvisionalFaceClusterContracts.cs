@@ -106,4 +106,4 @@ public sealed record ProvisionalClusterEvaluationFace(
     double? DetectorConfidence = null,
     double? FaceAreaFraction = null,
     DateTimeOffset? ReviewedAtUtc = null,
-    bool ReviewedPersonWasMerged = false);
+    bool ReviewedPersonHasMergeHistory = false);
