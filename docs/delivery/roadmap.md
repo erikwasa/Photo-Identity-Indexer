@@ -25,11 +25,11 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M18 | Operator application experience | completed |
 | M19 | Photo metadata and semantic collections | completed |
 | M20 | Operator polish and archive throughput | completed |
-| M21 | Reliability and recognition quality | ready |
+| M21 | Reliability and recognition quality | completed |
 | M22 | Protected Smart Collection slideshow | completed |
 | M23 | Source-copy lifecycle and privacy exclusion | ready |
 | M24 | PostgreSQL catalogue migration and archive-scale operation | completed |
-| M25 | Face discovery and cluster-assisted identity review | proposed |
+| M25 | Face discovery and cluster-assisted identity review | ready |
 | M26 | Creative Collections | ready |
 
 Expected evolution:

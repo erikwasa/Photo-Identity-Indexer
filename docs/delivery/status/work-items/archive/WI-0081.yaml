@@ -1,0 +1,29 @@
+id: WI-0081
+title: Investigate degraded identity suggestion accuracy
+milestone: M21
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0081-suggestion-accuracy-degradation.md
+started_at: 2026-09-15
+completed_at: 2026-09-15
+verified_at: 2026-09-15
+verified_by: maintainer
+last_updated_at: 2026-09-15
+branch: agent/WI-0081-record-evaluation-findings
+blockers:
+- WI-0016
+- WI-0043
+blocker_notes:
+- Private exact-model evaluation found 96.491% duplicate-resistant top-1 accuracy and 99.844% conservative High precision; the apparent degradation is concentrated in weak/small faces and sparse identities rather than monotonic catalogue-size decay.
+- Corrected source-content audit found 416 repeated-content reference groups and 0 cross-label near-duplicate candidates (maximum cross-label similarity 0.4317). Maintainer selected keeping the current max-exemplar plus High score/margin policy unchanged.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/340
+- type: merge_commit
+  value: d0086ee2c38cfae04ff62f416fb4123f13ea50a5
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/341
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/35019618954
+- type: maintainer_verification
+  value: 2026-09-15 private evaluation PASS; corrected content audit 0 cross-label near-duplicate candidates; maintainer decision keep current max-exemplar and High score+margin policy.

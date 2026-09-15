@@ -185,7 +185,7 @@ milestones:
   - WI-0078
 - id: M21
   title: Reliability and recognition quality
-  status: ready
+  status: completed
   document: ../milestones/M21-reliability-recognition-quality.md
   work_items:
   - WI-0079
@@ -235,7 +235,7 @@ milestones:
   - WI-0108
 - id: M25
   title: Face discovery and cluster-assisted identity review
-  status: proposed
+  status: ready
   document: ../milestones/M25-face-discovery-and-cluster-assisted-review.md
   work_items:
   - WI-0110
