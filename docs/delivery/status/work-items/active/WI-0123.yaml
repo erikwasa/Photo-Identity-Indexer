@@ -1,0 +1,10 @@
+id: WI-0123
+title: Detect burst and near-duplicate photo groups for creative selection
+milestone: M26
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0123-near-duplicate-burst-groups.md
+blockers:
+- WI-0120
+blocker_notes: []
+evidence: []
