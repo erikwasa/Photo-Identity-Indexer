@@ -164,6 +164,8 @@
     {
         <SlideshowPresentation ImageUrl="@CurrentImageUrl"
                                RevisionId="@Playback.CurrentRevisionId"
+                               Playing="@Playback.IsPlaying"
+                               MotionDurationSeconds="@Settings.ImageDurationSeconds"
                                Presented="OnCurrentImageLoadedAsync"
                                Failed="OnCurrentImageError" />
 

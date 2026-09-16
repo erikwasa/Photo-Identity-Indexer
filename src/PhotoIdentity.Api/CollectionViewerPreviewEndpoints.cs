@@ -1,4 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Web.Contracts;
 using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
@@ -9,6 +11,7 @@ public static class CollectionViewerPreviewEndpoints
     {
         endpoints.MapGet("/api/collections/photos/{revisionId}/viewer-preview", GetViewerPreviewAsync);
         endpoints.MapGet("/api/collections/photos/{revisionId}/viewer-proxy", GetViewerProxyAsync);
+        endpoints.MapGet("/api/collections/photos/{revisionId}/slideshow-face-geometry", GetSlideshowFaceGeometryAsync);
         return endpoints;
     }
 
@@ -72,6 +75,29 @@ public static class CollectionViewerPreviewEndpoints
         return proxy is null
             ? Results.NotFound(new { error = "No durable review proxy exists for this photo." })
             : Results.File(proxy.Path, proxy.ContentType, enableRangeProcessing: true);
+    }
+
+    private static async Task<IResult> GetSlideshowFaceGeometryAsync(
+        string revisionId,
+        IFaceReviewDerivativeRepository repository,
+        CancellationToken cancellationToken)
+    {
+        if (!TryRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
+        {
+            return InvalidRevision();
+        }
+
+        IReadOnlyList<FaceReviewGeometry> faces = await repository.GetFacesAsync(
+            parsedRevisionId,
+            cancellationToken);
+        SlideshowFaceBoxResponse[] response = faces
+            .Select(face => new SlideshowFaceBoxResponse(
+                face.BoundingBox.X,
+                face.BoundingBox.Y,
+                face.BoundingBox.Width,
+                face.BoundingBox.Height))
+            .ToArray();
+        return Results.Ok(new SlideshowFaceGeometryResponse(response));
     }
 
     private static bool TryRevisionId(string revisionId, out AssetRevisionId parsedRevisionId)
