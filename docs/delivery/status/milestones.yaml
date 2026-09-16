@@ -262,3 +262,17 @@ milestones:
   - WI-0126
   - WI-0127
   - WI-0128
+- id: M27
+  title: Slideshow presentation experience
+  status: ready
+  document: ../milestones/M27-slideshow-presentation-experience.md
+  work_items:
+  - WI-0129
+  - WI-0130
+  - WI-0131
+  - WI-0132
+  - WI-0133
+  - WI-0134
+  - WI-0135
+  - WI-0136
+  - WI-0137

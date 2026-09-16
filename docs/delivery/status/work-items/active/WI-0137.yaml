@@ -1,0 +1,15 @@
+id: WI-0137
+title: Tune and verify the polished slideshow experience on real devices
+milestone: M27
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0137-real-device-slideshow-polish-acceptance.md
+blockers:
+- WI-0129
+- WI-0130
+- WI-0131
+- WI-0134
+- WI-0135
+- WI-0136
+blocker_notes: []
+evidence: []

@@ -1,0 +1,11 @@
+id: WI-0133
+title: Add burst-aware compact pacing to slideshow playback
+milestone: M27
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0133-burst-aware-slideshow-pacing.md
+blockers:
+- WI-0129
+- WI-0123
+blocker_notes: []
+evidence: []

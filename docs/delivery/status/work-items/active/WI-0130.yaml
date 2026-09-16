@@ -1,0 +1,10 @@
+id: WI-0130
+title: Add subtle automatic motion and face-aware slideshow framing
+milestone: M27
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0130-subtle-motion-face-aware-framing.md
+blockers:
+- WI-0129
+blocker_notes: []
+evidence: []
