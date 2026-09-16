@@ -53,6 +53,8 @@ Maintainer review on representative phone playback should compare static versus 
 ## Completion notes
 
 - Files changed: identity-free slideshow face-geometry API contract/endpoint, deterministic motion policy, dual-layer presentation component/CSS, slideshow playback binding, and focused integration tests.
-- Trade-offs: the first policy intentionally uses only a 1.5% zoom around a safe deterministic pivot rather than free panning. This keeps the face-safety boundary simple and conservative; photos with more than two faces, edge-near/tight faces, invalid/unavailable geometry, or geometry request failures stay static.
-- Deferred work: subjective tuning plus phone/desktop validation are deferred to the maintainer's combined review of WI-0129, WI-0135 and WI-0130. More expressive motion should be considered only if this restrained baseline feels too static.
-- Commands run: repository CI is the authoritative automated validation for this branch; manual device review remains pending.
+- Trade-offs: the initial policy used a 1.5% eased zoom around a safe deterministic pivot rather than free panning. This kept the face-safety boundary simple and conservative; photos with more than two faces, edge-near/tight faces, invalid/unavailable geometry, or geometry request failures stayed static.
+- Verification finding: on 2026-09-16 the maintainer could not detect any motion on either Android or PC. Code review found the activation path intact; the 1.5% eased transform is below the practical perceptibility threshold for the tested playback durations, so acceptance remains open.
+- Follow-up tuning: increase the bounded zoom to 3% and use linear progression so suitable photos have clearly detectable but still restrained movement. The final-transform face-safety check remains authoritative; unsafe cases still render statically.
+- Deferred work: repeat Android/PC subjective review after tuning and adjust the fixed constant again only if the effect is still imperceptible or becomes distracting.
+- Commands run: repository CI is the authoritative automated validation for the implementation; manual device review remains required after tuning.
