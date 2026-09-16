@@ -718,13 +718,15 @@ public sealed class PostgresIdentityAutoAssignmentService :
             """;
         command.Parameters.AddWithValue("model_id", modelId.ToString());
         command.Parameters.AddWithValue("model_hash", modelHash.ToString());
-        object? value = await command.ExecuteScalarAsync(cancellationToken);
-        if (value is not DateTimeOffset requestedAtUtc)
+
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
         {
             throw new InvalidOperationException(
                 "Multi-evidence automatic assignment requires an active exact-model regeneration run.");
         }
-        return requestedAtUtc.ToUniversalTime();
+
+        return reader.GetFieldValue<DateTimeOffset>(0).ToUniversalTime();
     }
 
     private static string BuildNote(
