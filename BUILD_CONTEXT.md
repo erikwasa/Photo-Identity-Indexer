@@ -4,24 +4,26 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M27 Slideshow presentation experience is continuing with WI-0131: restrained adaptive backdrop for contained slideshow photos.**
+**M27 Slideshow presentation experience is continuing with WI-0134: bounded adaptive timing for a less mechanical slideshow rhythm.**
 
-WI-0129, WI-0130 and WI-0135 have completed maintainer desktop/phone verification and are archived as completed. WI-0130 uses the tuned 3% linear face-aware motion from PR #350.
+WI-0129, WI-0130 and WI-0135 have completed maintainer desktop/phone verification and are archived as completed. WI-0131 is merged in PR #352 but intentionally remains `in_progress` until the deferred visual/device review is performed.
 
-WI-0131 keeps the foreground photo fully contained and uncropped, but adds a heavily blurred/dimmed same-resource `object-fit: cover` backdrop inside each bounded A/B presentation slot. The whole slot now owns the WI-0129 opacity transition while foreground decode/readiness diagnostics remain attached to the contained image, so backdrop and foreground transition together rather than flashing independently. The backdrop is decorative-only and falls back to black when disabled or unsuitable.
+WI-0134 treats the persisted image duration as the dominant pace and reuses the face-geometry evidence already loaded by `SlideshowPresentation`. Timing is deterministic and narrowly bounded: reliable single-face frames use 98% of the configured duration, two-face frames 104%, groups 108%, while no-face or unavailable/unreliable evidence uses the configured duration exactly. The effective duration lives in `SlideshowPlaybackState` for progress/timer diagnostics and is not exposed as viewer chrome.
 
 ## Next concrete step
 
-Validate the WI-0131 implementation through the normal build/JavaScript/integration/docs gates. Then review representative desktop and phone slideshows across portrait-on-landscape, landscape-on-portrait, bright/dark images and low-resolution proxies. Decide whether the treatment should ship as the default, be simplified, or be rejected; tune fixed backdrop constants rather than adding a viewer-facing style control.
+Validate the WI-0134 implementation through the normal build/integration/docs gates. Pay particular attention to the generic presentation callback, manual-navigation ready-before-timer behavior, pause/resume, progress fraction and duration-setting changes. Subjective rhythm comparison can be batched with the later M27 visual review rather than blocking this implementation PR.
 
 ## Relevant files
 
-- docs/delivery/work-items/WI-0131-adaptive-slideshow-backdrop.md
-- docs/delivery/status/work-items/active/WI-0131.yaml
+- docs/delivery/work-items/WI-0134-adaptive-slideshow-rhythm.md
+- docs/delivery/status/work-items/active/WI-0134.yaml
+- src/PhotoIdentity.Web/SlideshowTimingPolicy.cs
+- src/PhotoIdentity.Web/SlideshowPlaybackState.cs
 - src/PhotoIdentity.Web/Components/SlideshowPresentation.razor
-- src/PhotoIdentity.Web/Components/SlideshowPresentation.razor.css
-- src/PhotoIdentity.Web/wwwroot/js/slideshow-presentation.js
-- tests/javascript/slideshow-prefetch.test.js
+- src/PhotoIdentity.Web/Pages/Slideshow.razor
+- tests/PhotoIdentity.Integration.Tests/SlideshowTimingPolicyTests.cs
+- tests/PhotoIdentity.Integration.Tests/SlideshowPlaybackStateTests.cs
 
 ## Repository validation
 
