@@ -39,4 +39,4 @@ Historical items stay queryable without opening the archive directory:
 dotnet run --project tools/PhotoIdentity.Docs -- show WI-0057
 ```
 
-Use `PhotoIdentity.Docs next` for ready work and the lifecycle commands for status changes; `work-items.yaml` is only the generated current-work compatibility view.
+Use `PhotoIdentity.Docs next` for ready work and the lifecycle commands for status changes; `work-items.yaml` is only a generated current-work compatibility view.
