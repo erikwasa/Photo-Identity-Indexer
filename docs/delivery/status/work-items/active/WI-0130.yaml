@@ -6,12 +6,9 @@ owner: ai-agent
 document: ../work-items/WI-0130-subtle-motion-face-aware-framing.md
 started_at: 2026-09-16
 last_updated_at: 2026-09-16
-branch: agent/WI-0130-motion-visibility-tuning
+branch: agent/WI-0130-subtle-motion-framing
 blockers:
 - WI-0129
-blocker_notes: []
-evidence:
-- type: pull_request
-  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/348
-- type: verification
-  value: '2026-09-16 maintainer review on Android and PC: no slideshow motion was perceptible; WI-0130 remains open for motion visibility tuning.'
+blocker_notes:
+- WI-0129 implementation is merged in pull request 346; its real-device acceptance is intentionally deferred to the combined M27 visual review requested by the maintainer.
+evidence: []
