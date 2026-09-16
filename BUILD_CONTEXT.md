@@ -4,34 +4,30 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M25 Face discovery and cluster-assisted identity review is in progress on WI-0117. WI-0110 through WI-0116 are complete.**
+**M27 Slideshow presentation experience is starting with WI-0129: a predecoded dual-layer slideshow transition renderer.**
 
-WI-0081 accepted the current max-exemplar matcher and current High score+margin policy after private evaluation: duplicate-resistant top-1 was 96.491%, conservative High precision 99.844%, known High coverage 49.709% and reviewed-Unknown High emission 0.121%. Centroid and cap-8 reference reduction regressed materially.
+The existing slideshow already keeps autoplay timing separate from image readiness and has a bounded adjacent-image prefetch pipeline. WI-0129 replaces the single keyed `<img>` presentation with a bounded current/incoming compositor so the next image can load and decode while the current photo remains visible, then crossfade without a black flash.
 
-WI-0116 accepted Strong cluster-assisted advisory evidence at 41/41 correct evaluable proposals with 0 false-person proposals. Cluster evidence remains derived/non-canonical and production `not same` evidence fails closed.
-
-WI-0117 private evaluation is complete. On 5,747 untouched holdout targets, the selected `cluster-plus-2x-0.50-margin-0.05` candidate added 50 assignments, all 50 correct known, with 0 additional wrong-known and 0 additional reviewed-Unknown assignments. Known coverage increased from 48.195% to 49.406%. Multi-reference-only expansion was unsafe and is explicitly rejected.
-
-The accepted production candidate is `m25-multi-evidence-auto-v1`: retain current High auto-assignment unchanged, and optionally add only Medium-or-better rank-1 candidates with margin >=0.05, at least 2 independent exact-content references to the same Person at cosine >=0.50, and target-specific Strong WI-0116 cluster corroboration from a fresh completed `m25-dbscan-v1` include-Unknown run. Same-content target evidence is excluded and `not same`/material competing-person evidence fails closed.
-
-Implementation is active on `agent/WI-0117-multi-evidence-production`. The new exact-model multi-evidence policy is separately versioned, default-disabled, and subordinate to the existing ordinary automatic-assignment master toggle. Candidate evidence is read before any canonical accepts so same-run cascading remains prohibited. Canonical decisions use the normal suggestion acceptance/history boundary with a distinct actor and detailed model/policy/cluster/reference provenance.
-
-PostgreSQL remains the sole writable production catalogue.
+The renderer must preserve M22 protected/fullscreen/original-preparation behavior and M24 slideshow performance diagnostics. Rapid manual navigation should serialize/coalesce through the existing navigation gate. Reduced-motion users still get ready-before-show swaps without nonessential animation.
 
 ## Next concrete step
 
-Finish CI and production verification for `m25-multi-evidence-auto-v1`. Required checks are: policy default-off/versioning, fresh-cluster and independent-reference gates, `not same` fail-closed behavior, exact provenance, fixed-snapshot/no-cascade, operator opt-in, and manual correction/undo. Do not mark WI-0117 complete until human Windows verification of opt-in plus correction/undo passes.
+Implement the presentation host/compositor in `slideshow.js`, wire `Slideshow.razor`/`Slideshow.razor.cs` so playback marks the destination ready only after the compositor reports it visible, and extend JavaScript plus playback-state regression tests for initial presentation, crossfade, reduced motion, rapid navigation/loop behavior and failures.
 
 ## Relevant files
 
-- docs/delivery/work-items/WI-0117-multi-evidence-auto-assignment-evaluation.md
-- docs/delivery/status/work-items/active/WI-0117.yaml
-- tools/cluster-evaluation/evaluate_auto_assignment.py
-- src/PhotoIdentity.Core/Review/IIdentityMultiEvidenceAutoAssignmentPolicyRepository.cs
-- src/PhotoIdentity.Persistence.Postgres/PostgresIdentityMultiEvidenceAutoAssignmentPolicyRepository.cs
-- src/PhotoIdentity.Persistence.Postgres/PostgresIdentityAutoAssignmentService.cs
-- src/PhotoIdentity.Web/Components/MultiEvidenceAutoAssignmentSettings.razor
-- docs/decisions/ADR-0006-canonical-auto-assignment.md
+- docs/delivery/work-items/WI-0129-dual-layer-slideshow-renderer.md
+- docs/delivery/status/work-items/active/WI-0129.yaml
+- src/PhotoIdentity.Web/Pages/Slideshow.razor
+- src/PhotoIdentity.Web/Pages/Slideshow.razor.cs
+- src/PhotoIdentity.Web/Pages/Slideshow.razor.css
+- src/PhotoIdentity.Web/SlideshowPlaybackState.cs
+- src/PhotoIdentity.Web/SlideshowNavigationGate.cs
+- src/PhotoIdentity.Web/wwwroot/js/slideshow.js
+- src/PhotoIdentity.Web/wwwroot/js/slideshow-performance.js
+- tests/javascript/slideshow-prefetch.test.js
+- tests/PhotoIdentity.Integration.Tests/SlideshowPlaybackStateTests.cs
+- tests/PhotoIdentity.Integration.Tests/SlideshowJavascriptTests.cs
 
 ## Repository validation
 
@@ -39,5 +35,4 @@ Finish CI and production verification for `m25-multi-evidence-auto-v1`. Required
     ./test.ps1
     dotnet run --project tools/PhotoIdentity.Docs -- validate
     dotnet run --project tools/PhotoIdentity.Docs -- generate --check
-    ./verify-review.ps1 -Mode Smoke -Configuration Release
     ./verify-postgres.ps1
