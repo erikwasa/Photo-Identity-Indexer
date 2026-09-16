@@ -38,13 +38,13 @@ The current read-only library is intentionally safe but still exposes textual ca
 
 ## Acceptance criteria
 
-- [ ] Every collection card has a deterministic visual cover or neutral fallback.
-- [ ] Activating the card starts the slideshow without requiring a separate visible Start button.
-- [ ] Settings/recovery remain available but do not dominate the normal browsing surface.
-- [ ] Cards remain accessible by keyboard and assistive technology.
-- [ ] Loading/preparation state does not cause the card layout to jump excessively.
-- [ ] The page remains read-only with respect to collection/photo metadata.
-- [ ] Focused UI tests cover card activation, fallback cover, accessibility semantics and start failure recovery.
+- [x] Every collection card has a deterministic visual cover or neutral fallback.
+- [x] Activating the card starts the slideshow without requiring a separate visible Start button.
+- [x] Settings/recovery remain available but do not dominate the normal browsing surface.
+- [x] Cards remain accessible by keyboard and assistive technology.
+- [x] Loading/preparation state does not cause the card layout to jump excessively.
+- [x] The page remains read-only with respect to collection/photo metadata.
+- [x] Focused UI tests cover card activation, fallback cover, accessibility semantics and start failure recovery.
 
 ## Verification requirements
 
@@ -56,4 +56,4 @@ Review on desktop and iPhone-sized viewport. The happy path should read visually
 - Trade-offs: cover discovery reuses the existing saved-collection query contract and leaves the fast slideshow-definition list unchanged. The first deterministic query result (currently the newest matching photo) is used until M26 can provide stronger anchor selection. Cover failure is decorative-only and falls back without blocking playback.
 - Deferred work: WI-0136 will further remove routine original-preparation operations from the happy path; M26 may later improve cover choice.
 - Commands run: repository CI for PR #347 plus maintainer manual review.
-- Verification: on 2026-09-16 the maintainer reviewed the combined slideshow changes and reported WI-0135 works as expected.
+- Verification: on 2026-09-17 the maintainer completed the combined desktop/phone slideshow review and reported WI-0135 works as expected.

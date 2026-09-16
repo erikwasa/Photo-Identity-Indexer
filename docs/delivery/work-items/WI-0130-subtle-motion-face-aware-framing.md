@@ -38,13 +38,13 @@ A completely static sequence can feel sterile even with smooth crossfades. Very 
 
 ## Acceptance criteria
 
-- [ ] Suitable photos can receive subtle deterministic motion without user configuration.
-- [ ] Detected face rectangles remain inside the visible safe region for every applied transform.
-- [ ] Group/tight/uncertain framing cases fall back to static presentation rather than forcing motion.
-- [ ] Motion does not interfere with crossfade transitions, pause/resume or manual navigation.
-- [ ] Reduced-motion preference disables the foreground motion policy.
-- [ ] The policy is deterministic for the same photo geometry and viewport class.
-- [ ] Automated tests cover one face, multiple faces, edge-near faces, no-face and unsafe-transform fallback cases.
+- [x] Suitable photos can receive subtle deterministic motion without user configuration.
+- [x] Detected face rectangles remain inside the visible safe region for every applied transform.
+- [x] Group/tight/uncertain framing cases fall back to static presentation rather than forcing motion.
+- [x] Motion does not interfere with crossfade transitions, pause/resume or manual navigation.
+- [x] Reduced-motion preference disables the foreground motion policy.
+- [x] The policy is deterministic for the same photo geometry and viewport class.
+- [x] Automated tests cover one face, multiple faces, edge-near faces, no-face and unsafe-transform fallback cases.
 
 ## Verification requirements
 
@@ -53,8 +53,7 @@ Maintainer review on representative phone playback should compare static versus 
 ## Completion notes
 
 - Files changed: identity-free slideshow face-geometry API contract/endpoint, deterministic motion policy, dual-layer presentation component/CSS, slideshow playback binding, and focused integration tests.
-- Trade-offs: the initial policy used a 1.5% eased zoom around a safe deterministic pivot rather than free panning. This kept the face-safety boundary simple and conservative; photos with more than two faces, edge-near/tight faces, invalid/unavailable geometry, or geometry request failures stayed static.
-- Verification finding: on 2026-09-16 the maintainer could not detect any motion on either Android or PC. Code review found the activation path intact; the 1.5% eased transform is below the practical perceptibility threshold for the tested playback durations, so acceptance remains open.
-- Follow-up tuning: increase the bounded zoom to 3% and use linear progression so suitable photos have clearly detectable but still restrained movement. The final-transform face-safety check remains authoritative; unsafe cases still render statically.
-- Deferred work: repeat Android/PC subjective review after tuning and adjust the fixed constant again only if the effect is still imperceptible or becomes distracting.
-- Commands run: repository CI is the authoritative automated validation for the implementation; manual device review remains required after tuning.
+- Trade-offs: the initial 1.5% eased zoom proved too subtle in device review. PR #350 tuned the bounded transform to 3% with linear progression while retaining the same deterministic pivot and final-transform face-safety checks. Group, edge-near, tight, invalid or unavailable geometry still falls back to static presentation.
+- Verification history: the first Android/PC review could not detect motion; after the tuning merged, the maintainer verified the effect works on both PC and phone.
+- Deferred work: more expressive pan/zoom remains out of scope unless later real-device tuning shows clear value.
+- Commands run: repository CI for PRs #348 and #350 plus maintainer PC/phone verification.

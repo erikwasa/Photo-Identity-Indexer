@@ -39,16 +39,16 @@ The current slideshow already prefetches adjacent image resources, but playback 
 
 ## Acceptance criteria
 
-- [ ] Normal successful advancement does not produce a black flash between two ready images.
-- [ ] The incoming image has completed load/decode readiness before it becomes the visible destination where the browser supports explicit decode.
-- [ ] Exactly bounded presentation layers are retained; long slideshows do not accumulate decoded DOM/image objects.
-- [ ] The configured per-image viewing duration begins after the destination presentation is ready.
-- [ ] Rapid taps/swipes do not leave both layers visible incorrectly, skip into an invalid state or permanently stall autoplay.
-- [ ] Looping from last to first uses the same transition lifecycle without a special visible reload flash.
-- [ ] One-photo looping does not crossfade the image with itself.
-- [ ] `prefers-reduced-motion` disables nonessential transition animation while retaining ready-before-show behavior.
-- [ ] Existing protected/fullscreen/original-preparation behavior remains functional.
-- [ ] Focused automated/browser tests cover autoplay transition, manual navigation, rapid navigation, loop boundary, one-photo and failed-image fallback.
+- [x] Normal successful advancement does not produce a black flash between two ready images.
+- [x] The incoming image has completed load/decode readiness before it becomes the visible destination where the browser supports explicit decode.
+- [x] Exactly bounded presentation layers are retained; long slideshows do not accumulate decoded DOM/image objects.
+- [x] The configured per-image viewing duration begins after the destination presentation is ready.
+- [x] Rapid taps/swipes do not leave both layers visible incorrectly, skip into an invalid state or permanently stall autoplay.
+- [x] Looping from last to first uses the same transition lifecycle without a special visible reload flash.
+- [x] One-photo looping does not crossfade the image with itself.
+- [x] `prefers-reduced-motion` disables nonessential transition animation while retaining ready-before-show behavior.
+- [x] Existing protected/fullscreen/original-preparation behavior remains functional.
+- [x] Focused automated/browser tests cover autoplay transition, manual navigation, rapid navigation, loop boundary, one-photo and failed-image fallback.
 
 ## Verification requirements
 
@@ -60,4 +60,4 @@ Run the existing slideshow unit/browser tests plus a representative phone slides
 - Trade-offs: transition language intentionally remains one conservative fixed crossfade; no viewer-facing transition controls were added.
 - Deferred work: later M27 items may build richer presentation behavior on the compositor, but the renderer itself is accepted.
 - Commands run: repository CI for PR #346 plus maintainer manual review.
-- Verification: on 2026-09-16 the maintainer reviewed the combined slideshow changes and reported WI-0129 works as expected.
+- Verification: on 2026-09-17 the maintainer completed the combined desktop/phone slideshow review and reported WI-0129 works as expected.

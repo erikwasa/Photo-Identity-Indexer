@@ -39,8 +39,8 @@
         return new Promise(resolve => requestAnimationFrame(() => resolve()));
     }
 
-    function waitForOpacityTransition(image) {
-        if (!image || typeof image.addEventListener !== "function") {
+    function waitForOpacityTransition(element) {
+        if (!element || typeof element.addEventListener !== "function") {
             return Promise.resolve();
         }
 
@@ -56,17 +56,17 @@
                 if (timeoutId !== null) {
                     clearTimeout(timeoutId);
                 }
-                image.removeEventListener?.("transitionend", onTransitionEnd);
+                element.removeEventListener?.("transitionend", onTransitionEnd);
                 resolve();
             };
 
             const onTransitionEnd = event => {
-                if (!event || event.target === image) {
+                if (!event || event.target === element) {
                     finish();
                 }
             };
 
-            image.addEventListener("transitionend", onTransitionEnd, { once: true });
+            element.addEventListener("transitionend", onTransitionEnd, { once: true });
             timeoutId = setTimeout(finish, transitionMilliseconds + 100);
         });
     }
@@ -135,19 +135,19 @@
         return true;
     }
 
-    async function showPresentationImage(image) {
-        if (!image?.style) {
+    async function showPresentationImage(layer, visibleImage = layer) {
+        if (!layer?.style || !visibleImage) {
             return false;
         }
 
-        image.style.transition = "none";
-        image.style.opacity = "1";
-        dispatchVisible(image, reducedMotionRequested(), false);
+        layer.style.transition = "none";
+        layer.style.opacity = "1";
+        dispatchVisible(visibleImage, reducedMotionRequested(), false);
         return true;
     }
 
-    async function transitionPresentationImages(outgoing, incoming) {
-        if (!outgoing?.style || !incoming?.style || outgoing === incoming) {
+    async function transitionPresentationImages(outgoing, incoming, visibleImage = incoming) {
+        if (!outgoing?.style || !incoming?.style || outgoing === incoming || !visibleImage) {
             return false;
         }
 
@@ -157,7 +157,7 @@
             incoming.style.transition = "none";
             outgoing.style.opacity = "0";
             incoming.style.opacity = "1";
-            dispatchVisible(incoming, true, false);
+            dispatchVisible(visibleImage, true, false);
             return true;
         }
 
@@ -173,7 +173,7 @@
 
         outgoing.style.transition = "";
         incoming.style.transition = "";
-        dispatchVisible(incoming, false, true);
+        dispatchVisible(visibleImage, false, true);
         return true;
     }
 

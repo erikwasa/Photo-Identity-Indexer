@@ -253,6 +253,39 @@ test("crossfade keeps the outgoing image until the decoded incoming layer is vis
     assert.ok(visibleEvent.visibleAt >= visibleEvent.readyAt);
 });
 
+test("layer crossfade keeps readiness diagnostics attached to the foreground image", async () => {
+    await reset();
+
+    const outgoingLayer = new FakeImage();
+    const incomingLayer = new FakeImage();
+    const incomingImage = new FakeImage();
+    incomingImage.complete = true;
+    incomingImage.naturalWidth = 100;
+    await slideshow.decodePresentationImage(incomingImage);
+
+    let visibleEvent = null;
+    incomingImage.addEventListener("photoidentity:slideshow-visible", event => {
+        visibleEvent = event.detail;
+    });
+
+    const transition = slideshow.transitionPresentationImages(
+        outgoingLayer,
+        incomingLayer,
+        incomingImage);
+    await Promise.resolve();
+    incomingLayer.completeTransition();
+
+    assert.equal(await transition, true);
+    assert.equal(outgoingLayer.style.opacity, "0");
+    assert.equal(incomingLayer.style.opacity, "1");
+    assert.equal(visibleEvent.animated, true);
+
+    const state = slideshow.getPresentationImageState(incomingImage);
+    assert.equal(typeof state.readyAt, "number");
+    assert.equal(typeof state.visibleAt, "number");
+    assert.ok(state.visibleAt >= state.readyAt);
+});
+
 test("reduced motion swaps only after readiness and skips crossfade animation", async () => {
     await reset();
     reducedMotion = true;
