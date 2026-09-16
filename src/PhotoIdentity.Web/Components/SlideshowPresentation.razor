@@ -417,10 +417,7 @@
 
         int durationSeconds = Math.Max(4, Math.Clamp(MotionDurationSeconds, 1, 60));
         return FormattableString.Invariant(
-            $"--slideshow-motion-scale:{plan.Scale:0.####};" +
-            $"--slideshow-motion-origin-x:{plan.OriginXPercent:0.##}%;" +
-            $"--slideshow-motion-origin-y:{plan.OriginYPercent:0.##}%;" +
-            $"--slideshow-motion-duration:{durationSeconds}s;");
+            $"--slideshow-motion-scale:{plan.Scale:0.####};--slideshow-motion-origin-x:{plan.OriginXPercent:0.##}%;--slideshow-motion-origin-y:{plan.OriginYPercent:0.##}%;--slideshow-motion-duration:{durationSeconds}s;");
     }
 
     private async Task RenderAsync()
