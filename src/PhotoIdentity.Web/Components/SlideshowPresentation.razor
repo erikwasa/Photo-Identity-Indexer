@@ -9,30 +9,56 @@
 <div class="slideshow-presentation" aria-hidden="true">
     @if (_slotA is PresentationSlot slotA)
     {
-        <img @key="slotA.Generation"
+        <div @key="slotA.Generation"
              class="@LayerClass(PresentationLayer.A)"
-             style="@LayerStyle(PresentationLayer.A)"
-             src="@slotA.Target.Url"
-             alt=""
-             draggable="false"
-             decoding="async"
-             @ref="_slotAElement"
-             @onload="() => IncomingLoadedAsync(PresentationLayer.A, slotA.Generation)"
-             @onerror="() => IncomingFailedAsync(PresentationLayer.A, slotA.Generation)" />
+             @ref="_slotALayerElement">
+            @if (BackdropEnabled)
+            {
+                <img class="slideshow-backdrop-image"
+                     src="@slotA.Target.Url"
+                     alt=""
+                     aria-hidden="true"
+                     draggable="false"
+                     decoding="async" />
+                <div class="slideshow-backdrop-shade"></div>
+            }
+            <img class="@ImageClass(PresentationLayer.A)"
+                 style="@ImageStyle(PresentationLayer.A)"
+                 src="@slotA.Target.Url"
+                 alt=""
+                 draggable="false"
+                 decoding="async"
+                 @ref="_slotAImageElement"
+                 @onload="() => IncomingLoadedAsync(PresentationLayer.A, slotA.Generation)"
+                 @onerror="() => IncomingFailedAsync(PresentationLayer.A, slotA.Generation)" />
+        </div>
     }
 
     @if (_slotB is PresentationSlot slotB)
     {
-        <img @key="slotB.Generation"
+        <div @key="slotB.Generation"
              class="@LayerClass(PresentationLayer.B)"
-             style="@LayerStyle(PresentationLayer.B)"
-             src="@slotB.Target.Url"
-             alt=""
-             draggable="false"
-             decoding="async"
-             @ref="_slotBElement"
-             @onload="() => IncomingLoadedAsync(PresentationLayer.B, slotB.Generation)"
-             @onerror="() => IncomingFailedAsync(PresentationLayer.B, slotB.Generation)" />
+             @ref="_slotBLayerElement">
+            @if (BackdropEnabled)
+            {
+                <img class="slideshow-backdrop-image"
+                     src="@slotB.Target.Url"
+                     alt=""
+                     aria-hidden="true"
+                     draggable="false"
+                     decoding="async" />
+                <div class="slideshow-backdrop-shade"></div>
+            }
+            <img class="@ImageClass(PresentationLayer.B)"
+                 style="@ImageStyle(PresentationLayer.B)"
+                 src="@slotB.Target.Url"
+                 alt=""
+                 draggable="false"
+                 decoding="async"
+                 @ref="_slotBImageElement"
+                 @onload="() => IncomingLoadedAsync(PresentationLayer.B, slotB.Generation)"
+                 @onerror="() => IncomingFailedAsync(PresentationLayer.B, slotB.Generation)" />
+        </div>
     }
 </div>
 
@@ -43,8 +69,10 @@
     private PresentationSlot? _slotB;
     private PresentationLayer? _visibleLayer;
     private PresentationLayer? _loadingLayer;
-    private ElementReference _slotAElement;
-    private ElementReference _slotBElement;
+    private ElementReference _slotALayerElement;
+    private ElementReference _slotBLayerElement;
+    private ElementReference _slotAImageElement;
+    private ElementReference _slotBImageElement;
     private long _generation;
     private long _requestVersion;
     private long _acknowledgedRequestVersion;
@@ -63,6 +91,9 @@
 
     [Parameter]
     public int MotionDurationSeconds { get; set; } = 5;
+
+    [Parameter]
+    public bool BackdropEnabled { get; set; } = true;
 
     [Parameter]
     public EventCallback Presented { get; set; }
@@ -139,7 +170,7 @@
             decoded = await JS.InvokeAsync<bool>(
                 "photoIdentitySlideshow.decodePresentationImage",
                 _lifetime.Token,
-                Element(layer));
+                ImageElement(layer));
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
@@ -289,7 +320,8 @@
                 presented = await JS.InvokeAsync<bool>(
                     "photoIdentitySlideshow.showPresentationImage",
                     _lifetime.Token,
-                    Element(layer));
+                    LayerElement(layer),
+                    ImageElement(layer));
             }
             else if (_visibleLayer == layer)
             {
@@ -301,8 +333,9 @@
                 presented = await JS.InvokeAsync<bool>(
                     "photoIdentitySlideshow.transitionPresentationImages",
                     _lifetime.Token,
-                    Element(_visibleLayer.Value),
-                    Element(layer));
+                    LayerElement(_visibleLayer.Value),
+                    LayerElement(layer),
+                    ImageElement(layer));
             }
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
@@ -384,16 +417,22 @@
         }
     }
 
-    private ElementReference Element(PresentationLayer layer) =>
-        layer == PresentationLayer.A ? _slotAElement : _slotBElement;
+    private ElementReference LayerElement(PresentationLayer layer) =>
+        layer == PresentationLayer.A ? _slotALayerElement : _slotBLayerElement;
 
-    private string LayerClass(PresentationLayer layer)
+    private ElementReference ImageElement(PresentationLayer layer) =>
+        layer == PresentationLayer.A ? _slotAImageElement : _slotBImageElement;
+
+    private string LayerClass(PresentationLayer layer) =>
+        _visibleLayer == layer
+            ? "slideshow-layer slideshow-layer-visible"
+            : "slideshow-layer slideshow-layer-staging";
+
+    private string ImageClass(PresentationLayer layer)
     {
         bool visible = _visibleLayer == layer;
         SlideshowMotionPlan? plan = Slot(layer)?.MotionPlan;
-        string classes = visible
-            ? "slideshow-image slideshow-image-visible"
-            : "slideshow-image slideshow-image-staging";
+        string classes = "slideshow-image";
 
         if (visible && plan?.Enabled == true)
         {
@@ -407,7 +446,7 @@
         return classes;
     }
 
-    private string? LayerStyle(PresentationLayer layer)
+    private string? ImageStyle(PresentationLayer layer)
     {
         SlideshowMotionPlan? plan = Slot(layer)?.MotionPlan;
         if (plan?.Enabled != true)
