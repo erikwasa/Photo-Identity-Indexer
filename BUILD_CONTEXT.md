@@ -4,29 +4,28 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M27 Slideshow presentation experience is continuing with WI-0135: redesign the slideshow library as a visual tap-to-play gallery.**
+**M27 Slideshow presentation experience is continuing with WI-0130: subtle automatic motion and face-aware slideshow framing.**
 
-WI-0129 is merged but intentionally remains `in_progress` until the deferred real-device slideshow acceptance is performed together with later M27 visual changes. Do not mark it complete merely to unblock dependent presentation work.
+WI-0129 and WI-0135 are merged but intentionally remain `in_progress` until the maintainer performs the requested combined visual/device review. WI-0130 may build on the merged WI-0129 compositor without treating that deferred acceptance as complete.
 
-WI-0135 keeps the fast `/api/slideshows/collections` definition list unchanged. Each visual card lazily queries the existing saved-collection endpoint for its deterministic first matching photo and uses that thumbnail as a decorative cover; empty/error cases retain a fixed neutral fallback. The whole card is the accessible Play action, while preparation controls and browser-local playback preferences are visually secondary.
+WI-0130 reuses `IFaceReviewDerivativeRepository.GetFacesAsync` to expose only normalized, identity-free face rectangles for the incoming slideshow revision. The two-layer compositor loads that geometry alongside image decode and applies a conservative deterministic policy: a 1.5% zoom around a safe face-region pivot for at most two suitable faces, deterministic near-center motion for reliable no-face geometry, and static fallback for groups, edge-near/tight/invalid faces, missing geometry, or request failures. CSS `animation-play-state` preserves motion position across pause/resume, and `prefers-reduced-motion` disables the effect.
 
 ## Next concrete step
 
-Validate the WI-0135 gallery implementation: compile the new cover component and presentation helper, run slideshow/integration tests, verify documentation generation, and review the `/slideshows` layout at desktop and iPhone-sized widths. Preserve existing fullscreen-rejection recovery through `SlideshowLibraryLaunch`.
+Validate the WI-0130 implementation through the normal build/integration/docs gates. In the combined maintainer review, compare #346 crossfades, #347 visual slideshow selection, and WI-0130 motion across portraits, landscapes, close-ups, group photos, pause/resume, manual navigation and reduced-motion behavior. Tune the fixed constants rather than adding viewer-facing motion controls.
 
 ## Relevant files
 
-- docs/delivery/work-items/WI-0135-visual-tap-to-play-slideshow-library.md
-- docs/delivery/status/work-items/active/WI-0135.yaml
-- src/PhotoIdentity.Web/Pages/Slideshows.razor
-- src/PhotoIdentity.Web/Pages/Slideshows.razor.css
-- src/PhotoIdentity.Web/Pages/Slideshows.razor.cs
-- src/PhotoIdentity.Web/Components/SlideshowLibraryCover.razor
-- src/PhotoIdentity.Web/Components/SlideshowLibraryCover.razor.css
-- src/PhotoIdentity.Web/SlideshowLibraryPresentation.cs
-- src/PhotoIdentity.Web/SlideshowLibraryLaunch.cs
-- tests/PhotoIdentity.Integration.Tests/SlideshowLibraryAcceptanceTests.cs
-- tests/PhotoIdentity.Integration.Tests/SlideshowLibraryPresentationTests.cs
+- docs/delivery/work-items/WI-0130-subtle-motion-face-aware-framing.md
+- docs/delivery/status/work-items/active/WI-0130.yaml
+- src/PhotoIdentity.Api/CollectionViewerPreviewEndpoints.cs
+- src/PhotoIdentity.Web/SlideshowPresentationContracts.cs
+- src/PhotoIdentity.Web/SlideshowMotionPolicy.cs
+- src/PhotoIdentity.Web/Components/SlideshowPresentation.razor
+- src/PhotoIdentity.Web/Components/SlideshowPresentation.razor.css
+- src/PhotoIdentity.Web/Pages/Slideshow.razor
+- tests/PhotoIdentity.Integration.Tests/SlideshowMotionPolicyTests.cs
+- tests/PhotoIdentity.Integration.Tests/SlideshowFaceGeometryApplicationTests.cs
 
 ## Repository validation
 
