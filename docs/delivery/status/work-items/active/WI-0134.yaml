@@ -1,9 +1,12 @@
 id: WI-0134
 title: Add bounded adaptive timing for a less mechanical slideshow rhythm
 milestone: M27
-status: proposed
-owner: unassigned
+status: in_progress
+owner: ai-agent
 document: ../work-items/WI-0134-adaptive-slideshow-rhythm.md
+started_at: 2026-09-17
+last_updated_at: 2026-09-17
+branch: agent/WI-0134-adaptive-slideshow-rhythm
 blockers:
 - WI-0129
 blocker_notes: []
