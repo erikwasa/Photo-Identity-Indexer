@@ -48,7 +48,7 @@ else
                 <button type="button"
                         class="slideshow-library-primary"
                         disabled="@busy"
-                        aria-label="@($"Play {collection.Name} slideshow")"
+                        aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(collection.Name)"
                         @onclick="() => StartSlideshowAsync(collection)">
                     <SlideshowLibraryCover CollectionId="@collection.Id" />
                     <span class="slideshow-library-card-shade" aria-hidden="true"></span>
