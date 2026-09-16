@@ -96,7 +96,7 @@
     public bool BackdropEnabled { get; set; } = true;
 
     [Parameter]
-    public EventCallback Presented { get; set; }
+    public EventCallback<SlideshowPresentationEvidence> Presented { get; set; }
 
     [Parameter]
     public EventCallback Failed { get; set; }
@@ -207,6 +207,9 @@
             slot.Target.RevisionId,
             geometry.Faces,
             geometry.Reliable);
+        slot.PresentationEvidence = new SlideshowPresentationEvidence(
+            geometry.Reliable,
+            geometry.Faces.Count);
         slot.Ready = true;
         _loadingLayer = null;
 
@@ -298,7 +301,8 @@
         }
         catch
         {
-            // Motion is decorative. Missing or unreadable geometry always falls back to static.
+            // Motion and adaptive timing are decorative. Missing or unreadable geometry
+            // always falls back to the static/configured presentation behavior.
             return MotionGeometryLoad.Unavailable;
         }
     }
@@ -389,7 +393,9 @@
         }
 
         _acknowledgedRequestVersion = _requested.Version;
-        await Presented.InvokeAsync();
+        SlideshowPresentationEvidence evidence =
+            VisibleSlot()?.PresentationEvidence ?? SlideshowPresentationEvidence.Unavailable;
+        await Presented.InvokeAsync(evidence);
     }
 
     private PresentationLayer HiddenLayer() => _visibleLayer switch
@@ -510,6 +516,8 @@
         public long Generation { get; } = generation;
         public Task<MotionGeometryLoad> GeometryLoad { get; } = geometryLoad;
         public SlideshowMotionPlan MotionPlan { get; set; } = SlideshowMotionPlan.Static;
+        public SlideshowPresentationEvidence PresentationEvidence { get; set; } =
+            SlideshowPresentationEvidence.Unavailable;
         public bool Ready { get; set; }
     }
 }
