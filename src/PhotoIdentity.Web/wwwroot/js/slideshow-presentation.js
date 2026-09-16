@@ -15,7 +15,8 @@
                 readyAt: null,
                 visibleAt: null,
                 reducedMotion: false,
-                animated: false
+                animated: false,
+                decodeFallback: false
             };
             presentationStates.set(image, state);
         }
@@ -103,11 +104,15 @@
             return false;
         }
 
+        let decodeFallback = false;
         if (typeof image.decode === "function") {
             try {
                 await image.decode();
             } catch {
-                return false;
+                // Some browsers reject decode() even after a successful load. Keep the
+                // loaded-pixel fallback rather than turning a displayable image into a
+                // slideshow failure; genuine resource failures still arrive via error.
+                decodeFallback = true;
             }
         }
 
@@ -120,6 +125,7 @@
         state.visibleAt = null;
         state.reducedMotion = false;
         state.animated = false;
+        state.decodeFallback = decodeFallback;
 
         if (image.dataset) {
             image.dataset.photoIdentityPresentationReadyAt = state.readyAt.toString();
@@ -180,6 +186,7 @@
                 visibleAt: null,
                 reducedMotion: false,
                 animated: false,
+                decodeFallback: false,
                 transitionMilliseconds
             };
     }
