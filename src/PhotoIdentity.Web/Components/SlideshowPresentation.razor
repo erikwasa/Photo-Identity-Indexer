@@ -12,6 +12,8 @@
         <img @key="slotA.Generation"
              class="@LayerClass(PresentationLayer.A)"
              style="@LayerStyle(PresentationLayer.A)"
+             data-photoidentity-motion="@LayerMotionState(PresentationLayer.A)"
+             data-photoidentity-motion-scale="@LayerMotionScale(PresentationLayer.A)"
              src="@slotA.Target.Url"
              alt=""
              draggable="false"
@@ -26,6 +28,8 @@
         <img @key="slotB.Generation"
              class="@LayerClass(PresentationLayer.B)"
              style="@LayerStyle(PresentationLayer.B)"
+             data-photoidentity-motion="@LayerMotionState(PresentationLayer.B)"
+             data-photoidentity-motion-scale="@LayerMotionScale(PresentationLayer.B)"
              src="@slotB.Target.Url"
              alt=""
              draggable="false"
@@ -172,6 +176,7 @@
             return;
         }
 
+        slot.GeometryReliable = geometry.Reliable;
         slot.MotionPlan = SlideshowMotionPolicy.Create(
             slot.Target.RevisionId,
             geometry.Faces,
@@ -407,6 +412,40 @@
         return classes;
     }
 
+    private string LayerMotionState(PresentationLayer layer)
+    {
+        PresentationSlot? slot = Slot(layer);
+        if (slot is null || !slot.Ready)
+        {
+            return "staging";
+        }
+
+        if (!slot.GeometryReliable)
+        {
+            return "static-geometry-unavailable";
+        }
+
+        if (!slot.MotionPlan.Enabled)
+        {
+            return "static-policy";
+        }
+
+        if (_visibleLayer != layer)
+        {
+            return "ready";
+        }
+
+        return Playing ? "active" : "paused";
+    }
+
+    private string? LayerMotionScale(PresentationLayer layer)
+    {
+        SlideshowMotionPlan? plan = Slot(layer)?.MotionPlan;
+        return plan?.Enabled == true
+            ? plan.Scale.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)
+            : null;
+    }
+
     private string? LayerStyle(PresentationLayer layer)
     {
         SlideshowMotionPlan? plan = Slot(layer)?.MotionPlan;
@@ -471,6 +510,7 @@
         public long Generation { get; } = generation;
         public Task<MotionGeometryLoad> GeometryLoad { get; } = geometryLoad;
         public SlideshowMotionPlan MotionPlan { get; set; } = SlideshowMotionPlan.Static;
+        public bool GeometryReliable { get; set; }
         public bool Ready { get; set; }
     }
 }
