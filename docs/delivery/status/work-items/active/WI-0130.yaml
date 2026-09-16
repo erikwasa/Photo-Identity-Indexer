@@ -10,5 +10,5 @@ branch: agent/WI-0130-subtle-motion-framing
 blockers:
 - WI-0129
 blocker_notes:
-- WI-0129 implementation is merged in PR #346; its real-device acceptance is intentionally deferred to the combined M27 visual review requested by the maintainer.
+- WI-0129 implementation is merged in pull request 346; its real-device acceptance is intentionally deferred to the combined M27 visual review requested by the maintainer.
 evidence: []
