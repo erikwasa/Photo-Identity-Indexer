@@ -54,9 +54,13 @@ The current slideshow already prefetches adjacent image resources, but playback 
 
 Run the existing slideshow unit/browser tests plus a representative phone slideshow with mixed portrait/landscape images. Capture browser diagnostics before/after to ensure the smoother renderer does not reintroduce fetch/decode stalls or unbounded memory behavior.
 
+## Maintainer verification
+
+- 2026-09-16: accepted in the combined M27 visual review. The maintainer reported WI-0129 works as expected after testing the merged renderer together with WI-0135 and WI-0130.
+
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: dual-layer slideshow presentation component, isolated transition CSS, browser presentation helpers/diagnostics, playback integration and focused tests in PR #346.
+- Trade-offs: the compositor intentionally keeps a fixed 600 ms transition and at most two presentation layers rather than exposing another user preference.
+- Deferred work: none for the WI-0129 presentation lifecycle; later M27 items build additional visual treatment on top of this renderer.
+- Commands run: repository CI passed before merge; maintainer visual/device acceptance was recorded on 2026-09-16.
