@@ -1,0 +1,10 @@
+id: WI-0131
+title: Add a restrained adaptive backdrop for contained slideshow photos
+milestone: M27
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0131-adaptive-slideshow-backdrop.md
+blockers:
+- WI-0129
+blocker_notes: []
+evidence: []

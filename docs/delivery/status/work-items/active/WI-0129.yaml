@@ -1,0 +1,11 @@
+id: WI-0129
+title: Add a predecoded dual-layer slideshow transition renderer
+milestone: M27
+status: ready
+owner: unassigned
+document: ../work-items/WI-0129-dual-layer-slideshow-renderer.md
+blockers:
+- WI-0084
+- WI-0108
+blocker_notes: []
+evidence: []

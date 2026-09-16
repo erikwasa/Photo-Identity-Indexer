@@ -1,0 +1,58 @@
+---
+id: WI-0135
+title: Redesign the slideshow library as a visual tap-to-play gallery
+milestone: M27
+status_source: ../status/work-items.yaml
+depends_on: [WI-0094]
+related_adrs: []
+affected_modules: [PhotoIdentity.Web, PhotoIdentity.Web.Tests, docs]
+---
+
+# WI-0135: Redesign the slideshow library as a visual tap-to-play gallery
+
+## Objective
+
+Make `/slideshows` feel like a collection of memories rather than an operator screen by giving each slideshow a representative cover and making the collection card itself the primary start action.
+
+## Why
+
+The current read-only library is intentionally safe but still exposes textual cards, explicit Start buttons, preparation actions and a settings disclosure. The desired consumption flow is simpler: open the library, choose something visually and start watching.
+
+## In scope
+
+- Add an automatic representative cover image for each saved slideshow/Smart Collection with deterministic fallback.
+- Redesign cards around cover image + collection title, with the whole accessible card acting as the primary Start slideshow action.
+- Retain keyboard/screen-reader accessibility and clear focus states.
+- Remove redundant primary-action chrome where the card itself communicates play.
+- Keep global settings available to the parent/operator but visually secondary to browsing; do not add new playback-style controls.
+- Avoid requiring a manually selected cover image.
+- Define graceful empty/loading/error states that remain consumer-oriented.
+- Allow later M26 selection/anchor logic to improve cover choice without making M26 a dependency.
+
+## Out of scope
+
+- Editing Smart Collection definitions from the read-only library.
+- Per-collection slideshow settings.
+- Manual cover-photo management.
+- Authentication/authorization changes.
+
+## Acceptance criteria
+
+- [ ] Every collection card has a deterministic visual cover or neutral fallback.
+- [ ] Activating the card starts the slideshow without requiring a separate visible Start button.
+- [ ] Settings/recovery remain available but do not dominate the normal browsing surface.
+- [ ] Cards remain accessible by keyboard and assistive technology.
+- [ ] Loading/preparation state does not cause the card layout to jump excessively.
+- [ ] The page remains read-only with respect to collection/photo metadata.
+- [ ] Focused UI tests cover card activation, fallback cover, accessibility semantics and start failure recovery.
+
+## Verification requirements
+
+Review on desktop and iPhone-sized viewport. The happy path should read visually as “choose a slideshow” rather than “operate slideshow controls.”
+
+## Completion notes
+
+- Files changed:
+- Trade-offs:
+- Deferred work:
+- Commands run:

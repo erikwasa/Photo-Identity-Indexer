@@ -1,0 +1,10 @@
+id: WI-0134
+title: Add bounded adaptive timing for a less mechanical slideshow rhythm
+milestone: M27
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0134-adaptive-slideshow-rhythm.md
+blockers:
+- WI-0129
+blocker_notes: []
+evidence: []

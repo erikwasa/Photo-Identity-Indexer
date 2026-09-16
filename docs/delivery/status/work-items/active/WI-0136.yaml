@@ -1,0 +1,12 @@
+id: WI-0136
+title: Make slideshow startup and original preparation exception-driven
+milestone: M27
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0136-exception-driven-slideshow-preparation.md
+blockers:
+- WI-0094
+- WI-0107
+- WI-0108
+blocker_notes: []
+evidence: []

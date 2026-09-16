@@ -1,0 +1,10 @@
+id: WI-0135
+title: Redesign the slideshow library as a visual tap-to-play gallery
+milestone: M27
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0135-visual-tap-to-play-slideshow-library.md
+blockers:
+- WI-0094
+blocker_notes: []
+evidence: []

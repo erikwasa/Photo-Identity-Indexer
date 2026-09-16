@@ -1,0 +1,11 @@
+id: WI-0132
+title: Add moment-aware transition language to slideshow playback
+milestone: M27
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0132-moment-aware-slideshow-transitions.md
+blockers:
+- WI-0129
+- WI-0118
+blocker_notes: []
+evidence: []
