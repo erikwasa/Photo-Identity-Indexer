@@ -4,20 +4,23 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M27 Slideshow presentation experience is continuing with WI-0130: subtle automatic motion and face-aware slideshow framing.**
+**M27 Slideshow presentation experience is continuing with a WI-0130 corrective slice for motion visibility and diagnostics.**
 
-WI-0129 and WI-0135 are merged but intentionally remain `in_progress` until the maintainer performs the requested combined visual/device review. WI-0130 may build on the merged WI-0129 compositor without treating that deferred acceptance as complete.
+The 2026-09-16 combined maintainer review accepted WI-0129 dual-layer transitions and WI-0135 visual tap-to-play library behavior. WI-0130 was not accepted because no foreground motion was detectable on either Android or PC.
 
-WI-0130 reuses `IFaceReviewDerivativeRepository.GetFacesAsync` to expose only normalized, identity-free face rectangles for the incoming slideshow revision. The two-layer compositor loads that geometry alongside image decode and applies a conservative deterministic policy: a 1.5% zoom around a safe face-region pivot for at most two suitable faces, deterministic near-center motion for reliable no-face geometry, and static fallback for groups, edge-near/tight/invalid faces, missing geometry, or request failures. CSS `animation-play-state` preserves motion position across pause/resume, and `prefers-reduced-motion` disables the effect.
+The merged WI-0130 path is functionally wired from identity-free face geometry through the motion policy into the dual-layer compositor, but its original 1.5% `ease-in-out` zoom over the full slide duration proved too subtle for real-device verification. The corrective slice raises the bounded scale-only zoom to 3% with linear progression while keeping the existing conservative safety policy: more than two faces, edge-near/tight/invalid faces, unavailable geometry, or geometry request failures remain static.
+
+The visible presentation layers now also expose identity-free `data-photoidentity-motion` diagnostics. During real-device inspection, `active`/`paused` confirms that the motion policy is actually applied, while `static-policy` and `static-geometry-unavailable` distinguish intentional framing fallback from a geometry delivery problem.
 
 ## Next concrete step
 
-Validate the WI-0130 implementation through the normal build/integration/docs gates. In the combined maintainer review, compare #346 crossfades, #347 visual slideshow selection, and WI-0130 motion across portraits, landscapes, close-ups, group photos, pause/resume, manual navigation and reduced-motion behavior. Tune the fixed constants rather than adding viewer-facing motion controls.
+Validate the corrective WI-0130 slice through the normal build/integration/docs gates, then repeat Android/PC slideshow review. Confirm that suitable photos now show restrained but detectable motion, face-risk cases stay static, pause/resume preserves position, and reduced-motion disables the foreground animation. Do not add viewer-facing motion controls.
 
 ## Relevant files
 
+- docs/delivery/work-items/WI-0129-dual-layer-slideshow-renderer.md
+- docs/delivery/work-items/WI-0135-visual-tap-to-play-slideshow-library.md
 - docs/delivery/work-items/WI-0130-subtle-motion-face-aware-framing.md
-- docs/delivery/status/work-items/active/WI-0130.yaml
 - src/PhotoIdentity.Api/CollectionViewerPreviewEndpoints.cs
 - src/PhotoIdentity.Web/SlideshowPresentationContracts.cs
 - src/PhotoIdentity.Web/SlideshowMotionPolicy.cs
