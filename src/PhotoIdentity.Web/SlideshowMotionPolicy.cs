@@ -13,7 +13,7 @@ public sealed record SlideshowMotionPlan(
 
 public static class SlideshowMotionPolicy
 {
-    private const double MotionScale = 1.015d;
+    private const double MotionScale = 1.03d;
     private const double FaceSafetyMargin = 0.015d;
     private const double MaximumProtectedSpan = 0.68d;
     private const double MaximumSingleFaceWidth = 0.48d;
