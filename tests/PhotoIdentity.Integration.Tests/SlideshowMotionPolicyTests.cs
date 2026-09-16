@@ -15,7 +15,7 @@ public sealed class SlideshowMotionPolicyTests
         SlideshowMotionPlan second = SlideshowMotionPolicy.Create(revisionId, [], geometryReliable: true);
 
         Assert.True(first.Enabled);
-        Assert.Equal(1.015d, first.Scale, 6);
+        Assert.Equal(1.03d, first.Scale, 6);
         Assert.Equal(first, second);
         Assert.InRange(first.OriginXPercent, 46d, 54d);
         Assert.InRange(first.OriginYPercent, 46d, 54d);
