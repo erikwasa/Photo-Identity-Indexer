@@ -31,7 +31,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M24 | PostgreSQL catalogue migration and archive-scale operation | completed |
 | M25 | Face discovery and cluster-assisted identity review | in_progress |
 | M26 | Creative Collections | ready |
-| M27 | Slideshow presentation experience | ready |
+| M27 | Slideshow presentation experience | in_progress |
 
 Expected evolution:
 
