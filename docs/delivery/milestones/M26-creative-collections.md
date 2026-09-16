@@ -13,6 +13,8 @@ Photo Identity can turn exact Smart Collection matches into a bounded, story-ori
 
 The milestone is intentionally metadata-first. Capture time is the primary signal for moment grouping; identified people, tags, source/path proximity and location may strengthen a grouping when available, but GPS or named-place metadata is never required. Creative grouping and selection are derived, regenerable presentation decisions rather than canonical facts about the archive.
 
+WI-0118 through WI-0120 are the core proof-of-value sequence. WI-0121 through WI-0128 are deliberately recorded as candidate follow-on work so useful ideas are not lost while M26 is evaluated. They are not an assertion that every feature must ship: a follow-on may conclude with a measured no-go/retirement decision recorded through the normal work-item lifecycle rather than forcing unnecessary implementation.
+
 ## Delivery principles
 
 - Keep Smart Collections exact and predictable. Creative Collections consume their results as anchors instead of weakening or redefining filter semantics.
@@ -22,7 +24,9 @@ The milestone is intentionally metadata-first. Capture time is the primary signa
 - Preserve provenance so the UI can distinguish direct anchor matches from added context.
 - Keep selection deterministic for the same catalogue state and policy/version, with stable tie-breaking.
 - Reuse the existing immutable slideshow snapshot/playback boundary after creative selection has produced its final ordered revision IDs.
-- Do not require semantic-image embeddings for the first milestone. Metadata-only diversity should establish whether the product idea is useful before adding heavier models.
+- Do not require semantic-image embeddings for the first milestone proof. Metadata-only diversity should establish whether the product idea is useful before heavier models are justified.
+- Keep presentation preferences/history, derived visual evidence and semantic-model evidence separate from canonical archive/identity facts.
+- Measure incremental product value before adding heavier models or vector infrastructure.
 - Do not mutate people, tags, Places, source metadata or original photos while generating a Creative Collection.
 
 ## User-visible demonstration
@@ -39,17 +43,36 @@ The same workflow must remain useful for archives with little or no GPS/location
 
 ## Work items
 
+### Core proof of value
+
 - [WI-0118](../work-items/WI-0118-moment-clustering.md) - prototype and evaluate timestamp-first moment clustering over the existing photo catalogue.
 - [WI-0119](../work-items/WI-0119-anchor-context-generation.md) - use exact Smart Collection matches as anchors and expand them with provenance-preserving context from inferred moments.
 - [WI-0120](../work-items/WI-0120-target-count-diversity-selector.md) - select a requested number of diverse photos from anchor/context candidates and hand the final immutable sequence to slideshow playback.
+
+### Candidate follow-on product and quality work
+
+- [WI-0121](../work-items/WI-0121-creative-collection-recipes-preview.md) - productize reusable Creative Collection recipes and an inspectable preview before playback.
+- [WI-0122](../work-items/WI-0122-photo-presentation-preferences.md) - add explicit photo-level Prefer/Avoid presentation preferences without changing archive truth.
+- [WI-0123](../work-items/WI-0123-near-duplicate-burst-groups.md) - detect burst/near-duplicate visual groups so selection can suppress repetitive frames.
+- [WI-0124](../work-items/WI-0124-slideshow-history-novelty.md) - track presentation history and optionally favor photos that have not been shown recently.
+- [WI-0125](../work-items/WI-0125-person-family-metadata.md) - add optional birth-date and family-relationship metadata for age/relationship-oriented family stories.
+
+### Candidate follow-on semantic experiments
+
+- [WI-0126](../work-items/WI-0126-visible-content-tagging.md) - re-evaluate local visible-content tagging with Creative Collection quality as the concrete consumer.
+- [WI-0127](../work-items/WI-0127-whole-image-embeddings.md) - evaluate whole-image embeddings for semantic retrieval, visual similarity and diversity before adopting vector infrastructure.
+- [WI-0128](../work-items/WI-0128-caption-narration-experiment.md) - evaluate optional local captions/story narration only after the simpler Creative Collection product is useful.
 
 ## Delivery sequence
 
 1. WI-0118 establishes whether useful moment boundaries can be inferred from ordinary family-photo metadata without depending on travel/location coverage.
 2. WI-0119 validates the core product idea that a slideshow about a person can include surrounding photographs where that person is not depicted, without silently weakening the original query.
 3. WI-0120 addresses collections that are too large or too small by curating toward a requested size while rewarding temporal, moment and people/context diversity and suppressing repetition.
+4. If the core result is useful, WI-0121 is the natural productization step. WI-0122 through WI-0125 are then individually selectable product/quality improvements and should be prioritized from measured everyday value rather than treated as one mandatory block.
+5. WI-0126 and WI-0127 are independent semantic experiments. Either may be skipped, rejected or selected based on incremental quality versus runtime/storage complexity.
+6. WI-0128 is intentionally late and optional; deterministic titles/templates should remain a valid simpler alternative to generative narration.
 
-Each stage should remain independently inspectable so unsuccessful heuristics can be replaced without changing canonical Smart Collection or slideshow semantics.
+Each stage should remain independently inspectable so unsuccessful heuristics/models can be replaced or retired without changing canonical Smart Collection or slideshow semantics.
 
 ## Exit criteria
 
@@ -62,6 +85,7 @@ Each stage should remain independently inspectable so unsuccessful heuristics ca
 - [ ] Selection reduces obvious repetition and improves coverage across time/moments/people compared with simple chronological truncation on a representative private sample.
 - [ ] The final ordered revision list can use the existing stable slideshow playback/snapshot lifecycle without changing playback into a live query.
 - [ ] Automated tests protect deterministic grouping/selection, provenance, exact-anchor semantics and important edge cases such as zero anchors, fewer candidates than target and many near-consecutive photos.
+- [ ] Follow-on work that is pursued retains the canonical-versus-derived/presentation boundaries above; follow-on ideas that are rejected are explicitly closed with evidence instead of being silently abandoned.
 
 ## Risks
 
@@ -70,3 +94,5 @@ Each stage should remain independently inspectable so unsuccessful heuristics ca
 - Context expansion can overwhelm the subject that motivated the collection. Provenance, bounded expansion and later diversity/target selection must keep anchors meaningful.
 - A diversity score can encode arbitrary aesthetic choices and repeatedly suppress personally important photos. Initial rules should be simple, explainable and replaceable.
 - Target-count selection may create false precision when the candidate pool is too small or too homogeneous. The UI must treat the count as a best-effort presentation goal rather than a guarantee.
+- Adding many attractive follow-on ideas can obscure whether the core feature itself is useful. Measure WI-0118 through WI-0120 first and prioritize later items from observed shortcomings.
+- Semantic models can add storage, packaging and maintenance cost faster than user value. Controlled experiments and explicit no-go outcomes are expected.
