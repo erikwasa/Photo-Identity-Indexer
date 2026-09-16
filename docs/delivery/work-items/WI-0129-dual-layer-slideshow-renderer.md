@@ -56,7 +56,8 @@ Run the existing slideshow unit/browser tests plus a representative phone slides
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: dual-layer slideshow presentation component, browser transition/decode helpers, focused slideshow tests and delivery metadata.
+- Trade-offs: transition language intentionally remains one conservative fixed crossfade; no viewer-facing transition controls were added.
+- Deferred work: later M27 items may build richer presentation behavior on the compositor, but the renderer itself is accepted.
+- Commands run: repository CI for PR #346 plus maintainer manual review.
+- Verification: on 2026-09-16 the maintainer reviewed the combined slideshow changes and reported WI-0129 works as expected.
