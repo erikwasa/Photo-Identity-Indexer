@@ -50,9 +50,16 @@ A completely static sequence can feel sterile even with smooth crossfades. Very 
 
 Maintainer review on representative phone playback should compare static versus motion-enabled behavior across portraits, landscapes, close-ups and group photos. Reject/tune any effect that draws attention to itself.
 
+## Maintainer verification
+
+- 2026-09-16: **not accepted**. The maintainer could not detect any foreground motion on either Android or PC while WI-0129 crossfades and WI-0135 library behavior worked as expected.
+- Investigation found the motion pipeline and CSS animation are wired, but the shipped baseline was only a 1.5% scale change with `ease-in-out` over the full image duration. The automated tests verified policy decisions, not that motion was perceptible in a real rendered slideshow.
+- Geometry-request failures are intentionally converted to a static fallback and previously had no runtime-visible diagnostic, so a production geometry problem could also look identical to intentionally static policy behavior.
+- Corrective tuning raises the bounded zoom to 3%, uses linear progression, and adds identity-free `data-photoidentity-motion` diagnostics to distinguish `active`, `paused`, `static-policy`, and `static-geometry-unavailable` states during real-device verification.
+
 ## Completion notes
 
-- Files changed: identity-free slideshow face-geometry API contract/endpoint, deterministic motion policy, dual-layer presentation component/CSS, slideshow playback binding, and focused integration tests.
-- Trade-offs: the first policy intentionally uses only a 1.5% zoom around a safe deterministic pivot rather than free panning. This keeps the face-safety boundary simple and conservative; photos with more than two faces, edge-near/tight faces, invalid/unavailable geometry, or geometry request failures stay static.
-- Deferred work: subjective tuning plus phone/desktop validation are deferred to the maintainer's combined review of WI-0129, WI-0135 and WI-0130. More expressive motion should be considered only if this restrained baseline feels too static.
-- Commands run: repository CI is the authoritative automated validation for this branch; manual device review remains pending.
+- Files changed: identity-free slideshow face-geometry API contract/endpoint, deterministic motion policy, dual-layer presentation component/CSS, slideshow playback binding, focused integration tests, and corrective runtime motion diagnostics.
+- Trade-offs: the first merged policy used a 1.5% scale-only zoom to keep the face-safety boundary simple and conservative, but maintainer testing showed that baseline was too subtle to verify. The corrective baseline uses a still-bounded 3% scale-only zoom; photos with more than two faces, edge-near/tight faces, invalid/unavailable geometry, or geometry request failures still remain static.
+- Deferred work: WI-0130 remains open pending repeat Android/PC verification of motion visibility, face-safe fallback, pause/resume and reduced-motion behavior.
+- Commands run: repository CI is the authoritative automated validation for the corrective branch; manual device review remains pending after the tuning change.
