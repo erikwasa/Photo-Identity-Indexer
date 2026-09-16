@@ -18,8 +18,12 @@ public sealed class PhotoMomentClustererTests
             PhotoMomentGapPolicy.Evaluation30Minutes);
 
         Assert.Equal(2, result.Moments.Count);
-        Assert.Equal([first.RevisionId, boundary.RevisionId], result.Moments[0].Members.Select(member => member.RevisionId));
-        Assert.Equal([split.RevisionId], result.Moments[1].Members.Select(member => member.RevisionId));
+        Assert.Equal(
+            new[] { first.RevisionId, boundary.RevisionId },
+            result.Moments[0].Members.Select(member => member.RevisionId));
+        Assert.Equal(
+            new[] { split.RevisionId },
+            result.Moments[1].Members.Select(member => member.RevisionId));
     }
 
     [Fact]
@@ -35,7 +39,7 @@ public sealed class PhotoMomentClustererTests
 
         PhotoMoment moment = Assert.Single(result.Moments);
         Assert.Equal(
-            [earlierId.RevisionId, laterId.RevisionId],
+            new[] { earlierId.RevisionId, laterId.RevisionId },
             moment.Members.Select(member => member.RevisionId));
     }
 
@@ -146,7 +150,7 @@ public sealed class PhotoMomentClustererTests
     }
 
     private static string MomentSignature(PhotoMoment moment) =>
-        $"{moment.Id}:{string.Join(',', moment.Members.Select(member => member.RevisionId.ToString()))}";
+        $"{moment.Id}:{string.Join(",", moment.Members.Select(member => member.RevisionId.ToString()))}";
 
     private static PhotoMomentCandidate Candidate(
         int suffix,
