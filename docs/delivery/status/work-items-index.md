@@ -24,7 +24,7 @@ Current work items: **26**. Archived terminal items: **110**.
 | [WI-0127](../work-items/WI-0127-whole-image-embeddings.md) Evaluate whole-image embeddings for semantic Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0127.yaml) |
 | [WI-0128](../work-items/WI-0128-caption-narration-experiment.md) Evaluate local captions and story narration for Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0128.yaml) |
 | [WI-0129](../work-items/WI-0129-dual-layer-slideshow-renderer.md) Add a predecoded dual-layer slideshow transition renderer | M27 | in_progress | ai-agent | [YAML](work-items/active/WI-0129.yaml) |
-| [WI-0130](../work-items/WI-0130-subtle-motion-face-aware-framing.md) Add subtle automatic motion and face-aware slideshow framing | M27 | proposed | unassigned | [YAML](work-items/active/WI-0130.yaml) |
+| [WI-0130](../work-items/WI-0130-subtle-motion-face-aware-framing.md) Add subtle automatic motion and face-aware slideshow framing | M27 | in_progress | ai-agent | [YAML](work-items/active/WI-0130.yaml) |
 | [WI-0131](../work-items/WI-0131-adaptive-slideshow-backdrop.md) Add a restrained adaptive backdrop for contained slideshow photos | M27 | proposed | unassigned | [YAML](work-items/active/WI-0131.yaml) |
 | [WI-0132](../work-items/WI-0132-moment-aware-slideshow-transitions.md) Add moment-aware transition language to slideshow playback | M27 | proposed | unassigned | [YAML](work-items/active/WI-0132.yaml) |
 | [WI-0133](../work-items/WI-0133-burst-aware-slideshow-pacing.md) Add burst-aware compact pacing to slideshow playback | M27 | proposed | unassigned | [YAML](work-items/active/WI-0133.yaml) |
@@ -39,4 +39,4 @@ Historical items stay queryable without opening the archive directory:
 dotnet run --project tools/PhotoIdentity.Docs -- show WI-0057
 ```
 
-Use `PhotoIdentity.Docs next` for ready work and the lifecycle commands for status changes; `work-items.yaml` is only a generated current-work compatibility view.
+Use `PhotoIdentity.Docs next` for ready work and the lifecycle commands for status changes; `work-items.yaml` is only the generated current-work compatibility view.
