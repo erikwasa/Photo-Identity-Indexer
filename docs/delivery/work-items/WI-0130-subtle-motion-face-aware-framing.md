@@ -52,7 +52,7 @@ Maintainer review on representative phone playback should compare static versus 
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: identity-free slideshow face-geometry API contract/endpoint, deterministic motion policy, dual-layer presentation component/CSS, slideshow playback binding, and focused integration tests.
+- Trade-offs: the first policy intentionally uses only a 1.5% zoom around a safe deterministic pivot rather than free panning. This keeps the face-safety boundary simple and conservative; photos with more than two faces, edge-near/tight faces, invalid/unavailable geometry, or geometry request failures stay static.
+- Deferred work: subjective tuning plus phone/desktop validation are deferred to the maintainer's combined review of WI-0129, WI-0135 and WI-0130. More expressive motion should be considered only if this restrained baseline feels too static.
+- Commands run: repository CI is the authoritative automated validation for this branch; manual device review remains pending.
