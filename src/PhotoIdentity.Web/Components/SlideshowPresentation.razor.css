@@ -34,7 +34,7 @@
 
 .slideshow-image-motion {
     transform-origin: var(--slideshow-motion-origin-x, 50%) var(--slideshow-motion-origin-y, 50%);
-    animation: slideshow-subtle-motion var(--slideshow-motion-duration, 5s) ease-in-out both;
+    animation: slideshow-subtle-motion var(--slideshow-motion-duration, 5s) linear both;
     will-change: opacity, transform;
 }
 
@@ -48,7 +48,7 @@
     }
 
     to {
-        transform: scale(var(--slideshow-motion-scale, 1.015));
+        transform: scale(var(--slideshow-motion-scale, 1.03));
     }
 }
 
