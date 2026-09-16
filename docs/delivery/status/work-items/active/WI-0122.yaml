@@ -1,0 +1,10 @@
+id: WI-0122
+title: Add photo presentation preferences for Creative Collections
+milestone: M26
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0122-photo-presentation-preferences.md
+blockers:
+- WI-0120
+blocker_notes: []
+evidence: []

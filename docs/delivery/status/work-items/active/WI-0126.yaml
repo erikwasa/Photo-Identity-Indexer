@@ -1,0 +1,11 @@
+id: WI-0126
+title: Re-evaluate local visible-content tagging for Creative Collections
+milestone: M26
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0126-visible-content-tagging.md
+blockers:
+- WI-0120
+- WI-0056
+blocker_notes: []
+evidence: []

@@ -1,0 +1,10 @@
+id: WI-0121
+title: Productize Creative Collection recipes and previews
+milestone: M26
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0121-creative-collection-recipes-preview.md
+blockers:
+- WI-0120
+blocker_notes: []
+evidence: []

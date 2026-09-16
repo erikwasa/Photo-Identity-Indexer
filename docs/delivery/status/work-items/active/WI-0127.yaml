@@ -1,0 +1,10 @@
+id: WI-0127
+title: Evaluate whole-image embeddings for semantic Creative Collections
+milestone: M26
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0127-whole-image-embeddings.md
+blockers:
+- WI-0120
+blocker_notes: []
+evidence: []
