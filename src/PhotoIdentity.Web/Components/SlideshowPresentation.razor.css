@@ -32,8 +32,31 @@
     opacity: 0;
 }
 
+.slideshow-image-motion {
+    transform-origin: var(--slideshow-motion-origin-x, 50%) var(--slideshow-motion-origin-y, 50%);
+    animation: slideshow-subtle-motion var(--slideshow-motion-duration, 5s) ease-in-out both;
+    will-change: opacity, transform;
+}
+
+.slideshow-image-motion-paused {
+    animation-play-state: paused;
+}
+
+@keyframes slideshow-subtle-motion {
+    from {
+        transform: scale(1);
+    }
+
+    to {
+        transform: scale(var(--slideshow-motion-scale, 1.015));
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
-    .slideshow-image {
+    .slideshow-image,
+    .slideshow-image-motion {
+        animation: none;
+        transform: none;
         will-change: auto;
     }
 }
