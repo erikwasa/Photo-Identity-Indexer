@@ -29,7 +29,7 @@ Current work items: **26**. Archived terminal items: **110**.
 | [WI-0132](../work-items/WI-0132-moment-aware-slideshow-transitions.md) Add moment-aware transition language to slideshow playback | M27 | proposed | unassigned | [YAML](work-items/active/WI-0132.yaml) |
 | [WI-0133](../work-items/WI-0133-burst-aware-slideshow-pacing.md) Add burst-aware compact pacing to slideshow playback | M27 | proposed | unassigned | [YAML](work-items/active/WI-0133.yaml) |
 | [WI-0134](../work-items/WI-0134-adaptive-slideshow-rhythm.md) Add bounded adaptive timing for a less mechanical slideshow rhythm | M27 | proposed | unassigned | [YAML](work-items/active/WI-0134.yaml) |
-| [WI-0135](../work-items/WI-0135-visual-tap-to-play-slideshow-library.md) Redesign the slideshow library as a visual tap-to-play gallery | M27 | proposed | unassigned | [YAML](work-items/active/WI-0135.yaml) |
+| [WI-0135](../work-items/WI-0135-visual-tap-to-play-slideshow-library.md) Redesign the slideshow library as a visual tap-to-play gallery | M27 | in_progress | ai-agent | [YAML](work-items/active/WI-0135.yaml) |
 | [WI-0136](../work-items/WI-0136-exception-driven-slideshow-preparation.md) Make slideshow startup and original preparation exception-driven | M27 | proposed | unassigned | [YAML](work-items/active/WI-0136.yaml) |
 | [WI-0137](../work-items/WI-0137-real-device-slideshow-polish-acceptance.md) Tune and verify the polished slideshow experience on real devices | M27 | proposed | unassigned | [YAML](work-items/active/WI-0137.yaml) |
 

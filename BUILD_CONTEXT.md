@@ -4,30 +4,29 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M27 Slideshow presentation experience is starting with WI-0129: a predecoded dual-layer slideshow transition renderer.**
+**M27 Slideshow presentation experience is continuing with WI-0135: redesign the slideshow library as a visual tap-to-play gallery.**
 
-The existing slideshow already keeps autoplay timing separate from image readiness and has a bounded adjacent-image prefetch pipeline. WI-0129 replaces the single keyed `<img>` presentation with a bounded current/incoming compositor so the next image can load and decode while the current photo remains visible, then crossfade without a black flash.
+WI-0129 is merged but intentionally remains `in_progress` until the deferred real-device slideshow acceptance is performed together with later M27 visual changes. Do not mark it complete merely to unblock dependent presentation work.
 
-The renderer must preserve M22 protected/fullscreen/original-preparation behavior and M24 slideshow performance diagnostics. Rapid manual navigation should serialize/coalesce through the existing navigation gate. Reduced-motion users still get ready-before-show swaps without nonessential animation.
+WI-0135 keeps the fast `/api/slideshows/collections` definition list unchanged. Each visual card lazily queries the existing saved-collection endpoint for its deterministic first matching photo and uses that thumbnail as a decorative cover; empty/error cases retain a fixed neutral fallback. The whole card is the accessible Play action, while preparation controls and browser-local playback preferences are visually secondary.
 
 ## Next concrete step
 
-Implement the presentation host/compositor in `slideshow.js`, wire `Slideshow.razor`/`Slideshow.razor.cs` so playback marks the destination ready only after the compositor reports it visible, and extend JavaScript plus playback-state regression tests for initial presentation, crossfade, reduced motion, rapid navigation/loop behavior and failures.
+Validate the WI-0135 gallery implementation: compile the new cover component and presentation helper, run slideshow/integration tests, verify documentation generation, and review the `/slideshows` layout at desktop and iPhone-sized widths. Preserve existing fullscreen-rejection recovery through `SlideshowLibraryLaunch`.
 
 ## Relevant files
 
-- docs/delivery/work-items/WI-0129-dual-layer-slideshow-renderer.md
-- docs/delivery/status/work-items/active/WI-0129.yaml
-- src/PhotoIdentity.Web/Pages/Slideshow.razor
-- src/PhotoIdentity.Web/Pages/Slideshow.razor.cs
-- src/PhotoIdentity.Web/Pages/Slideshow.razor.css
-- src/PhotoIdentity.Web/SlideshowPlaybackState.cs
-- src/PhotoIdentity.Web/SlideshowNavigationGate.cs
-- src/PhotoIdentity.Web/wwwroot/js/slideshow.js
-- src/PhotoIdentity.Web/wwwroot/js/slideshow-performance.js
-- tests/javascript/slideshow-prefetch.test.js
-- tests/PhotoIdentity.Integration.Tests/SlideshowPlaybackStateTests.cs
-- tests/PhotoIdentity.Integration.Tests/SlideshowJavascriptTests.cs
+- docs/delivery/work-items/WI-0135-visual-tap-to-play-slideshow-library.md
+- docs/delivery/status/work-items/active/WI-0135.yaml
+- src/PhotoIdentity.Web/Pages/Slideshows.razor
+- src/PhotoIdentity.Web/Pages/Slideshows.razor.css
+- src/PhotoIdentity.Web/Pages/Slideshows.razor.cs
+- src/PhotoIdentity.Web/Components/SlideshowLibraryCover.razor
+- src/PhotoIdentity.Web/Components/SlideshowLibraryCover.razor.css
+- src/PhotoIdentity.Web/SlideshowLibraryPresentation.cs
+- src/PhotoIdentity.Web/SlideshowLibraryLaunch.cs
+- tests/PhotoIdentity.Integration.Tests/SlideshowLibraryAcceptanceTests.cs
+- tests/PhotoIdentity.Integration.Tests/SlideshowLibraryPresentationTests.cs
 
 ## Repository validation
 

@@ -52,7 +52,7 @@ Review on desktop and iPhone-sized viewport. The happy path should read visually
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: `Slideshows.razor`, isolated gallery/cover CSS, `SlideshowLibraryCover`, `SlideshowLibraryPresentation`, focused integration tests and delivery handoff/status views.
+- Trade-offs: cover discovery reuses the existing saved-collection query contract and leaves the fast slideshow-definition list unchanged. The first deterministic query result (currently the newest matching photo) is used until M26 can provide stronger anchor selection. Cover failure is decorative-only and falls back without blocking playback.
+- Deferred work: WI-0136 will further remove routine original-preparation operations from the happy path; M26 may later improve cover choice.
+- Commands run: implementation prepared for normal CI; desktop/iPhone-sized subjective acceptance remains deferred with the planned M27 visual review batch.
