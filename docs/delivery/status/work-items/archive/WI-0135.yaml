@@ -1,0 +1,20 @@
+id: WI-0135
+title: Redesign the slideshow library as a visual tap-to-play gallery
+milestone: M27
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0135-visual-tap-to-play-slideshow-library.md
+started_at: 2026-09-16
+completed_at: 2026-09-16
+verified_at: 2026-09-16
+verified_by: maintainer
+last_updated_at: 2026-09-16
+branch: agent/WI-0135-visual-slideshow-library
+blockers:
+- WI-0094
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/347
+- type: verification
+  value: '2026-09-16 maintainer combined slideshow review: WI-0135 works as expected.'
