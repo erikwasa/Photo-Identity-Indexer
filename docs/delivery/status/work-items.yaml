@@ -224,7 +224,7 @@ work_items:
   blockers:
   - WI-0129
   blocker_notes:
-  - WI-0129 implementation is merged in PR #346; its real-device acceptance is intentionally deferred to the combined M27 visual review requested by the maintainer.
+  - WI-0129 implementation is merged in pull request 346; its real-device acceptance is intentionally deferred to the combined M27 visual review requested by the maintainer.
   evidence: []
 - id: WI-0131
   title: Add a restrained adaptive backdrop for contained slideshow photos
