@@ -97,6 +97,16 @@ The production candidate is **`m25-multi-evidence-auto-v1`**, corresponding to t
 
 All candidates are fully evaluated from the fixed regeneration/reference/cluster evidence before any canonical accept is applied, so one newly automatic assignment cannot strengthen another candidate inside the same run. Automatic decisions use the normal suggestion-acceptance/canonical review-history boundary, with a distinct actor and a provenance note containing exact model, ordinary policy version, multi-evidence policy/configuration version, cluster run/policy/key, cluster support/core/competition values, reference-support count/threshold, target score and margin.
 
+## Production implementation and maintainer verification — 2026-09-16
+
+PR #343 implemented `m25-multi-evidence-auto-v1` as a separate exact-model, default-disabled operator opt-in while preserving the accepted ordinary High path and master automatic-assignment switch. Automated coverage includes policy persistence/default-off behavior, evidence gates, exact provenance and the live PostgreSQL canonical assignment path.
+
+During real-catalogue maintainer verification, the first regeneration exposed an active-run timestamp CLR-mapping defect. PR #349 corrected the PostgreSQL timestamp read with the repository's typed `DateTimeOffset` pattern and added a live regression test. Workflow run #1875 (`35149340542`) completed successfully after that fix.
+
+The maintainer then reran real-catalogue regeneration successfully. Canonical review history contained `identity-matcher:auto-multi-evidence` actions with the exact model, ordinary suggestion policy, `m25-multi-evidence-auto-v1` configuration, cluster run/policy/key, cluster support/core/competition values, independent-reference support and target score/margin needed to explain the decision. Candidate evaluation remains fixed-snapshot: all qualifying decisions are evaluated before any canonical accept is written, preventing same-run cascade strengthening.
+
+A representative automatic assignment was manually superseded and then undone. The manual decision became authoritative through append-only canonical history, and undo restored the prior automatic assignment without rewriting history. This completes the required correction/undo verification and confirms that the broader policy remains explicit opt-in rather than a retroactive rewrite of existing assignments.
+
 ## Acceptance criteria
 
 - [x] WI-0081 is resolved before any production automatic-assignment semantics are broadened.
@@ -104,12 +114,12 @@ All candidates are fully evaluated from the fixed regeneration/reference/cluster
 - [x] Evaluation reports false automatic assignments explicitly and compares them with the current accepted High policy.
 - [x] Unknown-person rejection is measured so increased known-person coverage does not come from silently forcing unknown faces into existing identities.
 - [x] Any accepted broader policy requires independent evidence beyond one marginal face/exemplar match and fails closed on strong competing-person evidence.
-- [ ] Automatic decisions retain exact embedding/clustering/policy provenance sufficient for later audit. Production implementation and verification pending.
-- [ ] Fixed-snapshot regeneration and no-same-run-cascade invariants remain intact. Production implementation and verification pending.
-- [ ] Manual reassignment/undo continues to supersede automatic decisions through append-only canonical history. Production verification pending.
-- [ ] Broader automation is opt-in and disabled by default for a newly introduced policy revision unless explicit acceptance says otherwise. Production implementation and verification pending.
+- [x] Automatic decisions retain exact embedding/clustering/policy provenance sufficient for later audit.
+- [x] Fixed-snapshot regeneration and no-same-run-cascade invariants remain intact.
+- [x] Manual reassignment/undo continues to supersede automatic decisions through append-only canonical history.
+- [x] Broader automation is opt-in and disabled by default for a newly introduced policy revision unless explicit acceptance says otherwise.
 - [x] Evaluation demonstrates an acceptable precision/review-effort trade-off for a narrow candidate; unsafe multi-reference-only candidates are explicitly rejected rather than weakening safeguards.
 
 ## Verification requirements
 
-Private reviewed-sample evaluation, automated policy/scoring/audit integration coverage and human Windows verification of opt-in configuration plus correction/undo of a representative automatic decision if broader automation is accepted.
+Private reviewed-sample evaluation, automated policy/scoring/audit integration coverage and human Windows verification of opt-in configuration plus correction/undo of a representative automatic decision if broader automation is accepted. Completed on 2026-09-16 after the corrected real-catalogue regeneration and representative correction/undo check.
