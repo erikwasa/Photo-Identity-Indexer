@@ -6,7 +6,8 @@
 <div class="slideshow-presentation" aria-hidden="true">
     @if (_slotA is PresentationSlot slotA)
     {
-        <img class="@LayerClass(PresentationLayer.A)"
+        <img @key="slotA.Generation"
+             class="@LayerClass(PresentationLayer.A)"
              src="@slotA.Target.Url"
              alt=""
              draggable="false"
@@ -18,7 +19,8 @@
 
     @if (_slotB is PresentationSlot slotB)
     {
-        <img class="@LayerClass(PresentationLayer.B)"
+        <img @key="slotB.Generation"
+             class="@LayerClass(PresentationLayer.B)"
              src="@slotB.Target.Url"
              alt=""
              draggable="false"
