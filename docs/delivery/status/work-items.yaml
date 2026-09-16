@@ -198,3 +198,103 @@ work_items:
   - WI-0121
   blocker_notes: []
   evidence: []
+- id: WI-0129
+  title: Add a predecoded dual-layer slideshow transition renderer
+  milestone: M27
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0129-dual-layer-slideshow-renderer.md
+  blockers:
+  - WI-0084
+  - WI-0108
+  blocker_notes: []
+  evidence: []
+- id: WI-0130
+  title: Add subtle automatic motion and face-aware slideshow framing
+  milestone: M27
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0130-subtle-motion-face-aware-framing.md
+  blockers:
+  - WI-0129
+  blocker_notes: []
+  evidence: []
+- id: WI-0131
+  title: Add a restrained adaptive backdrop for contained slideshow photos
+  milestone: M27
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0131-adaptive-slideshow-backdrop.md
+  blockers:
+  - WI-0129
+  blocker_notes: []
+  evidence: []
+- id: WI-0132
+  title: Add moment-aware transition language to slideshow playback
+  milestone: M27
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0132-moment-aware-slideshow-transitions.md
+  blockers:
+  - WI-0129
+  - WI-0118
+  blocker_notes: []
+  evidence: []
+- id: WI-0133
+  title: Add burst-aware compact pacing to slideshow playback
+  milestone: M27
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0133-burst-aware-slideshow-pacing.md
+  blockers:
+  - WI-0129
+  - WI-0123
+  blocker_notes: []
+  evidence: []
+- id: WI-0134
+  title: Add bounded adaptive timing for a less mechanical slideshow rhythm
+  milestone: M27
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0134-adaptive-slideshow-rhythm.md
+  blockers:
+  - WI-0129
+  blocker_notes: []
+  evidence: []
+- id: WI-0135
+  title: Redesign the slideshow library as a visual tap-to-play gallery
+  milestone: M27
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0135-visual-tap-to-play-slideshow-library.md
+  blockers:
+  - WI-0094
+  blocker_notes: []
+  evidence: []
+- id: WI-0136
+  title: Make slideshow startup and original preparation exception-driven
+  milestone: M27
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0136-exception-driven-slideshow-preparation.md
+  blockers:
+  - WI-0094
+  - WI-0107
+  - WI-0108
+  blocker_notes: []
+  evidence: []
+- id: WI-0137
+  title: Tune and verify the polished slideshow experience on real devices
+  milestone: M27
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0137-real-device-slideshow-polish-acceptance.md
+  blockers:
+  - WI-0129
+  - WI-0130
+  - WI-0131
+  - WI-0134
+  - WI-0135
+  - WI-0136
+  blocker_notes: []
+  evidence: []
