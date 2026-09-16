@@ -250,6 +250,7 @@ public partial class Program
             if (context.Request.Path.StartsWithSegments("/api/review") ||
                 context.Request.Path.StartsWithSegments("/api/collections") ||
                 context.Request.Path.StartsWithSegments("/api/smart-collections") ||
+                context.Request.Path.StartsWithSegments("/api/moments") ||
                 context.Request.Path.StartsWithSegments("/api/slideshows") ||
                 context.Request.Path.StartsWithSegments("/api/photo-metadata") ||
                 context.Request.Path.StartsWithSegments("/api/places") ||
@@ -290,6 +291,7 @@ public partial class Program
         app.MapCollectionEndpoints();
         app.MapPhotoDetailsEndpoints();
         app.MapSmartCollectionEndpoints();
+        app.MapMomentPreviewEndpoints();
         app.MapSlideshowOriginalPreparationEndpoints();
         app.MapPhotoMetadataEndpoints();
         app.MapCollectionProxyEndpoints();
@@ -364,7 +366,8 @@ public partial class Program
         }
 
         if (path.StartsWithSegments("/api/collections") ||
-            path.StartsWithSegments("/api/smart-collections"))
+            path.StartsWithSegments("/api/smart-collections") ||
+            path.StartsWithSegments("/api/moments"))
         {
             return ArchiveThroughputMetricNames.ApiCollectionRequest;
         }

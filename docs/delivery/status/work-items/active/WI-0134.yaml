@@ -9,5 +9,8 @@ last_updated_at: 2026-09-17
 branch: agent/WI-0134-adaptive-slideshow-rhythm
 blockers:
 - WI-0129
-blocker_notes: []
-evidence: []
+blocker_notes:
+- Automated acceptance semantics are implemented and covered by tests; the representative fixed-versus-adaptive long-run rhythm comparison remains pending maintainer/device review.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/355

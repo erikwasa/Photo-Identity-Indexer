@@ -6,13 +6,13 @@ This file is intentionally a short handoff for the next development or verificat
 
 **M27 Slideshow presentation experience is continuing with WI-0134: bounded adaptive timing for a less mechanical slideshow rhythm.**
 
-WI-0129, WI-0130 and WI-0135 have completed maintainer desktop/phone verification and are archived as completed. WI-0131 is merged in PR #352 but intentionally remains `in_progress` until the deferred visual/device review is performed.
+WI-0129, WI-0130 and WI-0135 have completed maintainer desktop/phone verification and are archived as completed. WI-0131 is merged in PR #352 but intentionally remains `in_progress` until the deferred visual/device review is performed. WI-0118 moment-clustering implementation is merged in PR #354 and remains `in_progress` pending its representative private evaluation.
 
 WI-0134 treats the persisted image duration as the dominant pace and reuses the face-geometry evidence already loaded by `SlideshowPresentation`. Timing is deterministic and narrowly bounded: reliable single-face frames use 98% of the configured duration, two-face frames 104%, groups 108%, while no-face or unavailable/unreliable evidence uses the configured duration exactly. The effective duration lives in `SlideshowPlaybackState` for progress/timer diagnostics and is not exposed as viewer chrome.
 
 ## Next concrete step
 
-Validate the WI-0134 implementation through the normal build/integration/docs gates. Pay particular attention to the generic presentation callback, manual-navigation ready-before-timer behavior, pause/resume, progress fraction and duration-setting changes. Subjective rhythm comparison can be batched with the later M27 visual review rather than blocking this implementation PR.
+Validate the WI-0134 implementation through the normal build/integration/docs gates. Pay particular attention to the generic presentation callback, manual-navigation ready-before-timer behavior, pause/resume, progress fraction and duration-setting changes. Then compare representative fixed-timing and adaptive-timing runs; retain or tune the narrow multipliers based on whether the cadence feels less mechanical without becoming noticeable in itself.
 
 ## Relevant files
 

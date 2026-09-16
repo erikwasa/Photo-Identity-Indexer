@@ -1,0 +1,34 @@
+id: WI-0117
+title: Evaluate multi-evidence automatic identity assignment
+milestone: M25
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0117-multi-evidence-auto-assignment-evaluation.md
+started_at: 2026-09-15
+completed_at: 2026-09-16
+verified_at: 2026-09-16
+verified_by: maintainer
+last_updated_at: 2026-09-16
+branch: agent/WI-0117-multi-evidence-production
+blockers:
+- WI-0081
+- WI-0116
+blocker_notes:
+- Private reviewed-data evaluation selected m25-multi-evidence-auto-v1 only after the combined cluster-plus-reference rule preserved the accepted precision and reviewed-Unknown guardrails on untouched holdout data; unsafe multi-reference-only expansion remained rejected.
+- Production implementation merged in PR #343. Maintainer verification exposed an active-run timestamp mapping defect, corrected in PR #349. Workflow run #1875 then passed, and real-catalogue regeneration produced canonical identity-matcher:auto-multi-evidence actions with exact model, policy, cluster and independent-reference provenance.
+- Maintainer manually superseded a representative automatic assignment and then undid that correction. Append-only canonical history made the manual decision authoritative and restored the prior automatic assignment on undo as required.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/342
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/343
+- type: merge_commit
+  value: ec836e1e8acbf9454bba8924e31250ed7f7c2bb0
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/349
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/35149340542
+- type: merge_commit
+  value: 031cb80e633fbf22cc46c4ed68ab3e52f9caf3e8
+- type: maintainer_verification
+  value: 2026-09-16 real-catalogue regeneration PASS; identity-matcher:auto-multi-evidence provenance PASS; representative manual correction and undo PASS through append-only canonical history.

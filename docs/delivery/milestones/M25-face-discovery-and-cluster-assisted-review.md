@@ -50,19 +50,25 @@ The milestone introduces provisional face clusters as model-versioned, regenerab
 
 WI-0110, WI-0111, WI-0112 and WI-0113 can proceed independently when their dependencies are satisfied. Later clustering work must not block delivery of the simpler review improvements.
 
+## Completion — 2026-09-16
+
+All M25 work items WI-0110 through WI-0117 are completed and maintainer-accepted. The milestone delivered similarity discovery, bounded follow-up regeneration, person-oriented suggestion review, evaluated and productionized provisional clustering, cluster review, cluster-assisted known-person advisory evidence and the final multi-evidence automatic-assignment quality gate.
+
+WI-0117 accepted only the narrow `m25-multi-evidence-auto-v1` expansion after deterministic private selection/holdout evaluation. The existing ordinary High path remains unchanged; the broader policy is separately versioned, exact-model scoped, disabled by default and subordinate to the ordinary automatic-assignment master switch. Production verification completed after PR #349 corrected the active-run timestamp mapping defect: workflow run #1875 passed, real-catalogue automatic actions contained exact provenance, and representative manual correction plus undo behaved correctly through append-only canonical history.
+
 ## Exit criteria
 
-- [ ] From any eligible unreviewed face, the operator can open a similarity-ranked view of likely repetitions and bulk-assign selected matches without waiting to encounter them in normal queue order.
-- [ ] Useful human identity changes can trigger/coalesce a later regeneration without requiring the operator to remember a separate manual step, while fixed-snapshot and stale-evidence guarantees remain intact.
-- [ ] Existing ranked known-person suggestions can be reviewed by person/group rather than only as an undifferentiated face stream.
-- [ ] A model-versioned provisional cluster representation exists and is explicitly non-canonical.
-- [ ] The selected clustering method has measured split/merge/noise behavior on a reviewed sample, with false-merge risk treated as the primary safety metric.
-- [ ] Large unreviewed populations can be clustered in bounded/restart-safe work without requiring all pairwise face comparisons in application memory.
-- [ ] The operator can review a cluster through representative faces, inspect members, remove exceptions and assign/create a person from desktop and mobile.
-- [ ] New analysed faces can join existing discovery work without requiring a destructive full reset of canonical identity state.
-- [ ] Unknown faces may be intentionally rediscovered/rematched without silently changing their canonical Unknown state.
-- [ ] Cluster support may strengthen advisory known-person suggestions, but it cannot by itself create a canonical assignment before WI-0117 acceptance.
-- [ ] Any broader automatic-assignment rule is enabled only after WI-0081 is resolved and private reviewed evaluation demonstrates an acceptable precision/unknown-rejection trade-off; otherwise existing automation remains unchanged.
+- [x] From any eligible unreviewed face, the operator can open a similarity-ranked view of likely repetitions and bulk-assign selected matches without waiting to encounter them in normal queue order.
+- [x] Useful human identity changes can trigger/coalesce a later regeneration without requiring the operator to remember a separate manual step, while fixed-snapshot and stale-evidence guarantees remain intact.
+- [x] Existing ranked known-person suggestions can be reviewed by person/group rather than only as an undifferentiated face stream.
+- [x] A model-versioned provisional cluster representation exists and is explicitly non-canonical.
+- [x] The selected clustering method has measured split/merge/noise behavior on a reviewed sample, with false-merge risk treated as the primary safety metric.
+- [x] Large unreviewed populations can be clustered in bounded/restart-safe work without requiring all pairwise face comparisons in application memory.
+- [x] The operator can review a cluster through representative faces, inspect members, remove exceptions and assign/create a person from desktop and mobile.
+- [x] New analysed faces can join existing discovery work without requiring a destructive full reset of canonical identity state.
+- [x] Unknown faces may be intentionally rediscovered/rematched without silently changing their canonical Unknown state.
+- [x] Cluster support may strengthen advisory known-person suggestions, but it cannot by itself create a canonical assignment before WI-0117 acceptance.
+- [x] Any broader automatic-assignment rule is enabled only after WI-0081 is resolved and private reviewed evaluation demonstrates an acceptable precision/unknown-rejection trade-off; otherwise existing automation remains unchanged.
 
 ## Risks
 
