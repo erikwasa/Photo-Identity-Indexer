@@ -45,7 +45,7 @@
             SmartCollectionPageResponse? page = await Http.GetFromJsonAsync<SmartCollectionPageResponse>(
                 $"api/smart-collections/{Uri.EscapeDataString(CollectionId)}/query?offset=0&limit=1",
                 _lifetime.Token);
-            _coverUrl = page?.Items.FirstOrDefault()?.ThumbnailUrl;
+            _coverUrl = SlideshowLibraryPresentation.SelectCoverThumbnailUrl(page);
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
