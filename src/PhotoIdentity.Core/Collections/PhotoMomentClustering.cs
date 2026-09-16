@@ -251,6 +251,7 @@ public static class PhotoMomentClusterer
             Math.Pow(Math.Sin(latitudeDelta / 2), 2) +
             Math.Cos(firstLatitudeRadians) * Math.Cos(secondLatitudeRadians) *
             Math.Pow(Math.Sin(longitudeDelta / 2), 2);
+        a = Math.Clamp(a, 0d, 1d);
         double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
         distance = earthRadiusKilometers * c;
         return true;
