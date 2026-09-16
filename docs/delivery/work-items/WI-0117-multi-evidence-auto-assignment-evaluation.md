@@ -104,12 +104,21 @@ All candidates are fully evaluated from the fixed regeneration/reference/cluster
 - [x] Evaluation reports false automatic assignments explicitly and compares them with the current accepted High policy.
 - [x] Unknown-person rejection is measured so increased known-person coverage does not come from silently forcing unknown faces into existing identities.
 - [x] Any accepted broader policy requires independent evidence beyond one marginal face/exemplar match and fails closed on strong competing-person evidence.
-- [ ] Automatic decisions retain exact embedding/clustering/policy provenance sufficient for later audit. Production implementation and verification pending.
-- [ ] Fixed-snapshot regeneration and no-same-run-cascade invariants remain intact. Production implementation and verification pending.
-- [ ] Manual reassignment/undo continues to supersede automatic decisions through append-only canonical history. Production verification pending.
-- [ ] Broader automation is opt-in and disabled by default for a newly introduced policy revision unless explicit acceptance says otherwise. Production implementation and verification pending.
+- [x] Automatic decisions retain exact embedding/clustering/policy provenance sufficient for later audit.
+- [x] Fixed-snapshot regeneration and no-same-run-cascade invariants remain intact.
+- [x] Manual reassignment/undo continues to supersede automatic decisions through append-only canonical history.
+- [x] Broader automation is opt-in and disabled by default for a newly introduced policy revision unless explicit acceptance says otherwise.
 - [x] Evaluation demonstrates an acceptable precision/review-effort trade-off for a narrow candidate; unsafe multi-reference-only candidates are explicitly rejected rather than weakening safeguards.
 
 ## Verification requirements
 
 Private reviewed-sample evaluation, automated policy/scoring/audit integration coverage and human Windows verification of opt-in configuration plus correction/undo of a representative automatic decision if broader automation is accepted.
+
+## Completion notes — 2026-09-16
+
+- PR #342 added the deterministic private evaluation harness and selection/holdout guardrails.
+- PR #343 implemented the separately versioned, default-disabled `m25-multi-evidence-auto-v1` production policy through the canonical suggestion-acceptance/review-history path.
+- The initial real-catalogue verification exposed a PostgreSQL timestamp materialization bug in the active-regeneration guard. PR #349 corrected the read to use typed Npgsql timestamp access and added live-PostgreSQL regression coverage; workflow run #1875 (`35149340542`) completed successfully.
+- After PR #349 merged, the maintainer reran real-catalogue regeneration. PostgreSQL review history contained canonical actions from actor `identity-matcher:auto-multi-evidence` with exact SFace model/hash, suggestion-policy version, multi-evidence configuration/policy version, cluster run/policy/key, cluster support/core/competition values, independent-reference support, score and margin recorded in the provenance note.
+- A representative automatic assignment was visually verified, manually superseded, and then undone. The manual decision became authoritative and undo restored the prior automatic assignment through append-only review history as designed.
+- No private face sample, identity mapping or per-person evaluation data is committed; only aggregate policy evidence and maintainer acceptance are recorded.
