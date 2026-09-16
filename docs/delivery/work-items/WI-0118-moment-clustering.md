@@ -44,24 +44,34 @@ A moment is an inferred presentation grouping, not a canonical event or user-aut
 
 ## Acceptance criteria
 
-- [ ] The code/documentation defines moments as derived/regenerable and distinct from canonical archive metadata.
-- [ ] Initial grouping works from capture time alone and does not require location metadata.
+- [x] The code/documentation defines moments as derived/regenerable and distinct from canonical archive metadata.
+- [x] Initial grouping works from capture time alone and does not require location metadata.
 - [ ] At least two plausible time-gap/session policies or parameter sets are compared on the same private representative sample before an initial policy is selected.
 - [ ] Evaluation includes ordinary home/family sequences as well as any available outings so the chosen behavior is not travel-biased.
-- [ ] Missing/ambiguous capture timestamps have an explicit conservative behavior and are not silently clustered by unrelated catalogue-observation/import time.
-- [ ] Optional people/tag/path/location evidence can strengthen or split a candidate grouping without becoming mandatory input.
-- [ ] For the same catalogue state and policy/version, moment membership and ordering are deterministic.
-- [ ] A maintainer can inspect representative inferred moments and obvious split/merge mistakes through a bounded read-only diagnostic/preview path.
-- [ ] Automated tests cover time-gap boundaries, identical timestamps, midnight/day transitions, missing capture times, deterministic tie-breaking and optional-evidence absence.
-- [ ] Private evaluation data remains outside the repository.
+- [x] Missing/ambiguous capture timestamps have an explicit conservative behavior and are not silently clustered by unrelated catalogue-observation/import time.
+- [x] Optional people/tag/path/location evidence can strengthen or split a candidate grouping without becoming mandatory input.
+- [x] For the same catalogue state and policy/version, moment membership and ordering are deterministic.
+- [x] A maintainer can inspect representative inferred moments and obvious split/merge mistakes through a bounded read-only diagnostic/preview path.
+- [x] Automated tests cover time-gap boundaries, identical timestamps, midnight/day transitions, missing capture times, deterministic tie-breaking and optional-evidence absence.
+- [x] Private evaluation data remains outside the repository.
 
 ## Verification requirements
 
 Automated tests are required for deterministic grouping and edge cases. Human maintainer verification is required against a private representative family-photo sample to judge whether inferred boundaries are useful enough to support WI-0119.
 
+## Implementation notes
+
+- `PhotoMomentClusterer` is a pure Core derivation over canonical photo revision/capture metadata. It never writes moment membership.
+- Missing `TakenAtLocal` remains explicitly unclustered; `ObservedAtUtc` is never used as a capture-time fallback.
+- Ordering is capture wall-clock time followed by revision ID, so repository enumeration order cannot change the result.
+- The initial evaluation candidates are explicit 30-minute and 90-minute time-gap policies. Neither is declared the production default before private archive review.
+- `PhotoMomentGapPolicy` contains bounded optional-evidence seams for shared people/tags/source groups, nearby location support and distant-location splitting. The initial evaluation candidates leave all optional-evidence refinements disabled.
+- `GET /api/moments/preview` reads timestamped photos through the existing catalogue query abstraction, compares both gap candidates over the same bounded page and exposes revision IDs/capture times/thumbnail URLs without persisting unrelated state.
+- See [Moment clustering evaluation](../../operations/moment-clustering-evaluation.md) for private evaluation steps and privacy boundaries.
+
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: Core clustering contract/policy, Core tests, bounded API preview, host route wiring, evaluation documentation and delivery status.
+- Trade-offs: the first diagnostic intentionally samples at most 200 timestamped photos per request and flags potentially truncated boundary moments; this keeps evaluation bounded without introducing a dedicated persisted moment index.
+- Deferred work: select/tune the initial policy only after maintainer review of private home/family and outing samples; production anchor/context consumption belongs to WI-0119.
+- Commands run: automated verification is delegated to the repository CI for this connector-authored branch; maintainer private evaluation remains required before WI-0118 can be completed.
