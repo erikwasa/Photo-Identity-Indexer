@@ -1,5 +1,8 @@
+@using System.Net.Http.Json
 @using Microsoft.AspNetCore.Components
 @using Microsoft.JSInterop
+@using PhotoIdentity.Web.Contracts
+@inject HttpClient Http
 @inject IJSRuntime JS
 @implements IAsyncDisposable
 
@@ -8,6 +11,7 @@
     {
         <img @key="slotA.Generation"
              class="@LayerClass(PresentationLayer.A)"
+             style="@LayerStyle(PresentationLayer.A)"
              src="@slotA.Target.Url"
              alt=""
              draggable="false"
@@ -21,6 +25,7 @@
     {
         <img @key="slotB.Generation"
              class="@LayerClass(PresentationLayer.B)"
+             style="@LayerStyle(PresentationLayer.B)"
              src="@slotB.Target.Url"
              alt=""
              draggable="false"
@@ -52,6 +57,12 @@
 
     [Parameter]
     public string? RevisionId { get; set; }
+
+    [Parameter]
+    public bool Playing { get; set; } = true;
+
+    [Parameter]
+    public int MotionDurationSeconds { get; set; } = 5;
 
     [Parameter]
     public EventCallback Presented { get; set; }
@@ -96,9 +107,7 @@
                 }
                 else
                 {
-                    SetSlot(
-                        loadingLayer,
-                        new PresentationSlot(target, ++_generation));
+                    SetSlot(loadingLayer, CreateSlot(target));
                 }
             }
 
@@ -155,6 +164,18 @@
         }
 
         PresentationSlot slot = Slot(layer)!;
+        MotionGeometryLoad geometry = await slot.GeometryLoad;
+        if (_disposed ||
+            _loadingLayer != layer ||
+            Slot(layer)?.Generation != generation)
+        {
+            return;
+        }
+
+        slot.MotionPlan = SlideshowMotionPolicy.Create(
+            slot.Target.RevisionId,
+            geometry.Faces,
+            geometry.Reliable);
         slot.Ready = true;
         _loadingLayer = null;
 
@@ -215,11 +236,40 @@
             return;
         }
 
-        SetSlot(
-            targetLayer,
-            new PresentationSlot(_requested.Target, ++_generation));
+        SetSlot(targetLayer, CreateSlot(_requested.Target));
         _loadingLayer = targetLayer;
         await RenderAsync();
+    }
+
+    private PresentationSlot CreateSlot(PresentationTarget target) =>
+        new(target, ++_generation, LoadGeometryAsync(target));
+
+    private async Task<MotionGeometryLoad> LoadGeometryAsync(PresentationTarget target)
+    {
+        if (string.IsNullOrWhiteSpace(target.RevisionId))
+        {
+            return MotionGeometryLoad.Unavailable;
+        }
+
+        try
+        {
+            SlideshowFaceGeometryResponse? response =
+                await Http.GetFromJsonAsync<SlideshowFaceGeometryResponse>(
+                    $"api/collections/photos/{Uri.EscapeDataString(target.RevisionId)}/slideshow-face-geometry",
+                    _lifetime.Token);
+            return response is null
+                ? MotionGeometryLoad.Unavailable
+                : new MotionGeometryLoad(true, response.Faces ?? []);
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return MotionGeometryLoad.Unavailable;
+        }
+        catch
+        {
+            // Motion is decorative. Missing or unreadable geometry always falls back to static.
+            return MotionGeometryLoad.Unavailable;
+        }
     }
 
     private async Task PresentReadyLayerAsync(
@@ -337,10 +387,41 @@
     private ElementReference Element(PresentationLayer layer) =>
         layer == PresentationLayer.A ? _slotAElement : _slotBElement;
 
-    private string LayerClass(PresentationLayer layer) =>
-        _visibleLayer == layer
+    private string LayerClass(PresentationLayer layer)
+    {
+        bool visible = _visibleLayer == layer;
+        SlideshowMotionPlan? plan = Slot(layer)?.MotionPlan;
+        string classes = visible
             ? "slideshow-image slideshow-image-visible"
             : "slideshow-image slideshow-image-staging";
+
+        if (visible && plan?.Enabled == true)
+        {
+            classes += " slideshow-image-motion";
+            if (!Playing)
+            {
+                classes += " slideshow-image-motion-paused";
+            }
+        }
+
+        return classes;
+    }
+
+    private string? LayerStyle(PresentationLayer layer)
+    {
+        SlideshowMotionPlan? plan = Slot(layer)?.MotionPlan;
+        if (plan?.Enabled != true)
+        {
+            return null;
+        }
+
+        int durationSeconds = Math.Max(4, Math.Clamp(MotionDurationSeconds, 1, 60));
+        return FormattableString.Invariant(
+            $"--slideshow-motion-scale:{plan.Scale:0.####};" +
+            $"--slideshow-motion-origin-x:{plan.OriginXPercent:0.##}%;" +
+            $"--slideshow-motion-origin-y:{plan.OriginYPercent:0.##}%;" +
+            $"--slideshow-motion-duration:{durationSeconds}s;");
+    }
 
     private async Task RenderAsync()
     {
@@ -377,12 +458,22 @@
         PresentationTarget Target,
         long Version);
 
+    private sealed record MotionGeometryLoad(
+        bool Reliable,
+        IReadOnlyList<SlideshowFaceBoxResponse> Faces)
+    {
+        public static MotionGeometryLoad Unavailable { get; } = new(false, []);
+    }
+
     private sealed class PresentationSlot(
         PresentationTarget target,
-        long generation)
+        long generation,
+        Task<MotionGeometryLoad> geometryLoad)
     {
         public PresentationTarget Target { get; } = target;
         public long Generation { get; } = generation;
+        public Task<MotionGeometryLoad> GeometryLoad { get; } = geometryLoad;
+        public SlideshowMotionPlan MotionPlan { get; set; } = SlideshowMotionPlan.Static;
         public bool Ready { get; set; }
     }
 }
