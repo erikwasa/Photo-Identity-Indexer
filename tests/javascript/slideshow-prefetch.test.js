@@ -184,9 +184,10 @@ test("presentation decode must complete before an image is ready", async () => {
     const state = slideshow.getPresentationImageState(image);
     assert.equal(typeof state.readyAt, "number");
     assert.equal(state.visibleAt, null);
+    assert.equal(state.decodeFallback, false);
 });
 
-test("decode rejection keeps the staged image from being presented", async () => {
+test("a loaded image remains usable when explicit decode rejects", async () => {
     await reset();
 
     const image = new FakeImage();
@@ -194,10 +195,11 @@ test("decode rejection keeps the staged image from being presented", async () =>
     image.naturalWidth = 100;
     image.decodeRejects = true;
 
-    assert.equal(await slideshow.decodePresentationImage(image), false);
+    assert.equal(await slideshow.decodePresentationImage(image), true);
     const state = slideshow.getPresentationImageState(image);
-    assert.equal(state.readyAt, null);
+    assert.equal(typeof state.readyAt, "number");
     assert.equal(state.visibleAt, null);
+    assert.equal(state.decodeFallback, true);
 });
 
 test("initial presentation shows a decoded image without animation", async () => {
