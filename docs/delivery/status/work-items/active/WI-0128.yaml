@@ -1,0 +1,10 @@
+id: WI-0128
+title: Evaluate local captions and story narration for Creative Collections
+milestone: M26
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0128-caption-narration-experiment.md
+blockers:
+- WI-0121
+blocker_notes: []
+evidence: []
