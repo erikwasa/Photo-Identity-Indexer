@@ -1,0 +1,388 @@
+@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="slideshow-presentation" aria-hidden="true">
+    @if (_slotA is PresentationSlot slotA)
+    {
+        <img @key="slotA.Generation"
+             class="@LayerClass(PresentationLayer.A)"
+             src="@slotA.Target.Url"
+             alt=""
+             draggable="false"
+             decoding="async"
+             @ref="_slotAElement"
+             @onload="() => IncomingLoadedAsync(PresentationLayer.A, slotA.Generation)"
+             @onerror="() => IncomingFailedAsync(PresentationLayer.A, slotA.Generation)" />
+    }
+
+    @if (_slotB is PresentationSlot slotB)
+    {
+        <img @key="slotB.Generation"
+             class="@LayerClass(PresentationLayer.B)"
+             src="@slotB.Target.Url"
+             alt=""
+             draggable="false"
+             decoding="async"
+             @ref="_slotBElement"
+             @onload="() => IncomingLoadedAsync(PresentationLayer.B, slotB.Generation)"
+             @onerror="() => IncomingFailedAsync(PresentationLayer.B, slotB.Generation)" />
+    }
+</div>
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private PresentationRequest? _requested;
+    private PresentationSlot? _slotA;
+    private PresentationSlot? _slotB;
+    private PresentationLayer? _visibleLayer;
+    private PresentationLayer? _loadingLayer;
+    private ElementReference _slotAElement;
+    private ElementReference _slotBElement;
+    private long _generation;
+    private long _requestVersion;
+    private long _acknowledgedRequestVersion;
+    private bool _transitioning;
+    private bool _hasRendered;
+    private bool _disposed;
+
+    [Parameter, EditorRequired]
+    public string ImageUrl { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? RevisionId { get; set; }
+
+    [Parameter]
+    public EventCallback Presented { get; set; }
+
+    [Parameter]
+    public EventCallback Failed { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (string.IsNullOrWhiteSpace(ImageUrl) || _disposed)
+        {
+            return;
+        }
+
+        PresentationTarget target = new(ImageUrl, RevisionId);
+        if (_requested is not null && _requested.Target == target)
+        {
+            return;
+        }
+
+        _requested = new PresentationRequest(target, ++_requestVersion);
+
+        if (_transitioning)
+        {
+            return;
+        }
+
+        if (_loadingLayer is PresentationLayer loadingLayer)
+        {
+            PresentationSlot? loadingSlot = Slot(loadingLayer);
+            if (loadingSlot is null)
+            {
+                _loadingLayer = null;
+            }
+            else if (loadingSlot.Target != target)
+            {
+                if (VisibleSlot()?.Target == target)
+                {
+                    SetSlot(loadingLayer, null);
+                    _loadingLayer = null;
+                    await AcknowledgeCurrentRequestAsync();
+                }
+                else
+                {
+                    SetSlot(
+                        loadingLayer,
+                        new PresentationSlot(target, ++_generation));
+                }
+            }
+
+            return;
+        }
+
+        await AdvancePipelineAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        _hasRendered = true;
+    }
+
+    private async Task IncomingLoadedAsync(
+        PresentationLayer layer,
+        long generation)
+    {
+        if (_disposed ||
+            _loadingLayer != layer ||
+            Slot(layer)?.Generation != generation)
+        {
+            return;
+        }
+
+        bool decoded;
+        try
+        {
+            decoded = await JS.InvokeAsync<bool>(
+                "photoIdentitySlideshow.decodePresentationImage",
+                _lifetime.Token,
+                Element(layer));
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (JSException)
+        {
+            decoded = false;
+        }
+
+        if (_disposed ||
+            _loadingLayer != layer ||
+            Slot(layer)?.Generation != generation)
+        {
+            return;
+        }
+
+        if (!decoded)
+        {
+            await IncomingFailedAsync(layer, generation);
+            return;
+        }
+
+        PresentationSlot slot = Slot(layer)!;
+        slot.Ready = true;
+        _loadingLayer = null;
+
+        if (_requested is null || _requested.Target != slot.Target)
+        {
+            await AdvancePipelineAsync();
+            return;
+        }
+
+        await PresentReadyLayerAsync(layer, slot.Target);
+    }
+
+    private async Task IncomingFailedAsync(
+        PresentationLayer layer,
+        long generation)
+    {
+        if (_disposed || Slot(layer)?.Generation != generation)
+        {
+            return;
+        }
+
+        PresentationTarget failedTarget = Slot(layer)!.Target;
+        if (_loadingLayer == layer)
+        {
+            _loadingLayer = null;
+        }
+
+        SetSlot(layer, null);
+        await RenderAsync();
+
+        if (_requested is not null && _requested.Target == failedTarget)
+        {
+            await Failed.InvokeAsync();
+            return;
+        }
+
+        await AdvancePipelineAsync();
+    }
+
+    private async Task AdvancePipelineAsync()
+    {
+        if (_disposed || _transitioning || _loadingLayer is not null || _requested is null)
+        {
+            return;
+        }
+
+        if (VisibleSlot()?.Target == _requested.Target)
+        {
+            await AcknowledgeCurrentRequestAsync();
+            return;
+        }
+
+        PresentationLayer targetLayer = HiddenLayer();
+        PresentationSlot? hidden = Slot(targetLayer);
+        if (hidden is not null && hidden.Ready && hidden.Target == _requested.Target)
+        {
+            await PresentReadyLayerAsync(targetLayer, hidden.Target);
+            return;
+        }
+
+        SetSlot(
+            targetLayer,
+            new PresentationSlot(_requested.Target, ++_generation));
+        _loadingLayer = targetLayer;
+        await RenderAsync();
+    }
+
+    private async Task PresentReadyLayerAsync(
+        PresentationLayer layer,
+        PresentationTarget target)
+    {
+        if (_disposed || Slot(layer) is not { Ready: true })
+        {
+            return;
+        }
+
+        bool presented;
+        try
+        {
+            if (_visibleLayer is null)
+            {
+                presented = await JS.InvokeAsync<bool>(
+                    "photoIdentitySlideshow.showPresentationImage",
+                    _lifetime.Token,
+                    Element(layer));
+            }
+            else if (_visibleLayer == layer)
+            {
+                presented = true;
+            }
+            else
+            {
+                _transitioning = true;
+                presented = await JS.InvokeAsync<bool>(
+                    "photoIdentitySlideshow.transitionPresentationImages",
+                    _lifetime.Token,
+                    Element(_visibleLayer.Value),
+                    Element(layer));
+            }
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (JSException)
+        {
+            presented = false;
+        }
+        finally
+        {
+            _transitioning = false;
+        }
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (!presented)
+        {
+            if (_requested is not null && _requested.Target == target)
+            {
+                await Failed.InvokeAsync();
+            }
+
+            return;
+        }
+
+        _visibleLayer = layer;
+        await RenderAsync();
+
+        if (_requested is not null && _requested.Target == target)
+        {
+            await AcknowledgeCurrentRequestAsync();
+        }
+        else
+        {
+            await AdvancePipelineAsync();
+        }
+    }
+
+    private async Task AcknowledgeCurrentRequestAsync()
+    {
+        if (_requested is null ||
+            VisibleSlot()?.Target != _requested.Target ||
+            _acknowledgedRequestVersion == _requested.Version)
+        {
+            return;
+        }
+
+        _acknowledgedRequestVersion = _requested.Version;
+        await Presented.InvokeAsync();
+    }
+
+    private PresentationLayer HiddenLayer() => _visibleLayer switch
+    {
+        PresentationLayer.A => PresentationLayer.B,
+        PresentationLayer.B => PresentationLayer.A,
+        _ => PresentationLayer.A,
+    };
+
+    private PresentationSlot? VisibleSlot() =>
+        _visibleLayer is PresentationLayer layer ? Slot(layer) : null;
+
+    private PresentationSlot? Slot(PresentationLayer layer) =>
+        layer == PresentationLayer.A ? _slotA : _slotB;
+
+    private void SetSlot(PresentationLayer layer, PresentationSlot? slot)
+    {
+        if (layer == PresentationLayer.A)
+        {
+            _slotA = slot;
+        }
+        else
+        {
+            _slotB = slot;
+        }
+    }
+
+    private ElementReference Element(PresentationLayer layer) =>
+        layer == PresentationLayer.A ? _slotAElement : _slotBElement;
+
+    private string LayerClass(PresentationLayer layer) =>
+        _visibleLayer == layer
+            ? "slideshow-image slideshow-image-visible"
+            : "slideshow-image slideshow-image-staging";
+
+    private async Task RenderAsync()
+    {
+        if (_hasRendered && !_disposed)
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        if (_disposed)
+        {
+            return ValueTask.CompletedTask;
+        }
+
+        _disposed = true;
+        _lifetime.Cancel();
+        _lifetime.Dispose();
+        return ValueTask.CompletedTask;
+    }
+
+    private enum PresentationLayer
+    {
+        A,
+        B,
+    }
+
+    private sealed record PresentationTarget(
+        string Url,
+        string? RevisionId);
+
+    private sealed record PresentationRequest(
+        PresentationTarget Target,
+        long Version);
+
+    private sealed class PresentationSlot(
+        PresentationTarget target,
+        long generation)
+    {
+        public PresentationTarget Target { get; } = target;
+        public long Generation { get; } = generation;
+        public bool Ready { get; set; }
+    }
+}

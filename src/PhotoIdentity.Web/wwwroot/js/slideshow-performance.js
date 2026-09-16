@@ -59,15 +59,17 @@
         }
     }
 
-    function completeSample(image) {
+    function completeSample(image, detail = null) {
         const sample = imageStarts.get(image);
         if (!sample) {
             return;
         }
 
         imageStarts.delete(image);
-        const completedAt = performance.now();
-        const presentationMilliseconds = Math.max(0, completedAt - sample.startedAt);
+        const visibleAt = Number.isFinite(detail?.visibleAt)
+            ? detail.visibleAt
+            : performance.now();
+        const presentationMilliseconds = Math.max(0, visibleAt - sample.startedAt);
         const resource = latestResourceTiming(image);
         const resourceMilliseconds = resource && Number.isFinite(resource.duration)
             ? Math.max(0, resource.duration)
@@ -104,12 +106,17 @@
             prefetchState: currentPrefetchState(image)
         });
 
-        if (image.complete && image.naturalWidth > 0) {
-            queueMicrotask(() => completeSample(image));
+        const visibleAt = Number.parseFloat(
+            image.dataset?.photoIdentityPresentationVisibleAt ?? "");
+        if (Number.isFinite(visibleAt)) {
+            queueMicrotask(() => completeSample(image, { visibleAt }));
             return;
         }
 
-        image.addEventListener("load", () => completeSample(image), { once: true });
+        image.addEventListener(
+            "photoidentity:slideshow-visible",
+            event => completeSample(image, event.detail),
+            { once: true });
         image.addEventListener("error", () => imageStarts.delete(image), { once: true });
     }
 
