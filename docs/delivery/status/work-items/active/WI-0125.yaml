@@ -1,0 +1,11 @@
+id: WI-0125
+title: Add birth dates and family relationships for age-aware Creative Collections
+milestone: M26
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0125-person-family-metadata.md
+blockers:
+- WI-0121
+- WI-0060
+blocker_notes: []
+evidence: []
