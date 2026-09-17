@@ -200,6 +200,64 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         return new SmartCollectionPhotoPage(items, offset, limit, total, filter);
     }
 
+    public async Task<IReadOnlyList<SmartCollectionPhoto>> QueryAllAsync(
+        SmartCollectionFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+
+        string where = BuildWhere(filter);
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = $"""
+            {CommonCtes},
+            people_by_revision AS (
+                SELECT
+                    revision_people.revision_id,
+                    ARRAY_AGG(
+                        revision_people.person_id::text
+                        ORDER BY revision_people.person_id::text) AS people_keys
+                FROM revision_people
+                GROUP BY revision_people.revision_id
+            )
+            SELECT
+                asset_revisions.id,
+                asset_revisions.asset_id,
+                asset_revisions.observed_at_utc,
+                asset_revisions.media_type,
+                asset_revisions.width,
+                asset_revisions.height,
+                photo_capture_metadata.taken_at_local,
+                photo_capture_metadata.latitude,
+                photo_capture_metadata.longitude,
+                COALESCE(people_by_revision.people_keys, ARRAY[]::text[])
+            FROM asset_revisions
+            INNER JOIN assets ON assets.id = asset_revisions.asset_id
+            LEFT JOIN photo_capture_metadata
+                ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+            LEFT JOIN people_by_revision
+                ON people_by_revision.revision_id = asset_revisions.id
+            WHERE assets.deleted_at_utc IS NULL
+              {where}
+            ORDER BY
+                photo_capture_metadata.taken_at_local DESC,
+                asset_revisions.observed_at_utc DESC,
+                asset_revisions.id;
+            """;
+        AddFilterParameters(command, filter);
+
+        List<SmartCollectionPhoto> items = [];
+        await using NpgsqlDataReader reader =
+            await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(ReadPhoto(reader));
+        }
+
+        return items;
+    }
+
     public async Task<SmartCollectionSlideshowSnapshot?> CreateSlideshowSnapshotAsync(
         SmartCollectionId collectionId,
         CancellationToken cancellationToken = default)
