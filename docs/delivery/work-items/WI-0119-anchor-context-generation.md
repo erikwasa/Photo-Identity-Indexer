@@ -43,15 +43,15 @@ The generator should solve that presentation problem explicitly instead of weake
 
 ## Acceptance criteria
 
-- [ ] Existing Smart Collection query results are unchanged by the feature.
-- [ ] Every Creative Collection candidate is classified at minimum as a direct anchor or contextual addition, and context additions retain the moment/anchor reason that admitted them.
-- [ ] A people-based anchor collection can include same-moment photos where the selected person is not depicted.
-- [ ] Context expansion is bounded and cannot recursively spread from context-only photos into unrelated later moments.
-- [ ] Candidates reached through multiple anchors are emitted once while preserving useful provenance.
-- [ ] The preview/API reports direct-anchor, context and total counts so a user can understand the expansion.
-- [ ] Zero-anchor input produces an explicit empty/no-anchor result rather than silently broadening the query.
-- [ ] Same input catalogue, Smart Collection, moment policy and context policy produce a deterministic candidate set and order.
-- [ ] Automated tests cover person anchors, no-person context, overlapping moments/anchors, zero anchors, context bounds and exclusion/security invariants.
+- [x] Existing Smart Collection query results are unchanged by the feature.
+- [x] Every Creative Collection candidate is classified at minimum as a direct anchor or contextual addition, and context additions retain the moment/anchor reason that admitted them.
+- [x] A people-based anchor collection can include same-moment photos where the selected person is not depicted.
+- [x] Context expansion is bounded and cannot recursively spread from context-only photos into unrelated later moments.
+- [x] Candidates reached through multiple anchors are emitted once while preserving useful provenance.
+- [x] The preview/API reports direct-anchor, context and total counts so a user can understand the expansion.
+- [x] Zero-anchor input produces an explicit empty/no-anchor result rather than silently broadening the query.
+- [x] Same input catalogue, Smart Collection, moment policy and context policy produce a deterministic candidate set and order.
+- [x] Automated tests cover person anchors, no-person context, overlapping anchors, zero anchors, context bounds and the existing query visibility boundary used for context retrieval.
 - [ ] Human verification demonstrates at least one private family-photo sequence where context expansion produces a more coherent slideshow candidate set than strict person filtering alone.
 
 ## Verification requirements
@@ -60,7 +60,7 @@ Automated Core/persistence/API tests are required for exact-anchor semantics, bo
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: `src/PhotoIdentity.Core/Collections/CreativeCollectionCandidateGeneration.cs`, `src/PhotoIdentity.Api/CreativeCollectionPreviewEndpoints.cs`, `src/PhotoIdentity.Api/MomentPreviewEndpoints.cs`, Core/integration tests, and `docs/operations/creative-collection-preview.md`.
+- Trade-offs: `m26-anchor-context-balanced-v1` is intentionally simple and inspectable: at most six context photos per anchored moment, selected by capture-time proximity to direct anchors. The preview reads the accessible catalogue through the existing Smart Collection query repository rather than adding separate persistence semantics.
+- Deferred work: representative private-family verification remains pending and can be batched with the deferred WI-0118 30-minute versus 90-minute moment-policy evaluation. WI-0120 owns final target-size/diversity selection.
+- Commands run: GitHub Actions validation on PR #356; local execution is not available from this session.
