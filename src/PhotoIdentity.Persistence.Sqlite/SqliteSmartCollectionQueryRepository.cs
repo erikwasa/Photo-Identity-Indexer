@@ -177,7 +177,11 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
                 asset_revisions.height,
                 photo_capture_metadata.taken_at_local,
                 photo_capture_metadata.latitude,
-                photo_capture_metadata.longitude
+                photo_capture_metadata.longitude,
+                COALESCE((
+                    SELECT group_concat(revision_people.person_id, ',')
+                    FROM revision_people
+                    WHERE revision_people.revision_id = asset_revisions.id), '')
             FROM asset_revisions
             INNER JOIN assets ON assets.id = asset_revisions.asset_id
             LEFT JOIN photo_capture_metadata
@@ -207,7 +211,8 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
                 reader.IsDBNull(5) ? null : reader.GetInt32(5),
                 reader.IsDBNull(6) ? null : ParseLocal(reader.GetString(6)),
                 reader.IsDBNull(7) ? null : reader.GetDouble(7),
-                reader.IsDBNull(8) ? null : reader.GetDouble(8)));
+                reader.IsDBNull(8) ? null : reader.GetDouble(8),
+                ParsePeopleKeys(reader.GetString(9))));
         }
 
         return new SmartCollectionPhotoPage(items, offset, limit, total, filter);
@@ -405,6 +410,14 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
             CultureInfo.InvariantCulture,
             DateTimeStyles.None),
         DateTimeKind.Unspecified);
+
+    private static IReadOnlyList<string> ParsePeopleKeys(string value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? []
+            : value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(item => item, StringComparer.Ordinal)
+                .ToArray();
 
     private sealed record SlideshowSnapshotCandidate(
         AssetRevisionId RevisionId,
