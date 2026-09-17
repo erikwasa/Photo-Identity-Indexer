@@ -13,6 +13,7 @@ public sealed class CreativeCollectionSelectionReasonTests
         [
             Candidate(1, new DateTime(2026, 7, 1, 10, 0, 0)),
             Candidate(2, new DateTime(2026, 7, 1, 10, 1, 0)),
+            Candidate(3, new DateTime(2026, 7, 1, 20, 0, 0)),
         ];
         PhotoMomentClusteringResult moments = PhotoMomentClusterer.Cluster(
             catalogue,
@@ -27,15 +28,17 @@ public sealed class CreativeCollectionSelectionReasonTests
             generated,
             catalogue,
             moments,
-            targetCount: 2,
+            targetCount: 3,
             CreativeCollectionSelectionPolicy.BalancedV1);
 
-        CreativeCollectionSelectedCandidate second = result.Selected.Single(item =>
+        CreativeCollectionSelectedCandidate repeatedBucket = result.Selected.Single(item =>
             item.Candidate.RevisionId == Revision(2));
-        Assert.Contains(second.Reasons, reason =>
+        Assert.Contains(repeatedBucket.Reasons, reason =>
             reason.Code == CreativeCollectionSelectionReasonCodes.RepeatedTemporalBucket &&
             reason.ScoreDelta < 0);
-        Assert.Equal(100 + second.Reasons.Sum(reason => reason.ScoreDelta), second.SelectionScore);
+        Assert.Equal(
+            100 + repeatedBucket.Reasons.Sum(reason => reason.ScoreDelta),
+            repeatedBucket.SelectionScore);
     }
 
     private static PhotoMomentCandidate Candidate(int suffix, DateTime takenAtLocal) => new(
