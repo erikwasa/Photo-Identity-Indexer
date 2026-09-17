@@ -171,7 +171,7 @@ public sealed class CreativeCollectionCandidateGeneratorTests
 
     private static string[] Signatures(CreativeCollectionCandidateSet set) => set.Candidates
         .Select(candidate =>
-            $"{candidate.RevisionId}:{candidate.Kind}:{string.Join('|', candidate.ContextReasons.Select(reason => $"{reason.MomentId}:{string.Join(',', reason.AnchorRevisionIds)}"))}")
+            $"{candidate.RevisionId}:{candidate.Kind}:{string.Join("|", candidate.ContextReasons.Select(reason => $"{reason.MomentId}:{string.Join(",", reason.AnchorRevisionIds)}"))}")
         .ToArray();
 
     private static PhotoMomentCandidate Candidate(
