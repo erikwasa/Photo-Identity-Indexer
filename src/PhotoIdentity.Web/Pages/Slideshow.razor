@@ -166,7 +166,7 @@
                                RevisionId="@Playback.CurrentRevisionId"
                                Playing="@Playback.IsPlaying"
                                MotionDurationSeconds="@Settings.ImageDurationSeconds"
-                               Presented="OnCurrentImageLoadedAsync"
+                               Presented="OnCurrentImagePresentedAsync"
                                Failed="OnCurrentImageError" />
 
         @if (!string.IsNullOrWhiteSpace(ImageError))
@@ -352,3 +352,13 @@
         </section>
     }
 </div>
+
+@code {
+    private async Task OnCurrentImagePresentedAsync(SlideshowPresentationEvidence evidence)
+    {
+        ImageError = null;
+        Playback.MarkCurrentImageReady(evidence);
+        _lastTickTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+        await UpdatePrefetchAsync();
+    }
+}

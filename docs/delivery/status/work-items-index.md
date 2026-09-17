@@ -25,7 +25,7 @@ Current work items: **22**. Archived terminal items: **114**.
 | [WI-0131](../work-items/WI-0131-adaptive-slideshow-backdrop.md) Add a restrained adaptive backdrop for contained slideshow photos | M27 | in_progress | ai-agent | [YAML](work-items/active/WI-0131.yaml) |
 | [WI-0132](../work-items/WI-0132-moment-aware-slideshow-transitions.md) Add moment-aware transition language to slideshow playback | M27 | proposed | unassigned | [YAML](work-items/active/WI-0132.yaml) |
 | [WI-0133](../work-items/WI-0133-burst-aware-slideshow-pacing.md) Add burst-aware compact pacing to slideshow playback | M27 | proposed | unassigned | [YAML](work-items/active/WI-0133.yaml) |
-| [WI-0134](../work-items/WI-0134-adaptive-slideshow-rhythm.md) Add bounded adaptive timing for a less mechanical slideshow rhythm | M27 | proposed | unassigned | [YAML](work-items/active/WI-0134.yaml) |
+| [WI-0134](../work-items/WI-0134-adaptive-slideshow-rhythm.md) Add bounded adaptive timing for a less mechanical slideshow rhythm | M27 | in_progress | ai-agent | [YAML](work-items/active/WI-0134.yaml) |
 | [WI-0136](../work-items/WI-0136-exception-driven-slideshow-preparation.md) Make slideshow startup and original preparation exception-driven | M27 | proposed | unassigned | [YAML](work-items/active/WI-0136.yaml) |
 | [WI-0137](../work-items/WI-0137-real-device-slideshow-polish-acceptance.md) Tune and verify the polished slideshow experience on real devices | M27 | proposed | unassigned | [YAML](work-items/active/WI-0137.yaml) |
 

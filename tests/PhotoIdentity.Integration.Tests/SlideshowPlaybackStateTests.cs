@@ -191,4 +191,52 @@ public sealed class SlideshowPlaybackStateTests
         Assert.True(state.IsPlaying);
         Assert.Equal(TimeSpan.FromSeconds(5), state.Remaining);
     }
+
+    [Fact]
+    public void Adaptive_duration_starts_only_after_manual_destination_is_visible()
+    {
+        SlideshowPlaybackState state = new();
+        state.LoadSnapshot(
+            ["a", "b"],
+            SlideshowSettings.Defaults with { ImageDurationSeconds = 5 });
+        state.MarkCurrentImageReady(new SlideshowPresentationEvidence(true, 1));
+
+        Assert.Equal(4.9d, state.CurrentTiming.EffectiveDuration.TotalSeconds, 6);
+        _ = state.AdvanceTime(TimeSpan.FromSeconds(2));
+        state.Pause();
+        double pausedRemaining = state.Remaining.TotalSeconds;
+        _ = state.AdvanceTime(TimeSpan.FromSeconds(30));
+        Assert.Equal(pausedRemaining, state.Remaining.TotalSeconds, 6);
+
+        state.Resume();
+        Assert.Equal(SlideshowAdvanceResult.Moved, state.NextManual());
+        Assert.False(state.IsImageReady);
+        Assert.Equal(TimeSpan.FromSeconds(5), state.Remaining);
+
+        _ = state.AdvanceTime(TimeSpan.FromSeconds(30));
+        Assert.Equal(TimeSpan.FromSeconds(5), state.Remaining);
+
+        state.MarkCurrentImageReady(new SlideshowPresentationEvidence(true, 3));
+        Assert.Equal(5.4d, state.Remaining.TotalSeconds, 6);
+        Assert.Equal("group", state.CurrentTiming.Reason);
+    }
+
+    [Fact]
+    public void Duration_setting_change_preserves_progress_fraction_with_adaptive_policy()
+    {
+        SlideshowPlaybackState state = new();
+        state.LoadSnapshot(
+            ["a"],
+            SlideshowSettings.Defaults with { ImageDurationSeconds = 5 });
+        state.MarkCurrentImageReady(new SlideshowPresentationEvidence(true, 2));
+        _ = state.AdvanceTime(TimeSpan.FromSeconds(2.6));
+
+        Assert.Equal(0.5d, state.ProgressFraction, 6);
+
+        state.ApplySettings(state.Settings with { ImageDurationSeconds = 10 });
+
+        Assert.Equal(10.4d, state.CurrentTiming.EffectiveDuration.TotalSeconds, 6);
+        Assert.Equal(5.2d, state.Remaining.TotalSeconds, 6);
+        Assert.Equal(0.5d, state.ProgressFraction, 6);
+    }
 }

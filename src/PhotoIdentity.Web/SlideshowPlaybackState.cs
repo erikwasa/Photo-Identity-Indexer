@@ -13,6 +13,7 @@ public sealed class SlideshowPlaybackState
 {
     private IReadOnlyList<string> _revisionIds = [];
     private bool _resetTimerWhenReady;
+    private SlideshowPresentationEvidence _currentEvidence = SlideshowPresentationEvidence.Unavailable;
 
     public SlideshowSettings Settings { get; private set; } = SlideshowSettings.Defaults;
     public int CurrentIndex { get; private set; }
@@ -24,11 +25,13 @@ public sealed class SlideshowPlaybackState
     public bool IsDocumentVisible { get; private set; } = true;
     public bool ExitRequested { get; private set; }
     public TimeSpan Remaining { get; private set; }
+    public SlideshowTimingDecision CurrentTiming { get; private set; } =
+        SlideshowTimingDecision.Fallback(SlideshowSettings.Defaults.ImageDurationSeconds);
     public double ProgressFraction
     {
         get
         {
-            double duration = Settings.ImageDurationSeconds;
+            double duration = CurrentTiming.EffectiveDuration.TotalSeconds;
             if (!IsImageReady || duration <= 0)
             {
                 return 0;
@@ -49,7 +52,9 @@ public sealed class SlideshowPlaybackState
             .ToArray();
         CurrentIndex = 0;
         ExitRequested = false;
-        Remaining = Duration();
+        _currentEvidence = SlideshowPresentationEvidence.Unavailable;
+        CurrentTiming = SlideshowTimingDecision.Fallback(Settings.ImageDurationSeconds);
+        Remaining = CurrentTiming.EffectiveDuration;
         IsImageReady = false;
         _resetTimerWhenReady = _revisionIds.Count > 0;
         IsPlaying = _revisionIds.Count > 0 && Settings.Autoplay;
@@ -58,22 +63,32 @@ public sealed class SlideshowPlaybackState
     public void ApplySettings(SlideshowSettings settings)
     {
         SlideshowSettings normalized = settings.Normalize();
-        int previousDuration = Settings.ImageDurationSeconds;
-        double elapsedFraction = previousDuration <= 0
+        TimeSpan previousEffectiveDuration = CurrentTiming.EffectiveDuration;
+        double elapsedFraction = previousEffectiveDuration <= TimeSpan.Zero
             ? 0
-            : Math.Clamp(1d - (Remaining.TotalSeconds / previousDuration), 0d, 1d);
+            : Math.Clamp(
+                1d - (Remaining.TotalSeconds / previousEffectiveDuration.TotalSeconds),
+                0d,
+                1d);
 
         bool autoplayChanged = normalized.Autoplay != Settings.Autoplay;
+        bool configuredDurationChanged = normalized.ImageDurationSeconds != Settings.ImageDurationSeconds;
         Settings = normalized;
 
         if (_resetTimerWhenReady || !IsImageReady)
         {
-            Remaining = Duration();
+            _currentEvidence = SlideshowPresentationEvidence.Unavailable;
+            CurrentTiming = SlideshowTimingDecision.Fallback(Settings.ImageDurationSeconds);
+            Remaining = CurrentTiming.EffectiveDuration;
         }
-        else if (previousDuration != Settings.ImageDurationSeconds)
+        else if (configuredDurationChanged)
         {
-            Remaining = TimeSpan.FromSeconds(
-                Settings.ImageDurationSeconds * (1d - elapsedFraction));
+            CurrentTiming = SlideshowTimingPolicy.Create(
+                Settings.ImageDurationSeconds,
+                _currentEvidence);
+            Remaining = TimeSpan.FromTicks((long)Math.Round(
+                CurrentTiming.EffectiveDuration.Ticks * (1d - elapsedFraction),
+                MidpointRounding.AwayFromZero));
         }
 
         if (autoplayChanged)
@@ -89,17 +104,24 @@ public sealed class SlideshowPlaybackState
         }
     }
 
-    public void MarkCurrentImageReady()
+    public void MarkCurrentImageReady() =>
+        MarkCurrentImageReady(SlideshowPresentationEvidence.Unavailable);
+
+    public void MarkCurrentImageReady(SlideshowPresentationEvidence evidence)
     {
         if (CurrentRevisionId is null)
         {
             return;
         }
 
+        _currentEvidence = evidence ?? SlideshowPresentationEvidence.Unavailable;
+        CurrentTiming = SlideshowTimingPolicy.Create(
+            Settings.ImageDurationSeconds,
+            _currentEvidence);
         IsImageReady = true;
         if (_resetTimerWhenReady)
         {
-            Remaining = Duration();
+            Remaining = CurrentTiming.EffectiveDuration;
             _resetTimerWhenReady = false;
         }
     }
@@ -107,6 +129,8 @@ public sealed class SlideshowPlaybackState
     public void MarkCurrentImageUnavailable()
     {
         IsImageReady = false;
+        _currentEvidence = SlideshowPresentationEvidence.Unavailable;
+        CurrentTiming = SlideshowTimingDecision.Fallback(Settings.ImageDurationSeconds);
         Pause();
     }
 
@@ -121,7 +145,7 @@ public sealed class SlideshowPlaybackState
 
         if (Remaining <= TimeSpan.Zero)
         {
-            Remaining = Duration();
+            Remaining = CurrentTiming.EffectiveDuration;
         }
 
         IsPlaying = true;
@@ -242,7 +266,7 @@ public sealed class SlideshowPlaybackState
     {
         if (_revisionIds.Count == 1)
         {
-            Remaining = Duration();
+            Remaining = CurrentTiming.EffectiveDuration;
             IsImageReady = true;
             _resetTimerWhenReady = false;
             return SlideshowAdvanceResult.CycledSamePhoto;
@@ -271,11 +295,11 @@ public sealed class SlideshowPlaybackState
     {
         CurrentIndex = index;
         IsImageReady = false;
-        Remaining = Duration();
+        _currentEvidence = SlideshowPresentationEvidence.Unavailable;
+        CurrentTiming = SlideshowTimingDecision.Fallback(Settings.ImageDurationSeconds);
+        Remaining = CurrentTiming.EffectiveDuration;
         _resetTimerWhenReady = true;
     }
-
-    private TimeSpan Duration() => TimeSpan.FromSeconds(Settings.ImageDurationSeconds);
 
     private static int Mod(int value, int modulus)
     {
