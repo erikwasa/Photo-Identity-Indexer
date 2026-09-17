@@ -14,6 +14,22 @@ public sealed record CreativeCollectionPreviewCandidateResponse(
     string ThumbnailUrl,
     CreativeCollectionContextReasonResponse[] ContextReasons);
 
+public sealed record CreativeCollectionSelectionReasonResponse(
+    string Code,
+    int ScoreDelta,
+    string Detail);
+
+public sealed record CreativeCollectionSelectedCandidateResponse(
+    string RevisionId,
+    string Kind,
+    DateTime? TakenAtLocal,
+    string ThumbnailUrl,
+    string? MomentId,
+    string? PeopleCombinationKey,
+    int SelectionScore,
+    CreativeCollectionSelectionReasonResponse[] SelectionReasons,
+    CreativeCollectionContextReasonResponse[] ContextReasons);
+
 public sealed record CreativeCollectionPreviewResponse(
     string CollectionId,
     string CollectionName,
@@ -23,7 +39,13 @@ public sealed record CreativeCollectionPreviewResponse(
     int AddedContextCount,
     int TotalCandidateCount,
     bool NoAnchors,
-    CreativeCollectionPreviewCandidateResponse[] Candidates);
+    string SelectionPolicyVersion,
+    int RequestedTargetCount,
+    int SelectedDirectAnchorCount,
+    int SelectedContextCount,
+    int SelectedCount,
+    CreativeCollectionPreviewCandidateResponse[] Candidates,
+    CreativeCollectionSelectedCandidateResponse[] SelectedCandidates);
 
 public static class CreativeCollectionPreviewEndpoints
 {
@@ -35,6 +57,9 @@ public static class CreativeCollectionPreviewEndpoints
         endpoints.MapGet(
             "/api/smart-collections/{id:guid}/creative-preview",
             PreviewAsync);
+        endpoints.MapPost(
+            "/api/smart-collections/{id:guid}/creative-slideshow-snapshot",
+            CreateCreativeSlideshowSnapshotAsync);
         return endpoints;
     }
 
@@ -43,33 +68,115 @@ public static class CreativeCollectionPreviewEndpoints
         ISmartCollectionRepository definitions,
         ISmartCollectionQueryRepository query,
         CancellationToken cancellationToken,
+        int targetCount = 100,
         int momentGapMinutes = 30)
     {
-        SmartCollectionId collectionId;
-        try
+        if (!TryCreatePolicies(
+                id,
+                targetCount,
+                momentGapMinutes,
+                out SmartCollectionId collectionId,
+                out PhotoMomentGapPolicy? momentPolicy,
+                out IResult? error))
         {
-            collectionId = SmartCollectionId.From(id);
-        }
-        catch (ArgumentException exception)
-        {
-            return Results.BadRequest(new { error = exception.Message });
-        }
-
-        PhotoMomentGapPolicy momentPolicy;
-        try
-        {
-            momentPolicy = PhotoMomentGapPolicy.CreateTimeGapEvaluation(momentGapMinutes);
-        }
-        catch (ArgumentOutOfRangeException exception)
-        {
-            return Results.BadRequest(new { error = exception.Message });
+            return error!;
         }
 
+        CreativeCollectionMaterialization? materialized = await MaterializeAsync(
+            collectionId,
+            momentPolicy!,
+            targetCount,
+            definitions,
+            query,
+            cancellationToken);
+        if (materialized is null)
+        {
+            return Results.NotFound();
+        }
+
+        CreativeCollectionPreviewCandidateResponse[] candidates = materialized.Generated.Candidates
+            .Select(ToPreviewCandidate)
+            .ToArray();
+        CreativeCollectionSelectedCandidateResponse[] selected = materialized.Selection.Selected
+            .Select(ToSelectedCandidate)
+            .ToArray();
+
+        return Results.Ok(new CreativeCollectionPreviewResponse(
+            materialized.Definition.Id.ToString(),
+            materialized.Definition.Name,
+            materialized.Generated.MomentPolicyVersion,
+            materialized.Generated.ContextPolicyVersion,
+            materialized.Generated.DirectAnchorCount,
+            materialized.Generated.AddedContextCount,
+            materialized.Generated.TotalCandidateCount,
+            materialized.Generated.NoAnchors,
+            materialized.Selection.PolicyVersion,
+            materialized.Selection.RequestedTargetCount,
+            materialized.Selection.SelectedDirectAnchorCount,
+            materialized.Selection.SelectedContextCount,
+            materialized.Selection.SelectedCount,
+            candidates,
+            selected));
+    }
+
+    private static async Task<IResult> CreateCreativeSlideshowSnapshotAsync(
+        Guid id,
+        ISmartCollectionRepository definitions,
+        ISmartCollectionQueryRepository query,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken,
+        int targetCount = 100,
+        int momentGapMinutes = 30)
+    {
+        if (!TryCreatePolicies(
+                id,
+                targetCount,
+                momentGapMinutes,
+                out SmartCollectionId collectionId,
+                out PhotoMomentGapPolicy? momentPolicy,
+                out IResult? error))
+        {
+            return error!;
+        }
+
+        CreativeCollectionMaterialization? materialized = await MaterializeAsync(
+            collectionId,
+            momentPolicy!,
+            targetCount,
+            definitions,
+            query,
+            cancellationToken);
+        if (materialized is null)
+        {
+            return Results.NotFound();
+        }
+
+        SmartCollectionSlideshowSnapshotItemResponse[] items = materialized.Selection.Selected
+            .Select(item => new SmartCollectionSlideshowSnapshotItemResponse(
+                item.Candidate.RevisionId.ToString()))
+            .ToArray();
+
+        return Results.Ok(new SmartCollectionSlideshowSnapshotResponse(
+            materialized.Definition.Id.ToString(),
+            materialized.Definition.Name,
+            timeProvider.GetUtcNow().ToUniversalTime(),
+            items,
+            items.Length));
+    }
+
+    private static async Task<CreativeCollectionMaterialization?> MaterializeAsync(
+        SmartCollectionId collectionId,
+        PhotoMomentGapPolicy momentPolicy,
+        int targetCount,
+        ISmartCollectionRepository definitions,
+        ISmartCollectionQueryRepository query,
+        CancellationToken cancellationToken)
+    {
         SmartCollectionDefinition? definition =
             await definitions.GetAsync(collectionId, cancellationToken);
         if (definition is null)
         {
-            return Results.NotFound();
+            return null;
         }
 
         IReadOnlyList<SmartCollectionPhoto> anchorPhotos = await QueryAllAsync(
@@ -78,21 +185,27 @@ public static class CreativeCollectionPreviewEndpoints
             cancellationToken);
         if (anchorPhotos.Count == 0)
         {
-            return Results.Ok(new CreativeCollectionPreviewResponse(
-                definition.Id.ToString(),
-                definition.Name,
-                momentPolicy.Version,
-                CreativeCollectionContextPolicy.BalancedV1.Version,
-                0,
-                0,
-                0,
-                true,
-                []));
+            PhotoMomentClusteringResult noMoments = PhotoMomentClusterer.Cluster([], momentPolicy);
+            CreativeCollectionCandidateSet noCandidates = CreativeCollectionCandidateGenerator.Generate(
+                [],
+                [],
+                noMoments,
+                CreativeCollectionContextPolicy.BalancedV1);
+            CreativeCollectionSelectionResult noSelection = CreativeCollectionSelector.Select(
+                noCandidates,
+                [],
+                noMoments,
+                targetCount,
+                CreativeCollectionSelectionPolicy.BalancedV1);
+            return new CreativeCollectionMaterialization(
+                definition,
+                noCandidates,
+                noSelection);
         }
 
-        // The context catalogue is intentionally obtained through the same Smart Collection query
-        // repository as direct anchors. That keeps source deletion/exclusion visibility boundaries
-        // identical; only the filter is empty so same-moment non-matches can be considered.
+        // Use the same Smart Collection query repository for context so deleted/excluded visibility
+        // remains identical to direct anchors. Empty filtering only broadens eligibility for same-moment
+        // context; it does not change archive truth or persist Creative Collection membership.
         IReadOnlyList<SmartCollectionPhoto> cataloguePhotos = await QueryAllAsync(
             query,
             new SmartCollectionFilter(),
@@ -102,6 +215,7 @@ public static class CreativeCollectionPreviewEndpoints
             .Select(photo => new PhotoMomentCandidate(
                 photo.RevisionId,
                 photo.TakenAtLocal,
+                PeopleKeys: photo.PeopleKeys,
                 Latitude: photo.Latitude,
                 Longitude: photo.Longitude))
             .ToArray();
@@ -113,31 +227,75 @@ public static class CreativeCollectionPreviewEndpoints
             anchorPhotos.Select(photo => photo.RevisionId),
             moments,
             CreativeCollectionContextPolicy.BalancedV1);
+        CreativeCollectionSelectionResult selection = CreativeCollectionSelector.Select(
+            generated,
+            momentCandidates,
+            moments,
+            targetCount,
+            CreativeCollectionSelectionPolicy.BalancedV1);
 
-        CreativeCollectionPreviewCandidateResponse[] candidates = generated.Candidates
-            .Select(candidate => new CreativeCollectionPreviewCandidateResponse(
-                candidate.RevisionId.ToString(),
-                candidate.Kind,
-                candidate.TakenAtLocal,
-                $"/api/collections/photos/{candidate.RevisionId}/thumbnail",
-                candidate.ContextReasons
-                    .Select(reason => new CreativeCollectionContextReasonResponse(
-                        reason.MomentId,
-                        reason.AnchorRevisionIds.Select(anchor => anchor.ToString()).ToArray()))
-                    .ToArray()))
-            .ToArray();
-
-        return Results.Ok(new CreativeCollectionPreviewResponse(
-            definition.Id.ToString(),
-            definition.Name,
-            generated.MomentPolicyVersion,
-            generated.ContextPolicyVersion,
-            generated.DirectAnchorCount,
-            generated.AddedContextCount,
-            generated.TotalCandidateCount,
-            generated.NoAnchors,
-            candidates));
+        return new CreativeCollectionMaterialization(
+            definition,
+            generated,
+            selection);
     }
+
+    private static bool TryCreatePolicies(
+        Guid id,
+        int targetCount,
+        int momentGapMinutes,
+        out SmartCollectionId collectionId,
+        out PhotoMomentGapPolicy? momentPolicy,
+        out IResult? error)
+    {
+        try
+        {
+            collectionId = SmartCollectionId.From(id);
+            CreativeCollectionSelectionPolicy.ValidateTargetCount(targetCount);
+            momentPolicy = PhotoMomentGapPolicy.CreateTimeGapEvaluation(momentGapMinutes);
+            error = null;
+            return true;
+        }
+        catch (Exception exception) when (exception is ArgumentException or ArgumentOutOfRangeException)
+        {
+            collectionId = default;
+            momentPolicy = null;
+            error = Results.BadRequest(new { error = exception.Message });
+            return false;
+        }
+    }
+
+    private static CreativeCollectionPreviewCandidateResponse ToPreviewCandidate(
+        CreativeCollectionCandidate candidate) => new(
+        candidate.RevisionId.ToString(),
+        candidate.Kind,
+        candidate.TakenAtLocal,
+        $"/api/collections/photos/{candidate.RevisionId}/thumbnail",
+        ToContextReasons(candidate.ContextReasons));
+
+    private static CreativeCollectionSelectedCandidateResponse ToSelectedCandidate(
+        CreativeCollectionSelectedCandidate selected) => new(
+        selected.Candidate.RevisionId.ToString(),
+        selected.Candidate.Kind,
+        selected.Candidate.TakenAtLocal,
+        $"/api/collections/photos/{selected.Candidate.RevisionId}/thumbnail",
+        selected.MomentId,
+        selected.PeopleCombinationKey,
+        selected.SelectionScore,
+        selected.Reasons
+            .Select(reason => new CreativeCollectionSelectionReasonResponse(
+                reason.Code,
+                reason.ScoreDelta,
+                reason.Detail))
+            .ToArray(),
+        ToContextReasons(selected.Candidate.ContextReasons));
+
+    private static CreativeCollectionContextReasonResponse[] ToContextReasons(
+        IReadOnlyList<CreativeCollectionContextReason> reasons) => reasons
+        .Select(reason => new CreativeCollectionContextReasonResponse(
+            reason.MomentId,
+            reason.AnchorRevisionIds.Select(anchor => anchor.ToString()).ToArray()))
+        .ToArray();
 
     private static async Task<IReadOnlyList<SmartCollectionPhoto>> QueryAllAsync(
         ISmartCollectionQueryRepository query,
@@ -165,4 +323,9 @@ public static class CreativeCollectionPreviewEndpoints
 
         return items;
     }
+
+    private sealed record CreativeCollectionMaterialization(
+        SmartCollectionDefinition Definition,
+        CreativeCollectionCandidateSet Generated,
+        CreativeCollectionSelectionResult Selection);
 }
