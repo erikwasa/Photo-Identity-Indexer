@@ -114,7 +114,7 @@ else
                     {
                         <span>@preparation.Ready / @preparation.Total originals are prepared.</span>
                     }
-                    else if (preparing)
+                    else if (preparation is { State: "preparing" })
                     {
                         <span>@preparation.Ready / @preparation.Total ready</span>
                         @if (preparation.NoProgressWarning)
