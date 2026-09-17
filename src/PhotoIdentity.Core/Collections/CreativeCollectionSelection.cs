@@ -7,6 +7,7 @@ public static class CreativeCollectionSelectionReasonCodes
     public const string DirectAnchor = "direct-anchor";
     public const string NewMoment = "new-moment";
     public const string NewTemporalBucket = "new-temporal-bucket";
+    public const string RepeatedTemporalBucket = "repeated-temporal-bucket";
     public const string NewPeopleCombination = "new-people-combination";
     public const string ContextView = "context-view";
     public const string RepeatedMoment = "repeated-moment";
@@ -304,7 +305,10 @@ public static class CreativeCollectionSelector
             }
             else
             {
-                score -= Math.Min(20, count * 5);
+                int penalty = -Math.Min(20, count * 5);
+                AddReason(reasons, CreativeCollectionSelectionReasonCodes.RepeatedTemporalBucket, penalty,
+                    $"Temporal bucket {bucket + 1} already has {count} selected photo(s).");
+                score += penalty;
             }
         }
 
