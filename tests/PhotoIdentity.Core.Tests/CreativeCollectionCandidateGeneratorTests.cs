@@ -36,8 +36,9 @@ public sealed class CreativeCollectionCandidateGeneratorTests
         Assert.Equal(1, result.AddedContextCount);
         Assert.Equal(2, result.TotalCandidateCount);
         Assert.Equal(CreativeCollectionCandidateKinds.DirectAnchor, result.Candidates[0].Kind);
-        CreativeCollectionCandidate added = Assert.Single(result.Candidates.Where(candidate =>
-            candidate.Kind == CreativeCollectionCandidateKinds.ContextualAddition));
+        CreativeCollectionCandidate added = Assert.Single(
+            result.Candidates,
+            candidate => candidate.Kind == CreativeCollectionCandidateKinds.ContextualAddition);
         Assert.Equal(context.RevisionId, added.RevisionId);
         CreativeCollectionContextReason reason = Assert.Single(added.ContextReasons);
         Assert.Equal("moment-0001", reason.MomentId);
@@ -65,8 +66,9 @@ public sealed class CreativeCollectionCandidateGeneratorTests
         Assert.Equal(2, result.DirectAnchorCount);
         Assert.Equal(1, result.AddedContextCount);
         Assert.Equal(3, result.Candidates.Select(candidate => candidate.RevisionId).Distinct().Count());
-        CreativeCollectionCandidate added = Assert.Single(result.Candidates.Where(candidate =>
-            candidate.Kind == CreativeCollectionCandidateKinds.ContextualAddition));
+        CreativeCollectionCandidate added = Assert.Single(
+            result.Candidates,
+            candidate => candidate.Kind == CreativeCollectionCandidateKinds.ContextualAddition);
         CreativeCollectionContextReason reason = Assert.Single(added.ContextReasons);
         Assert.Equal(
             new[] { firstAnchor.RevisionId, secondAnchor.RevisionId },

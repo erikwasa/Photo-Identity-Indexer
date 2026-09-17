@@ -57,8 +57,9 @@ public sealed class CreativeCollectionPreviewApplicationTests
             Assert.Contains(preview.Candidates, candidate =>
                 candidate.RevisionId == anchor.Id.ToString() &&
                 candidate.Kind == CreativeCollectionCandidateKinds.DirectAnchor);
-            CreativeCollectionPreviewCandidateResponse added = Assert.Single(preview.Candidates.Where(candidate =>
-                candidate.Kind == CreativeCollectionCandidateKinds.ContextualAddition));
+            CreativeCollectionPreviewCandidateResponse added = Assert.Single(
+                preview.Candidates,
+                candidate => candidate.Kind == CreativeCollectionCandidateKinds.ContextualAddition);
             Assert.Equal(context.Id.ToString(), added.RevisionId);
             Assert.DoesNotContain(preview.Candidates, candidate => candidate.RevisionId == unrelated.Id.ToString());
             CreativeCollectionContextReasonResponse reason = Assert.Single(added.ContextReasons);
