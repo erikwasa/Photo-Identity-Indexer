@@ -35,6 +35,35 @@ public interface ISmartCollectionQueryRepository
         int limit = 40,
         CancellationToken cancellationToken = default);
 
+    async Task<IReadOnlyList<SmartCollectionPhoto>> QueryAllAsync(
+        SmartCollectionFilter filter,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+
+        const int pageSize = 200;
+        List<SmartCollectionPhoto> items = [];
+        int offset = 0;
+
+        while (true)
+        {
+            SmartCollectionPhotoPage page = await QueryAsync(
+                filter,
+                offset,
+                pageSize,
+                cancellationToken);
+            items.AddRange(page.Items);
+            offset += page.Items.Count;
+
+            if (page.Items.Count == 0 || offset >= page.Total)
+            {
+                break;
+            }
+        }
+
+        return items;
+    }
+
     Task<SmartCollectionSlideshowSnapshot?> CreateSlideshowSnapshotAsync(
         SmartCollectionId collectionId,
         CancellationToken cancellationToken = default);
