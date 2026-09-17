@@ -62,11 +62,11 @@ else
                             }
                             else if (preparing)
                             {
-                                <span>Preparing originals…</span>
+                                <span>Getting originals ready…</span>
                             }
                             else if (needsAttention)
                             {
-                                <span>Preparation needs attention</span>
+                                <span>Parent attention needed</span>
                             }
                             else
                             {
@@ -75,81 +75,6 @@ else
                         </span>
                     </span>
                 </button>
-
-                <details class="slideshow-library-card-tools">
-                    <summary>Options</summary>
-                    <div class="slideshow-library-card-tools-body">
-                        @if (preparation is not null)
-                        {
-                            <div class="slideshow-library-preparation" role="status">
-                                @if (preparation.State == "ready")
-                                {
-                                    <strong>Originals prepared</strong>
-                                    <span>@preparation.Ready / @preparation.Total photos ready</span>
-                                }
-                                else if (preparing)
-                                {
-                                    <strong>Preparing originals</strong>
-                                    <span>@preparation.Ready / @preparation.Total ready</span>
-                                    <span>
-                                        @preparation.Downloading downloading ·
-                                        @preparation.Queued queued ·
-                                        @preparation.WaitingForRelease waiting for release
-                                    </span>
-                                    @if (!string.IsNullOrWhiteSpace(preparation.Message))
-                                    {
-                                        <span>@preparation.Message</span>
-                                    }
-                                    @if (preparation.NoProgressWarning)
-                                    {
-                                        <div class="slideshow-library-warning" role="alert">
-                                            <strong>OneDrive has not made progress</strong>
-                                            <span>No progress for @preparation.NoProgressSeconds seconds.</span>
-                                        </div>
-                                    }
-                                }
-                                else if (needsAttention)
-                                {
-                                    <strong>Preparation needs attention</strong>
-                                    <span>@preparation.Message</span>
-                                    @if (preparation.RequiredAdditionalBytes > 0)
-                                    {
-                                        <span>Required additional bytes: @preparation.RequiredAdditionalBytes</span>
-                                        <span>Available managed capacity: @preparation.AvailableManagedCapacity</span>
-                                    }
-                                }
-                            </div>
-                        }
-
-                        <div class="slideshow-library-actions">
-                            @if (preparation?.NoProgressWarning == true && preparation.CanRetry)
-                            {
-                                <button type="button"
-                                        class="button secondary"
-                                        @onclick="() => RetryPreparationAsync(collection.Id)">
-                                    Retry preparation
-                                </button>
-                            }
-                            else if (!busy)
-                            {
-                                <button type="button"
-                                        class="button secondary"
-                                        @onclick="() => PrepareOriginalsAsync(collection)">
-                                    @(preparation?.State == "ready" ? "Prepare again" : "Prepare originals")
-                                </button>
-                            }
-
-                            @if (preparing || needsAttention)
-                            {
-                                <button type="button"
-                                        class="button secondary"
-                                        @onclick="() => CancelPreparationAsync(collection.Id)">
-                                    Cancel preparation
-                                </button>
-                            }
-                        </div>
-                    </div>
-                </details>
             </article>
         }
     </section>
@@ -165,6 +90,87 @@ else
         </p>
     </div>
 </details>
+
+@if (Collections.Count > 0)
+{
+    <details class="slideshow-library-settings">
+        <summary>Parent preparation tools</summary>
+        <div class="slideshow-library-settings-body">
+            <p class="slideshow-library-note">
+                Optional: prepare best-quality originals ahead of time. Ordinary playback follows the saved Prepare originals preference automatically.
+            </p>
+
+            @foreach (SlideshowLibraryCollectionResponse collection in Collections)
+            {
+                SlideshowOriginalPreparationResponse? preparation = PreparationFor(collection.Id);
+                bool preparing = preparation?.State == "preparing";
+                bool needsAttention = preparation?.State == "failed";
+                bool starting = IsStarting(collection.Id);
+
+                <div class="slideshow-library-preparation" role="status">
+                    <strong>@collection.Name</strong>
+
+                    @if (preparation?.State == "ready")
+                    {
+                        <span>@preparation.Ready / @preparation.Total originals are prepared.</span>
+                    }
+                    else if (preparing)
+                    {
+                        <span>@preparation!.Ready / @preparation.Total ready</span>
+                        @if (preparation.NoProgressWarning)
+                        {
+                            <div class="slideshow-library-warning" role="alert">
+                                <strong>OneDrive has not made progress</strong>
+                                <span>No progress for @preparation.NoProgressSeconds seconds.</span>
+                            </div>
+                        }
+                    }
+                    else if (needsAttention)
+                    {
+                        <span>@preparation!.Message</span>
+                        @if (preparation.RequiredAdditionalBytes > 0)
+                        {
+                            <span>Required additional bytes: @preparation.RequiredAdditionalBytes</span>
+                            <span>Available managed capacity: @preparation.AvailableManagedCapacity</span>
+                        }
+                    }
+                    else
+                    {
+                        <span>No standalone preparation is running.</span>
+                    }
+
+                    <div class="slideshow-library-actions">
+                        @if (preparation?.NoProgressWarning == true && preparation.CanRetry)
+                        {
+                            <button type="button"
+                                    class="button secondary"
+                                    @onclick="() => RetryPreparationAsync(collection.Id)">
+                                Retry preparation
+                            </button>
+                        }
+
+                        @if (preparing || needsAttention)
+                        {
+                            <button type="button"
+                                    class="button secondary"
+                                    @onclick="() => CancelPreparationAsync(collection.Id)">
+                                Cancel preparation
+                            </button>
+                        }
+                        else if (!starting)
+                        {
+                            <button type="button"
+                                    class="button secondary"
+                                    @onclick="() => PrepareOriginalsAsync(collection)">
+                                @(preparation?.State == "ready" ? "Prepare again" : "Prepare originals")
+                            </button>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    </details>
+}
 
 <section class="slideshow-library-boundary">
     <strong>Viewing only</strong>
