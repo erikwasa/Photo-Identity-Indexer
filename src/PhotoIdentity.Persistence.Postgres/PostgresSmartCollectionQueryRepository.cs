@@ -211,7 +211,16 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = $"""
-            {CommonCtes}
+            {CommonCtes},
+            people_by_revision AS (
+                SELECT
+                    revision_people.revision_id,
+                    ARRAY_AGG(
+                        revision_people.person_id::text
+                        ORDER BY revision_people.person_id::text) AS people_keys
+                FROM revision_people
+                GROUP BY revision_people.revision_id
+            )
             SELECT
                 asset_revisions.id,
                 asset_revisions.asset_id,
@@ -222,15 +231,13 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 photo_capture_metadata.taken_at_local,
                 photo_capture_metadata.latitude,
                 photo_capture_metadata.longitude,
-                ARRAY(
-                    SELECT revision_people.person_id::text
-                    FROM revision_people
-                    WHERE revision_people.revision_id = asset_revisions.id
-                    ORDER BY revision_people.person_id::text)
+                COALESCE(people_by_revision.people_keys, ARRAY[]::text[])
             FROM asset_revisions
             INNER JOIN assets ON assets.id = asset_revisions.asset_id
             LEFT JOIN photo_capture_metadata
                 ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+            LEFT JOIN people_by_revision
+                ON people_by_revision.revision_id = asset_revisions.id
             WHERE assets.deleted_at_utc IS NULL
               {where}
             ORDER BY
