@@ -222,8 +222,7 @@ public static class CreativeCollectionSelector
         return new SelectionMetadata(
             candidate.TakenAtLocal,
             momentId,
-            peopleCombinationKey,
-            TemporalBucket: null);
+            peopleCombinationKey);
     }
 
     private static void AssignTemporalBuckets(
@@ -246,7 +245,7 @@ public static class CreativeCollectionSelector
             long offsetTicks = item.TakenAtLocal!.Value.Ticks - minimum.Ticks;
             int bucket = (int)Math.Min(
                 bucketCount - 1,
-                offsetTicks * bucketCount / (double)(spanTicks + 1));
+                (double)offsetTicks * bucketCount / (spanTicks + 1d));
             item.TemporalBucket = bucket;
         }
     }
@@ -305,8 +304,6 @@ public static class CreativeCollectionSelector
             }
             else
             {
-                // No hard penalty here: the moment and near-consecutive rules provide diminishing returns,
-                // while the one-time bonus makes underrepresented periods attractive.
                 score -= Math.Min(20, count * 5);
             }
         }
@@ -355,22 +352,32 @@ public static class CreativeCollectionSelector
 
     private static void Increment(IDictionary<string, int> counts, string? key)
     {
-        if (key is not null)
+        if (key is null)
         {
-            counts[key] = counts.GetValueOrDefault(key) + 1;
+            return;
         }
+
+        counts[key] = counts.TryGetValue(key, out int current)
+            ? current + 1
+            : 1;
     }
 
-    private sealed class SelectionMetadata(
-        DateTime? takenAtLocal,
-        string? momentId,
-        string? peopleCombinationKey,
-        int? TemporalBucket)
+    private sealed class SelectionMetadata
     {
-        public DateTime? TakenAtLocal { get; } = takenAtLocal;
-        public string? MomentId { get; } = momentId;
-        public string? PeopleCombinationKey { get; } = peopleCombinationKey;
-        public int? TemporalBucket { get; set; } = TemporalBucket;
+        public SelectionMetadata(
+            DateTime? takenAtLocal,
+            string? momentId,
+            string? peopleCombinationKey)
+        {
+            TakenAtLocal = takenAtLocal;
+            MomentId = momentId;
+            PeopleCombinationKey = peopleCombinationKey;
+        }
+
+        public DateTime? TakenAtLocal { get; }
+        public string? MomentId { get; }
+        public string? PeopleCombinationKey { get; }
+        public int? TemporalBucket { get; set; }
     }
 
     private sealed record ScoredCandidate(
