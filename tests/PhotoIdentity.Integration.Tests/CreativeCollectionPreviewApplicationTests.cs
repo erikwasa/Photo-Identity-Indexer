@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -15,7 +16,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class CreativeCollectionPreviewApplicationTests
 {
     [Fact]
-    public async Task Preview_preserves_exact_anchor_membership_and_adds_bounded_same_moment_context()
+    public async Task Preview_preserves_exact_membership_selects_target_and_creates_immutable_slideshow_snapshot()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -47,13 +48,19 @@ public sealed class CreativeCollectionPreviewApplicationTests
             using HttpClient client = factory.CreateClient();
             CreativeCollectionPreviewResponse preview =
                 await client.GetFromJsonAsync<CreativeCollectionPreviewResponse>(
-                    $"/api/smart-collections/{saved.Id}/creative-preview?momentGapMinutes=30")
+                    $"/api/smart-collections/{saved.Id}/creative-preview?momentGapMinutes=30&targetCount=1")
                 ?? throw new InvalidOperationException();
 
             Assert.Equal(1, preview.DirectAnchorCount);
             Assert.Equal(1, preview.AddedContextCount);
             Assert.Equal(2, preview.TotalCandidateCount);
             Assert.False(preview.NoAnchors);
+            Assert.Equal(CreativeCollectionSelectionPolicy.BalancedV1.Version, preview.SelectionPolicyVersion);
+            Assert.Equal(1, preview.RequestedTargetCount);
+            Assert.Equal(1, preview.SelectedCount);
+            Assert.Equal(
+                preview.SelectedCount,
+                preview.SelectedDirectAnchorCount + preview.SelectedContextCount);
             Assert.Contains(preview.Candidates, candidate =>
                 candidate.RevisionId == anchor.Id.ToString() &&
                 candidate.Kind == CreativeCollectionCandidateKinds.DirectAnchor);
@@ -65,6 +72,18 @@ public sealed class CreativeCollectionPreviewApplicationTests
             CreativeCollectionContextReasonResponse reason = Assert.Single(added.ContextReasons);
             Assert.Equal([anchor.Id.ToString()], reason.AnchorRevisionIds);
 
+            using HttpResponseMessage snapshotResponse = await client.PostAsync(
+                $"/api/smart-collections/{saved.Id}/creative-slideshow-snapshot?momentGapMinutes=30&targetCount=1",
+                content: null);
+            snapshotResponse.EnsureSuccessStatusCode();
+            SmartCollectionSlideshowSnapshotResponse snapshot =
+                await snapshotResponse.Content.ReadFromJsonAsync<SmartCollectionSlideshowSnapshotResponse>()
+                ?? throw new InvalidOperationException();
+            Assert.Equal(1, snapshot.Total);
+            Assert.Equal(
+                preview.SelectedCandidates.Select(candidate => candidate.RevisionId),
+                snapshot.Items.Select(item => item.RevisionId));
+
             SmartCollectionPhotoPage exactAfter = await query.QueryAsync(saved.Filter);
             Assert.Equal(anchor.Id, Assert.Single(exactAfter.Items).RevisionId);
         }
@@ -75,7 +94,7 @@ public sealed class CreativeCollectionPreviewApplicationTests
     }
 
     [Fact]
-    public async Task Preview_reports_explicit_no_anchor_result()
+    public async Task Preview_reports_explicit_no_anchor_result_without_inventing_target_members()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -92,14 +111,48 @@ public sealed class CreativeCollectionPreviewApplicationTests
             using HttpClient client = factory.CreateClient();
             CreativeCollectionPreviewResponse preview =
                 await client.GetFromJsonAsync<CreativeCollectionPreviewResponse>(
-                    $"/api/smart-collections/{saved.Id}/creative-preview")
+                    $"/api/smart-collections/{saved.Id}/creative-preview?targetCount=25")
                 ?? throw new InvalidOperationException();
 
             Assert.True(preview.NoAnchors);
             Assert.Equal(0, preview.DirectAnchorCount);
             Assert.Equal(0, preview.AddedContextCount);
             Assert.Equal(0, preview.TotalCandidateCount);
+            Assert.Equal(0, preview.SelectedCount);
             Assert.Empty(preview.Candidates);
+            Assert.Empty(preview.SelectedCandidates);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task Creative_endpoints_reject_invalid_target_count()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
+            SmartCollectionDefinition saved = await definitions.CreateAsync(
+                "Any collection",
+                new SmartCollectionFilter());
+
+            await using CreativePreviewApiFactory factory = new(databasePath);
+            using HttpClient client = factory.CreateClient();
+
+            using HttpResponseMessage preview = await client.GetAsync(
+                $"/api/smart-collections/{saved.Id}/creative-preview?targetCount=0");
+            using HttpResponseMessage snapshot = await client.PostAsync(
+                $"/api/smart-collections/{saved.Id}/creative-slideshow-snapshot?targetCount=1001",
+                content: null);
+
+            Assert.Equal(HttpStatusCode.BadRequest, preview.StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, snapshot.StatusCode);
         }
         finally
         {
