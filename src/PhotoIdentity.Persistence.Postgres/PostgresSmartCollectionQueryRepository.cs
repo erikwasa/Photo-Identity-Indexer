@@ -167,7 +167,12 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 asset_revisions.height,
                 photo_capture_metadata.taken_at_local,
                 photo_capture_metadata.latitude,
-                photo_capture_metadata.longitude
+                photo_capture_metadata.longitude,
+                ARRAY(
+                    SELECT revision_people.person_id::text
+                    FROM revision_people
+                    WHERE revision_people.revision_id = asset_revisions.id
+                    ORDER BY revision_people.person_id::text)
             FROM asset_revisions
             INNER JOIN assets ON assets.id = asset_revisions.asset_id
             LEFT JOIN photo_capture_metadata
@@ -260,7 +265,8 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         reader.IsDBNull(5) ? null : reader.GetInt32(5),
         reader.IsDBNull(6) ? null : reader.GetDateTime(6),
         reader.IsDBNull(7) ? null : reader.GetDouble(7),
-        reader.IsDBNull(8) ? null : reader.GetDouble(8));
+        reader.IsDBNull(8) ? null : reader.GetDouble(8),
+        reader.GetFieldValue<string[]>(9));
 
     private static DateTime EffectiveSlideshowTime(SlideshowSnapshotCandidate candidate) =>
         candidate.TakenAtLocal
