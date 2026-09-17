@@ -40,7 +40,7 @@ else
         {
             SlideshowOriginalPreparationResponse? preparation = PreparationFor(collection.Id);
             bool preparing = preparation?.State == "preparing";
-            bool needsAttention = preparation?.State == "failed";
+            bool needsAttention = SlideshowPreparationExperience.NeedsParentAttention(preparation);
             bool starting = IsStarting(collection.Id);
             bool busy = preparing || needsAttention || starting;
 
@@ -60,13 +60,13 @@ else
                             {
                                 <span>Starting…</span>
                             }
-                            else if (preparing)
-                            {
-                                <span>Getting originals ready…</span>
-                            }
                             else if (needsAttention)
                             {
                                 <span>Parent attention needed</span>
+                            }
+                            else if (preparing)
+                            {
+                                <span>Getting originals ready…</span>
                             }
                             else
                             {
@@ -104,7 +104,7 @@ else
             {
                 SlideshowOriginalPreparationResponse? preparation = PreparationFor(collection.Id);
                 bool preparing = preparation?.State == "preparing";
-                bool needsAttention = preparation?.State == "failed";
+                bool needsAttention = SlideshowPreparationExperience.NeedsParentAttention(preparation);
                 bool starting = IsStarting(collection.Id);
 
                 <div class="slideshow-library-preparation" role="status">
@@ -116,7 +116,7 @@ else
                     }
                     else if (preparing)
                     {
-                        <span>@preparation!.Ready / @preparation.Total ready</span>
+                        <span>@preparation.Ready / @preparation.Total ready</span>
                         @if (preparation.NoProgressWarning)
                         {
                             <div class="slideshow-library-warning" role="alert">
