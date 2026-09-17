@@ -11,7 +11,8 @@ public sealed record SmartCollectionPhoto(
     int? Height,
     DateTime? TakenAtLocal,
     double? Latitude,
-    double? Longitude);
+    double? Longitude,
+    IReadOnlyList<string>? PeopleKeys = null);
 
 public sealed record SmartCollectionPhotoPage(
     IReadOnlyList<SmartCollectionPhoto> Items,
