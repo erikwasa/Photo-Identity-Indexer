@@ -37,6 +37,7 @@ public static class MomentPreviewEndpoints
     public static IEndpointRouteBuilder MapMomentPreviewEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/moments/preview", PreviewAsync);
+        endpoints.MapCreativeCollectionPreviewEndpoints();
         return endpoints;
     }
 

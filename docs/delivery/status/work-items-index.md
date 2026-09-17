@@ -12,7 +12,7 @@ Current work items: **22**. Archived terminal items: **114**.
 | [WI-0090](../work-items/WI-0090-exclusion-purge-service.md) Purge excluded photo data and derivatives safely | M23 | proposed | unassigned | [YAML](work-items/active/WI-0090.yaml) |
 | [WI-0091](../work-items/WI-0091-archive-lifecycle-review.md) Add archive lifecycle review and exclusion workflows | M23 | proposed | unassigned | [YAML](work-items/active/WI-0091.yaml) |
 | [WI-0118](../work-items/WI-0118-moment-clustering.md) Prototype timestamp-first photo moment clustering | M26 | in_progress | ai-agent | [YAML](work-items/active/WI-0118.yaml) |
-| [WI-0119](../work-items/WI-0119-anchor-context-generation.md) Generate Creative Collection anchors and moment context | M26 | proposed | unassigned | [YAML](work-items/active/WI-0119.yaml) |
+| [WI-0119](../work-items/WI-0119-anchor-context-generation.md) Generate Creative Collection anchors and moment context | M26 | in_progress | ai-agent | [YAML](work-items/active/WI-0119.yaml) |
 | [WI-0120](../work-items/WI-0120-target-count-diversity-selector.md) Add target-count and diversity selection for Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0120.yaml) |
 | [WI-0121](../work-items/WI-0121-creative-collection-recipes-preview.md) Productize Creative Collection recipes and previews | M26 | proposed | unassigned | [YAML](work-items/active/WI-0121.yaml) |
 | [WI-0122](../work-items/WI-0122-photo-presentation-preferences.md) Add photo presentation preferences for Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0122.yaml) |
