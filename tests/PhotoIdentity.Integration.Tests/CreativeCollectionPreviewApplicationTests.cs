@@ -128,7 +128,7 @@ public sealed class CreativeCollectionPreviewApplicationTests
                 extracted_at_utc = excluded.extracted_at_utc;
             """;
         command.Parameters.AddWithValue("$revision_id", revisionId.Value.ToString("D"));
-        command.Parameters.AddWithValue("$taken_at_local", takenAtLocal.ToString("yyyy-MM-dd HH:mm:ss"));
+        command.Parameters.AddWithValue("$taken_at_local", takenAtLocal.ToString("yyyy-MM-dd'T'HH:mm:ss.fffffff"));
         command.Parameters.AddWithValue("$extracted_at_utc", DateTimeOffset.UtcNow.ToString("O"));
         await command.ExecuteNonQueryAsync();
     }
