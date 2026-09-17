@@ -49,8 +49,6 @@ public sealed record CreativeCollectionPreviewResponse(
 
 public static class CreativeCollectionPreviewEndpoints
 {
-    private const int QueryPageSize = 200;
-
     public static IEndpointRouteBuilder MapCreativeCollectionPreviewEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
@@ -179,11 +177,15 @@ public static class CreativeCollectionPreviewEndpoints
             return null;
         }
 
-        IReadOnlyList<SmartCollectionPhoto> anchorPhotos = await QueryAllAsync(
-            query,
-            definition.Filter,
-            cancellationToken);
-        if (anchorPhotos.Count == 0)
+        SmartCollectionSlideshowSnapshot? anchorSnapshot =
+            await query.CreateSlideshowSnapshotAsync(collectionId, cancellationToken);
+        if (anchorSnapshot is null)
+        {
+            return null;
+        }
+
+        IReadOnlyList<AssetRevisionId> anchorRevisionIds = anchorSnapshot.RevisionIds;
+        if (anchorRevisionIds.Count == 0)
         {
             PhotoMomentClusteringResult noMoments = PhotoMomentClusterer.Cluster([], momentPolicy);
             CreativeCollectionCandidateSet noCandidates = CreativeCollectionCandidateGenerator.Generate(
@@ -206,8 +208,7 @@ public static class CreativeCollectionPreviewEndpoints
         // Use the same Smart Collection query repository for context so deleted/excluded visibility
         // remains identical to direct anchors. Empty filtering only broadens eligibility for same-moment
         // context; it does not change archive truth or persist Creative Collection membership.
-        IReadOnlyList<SmartCollectionPhoto> cataloguePhotos = await QueryAllAsync(
-            query,
+        IReadOnlyList<SmartCollectionPhoto> cataloguePhotos = await query.QueryAllAsync(
             new SmartCollectionFilter(),
             cancellationToken);
 
@@ -224,7 +225,7 @@ public static class CreativeCollectionPreviewEndpoints
             momentPolicy);
         CreativeCollectionCandidateSet generated = CreativeCollectionCandidateGenerator.Generate(
             momentCandidates,
-            anchorPhotos.Select(photo => photo.RevisionId),
+            anchorRevisionIds,
             moments,
             CreativeCollectionContextPolicy.BalancedV1);
         CreativeCollectionSelectionResult selection = CreativeCollectionSelector.Select(
@@ -296,33 +297,6 @@ public static class CreativeCollectionPreviewEndpoints
             reason.MomentId,
             reason.AnchorRevisionIds.Select(anchor => anchor.ToString()).ToArray()))
         .ToArray();
-
-    private static async Task<IReadOnlyList<SmartCollectionPhoto>> QueryAllAsync(
-        ISmartCollectionQueryRepository query,
-        SmartCollectionFilter filter,
-        CancellationToken cancellationToken)
-    {
-        List<SmartCollectionPhoto> items = [];
-        int offset = 0;
-
-        while (true)
-        {
-            SmartCollectionPhotoPage page = await query.QueryAsync(
-                filter,
-                offset,
-                QueryPageSize,
-                cancellationToken);
-            items.AddRange(page.Items);
-            offset += page.Items.Count;
-
-            if (page.Items.Count == 0 || offset >= page.Total)
-            {
-                break;
-            }
-        }
-
-        return items;
-    }
 
     private sealed record CreativeCollectionMaterialization(
         SmartCollectionDefinition Definition,
