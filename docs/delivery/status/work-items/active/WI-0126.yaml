@@ -5,11 +5,11 @@ status: in_progress
 owner: ai-agent
 document: ../work-items/WI-0126-visible-content-tagging.md
 started_at: 2026-09-18
-last_updated_at: 2026-09-18
-branch: agent/WI-0126-visible-content-tagging
+last_updated_at: 2026-09-19
+branch: agent/WI-0126-visual-review-output
 blockers:
 - WI-0120
 - WI-0056
 blocker_notes:
-- Experiment implementation is on the work branch; completion remains pending CI and a representative private proxy/original plus Creative-selection comparison.
+- Visual review follow-up is on the work branch; completion remains pending a representative private proxy/original plus baseline-versus-semantic comparison and the resulting go/no-go decision.
 evidence: []
