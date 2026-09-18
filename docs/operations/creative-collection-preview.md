@@ -62,6 +62,18 @@ The absolute score is an implementation aid rather than a quality percentage. Wh
 
 Location is not required. GPS/place metadata is not part of the WI-0120 selector, so the policy remains usable for archives with sparse or absent location metadata.
 
+## Photo presentation preferences
+
+WI-0122 adds revision-bound presentation-only `Prefer` and `Avoid` signals without changing Smart Collection membership, tags, people, Places, source state or archive truth.
+
+Photo Details exposes the current preference and append-only history:
+
+- **Prefer** adds +220 to the otherwise eligible photo's Creative selection score and appears as a `presentation-prefer` selection reason.
+- **Avoid** removes the photo from normal Creative selection even when it is a direct anchor. The photo remains visible in ordinary browsing and exact Smart Collection results.
+- **Clear preference** appends a `clear` action and restores automatic selection behavior.
+
+The latest action is effective. Repeating the already-effective preference is idempotent and does not add audit noise. A stronger Pin/Always-include action is intentionally deferred until real use demonstrates that Prefer is insufficient.
+
 ## Materialize a Creative slideshow snapshot
 
 The selected sequence can be materialized through the same immutable slideshow response contract used by Classic Smart Collections:
