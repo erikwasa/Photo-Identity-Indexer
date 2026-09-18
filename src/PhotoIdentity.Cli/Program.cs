@@ -215,6 +215,7 @@ public static class Program
                                      [--concepts-per-photo COUNT]
                                      [--compare-originals COUNT]
                                      [--report PATH]
+                                     [--review-output DIR]
 
             Catalogue backup is the WI-0102 stopped-source snapshot path. It requires the
             operator to explicitly confirm that Photo Identity has been stopped, opens the
