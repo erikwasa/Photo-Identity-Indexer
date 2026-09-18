@@ -79,3 +79,67 @@ public sealed record SmartCollectionSlideshowSnapshotResponse(
     int Total);
 
 public sealed record SmartCollectionErrorResponse(string Error);
+
+
+public sealed record CreativeCollectionRecipeRequest(
+    int TargetCount = 50,
+    string ContextStrength = "balanced");
+
+public sealed record CreativeCollectionRecipeResponse(
+    string AnchorCollectionId,
+    string AnchorCollectionName,
+    int TargetCount,
+    int MomentGapMinutes,
+    string MomentPolicyVersion,
+    string ContextStrength,
+    string ContextPolicyVersion,
+    string SelectionPolicyVersion,
+    string OrderingPolicyVersion,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record CreativeCollectionContextReasonResponse(
+    string MomentId,
+    string[] AnchorRevisionIds);
+
+public sealed record CreativeCollectionSelectionReasonResponse(
+    string Code,
+    int ScoreDelta,
+    string Detail);
+
+public sealed record CreativeCollectionPreviewCandidateResponse(
+    string RevisionId,
+    string Kind,
+    DateTime? TakenAtLocal,
+    string ThumbnailUrl,
+    CreativeCollectionContextReasonResponse[] ContextReasons);
+
+public sealed record CreativeCollectionSelectedCandidateResponse(
+    string RevisionId,
+    string Kind,
+    DateTime? TakenAtLocal,
+    string ThumbnailUrl,
+    string? MomentId,
+    string? PeopleCombinationKey,
+    int SelectionScore,
+    CreativeCollectionSelectionReasonResponse[] SelectionReasons,
+    CreativeCollectionContextReasonResponse[] ContextReasons);
+
+public sealed record CreativeCollectionPreviewResponse(
+    string CollectionId,
+    string CollectionName,
+    string MomentPolicyVersion,
+    string ContextPolicyVersion,
+    int DirectAnchorCount,
+    int AddedContextCount,
+    int TotalCandidateCount,
+    bool NoAnchors,
+    string SelectionPolicyVersion,
+    int RequestedTargetCount,
+    int SelectedDirectAnchorCount,
+    int SelectedContextCount,
+    int SelectedCount,
+    int RepresentedMomentCount,
+    int RepresentedTimePeriodCount,
+    CreativeCollectionPreviewCandidateResponse[] Candidates,
+    CreativeCollectionSelectedCandidateResponse[] SelectedCandidates);
