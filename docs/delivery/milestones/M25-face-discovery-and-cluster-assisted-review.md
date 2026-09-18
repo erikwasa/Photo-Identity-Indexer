@@ -62,7 +62,9 @@ WI-0117 accepted only the narrow `m25-multi-evidence-auto-v1` expansion after de
 
 Sustained Suggested-groups review later exposed background-work thrash that was not visible in the original bounded acceptance pass. Canonical review mutations correctly invalidated provisional clustering, but the scheduler could immediately rebuild both current scopes between nearby human decisions. A captured log showed dozens of complete ~3.5k- and ~8.1k-face cluster publications while ordinary review-list query latency remained broadly stable, with several suggestion-accept requests spiking into the hundreds of milliseconds near large publications.
 
-WI-0138 reopens M25 narrowly to coalesce automatic review-triggered cluster refreshes. The clustering algorithm, canonical review semantics and explicit replacement paths remain unchanged.
+WI-0138 reopened M25 narrowly to coalesce automatic review-triggered cluster refreshes. The clustering algorithm, canonical review semantics and explicit replacement paths remain unchanged.
+
+PR #368 merged the durable 30-second review quiet period and passed workflow run #1961. Maintainer sustained-review verification on 2026-09-18 confirmed WI-0138 works as expected, so the performance follow-up is accepted and M25 is completed again.
 
 ## Exit criteria
 
@@ -77,7 +79,7 @@ WI-0138 reopens M25 narrowly to coalesce automatic review-triggered cluster refr
 - [x] Unknown faces may be intentionally rediscovered/rematched without silently changing their canonical Unknown state.
 - [x] Cluster support may strengthen advisory known-person suggestions, but it cannot by itself create a canonical assignment before WI-0117 acceptance.
 - [x] Any broader automatic-assignment rule is enabled only after WI-0081 is resolved and private reviewed evaluation demonstrates an acceptable precision/unknown-rejection trade-off; otherwise existing automation remains unchanged.
-- [ ] Sustained face review coalesces automatic provisional-cluster refreshes behind a durable quiet period rather than repeatedly rebuilding after individual review mutations.
+- [x] Sustained face review coalesces automatic provisional-cluster refreshes behind a durable quiet period rather than repeatedly rebuilding after individual review mutations.
 
 ## Risks
 
