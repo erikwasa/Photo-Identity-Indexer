@@ -460,9 +460,13 @@ internal static class CatalogueMigrationCommandRunner
 
         await using NpgsqlCommand insert = target.CreateCommand();
         insert.Transaction = transaction;
+        string identityOverride = insertColumns.Any(column => column.Identity)
+            ? " OVERRIDING SYSTEM VALUE"
+            : string.Empty;
         insert.CommandText =
-            $"INSERT INTO {QuotePostgres(targetTable.Name)} ({string.Join(", ", insertColumns.Select(column => QuotePostgres(column.Name)))}) " +
-            $"VALUES ({string.Join(", ", insertColumns.Select((_, index) => $"@p{index}"))});";
+            $"INSERT INTO {QuotePostgres(targetTable.Name)} ({string.Join(", ", insertColumns.Select(column => QuotePostgres(column.Name)))})" +
+            identityOverride +
+            $" VALUES ({string.Join(", ", insertColumns.Select((_, index) => $"@p{index}"))});";
         foreach ((TargetColumn column, int index) in insertColumns.Select((column, index) => (column, index)))
         {
             insert.Parameters.Add(new NpgsqlParameter($"p{index}", MapType(column)));

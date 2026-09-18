@@ -183,6 +183,9 @@ public sealed class CatalogueMigrationCommandTests
             INSERT INTO identity_suggestions (
                 id, face_occurrence_id, suggested_person_id, model_id, model_hash, score, status, created_at_utc)
             VALUES (71, $face, $person, 'sface-2021dec-fp32', $model_hash, 0.91, 'pending', $now);
+            INSERT INTO photo_presentation_preference_actions (
+                id, asset_revision_id, action_kind, preference_kind, actor, created_at_utc)
+            VALUES (81, $revision, 'set', 'prefer', 'maintainer', $now);
             """;
         seed.Parameters.AddWithValue("$source", sourceId.ToString());
         seed.Parameters.AddWithValue("$asset", assetId.ToString());
@@ -253,6 +256,11 @@ public sealed class CatalogueMigrationCommandTests
         Assert.Equal(revisionId, await ScalarGuidAsync(verify, "SELECT id FROM asset_revisions LIMIT 1;"));
         Assert.Equal(personId, await ScalarGuidAsync(verify, "SELECT person_id FROM review_actions WHERE id = 61;"));
         Assert.Equal(1L, await ScalarLongAsync(verify, "SELECT COUNT(*) FROM identity_suggestions WHERE id = 71 AND status = 'pending';"));
+        Assert.Equal(
+            1L,
+            await ScalarLongAsync(
+                verify,
+                "SELECT COUNT(*) FROM photo_presentation_preference_actions WHERE id = 81 AND preference_kind = 'prefer';"));
 
         await using NpgsqlCommand insertEmbedding = verify.CreateCommand();
         insertEmbedding.CommandText = """
@@ -267,6 +275,27 @@ public sealed class CatalogueMigrationCommandTests
         insertEmbedding.Parameters.AddWithValue("now", now.AddMinutes(1));
         long generated = Convert.ToInt64(await insertEmbedding.ExecuteScalarAsync());
         Assert.True(generated > 41);
+
+        await using NpgsqlCommand insertPreference = verify.CreateCommand();
+        insertPreference.CommandText = """
+            INSERT INTO photo_presentation_preference_actions (
+                asset_revision_id,
+                action_kind,
+                preference_kind,
+                actor,
+                created_at_utc)
+            VALUES (
+                @revision,
+                'set',
+                'avoid',
+                'sequence-test',
+                @now)
+            RETURNING id;
+            """;
+        insertPreference.Parameters.AddWithValue("revision", revisionId);
+        insertPreference.Parameters.AddWithValue("now", now.AddMinutes(2));
+        long generatedPreference = Convert.ToInt64(await insertPreference.ExecuteScalarAsync());
+        Assert.True(generatedPreference > 81);
     }
 
     private static string BuildTargetConnectionString(string adminString, string databaseName) =>
