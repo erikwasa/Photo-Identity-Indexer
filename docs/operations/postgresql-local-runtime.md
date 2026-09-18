@@ -67,12 +67,12 @@ A healthy PostgreSQL-authoritative runtime reports:
 ~~~json
 {
   "status": "ok",
-  "schemaVersion": 23,
+  "schemaVersion": 24,
   "catalogueProvider": "postgresql",
   "postgres": {
     "configured": true,
     "status": "ready",
-    "schemaVersion": 23
+    "schemaVersion": 24
   }
 }
 ~~~

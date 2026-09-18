@@ -5,7 +5,7 @@ milestone: M26
 status_source: ../status/work-items.yaml
 depends_on: [WI-0120]
 related_adrs: []
-affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Integration.Tests, docs]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Cli, PhotoIdentity.Integration.Tests, PhotoIdentity.Persistence.Tests, docs]
 ---
 
 # WI-0121: Productize Creative Collection recipes and previews
@@ -35,11 +35,11 @@ Moment/context/selection heuristics are much more useful when an operator can sa
 
 ## Acceptance criteria
 
-- [ ] A Creative Collection recipe can be saved, loaded and regenerated without changing its anchor Smart Collection.
-- [ ] Preview exposes anchor, context, candidate and final selected counts with clear provenance.
-- [ ] The operator can adjust at least target count and context strength/policy before playback.
-- [ ] Regeneration is deterministic for a fixed catalogue/policy version and final playback remains snapshot-based.
-- [ ] Automated tests cover persistence, preview provenance, regeneration and zero/small/large result sets.
+- [x] A Creative Collection recipe can be saved, loaded and regenerated without changing its anchor Smart Collection.
+- [x] Preview exposes anchor, context, candidate and final selected counts with clear provenance.
+- [x] The operator can adjust at least target count and context strength/policy before playback.
+- [x] Regeneration is deterministic for a fixed catalogue/policy version and final playback remains snapshot-based.
+- [x] Automated tests cover persistence, preview provenance, regeneration and zero/small/large result sets.
 
 ## Verification requirements
 
@@ -47,7 +47,9 @@ Automated repository/integration tests plus maintainer review of at least two re
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: Creative recipe Core/repository contracts, SQLite/PostgreSQL schema and repositories, shared Creative materialization service, recipe/preview/snapshot API routes, Smart Collections recipe/preview UI, Creative slideshow snapshot routing, focused persistence/integration tests and operational documentation.
+- Trade-offs: the first productized shape stores one Creative recipe per exact Smart Collection. Everyday controls are intentionally limited to target count plus Focused/Balanced/Broad context; the accepted 30-minute moment policy, metadata-first diversity selector and chronological ordering remain versioned recipe fields rather than additional UI knobs.
+- Persistence: recipes are separate catalogue rows keyed by the anchor Smart Collection and cascade on anchor deletion. SQLite schema advances to 17 and PostgreSQL to 24.
+- Playback: Creative mode materializes an immutable recipe snapshot before the existing slideshow viewer starts; Classic slideshow behavior is unchanged and original preparation consumes the same Creative snapshot revision IDs.
+- Deferred work: maintainer review of at least two representative private saved recipes remains required before WI-0121 can be completed. Later M26 items own photo preferences, burst grouping, history/novelty and semantic experiments.
+- Commands run: GitHub Actions validation on PR #362 passed build/fast tests, both integration shards, living/generated documentation checks, launcher verification and Windows package verification. Maintainer private recipe review remains pending.

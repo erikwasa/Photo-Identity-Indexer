@@ -72,7 +72,41 @@ POST /api/smart-collections/{collection-id}/creative-slideshow-snapshot?targetCo
 
 The response contains the selected immutable revision IDs in final chronological order. Playback consumes those revision IDs rather than re-running selection while a session is active. Classic `POST /api/smart-collections/{collection-id}/slideshow-snapshot` behavior is unchanged.
 
-WI-0121 owns productizing Creative recipes/previews and adding a normal user-facing launch surface; WI-0120 establishes and verifies the selection/snapshot boundary without adding another slideshow menu option.
+WI-0121 productizes that boundary as a saved Creative recipe inside the existing Smart Collections workspace rather than adding another top-level slideshow menu.
+
+## Saved Creative recipes
+
+A saved Creative recipe is separate from its exact Smart Collection definition. The recipe references the Smart Collection by identifier and stores the presentation policies needed to regenerate a Creative selection:
+
+- target photo count;
+- accepted 30-minute moment policy/version;
+- context policy/version;
+- deterministic diversity-selection policy/version; and
+- chronological ordering policy/version.
+
+The normal Smart Collections workspace exposes only two everyday controls before playback: target photo count and context strength. Context strength maps to versioned bounded policies:
+
+| Strength | Context cap per anchored moment |
+| --- | ---: |
+| Focused | 2 |
+| Balanced | 6 |
+| Broad | 12 |
+
+Changing these controls does not modify the Smart Collection filter. Preview regenerates against the current catalogue and reports anchor, added-context, total-candidate, selected, represented-moment and represented-month counts. Selected thumbnails remain labelled as direct anchors or context and show concise selection reasons.
+
+Recipe API:
+
+~~~text
+GET    /api/smart-collections/{collection-id}/creative-recipe
+PUT    /api/smart-collections/{collection-id}/creative-recipe
+DELETE /api/smart-collections/{collection-id}/creative-recipe
+GET    /api/smart-collections/{collection-id}/creative-recipe/preview
+POST   /api/smart-collections/{collection-id}/creative-recipe/slideshow-snapshot
+~~~
+
+The PUT body contains `targetCount` and `contextStrength`. The saved recipe records concrete policy versions so reopening it does not depend on mutable UI defaults. Deleting the anchor Smart Collection deletes its recipe through the catalogue foreign-key boundary.
+
+The Creative slideshow viewer requests the recipe snapshot once and then uses the existing immutable slideshow playback contract. Original preparation receives those same snapshot revision IDs. Classic Smart Collection slideshow snapshot behavior remains unchanged.
 
 ## Combined maintainer verification for WI-0118–WI-0120
 

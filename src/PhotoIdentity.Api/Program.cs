@@ -116,6 +116,7 @@ public partial class Program
             automaticGeoNamesMinimumRequestInterval,
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:AutomaticIdlePollIntervalMilliseconds")));
         builder.Services.AddSingleton<PhotoPlaceEnrichmentWorkerState>();
+        builder.Services.AddSingleton<CreativeCollectionMaterializationService>();
 
         builder.Services.AddSingleton<ArchiveSourceCatalogueScanner>();
         builder.Services.AddSingleton<LocalArchiveSyncCoordinator>();

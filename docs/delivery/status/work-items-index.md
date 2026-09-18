@@ -11,7 +11,7 @@ Current work items: **16**. Archived terminal items: **120**.
 | [WI-0089](../work-items/WI-0089-source-copy-exclusion-boundary.md) Add durable source-copy exclusion and access enforcement | M23 | ready | unassigned | [YAML](work-items/active/WI-0089.yaml) |
 | [WI-0090](../work-items/WI-0090-exclusion-purge-service.md) Purge excluded photo data and derivatives safely | M23 | proposed | unassigned | [YAML](work-items/active/WI-0090.yaml) |
 | [WI-0091](../work-items/WI-0091-archive-lifecycle-review.md) Add archive lifecycle review and exclusion workflows | M23 | proposed | unassigned | [YAML](work-items/active/WI-0091.yaml) |
-| [WI-0121](../work-items/WI-0121-creative-collection-recipes-preview.md) Productize Creative Collection recipes and previews | M26 | proposed | unassigned | [YAML](work-items/active/WI-0121.yaml) |
+| [WI-0121](../work-items/WI-0121-creative-collection-recipes-preview.md) Productize Creative Collection recipes and previews | M26 | in_progress | ai-agent | [YAML](work-items/active/WI-0121.yaml) |
 | [WI-0122](../work-items/WI-0122-photo-presentation-preferences.md) Add photo presentation preferences for Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0122.yaml) |
 | [WI-0123](../work-items/WI-0123-near-duplicate-burst-groups.md) Detect burst and near-duplicate photo groups for creative selection | M26 | proposed | unassigned | [YAML](work-items/active/WI-0123.yaml) |
 | [WI-0124](../work-items/WI-0124-slideshow-history-novelty.md) Track slideshow exposure and novelty for Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0124.yaml) |

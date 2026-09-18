@@ -94,6 +94,7 @@ internal static class CatalogueMigrationCommandRunner
         "photo_tag_actions",
         "photo_place_actions",
         "smart_collections",
+        "creative_collection_recipes",
         "processing_runs",
         "processing_jobs",
     ];
