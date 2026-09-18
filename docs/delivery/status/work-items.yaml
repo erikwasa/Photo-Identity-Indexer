@@ -88,7 +88,8 @@ work_items:
   blockers:
   - WI-0120
   - WI-0056
-  blocker_notes: []
+  blocker_notes:
+  - Experiment implementation is on the work branch; completion remains pending CI and a representative private proxy/original plus Creative-selection comparison.
   evidence: []
 - id: WI-0127
   title: Evaluate whole-image embeddings for semantic Creative Collections
