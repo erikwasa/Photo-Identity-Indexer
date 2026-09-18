@@ -87,13 +87,19 @@ work_items:
 - id: WI-0123
   title: Detect burst and near-duplicate photo groups for creative selection
   milestone: M26
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0123-near-duplicate-burst-groups.md
+  started_at: 2026-09-18
+  last_updated_at: 2026-09-18
+  branch: agent/WI-0123-visual-redundancy
   blockers:
   - WI-0120
-  blocker_notes: []
-  evidence: []
+  blocker_notes:
+  - Automated grouping, selector interaction and the local proxy experiment are implemented; private burst review must choose Hamming 4/6/8 before the accepted policy is enabled in normal Creative selection.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/363
 - id: WI-0124
   title: Track slideshow exposure and novelty for Creative Collections
   milestone: M26
