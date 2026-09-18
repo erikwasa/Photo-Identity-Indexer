@@ -107,6 +107,15 @@ public sealed class CreativeVisualRedundancyApplicationTests
                 Assert.Contains(group.Members, member => member.RevisionId == second.Id.ToString());
                 Assert.DoesNotContain(group.Members, member => member.RevisionId == third.Id.ToString());
             }
+
+            CreativeCollectionPreviewResponse normalPreview =
+                await client.GetFromJsonAsync<CreativeCollectionPreviewResponse>(
+                    $"/api/smart-collections/{saved.Id}/creative-preview?targetCount=2&momentGapMinutes=30")
+                ?? throw new InvalidOperationException();
+
+            Assert.Equal(
+                [first.Id.ToString(), third.Id.ToString()],
+                normalPreview.SelectedCandidates.Select(candidate => candidate.RevisionId).ToArray());
         }
         finally
         {
