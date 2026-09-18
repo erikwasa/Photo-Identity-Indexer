@@ -52,7 +52,7 @@ The generator should solve that presentation problem explicitly instead of weake
 - [x] Zero-anchor input produces an explicit empty/no-anchor result rather than silently broadening the query.
 - [x] Same input catalogue, Smart Collection, moment policy and context policy produce a deterministic candidate set and order.
 - [x] Automated tests cover person anchors, no-person context, overlapping anchors, zero anchors, context bounds and the existing query visibility boundary used for context retrieval.
-- [ ] Human verification demonstrates at least one private family-photo sequence where context expansion produces a more coherent slideshow candidate set than strict person filtering alone.
+- [x] Human verification demonstrates at least one private family-photo sequence where context expansion produces a more coherent slideshow candidate set than strict person filtering alone.
 
 ## Verification requirements
 
@@ -62,5 +62,5 @@ Automated Core/persistence/API tests are required for exact-anchor semantics, bo
 
 - Files changed: `src/PhotoIdentity.Core/Collections/CreativeCollectionCandidateGeneration.cs`, `src/PhotoIdentity.Api/CreativeCollectionPreviewEndpoints.cs`, `src/PhotoIdentity.Api/MomentPreviewEndpoints.cs`, Core/integration tests, and `docs/operations/creative-collection-preview.md`.
 - Trade-offs: `m26-anchor-context-balanced-v1` is intentionally simple and inspectable: at most six context photos per anchored moment, selected by capture-time proximity to direct anchors. The preview reads the accessible catalogue through the existing Smart Collection query repository rather than adding separate persistence semantics.
-- Deferred work: representative private-family verification remains pending and can be batched with the deferred WI-0118 30-minute versus 90-minute moment-policy evaluation. WI-0120 owns final target-size/diversity selection.
-- Commands run: GitHub Actions validation on PR #356; local execution is not available from this session.
+- Maintainer verification: private representative review found that contextual additions generally belonged to the same real-world moment and usually improved sequence coherence. Occasional unrelated photos can still enter when they merely fall inside the same timestamp-derived moment; that bounded time-only limitation is accepted for the initial policy.
+- Commands run: GitHub Actions validation on PR #356 plus maintainer private verification completed on 2026-09-18.
