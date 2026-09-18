@@ -391,6 +391,117 @@ public sealed class CreativeCollectionSelectorTests
     }
 
     [Fact]
+    public void Semantic_diversity_disabled_preserves_existing_selection()
+    {
+        DateTime taken = new(2026, 9, 1, 10, 0, 0);
+        PhotoMomentCandidate[] catalogue =
+        [
+            Candidate(1, taken),
+            Candidate(2, taken),
+            Candidate(3, taken),
+        ];
+        (CreativeCollectionCandidateSet generated, PhotoMomentClusteringResult moments) =
+            GenerateAllAnchors(catalogue);
+        Dictionary<AssetRevisionId, IReadOnlyList<string>> concepts = new()
+        {
+            [Revision(1)] = ["indoors"],
+            [Revision(2)] = ["indoors"],
+            [Revision(3)] = ["outdoors"],
+        };
+
+        CreativeCollectionSelectionResult baseline = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            targetCount: 2,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+        CreativeCollectionSelectionResult disabled = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            presentationPreferences: null,
+            exposureHistory: null,
+            noveltyEnabled: false,
+            noveltyEvaluatedAtUtc: DateTimeOffset.UnixEpoch,
+            semanticConcepts: concepts,
+            semanticDiversityEnabled: false,
+            targetCount: 2,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+
+        Assert.Equal(
+            baseline.Selected.Select(item => item.Candidate.RevisionId),
+            disabled.Selected.Select(item => item.Candidate.RevisionId));
+        Assert.Equal(CreativeCollectionSelectionPolicy.BalancedV1.Version, disabled.PolicyVersion);
+    }
+
+    [Fact]
+    public void Semantic_diversity_rewards_new_visible_content_without_overriding_prefer()
+    {
+        DateTime taken = new(2026, 9, 1, 10, 0, 0);
+        PhotoMomentCandidate[] catalogue =
+        [
+            Candidate(1, taken),
+            Candidate(2, taken),
+            Candidate(3, taken),
+        ];
+        (CreativeCollectionCandidateSet generated, PhotoMomentClusteringResult moments) =
+            GenerateAllAnchors(catalogue);
+        Dictionary<AssetRevisionId, IReadOnlyList<string>> concepts = new()
+        {
+            [Revision(1)] = ["indoors"],
+            [Revision(2)] = ["indoors"],
+            [Revision(3)] = ["outdoors"],
+        };
+
+        CreativeCollectionSelectionResult semantic = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            presentationPreferences: null,
+            exposureHistory: null,
+            noveltyEnabled: false,
+            noveltyEvaluatedAtUtc: DateTimeOffset.UnixEpoch,
+            semanticConcepts: concepts,
+            semanticDiversityEnabled: true,
+            targetCount: 2,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+
+        Assert.Equal([Revision(1), Revision(3)],
+            semantic.Selected.Select(item => item.Candidate.RevisionId).ToArray());
+        CreativeCollectionSelectedCandidate distinct = semantic.Selected.Single(item =>
+            item.Candidate.RevisionId == Revision(3));
+        Assert.Contains(distinct.Reasons, reason =>
+            reason.Code == CreativeCollectionSelectionReasonCodes.SemanticNewConcept &&
+            reason.ScoreDelta > 0);
+        Assert.EndsWith(
+            CreativeCollectionSemanticDiversityPolicies.BalancedV1,
+            semantic.PolicyVersion,
+            StringComparison.Ordinal);
+
+        Dictionary<AssetRevisionId, string> preferences = new()
+        {
+            [Revision(2)] = PhotoPresentationPreferenceKinds.Prefer,
+        };
+        CreativeCollectionSelectionResult preferred = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            presentationPreferences: preferences,
+            exposureHistory: null,
+            noveltyEnabled: false,
+            noveltyEvaluatedAtUtc: DateTimeOffset.UnixEpoch,
+            semanticConcepts: concepts,
+            semanticDiversityEnabled: true,
+            targetCount: 1,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+
+        Assert.Equal(Revision(2), Assert.Single(preferred.Selected).Candidate.RevisionId);
+    }
+
+    [Fact]
     public void Same_inputs_target_and_policy_are_deterministic_under_candidate_reordering()
     {
         PhotoMomentCandidate[] catalogue = Enumerable.Range(1, 8)
