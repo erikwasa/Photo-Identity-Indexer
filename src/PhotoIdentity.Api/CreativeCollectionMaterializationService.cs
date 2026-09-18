@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Imaging.OpenCv;
 
 namespace PhotoIdentity.Api;
 
@@ -10,17 +12,23 @@ public sealed record CreativeCollectionMaterialization(
 
 public sealed class CreativeCollectionMaterializationService
 {
+    private const int VisualHashConcurrency = 4;
+
     private readonly ISmartCollectionRepository _definitions;
     private readonly ISmartCollectionQueryRepository _query;
+    private readonly CollectionReviewProxyFileResolver _proxyResolver;
 
     public CreativeCollectionMaterializationService(
         ISmartCollectionRepository definitions,
-        ISmartCollectionQueryRepository query)
+        ISmartCollectionQueryRepository query,
+        CollectionReviewProxyFileResolver proxyResolver)
     {
         ArgumentNullException.ThrowIfNull(definitions);
         ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(proxyResolver);
         _definitions = definitions;
         _query = query;
+        _proxyResolver = proxyResolver;
     }
 
     public async Task<CreativeCollectionMaterialization?> MaterializeAsync(
@@ -91,10 +99,16 @@ public sealed class CreativeCollectionMaterializationService
             anchorRevisionIds,
             moments,
             contextPolicy);
+        PhotoVisualRedundancyResult visualRedundancy =
+            await BuildAcceptedVisualRedundancyAsync(
+                generated.Candidates,
+                moments,
+                cancellationToken);
         CreativeCollectionSelectionResult selection = CreativeCollectionSelector.Select(
             generated,
             momentCandidates,
             moments,
+            visualRedundancy,
             settings.TargetCount,
             CreativeCollectionSelectionPolicy.BalancedV1);
 
@@ -102,5 +116,60 @@ public sealed class CreativeCollectionMaterializationService
             definition,
             generated,
             selection);
+    }
+
+    private async Task<PhotoVisualRedundancyResult> BuildAcceptedVisualRedundancyAsync(
+        IReadOnlyList<CreativeCollectionCandidate> candidates,
+        PhotoMomentClusteringResult moments,
+        CancellationToken cancellationToken)
+    {
+        ConcurrentBag<PhotoVisualFingerprint> fingerprints = [];
+        using SemaphoreSlim gate = new(VisualHashConcurrency);
+        OpenCvPerceptualHashCalculator calculator = new();
+
+        Task[] work = candidates.Select(async candidate =>
+        {
+            await gate.WaitAsync(cancellationToken);
+            try
+            {
+                CollectionPhotoFile? proxy = await _proxyResolver.ResolveAsync(
+                    candidate.RevisionId,
+                    cancellationToken);
+                if (proxy is null)
+                {
+                    return;
+                }
+
+                try
+                {
+                    PhotoPerceptualHash64 hash = await calculator.ComputeAsync(
+                        proxy.Path,
+                        cancellationToken);
+                    fingerprints.Add(new PhotoVisualFingerprint(
+                        candidate.RevisionId,
+                        candidate.TakenAtLocal,
+                        hash));
+                }
+                catch (Exception exception) when (
+                    exception is InvalidDataException or
+                    IOException or
+                    UnauthorizedAccessException)
+                {
+                    // Visual redundancy is optional derived evidence. A missing or unreadable
+                    // proxy must never make Creative materialization fail or hydrate originals.
+                }
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }).ToArray();
+
+        await Task.WhenAll(work);
+
+        return PhotoVisualRedundancyGrouper.Group(
+            fingerprints,
+            moments,
+            PhotoVisualRedundancyPolicy.AcceptedCreativeV1);
     }
 }
