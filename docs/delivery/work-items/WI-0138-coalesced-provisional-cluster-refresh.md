@@ -45,7 +45,7 @@ WI-0114 intentionally makes canonical review changes invalidate provisional clus
 - [x] An embedding-only stale cluster remains eligible for automatic refresh without waiting on the review debounce when its captured review evidence still matches.
 - [x] Explicit clustering starts and existing not-same replacement behavior remain outside the automatic review debounce.
 - [x] PostgreSQL persistence coverage verifies no refresh before the quiet boundary and refresh after the boundary, including across a fresh repository instance.
-- [ ] Maintainer sustained-review verification confirms that ordinary face review no longer produces a stream of full provisional-clustering publications or corresponding interaction stalls.
+- [x] Maintainer sustained-review verification confirms that ordinary face review no longer produces a stream of full provisional-clustering publications or corresponding interaction stalls.
 
 ## Verification requirements
 
@@ -62,3 +62,11 @@ WI-0114 intentionally makes canonical review changes invalidate provisional clus
 - `ProvisionalFaceClusteringWorker` supplies a 30-second quiet period only for automatic refresh discovery.
 - `PostgresProvisionalFaceClusterRepository.TryStartNextRefreshAsync` compares the current evidence to the published run. When review evidence changed too recently, it leaves the current run stale and returns without starting work. The hosted service naturally retries later.
 - The debounce does not weaken evidence consistency: any active run still fails closed as stale if evidence changes before publication.
+
+## Completion notes
+
+- Implementation merged in PR #368 after workflow run #1961 passed the repository build/test/documentation/package gates.
+- The automatic refresh quiet period is 30 seconds and is derived from durable review-mutation evidence, so sustained review activity coalesces repeated invalidations instead of starting a full replacement after each decision.
+- Embedding-only refresh, explicit clustering and explicit not-same replacement semantics remain unchanged.
+- Maintainer verification on 2026-09-18 confirmed WI-0138 works as expected during real face-review use.
+- M25 can return to completed; this post-acceptance regression is resolved.
