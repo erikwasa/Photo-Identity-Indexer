@@ -36,7 +36,7 @@ Three candidate thresholds are exposed for private evaluation:
 | `m26-dhash64-h6-20s-v1` | 6 | 20 s |
 | `m26-dhash64-h8-20s-v1` | 8 | 20 s |
 
-No policy is the normal Creative Collection default yet. Maintainer private review chooses the initial threshold.
+Maintainer private review on 2026-09-18 accepted `m26-dhash64-h8-20s-v1` as the initial normal Creative Collection policy. Hamming 4 and 6 remain explicit evaluation policies for future tuning.
 
 ## Selector interaction
 
@@ -84,4 +84,6 @@ For at least two representative private burst groups:
 5. prefer the strictest threshold that removes useful repetition without collapsing distinct expressions/compositions;
 6. compare `baselineRepeatedSelectedFrames` with `redundancyAwareRepeatedSelectedFrames`.
 
-After that review, record the chosen policy version and wire that policy into the normal Creative materialization path. Until then the existing WI-0120 normal selection behavior remains unchanged.
+The initial review used an 84-photo burst-heavy private collection. All 84 candidates had usable review proxies. Hamming 4 and 6 produced no groups; Hamming 8 produced two two-photo groups. Both H8 groups were visually judged redundant enough that one slideshow frame was sufficient. In that experiment, repeated selected frames within detected visual groups fell from 2 to 1.
+
+Normal Creative materialization now computes the accepted H8 evidence from available local review proxies before target/diversity selection. The existing `visual-redundancy` penalty remains a preference rather than a hard exclusion. Missing or unreadable proxies contribute no visual evidence and never trigger original hydration or make Creative generation fail.
