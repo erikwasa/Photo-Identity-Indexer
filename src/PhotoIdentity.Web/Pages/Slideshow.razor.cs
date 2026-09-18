@@ -55,6 +55,10 @@ public partial class Slideshow : IAsyncDisposable
     [SupplyParameterFromQuery(Name = "return")]
     public string? ReturnUrl { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "creative")]
+    public bool Creative { get; set; }
+
     private SlideshowSettings Settings { get; set; } = SlideshowSettings.Defaults;
     private SmartCollectionSlideshowSnapshotResponse? Snapshot { get; set; }
     private SlideshowOriginalPreparationResponse? OriginalPreparation { get; set; }
@@ -169,13 +173,18 @@ public partial class Slideshow : IAsyncDisposable
         bool beginOriginalPreparation = false;
         try
         {
+            string snapshotPath = Creative
+                ? $"api/smart-collections/{CollectionId:D}/creative-recipe/slideshow-snapshot"
+                : $"api/smart-collections/{CollectionId:D}/slideshow-snapshot";
             using HttpResponseMessage response = await Http.PostAsync(
-                $"api/smart-collections/{CollectionId:D}/slideshow-snapshot",
+                snapshotPath,
                 content: null);
             if (!response.IsSuccessStatusCode)
             {
                 Error = response.StatusCode == System.Net.HttpStatusCode.NotFound
-                    ? "The saved Smart Collection no longer exists."
+                    ? Creative
+                        ? "The saved Creative Collection recipe no longer exists."
+                        : "The saved Smart Collection no longer exists."
                     : $"The slideshow snapshot could not be created. Status {(int)response.StatusCode}.";
                 return;
             }
