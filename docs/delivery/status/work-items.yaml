@@ -146,26 +146,6 @@ work_items:
   - WI-0121
   blocker_notes: []
   evidence: []
-- id: WI-0131
-  title: Add a restrained adaptive backdrop for contained slideshow photos
-  milestone: M27
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0131-adaptive-slideshow-backdrop.md
-  started_at: 2026-09-17
-  last_updated_at: 2026-09-17
-  branch: agent/WI-0131-adaptive-slideshow-backdrop
-  blockers:
-  - WI-0129
-  blocker_notes:
-  - Implementation is merged in pull request 352; subjective desktop/phone acceptance is intentionally deferred while later M27 presentation work continues.
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/352
-  - type: workflow
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/35156916025
-  - type: merge_commit
-    value: b4e3dc6490c5671d8411c891b8ca2d50fe8a7eb3
 - id: WI-0132
   title: Add moment-aware transition language to slideshow playback
   milestone: M27
@@ -188,40 +168,6 @@ work_items:
   - WI-0123
   blocker_notes: []
   evidence: []
-- id: WI-0134
-  title: Add bounded adaptive timing for a less mechanical slideshow rhythm
-  milestone: M27
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0134-adaptive-slideshow-rhythm.md
-  started_at: 2026-09-17
-  last_updated_at: 2026-09-17
-  branch: agent/WI-0134-adaptive-slideshow-rhythm
-  blockers:
-  - WI-0129
-  blocker_notes:
-  - Automated acceptance semantics are implemented and covered by tests; the representative fixed-versus-adaptive long-run rhythm comparison remains pending maintainer/device review.
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/355
-- id: WI-0136
-  title: Make slideshow startup and original preparation exception-driven
-  milestone: M27
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0136-exception-driven-slideshow-preparation.md
-  started_at: 2026-09-17
-  last_updated_at: 2026-09-17
-  branch: agent/WI-0136-exception-driven-preparation
-  blockers:
-  - WI-0094
-  - WI-0107
-  - WI-0108
-  blocker_notes:
-  - Automated implementation is ready in pull request 359; representative proxy-only and prepared-original phone-path acceptance remains pending in the separate verification thread.
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/359
 - id: WI-0137
   title: Tune and verify the polished slideshow experience on real devices
   milestone: M27

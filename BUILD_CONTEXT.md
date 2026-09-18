@@ -4,25 +4,26 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M27 Slideshow presentation experience is continuing with WI-0136: make slideshow startup and original preparation exception-driven.**
+**M27 Slideshow presentation experience is ready for its final real-device acceptance item, WI-0137.**
 
-The M22 preparation lifecycle is already safe and automatic inside the slideshow when the persisted Prepare originals preference is enabled. WI-0136 keeps that storage/preflight/hydration/verification contract intact while removing routine preparation operations from each visual gallery card, simplifying happy-path preparation progress and reserving explicit recovery for no-progress or failed preparation states.
+WI-0131 adaptive backdrop, WI-0134 adaptive rhythm and WI-0136 exception-driven preparation were accepted by the maintainer on 2026-09-18 and are now completed. Together with the previously completed M27 core items, that unblocks WI-0137 as the milestone-level device/polish acceptance pass.
 
-Standalone pre-preparation remains available under collapsed parent preparation tools. No-progress recovery now offers retry, continue-with-available playback or cancellation; capacity and immutable-verification failures retain explicit degraded-playback recovery. Real-phone verification is intentionally happening in the separate verification thread rather than blocking implementation work here.
+WI-0137 should evaluate the combined slideshow experience rather than reopening the individual accepted features unless the integrated pass exposes a reproducible regression.
 
 ## Next concrete step
 
-Validate the WI-0136 branch through the normal build/integration/docs gates. Then verify one Prepare originals Off slideshow and one Prepare originals On slideshow on the supported phone path, including a representative exception recovery, before closing the item. Broader device/polish acceptance remains with WI-0137.
+Start WI-0137 and run the representative combined slideshow acceptance set on the supported iPhone/browser path and at least one desktop browser. Cover autoplay, transitions/readiness, rapid manual navigation, pause/resume, looping, reduced motion, backdrop/motion/timing defaults, tap-to-play library flow, exception-driven preparation, protected controls, fullscreen/orientation recovery and browser performance/resource behavior.
 
 ## Relevant files
 
+- docs/delivery/work-items/WI-0137-real-device-slideshow-polish-acceptance.md
+- docs/delivery/status/work-items/active/WI-0137.yaml
+- docs/delivery/work-items/WI-0131-adaptive-slideshow-backdrop.md
+- docs/delivery/work-items/WI-0134-adaptive-slideshow-rhythm.md
 - docs/delivery/work-items/WI-0136-exception-driven-slideshow-preparation.md
-- docs/delivery/status/work-items/active/WI-0136.yaml
 - src/PhotoIdentity.Web/Pages/Slideshows.razor
 - src/PhotoIdentity.Web/Pages/Slideshow.razor
-- src/PhotoIdentity.Web/SlideshowPreparationExperience.cs
-- tests/PhotoIdentity.Integration.Tests/SlideshowPreparationExperienceTests.cs
-- tests/PhotoIdentity.Integration.Tests/SlideshowOriginalPreparationServiceTests.cs
+- src/PhotoIdentity.Web/Components/SlideshowPresentation.razor
 
 ## Repository validation
 

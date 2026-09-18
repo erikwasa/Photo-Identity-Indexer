@@ -51,5 +51,5 @@ Compare long representative runs with fixed timing and adaptive timing; retain o
 
 - Files changed: `SlideshowTimingPolicy.cs`, `SlideshowPlaybackState.cs`, `SlideshowPresentation.razor`, `Slideshow.razor`, timing/playback integration tests, and delivery-status documentation.
 - Trade-offs: the first policy deliberately uses only reliable face-count evidence already fetched for presentation. Single-face frames run at 98% of the configured duration, two-face frames at 104%, groups at 108%, and no-face/unavailable evidence at exactly 100%. This keeps the configured preference dominant and avoids a new settings surface or random timing.
-- Deferred work: the required representative fixed-versus-adaptive long-run rhythm comparison remains a maintainer/device review item. If the rhythm feels distracting, tune the fixed multipliers rather than adding viewer controls.
-- Commands run: the initial PR workflow built successfully and all test/integration shards passed. Its generated-document check failed because `work-items.yaml` and `work-items-index.md` were stale; the PR update regenerates those views while also incorporating current `main`.
+- Maintainer verification: accepted on 2026-09-18 after representative slideshow review; the adaptive rhythm worked as expected without introducing distracting or unpredictable timing.
+- Commands run: the implementation PR passed build/test/integration gates after regenerating the delivery views; maintainer acceptance completed on 2026-09-18.

@@ -36,13 +36,13 @@ The current library exposes Prepare originals and detailed preparation state bec
 
 ## Acceptance criteria
 
-- [ ] Normal library cards do not expose routine Prepare/Retry/Cancel controls when no action is required.
-- [ ] Starting with Prepare originals enabled automatically follows the existing safe preparation lifecycle.
-- [ ] Successful preparation proceeds into playback without an additional confirmation click.
-- [ ] Capacity/no-progress/verification failures remain explicit and provide parent-safe recovery choices.
-- [ ] Standalone pre-preparation remains available in a secondary parent/operator path.
-- [ ] Storage ownership and eviction protections remain unchanged.
-- [ ] Tests cover prepare-off happy path, prepare-on success, no-progress, capacity failure, verification failure and continue-with-available recovery.
+- [x] Normal library cards do not expose routine Prepare/Retry/Cancel controls when no action is required.
+- [x] Starting with Prepare originals enabled automatically follows the existing safe preparation lifecycle.
+- [x] Successful preparation proceeds into playback without an additional confirmation click.
+- [x] Capacity/no-progress/verification failures remain explicit and provide parent-safe recovery choices.
+- [x] Standalone pre-preparation remains available in a secondary parent/operator path.
+- [x] Storage ownership and eviction protections remain unchanged.
+- [x] Tests cover prepare-off happy path, prepare-on success, no-progress, capacity failure, verification failure and continue-with-available recovery.
 
 ## Verification requirements
 
@@ -52,5 +52,5 @@ Run representative proxy-only and prepared-original slideshows on the supported 
 
 - Files changed: `Slideshows.razor`, `Slideshow.razor`, `SlideshowPreparationExperience`, focused integration tests and delivery handoff/status files.
 - Trade-offs: the existing M22 snapshot, storage-admission, hydration, lease and immutable-verification lifecycle is retained rather than replaced. Routine preparation controls move out of each gallery card into a collapsed parent/operator tool surface; active preparation remains visible only as ambient progress or an exception cue. No-progress recovery now also permits explicit continue-with-available playback.
-- Deferred work: representative proxy-only and prepared-original phone-path verification remains pending in the separate verification thread; WI-0137 still owns the broader real-device slideshow polish pass.
-- Commands run: implementation prepared for the normal build/integration/docs CI gates; manual phone-path acceptance remains pending.
+- Maintainer verification: accepted on 2026-09-18 on the supported phone path. Prepare-originals Off/On startup behavior and the exception-driven preparation experience worked as expected; WI-0137 still owns the broader real-device slideshow polish pass.
+- Commands run: implementation passed repository CI before merge; maintainer phone-path acceptance completed on 2026-09-18.

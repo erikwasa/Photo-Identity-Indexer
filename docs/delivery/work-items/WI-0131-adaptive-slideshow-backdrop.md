@@ -36,12 +36,12 @@ The current black fullscreen surface is safe and predictable, but large unused a
 
 ## Acceptance criteria
 
-- [ ] Mixed-aspect-ratio photos retain an uncropped/contained foreground presentation.
-- [ ] The backdrop cannot obscure or materially reduce contrast of the foreground photo.
-- [ ] Backdrop transition is synchronized with foreground transition and does not flash the outgoing/incoming image incorrectly.
-- [ ] The implementation has a cheap neutral fallback and can disable expensive effects on unsuitable devices/browsers.
-- [ ] Long playback remains bounded in DOM/image resources.
-- [ ] Maintainer comparison on representative family photos records whether the treatment should ship as default, be simplified, or be rejected.
+- [x] Mixed-aspect-ratio photos retain an uncropped/contained foreground presentation.
+- [x] The backdrop cannot obscure or materially reduce contrast of the foreground photo.
+- [x] Backdrop transition is synchronized with foreground transition and does not flash the outgoing/incoming image incorrectly.
+- [x] The implementation has a cheap neutral fallback and can disable expensive effects on unsuitable devices/browsers.
+- [x] Long playback remains bounded in DOM/image resources.
+- [x] Maintainer comparison on representative family photos records whether the treatment should ship as default, be simplified, or be rejected.
 
 ## Verification requirements
 
@@ -53,5 +53,5 @@ Phone/browser review across portrait-on-landscape, landscape-on-portrait, dark i
 - Trade-offs: each bounded A/B presentation slot now contains the normal `object-fit: contain` foreground plus one same-resource `object-fit: cover` backdrop. The backdrop is heavily blurred, dimmed and desaturated, with an additional shade; the foreground remains uncropped and visually above it. This adds one decorative image element per slot but does not add another slideshow generation or unbounded lifecycle.
 - Fallback: the backdrop can be disabled through the internal component parameter without adding a viewer setting. Unsupported CSS filter, reduced-data preference, or forced-colors mode suppresses the expensive backdrop and leaves the existing black layer background.
 - Transition behavior: opacity is now applied to the entire A/B presentation layer while decode/readiness diagnostics remain attached to the foreground image, so foreground and backdrop enter/leave together. A JavaScript regression test covers this split.
-- Deferred work: subjective default/simplify/reject decision and final blur/dimming tuning require representative desktop/phone review after CI.
-- Commands run: implementation prepared for normal repository CI; maintainer device review remains pending.
+- Maintainer verification: accepted on 2026-09-18 after representative desktop/phone review; the adaptive backdrop, synchronized transitions and playback performance worked as expected, so the treatment is accepted as the default.
+- Commands run: implementation passed repository CI before merge; maintainer desktop/phone acceptance completed on 2026-09-18.

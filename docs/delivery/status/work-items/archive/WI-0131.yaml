@@ -1,16 +1,18 @@
 id: WI-0131
 title: Add a restrained adaptive backdrop for contained slideshow photos
 milestone: M27
-status: in_progress
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0131-adaptive-slideshow-backdrop.md
 started_at: 2026-09-17
-last_updated_at: 2026-09-17
+completed_at: 2026-09-18
+verified_at: 2026-09-18
+verified_by: maintainer
+last_updated_at: 2026-09-18
 branch: agent/WI-0131-adaptive-slideshow-backdrop
 blockers:
 - WI-0129
-blocker_notes:
-- Implementation is merged in pull request 352; subjective desktop/phone acceptance is intentionally deferred while later M27 presentation work continues.
+blocker_notes: []
 evidence:
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/352
@@ -18,3 +20,5 @@ evidence:
   value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/35156916025
 - type: merge_commit
   value: b4e3dc6490c5671d8411c891b8ca2d50fe8a7eb3
+- type: verification
+  value: '2026-09-18 maintainer desktop/phone review: WI-0131 adaptive backdrop, synchronized transitions and playback performance work as expected; accepted as the default treatment.'
