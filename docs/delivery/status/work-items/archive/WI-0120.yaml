@@ -1,0 +1,23 @@
+id: WI-0120
+title: Add target-count and diversity selection for Creative Collections
+milestone: M26
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0120-target-count-diversity-selector.md
+started_at: 2026-09-17
+completed_at: 2026-09-18
+verified_at: 2026-09-18
+verified_by: maintainer
+last_updated_at: 2026-09-18
+branch: agent/WI-0120-target-count-diversity-selector
+blockers:
+- WI-0119
+- WI-0083
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/357
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/358
+- type: maintainer_verification
+  value: 2026-09-18 private large/small/repetition-heavy review passed; large-set coverage broadened materially, two-minute-adjacent repetition fell from 55 to 21 on the burst-heavy sample, small-set uniqueness held, and the 50-photo snapshot exactly matched preview revision IDs and order.

@@ -248,7 +248,7 @@ milestones:
   - WI-0117
 - id: M26
   title: Creative Collections
-  status: in_progress
+  status: ready
   document: ../milestones/M26-creative-collections.md
   work_items:
   - WI-0118

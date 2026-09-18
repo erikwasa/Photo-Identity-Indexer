@@ -76,15 +76,15 @@ Each stage should remain independently inspectable so unsuccessful heuristics/mo
 
 ## Exit criteria
 
-- [ ] A documented, versioned moment-clustering policy can group representative family-photo sequences using capture-time-first evidence and can leave uncertain photos ungrouped/singleton rather than forcing a result.
-- [ ] Moment clustering is demonstrably useful on a private representative archive sample that includes photos without location metadata.
-- [ ] Exact Smart Collection results remain unchanged and can be identified separately as Creative Collection anchors.
-- [ ] Context expansion can add photos from the same inferred moments even when selected people are absent, while every added photo records why it was included.
-- [ ] A Creative Collection can show direct-match and context counts so the operator can understand what the generator changed.
-- [ ] The operator can request a target photo count and receive a best-effort bounded selection without duplicating photos or inventing matches.
-- [ ] Selection reduces obvious repetition and improves coverage across time/moments/people compared with simple chronological truncation on a representative private sample.
-- [ ] The final ordered revision list can use the existing stable slideshow playback/snapshot lifecycle without changing playback into a live query.
-- [ ] Automated tests protect deterministic grouping/selection, provenance, exact-anchor semantics and important edge cases such as zero anchors, fewer candidates than target and many near-consecutive photos.
+- [x] A documented, versioned moment-clustering policy can group representative family-photo sequences using capture-time-first evidence and can leave uncertain photos ungrouped/singleton rather than forcing a result.
+- [x] Moment clustering is demonstrably useful on a private representative archive sample that includes photos without location metadata.
+- [x] Exact Smart Collection results remain unchanged and can be identified separately as Creative Collection anchors.
+- [x] Context expansion can add photos from the same inferred moments even when selected people are absent, while every added photo records why it was included.
+- [x] A Creative Collection can show direct-match and context counts so the operator can understand what the generator changed.
+- [x] The operator can request a target photo count and receive a best-effort bounded selection without duplicating photos or inventing matches.
+- [x] Selection reduces obvious repetition and improves coverage across time/moments/people compared with simple chronological truncation on a representative private sample.
+- [x] The final ordered revision list can use the existing stable slideshow playback/snapshot lifecycle without changing playback into a live query.
+- [x] Automated tests protect deterministic grouping/selection, provenance, exact-anchor semantics and important edge cases such as zero anchors, fewer candidates than target and many near-consecutive photos.
 - [ ] Follow-on work that is pursued retains the canonical-versus-derived/presentation boundaries above; follow-on ideas that are rejected are explicitly closed with evidence instead of being silently abandoned.
 
 ## Risks
