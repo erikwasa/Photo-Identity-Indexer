@@ -31,8 +31,52 @@ public sealed record CreativeCollectionContextPolicy
     public string Version { get; }
     public int MaximumContextPhotosPerAnchoredMoment { get; }
 
+    public static CreativeCollectionContextPolicy FocusedV1 { get; } =
+        new("m26-anchor-context-focused-v1", 2);
+
     public static CreativeCollectionContextPolicy BalancedV1 { get; } =
         new("m26-anchor-context-balanced-v1", 6);
+
+    public static CreativeCollectionContextPolicy BroadV1 { get; } =
+        new("m26-anchor-context-broad-v1", 12);
+
+    public static CreativeCollectionContextPolicy FromVersion(string version)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(version);
+        return version.Trim() switch
+        {
+            "m26-anchor-context-focused-v1" => FocusedV1,
+            "m26-anchor-context-balanced-v1" => BalancedV1,
+            "m26-anchor-context-broad-v1" => BroadV1,
+            _ => throw new ArgumentException(
+                $"Creative Collection context policy '{version}' is not supported.",
+                nameof(version)),
+        };
+    }
+
+    public static CreativeCollectionContextPolicy FromStrength(string strength)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(strength);
+        return strength.Trim().ToLowerInvariant() switch
+        {
+            "focused" => FocusedV1,
+            "balanced" => BalancedV1,
+            "broad" => BroadV1,
+            _ => throw new ArgumentException(
+                "Creative Collection context strength must be focused, balanced or broad.",
+                nameof(strength)),
+        };
+    }
+
+    public static string StrengthForVersion(string version)
+    {
+        CreativeCollectionContextPolicy policy = FromVersion(version);
+        return ReferenceEquals(policy, FocusedV1)
+            ? "focused"
+            : ReferenceEquals(policy, BroadV1)
+                ? "broad"
+                : "balanced";
+    }
 }
 
 public sealed record CreativeCollectionContextReason(
