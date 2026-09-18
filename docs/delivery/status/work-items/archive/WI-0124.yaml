@@ -1,0 +1,24 @@
+id: WI-0124
+title: Track slideshow exposure and novelty for Creative Collections
+milestone: M26
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0124-slideshow-history-novelty.md
+started_at: 2026-09-18
+completed_at: 2026-09-18
+verified_at: 2026-09-18
+verified_by: maintainer
+last_updated_at: 2026-09-18
+branch: agent/WI-0124-slideshow-history-novelty
+blockers:
+- WI-0120
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/366
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/367
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/369
+- type: maintainer_verification
+  value: 2026-09-18 show counts updated for displayed photos, freshness off remained stable, and freshness on produced a sensible different selection with more unseen photos.
