@@ -15,6 +15,7 @@ public static class PhotoDetailsEndpoints
         endpoints.MapGet("/api/collections/photos/{revisionId}/details", GetPhotoDetailsAsync);
         endpoints.MapPost("/api/collections/photos/{revisionId}/people", AddManualPersonAsync);
         endpoints.MapDelete("/api/collections/photos/{revisionId}/people/{personId}", RemoveManualPersonAsync);
+        endpoints.MapPhotoPresentationPreferenceEndpoints();
         return endpoints;
     }
 
