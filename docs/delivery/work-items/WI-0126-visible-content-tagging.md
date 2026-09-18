@@ -5,7 +5,7 @@ milestone: M26
 status_source: ../status/work-items.yaml
 depends_on: [WI-0120, WI-0056]
 related_adrs: []
-affected_modules: [PhotoIdentity.Core, PhotoIdentity.Imaging.OpenCv, PhotoIdentity.Recognition.Onnx, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Core.Tests, PhotoIdentity.Persistence.Tests, docs]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Cli, PhotoIdentity.Imaging.OpenCv, PhotoIdentity.Recognition.Onnx, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Core.Tests, PhotoIdentity.Recognition.Tests, PhotoIdentity.Integration.Tests, docs]
 ---
 
 # WI-0126: Re-evaluate local visible-content tagging for Creative Collections
@@ -45,9 +45,18 @@ People/time metadata can produce useful stories, but whole-photo content such as
 
 Automated smoke tests for the experiment/integration contract plus maintainer review of privacy-safe aggregate findings and representative private Creative Collections.
 
+## Implementation status
+
+- The first slice is experiment-only and read-only. It adds a bounded CLIP zero-shot evaluator over existing durable review proxies and does not create automatic catalogue tags.
+- The checked-in vocabulary and prompt-template versions make the family-photo concepts inspectable; the evaluator additionally records SHA-256 hashes for the exact local model, tokenizer vocabulary, tokenizer merges and concept vocabulary.
+- Semantic diversity is opt-in through the experimental 'm26-visible-content-diversity-v1' selector input. Existing production selector overloads delegate with semantic diversity disabled, preserving prior behavior.
+- Review proxies are the default input. Opening source originals requires an explicit bounded '--compare-originals' count and is used only for proxy/original agreement measurement.
+- The evaluator emits aggregate concept/runtime/selection evidence and never reports private paths, filenames, collection names or revision ids.
+- A representative private run is still required before deciding whether the experiment justifies production automatic-tag evidence.
+
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: Core experimental semantic diversity scoring, local CLIP ONNX/tokenizer adapter, bounded family-photo concept vocabulary, PostgreSQL CLI evaluator, selector/tokenizer/CLI tests, operational evaluation guide and delivery status.
+- Trade-offs: no model weights are bundled; automatic evidence is not persisted before usefulness is demonstrated; semantic scoring is capped below established moment diversity and explicit Prefer.
+- Deferred work: maintainer private evaluation, proxy/original quality/runtime findings, and a go/no-go production integration decision.
+- Commands run: repository CI will provide build/test/documentation evidence; the model-dependent private experiment is intentionally operator-run because model assets and private photos are not part of CI.

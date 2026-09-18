@@ -18,6 +18,13 @@ public static class CreativeCollectionSelectionReasonCodes
     public const string NoveltyUnseen = "novelty-unseen";
     public const string NoveltyRecent = "novelty-recent";
     public const string NoveltyFrequency = "novelty-frequency";
+    public const string SemanticNewConcept = "semantic-new-concept";
+}
+
+public static class CreativeCollectionSemanticDiversityPolicies
+{
+    public const string Disabled = "disabled";
+    public const string BalancedV1 = "m26-visible-content-diversity-v1";
 }
 
 /// <summary>
@@ -166,6 +173,33 @@ public static class CreativeCollectionSelector
         bool noveltyEnabled,
         DateTimeOffset noveltyEvaluatedAtUtc,
         int targetCount,
+        CreativeCollectionSelectionPolicy policy) =>
+        Select(
+            candidates,
+            catalogue,
+            moments,
+            visualRedundancy,
+            presentationPreferences,
+            exposureHistory,
+            noveltyEnabled,
+            noveltyEvaluatedAtUtc,
+            semanticConcepts: null,
+            semanticDiversityEnabled: false,
+            targetCount,
+            policy);
+
+    public static CreativeCollectionSelectionResult Select(
+        CreativeCollectionCandidateSet candidates,
+        IEnumerable<PhotoMomentCandidate> catalogue,
+        PhotoMomentClusteringResult moments,
+        PhotoVisualRedundancyResult? visualRedundancy,
+        IReadOnlyDictionary<AssetRevisionId, string>? presentationPreferences,
+        IReadOnlyDictionary<AssetRevisionId, PhotoSlideshowExposureSummary>? exposureHistory,
+        bool noveltyEnabled,
+        DateTimeOffset noveltyEvaluatedAtUtc,
+        IReadOnlyDictionary<AssetRevisionId, IReadOnlyList<string>>? semanticConcepts,
+        bool semanticDiversityEnabled,
+        int targetCount,
         CreativeCollectionSelectionPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(candidates);
@@ -220,7 +254,8 @@ public static class CreativeCollectionSelector
                     momentByRevision.GetValueOrDefault(candidate.RevisionId),
                     visualGroupByRevision.GetValueOrDefault(candidate.RevisionId),
                     presentationPreferences?.GetValueOrDefault(candidate.RevisionId),
-                    exposureHistory?.GetValueOrDefault(candidate.RevisionId)));
+                    exposureHistory?.GetValueOrDefault(candidate.RevisionId),
+                    semanticConcepts?.GetValueOrDefault(candidate.RevisionId)));
         AssignTemporalBuckets(metadata.Values, policy.TemporalBucketCount);
 
         List<CreativeCollectionSelectedCandidate> selected = [];
@@ -229,6 +264,7 @@ public static class CreativeCollectionSelector
         Dictionary<int, int> temporalBucketCounts = [];
         Dictionary<string, int> peopleCombinationCounts = new(StringComparer.Ordinal);
         Dictionary<string, int> visualGroupCounts = new(StringComparer.Ordinal);
+        Dictionary<string, int> semanticConceptCounts = new(StringComparer.Ordinal);
 
         while (selected.Count < selectionCount)
         {
@@ -242,8 +278,10 @@ public static class CreativeCollectionSelector
                     temporalBucketCounts,
                     peopleCombinationCounts,
                     visualGroupCounts,
+                    semanticConceptCounts,
                     noveltyEnabled,
                     noveltyEvaluatedAtUtc,
+                    semanticDiversityEnabled,
                     policy))
                 .OrderByDescending(candidate => candidate.Score)
                 .ThenBy(candidate => candidate.Metadata.TakenAtLocal.HasValue ? 0 : 1)
@@ -259,6 +297,10 @@ public static class CreativeCollectionSelector
             }
             Increment(peopleCombinationCounts, next.Metadata.PeopleCombinationKey);
             Increment(visualGroupCounts, next.Metadata.VisualGroupId);
+            foreach (string concept in next.Metadata.SemanticConcepts)
+            {
+                semanticConceptCounts[concept] = semanticConceptCounts.GetValueOrDefault(concept) + 1;
+            }
 
             selected.Add(new CreativeCollectionSelectedCandidate(
                 next.Candidate,
@@ -274,8 +316,12 @@ public static class CreativeCollectionSelector
             .ThenBy(candidate => candidate.Candidate.RevisionId.ToString(), StringComparer.Ordinal)
             .ToArray();
 
+        string effectivePolicyVersion = semanticDiversityEnabled
+            ? $"{policy.Version}+{CreativeCollectionSemanticDiversityPolicies.BalancedV1}"
+            : policy.Version;
+
         return new CreativeCollectionSelectionResult(
-            policy.Version,
+            effectivePolicyVersion,
             targetCount,
             eligibleCandidates.Length,
             finalOrder.Count(candidate =>
@@ -291,7 +337,8 @@ public static class CreativeCollectionSelector
         string? momentId,
         string? visualGroupId,
         string? presentationPreference,
-        PhotoSlideshowExposureSummary? exposure)
+        PhotoSlideshowExposureSummary? exposure,
+        IReadOnlyList<string>? semanticConcepts)
     {
         string? peopleCombinationKey = source.PeopleKeys is null
             ? null
@@ -313,7 +360,8 @@ public static class CreativeCollectionSelector
             peopleCombinationKey,
             visualGroupId,
             presentationPreference,
-            exposure);
+            exposure,
+            NormalizeSemanticConcepts(semanticConcepts));
     }
 
     private static void AssignTemporalBuckets(
@@ -349,8 +397,10 @@ public static class CreativeCollectionSelector
         IReadOnlyDictionary<int, int> temporalBucketCounts,
         IReadOnlyDictionary<string, int> peopleCombinationCounts,
         IReadOnlyDictionary<string, int> visualGroupCounts,
+        IReadOnlyDictionary<string, int> semanticConceptCounts,
         bool noveltyEnabled,
         DateTimeOffset noveltyEvaluatedAtUtc,
+        bool semanticDiversityEnabled,
         CreativeCollectionSelectionPolicy policy)
     {
         List<CreativeCollectionSelectionReason> reasons = [];
@@ -483,6 +533,24 @@ public static class CreativeCollectionSelector
             }
         }
 
+        if (semanticDiversityEnabled && metadata.SemanticConcepts.Count > 0)
+        {
+            string[] unseen = metadata.SemanticConcepts
+                .Where(concept => semanticConceptCounts.GetValueOrDefault(concept) == 0)
+                .Take(2)
+                .ToArray();
+            if (unseen.Length > 0)
+            {
+                int bonus = unseen.Length * 25;
+                AddReason(
+                    reasons,
+                    CreativeCollectionSelectionReasonCodes.SemanticNewConcept,
+                    bonus,
+                    $"Adds visible-content concept coverage: {string.Join(", ", unseen)}.");
+                score += bonus;
+            }
+        }
+
         if (metadata.VisualGroupId is string visualGroupId)
         {
             int count = visualGroupCounts.GetValueOrDefault(visualGroupId);
@@ -511,6 +579,17 @@ public static class CreativeCollectionSelector
 
         return new ScoredCandidate(candidate, metadata, score, reasons);
     }
+
+    private static IReadOnlyList<string> NormalizeSemanticConcepts(
+        IReadOnlyList<string>? concepts) =>
+        concepts is null
+            ? []
+            : concepts
+                .Where(concept => !string.IsNullOrWhiteSpace(concept))
+                .Select(concept => concept.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(concept => concept, StringComparer.Ordinal)
+                .ToArray();
 
     private static Dictionary<AssetRevisionId, string> BuildVisualGroupMap(
         PhotoVisualRedundancyResult? visualRedundancy)
@@ -564,7 +643,8 @@ public static class CreativeCollectionSelector
             string? peopleCombinationKey,
             string? visualGroupId,
             string? presentationPreference,
-            PhotoSlideshowExposureSummary? exposure)
+            PhotoSlideshowExposureSummary? exposure,
+            IReadOnlyList<string> semanticConcepts)
         {
             TakenAtLocal = takenAtLocal;
             MomentId = momentId;
@@ -572,6 +652,7 @@ public static class CreativeCollectionSelector
             VisualGroupId = visualGroupId;
             PresentationPreference = presentationPreference;
             Exposure = exposure;
+            SemanticConcepts = semanticConcepts;
         }
 
         public DateTime? TakenAtLocal { get; }
@@ -580,6 +661,7 @@ public static class CreativeCollectionSelector
         public string? VisualGroupId { get; }
         public string? PresentationPreference { get; }
         public PhotoSlideshowExposureSummary? Exposure { get; }
+        public IReadOnlyList<string> SemanticConcepts { get; }
         public int? TemporalBucket { get; set; }
     }
 
