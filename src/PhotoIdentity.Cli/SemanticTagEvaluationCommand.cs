@@ -272,8 +272,8 @@ internal static class SemanticTagEvaluationCommandRunner
                 photo.RevisionId,
                 photo.TakenAtLocal,
                 photo.PeopleKeys,
-                photo.Latitude,
-                photo.Longitude))
+                Latitude: photo.Latitude,
+                Longitude: photo.Longitude))
             .ToArray();
         PhotoMomentGapPolicy momentPolicy =
             PhotoMomentGapPolicy.CreateTimeGapEvaluation(options.MomentGapMinutes);
