@@ -516,8 +516,8 @@ internal static class SemanticTagEvaluationCommandRunner
         Directory.CreateDirectory(outputDirectory);
         string baselineDirectory = Path.Combine(outputDirectory, "baseline");
         string semanticDirectory = Path.Combine(outputDirectory, "semantic");
-        ResetReviewDirectory(baselineDirectory);
-        ResetReviewDirectory(semanticDirectory);
+        Directory.CreateDirectory(baselineDirectory);
+        Directory.CreateDirectory(semanticDirectory);
 
         HashSet<AssetRevisionId> baselineIds = baseline.Selected
             .Select(item => item.Candidate.RevisionId)
@@ -660,16 +660,6 @@ internal static class SemanticTagEvaluationCommandRunner
         }
 
         html.AppendLine("</div></section>");
-    }
-
-    private static void ResetReviewDirectory(string path)
-    {
-        if (Directory.Exists(path))
-        {
-            Directory.Delete(path, recursive: true);
-        }
-
-        Directory.CreateDirectory(path);
     }
 
     private sealed record SemanticReviewCard(
