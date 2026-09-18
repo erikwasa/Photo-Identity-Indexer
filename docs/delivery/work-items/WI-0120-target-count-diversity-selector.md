@@ -50,8 +50,8 @@ The initial selector should be explainable and metadata-first. It does not need 
 - [x] Large candidate sets are reduced deterministically toward the target count.
 - [x] Selection gives explicit value to temporal and moment coverage and applies a documented diminishing-return penalty to repetitive near-consecutive material.
 - [x] Anchor/context provenance survives selection so the final result can report how many direct matches and contextual additions remain.
-- [ ] A private high-volume collection shows measurably broader temporal/moment coverage than simple first-N or uniform chronological truncation at the same target size.
-- [ ] A private burst/repetition-heavy collection contains fewer obviously repetitive selections than an uncurated candidate list at the same size.
+- [x] A private high-volume collection shows measurably broader temporal/moment coverage than simple first-N or uniform chronological truncation at the same target size.
+- [x] A private burst/repetition-heavy collection contains fewer obviously repetitive selections than an uncurated candidate list at the same size.
 - [x] The selector does not require location metadata and remains useful when all candidates lack GPS/place data.
 - [x] Same candidates, target and policy/version produce the same selected revision IDs and final order.
 - [x] The final immutable revision sequence can be materialized through the existing slideshow snapshot contract so playback receives fixed revision IDs instead of live selection state.
@@ -65,5 +65,6 @@ Automated tests are required for deterministic selection, target bounds, diversi
 
 - Files changed: `src/PhotoIdentity.Core/Collections/CreativeCollectionSelection.cs`, `src/PhotoIdentity.Core/Collections/ISmartCollectionQueryRepository.cs`, SQLite/PostgreSQL Smart Collection query repositories, `src/PhotoIdentity.Api/CreativeCollectionPreviewEndpoints.cs`, Core/integration tests, and `docs/operations/creative-collection-preview.md`.
 - Trade-offs: `m26-target-diversity-balanced-v1` deliberately uses inspectable metadata weights rather than image embeddings or aesthetic scoring. It rewards first coverage of moments, time-span buckets and identified-person combinations, gives direct anchors a relevance preference, permits context to survive when it adds diversity, and penalizes repeated moments/people combinations plus captures within two minutes of already selected photos. Final ordering remains chronological. Identified people are added only as internal query evidence; existing public Smart Collection page contracts remain unchanged.
-- Deferred work: private large/small/repetition-heavy evaluation remains pending and is intentionally batched with WI-0118/WI-0119 human verification. WI-0121 owns the user-facing Creative recipe/preview/launch surface rather than adding another slideshow menu option here.
-- Commands run: GitHub Actions validation on PR #357; local execution is not available from this session.
+- Maintainer verification: on the private high-volume sample, the chronological baseline covered 6 distinct days and 5 months with 40 adjacent pairs within two minutes, while Creative selected 50 covered 48 days and 22 months with zero adjacent pairs within two minutes, spanning 50 distinct inferred moments and 19 identified-person combinations. On a repetition-heavy 84-photo sample, selection reduced adjacent pairs within two minutes from 55 to 21 while selecting 50 photos across four inferred moments. A 14-photo sample remained 14 unique photos when the requested target was 50. A 50-photo Creative slideshow snapshot matched the preview selection exactly by revision ID and order.
+- Follow-on: WI-0121 owns the user-facing Creative recipe/preview/launch surface rather than adding another slideshow menu option here.
+- Commands run: GitHub Actions validation on PR #357, PostgreSQL materialization fix in PR #358, and maintainer private verification completed on 2026-09-18.
