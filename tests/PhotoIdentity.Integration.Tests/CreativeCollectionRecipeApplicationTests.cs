@@ -228,6 +228,122 @@ public sealed class CreativeCollectionRecipeApplicationTests
     }
 
     [Fact]
+    public async Task Slideshow_exposure_is_idempotent_and_novelty_changes_selection_without_changing_exact_membership()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            SqliteAssetCatalogueRepository catalogue = new(database);
+            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
+            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
+
+            CatalogueAssetRevision first = await CreateRevisionAsync(catalogue, directory, "history-1.jpg", '4');
+            CatalogueAssetRevision second = await CreateRevisionAsync(catalogue, directory, "history-2.jpg", '5');
+            CatalogueAssetRevision third = await CreateRevisionAsync(catalogue, directory, "history-3.jpg", '6');
+
+            foreach (CatalogueAssetRevision revision in new[] { first, second, third })
+            {
+                await tags.AddManualTagAsync(revision.Id, "Creative/Novelty", "test");
+            }
+
+            await SetTakenAtAsync(database, first.Id, new DateTime(2026, 7, 1, 10, 0, 0));
+            await SetTakenAtAsync(database, second.Id, new DateTime(2026, 8, 1, 10, 0, 0));
+            await SetTakenAtAsync(database, third.Id, new DateTime(2026, 9, 1, 10, 0, 0));
+
+            SmartCollectionDefinition saved = await definitions.CreateAsync(
+                "Novelty anchors",
+                new SmartCollectionFilter(tags: ["Creative/Novelty"]));
+
+            await using CreativeRecipeApiFactory factory = new(databasePath);
+            using HttpClient client = factory.CreateClient();
+
+            CreativeCollectionPreviewResponse baseline =
+                await client.GetFromJsonAsync<CreativeCollectionPreviewResponse>(
+                    $"/api/smart-collections/{saved.Id}/creative-preview?targetCount=1&momentGapMinutes=30&novelty=false")
+                ?? throw new InvalidOperationException();
+            string shownRevisionId = Assert.Single(baseline.SelectedCandidates).RevisionId;
+
+            Guid firstSession = Guid.NewGuid();
+            SlideshowExposureRequest firstRequest = new(
+                firstSession,
+                saved.Id.Value,
+                Creative: true,
+                shownRevisionId);
+
+            using HttpResponseMessage firstExposureResponse = await client.PostAsJsonAsync(
+                "/api/slideshows/exposures",
+                firstRequest);
+            firstExposureResponse.EnsureSuccessStatusCode();
+            SlideshowExposureResponse firstExposure =
+                await firstExposureResponse.Content.ReadFromJsonAsync<SlideshowExposureResponse>()
+                ?? throw new InvalidOperationException();
+            Assert.True(firstExposure.Recorded);
+            Assert.Equal(1, firstExposure.ShowCount);
+            Assert.NotNull(firstExposure.LastShownAtUtc);
+
+            using HttpResponseMessage duplicateResponse = await client.PostAsJsonAsync(
+                "/api/slideshows/exposures",
+                firstRequest);
+            duplicateResponse.EnsureSuccessStatusCode();
+            SlideshowExposureResponse duplicate =
+                await duplicateResponse.Content.ReadFromJsonAsync<SlideshowExposureResponse>()
+                ?? throw new InvalidOperationException();
+            Assert.False(duplicate.Recorded);
+            Assert.Equal(1, duplicate.ShowCount);
+
+            using HttpResponseMessage laterSessionResponse = await client.PostAsJsonAsync(
+                "/api/slideshows/exposures",
+                firstRequest with { SessionId = Guid.NewGuid() });
+            laterSessionResponse.EnsureSuccessStatusCode();
+            SlideshowExposureResponse laterSession =
+                await laterSessionResponse.Content.ReadFromJsonAsync<SlideshowExposureResponse>()
+                ?? throw new InvalidOperationException();
+            Assert.True(laterSession.Recorded);
+            Assert.Equal(2, laterSession.ShowCount);
+
+            CreativeCollectionPreviewResponse historyDisabled =
+                await client.GetFromJsonAsync<CreativeCollectionPreviewResponse>(
+                    $"/api/smart-collections/{saved.Id}/creative-preview?targetCount=1&momentGapMinutes=30&novelty=false")
+                ?? throw new InvalidOperationException();
+            Assert.False(historyDisabled.NoveltyEnabled);
+            Assert.Equal(
+                shownRevisionId,
+                Assert.Single(historyDisabled.SelectedCandidates).RevisionId);
+
+            CreativeCollectionPreviewResponse noveltyEnabled =
+                await client.GetFromJsonAsync<CreativeCollectionPreviewResponse>(
+                    $"/api/smart-collections/{saved.Id}/creative-preview?targetCount=1&momentGapMinutes=30&novelty=true")
+                ?? throw new InvalidOperationException();
+            Assert.True(noveltyEnabled.NoveltyEnabled);
+            Assert.Equal(CreativeCollectionNoveltyPolicies.BalancedV1, noveltyEnabled.NoveltyPolicyVersion);
+            CreativeCollectionSelectedCandidateResponse fresh =
+                Assert.Single(noveltyEnabled.SelectedCandidates);
+            Assert.NotEqual(shownRevisionId, fresh.RevisionId);
+            Assert.Equal(0, fresh.ShowCount);
+            Assert.Contains(
+                fresh.SelectionReasons,
+                reason => reason.Code == CreativeCollectionSelectionReasonCodes.NoveltyUnseen);
+
+            CreativeCollectionPreviewCandidateResponse shown =
+                noveltyEnabled.Candidates.Single(candidate => candidate.RevisionId == shownRevisionId);
+            Assert.Equal(2, shown.ShowCount);
+            Assert.NotNull(shown.LastShownAtUtc);
+
+            SqliteSmartCollectionQueryRepository query = new(database);
+            SmartCollectionPhotoPage exact = await query.QueryAsync(saved.Filter);
+            Assert.Equal(3, exact.Total);
+            Assert.Contains(exact.Items, item => item.RevisionId.ToString() == shownRevisionId);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Saved_recipe_keeps_zero_anchor_collection_empty()
     {
         string directory = CreateTemporaryDirectory();
