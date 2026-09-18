@@ -63,6 +63,9 @@ public sealed record PhotoVisualRedundancyPolicy
     public static PhotoVisualRedundancyPolicy BroadEvaluationV1 { get; } =
         new("m26-dhash64-h8-20s-v1", 8, TimeSpan.FromSeconds(20));
 
+    public static PhotoVisualRedundancyPolicy AcceptedCreativeV1 { get; } =
+        BroadEvaluationV1;
+
     public static IReadOnlyList<PhotoVisualRedundancyPolicy> EvaluationPolicies { get; } =
     [
         StrictEvaluationV1,
