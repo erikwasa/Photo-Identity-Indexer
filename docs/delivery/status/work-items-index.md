@@ -21,7 +21,6 @@ Current work items: **33**. Archived terminal items: **122**.
 | [WI-0133](../work-items/WI-0133-burst-aware-slideshow-pacing.md) Add burst-aware compact pacing to slideshow playback | M27 | proposed | unassigned | [YAML](work-items/active/WI-0133.yaml) |
 | [WI-0137](../work-items/WI-0137-real-device-slideshow-polish-acceptance.md) Tune and verify the polished slideshow experience on real devices | M27 | proposed | unassigned | [YAML](work-items/active/WI-0137.yaml) |
 | [WI-0138](../work-items/WI-0138-coalesced-provisional-cluster-refresh.md) Coalesce provisional clustering refreshes during active face review | M25 | in_progress | ai-agent | [YAML](work-items/active/WI-0138.yaml) |
-
 | [WI-0139](../work-items/WI-0139-no-fullscreen-slideshow-fallback.md) Allow slideshow playback when browser fullscreen is unavailable | M27 | ready | unassigned | [YAML](work-items/active/WI-0139.yaml) |
 | [WI-0140](../work-items/WI-0140-searchable-place-picker.md) Replace long place dropdowns with a searchable place picker | M28 | ready | unassigned | [YAML](work-items/active/WI-0140.yaml) |
 | [WI-0141](../work-items/WI-0141-manual-capture-date-model.md) Add manual capture-date overrides with provenance and precision | M28 | ready | unassigned | [YAML](work-items/active/WI-0141.yaml) |
