@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "vocabularyVersion": "m26-family-visible-content-v1",
+  "promptTemplateVersion": "clip-family-photo-prompts-v1",
+  "concepts": [
+    { "id": "birthday", "prompt": "a family photo of a birthday celebration" },
+    { "id": "cake", "prompt": "a family photo with a cake" },
+    { "id": "meal", "prompt": "a family photo of food or a meal" },
+    { "id": "dog", "prompt": "a family photo with a dog" },
+    { "id": "cat", "prompt": "a family photo with a cat" },
+    { "id": "playground", "prompt": "a family photo at a playground" },
+    { "id": "snow", "prompt": "a family photo in snow" },
+    { "id": "beach", "prompt": "a family photo at a beach" },
+    { "id": "water-play", "prompt": "a family photo of swimming or water play" },
+    { "id": "sports", "prompt": "a family photo of sports" },
+    { "id": "vehicle", "prompt": "a family photo with a car or vehicle" },
+    { "id": "indoors", "prompt": "a family photo indoors" },
+    { "id": "outdoors", "prompt": "a family photo outdoors" },
+    { "id": "nature", "prompt": "a family photo in a forest or park" },
+    { "id": "baby", "prompt": "a family photo of a baby" },
+    { "id": "holiday", "prompt": "a family photo with holiday decorations" },
+    { "id": "school", "prompt": "a family photo at school" },
+    { "id": "wedding", "prompt": "a family photo at a wedding" }
+  ]
+}
