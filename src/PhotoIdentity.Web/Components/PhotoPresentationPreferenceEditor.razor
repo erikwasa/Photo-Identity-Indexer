@@ -27,13 +27,13 @@
             <button type="button"
                     class="@ButtonClass("prefer")"
                     disabled="@Busy"
-                    @onclick="() => SetAsync("prefer")">
+                    @onclick="SetPreferAsync">
                 Prefer
             </button>
             <button type="button"
                     class="@ButtonClass("avoid")"
                     disabled="@Busy"
-                    @onclick="() => SetAsync("avoid")">
+                    @onclick="SetAvoidAsync">
                 Avoid
             </button>
             @if (State?.Preference is not null)
@@ -112,6 +112,10 @@
             Loading = false;
         }
     }
+
+    private Task SetPreferAsync() => SetAsync("prefer");
+
+    private Task SetAvoidAsync() => SetAsync("avoid");
 
     private async Task SetAsync(string preference)
     {
