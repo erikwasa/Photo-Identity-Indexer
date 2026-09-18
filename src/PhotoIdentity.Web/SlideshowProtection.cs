@@ -160,6 +160,15 @@ public sealed class SlideshowProtectionState
     }
 }
 
+public enum SlideshowFullscreenState
+{
+    Inactive,
+    Active,
+    UnsupportedFallback,
+    RequestRejected,
+    Lost,
+}
+
 public sealed record SlideshowBrowserFeatureStatus(
     bool Supported,
     bool Active,
@@ -181,9 +190,39 @@ public sealed record SlideshowBrowserProtectionStatus(
         false,
         null);
 
+    public SlideshowFullscreenState FullscreenState
+    {
+        get
+        {
+            if (Fullscreen.Active)
+            {
+                return SlideshowFullscreenState.Active;
+            }
+
+            return Fullscreen.Mode?.Trim().ToLowerInvariant() switch
+            {
+                "unsupported" => SlideshowFullscreenState.UnsupportedFallback,
+                "rejected" => SlideshowFullscreenState.RequestRejected,
+                "lost" => SlideshowFullscreenState.Lost,
+                "active" => SlideshowFullscreenState.Active,
+                _ when !Fullscreen.Supported => SlideshowFullscreenState.UnsupportedFallback,
+                _ when Fullscreen.Failed => SlideshowFullscreenState.RequestRejected,
+                _ => SlideshowFullscreenState.Inactive,
+            };
+        }
+    }
+
+    public bool PresentationActive =>
+        FullscreenState is SlideshowFullscreenState.Active or SlideshowFullscreenState.UnsupportedFallback;
+
     public IReadOnlyList<string> ParentWarnings()
     {
         List<string> warnings = [];
+
+        if (FullscreenState == SlideshowFullscreenState.UnsupportedFallback)
+        {
+            warnings.Add("This browser cannot enter slideshow fullscreen. The full-window fallback keeps application parent controls, but browser chrome and navigation remain available, so browser-level toddler protection is reduced.");
+        }
 
         if (!SecureContext)
         {
