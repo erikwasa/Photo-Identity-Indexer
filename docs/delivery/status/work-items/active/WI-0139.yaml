@@ -1,11 +1,15 @@
 id: WI-0139
 title: Allow slideshow playback when browser fullscreen is unavailable
 milestone: M27
-status: ready
-owner: unassigned
+status: in_progress
+owner: ai-agent
 document: ../work-items/WI-0139-no-fullscreen-slideshow-fallback.md
+started_at: 2026-09-19
+last_updated_at: 2026-09-19
+branch: agent/WI-0139-fullscreen-fallback
 blockers:
 - WI-0084
 - WI-0136
-blocker_notes: []
+blocker_notes:
+- Implementation and automated regression coverage are on the work branch; completion remains pending CI plus maintainer verification on the affected iPhone path and a desktop browser.
 evidence: []
