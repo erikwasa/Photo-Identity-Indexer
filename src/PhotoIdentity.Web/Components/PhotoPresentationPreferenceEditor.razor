@@ -55,9 +55,9 @@
         @if (State?.History.Count > 0)
         {
             <details class="photo-presentation-history">
-                <summary>Preference history (@State.History.Count)</summary>
+                <summary>Preference history (@State!.History.Count)</summary>
                 <ul>
-                    @foreach (PhotoPresentationPreferenceActionResponse action in State.History.Take(8))
+                    @foreach (PhotoPresentationPreferenceActionResponse action in State!.History.Take(8))
                     {
                         <li>
                             <strong>@ActionLabel(action)</strong>
