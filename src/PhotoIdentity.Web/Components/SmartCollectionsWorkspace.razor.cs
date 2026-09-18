@@ -48,6 +48,7 @@ public partial class SmartCollectionsWorkspace
     private CreativeCollectionPreviewResponse? CreativePreview { get; set; }
     private int CreativeTargetCount { get; set; } = 50;
     private string CreativeContextStrength { get; set; } = "balanced";
+    private bool CreativeNoveltyEnabled { get; set; }
     private string? EditingId { get; set; }
     private string? TransientPreviewKey { get; set; }
     private string Name { get; set; } = "";
@@ -84,12 +85,13 @@ public partial class SmartCollectionsWorkspace
         !string.Equals(
             CreativeRecipe.ContextStrength,
             CreativeContextStrength,
-            StringComparison.OrdinalIgnoreCase);
+            StringComparison.OrdinalIgnoreCase) ||
+        CreativeRecipe.NoveltyEnabled != CreativeNoveltyEnabled;
     private string CreativeRecipeStatus => CreativeRecipe is null
         ? "Not saved yet"
         : CreativeRecipeDirty
             ? "Unsaved recipe changes"
-            : $"Saved · {CreativeRecipe.TargetCount} photos · {CreativeRecipe.ContextStrength} context";
+            : $"Saved · {CreativeRecipe.TargetCount} photos · {CreativeRecipe.ContextStrength} context · freshness {(CreativeRecipe.NoveltyEnabled ? "on" : "off")}";
     private int FirstResult => Results is null || Results.Items.Length == 0 ? 0 : Results.Offset + 1;
     private int LastResult => Results is null ? 0 : Results.Offset + Results.Items.Length;
     private string CurrentWorkspaceReturnUrl => ActiveResultMode switch
@@ -339,6 +341,7 @@ public partial class SmartCollectionsWorkspace
         CreativePreview = null;
         CreativeTargetCount = 50;
         CreativeContextStrength = "balanced";
+        CreativeNoveltyEnabled = false;
     }
 
     private async Task LoadCreativeRecipeAsync()
@@ -359,6 +362,7 @@ public partial class SmartCollectionsWorkspace
                 CreativeRecipe = null;
                 CreativeTargetCount = 50;
                 CreativeContextStrength = "balanced";
+                CreativeNoveltyEnabled = false;
                 return;
             }
 
@@ -372,6 +376,8 @@ public partial class SmartCollectionsWorkspace
                 ?? throw new InvalidOperationException("The Creative Collection recipe response was empty.");
             CreativeTargetCount = CreativeRecipe.TargetCount;
             CreativeContextStrength = CreativeRecipe.ContextStrength;
+            CreativeNoveltyEnabled = CreativeRecipe.NoveltyEnabled;
+            CreativeNoveltyEnabled = CreativeRecipe.NoveltyEnabled;
         }
         catch (Exception exception)
         {
@@ -411,7 +417,7 @@ public partial class SmartCollectionsWorkspace
             string strength = Uri.EscapeDataString(CreativeContextStrength);
             using HttpResponseMessage response = await Http.GetAsync(
                 $"api/smart-collections/{EditingId}/creative-preview" +
-                $"?targetCount={CreativeTargetCount}&momentGapMinutes=30&contextStrength={strength}");
+                $"?targetCount={CreativeTargetCount}&momentGapMinutes=30&contextStrength={strength}&novelty={CreativeNoveltyEnabled.ToString().ToLowerInvariant()}");
             if (!response.IsSuccessStatusCode)
             {
                 Error = await ReadErrorAsync(response, "The Creative Collection preview could not be generated.");
@@ -442,7 +448,8 @@ public partial class SmartCollectionsWorkspace
         {
             CreativeCollectionRecipeRequest request = new(
                 CreativeTargetCount,
-                CreativeContextStrength);
+                CreativeContextStrength,
+                CreativeNoveltyEnabled);
             using HttpResponseMessage response = await Http.PutAsJsonAsync(
                 $"api/smart-collections/{EditingId}/creative-recipe",
                 request);
@@ -498,7 +505,7 @@ public partial class SmartCollectionsWorkspace
         string strength = Uri.EscapeDataString(CreativeContextStrength);
         using HttpResponseMessage response = await Http.GetAsync(
             $"api/smart-collections/{EditingId}/creative-preview" +
-            $"?targetCount={CreativeTargetCount}&momentGapMinutes=30&contextStrength={strength}");
+            $"?targetCount={CreativeTargetCount}&momentGapMinutes=30&contextStrength={strength}&novelty={CreativeNoveltyEnabled.ToString().ToLowerInvariant()}");
         if (!response.IsSuccessStatusCode)
         {
             Error = await ReadErrorAsync(response, "The Creative Collection preview could not be generated.");
@@ -566,6 +573,9 @@ public partial class SmartCollectionsWorkspace
                 "repeated-people-combination" => "repeated people",
                 "near-consecutive" => "nearby capture",
                 "presentation-prefer" => "preferred",
+                "novelty-unseen" => "not shown yet",
+                "novelty-recent" => "shown recently",
+                "novelty-frequency" => "shown often",
                 _ => reason.Code,
             })
             .Distinct(StringComparer.Ordinal)
@@ -574,6 +584,11 @@ public partial class SmartCollectionsWorkspace
 
         return labels.Length == 0 ? "selected by diversity policy" : string.Join(" · ", labels);
     }
+
+    private static string CreativeHistorySummary(CreativeCollectionSelectedCandidateResponse photo) =>
+        photo.ShowCount == 0
+            ? "Not shown in a recorded slideshow yet"
+            : $"Shown {photo.ShowCount} time{(photo.ShowCount == 1 ? "" : "s")} · last {photo.LastShownAtUtc?.ToLocalTime():yyyy-MM-dd}";
 
     private async Task PreviewAsync()
     {
