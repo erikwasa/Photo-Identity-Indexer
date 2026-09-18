@@ -234,9 +234,8 @@ public sealed class PostgresPhotoPresentationPreferenceRepository : IPhotoPresen
             NpgsqlDbType.Uuid,
             Guid.Parse(revisionId.ToString()));
         command.Parameters.AddWithValue("action_kind", actionKind);
-        command.Parameters.AddWithValue(
-            "preference_kind",
-            preference is null ? DBNull.Value : preference);
+        command.Parameters.Add("preference_kind", NpgsqlDbType.Text).Value =
+            preference is null ? DBNull.Value : preference;
         command.Parameters.AddWithValue("actor", actor);
         command.Parameters.AddWithValue("created_at_utc", createdAtUtc);
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -250,19 +249,24 @@ public sealed class PostgresPhotoPresentationPreferenceRepository : IPhotoPresen
     {
         await using NpgsqlCommand command = connection.CreateCommand();
         command.Transaction = transaction;
-        command.CommandText = """
-            SELECT COUNT(*)
-            FROM asset_revisions
-            WHERE id = @revision_id;
-            """;
+        command.CommandText = transaction is null
+            ? """
+              SELECT 1
+              FROM asset_revisions
+              WHERE id = @revision_id;
+              """
+            : """
+              SELECT 1
+              FROM asset_revisions
+              WHERE id = @revision_id
+              FOR UPDATE;
+              """;
         command.Parameters.AddWithValue(
             "revision_id",
             NpgsqlDbType.Uuid,
             Guid.Parse(revisionId.ToString()));
-        long count = Convert.ToInt64(
-            await command.ExecuteScalarAsync(cancellationToken),
-            System.Globalization.CultureInfo.InvariantCulture);
-        if (count == 0)
+        object? exists = await command.ExecuteScalarAsync(cancellationToken);
+        if (exists is null)
         {
             throw new KeyNotFoundException($"Asset revision '{revisionId}' was not found.");
         }
