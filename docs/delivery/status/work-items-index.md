@@ -11,8 +11,8 @@ Current work items: **12**. Archived terminal items: **125**.
 | [WI-0089](../work-items/WI-0089-source-copy-exclusion-boundary.md) Add durable source-copy exclusion and access enforcement | M23 | ready | unassigned | [YAML](work-items/active/WI-0089.yaml) |
 | [WI-0090](../work-items/WI-0090-exclusion-purge-service.md) Purge excluded photo data and derivatives safely | M23 | proposed | unassigned | [YAML](work-items/active/WI-0090.yaml) |
 | [WI-0091](../work-items/WI-0091-archive-lifecycle-review.md) Add archive lifecycle review and exclusion workflows | M23 | proposed | unassigned | [YAML](work-items/active/WI-0091.yaml) |
-| [WI-0125](../work-items/WI-0125-person-family-metadata.md) Add birth dates and family relationships for age-aware Creative Collections | M26 | ready | unassigned | [YAML](work-items/active/WI-0125.yaml) |
-| [WI-0126](../work-items/WI-0126-visible-content-tagging.md) Re-evaluate local visible-content tagging for Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0126.yaml) |
+| [WI-0125](../work-items/WI-0125-person-family-metadata.md) Add birth dates and family relationships for age-aware Creative Collections | M26 | blocked | unassigned | [YAML](work-items/active/WI-0125.yaml) |
+| [WI-0126](../work-items/WI-0126-visible-content-tagging.md) Re-evaluate local visible-content tagging for Creative Collections | M26 | ready | unassigned | [YAML](work-items/active/WI-0126.yaml) |
 | [WI-0127](../work-items/WI-0127-whole-image-embeddings.md) Evaluate whole-image embeddings for semantic Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0127.yaml) |
 | [WI-0128](../work-items/WI-0128-caption-narration-experiment.md) Evaluate local captions and story narration for Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0128.yaml) |
 | [WI-0132](../work-items/WI-0132-moment-aware-slideshow-transitions.md) Add moment-aware transition language to slideshow playback | M27 | proposed | unassigned | [YAML](work-items/active/WI-0132.yaml) |
