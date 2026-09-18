@@ -205,6 +205,101 @@ public sealed class PostgresSmartCollectionRepositoryTests
     }
 
     [Fact]
+    public async Task PresentationPreferenceRepository_RoundTripsAuditHistory_WhenLivePostgresIsConfigured()
+    {
+        string? adminConnectionString = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(adminConnectionString))
+        {
+            return;
+        }
+
+        string databaseName = $"photoidentity_presentation_preferences_{Guid.NewGuid():N}";
+        string quotedDatabaseName = QuoteIdentifier(databaseName);
+        NpgsqlConnectionStringBuilder adminBuilder = new(adminConnectionString)
+        {
+            Pooling = false,
+        };
+
+        await using NpgsqlConnection adminConnection = new(adminBuilder.ConnectionString);
+        await adminConnection.OpenAsync();
+        await using (NpgsqlCommand createDatabase = adminConnection.CreateCommand())
+        {
+            createDatabase.CommandText = $"CREATE DATABASE {quotedDatabaseName};";
+            await createDatabase.ExecuteNonQueryAsync();
+        }
+
+        try
+        {
+            NpgsqlConnectionStringBuilder testBuilder = new(adminConnectionString)
+            {
+                Database = databaseName,
+                Pooling = false,
+            };
+
+            await using PostgresCatalogueDatabase database = new(testBuilder.ConnectionString);
+            PostgresInitializationResult initialization = await database.TryInitializeAsync();
+            Assert.Null(initialization.Error);
+            Assert.Equal(PostgresCatalogueDatabase.CurrentSchemaVersion, initialization.Health.SchemaVersion);
+
+            AssetRevisionId revisionId = AssetRevisionId.New();
+            await SeedQueryRevisionAsync(
+                testBuilder.ConnectionString,
+                revisionId,
+                PersonId.New(),
+                sourceKey: "presentation/preference.jpg",
+                contentHash: new string('d', 64),
+                tag: "presentation/test",
+                place: "places/sweden/stockholm",
+                latitude: 59.3,
+                longitude: 18.0,
+                takenAtLocal: new DateTime(2026, 9, 18, 12, 0, 0, DateTimeKind.Unspecified));
+
+            PostgresPhotoPresentationPreferenceRepository repository =
+                new(database, TimeProvider.System);
+
+            PhotoPresentationPreferenceState preferred = await repository.SetAsync(
+                revisionId,
+                PhotoPresentationPreferenceKinds.Prefer,
+                "test");
+            Assert.Equal(PhotoPresentationPreferenceKinds.Prefer, preferred.Preference);
+            Assert.Single(preferred.History);
+
+            PhotoPresentationPreferenceState duplicate = await repository.SetAsync(
+                revisionId,
+                PhotoPresentationPreferenceKinds.Prefer,
+                "test");
+            Assert.Single(duplicate.History);
+
+            PhotoPresentationPreferenceState avoided = await repository.SetAsync(
+                revisionId,
+                PhotoPresentationPreferenceKinds.Avoid,
+                "test");
+            Assert.Equal(PhotoPresentationPreferenceKinds.Avoid, avoided.Preference);
+            Assert.Equal(2, avoided.History.Count);
+
+            IReadOnlyDictionary<AssetRevisionId, string> effective =
+                await repository.GetEffectiveAsync([revisionId]);
+            Assert.Equal(PhotoPresentationPreferenceKinds.Avoid, effective[revisionId]);
+
+            PhotoPresentationPreferenceState cleared = await repository.ClearAsync(
+                revisionId,
+                "test");
+            Assert.Null(cleared.Preference);
+            Assert.Equal(3, cleared.History.Count);
+            Assert.Equal(PhotoPresentationPreferenceActionKinds.Clear, cleared.History[0].ActionKind);
+            Assert.Empty(await repository.GetEffectiveAsync([revisionId]));
+        }
+        finally
+        {
+            await using NpgsqlCommand dropDatabase = adminConnection.CreateCommand();
+            dropDatabase.CommandText =
+                $"DROP DATABASE IF EXISTS {quotedDatabaseName} WITH (FORCE);";
+            await dropDatabase.ExecuteNonQueryAsync();
+        }
+    }
+
+    [Fact]
     public async Task QueryAndSnapshot_EvaluateCurrentCatalogue_WhenLivePostgresIsConfigured()
     {
         string? adminConnectionString = Environment.GetEnvironmentVariable(
