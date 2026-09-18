@@ -377,7 +377,6 @@ public partial class SmartCollectionsWorkspace
             CreativeTargetCount = CreativeRecipe.TargetCount;
             CreativeContextStrength = CreativeRecipe.ContextStrength;
             CreativeNoveltyEnabled = CreativeRecipe.NoveltyEnabled;
-            CreativeNoveltyEnabled = CreativeRecipe.NoveltyEnabled;
         }
         catch (Exception exception)
         {
@@ -463,6 +462,7 @@ public partial class SmartCollectionsWorkspace
                 ?? throw new InvalidOperationException("The saved Creative Collection recipe response was empty.");
             CreativeTargetCount = CreativeRecipe.TargetCount;
             CreativeContextStrength = CreativeRecipe.ContextStrength;
+            CreativeNoveltyEnabled = CreativeRecipe.NoveltyEnabled;
             if (showNotice)
             {
                 Notice = "Creative Collection recipe saved.";
@@ -585,10 +585,18 @@ public partial class SmartCollectionsWorkspace
         return labels.Length == 0 ? "selected by diversity policy" : string.Join(" · ", labels);
     }
 
-    private static string CreativeHistorySummary(CreativeCollectionSelectedCandidateResponse photo) =>
-        photo.ShowCount == 0
-            ? "Not shown in a recorded slideshow yet"
-            : $"Shown {photo.ShowCount} time{(photo.ShowCount == 1 ? "" : "s")} · last {photo.LastShownAtUtc?.ToLocalTime():yyyy-MM-dd}";
+    private static string CreativeHistorySummary(CreativeCollectionSelectedCandidateResponse photo)
+    {
+        if (photo.ShowCount == 0)
+        {
+            return "Not shown in a recorded slideshow yet";
+        }
+
+        string lastShown = photo.LastShownAtUtc is DateTimeOffset shown
+            ? shown.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            : "unknown";
+        return $"Shown {photo.ShowCount} time{(photo.ShowCount == 1 ? "" : "s")} · last {lastShown}";
+    }
 
     private async Task PreviewAsync()
     {
