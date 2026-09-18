@@ -31,6 +31,25 @@ public sealed class SlideshowLibraryAcceptanceTests
     }
 
     [Fact]
+    public async Task Library_launch_still_navigates_when_fullscreen_is_unavailable()
+    {
+        List<string> events = [];
+        RecordingJsRuntime js = new(events, fullscreenResult: false);
+        RecordingNavigationManager navigation = new(events);
+        string collectionId = Guid.NewGuid().ToString("D");
+
+        string? notice = await SlideshowLibraryLaunch.RequestFullscreenAndNavigateAsync(
+            js,
+            navigation,
+            collectionId,
+            "/slideshows");
+
+        Assert.Null(notice);
+        Assert.Equal(new[] { "fullscreen", "navigate" }, events);
+        Assert.NotNull(navigation.LastRelativeUri);
+    }
+
+    [Fact]
     public async Task Library_launch_still_navigates_when_fullscreen_is_rejected_by_interop()
     {
         List<string> events = [];
@@ -78,11 +97,16 @@ public sealed class SlideshowLibraryAcceptanceTests
     {
         private readonly List<string> _events;
         private readonly bool _throwOnFullscreen;
+        private readonly bool _fullscreenResult;
 
-        public RecordingJsRuntime(List<string> events, bool throwOnFullscreen = false)
+        public RecordingJsRuntime(
+            List<string> events,
+            bool throwOnFullscreen = false,
+            bool fullscreenResult = true)
         {
             _events = events;
             _throwOnFullscreen = throwOnFullscreen;
+            _fullscreenResult = fullscreenResult;
         }
 
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, object?[]? args)
@@ -93,7 +117,7 @@ public sealed class SlideshowLibraryAcceptanceTests
                 throw new JSException("Fullscreen rejected for test.");
             }
 
-            return ValueTask.FromResult((TValue)(object)true);
+            return ValueTask.FromResult((TValue)(object)_fullscreenResult);
         }
 
         public ValueTask<TValue> InvokeAsync<TValue>(
