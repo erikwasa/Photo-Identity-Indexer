@@ -83,7 +83,8 @@ public sealed record SmartCollectionErrorResponse(string Error);
 
 public sealed record CreativeCollectionRecipeRequest(
     int TargetCount = 50,
-    string ContextStrength = "balanced");
+    string ContextStrength = "balanced",
+    bool NoveltyEnabled = false);
 
 public sealed record CreativeCollectionRecipeResponse(
     string AnchorCollectionId,
@@ -95,6 +96,8 @@ public sealed record CreativeCollectionRecipeResponse(
     string ContextPolicyVersion,
     string SelectionPolicyVersion,
     string OrderingPolicyVersion,
+    bool NoveltyEnabled,
+    string NoveltyPolicyVersion,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc);
 
