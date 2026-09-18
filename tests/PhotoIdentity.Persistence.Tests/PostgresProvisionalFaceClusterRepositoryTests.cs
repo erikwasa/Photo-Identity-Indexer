@@ -123,7 +123,10 @@ public sealed class PostgresProvisionalFaceClusterRepositoryTests
                 now.AddMinutes(7));
             Assert.False(await afterRestart.EvidenceStillMatchesAsync(initialCompleted));
             ProvisionalFaceClusterRun refresh = Assert.IsType<ProvisionalFaceClusterRun>(
-                await afterRestart.TryStartNextRefreshAsync("cluster:auto", now.AddMinutes(8)));
+                await afterRestart.TryStartNextRefreshAsync(
+                    "cluster:auto",
+                    now.AddMinutes(8),
+                    TimeSpan.FromSeconds(30)));
             Assert.Equal(4, refresh.TargetCount);
             IReadOnlyList<ProvisionalFaceClusterInputFace> refreshedFaces =
                 await afterRestart.ReadInputSnapshotAsync(refresh);
@@ -170,6 +173,25 @@ public sealed class PostgresProvisionalFaceClusterRepositoryTests
                 now.AddMinutes(11));
             Assert.False(await afterRestart.EvidenceStillMatchesAsync(refreshCompleted));
             Assert.Equal(canonicalActionCount, await CountReviewActionsAsync(testBuilder.ConnectionString));
+
+            // Automatic replacement waits for a quiet period after canonical review churn. The
+            // timestamp comes from the durable review-mutation evidence version, so a repository
+            // restart cannot reset the debounce and trigger an immediate expensive rebuild.
+            Assert.Null(await afterRestart.TryStartNextRefreshAsync(
+                "cluster:auto",
+                now.AddMinutes(11).AddSeconds(20),
+                TimeSpan.FromSeconds(30)));
+            PostgresProvisionalFaceClusterRepository afterDebounceRestart = new(database);
+            Assert.Null(await afterDebounceRestart.TryStartNextRefreshAsync(
+                "cluster:auto",
+                now.AddMinutes(11).AddSeconds(29),
+                TimeSpan.FromSeconds(30)));
+            ProvisionalFaceClusterRun reviewRefresh = Assert.IsType<ProvisionalFaceClusterRun>(
+                await afterDebounceRestart.TryStartNextRefreshAsync(
+                    "cluster:auto",
+                    now.AddMinutes(11).AddSeconds(31),
+                    TimeSpan.FromSeconds(30)));
+            Assert.Equal(5, reviewRefresh.TargetCount);
         }
         finally
         {
