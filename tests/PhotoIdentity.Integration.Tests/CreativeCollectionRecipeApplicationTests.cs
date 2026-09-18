@@ -134,6 +134,100 @@ public sealed class CreativeCollectionRecipeApplicationTests
     }
 
     [Fact]
+    public async Task Presentation_preferences_change_creative_selection_without_changing_exact_membership()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            SqliteAssetCatalogueRepository catalogue = new(database);
+            SqlitePhotoTagRepository tags = new(database, TimeProvider.System);
+            SqliteSmartCollectionRepository definitions = new(database, TimeProvider.System);
+
+            CatalogueAssetRevision avoided = await CreateRevisionAsync(catalogue, directory, "avoid.jpg", '1');
+            CatalogueAssetRevision automatic = await CreateRevisionAsync(catalogue, directory, "automatic.jpg", '2');
+            CatalogueAssetRevision preferred = await CreateRevisionAsync(catalogue, directory, "prefer.jpg", '3');
+
+            foreach (CatalogueAssetRevision revision in new[] { avoided, automatic, preferred })
+            {
+                await tags.AddManualTagAsync(revision.Id, "Creative/Preferences", "test");
+            }
+
+            await SetTakenAtAsync(database, avoided.Id, new DateTime(2026, 3, 1, 10, 0, 0));
+            await SetTakenAtAsync(database, automatic.Id, new DateTime(2026, 4, 1, 10, 0, 0));
+            await SetTakenAtAsync(database, preferred.Id, new DateTime(2026, 5, 1, 10, 0, 0));
+
+            SmartCollectionDefinition saved = await definitions.CreateAsync(
+                "Preference anchors",
+                new SmartCollectionFilter(tags: ["Creative/Preferences"]));
+
+            await using CreativeRecipeApiFactory factory = new(databasePath);
+            using HttpClient client = factory.CreateClient();
+
+            using HttpResponseMessage avoidResponse = await client.PutAsJsonAsync(
+                $"/api/collections/photos/{avoided.Id}/presentation-preference",
+                new PhotoPresentationPreferenceMutationRequest("avoid"));
+            avoidResponse.EnsureSuccessStatusCode();
+
+            using HttpResponseMessage preferResponse = await client.PutAsJsonAsync(
+                $"/api/collections/photos/{preferred.Id}/presentation-preference",
+                new PhotoPresentationPreferenceMutationRequest("prefer"));
+            preferResponse.EnsureSuccessStatusCode();
+
+            CreativeCollectionPreviewResponse preview =
+                await client.GetFromJsonAsync<CreativeCollectionPreviewResponse>(
+                    $"/api/smart-collections/{saved.Id}/creative-preview?targetCount=2&momentGapMinutes=30")
+                ?? throw new InvalidOperationException();
+
+            Assert.Equal(3, preview.DirectAnchorCount);
+            Assert.Equal(2, preview.SelectedCount);
+            Assert.DoesNotContain(
+                preview.SelectedCandidates,
+                item => item.RevisionId == avoided.Id.ToString());
+            Assert.Contains(
+                preview.SelectedCandidates,
+                item => item.RevisionId == preferred.Id.ToString());
+            CreativeCollectionSelectedCandidateResponse preferredSelected =
+                preview.SelectedCandidates.Single(item => item.RevisionId == preferred.Id.ToString());
+            Assert.Contains(
+                preferredSelected.SelectionReasons,
+                reason => reason.Code == CreativeCollectionSelectionReasonCodes.PresentationPrefer);
+
+            SqliteSmartCollectionQueryRepository query = new(database);
+            SmartCollectionPhotoPage exact = await query.QueryAsync(saved.Filter);
+            Assert.Equal(3, exact.Total);
+            Assert.Contains(exact.Items, item => item.RevisionId == avoided.Id);
+
+            using HttpResponseMessage clearResponse = await client.DeleteAsync(
+                $"/api/collections/photos/{avoided.Id}/presentation-preference");
+            clearResponse.EnsureSuccessStatusCode();
+            PhotoPresentationPreferenceResponse cleared =
+                await clearResponse.Content.ReadFromJsonAsync<PhotoPresentationPreferenceResponse>()
+                ?? throw new InvalidOperationException();
+
+            Assert.Null(cleared.Preference);
+            Assert.Equal(2, cleared.History.Count);
+            Assert.Equal("clear", cleared.History[0].ActionKind);
+            Assert.Equal("avoid", cleared.History[1].Preference);
+
+            CreativeCollectionPreviewResponse restored =
+                await client.GetFromJsonAsync<CreativeCollectionPreviewResponse>(
+                    $"/api/smart-collections/{saved.Id}/creative-preview?targetCount=3&momentGapMinutes=30")
+                ?? throw new InvalidOperationException();
+            Assert.Equal(3, restored.SelectedCount);
+            Assert.Contains(
+                restored.SelectedCandidates,
+                item => item.RevisionId == avoided.Id.ToString());
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Saved_recipe_keeps_zero_anchor_collection_empty()
     {
         string directory = CreateTemporaryDirectory();
