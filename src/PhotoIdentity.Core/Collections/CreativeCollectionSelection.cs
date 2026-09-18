@@ -14,6 +14,7 @@ public static class CreativeCollectionSelectionReasonCodes
     public const string RepeatedPeopleCombination = "repeated-people-combination";
     public const string NearConsecutive = "near-consecutive";
     public const string VisualRedundancy = "visual-redundancy";
+    public const string PresentationPrefer = "presentation-prefer";
 }
 
 /// <summary>
@@ -106,6 +107,7 @@ public static class CreativeCollectionSelector
             catalogue,
             moments,
             visualRedundancy: null,
+            presentationPreferences: null,
             targetCount,
             policy);
 
@@ -114,6 +116,23 @@ public static class CreativeCollectionSelector
         IEnumerable<PhotoMomentCandidate> catalogue,
         PhotoMomentClusteringResult moments,
         PhotoVisualRedundancyResult? visualRedundancy,
+        int targetCount,
+        CreativeCollectionSelectionPolicy policy) =>
+        Select(
+            candidates,
+            catalogue,
+            moments,
+            visualRedundancy,
+            presentationPreferences: null,
+            targetCount,
+            policy);
+
+    public static CreativeCollectionSelectionResult Select(
+        CreativeCollectionCandidateSet candidates,
+        IEnumerable<PhotoMomentCandidate> catalogue,
+        PhotoMomentClusteringResult moments,
+        PhotoVisualRedundancyResult? visualRedundancy,
+        IReadOnlyDictionary<AssetRevisionId, string>? presentationPreferences,
         int targetCount,
         CreativeCollectionSelectionPolicy policy)
     {
@@ -140,7 +159,15 @@ public static class CreativeCollectionSelector
             }
         }
 
-        int selectionCount = Math.Min(targetCount, candidates.Candidates.Count);
+        CreativeCollectionCandidate[] eligibleCandidates = candidates.Candidates
+            .Where(candidate =>
+                !string.Equals(
+                    presentationPreferences?.GetValueOrDefault(candidate.RevisionId),
+                    PhotoPresentationPreferenceKinds.Avoid,
+                    StringComparison.Ordinal))
+            .ToArray();
+
+        int selectionCount = Math.Min(targetCount, eligibleCandidates.Length);
         if (selectionCount == 0)
         {
             return new CreativeCollectionSelectionResult(
@@ -152,14 +179,15 @@ public static class CreativeCollectionSelector
                 []);
         }
 
-        Dictionary<AssetRevisionId, SelectionMetadata> metadata = candidates.Candidates
+        Dictionary<AssetRevisionId, SelectionMetadata> metadata = eligibleCandidates
             .ToDictionary(
                 candidate => candidate.RevisionId,
                 candidate => CreateMetadata(
                     candidate,
                     catalogueByRevision[candidate.RevisionId],
                     momentByRevision.GetValueOrDefault(candidate.RevisionId),
-                    visualGroupByRevision.GetValueOrDefault(candidate.RevisionId)));
+                    visualGroupByRevision.GetValueOrDefault(candidate.RevisionId),
+                    presentationPreferences?.GetValueOrDefault(candidate.RevisionId)));
         AssignTemporalBuckets(metadata.Values, policy.TemporalBucketCount);
 
         List<CreativeCollectionSelectedCandidate> selected = [];
@@ -171,7 +199,7 @@ public static class CreativeCollectionSelector
 
         while (selected.Count < selectionCount)
         {
-            ScoredCandidate next = candidates.Candidates
+            ScoredCandidate next = eligibleCandidates
                 .Where(candidate => !selectedIds.Contains(candidate.RevisionId))
                 .Select(candidate => Score(
                     candidate,
@@ -214,7 +242,7 @@ public static class CreativeCollectionSelector
         return new CreativeCollectionSelectionResult(
             policy.Version,
             targetCount,
-            candidates.Candidates.Count,
+            eligibleCandidates.Length,
             finalOrder.Count(candidate =>
                 candidate.Candidate.Kind == CreativeCollectionCandidateKinds.DirectAnchor),
             finalOrder.Count(candidate =>
@@ -226,7 +254,8 @@ public static class CreativeCollectionSelector
         CreativeCollectionCandidate candidate,
         PhotoMomentCandidate source,
         string? momentId,
-        string? visualGroupId)
+        string? visualGroupId,
+        string? presentationPreference)
     {
         string? peopleCombinationKey = source.PeopleKeys is null
             ? null
@@ -246,7 +275,8 @@ public static class CreativeCollectionSelector
             candidate.TakenAtLocal,
             momentId,
             peopleCombinationKey,
-            visualGroupId);
+            visualGroupId,
+            presentationPreference);
     }
 
     private static void AssignTemporalBuckets(
@@ -298,6 +328,19 @@ public static class CreativeCollectionSelector
             AddReason(reasons, CreativeCollectionSelectionReasonCodes.ContextView, 15,
                 "Context photos receive a smaller base value so distinct contextual views can survive selection.");
             score += 15;
+        }
+
+        if (string.Equals(
+                metadata.PresentationPreference,
+                PhotoPresentationPreferenceKinds.Prefer,
+                StringComparison.Ordinal))
+        {
+            AddReason(
+                reasons,
+                CreativeCollectionSelectionReasonCodes.PresentationPrefer,
+                220,
+                "Explicit presentation preference increases this eligible photo's priority.");
+            score += 220;
         }
 
         if (metadata.MomentId is string momentId)
@@ -433,18 +476,21 @@ public static class CreativeCollectionSelector
             DateTime? takenAtLocal,
             string? momentId,
             string? peopleCombinationKey,
-            string? visualGroupId)
+            string? visualGroupId,
+            string? presentationPreference)
         {
             TakenAtLocal = takenAtLocal;
             MomentId = momentId;
             PeopleCombinationKey = peopleCombinationKey;
             VisualGroupId = visualGroupId;
+            PresentationPreference = presentationPreference;
         }
 
         public DateTime? TakenAtLocal { get; }
         public string? MomentId { get; }
         public string? PeopleCombinationKey { get; }
         public string? VisualGroupId { get; }
+        public string? PresentationPreference { get; }
         public int? TemporalBucket { get; set; }
     }
 

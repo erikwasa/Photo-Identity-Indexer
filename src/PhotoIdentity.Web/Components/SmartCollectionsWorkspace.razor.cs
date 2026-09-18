@@ -565,6 +565,7 @@ public partial class SmartCollectionsWorkspace
                 "repeated-temporal-bucket" => "represented period",
                 "repeated-people-combination" => "repeated people",
                 "near-consecutive" => "nearby capture",
+                "presentation-prefer" => "preferred",
                 _ => reason.Code,
             })
             .Distinct(StringComparer.Ordinal)

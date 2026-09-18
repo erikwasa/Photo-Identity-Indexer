@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 17;
+    public const int CurrentSchemaVersion = 18;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -797,6 +797,28 @@ public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
         PRAGMA user_version = 17;
         """;
 
+    private const string VersionEighteenMigration = """
+        CREATE TABLE IF NOT EXISTS photo_presentation_preference_actions (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            asset_revision_id TEXT NOT NULL,
+            action_kind TEXT NOT NULL CHECK (action_kind IN ('set', 'clear')),
+            preference_kind TEXT NULL,
+            actor TEXT NOT NULL CHECK (length(trim(actor)) > 0),
+            created_at_utc TEXT NOT NULL,
+            FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+            CHECK (
+                (action_kind = 'set' AND preference_kind IN ('prefer', 'avoid'))
+                OR (action_kind = 'clear' AND preference_kind IS NULL))
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_photo_presentation_preference_actions_revision
+            ON photo_presentation_preference_actions (asset_revision_id, id DESC);
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (18, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 18;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -935,6 +957,12 @@ public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
         if (version < 17)
         {
             await ApplyMigrationAsync(connection, VersionSeventeenMigration, cancellationToken);
+            version = 17;
+        }
+
+        if (version < 18)
+        {
+            await ApplyMigrationAsync(connection, VersionEighteenMigration, cancellationToken);
         }
     }
 

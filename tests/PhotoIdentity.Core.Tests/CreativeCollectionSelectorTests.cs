@@ -210,6 +210,77 @@ public sealed class CreativeCollectionSelectorTests
     }
 
     [Fact]
+    public void Prefer_increases_priority_for_an_otherwise_eligible_photo()
+    {
+        PhotoMomentCandidate[] catalogue =
+        [
+            Candidate(1, new DateTime(2026, 5, 4, 10, 0, 0)),
+            Candidate(2, new DateTime(2026, 5, 4, 12, 0, 0)),
+            Candidate(3, new DateTime(2026, 5, 4, 14, 0, 0)),
+        ];
+        (CreativeCollectionCandidateSet generated, PhotoMomentClusteringResult moments) =
+            GenerateAllAnchors(catalogue);
+
+        CreativeCollectionSelectionResult automatic = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            presentationPreferences: null,
+            targetCount: 1,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+        CreativeCollectionSelectionResult preferred = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            new Dictionary<AssetRevisionId, string>
+            {
+                [Revision(3)] = PhotoPresentationPreferenceKinds.Prefer,
+            },
+            targetCount: 1,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+
+        Assert.Equal(Revision(1), Assert.Single(automatic.Selected).Candidate.RevisionId);
+        CreativeCollectionSelectedCandidate selected = Assert.Single(preferred.Selected);
+        Assert.Equal(Revision(3), selected.Candidate.RevisionId);
+        Assert.Contains(selected.Reasons, reason =>
+            reason.Code == CreativeCollectionSelectionReasonCodes.PresentationPrefer &&
+            reason.ScoreDelta > 0);
+    }
+
+    [Fact]
+    public void Avoid_is_a_hard_presentation_exclusion_even_for_direct_anchors()
+    {
+        PhotoMomentCandidate[] catalogue =
+        [
+            Candidate(1, new DateTime(2026, 5, 5, 10, 0, 0)),
+            Candidate(2, new DateTime(2026, 5, 5, 12, 0, 0)),
+            Candidate(3, new DateTime(2026, 5, 5, 14, 0, 0)),
+        ];
+        (CreativeCollectionCandidateSet generated, PhotoMomentClusteringResult moments) =
+            GenerateAllAnchors(catalogue);
+
+        CreativeCollectionSelectionResult result = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            new Dictionary<AssetRevisionId, string>
+            {
+                [Revision(2)] = PhotoPresentationPreferenceKinds.Avoid,
+            },
+            targetCount: 10,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+
+        Assert.Equal(2, result.AvailableCandidateCount);
+        Assert.Equal(2, result.SelectedCount);
+        Assert.DoesNotContain(result.Selected, item => item.Candidate.RevisionId == Revision(2));
+        Assert.Contains(result.Selected, item => item.Candidate.RevisionId == Revision(1));
+        Assert.Contains(result.Selected, item => item.Candidate.RevisionId == Revision(3));
+    }
+
+    [Fact]
     public void Same_inputs_target_and_policy_are_deterministic_under_candidate_reordering()
     {
         PhotoMomentCandidate[] catalogue = Enumerable.Range(1, 8)

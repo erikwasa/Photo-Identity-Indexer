@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 24;
+    public const int CurrentSchemaVersion = 25;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1110,6 +1110,25 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
                     FOREIGN KEY (anchor_collection_id)
                     REFERENCES smart_collections (id) ON DELETE CASCADE
             );
+            """),
+        new(25, "photo-presentation-preferences", """
+            CREATE TABLE IF NOT EXISTS photo_presentation_preference_actions (
+                id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                asset_revision_id uuid NOT NULL,
+                action_kind text NOT NULL CHECK (action_kind IN ('set', 'clear')),
+                preference_kind text NULL,
+                actor text NOT NULL CHECK (btrim(actor) <> ''),
+                created_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT fk_photo_presentation_preference_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                CHECK (
+                    (action_kind = 'set' AND preference_kind IN ('prefer', 'avoid'))
+                    OR (action_kind = 'clear' AND preference_kind IS NULL))
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_photo_presentation_preference_actions_revision
+                ON photo_presentation_preference_actions (asset_revision_id, id DESC);
             """),
     ];
 

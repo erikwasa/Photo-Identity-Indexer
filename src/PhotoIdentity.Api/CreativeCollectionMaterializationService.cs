@@ -17,18 +17,22 @@ public sealed class CreativeCollectionMaterializationService
     private readonly ISmartCollectionRepository _definitions;
     private readonly ISmartCollectionQueryRepository _query;
     private readonly CollectionReviewProxyFileResolver _proxyResolver;
+    private readonly IPhotoPresentationPreferenceRepository _presentationPreferences;
 
     public CreativeCollectionMaterializationService(
         ISmartCollectionRepository definitions,
         ISmartCollectionQueryRepository query,
-        CollectionReviewProxyFileResolver proxyResolver)
+        CollectionReviewProxyFileResolver proxyResolver,
+        IPhotoPresentationPreferenceRepository presentationPreferences)
     {
         ArgumentNullException.ThrowIfNull(definitions);
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(proxyResolver);
+        ArgumentNullException.ThrowIfNull(presentationPreferences);
         _definitions = definitions;
         _query = query;
         _proxyResolver = proxyResolver;
+        _presentationPreferences = presentationPreferences;
     }
 
     public async Task<CreativeCollectionMaterialization?> MaterializeAsync(
@@ -104,11 +108,16 @@ public sealed class CreativeCollectionMaterializationService
                 generated.Candidates,
                 moments,
                 cancellationToken);
+        IReadOnlyDictionary<AssetRevisionId, string> presentationPreferences =
+            await _presentationPreferences.GetEffectiveAsync(
+                generated.Candidates.Select(candidate => candidate.RevisionId),
+                cancellationToken);
         CreativeCollectionSelectionResult selection = CreativeCollectionSelector.Select(
             generated,
             momentCandidates,
             moments,
             visualRedundancy,
+            presentationPreferences,
             settings.TargetCount,
             CreativeCollectionSelectionPolicy.BalancedV1);
 
