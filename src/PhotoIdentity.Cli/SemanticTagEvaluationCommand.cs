@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Collections;
@@ -26,7 +27,8 @@ internal sealed record SemanticTagEvaluationCommandOptions(
     int MaximumCandidates,
     int ConceptsPerPhoto,
     int OriginalComparisonCount,
-    string? ReportPath)
+    string? ReportPath,
+    string? ReviewOutputDirectory)
 {
     public static SemanticTagEvaluationCommandOptions Parse(string[] args)
     {
@@ -39,6 +41,7 @@ internal sealed record SemanticTagEvaluationCommandOptions(
         string? tokenizerMerges = null;
         string? concepts = null;
         string? report = null;
+        string? reviewOutput = null;
         int targetCount = 50;
         int momentGapMinutes = 30;
         int maximumCandidates = 200;
@@ -104,6 +107,9 @@ internal sealed record SemanticTagEvaluationCommandOptions(
                 case "--report":
                     report = Single(report, value, option);
                     break;
+                case "--review-output":
+                    reviewOutput = Single(reviewOutput, value, option);
+                    break;
                 default:
                     throw new ArgumentException($"Unknown semantic-tags option '{option}'.");
             }
@@ -159,7 +165,8 @@ internal sealed record SemanticTagEvaluationCommandOptions(
             maximumCandidates,
             conceptsPerPhoto,
             originalComparisonCount,
-            report is null ? null : Path.GetFullPath(report));
+            report is null ? null : Path.GetFullPath(report),
+            reviewOutput is null ? null : Path.GetFullPath(reviewOutput));
     }
 
     private static string Single(string? current, string value, string option)
@@ -466,6 +473,19 @@ internal static class SemanticTagEvaluationCommandRunner
             output.WriteLine($"report: {Path.GetFileName(reportPath)}");
         }
 
+        if (options.ReviewOutputDirectory is string reviewOutputDirectory)
+        {
+            string reviewIndex = await WriteReviewOutputAsync(
+                reviewOutputDirectory,
+                options.ProxyRoot,
+                proxies,
+                baseline,
+                semantic,
+                semanticConcepts,
+                cancellationToken);
+            output.WriteLine($"review-output: {reviewIndex}");
+        }
+
         output.WriteLine($"experiment-version: {ExperimentVersion}");
         output.WriteLine($"vocabulary-version: {vocabulary.VocabularyVersion}");
         output.WriteLine($"candidate-count: {generated.TotalCandidateCount}");
@@ -483,6 +503,181 @@ internal static class SemanticTagEvaluationCommandRunner
         output.WriteLine("catalogue-writes: 0");
         return 0;
     }
+
+    private static async Task<string> WriteReviewOutputAsync(
+        string outputDirectory,
+        string proxyRoot,
+        IReadOnlyDictionary<AssetRevisionId, ArchiveReviewProxyMetadata> proxies,
+        CreativeCollectionSelectionResult baseline,
+        CreativeCollectionSelectionResult semantic,
+        IReadOnlyDictionary<AssetRevisionId, IReadOnlyList<string>> concepts,
+        CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(outputDirectory);
+        string baselineDirectory = Path.Combine(outputDirectory, "baseline");
+        string semanticDirectory = Path.Combine(outputDirectory, "semantic");
+        ResetReviewDirectory(baselineDirectory);
+        ResetReviewDirectory(semanticDirectory);
+
+        HashSet<AssetRevisionId> baselineIds = baseline.Selected
+            .Select(item => item.Candidate.RevisionId)
+            .ToHashSet();
+        HashSet<AssetRevisionId> semanticIds = semantic.Selected
+            .Select(item => item.Candidate.RevisionId)
+            .ToHashSet();
+
+        IReadOnlyList<SemanticReviewCard> baselineCards = CopyReviewSelection(
+            outputDirectory,
+            baselineDirectory,
+            proxyRoot,
+            proxies,
+            baseline,
+            semanticIds,
+            concepts,
+            "baseline-only",
+            cancellationToken);
+        IReadOnlyList<SemanticReviewCard> semanticCards = CopyReviewSelection(
+            outputDirectory,
+            semanticDirectory,
+            proxyRoot,
+            proxies,
+            semantic,
+            baselineIds,
+            concepts,
+            "semantic-replacement",
+            cancellationToken);
+
+        int sharedCount = baselineIds.Intersect(semanticIds).Count();
+        int replacementCount = semanticIds.Except(baselineIds).Count();
+        StringBuilder html = new();
+        html.AppendLine("<!doctype html>");
+        html.AppendLine("<html lang=\"en\"><head><meta charset=\"utf-8\">");
+        html.AppendLine("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
+        html.AppendLine("<title>WI-0126 Creative Collection comparison</title>");
+        html.AppendLine("<style>");
+        html.AppendLine("body{font-family:system-ui,sans-serif;margin:24px;background:#f5f5f5;color:#111}h1,h2{margin:.2em 0}.notice{max-width:1000px}.columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:start}.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}.card{background:white;border:1px solid #ccc;border-radius:8px;overflow:hidden}.card img{width:100%;aspect-ratio:4/3;object-fit:contain;background:#222}.meta{padding:8px;font-size:.9rem}.status{font-weight:600}.concepts{color:#444;margin-top:4px}@media(max-width:900px){.columns{grid-template-columns:1fr}}</style>");
+        html.AppendLine("</head><body>");
+        html.AppendLine("<h1>WI-0126 Creative Collection comparison</h1>");
+        html.Append("<p class=\"notice\">Private local review artifact. ")
+            .Append("Baseline selected ").Append(baseline.SelectedCount)
+            .Append(", semantic selected ").Append(semantic.SelectedCount)
+            .Append(", shared ").Append(sharedCount)
+            .Append(", semantic replacements ").Append(replacementCount)
+            .AppendLine(". No originals are copied here.</p>");
+        html.AppendLine("<div class=\"columns\">");
+        AppendReviewColumn(html, "Metadata-only baseline", baselineCards);
+        AppendReviewColumn(html, "Semantic diversity", semanticCards);
+        html.AppendLine("</div></body></html>");
+
+        string indexPath = Path.Combine(outputDirectory, "index.html");
+        await File.WriteAllTextAsync(indexPath, html.ToString(), cancellationToken);
+        return indexPath;
+    }
+
+    private static IReadOnlyList<SemanticReviewCard> CopyReviewSelection(
+        string outputDirectory,
+        string selectionDirectory,
+        string proxyRoot,
+        IReadOnlyDictionary<AssetRevisionId, ArchiveReviewProxyMetadata> proxies,
+        CreativeCollectionSelectionResult selection,
+        IReadOnlySet<AssetRevisionId> otherSelectionIds,
+        IReadOnlyDictionary<AssetRevisionId, IReadOnlyList<string>> concepts,
+        string exclusiveStatus,
+        CancellationToken cancellationToken)
+    {
+        List<SemanticReviewCard> cards = [];
+        for (int index = 0; index < selection.Selected.Count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CreativeCollectionSelectedCandidate selected = selection.Selected[index];
+            AssetRevisionId revisionId = selected.Candidate.RevisionId;
+            if (!proxies.TryGetValue(revisionId, out ArchiveReviewProxyMetadata? proxy))
+            {
+                throw new InvalidOperationException(
+                    "A selected Creative Collection photo has no review-proxy metadata.");
+            }
+
+            string? sourcePath = ResolveSafePath(
+                proxyRoot,
+                proxy.RelativePath,
+                proxy.EncodedByteLength);
+            if (sourcePath is null)
+            {
+                throw new InvalidOperationException(
+                    "A selected Creative Collection review proxy became unavailable.");
+            }
+
+            string extension = Path.GetExtension(proxy.RelativePath);
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                extension = ".img";
+            }
+
+            string fileName = $"{index + 1:D3}{extension.ToLowerInvariant()}";
+            string destinationPath = Path.Combine(selectionDirectory, fileName);
+            File.Copy(sourcePath, destinationPath, overwrite: true);
+            string relativePath = Path.GetRelativePath(outputDirectory, destinationPath)
+                .Replace(Path.DirectorySeparatorChar, '/');
+
+            cards.Add(new SemanticReviewCard(
+                index + 1,
+                relativePath,
+                otherSelectionIds.Contains(revisionId) ? "shared" : exclusiveStatus,
+                selected.SelectionScore,
+                concepts.GetValueOrDefault(revisionId) ?? []));
+        }
+
+        return cards;
+    }
+
+    private static void AppendReviewColumn(
+        StringBuilder html,
+        string heading,
+        IReadOnlyList<SemanticReviewCard> cards)
+    {
+        html.Append("<section><h2>")
+            .Append(System.Net.WebUtility.HtmlEncode(heading))
+            .AppendLine("</h2><div class=\"gallery\">");
+        foreach (SemanticReviewCard card in cards)
+        {
+            html.AppendLine("<article class=\"card\">");
+            html.Append("<img loading=\"lazy\" src=\"")
+                .Append(System.Net.WebUtility.HtmlEncode(card.ImageRelativePath))
+                .AppendLine("\" alt=\"Selected review proxy\">");
+            html.Append("<div class=\"meta\"><strong>#")
+                .Append(card.Rank.ToString("D2", CultureInfo.InvariantCulture))
+                .Append("</strong> · score ")
+                .Append(card.SelectionScore.ToString(CultureInfo.InvariantCulture))
+                .Append("<div class=\"status\">")
+                .Append(System.Net.WebUtility.HtmlEncode(card.Status))
+                .AppendLine("</div>");
+            html.Append("<div class=\"concepts\">")
+                .Append(System.Net.WebUtility.HtmlEncode(
+                    card.Concepts.Count == 0
+                        ? "no semantic concepts"
+                        : string.Join(", ", card.Concepts)))
+                .AppendLine("</div></div></article>");
+        }
+
+        html.AppendLine("</div></section>");
+    }
+
+    private static void ResetReviewDirectory(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            Directory.Delete(path, recursive: true);
+        }
+
+        Directory.CreateDirectory(path);
+    }
+
+    private sealed record SemanticReviewCard(
+        int Rank,
+        string ImageRelativePath,
+        string Status,
+        int SelectionScore,
+        IReadOnlyList<string> Concepts);
 
     private static SemanticTagEvaluationReport BuildReport(
         SemanticTagEvaluationCommandOptions options,
