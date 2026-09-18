@@ -281,6 +281,116 @@ public sealed class CreativeCollectionSelectorTests
     }
 
     [Fact]
+    public void Novelty_disabled_preserves_existing_selection_even_when_history_exists()
+    {
+        PhotoMomentCandidate[] catalogue =
+        [
+            Candidate(1, new DateTime(2026, 7, 1, 10, 0, 0)),
+            Candidate(2, new DateTime(2026, 8, 1, 10, 0, 0)),
+            Candidate(3, new DateTime(2026, 9, 1, 10, 0, 0)),
+        ];
+        (CreativeCollectionCandidateSet generated, PhotoMomentClusteringResult moments) =
+            GenerateAllAnchors(catalogue);
+        Dictionary<AssetRevisionId, PhotoSlideshowExposureSummary> history = new()
+        {
+            [Revision(1)] = new(Revision(1), 7, new DateTimeOffset(2026, 9, 18, 8, 0, 0, TimeSpan.Zero)),
+        };
+
+        CreativeCollectionSelectionResult baseline = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            presentationPreferences: null,
+            targetCount: 2,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+        CreativeCollectionSelectionResult disabled = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            presentationPreferences: null,
+            history,
+            noveltyEnabled: false,
+            noveltyEvaluatedAtUtc: new DateTimeOffset(2026, 9, 18, 12, 0, 0, TimeSpan.Zero),
+            targetCount: 2,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+
+        Assert.Equal(
+            baseline.Selected.Select(item => item.Candidate.RevisionId),
+            disabled.Selected.Select(item => item.Candidate.RevisionId));
+    }
+
+    [Fact]
+    public void Novelty_enabled_prefers_unseen_photo_over_recently_repeated_photo()
+    {
+        PhotoMomentCandidate[] catalogue =
+        [
+            Candidate(1, new DateTime(2026, 7, 1, 10, 0, 0)),
+            Candidate(2, new DateTime(2026, 8, 1, 10, 0, 0)),
+            Candidate(3, new DateTime(2026, 9, 1, 10, 0, 0)),
+        ];
+        (CreativeCollectionCandidateSet generated, PhotoMomentClusteringResult moments) =
+            GenerateAllAnchors(catalogue);
+        Dictionary<AssetRevisionId, PhotoSlideshowExposureSummary> history = new()
+        {
+            [Revision(1)] = new(Revision(1), 4, new DateTimeOffset(2026, 9, 18, 8, 0, 0, TimeSpan.Zero)),
+        };
+
+        CreativeCollectionSelectionResult result = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            presentationPreferences: null,
+            history,
+            noveltyEnabled: true,
+            noveltyEvaluatedAtUtc: new DateTimeOffset(2026, 9, 18, 12, 0, 0, TimeSpan.Zero),
+            targetCount: 1,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+
+        CreativeCollectionSelectedCandidate selected = Assert.Single(result.Selected);
+        Assert.NotEqual(Revision(1), selected.Candidate.RevisionId);
+        Assert.Contains(
+            selected.Reasons,
+            reason => reason.Code == CreativeCollectionSelectionReasonCodes.NoveltyUnseen);
+    }
+
+    [Fact]
+    public void Explicit_prefer_remains_stronger_than_novelty()
+    {
+        PhotoMomentCandidate[] catalogue =
+        [
+            Candidate(1, new DateTime(2026, 7, 1, 10, 0, 0)),
+            Candidate(2, new DateTime(2026, 8, 1, 10, 0, 0)),
+        ];
+        (CreativeCollectionCandidateSet generated, PhotoMomentClusteringResult moments) =
+            GenerateAllAnchors(catalogue);
+        Dictionary<AssetRevisionId, string> preferences = new()
+        {
+            [Revision(1)] = PhotoPresentationPreferenceKinds.Prefer,
+        };
+        Dictionary<AssetRevisionId, PhotoSlideshowExposureSummary> history = new()
+        {
+            [Revision(1)] = new(Revision(1), 1, new DateTimeOffset(2026, 9, 18, 8, 0, 0, TimeSpan.Zero)),
+        };
+
+        CreativeCollectionSelectionResult result = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            preferences,
+            history,
+            noveltyEnabled: true,
+            noveltyEvaluatedAtUtc: new DateTimeOffset(2026, 9, 18, 12, 0, 0, TimeSpan.Zero),
+            targetCount: 1,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+
+        Assert.Equal(Revision(1), Assert.Single(result.Selected).Candidate.RevisionId);
+    }
+
+    [Fact]
     public void Same_inputs_target_and_policy_are_deterministic_under_candidate_reordering()
     {
         PhotoMomentCandidate[] catalogue = Enumerable.Range(1, 8)
