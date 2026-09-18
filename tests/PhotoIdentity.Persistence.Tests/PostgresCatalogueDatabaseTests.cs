@@ -29,6 +29,84 @@ public sealed class PostgresCatalogueDatabaseTests
     }
 
     [Fact]
+    public async Task InitializeAsync_ReplaysNoveltyMigration_WhenColumnAlreadyExists()
+    {
+        string? adminConnectionString = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(adminConnectionString))
+        {
+            return;
+        }
+
+        string databaseName = $"photoidentity_novelty_replay_{Guid.NewGuid():N}";
+        string quotedDatabaseName = QuoteIdentifier(databaseName);
+        NpgsqlConnectionStringBuilder adminBuilder = new(adminConnectionString)
+        {
+            Pooling = false,
+        };
+
+        await using NpgsqlConnection adminConnection = new(adminBuilder.ConnectionString);
+        await adminConnection.OpenAsync();
+        await using (NpgsqlCommand createDatabase = adminConnection.CreateCommand())
+        {
+            createDatabase.CommandText = $"CREATE DATABASE {quotedDatabaseName};";
+            await createDatabase.ExecuteNonQueryAsync();
+        }
+
+        try
+        {
+            NpgsqlConnectionStringBuilder testBuilder = new(adminConnectionString)
+            {
+                Database = databaseName,
+                Pooling = false,
+            };
+
+            await using PostgresCatalogueDatabase database = new(testBuilder.ConnectionString);
+            await database.InitializeAsync();
+
+            await using (NpgsqlConnection connection = new(testBuilder.ConnectionString))
+            {
+                await connection.OpenAsync();
+                await using NpgsqlCommand rewind = connection.CreateCommand();
+                rewind.CommandText = """
+                    DELETE FROM photo_identity_schema_migrations
+                    WHERE version = 26;
+                    """;
+                await rewind.ExecuteNonQueryAsync();
+            }
+
+            await database.InitializeAsync();
+
+            await using NpgsqlConnection verification = new(testBuilder.ConnectionString);
+            await verification.OpenAsync();
+            await using NpgsqlCommand read = verification.CreateCommand();
+            read.CommandText = """
+                SELECT
+                    (SELECT COUNT(*)
+                     FROM information_schema.columns
+                     WHERE table_schema = 'public'
+                       AND table_name = 'creative_collection_recipes'
+                       AND column_name = 'novelty_enabled'),
+                    (SELECT COUNT(*)
+                     FROM photo_identity_schema_migrations
+                     WHERE version = 26);
+                """;
+
+            await using NpgsqlDataReader reader = await read.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal(1L, reader.GetInt64(0));
+            Assert.Equal(1L, reader.GetInt64(1));
+        }
+        finally
+        {
+            await using NpgsqlCommand dropDatabase = adminConnection.CreateCommand();
+            dropDatabase.CommandText =
+                $"DROP DATABASE IF EXISTS {quotedDatabaseName} WITH (FORCE);";
+            await dropDatabase.ExecuteNonQueryAsync();
+        }
+    }
+
+    [Fact]
     public async Task InitializeAsync_IsVersionedAndIdempotent_WhenLivePostgresIsConfigured()
     {
         string? adminConnectionString = Environment.GetEnvironmentVariable(
