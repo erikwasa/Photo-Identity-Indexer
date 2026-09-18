@@ -78,6 +78,44 @@ public sealed class SlideshowProtectionStateTests
     }
 
     [Fact]
+    public void Fullscreen_status_distinguishes_unsupported_fallback_rejection_and_loss()
+    {
+        SlideshowBrowserProtectionStatus unsupported = new(
+            new(false, false, false, "not supported", "unsupported"),
+            new(false, false, false),
+            new(true, true, false),
+            SecureContext: true,
+            StartingOrientation: "portrait-primary");
+
+        Assert.Equal(SlideshowFullscreenState.UnsupportedFallback, unsupported.FullscreenState);
+        Assert.True(unsupported.PresentationActive);
+        Assert.Contains(
+            unsupported.ParentWarnings(),
+            warning => warning.Contains("browser-level", StringComparison.OrdinalIgnoreCase));
+
+        SlideshowBrowserProtectionStatus rejected = unsupported with
+        {
+            Fullscreen = new(true, false, true, "request rejected", "rejected"),
+        };
+        Assert.Equal(SlideshowFullscreenState.RequestRejected, rejected.FullscreenState);
+        Assert.False(rejected.PresentationActive);
+
+        SlideshowBrowserProtectionStatus lost = unsupported with
+        {
+            Fullscreen = new(true, false, false, "fullscreen lost", "lost"),
+        };
+        Assert.Equal(SlideshowFullscreenState.Lost, lost.FullscreenState);
+        Assert.False(lost.PresentationActive);
+
+        SlideshowBrowserProtectionStatus active = unsupported with
+        {
+            Fullscreen = new(true, true, false, Mode: "active"),
+        };
+        Assert.Equal(SlideshowFullscreenState.Active, active.FullscreenState);
+        Assert.True(active.PresentationActive);
+    }
+
+    [Fact]
     public void Capability_status_distinguishes_support_from_successful_acquisition()
     {
         SlideshowBrowserProtectionStatus healthy = new(
