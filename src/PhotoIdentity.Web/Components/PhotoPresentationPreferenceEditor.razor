@@ -1,0 +1,179 @@
+@inject HttpClient Http
+
+<section class="photo-presentation-editor" aria-labelledby="photo-presentation-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Creative presentation</p>
+            <h3 id="photo-presentation-heading">Slideshow preference</h3>
+        </div>
+        @if (!Loading)
+        {
+            <span>@PreferenceLabel</span>
+        }
+    </div>
+
+    @if (Loading)
+    {
+        <div class="empty-state compact"><p>Loading presentation preference…</p></div>
+    }
+    else
+    {
+        <p class="photo-presentation-help">
+            Prefer makes this photo more likely to survive Creative selection. Avoid keeps it browsable
+            everywhere else but removes it from normal Creative slideshow selection.
+        </p>
+
+        <div class="collection-inline-actions">
+            <button type="button"
+                    class="@ButtonClass("prefer")"
+                    disabled="@Busy"
+                    @onclick="() => SetAsync("prefer")">
+                Prefer
+            </button>
+            <button type="button"
+                    class="@ButtonClass("avoid")"
+                    disabled="@Busy"
+                    @onclick="() => SetAsync("avoid")">
+                Avoid
+            </button>
+            @if (State?.Preference is not null)
+            {
+                <button type="button"
+                        class="button secondary"
+                        disabled="@Busy"
+                        @onclick="ClearAsync">
+                    Clear preference
+                </button>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <div class="notice error" role="alert">@Error</div>
+        }
+
+        @if (State?.History.Count > 0)
+        {
+            <details class="photo-presentation-history">
+                <summary>Preference history (@State.History.Count)</summary>
+                <ul>
+                    @foreach (PhotoPresentationPreferenceActionResponse action in State.History.Take(8))
+                    {
+                        <li>
+                            <strong>@ActionLabel(action)</strong>
+                            <span>@action.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+                        </li>
+                    }
+                </ul>
+            </details>
+        }
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public string RevisionId { get; set; } = string.Empty;
+
+    private PhotoPresentationPreferenceResponse? State { get; set; }
+    private bool Loading { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+
+    private string Url =>
+        $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/presentation-preference";
+
+    private string PreferenceLabel => State?.Preference switch
+    {
+        "prefer" => "Preferred",
+        "avoid" => "Avoid in Creative",
+        _ => "Automatic",
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            State = await Http.GetFromJsonAsync<PhotoPresentationPreferenceResponse>(Url);
+        }
+        catch (Exception exception)
+        {
+            State = null;
+            Error = $"Presentation preference could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task SetAsync(string preference)
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                Url,
+                new PhotoPresentationPreferenceMutationRequest(preference));
+            await ReadStateAsync(response);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ClearAsync()
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.DeleteAsync(Url);
+            await ReadStateAsync(response);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ReadStateAsync(HttpResponseMessage response)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Presentation preference could not be saved. HTTP {(int)response.StatusCode}.");
+        }
+
+        State = await response.Content.ReadFromJsonAsync<PhotoPresentationPreferenceResponse>()
+            ?? throw new InvalidOperationException("Presentation preference response was empty.");
+    }
+
+    private string ButtonClass(string preference) =>
+        string.Equals(State?.Preference, preference, StringComparison.Ordinal)
+            ? "button primary"
+            : "button secondary";
+
+    private static string ActionLabel(PhotoPresentationPreferenceActionResponse action) =>
+        action.ActionKind == "clear"
+            ? "Cleared"
+            : action.Preference == "prefer"
+                ? "Preferred"
+                : "Avoided";
+}
