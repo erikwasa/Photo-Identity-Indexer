@@ -146,7 +146,6 @@ work_items:
   - WI-0121
   blocker_notes: []
   evidence: []
-
 - id: WI-0132
   title: Add moment-aware transition language to slideshow playback
   milestone: M27
@@ -169,8 +168,6 @@ work_items:
   - WI-0123
   blocker_notes: []
   evidence: []
-
-
 - id: WI-0137
   title: Tune and verify the polished slideshow experience on real devices
   milestone: M27
