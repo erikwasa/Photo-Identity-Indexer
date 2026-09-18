@@ -13,6 +13,7 @@ public static class CreativeCollectionSelectionReasonCodes
     public const string RepeatedMoment = "repeated-moment";
     public const string RepeatedPeopleCombination = "repeated-people-combination";
     public const string NearConsecutive = "near-consecutive";
+    public const string VisualRedundancy = "visual-redundancy";
 }
 
 /// <summary>
@@ -99,6 +100,21 @@ public static class CreativeCollectionSelector
         IEnumerable<PhotoMomentCandidate> catalogue,
         PhotoMomentClusteringResult moments,
         int targetCount,
+        CreativeCollectionSelectionPolicy policy) =>
+        Select(
+            candidates,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            targetCount,
+            policy);
+
+    public static CreativeCollectionSelectionResult Select(
+        CreativeCollectionCandidateSet candidates,
+        IEnumerable<PhotoMomentCandidate> catalogue,
+        PhotoMomentClusteringResult moments,
+        PhotoVisualRedundancyResult? visualRedundancy,
+        int targetCount,
         CreativeCollectionSelectionPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(candidates);
@@ -112,6 +128,7 @@ public static class CreativeCollectionSelector
         Dictionary<AssetRevisionId, string> momentByRevision = moments.Moments
             .SelectMany(moment => moment.Members.Select(member => (member.RevisionId, moment.Id)))
             .ToDictionary(pair => pair.RevisionId, pair => pair.Id);
+        Dictionary<AssetRevisionId, string> visualGroupByRevision = BuildVisualGroupMap(visualRedundancy);
 
         foreach (CreativeCollectionCandidate candidate in candidates.Candidates)
         {
@@ -141,7 +158,8 @@ public static class CreativeCollectionSelector
                 candidate => CreateMetadata(
                     candidate,
                     catalogueByRevision[candidate.RevisionId],
-                    momentByRevision.GetValueOrDefault(candidate.RevisionId)));
+                    momentByRevision.GetValueOrDefault(candidate.RevisionId),
+                    visualGroupByRevision.GetValueOrDefault(candidate.RevisionId)));
         AssignTemporalBuckets(metadata.Values, policy.TemporalBucketCount);
 
         List<CreativeCollectionSelectedCandidate> selected = [];
@@ -149,6 +167,7 @@ public static class CreativeCollectionSelector
         Dictionary<string, int> momentCounts = new(StringComparer.Ordinal);
         Dictionary<int, int> temporalBucketCounts = [];
         Dictionary<string, int> peopleCombinationCounts = new(StringComparer.Ordinal);
+        Dictionary<string, int> visualGroupCounts = new(StringComparer.Ordinal);
 
         while (selected.Count < selectionCount)
         {
@@ -161,6 +180,7 @@ public static class CreativeCollectionSelector
                     momentCounts,
                     temporalBucketCounts,
                     peopleCombinationCounts,
+                    visualGroupCounts,
                     policy))
                 .OrderByDescending(candidate => candidate.Score)
                 .ThenBy(candidate => candidate.Metadata.TakenAtLocal.HasValue ? 0 : 1)
@@ -175,6 +195,7 @@ public static class CreativeCollectionSelector
                 temporalBucketCounts[bucket] = temporalBucketCounts.GetValueOrDefault(bucket) + 1;
             }
             Increment(peopleCombinationCounts, next.Metadata.PeopleCombinationKey);
+            Increment(visualGroupCounts, next.Metadata.VisualGroupId);
 
             selected.Add(new CreativeCollectionSelectedCandidate(
                 next.Candidate,
@@ -204,7 +225,8 @@ public static class CreativeCollectionSelector
     private static SelectionMetadata CreateMetadata(
         CreativeCollectionCandidate candidate,
         PhotoMomentCandidate source,
-        string? momentId)
+        string? momentId,
+        string? visualGroupId)
     {
         string? peopleCombinationKey = source.PeopleKeys is null
             ? null
@@ -223,7 +245,8 @@ public static class CreativeCollectionSelector
         return new SelectionMetadata(
             candidate.TakenAtLocal,
             momentId,
-            peopleCombinationKey);
+            peopleCombinationKey,
+            visualGroupId);
     }
 
     private static void AssignTemporalBuckets(
@@ -258,6 +281,7 @@ public static class CreativeCollectionSelector
         IReadOnlyDictionary<string, int> momentCounts,
         IReadOnlyDictionary<int, int> temporalBucketCounts,
         IReadOnlyDictionary<string, int> peopleCombinationCounts,
+        IReadOnlyDictionary<string, int> visualGroupCounts,
         CreativeCollectionSelectionPolicy policy)
     {
         List<CreativeCollectionSelectionReason> reasons = [];
@@ -330,6 +354,18 @@ public static class CreativeCollectionSelector
             }
         }
 
+        if (metadata.VisualGroupId is string visualGroupId)
+        {
+            int count = visualGroupCounts.GetValueOrDefault(visualGroupId);
+            if (count > 0)
+            {
+                int penalty = -180 * count;
+                AddReason(reasons, CreativeCollectionSelectionReasonCodes.VisualRedundancy, penalty,
+                    $"Visual redundancy group '{visualGroupId}' already has {count} selected representative photo(s).");
+                score += penalty;
+            }
+        }
+
         if (metadata.TakenAtLocal is DateTime takenAtLocal)
         {
             int nearCount = selected.Count(existing =>
@@ -345,6 +381,31 @@ public static class CreativeCollectionSelector
         }
 
         return new ScoredCandidate(candidate, metadata, score, reasons);
+    }
+
+    private static Dictionary<AssetRevisionId, string> BuildVisualGroupMap(
+        PhotoVisualRedundancyResult? visualRedundancy)
+    {
+        Dictionary<AssetRevisionId, string> result = [];
+        if (visualRedundancy is null)
+        {
+            return result;
+        }
+
+        foreach (PhotoVisualRedundancyGroup group in visualRedundancy.Groups)
+        {
+            foreach (PhotoVisualRedundancyMember member in group.Members)
+            {
+                if (!result.TryAdd(member.RevisionId, group.Id))
+                {
+                    throw new ArgumentException(
+                        $"Visual redundancy evidence assigns revision '{member.RevisionId}' to multiple groups.",
+                        nameof(visualRedundancy));
+                }
+            }
+        }
+
+        return result;
     }
 
     private static void AddReason(
@@ -371,16 +432,19 @@ public static class CreativeCollectionSelector
         public SelectionMetadata(
             DateTime? takenAtLocal,
             string? momentId,
-            string? peopleCombinationKey)
+            string? peopleCombinationKey,
+            string? visualGroupId)
         {
             TakenAtLocal = takenAtLocal;
             MomentId = momentId;
             PeopleCombinationKey = peopleCombinationKey;
+            VisualGroupId = visualGroupId;
         }
 
         public DateTime? TakenAtLocal { get; }
         public string? MomentId { get; }
         public string? PeopleCombinationKey { get; }
+        public string? VisualGroupId { get; }
         public int? TemporalBucket { get; set; }
     }
 

@@ -142,6 +142,74 @@ public sealed class CreativeCollectionSelectorTests
     }
 
     [Fact]
+    public void Visual_redundancy_prefers_one_representative_before_a_distinct_frame()
+    {
+        PhotoMomentCandidate[] catalogue =
+        [
+            Candidate(1, new DateTime(2026, 5, 2, 10, 0, 0)),
+            Candidate(2, new DateTime(2026, 5, 2, 10, 0, 5)),
+            Candidate(3, new DateTime(2026, 5, 2, 10, 0, 10)),
+        ];
+        (CreativeCollectionCandidateSet generated, PhotoMomentClusteringResult moments) =
+            GenerateAllAnchors(catalogue);
+        PhotoVisualRedundancyResult redundancy = PhotoVisualRedundancyGrouper.Group(
+            [
+                new PhotoVisualFingerprint(Revision(1), catalogue[0].TakenAtLocal, new PhotoPerceptualHash64(0)),
+                new PhotoVisualFingerprint(Revision(2), catalogue[1].TakenAtLocal, new PhotoPerceptualHash64(1)),
+                new PhotoVisualFingerprint(Revision(3), catalogue[2].TakenAtLocal, new PhotoPerceptualHash64(ulong.MaxValue)),
+            ],
+            moments,
+            PhotoVisualRedundancyPolicy.BalancedEvaluationV1);
+
+        CreativeCollectionSelectionResult result = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            redundancy,
+            targetCount: 2,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+
+        Assert.Equal([Revision(1), Revision(3)],
+            result.Selected.Select(item => item.Candidate.RevisionId).ToArray());
+    }
+
+    [Fact]
+    public void Visual_redundancy_is_a_penalty_not_a_hard_exclusion()
+    {
+        PhotoMomentCandidate[] catalogue =
+        [
+            Candidate(1, new DateTime(2026, 5, 3, 10, 0, 0)),
+            Candidate(2, new DateTime(2026, 5, 3, 10, 0, 5)),
+            Candidate(3, new DateTime(2026, 5, 3, 10, 0, 10)),
+        ];
+        (CreativeCollectionCandidateSet generated, PhotoMomentClusteringResult moments) =
+            GenerateAllAnchors(catalogue);
+        PhotoVisualRedundancyResult redundancy = PhotoVisualRedundancyGrouper.Group(
+            [
+                new PhotoVisualFingerprint(Revision(1), catalogue[0].TakenAtLocal, new PhotoPerceptualHash64(0)),
+                new PhotoVisualFingerprint(Revision(2), catalogue[1].TakenAtLocal, new PhotoPerceptualHash64(1)),
+                new PhotoVisualFingerprint(Revision(3), catalogue[2].TakenAtLocal, new PhotoPerceptualHash64(ulong.MaxValue)),
+            ],
+            moments,
+            PhotoVisualRedundancyPolicy.BalancedEvaluationV1);
+
+        CreativeCollectionSelectionResult result = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            redundancy,
+            targetCount: 3,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+
+        Assert.Equal(3, result.SelectedCount);
+        CreativeCollectionSelectedCandidate repeated = result.Selected.Single(item =>
+            item.Candidate.RevisionId == Revision(2));
+        Assert.Contains(repeated.Reasons, reason =>
+            reason.Code == CreativeCollectionSelectionReasonCodes.VisualRedundancy &&
+            reason.ScoreDelta < 0);
+    }
+
+    [Fact]
     public void Same_inputs_target_and_policy_are_deterministic_under_candidate_reordering()
     {
         PhotoMomentCandidate[] catalogue = Enumerable.Range(1, 8)
