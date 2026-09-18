@@ -14,7 +14,7 @@ GET /api/smart-collections/{collection-id}/creative-preview?targetCount=100
 
 `targetCount` defaults to `100` and must be between `1` and `1000`. If fewer unique candidates exist, all available candidates remain valid; the selector never duplicates or invents photos to reach the target.
 
-The current default uses the WI-0118 30-minute evaluation moment policy. While WI-0118 representative verification remains deferred, the alternative evaluation gap can be inspected explicitly:
+The accepted initial default uses the WI-0118 30-minute moment policy after private representative comparison with the 90-minute candidate. The 90-minute policy remains available for explicit comparison or future tuning:
 
 ```text
 GET /api/smart-collections/{collection-id}/creative-preview?targetCount=100&momentGapMinutes=90
@@ -88,3 +88,9 @@ Human acceptance can be batched after these implementation work items are merged
 8. Create a `creative-slideshow-snapshot` for the chosen target and confirm its revision IDs match the preview's selected sequence.
 
 Record which moment gap is more coherent and any obvious over/under-selection patterns. If tuning is needed, change the versioned policies rather than exposing raw scoring knobs to slideshow users.
+
+### Maintainer acceptance recorded 2026-09-18
+
+The private representative review selected the 30-minute moment policy as the more coherent initial default. Context additions generally improved same-moment sequence coherence, with an accepted limitation that timestamp-only grouping can occasionally admit an unrelated photo from the same time slot.
+
+For the high-volume sample, simple chronological truncation covered 6 distinct days and 5 months and contained 40 adjacent pairs within two minutes, while the Creative 50 covered 48 distinct days and 22 months with no adjacent pairs within two minutes. The selected set covered 50 inferred moments and 19 identified-person combinations. On a repetition-heavy 84-photo sample, Creative selection reduced adjacent pairs within two minutes from 55 to 21 while selecting 50 photos. A target larger than a 14-photo candidate set returned all 14 unique candidates, and a 50-photo Creative snapshot matched the preview selection exactly by immutable revision ID and order.
