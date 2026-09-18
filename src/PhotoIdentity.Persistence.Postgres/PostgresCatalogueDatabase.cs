@@ -1132,7 +1132,7 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
             """),
         new(26, "slideshow-exposure-novelty", """
             ALTER TABLE creative_collection_recipes
-                ADD COLUMN novelty_enabled boolean NOT NULL DEFAULT false;
+                ADD COLUMN IF NOT EXISTS novelty_enabled boolean NOT NULL DEFAULT false;
 
             CREATE TABLE IF NOT EXISTS photo_slideshow_exposures (
                 session_id uuid NOT NULL,
