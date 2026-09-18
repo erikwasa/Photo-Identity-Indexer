@@ -200,6 +200,122 @@
                         </button>
                     }
                 </div>
+
+                @if (EditingId is not null)
+                {
+                    <section class="creative-recipe" aria-labelledby="creative-recipe-heading">
+                        <div class="smart-workspace-heading compact">
+                            <div>
+                                <p class="eyebrow">Creative collection</p>
+                                <h3 id="creative-recipe-heading">Turn this exact collection into a varied slideshow</h3>
+                                <p>
+                                    The Smart Collection remains the exact anchor definition. Creative mode can add nearby
+                                    same-moment context and curate the result toward a target size.
+                                </p>
+                            </div>
+                            <span class="smart-result-label">@CreativeRecipeStatus</span>
+                        </div>
+
+                        <div class="creative-controls">
+                            <label class="smart-field">
+                                <span class="field-label">Target photos</span>
+                                <input type="number"
+                                       min="1"
+                                       max="1000"
+                                       inputmode="numeric"
+                                       @bind="CreativeTargetCount"
+                                       @bind:after="ClearCreativePreview"
+                                       disabled="@Busy" />
+                            </label>
+
+                            <label class="smart-field">
+                                <span class="field-label">Context</span>
+                                <select @bind="CreativeContextStrength"
+                                        @bind:after="ClearCreativePreview"
+                                        disabled="@Busy">
+                                    <option value="focused">Focused</option>
+                                    <option value="balanced">Balanced</option>
+                                    <option value="broad">Broad</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <p class="smart-help">
+                            Focused adds at most 2 nearby context photos per anchored moment, Balanced 6, and Broad 12.
+                            The accepted 30-minute moment policy, deterministic diversity policy and chronological playback
+                            order stay versioned with the saved recipe.
+                        </p>
+
+                        <div class="smart-actions">
+                            <button type="button"
+                                    class="button secondary"
+                                    disabled="@Busy"
+                                    @onclick="PreviewCreativeAsync">
+                                Preview creative selection
+                            </button>
+                            <button type="button"
+                                    class="button secondary"
+                                    disabled="@Busy"
+                                    @onclick="SaveCreativeRecipeAsync">
+                                Save creative recipe
+                            </button>
+                            <button type="button"
+                                    class="button primary"
+                                    disabled="@Busy"
+                                    @onclick="StartCreativeSlideshowAsync">
+                                Save &amp; start creative slideshow
+                            </button>
+                        </div>
+
+                        @if (CreativePreview is CreativeCollectionPreviewResponse creative)
+                        {
+                            <div class="creative-summary" aria-label="Creative collection preview counts">
+                                <div class="creative-stat"><strong>@creative.DirectAnchorCount</strong><span>anchors</span></div>
+                                <div class="creative-stat"><strong>+@creative.AddedContextCount</strong><span>context</span></div>
+                                <div class="creative-stat"><strong>@creative.TotalCandidateCount</strong><span>candidates</span></div>
+                                <div class="creative-stat"><strong>@creative.SelectedCount</strong><span>selected</span></div>
+                                <div class="creative-stat"><strong>@creative.RepresentedMomentCount</strong><span>moments</span></div>
+                                <div class="creative-stat"><strong>@creative.RepresentedTimePeriodCount</strong><span>months</span></div>
+                            </div>
+
+                            @if (creative.NoAnchors)
+                            {
+                                <div class="empty-state compact">
+                                    <p>No photos currently match the exact Smart Collection, so Creative mode stays empty.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="creative-preview-grid" aria-label="Selected Creative Collection photos">
+                                    @foreach (CreativeCollectionSelectedCandidateResponse photo in creative.SelectedCandidates.Take(60))
+                                    {
+                                        bool directAnchor = string.Equals(photo.Kind, "direct-anchor", StringComparison.Ordinal);
+                                        <article class="creative-preview-card">
+                                            <img src="@photo.ThumbnailUrl"
+                                                 alt="Creative collection selected photo"
+                                                 loading="lazy"
+                                                 decoding="async" />
+                                            <div>
+                                                <span class="creative-kind @(directAnchor ? "anchor" : "context")">
+                                                    @(directAnchor ? "Anchor" : "Context")
+                                                </span>
+                                                <strong>@CreativePhotoDate(photo)</strong>
+                                                <span class="smart-muted">@CreativeReasonSummary(photo)</span>
+                                            </div>
+                                        </article>
+                                    }
+                                </div>
+
+                                @if (creative.SelectedCandidates.Length > 60)
+                                {
+                                    <p class="smart-help">
+                                        Showing the first 60 selected photos. Playback uses the full @creative.SelectedCount-photo snapshot.
+                                    </p>
+                                }
+                            }
+                        }
+                    </section>
+                }
             </div>
         </div>
 
