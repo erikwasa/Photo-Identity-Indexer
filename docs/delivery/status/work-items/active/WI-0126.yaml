@@ -10,5 +10,6 @@ branch: agent/WI-0126-visible-content-tagging
 blockers:
 - WI-0120
 - WI-0056
-blocker_notes: []
+blocker_notes:
+- Experiment implementation is on the work branch; completion remains pending CI and a representative private proxy/original plus Creative-selection comparison.
 evidence: []
