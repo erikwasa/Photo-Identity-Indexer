@@ -46,7 +46,7 @@ Automated browser/interop state tests plus maintainer verification on the affect
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: slideshow browser interop, slideshow presentation gating/recovery, protection-state policy/tests, slideshow-library launch regression coverage.
+- Trade-offs: unsupported browsers use the existing fixed full-window slideshow surface but cannot suppress browser chrome/navigation; supported browsers still require real fullscreen and keep strict recovery after rejection or loss.
+- Deferred work: maintainer verification on the reported iPhone/browser path and a desktop browser before completion.
+- Commands run: CI build/test/document validation on the pull request.
