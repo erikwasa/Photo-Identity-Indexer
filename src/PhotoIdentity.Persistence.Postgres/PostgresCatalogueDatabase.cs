@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 23;
+    public const int CurrentSchemaVersion = 24;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1094,6 +1094,22 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
             ALTER TABLE archive_source_observations
                 ADD COLUMN observed_last_write_ticks bigint NULL CHECK (observed_last_write_ticks BETWEEN 0 AND 3155378975999999999),
                 ADD COLUMN verified_last_write_ticks bigint NULL CHECK (verified_last_write_ticks BETWEEN 0 AND 3155378975999999999);
+            """),
+        new(24, "creative-collection-recipes", """
+            CREATE TABLE IF NOT EXISTS creative_collection_recipes (
+                anchor_collection_id uuid NOT NULL PRIMARY KEY,
+                target_count integer NOT NULL CHECK (target_count BETWEEN 1 AND 1000),
+                moment_gap_minutes integer NOT NULL CHECK (moment_gap_minutes BETWEEN 1 AND 720),
+                moment_policy_version text NOT NULL CHECK (btrim(moment_policy_version) <> ''),
+                context_policy_version text NOT NULL CHECK (btrim(context_policy_version) <> ''),
+                selection_policy_version text NOT NULL CHECK (btrim(selection_policy_version) <> ''),
+                ordering_policy_version text NOT NULL CHECK (btrim(ordering_policy_version) <> ''),
+                created_at_utc timestamp with time zone NOT NULL,
+                updated_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT fk_creative_collection_recipe_anchor
+                    FOREIGN KEY (anchor_collection_id)
+                    REFERENCES smart_collections (id) ON DELETE CASCADE
+            );
             """),
     ];
 
