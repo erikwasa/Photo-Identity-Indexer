@@ -79,6 +79,8 @@
             <ManualPhotoPeopleEditor RevisionId="@RevisionId"
                                      Details="@Details"
                                      DetailsChanged="@((PhotoDetailsResponse details) => Details = details)" />
+
+            <PhotoPresentationPreferenceEditor RevisionId="@RevisionId" />
         }
 
         @if (!string.IsNullOrWhiteSpace(DetailsError))
