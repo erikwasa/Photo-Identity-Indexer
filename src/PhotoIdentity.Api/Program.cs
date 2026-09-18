@@ -294,6 +294,7 @@ public partial class Program
         app.MapSmartCollectionEndpoints();
         app.MapMomentPreviewEndpoints();
         app.MapSlideshowOriginalPreparationEndpoints();
+        app.MapSlideshowExposureEndpoints();
         app.MapPhotoMetadataEndpoints();
         app.MapCollectionProxyEndpoints();
         app.MapCollectionViewerPreviewEndpoints();
