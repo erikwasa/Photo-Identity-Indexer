@@ -2,7 +2,7 @@
 id: M30
 title: Video media support
 status_source: ../status/milestones.yaml
-depends_on: [M19, M22, M24]
+depends_on: [M19, M22, M24, M27]
 ---
 
 # M30: Video media support
