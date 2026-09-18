@@ -7,5 +7,5 @@ document: ../work-items/WI-0150-video-architecture-activation-gate.md
 blockers:
 - WI-0137
 blocker_notes:
-- Intentional scheduling hold: video is planned future work but must not start until the maintainer explicitly reactivates M30 after higher-priority work. WI-0137 is only a minimum sequencing gate.
+- Intentional scheduling hold. Video is planned future work but must not start until the maintainer explicitly reactivates M30 after higher-priority work. WI-0137 is only a minimum sequencing gate.
 evidence: []
