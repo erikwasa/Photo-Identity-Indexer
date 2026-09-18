@@ -16,11 +16,6 @@ Start WI-0137 and run the representative combined slideshow acceptance set on th
 
 ## Relevant files
 
-- docs/delivery/work-items/WI-0138-coalesced-provisional-cluster-refresh.md
-- src/PhotoIdentity.Api/ProvisionalFaceClusteringWorker.cs
-- src/PhotoIdentity.Persistence.Postgres/PostgresProvisionalFaceClusterRepository.cs
-- tests/PhotoIdentity.Persistence.Tests/PostgresProvisionalFaceClusterRepositoryTests.cs
-- docs/architecture/provisional-face-clustering.md
 - docs/delivery/work-items/WI-0137-real-device-slideshow-polish-acceptance.md
 - docs/delivery/status/work-items/active/WI-0137.yaml
 - docs/delivery/work-items/WI-0131-adaptive-slideshow-backdrop.md
