@@ -59,6 +59,8 @@ public sealed class CreativeCollectionRecipeApplicationTests
                 Assert.Equal("focused", recipe.ContextStrength);
                 Assert.Equal(CreativeCollectionRecipe.DefaultMomentGapMinutes, recipe.MomentGapMinutes);
                 Assert.Equal(CreativeCollectionSelectionPolicy.BalancedV1.Version, recipe.SelectionPolicyVersion);
+                Assert.False(recipe.NoveltyEnabled);
+                Assert.Equal(CreativeCollectionNoveltyPolicies.Disabled, recipe.NoveltyPolicyVersion);
 
                 firstPreview =
                     await client.GetFromJsonAsync<CreativeCollectionPreviewResponse>(
@@ -100,7 +102,7 @@ public sealed class CreativeCollectionRecipeApplicationTests
 
                 using HttpResponseMessage update = await client.PutAsJsonAsync(
                     $"/api/smart-collections/{saved.Id}/creative-recipe",
-                    new CreativeCollectionRecipeRequest(10, "broad"));
+                    new CreativeCollectionRecipeRequest(10, "broad", NoveltyEnabled: true));
                 update.EnsureSuccessStatusCode();
 
                 CreativeCollectionPreviewResponse broadened =
@@ -110,6 +112,8 @@ public sealed class CreativeCollectionRecipeApplicationTests
                 Assert.Equal(3, broadened.AddedContextCount);
                 Assert.Equal(4, broadened.TotalCandidateCount);
                 Assert.Equal(4, broadened.SelectedCount);
+                Assert.True(broadened.NoveltyEnabled);
+                Assert.Equal(CreativeCollectionNoveltyPolicies.BalancedV1, broadened.NoveltyPolicyVersion);
 
                 using HttpResponseMessage snapshotResponse = await client.PostAsync(
                     $"/api/smart-collections/{saved.Id}/creative-recipe/slideshow-snapshot",
