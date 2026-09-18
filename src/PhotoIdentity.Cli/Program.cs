@@ -100,6 +100,11 @@ public static class Program
                     DetectorRolloutCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
                     cancellationToken),
+                "semantic-tags" when args.Length > 1 && args[1] == "evaluate" =>
+                    await SemanticTagEvaluationCommandRunner.RunAsync(
+                        SemanticTagEvaluationCommandOptions.Parse(args.Skip(2).ToArray()),
+                        output,
+                        cancellationToken),
                 _ => UnknownCommand(args[0], error),
             };
         }
@@ -197,6 +202,20 @@ public static class Program
                                [--high-margin-threshold 0..2]
                                [--medium-score-threshold 0..1]
 
+              semantic-tags evaluate --postgres-connection-env NAME
+                                     --collection COLLECTION_ID
+                                     --proxy-root DIR --proxy-profile ID
+                                     --model PATH
+                                     --tokenizer-vocab PATH
+                                     --tokenizer-merges PATH
+                                     --concept-vocabulary PATH
+                                     [--target-count COUNT]
+                                     [--moment-gap-minutes MINUTES]
+                                     [--max-candidates COUNT]
+                                     [--concepts-per-photo COUNT]
+                                     [--compare-originals COUNT]
+                                     [--report PATH]
+
             Catalogue backup is the WI-0102 stopped-source snapshot path. It requires the
             operator to explicitly confirm that Photo Identity has been stopped, opens the
             source SQLite catalogue read-only, verifies the current schema and foreign keys,
@@ -289,6 +308,17 @@ public static class Program
             five-point SFace alignment and embeddings. It writes an annotated SVG,
             per-face outputs, a reproducibility manifest and detailed timings without
             modifying the source image.
+
+            Semantic-tags evaluate is the WI-0126 bounded local visible-content experiment.
+            It reads one saved Smart Collection from PostgreSQL, generates the same timestamp-first
+            Creative candidate set, scores only existing durable review proxies with an operator-
+            supplied CLIP-compatible ONNX model plus tokenizer files, and compares the ordinary
+            selector with an experimental semantic-diversity bonus. It never writes automatic tags
+            or model evidence into the catalogue. --compare-originals explicitly opts into opening
+            at most the requested number of safely resolved source originals for proxy/original
+            agreement measurement; zero is the default. Output and reports contain aggregate counts,
+            public vocabulary concept ids, hashes and runtime evidence only, never private paths,
+            filenames, Smart Collection names or revision ids.
 
             Match regenerate rebuilds ranked suggestions for one exact embedding model
             revision from the current canonical exemplar snapshot while preserving rejected
