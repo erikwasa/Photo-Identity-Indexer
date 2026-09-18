@@ -165,11 +165,13 @@ public sealed class ReviewProxyTests
     private static byte[] EncodeGradient(bool reverse)
     {
         using Mat image = new(new Size(90, 80), MatType.CV_8UC1);
-        for (int row = 0; row < image.Rows; row++)
+        int rows = image.Rows;
+        int columns = image.Cols;
+        for (int row = 0; row < rows; row++)
         {
-            for (int column = 0; column < image.Cols; column++)
+            for (int column = 0; column < columns; column++)
             {
-                int normalized = column * 255 / Math.Max(1, image.Cols - 1);
+                int normalized = column * 255 / Math.Max(1, columns - 1);
                 image.Set(row, column, (byte)(reverse ? 255 - normalized : normalized));
             }
         }
