@@ -171,18 +171,3 @@ work_items:
   - WI-0136
   blocker_notes: []
   evidence: []
-- id: WI-0138
-  title: Coalesce provisional clustering refreshes during active face review
-  milestone: M25
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0138-coalesced-provisional-cluster-refresh.md
-  started_at: 2026-09-18
-  last_updated_at: 2026-09-18
-  branch: agent/WI-0138-coalesce-provisional-cluster-refresh
-  blockers:
-  - WI-0114
-  - WI-0115
-  blocker_notes:
-  - Implementation and automated regression coverage are on the work branch; completion remains pending CI/live PostgreSQL and maintainer sustained-review verification.
-  evidence: []
