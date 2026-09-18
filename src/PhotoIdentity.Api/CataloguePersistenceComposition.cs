@@ -90,6 +90,8 @@ internal static class CataloguePersistenceComposition
         services.AddSingleton<ISmartCollectionQueryRepository>(sp => sp.GetRequiredService<SqliteSmartCollectionQueryRepository>());
         services.AddSingleton<SqliteSmartCollectionRepository>();
         services.AddSingleton<ISmartCollectionRepository>(sp => sp.GetRequiredService<SqliteSmartCollectionRepository>());
+        services.AddSingleton<SqliteCreativeCollectionRecipeRepository>();
+        services.AddSingleton<ICreativeCollectionRecipeRepository>(sp => sp.GetRequiredService<SqliteCreativeCollectionRecipeRepository>());
 
         services.AddSingleton<SqliteAssetCatalogueRepository>();
         services.AddSingleton<IPhotoCaptureMetadataRepository>(sp => sp.GetRequiredService<SqliteAssetCatalogueRepository>());
@@ -208,6 +210,8 @@ internal static class CataloguePersistenceComposition
         services.AddSingleton<ISmartCollectionQueryRepository>(sp => sp.GetRequiredService<PostgresSmartCollectionQueryRepository>());
         services.AddSingleton<PostgresSmartCollectionRepository>();
         services.AddSingleton<ISmartCollectionRepository>(sp => sp.GetRequiredService<PostgresSmartCollectionRepository>());
+        services.AddSingleton<PostgresCreativeCollectionRecipeRepository>();
+        services.AddSingleton<ICreativeCollectionRecipeRepository>(sp => sp.GetRequiredService<PostgresCreativeCollectionRecipeRepository>());
 
         services.AddSingleton<PostgresPhotoCaptureMetadataRepository>();
         services.AddSingleton<IPhotoCaptureMetadataRepository>(sp => sp.GetRequiredService<PostgresPhotoCaptureMetadataRepository>());
