@@ -1,0 +1,11 @@
+id: WI-0145
+title: Add explicit photo-list collections for manually assembled slideshows
+milestone: M28
+status: ready
+owner: unassigned
+document: ../work-items/WI-0145-manual-slideshow-collection-model.md
+blockers:
+- WI-0083
+- WI-0094
+blocker_notes: []
+evidence: []

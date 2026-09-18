@@ -1,0 +1,11 @@
+id: WI-0147
+title: Make PostgreSQL the unconditional runtime catalogue
+milestone: M29
+status: ready
+owner: unassigned
+document: ../work-items/WI-0147-postgres-only-runtime-composition.md
+blockers:
+- WI-0102
+- WI-0106
+blocker_notes: []
+evidence: []

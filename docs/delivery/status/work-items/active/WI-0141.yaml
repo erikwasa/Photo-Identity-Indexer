@@ -1,0 +1,10 @@
+id: WI-0141
+title: Add manual capture-date overrides with provenance and precision
+milestone: M28
+status: ready
+owner: unassigned
+document: ../work-items/WI-0141-manual-capture-date-model.md
+blockers:
+- WI-0050
+blocker_notes: []
+evidence: []

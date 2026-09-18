@@ -169,6 +169,7 @@ work_items:
   - WI-0134
   - WI-0135
   - WI-0136
+  - WI-0139
   blocker_notes: []
   evidence: []
 - id: WI-0138
@@ -185,4 +186,192 @@ work_items:
   - WI-0115
   blocker_notes:
   - Implementation and automated regression coverage are on the work branch; completion remains pending CI/live PostgreSQL and maintainer sustained-review verification.
+  evidence: []
+- id: WI-0139
+  title: Allow slideshow playback when browser fullscreen is unavailable
+  milestone: M27
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0139-no-fullscreen-slideshow-fallback.md
+  blockers:
+  - WI-0084
+  - WI-0136
+  blocker_notes: []
+  evidence: []
+- id: WI-0140
+  title: Replace long place dropdowns with a searchable place picker
+  milestone: M28
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0140-searchable-place-picker.md
+  blockers:
+  - WI-0063
+  blocker_notes: []
+  evidence: []
+- id: WI-0141
+  title: Add manual capture-date overrides with provenance and precision
+  milestone: M28
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0141-manual-capture-date-model.md
+  blockers:
+  - WI-0050
+  blocker_notes: []
+  evidence: []
+- id: WI-0142
+  title: Add manual and imprecise capture-date editing to Photo Details
+  milestone: M28
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0142-manual-capture-date-editor.md
+  blockers:
+  - WI-0141
+  blocker_notes: []
+  evidence: []
+- id: WI-0143
+  title: Replace Smart Collection date free text with structured controls
+  milestone: M28
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0143-structured-smart-collection-date-controls.md
+  blockers:
+  - WI-0141
+  blocker_notes: []
+  evidence: []
+- id: WI-0144
+  title: Allow Smart Collections to match any of multiple named locations
+  milestone: M28
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0144-smart-collection-multiple-locations.md
+  blockers:
+  - WI-0063
+  - WI-0140
+  blocker_notes: []
+  evidence: []
+- id: WI-0145
+  title: Add explicit photo-list collections for manually assembled slideshows
+  milestone: M28
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0145-manual-slideshow-collection-model.md
+  blockers:
+  - WI-0083
+  - WI-0094
+  blocker_notes: []
+  evidence: []
+- id: WI-0146
+  title: Add manual slideshow curation and launch UI
+  milestone: M28
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0146-manual-slideshow-curation-ui.md
+  blockers:
+  - WI-0145
+  blocker_notes: []
+  evidence: []
+- id: WI-0147
+  title: Make PostgreSQL the unconditional runtime catalogue
+  milestone: M29
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0147-postgres-only-runtime-composition.md
+  blockers:
+  - WI-0102
+  - WI-0106
+  blocker_notes: []
+  evidence: []
+- id: WI-0148
+  title: Retire SQLite-dependent tests and compatibility tools that no longer protect supported behavior
+  milestone: M29
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0148-retire-sqlite-test-tool-dependencies.md
+  blockers:
+  - WI-0147
+  blocker_notes: []
+  evidence: []
+- id: WI-0149
+  title: Remove the SQLite implementation and obsolete migration-era active references
+  milestone: M29
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0149-remove-sqlite-implementation.md
+  blockers:
+  - WI-0148
+  blocker_notes: []
+  evidence: []
+- id: WI-0150
+  title: Define the video media architecture and explicitly activate deferred implementation
+  milestone: M30
+  status: blocked
+  owner: unassigned
+  document: ../work-items/WI-0150-video-architecture-activation-gate.md
+  blockers:
+  - WI-0137
+  blocker_notes:
+  - Intentional scheduling hold: video is planned future work but must not start until the maintainer explicitly reactivates M30 after higher-priority work. WI-0137 is only a minimum sequencing gate.
+  evidence: []
+- id: WI-0151
+  title: Ingest supported videos and extract metadata plus poster proxies
+  milestone: M30
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0151-video-ingestion-metadata-posters.md
+  blockers:
+  - WI-0150
+  blocker_notes: []
+  evidence: []
+- id: WI-0152
+  title: Add safe browser video serving and viewer playback
+  milestone: M30
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0152-video-serving-playback.md
+  blockers:
+  - WI-0151
+  blocker_notes: []
+  evidence: []
+- id: WI-0153
+  title: Integrate video with manual metadata and collection queries
+  milestone: M30
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0153-video-metadata-collections.md
+  blockers:
+  - WI-0151
+  - WI-0141
+  - WI-0144
+  blocker_notes: []
+  evidence: []
+- id: WI-0154
+  title: Integrate video clips into slideshow playback
+  milestone: M30
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0154-video-slideshow-playback.md
+  blockers:
+  - WI-0152
+  - WI-0139
+  blocker_notes: []
+  evidence: []
+- id: WI-0155
+  title: Evaluate face discovery and identity processing inside video
+  milestone: M30
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0155-video-face-processing-evaluation.md
+  blockers:
+  - WI-0151
+  blocker_notes: []
+  evidence: []
+- id: WI-0156
+  title: Evaluate iPhone Live Photo pairing as one logical media experience
+  milestone: M30
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0156-live-photo-pairing-evaluation.md
+  blockers:
+  - WI-0151
+  blocker_notes: []
   evidence: []

@@ -45,6 +45,10 @@ These are not required for the local product or for version 1:
 - public hosting or a cloud database;
 - GPU requirements;
 - neural-network fine-tuning; and
-- video processing.
+- video processing in the current implementation. Video is a planned later direction under [M30](../delivery/milestones/M30-video-media-support.md), intentionally held until explicitly reactivated.
 
 Azure remains an optional compute path for bounded jobs. The canonical catalogue, review workflow and source-of-truth decisions remain local.
+
+## Future media direction
+
+Video support is intentionally deferred rather than rejected. Until M30 is activated, avoid new runtime dependencies and speculative video implementation. When core source/asset/revision, metadata or collection contracts change for current work, prefer media-neutral semantics where natural and low-cost; keep genuinely image-specific decoding/face pipelines explicit rather than prematurely generalizing them.

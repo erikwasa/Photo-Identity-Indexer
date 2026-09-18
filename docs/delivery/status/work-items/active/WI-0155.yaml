@@ -1,0 +1,10 @@
+id: WI-0155
+title: Evaluate face discovery and identity processing inside video
+milestone: M30
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0155-video-face-processing-evaluation.md
+blockers:
+- WI-0151
+blocker_notes: []
+evidence: []

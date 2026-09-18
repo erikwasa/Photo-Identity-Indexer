@@ -1,0 +1,10 @@
+id: WI-0151
+title: Ingest supported videos and extract metadata plus poster proxies
+milestone: M30
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0151-video-ingestion-metadata-posters.md
+blockers:
+- WI-0150
+blocker_notes: []
+evidence: []

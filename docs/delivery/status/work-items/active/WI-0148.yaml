@@ -1,0 +1,10 @@
+id: WI-0148
+title: Retire SQLite-dependent tests and compatibility tools that no longer protect supported behavior
+milestone: M29
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0148-retire-sqlite-test-tool-dependencies.md
+blockers:
+- WI-0147
+blocker_notes: []
+evidence: []

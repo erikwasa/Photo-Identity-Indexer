@@ -1,0 +1,11 @@
+id: WI-0150
+title: Define the video media architecture and explicitly activate deferred implementation
+milestone: M30
+status: blocked
+owner: unassigned
+document: ../work-items/WI-0150-video-architecture-activation-gate.md
+blockers:
+- WI-0137
+blocker_notes:
+- Intentional scheduling hold: video is planned future work but must not start until the maintainer explicitly reactivates M30 after higher-priority work. WI-0137 is only a minimum sequencing gate.
+evidence: []

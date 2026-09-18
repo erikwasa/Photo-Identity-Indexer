@@ -1,0 +1,10 @@
+id: WI-0149
+title: Remove the SQLite implementation and obsolete migration-era active references
+milestone: M29
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0149-remove-sqlite-implementation.md
+blockers:
+- WI-0148
+blocker_notes: []
+evidence: []

@@ -1,0 +1,11 @@
+id: WI-0154
+title: Integrate video clips into slideshow playback
+milestone: M30
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0154-video-slideshow-playback.md
+blockers:
+- WI-0152
+- WI-0139
+blocker_notes: []
+evidence: []

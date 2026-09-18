@@ -1,0 +1,12 @@
+id: WI-0153
+title: Integrate video with manual metadata and collection queries
+milestone: M30
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0153-video-metadata-collections.md
+blockers:
+- WI-0151
+- WI-0141
+- WI-0144
+blocker_notes: []
+evidence: []
