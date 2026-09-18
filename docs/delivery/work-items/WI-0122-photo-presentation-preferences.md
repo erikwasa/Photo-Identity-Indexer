@@ -51,5 +51,6 @@ Automated persistence/selection tests plus maintainer verification that preferen
 - Audit/storage: the latest append-only `set`/`clear` action determines effective state. Preferences are tied to immutable revision IDs and cascade only when that revision is actually removed; tags, people, Places, source state and exact Smart Collection membership are unchanged.
 - Pin decision: no stronger Pin/Always-include action is introduced in this slice because Prefer provides a correction signal without creating target-count impossibility or precedence complexity. It can be reconsidered if private use shows Prefer is insufficient.
 - Persistence: SQLite schema advances to 18 and PostgreSQL to 25; offline catalogue migration includes the new action table in critical count verification.
-- Deferred work: maintainer verification on a representative private Creative Collection remains required before WI-0122 can be completed.
-- Commands run: repository CI will provide build, selector, integration, persistence, documentation, launcher and packaging evidence for this branch.
+- Maintainer verification: completed on 2026-09-18. Prefer, Avoid and Clear behaved as intended on a representative private Creative Collection, and an avoided photo remained visible in the ordinary exact Smart Collection.
+- Deferred work: a stronger Pin/Always-include action remains optional and should only be reconsidered if normal use shows Prefer is insufficient.
+- Commands run: PR 365 CI covered build, selector, integration, persistence, documentation, launcher and packaging surfaces; later PostgreSQL migration fixes in PRs 367 and 369 restored live PostgreSQL acceptance after the new presentation/history schema additions.
