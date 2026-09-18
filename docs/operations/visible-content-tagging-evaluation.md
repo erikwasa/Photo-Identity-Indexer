@@ -50,23 +50,8 @@ Use a representative saved Smart Collection that has more candidates than the re
 ~~~powershell
 $env:PHOTOIDENTITY_SEMANTIC_TEST = "<current PostgreSQL connection string>"
 
-dotnet run --project src/PhotoIdentity.Cli -c Release -- ^
-  semantic-tags evaluate ^
-  --postgres-connection-env PHOTOIDENTITY_SEMANTIC_TEST ^
-  --collection "<saved Smart Collection GUID>" ^
-  --proxy-root "<archive derivative root>" ^
-  --proxy-profile "<current review proxy profile id>" ^
-  --model "<local CLIP ONNX path>" ^
-  --tokenizer-vocab "<matching vocab.json>" ^
-  --tokenizer-merges "<matching merges.txt>" ^
-  --concept-vocabulary experiments/visible-content/wi-0126-vocabulary-v1.json ^
-  --target-count 50 ^
-  --max-candidates 200 ^
-  --concepts-per-photo 2 ^
-  --report artifacts/wi-0126-visible-content-report.json
+dotnet run --project src/PhotoIdentity.Cli -c Release -- semantic-tags evaluate --postgres-connection-env PHOTOIDENTITY_SEMANTIC_TEST --collection "<saved Smart Collection GUID>" --proxy-root "<archive derivative root>" --proxy-profile "<current review proxy profile id>" --model "<local CLIP ONNX path>" --tokenizer-vocab "<matching vocab.json>" --tokenizer-merges "<matching merges.txt>" --concept-vocabulary experiments/visible-content/wi-0126-vocabulary-v1.json --target-count 50 --max-candidates 200 --concepts-per-photo 2 --report artifacts/wi-0126-visible-content-report.json
 ~~~
-
-The line continuations above are illustrative; PowerShell users may place the command on one line or use normal PowerShell backtick continuation.
 
 By default **no source original is opened**. To explicitly compare proxy inference against originals, rerun with a small bounded count such as '--compare-originals 20'.
 
