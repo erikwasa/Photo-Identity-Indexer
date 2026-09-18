@@ -68,6 +68,11 @@ public partial class Slideshow : IAsyncDisposable
     private bool ProtectionStatusKnown { get; set; }
     private bool Preparing { get; set; } = true;
     private bool FullscreenActive { get; set; }
+    private bool FullscreenFallbackActive =>
+        ProtectionStatusKnown &&
+        !FullscreenActive &&
+        Capabilities.FullscreenState == SlideshowFullscreenState.UnsupportedFallback;
+    private bool PresentationActive => FullscreenActive || FullscreenFallbackActive;
     private bool SettingsOpen { get; set; }
     private string? Error { get; set; }
     private string? ImageError { get; set; }
@@ -87,14 +92,14 @@ public partial class Slideshow : IAsyncDisposable
     private bool PreparationFailed =>
         OriginalPreparation?.State == "failed";
     private bool ShowTimerProgress =>
-        FullscreenActive &&
+        PresentationActive &&
         !Protection.ParentControlsOpen &&
         Playback.IsPlaying &&
         Playback.IsImageReady &&
         Settings.ShowTimerProgress &&
         Snapshot?.Total > 0;
     private bool ShowAdultToolbar =>
-        FullscreenActive &&
+        PresentationActive &&
         !Preparing &&
         !PreparingOriginals &&
         string.IsNullOrWhiteSpace(Error) &&
@@ -148,7 +153,7 @@ public partial class Slideshow : IAsyncDisposable
                 "photoIdentitySlideshow.getProtectionStatus");
             ProtectionStatusKnown = true;
 
-            if (FullscreenActive)
+            if (PresentationActive)
             {
                 await AcquireProtectionsAsync(showWarning: false);
             }
@@ -196,7 +201,7 @@ public partial class Slideshow : IAsyncDisposable
                 Snapshot.Items.Select(item => item.RevisionId),
                 Settings);
 
-            if (!FullscreenActive && Playback.IsPlaying)
+            if (!PresentationActive && Playback.IsPlaying)
             {
                 _resumeAfterFullscreenRecovery = true;
                 Playback.Pause();
@@ -243,7 +248,7 @@ public partial class Slideshow : IAsyncDisposable
                 TimeSpan elapsed = Stopwatch.GetElapsedTime(_lastTickTimestamp, now);
                 _lastTickTimestamp = now;
 
-                if (!FullscreenActive || Protection.ParentControlsOpen)
+                if (!PresentationActive || Protection.ParentControlsOpen)
                 {
                     continue;
                 }
@@ -377,7 +382,7 @@ public partial class Slideshow : IAsyncDisposable
 
     private bool CanNavigatePresentation() =>
         Settings.ManualNavigation &&
-        FullscreenActive &&
+        PresentationActive &&
         !Preparing &&
         !PreparingOriginals &&
         !PreparationFailed &&
@@ -492,7 +497,7 @@ public partial class Slideshow : IAsyncDisposable
             case "ArrowRight":
                 await RequestNavigationAsync(SlideshowNavigationDirection.Next);
                 break;
-            case " " when FullscreenActive && !PreparingOriginals && !PreparationFailed:
+            case " " when PresentationActive && !PreparingOriginals && !PreparationFailed:
                 TogglePlay();
                 break;
         }
@@ -600,7 +605,7 @@ public partial class Slideshow : IAsyncDisposable
     {
         if (!Settings.ProtectedSlideshow ||
             !ProtectionStatusKnown ||
-            !FullscreenActive ||
+            !PresentationActive ||
             Preparing ||
             Snapshot is null ||
             Protection.ParentControlsOpen ||
@@ -618,7 +623,18 @@ public partial class Slideshow : IAsyncDisposable
         FullscreenActive = entered;
         _lastTickTimestamp = Stopwatch.GetTimestamp();
 
-        if (!entered)
+        try
+        {
+            Capabilities = await JS.InvokeAsync<SlideshowBrowserProtectionStatus>(
+                "photoIdentitySlideshow.getProtectionStatus");
+            ProtectionStatusKnown = true;
+        }
+        catch (JSException)
+        {
+            ProtectionStatusKnown = false;
+        }
+
+        if (!PresentationActive)
         {
             return;
         }
@@ -675,7 +691,7 @@ public partial class Slideshow : IAsyncDisposable
         SettingsOpen = false;
         _resumeAfterParentControls = false;
 
-        if (shouldResume && FullscreenActive)
+        if (shouldResume && PresentationActive)
         {
             _resumeAfterFullscreenRecovery = false;
             Playback.Resume();
@@ -871,7 +887,7 @@ public partial class Slideshow : IAsyncDisposable
         else if (parentWasOpen && !Settings.ProtectedSlideshow)
         {
             _resumeAfterParentControls = false;
-            if (desiredResume && FullscreenActive)
+            if (desiredResume && PresentationActive)
             {
                 Playback.Resume();
             }
@@ -880,7 +896,7 @@ public partial class Slideshow : IAsyncDisposable
         if (!previous.ProtectedSlideshow && Settings.ProtectedSlideshow)
         {
             SettingsOpen = false;
-            if (FullscreenActive)
+            if (PresentationActive)
             {
                 await AcquireProtectionsAsync(showWarning: true);
             }
@@ -1140,7 +1156,7 @@ public partial class Slideshow : IAsyncDisposable
             return;
         }
 
-        if (FullscreenActive)
+        if (PresentationActive)
         {
             _resumeAfterFullscreenRecovery = false;
             Playback.Resume();
@@ -1212,7 +1228,7 @@ public partial class Slideshow : IAsyncDisposable
             _resumeAfterParentControls = shouldResume;
             CloseParentControls();
         }
-        else if (shouldResume && FullscreenActive)
+        else if (shouldResume && PresentationActive)
         {
             Playback.Resume();
         }
