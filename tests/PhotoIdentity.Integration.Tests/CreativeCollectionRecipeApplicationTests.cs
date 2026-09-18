@@ -208,7 +208,7 @@ public sealed class CreativeCollectionRecipeApplicationTests
                 ?? throw new InvalidOperationException();
 
             Assert.Null(cleared.Preference);
-            Assert.Equal(2, cleared.History.Count);
+            Assert.Equal(2, cleared.History.Length);
             Assert.Equal("clear", cleared.History[0].ActionKind);
             Assert.Equal("avoid", cleared.History[1].Preference);
 
