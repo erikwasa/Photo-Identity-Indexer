@@ -74,6 +74,15 @@ The same workflow must remain useful for archives with little or no GPS/location
 
 Each stage should remain independently inspectable so unsuccessful heuristics/models can be replaced or retired without changing canonical Smart Collection or slideshow semantics.
 
+## Maintainer verification progress
+
+On 2026-09-18, the maintainer accepted the pursued presentation-quality follow-ons:
+
+- WI-0122: Prefer, Avoid and Clear behaved correctly on a representative private Creative Collection; Avoid changed Creative presentation only and the photo remained in the ordinary exact Smart Collection.
+- WI-0124: slideshow show counts updated for actually displayed photos; freshness disabled preserved the stable baseline; freshness enabled produced a sensible different selection with more unseen photos.
+
+WI-0125 is the next ready product-quality follow-on. It keeps M26 in the metadata-first/product layer by adding optional person birth-date precision and explicit family relationships for age- and relationship-oriented stories. WI-0126 through WI-0128 remain optional semantic experiments and are not prerequisites for starting WI-0125.
+
 ## Exit criteria
 
 - [x] A documented, versioned moment-clustering policy can group representative family-photo sequences using capture-time-first evidence and can leave uncertain photos ungrouped/singleton rather than forcing a result.

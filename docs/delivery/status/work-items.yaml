@@ -64,38 +64,10 @@ work_items:
   - WI-0090
   blocker_notes: []
   evidence: []
-- id: WI-0122
-  title: Add photo presentation preferences for Creative Collections
-  milestone: M26
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0122-photo-presentation-preferences.md
-  started_at: 2026-09-18
-  last_updated_at: 2026-09-18
-  branch: agent/WI-0122-photo-presentation-preferences
-  blockers:
-  - WI-0120
-  blocker_notes:
-  - Automated persistence, audit, selector precedence and exact-membership coverage are implemented; completion remains pending maintainer verification on a representative private Creative Collection.
-  evidence: []
-- id: WI-0124
-  title: Track slideshow exposure and novelty for Creative Collections
-  milestone: M26
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0124-slideshow-history-novelty.md
-  started_at: 2026-09-18
-  last_updated_at: 2026-09-18
-  branch: agent/WI-0124-slideshow-history-novelty
-  blockers:
-  - WI-0120
-  blocker_notes:
-  - Automated exposure persistence, idempotent session semantics, history-disabled equivalence, novelty selection and preference precedence are implemented; completion remains pending maintainer novelty-off/on comparison on a representative private Creative Collection.
-  evidence: []
 - id: WI-0125
   title: Add birth dates and family relationships for age-aware Creative Collections
   milestone: M26
-  status: proposed
+  status: ready
   owner: unassigned
   document: ../work-items/WI-0125-person-family-metadata.md
   blockers:
@@ -171,21 +143,6 @@ work_items:
   - WI-0136
   - WI-0139
   blocker_notes: []
-  evidence: []
-- id: WI-0138
-  title: Coalesce provisional clustering refreshes during active face review
-  milestone: M25
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0138-coalesced-provisional-cluster-refresh.md
-  started_at: 2026-09-18
-  last_updated_at: 2026-09-18
-  branch: agent/WI-0138-coalesce-provisional-cluster-refresh
-  blockers:
-  - WI-0114
-  - WI-0115
-  blocker_notes:
-  - Implementation and automated regression coverage are on the work branch; completion remains pending CI/live PostgreSQL and maintainer sustained-review verification.
   evidence: []
 - id: WI-0139
   title: Allow slideshow playback when browser fullscreen is unavailable

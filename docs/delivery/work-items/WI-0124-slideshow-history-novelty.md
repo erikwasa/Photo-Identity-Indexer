@@ -52,5 +52,6 @@ Automated persistence/selection tests plus maintainer comparison of repeated Cre
 - Privacy/state boundary: exposure rows store session ID, immutable revision ID, Smart Collection ID, Creative/classic flag and server timestamp only. No source paths, filenames or media URLs are persisted.
 - Scale boundary: storage admits at most one row per revision per slideshow session; selection reads indexed aggregate history only for the current candidate revisions in a batch.
 - Schema: SQLite advances to 19 and PostgreSQL to 26. Offline catalogue migration includes exposure history in critical count verification.
-- Deferred work: maintainer comparison of repeated private Creative Collection runs with freshness disabled and enabled remains required before WI-0124 completion.
-- Commands run: repository CI will provide build, selector, integration, provider, documentation, launcher and package verification evidence for this branch.
+- Maintainer verification: completed on 2026-09-18. Show counts updated for actually displayed photos, freshness-disabled selection remained stable, and enabling freshness produced a sensible different selection with more unseen photos.
+- Deferred work: future novelty tuning should be based on repeated-use evidence rather than exposing raw scoring controls.
+- Commands run: PR 366 CI covered build, selector, integration, provider, documentation, launcher and package verification surfaces; follow-up PostgreSQL migration fixes in PRs 367 and 369 repaired replay-safe schema initialization and SQLite-to-PostgreSQL identity preservation found by live acceptance.
