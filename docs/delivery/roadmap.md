@@ -32,6 +32,9 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M25 | Face discovery and cluster-assisted identity review | completed |
 | M26 | Creative Collections | ready |
 | M27 | Slideshow presentation experience | ready |
+| M28 | Library curation and metadata editing | ready |
+| M29 | PostgreSQL-only catalogue cleanup | ready |
+| M30 | Video media support | blocked |
 
 Expected evolution:
 

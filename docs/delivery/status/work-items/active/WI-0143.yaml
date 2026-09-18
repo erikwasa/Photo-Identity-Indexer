@@ -1,0 +1,10 @@
+id: WI-0143
+title: Replace Smart Collection date free text with structured controls
+milestone: M28
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0143-structured-smart-collection-date-controls.md
+blockers:
+- WI-0141
+blocker_notes: []
+evidence: []

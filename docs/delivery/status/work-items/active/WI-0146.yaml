@@ -1,0 +1,10 @@
+id: WI-0146
+title: Add manual slideshow curation and launch UI
+milestone: M28
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0146-manual-slideshow-curation-ui.md
+blockers:
+- WI-0145
+blocker_notes: []
+evidence: []

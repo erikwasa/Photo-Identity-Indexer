@@ -16,6 +16,8 @@ An **asset revision** is an immutable observed content version of an asset. It r
 
 Processing attaches to revisions so changed content cannot silently reuse older detections, crops or embeddings.
 
+Current production processing is image/photo-specific, but video is a planned later media type under M30. Source, asset and revision identity should therefore remain media-neutral where practical. Image decoding, face crops and other genuinely image-specific derived contracts do not need speculative generalization before M30 is explicitly activated.
+
 ## Source-copy presence, duplicates and exclusion
 
 Source presence and operator exclusion are separate dimensions.

@@ -1,0 +1,10 @@
+id: WI-0142
+title: Add manual and imprecise capture-date editing to Photo Details
+milestone: M28
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0142-manual-capture-date-editor.md
+blockers:
+- WI-0141
+blocker_notes: []
+evidence: []

@@ -1,0 +1,11 @@
+id: WI-0139
+title: Allow slideshow playback when browser fullscreen is unavailable
+milestone: M27
+status: ready
+owner: unassigned
+document: ../work-items/WI-0139-no-fullscreen-slideshow-fallback.md
+blockers:
+- WI-0084
+- WI-0136
+blocker_notes: []
+evidence: []

@@ -61,6 +61,7 @@ These integrations may remain proposed until their M26 dependencies prove useful
 
 - [WI-0135](../work-items/WI-0135-visual-tap-to-play-slideshow-library.md) - redesign the read-only slideshow library around automatic cover images and tap-to-play collection cards.
 - [WI-0136](../work-items/WI-0136-exception-driven-slideshow-preparation.md) - hide routine original-preparation mechanics from normal consumption and surface only states that require action.
+- [WI-0139](../work-items/WI-0139-no-fullscreen-slideshow-fallback.md) - allow immersive slideshow playback when the standard Fullscreen API is unavailable, while keeping reduced-protection status explicit.
 - [WI-0137](../work-items/WI-0137-real-device-slideshow-polish-acceptance.md) - run real-device acceptance, tune presentation defaults and verify the combined experience remains smooth, bounded and toddler-safe.
 
 ## Delivery sequence
@@ -70,7 +71,8 @@ These integrations may remain proposed until their M26 dependencies prove useful
 3. WI-0134 tunes timing so autoplay feels less mechanical without adding another preference surface.
 4. WI-0135 and WI-0136 simplify the entry path so routine use becomes choose -> tap -> watch, while parent/recovery controls remain available when genuinely needed.
 5. WI-0132 and WI-0133 integrate Creative Collection structure only after the relevant M26 evidence exists; they are presentation consumers, not reasons to alter canonical collection semantics.
-6. WI-0137 performs representative phone/browser acceptance and records the defaults that should ship.
+6. WI-0139 closes the no-Fullscreen-API startup dead end before final acceptance.
+7. WI-0137 performs representative phone/browser acceptance and records the defaults that should ship.
 
 ## Exit criteria
 
@@ -84,7 +86,8 @@ These integrations may remain proposed until their M26 dependencies prove useful
 - [ ] `/slideshows` is visually collection-first, uses automatic representative covers and supports starting playback by activating the collection card itself.
 - [ ] Routine original preparation/status UI is absent from the normal happy path; actionable failures and recovery remain explicit and parent-safe.
 - [ ] Moment/burst presentation integrations, when enabled, change pacing/transition language only and do not silently change slideshow membership.
-- [ ] Real-device acceptance covers autoplay, manual navigation, protected controls, orientation/fullscreen recovery, reduced motion, mixed aspect ratios, slow image readiness and repeated loops.
+- [ ] Browsers without the standard Fullscreen API can still start an immersive full-viewport slideshow, with reduced browser-level protection reported explicitly rather than entering an unrecoverable pause loop.
+- [ ] Real-device acceptance covers autoplay, manual navigation, protected controls, orientation/fullscreen recovery, no-fullscreen fallback, reduced motion, mixed aspect ratios, slow image readiness and repeated loops.
 - [ ] Automated tests cover transition lifecycle, timer/reset semantics, bounded staging, fallback behavior and the simplified library/startup states.
 
 ## Risks

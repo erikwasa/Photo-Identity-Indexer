@@ -1,0 +1,10 @@
+id: WI-0140
+title: Replace long place dropdowns with a searchable place picker
+milestone: M28
+status: ready
+owner: unassigned
+document: ../work-items/WI-0140-searchable-place-picker.md
+blockers:
+- WI-0063
+blocker_notes: []
+evidence: []

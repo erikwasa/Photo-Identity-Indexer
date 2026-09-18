@@ -1,0 +1,10 @@
+id: WI-0152
+title: Add safe browser video serving and viewer playback
+milestone: M30
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0152-video-serving-playback.md
+blockers:
+- WI-0151
+blocker_notes: []
+evidence: []

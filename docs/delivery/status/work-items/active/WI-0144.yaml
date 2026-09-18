@@ -1,0 +1,11 @@
+id: WI-0144
+title: Allow Smart Collections to match any of multiple named locations
+milestone: M28
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0144-smart-collection-multiple-locations.md
+blockers:
+- WI-0063
+- WI-0140
+blocker_notes: []
+evidence: []

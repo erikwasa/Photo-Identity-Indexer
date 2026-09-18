@@ -1,0 +1,10 @@
+id: WI-0156
+title: Evaluate iPhone Live Photo pairing as one logical media experience
+milestone: M30
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0156-live-photo-pairing-evaluation.md
+blockers:
+- WI-0151
+blocker_notes: []
+evidence: []

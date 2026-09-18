@@ -277,3 +277,36 @@ milestones:
   - WI-0135
   - WI-0136
   - WI-0137
+  - WI-0139
+- id: M28
+  title: Library curation and metadata editing
+  status: ready
+  document: ../milestones/M28-library-curation-metadata-editing.md
+  work_items:
+  - WI-0140
+  - WI-0141
+  - WI-0142
+  - WI-0143
+  - WI-0144
+  - WI-0145
+  - WI-0146
+- id: M29
+  title: PostgreSQL-only catalogue cleanup
+  status: ready
+  document: ../milestones/M29-postgresql-only-catalogue-cleanup.md
+  work_items:
+  - WI-0147
+  - WI-0148
+  - WI-0149
+- id: M30
+  title: Video media support
+  status: blocked
+  document: ../milestones/M30-video-media-support.md
+  work_items:
+  - WI-0150
+  - WI-0151
+  - WI-0152
+  - WI-0153
+  - WI-0154
+  - WI-0155
+  - WI-0156

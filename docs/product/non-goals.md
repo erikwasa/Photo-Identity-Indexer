@@ -12,7 +12,7 @@ The current product direction deliberately does not aim to:
 - Require the full logical OneDrive archive to remain hydrated on local disk.
 - Support several simultaneous independent writers to the canonical catalogue.
 - Guarantee universal decoding of every proprietary camera RAW format ever produced; version 1 targets HEIC/HEIF and the RAW variants actually present in the maintained archive and reports unsupported variants explicitly.
-- Process video in version 1.
+- Process video in the current implementation. Video remains intentionally deferred, but is a planned later capability under [M30](../delivery/milestones/M30-video-media-support.md).
 - Build a public cloud photo gallery or public sharing service.
 - Treat model-generated visible-content tags as authoritative human facts without provenance.
 
