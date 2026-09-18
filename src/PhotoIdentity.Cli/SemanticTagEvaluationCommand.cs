@@ -5,6 +5,7 @@ using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Recognition.Onnx.Semantic;
