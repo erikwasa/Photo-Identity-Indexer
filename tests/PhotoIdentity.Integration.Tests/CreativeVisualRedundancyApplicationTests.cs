@@ -141,11 +141,13 @@ public sealed class CreativeVisualRedundancyApplicationTests
     private static byte[] CreateGradient(bool reverse)
     {
         using Mat image = new(new Size(90, 80), MatType.CV_8UC3);
-        for (int row = 0; row < image.Rows; row++)
+        int rows = image.Rows;
+        int columns = image.Cols;
+        for (int row = 0; row < rows; row++)
         {
-            for (int column = 0; column < image.Cols; column++)
+            for (int column = 0; column < columns; column++)
             {
-                int normalized = column * 255 / Math.Max(1, image.Cols - 1);
+                int normalized = column * 255 / Math.Max(1, columns - 1);
                 byte value = (byte)(reverse ? 255 - normalized : normalized);
                 image.Set(row, column, new Vec3b(value, value, value));
             }
