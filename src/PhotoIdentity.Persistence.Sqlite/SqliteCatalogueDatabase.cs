@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 18;
+    public const int CurrentSchemaVersion = 19;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -819,6 +819,26 @@ public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
         PRAGMA user_version = 18;
         """;
 
+    private const string VersionNineteenMigration = """
+        CREATE TABLE IF NOT EXISTS photo_slideshow_exposures (
+            session_id TEXT NOT NULL,
+            asset_revision_id TEXT NOT NULL,
+            collection_id TEXT NOT NULL,
+            creative INTEGER NOT NULL CHECK (creative IN (0, 1)),
+            shown_at_utc TEXT NOT NULL,
+            PRIMARY KEY (session_id, asset_revision_id),
+            FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE,
+            FOREIGN KEY (collection_id) REFERENCES smart_collections (id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_photo_slideshow_exposures_revision
+            ON photo_slideshow_exposures (asset_revision_id, shown_at_utc DESC);
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (19, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 19;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -963,6 +983,12 @@ public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
         if (version < 18)
         {
             await ApplyMigrationAsync(connection, VersionEighteenMigration, cancellationToken);
+            version = 18;
+        }
+
+        if (version < 19)
+        {
+            await ApplyVersionNineteenMigrationAsync(connection, cancellationToken);
         }
     }
 
@@ -993,6 +1019,51 @@ public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
         command.CommandText = "PRAGMA user_version;";
         object? value = await command.ExecuteScalarAsync(cancellationToken);
         return Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static async Task ApplyVersionNineteenMigrationAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        using SqliteTransaction transaction = connection.BeginTransaction();
+
+        bool noveltyColumnExists;
+        using (SqliteCommand columns = connection.CreateCommand())
+        {
+            columns.Transaction = transaction;
+            columns.CommandText = "PRAGMA table_info(creative_collection_recipes);";
+            await using SqliteDataReader reader = await columns.ExecuteReaderAsync(cancellationToken);
+            noveltyColumnExists = false;
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (string.Equals(reader.GetString(1), "novelty_enabled", StringComparison.OrdinalIgnoreCase))
+                {
+                    noveltyColumnExists = true;
+                    break;
+                }
+            }
+        }
+
+        if (!noveltyColumnExists)
+        {
+            using SqliteCommand addColumn = connection.CreateCommand();
+            addColumn.Transaction = transaction;
+            addColumn.CommandText = """
+                ALTER TABLE creative_collection_recipes
+                    ADD COLUMN novelty_enabled INTEGER NOT NULL DEFAULT 0
+                    CHECK (novelty_enabled IN (0, 1));
+                """;
+            await addColumn.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        using (SqliteCommand migration = connection.CreateCommand())
+        {
+            migration.Transaction = transaction;
+            migration.CommandText = VersionNineteenMigration;
+            await migration.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        transaction.Commit();
     }
 
     private static async Task ApplyMigrationAsync(

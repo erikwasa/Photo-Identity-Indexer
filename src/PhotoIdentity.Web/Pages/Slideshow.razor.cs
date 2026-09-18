@@ -19,6 +19,7 @@ public partial class Slideshow : IAsyncDisposable
     private readonly SlideshowProtectionState Protection = new();
     private readonly SlideshowNavigationGate _navigationGate = new();
     private readonly CancellationTokenSource _timerCancellation = new();
+    private readonly Guid _exposureSessionId = Guid.NewGuid();
 
     private DotNetObjectReference<Slideshow>? _dotNetReference;
     private CancellationTokenSource? _parentUnlockCancellation;

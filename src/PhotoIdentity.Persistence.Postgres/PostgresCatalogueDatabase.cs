@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 25;
+    public const int CurrentSchemaVersion = 26;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1129,6 +1129,28 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
 
             CREATE INDEX IF NOT EXISTS ix_photo_presentation_preference_actions_revision
                 ON photo_presentation_preference_actions (asset_revision_id, id DESC);
+            """),
+        new(26, "slideshow-exposure-novelty", """
+            ALTER TABLE creative_collection_recipes
+                ADD COLUMN novelty_enabled boolean NOT NULL DEFAULT false;
+
+            CREATE TABLE IF NOT EXISTS photo_slideshow_exposures (
+                session_id uuid NOT NULL,
+                asset_revision_id uuid NOT NULL,
+                collection_id uuid NOT NULL,
+                creative boolean NOT NULL,
+                shown_at_utc timestamp with time zone NOT NULL,
+                PRIMARY KEY (session_id, asset_revision_id),
+                CONSTRAINT fk_photo_slideshow_exposure_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                CONSTRAINT fk_photo_slideshow_exposure_collection
+                    FOREIGN KEY (collection_id)
+                    REFERENCES smart_collections (id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_photo_slideshow_exposures_revision
+                ON photo_slideshow_exposures (asset_revision_id, shown_at_utc DESC);
             """),
     ];
 

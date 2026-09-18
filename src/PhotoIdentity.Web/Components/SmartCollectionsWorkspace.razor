@@ -238,12 +238,21 @@
                                     <option value="broad">Broad</option>
                                 </select>
                             </label>
+
+                            <label class="smart-location-toggle">
+                                <input type="checkbox"
+                                       @bind="CreativeNoveltyEnabled"
+                                       @bind:after="ClearCreativePreview"
+                                       disabled="@Busy" />
+                                <span>Favor photos not shown recently</span>
+                            </label>
                         </div>
 
                         <p class="smart-help">
                             Focused adds at most 2 nearby context photos per anchored moment, Balanced 6, and Broad 12.
-                            The accepted 30-minute moment policy, deterministic diversity policy and chronological playback
-                            order stay versioned with the saved recipe.
+                            Freshness is optional and uses recorded slideshow presentations only; it never changes exact
+                            Smart Collection membership or photo metadata. The accepted 30-minute moment policy,
+                            deterministic diversity policy and chronological playback order stay versioned with the saved recipe.
                         </p>
 
                         <div class="smart-actions">
@@ -276,6 +285,7 @@
                                 <div class="creative-stat"><strong>@creative.SelectedCount</strong><span>selected</span></div>
                                 <div class="creative-stat"><strong>@creative.RepresentedMomentCount</strong><span>moments</span></div>
                                 <div class="creative-stat"><strong>@creative.RepresentedTimePeriodCount</strong><span>months</span></div>
+                                <div class="creative-stat"><strong>@(creative.NoveltyEnabled ? "On" : "Off")</strong><span>freshness</span></div>
                             </div>
 
                             @if (creative.NoAnchors)
@@ -301,6 +311,7 @@
                                                 </span>
                                                 <strong>@CreativePhotoDate(photo)</strong>
                                                 <span class="smart-muted">@CreativeReasonSummary(photo)</span>
+                                                <span class="smart-muted">@CreativeHistorySummary(photo)</span>
                                             </div>
                                         </article>
                                     }

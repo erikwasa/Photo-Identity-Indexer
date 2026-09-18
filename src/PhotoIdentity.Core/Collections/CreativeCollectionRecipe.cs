@@ -13,6 +13,7 @@ public sealed record CreativeCollectionRecipe(
     string ContextPolicyVersion,
     string SelectionPolicyVersion,
     string OrderingPolicyVersion,
+    bool NoveltyEnabled,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc)
 {
@@ -25,7 +26,8 @@ public sealed record CreativeCollectionRecipe(
         PhotoMomentGapPolicy.CreateTimeGapEvaluation(DefaultMomentGapMinutes).Version,
         CreativeCollectionContextPolicy.BalancedV1.Version,
         CreativeCollectionSelectionPolicy.BalancedV1.Version,
-        CreativeCollectionOrderingPolicies.ChronologicalV1);
+        CreativeCollectionOrderingPolicies.ChronologicalV1,
+        NoveltyEnabled: false);
 }
 
 public sealed record CreativeCollectionRecipeSettings(
@@ -34,20 +36,24 @@ public sealed record CreativeCollectionRecipeSettings(
     string MomentPolicyVersion,
     string ContextPolicyVersion,
     string SelectionPolicyVersion,
-    string OrderingPolicyVersion)
+    string OrderingPolicyVersion,
+    bool NoveltyEnabled)
 {
     public static CreativeCollectionRecipeSettings Create(
         int targetCount,
-        string contextPolicyVersion) =>
+        string contextPolicyVersion,
+        bool noveltyEnabled = false) =>
         CreateForPreview(
             targetCount,
             CreativeCollectionRecipe.DefaultMomentGapMinutes,
-            contextPolicyVersion);
+            contextPolicyVersion,
+            noveltyEnabled);
 
     public static CreativeCollectionRecipeSettings CreateForPreview(
         int targetCount,
         int momentGapMinutes,
-        string contextPolicyVersion)
+        string contextPolicyVersion,
+        bool noveltyEnabled = false)
     {
         CreativeCollectionSelectionPolicy.ValidateTargetCount(targetCount);
         CreativeCollectionContextPolicy contextPolicy =
@@ -61,7 +67,8 @@ public sealed record CreativeCollectionRecipeSettings(
             momentPolicy.Version,
             contextPolicy.Version,
             CreativeCollectionSelectionPolicy.BalancedV1.Version,
-            CreativeCollectionOrderingPolicies.ChronologicalV1);
+            CreativeCollectionOrderingPolicies.ChronologicalV1,
+            noveltyEnabled);
     }
 
     public void ValidateSupported()

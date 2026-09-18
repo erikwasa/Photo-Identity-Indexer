@@ -83,7 +83,8 @@ public sealed record SmartCollectionErrorResponse(string Error);
 
 public sealed record CreativeCollectionRecipeRequest(
     int TargetCount = 50,
-    string ContextStrength = "balanced");
+    string ContextStrength = "balanced",
+    bool NoveltyEnabled = false);
 
 public sealed record CreativeCollectionRecipeResponse(
     string AnchorCollectionId,
@@ -95,6 +96,8 @@ public sealed record CreativeCollectionRecipeResponse(
     string ContextPolicyVersion,
     string SelectionPolicyVersion,
     string OrderingPolicyVersion,
+    bool NoveltyEnabled,
+    string NoveltyPolicyVersion,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc);
 
@@ -112,6 +115,8 @@ public sealed record CreativeCollectionPreviewCandidateResponse(
     string Kind,
     DateTime? TakenAtLocal,
     string ThumbnailUrl,
+    int ShowCount,
+    DateTimeOffset? LastShownAtUtc,
     CreativeCollectionContextReasonResponse[] ContextReasons);
 
 public sealed record CreativeCollectionSelectedCandidateResponse(
@@ -122,6 +127,8 @@ public sealed record CreativeCollectionSelectedCandidateResponse(
     string? MomentId,
     string? PeopleCombinationKey,
     int SelectionScore,
+    int ShowCount,
+    DateTimeOffset? LastShownAtUtc,
     CreativeCollectionSelectionReasonResponse[] SelectionReasons,
     CreativeCollectionContextReasonResponse[] ContextReasons);
 
@@ -135,6 +142,8 @@ public sealed record CreativeCollectionPreviewResponse(
     int TotalCandidateCount,
     bool NoAnchors,
     string SelectionPolicyVersion,
+    bool NoveltyEnabled,
+    string NoveltyPolicyVersion,
     int RequestedTargetCount,
     int SelectedDirectAnchorCount,
     int SelectedContextCount,

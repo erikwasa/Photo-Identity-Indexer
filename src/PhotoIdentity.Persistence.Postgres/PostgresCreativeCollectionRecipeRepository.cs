@@ -33,6 +33,7 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
                    context_policy_version,
                    selection_policy_version,
                    ordering_policy_version,
+                   novelty_enabled,
                    created_at_utc,
                    updated_at_utc
             FROM creative_collection_recipes
@@ -66,6 +67,7 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
                 context_policy_version,
                 selection_policy_version,
                 ordering_policy_version,
+                novelty_enabled,
                 created_at_utc,
                 updated_at_utc)
             VALUES (
@@ -76,6 +78,7 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
                 @context_policy_version,
                 @selection_policy_version,
                 @ordering_policy_version,
+                @novelty_enabled,
                 @created_at_utc,
                 @updated_at_utc)
             ON CONFLICT(anchor_collection_id) DO UPDATE SET
@@ -85,6 +88,7 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
                 context_policy_version = EXCLUDED.context_policy_version,
                 selection_policy_version = EXCLUDED.selection_policy_version,
                 ordering_policy_version = EXCLUDED.ordering_policy_version,
+                novelty_enabled = EXCLUDED.novelty_enabled,
                 updated_at_utc = EXCLUDED.updated_at_utc;
             """;
         command.Parameters.AddWithValue("anchor_collection_id", NpgsqlDbType.Uuid, anchorCollectionId.Value);
@@ -94,6 +98,7 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
         command.Parameters.AddWithValue("context_policy_version", settings.ContextPolicyVersion);
         command.Parameters.AddWithValue("selection_policy_version", settings.SelectionPolicyVersion);
         command.Parameters.AddWithValue("ordering_policy_version", settings.OrderingPolicyVersion);
+        command.Parameters.AddWithValue("novelty_enabled", NpgsqlDbType.Boolean, settings.NoveltyEnabled);
         command.Parameters.AddWithValue("created_at_utc", now);
         command.Parameters.AddWithValue("updated_at_utc", now);
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -124,8 +129,9 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
             reader.GetString(4),
             reader.GetString(5),
             reader.GetString(6),
-            reader.GetFieldValue<DateTimeOffset>(7),
-            reader.GetFieldValue<DateTimeOffset>(8));
+            reader.GetBoolean(7),
+            reader.GetFieldValue<DateTimeOffset>(8),
+            reader.GetFieldValue<DateTimeOffset>(9));
 
         new CreativeCollectionRecipeSettings(
             recipe.TargetCount,
@@ -133,7 +139,8 @@ public sealed class PostgresCreativeCollectionRecipeRepository : ICreativeCollec
             recipe.MomentPolicyVersion,
             recipe.ContextPolicyVersion,
             recipe.SelectionPolicyVersion,
-            recipe.OrderingPolicyVersion).ValidateSupported();
+            recipe.OrderingPolicyVersion,
+            recipe.NoveltyEnabled).ValidateSupported();
         return recipe;
     }
 }

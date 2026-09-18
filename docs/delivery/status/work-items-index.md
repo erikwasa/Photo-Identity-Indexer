@@ -12,7 +12,7 @@ Current work items: **14**. Archived terminal items: **122**.
 | [WI-0090](../work-items/WI-0090-exclusion-purge-service.md) Purge excluded photo data and derivatives safely | M23 | proposed | unassigned | [YAML](work-items/active/WI-0090.yaml) |
 | [WI-0091](../work-items/WI-0091-archive-lifecycle-review.md) Add archive lifecycle review and exclusion workflows | M23 | proposed | unassigned | [YAML](work-items/active/WI-0091.yaml) |
 | [WI-0122](../work-items/WI-0122-photo-presentation-preferences.md) Add photo presentation preferences for Creative Collections | M26 | in_progress | ai-agent | [YAML](work-items/active/WI-0122.yaml) |
-| [WI-0124](../work-items/WI-0124-slideshow-history-novelty.md) Track slideshow exposure and novelty for Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0124.yaml) |
+| [WI-0124](../work-items/WI-0124-slideshow-history-novelty.md) Track slideshow exposure and novelty for Creative Collections | M26 | in_progress | ai-agent | [YAML](work-items/active/WI-0124.yaml) |
 | [WI-0125](../work-items/WI-0125-person-family-metadata.md) Add birth dates and family relationships for age-aware Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0125.yaml) |
 | [WI-0126](../work-items/WI-0126-visible-content-tagging.md) Re-evaluate local visible-content tagging for Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0126.yaml) |
 | [WI-0127](../work-items/WI-0127-whole-image-embeddings.md) Evaluate whole-image embeddings for semantic Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0127.yaml) |

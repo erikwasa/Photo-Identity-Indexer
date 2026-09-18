@@ -5,7 +5,7 @@ milestone: M26
 status_source: ../status/work-items.yaml
 depends_on: [WI-0120]
 related_adrs: []
-affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Integration.Tests, docs]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Cli, PhotoIdentity.Core.Tests, PhotoIdentity.Integration.Tests, PhotoIdentity.Persistence.Tests, docs]
 ---
 
 # WI-0124: Track slideshow exposure and novelty for Creative Collections
@@ -34,11 +34,11 @@ A deterministic selector can otherwise converge on the same strongest photos eve
 
 ## Acceptance criteria
 
-- [ ] Slideshow exposure is persisted as presentation state separate from archive/identity facts.
-- [ ] The application can report last-shown/show-count signals for eligible revisions without exposing private source paths.
-- [ ] An optional novelty policy can produce a materially different valid selection while preserving hard eligibility and presentation-preference rules.
-- [ ] History updates are idempotent/restart-safe under the chosen session semantics.
-- [ ] Automated tests cover repeated sessions, unseen photos and history-disabled behavior.
+- [x] Slideshow exposure is persisted as presentation state separate from archive/identity facts.
+- [x] The application can report last-shown/show-count signals for eligible revisions without exposing private source paths.
+- [x] An optional novelty policy can produce a materially different valid selection while preserving hard eligibility and presentation-preference rules.
+- [x] History updates are idempotent/restart-safe under the chosen session semantics.
+- [x] Automated tests cover repeated sessions, unseen photos and history-disabled behavior.
 
 ## Verification requirements
 
@@ -46,7 +46,11 @@ Automated persistence/selection tests plus maintainer comparison of repeated Cre
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: provider-neutral slideshow exposure contracts, SQLite/PostgreSQL exposure repositories and migrations, Creative recipe novelty setting, presentation callback/API recording, selector novelty scoring, Creative preview history evidence, workspace freshness control, migration verification and automated tests.
+- Session semantics: each slideshow page load creates a new session identifier. A revision is recorded only after the presentation component reports it displayed successfully; repeated callbacks or revisits of that revision within the same page session are idempotent, while a later slideshow session may record it again.
+- Novelty policy: disabled by default. `m26-slideshow-novelty-balanced-v1` rewards unseen photos by +100, applies bounded recency penalties of -100/-60/-25 for <=7/30/180 days, and a -5-per-session frequency penalty capped at -40. `Avoid` remains a hard exclusion and explicit `Prefer` remains stronger at +220.
+- Privacy/state boundary: exposure rows store session ID, immutable revision ID, Smart Collection ID, Creative/classic flag and server timestamp only. No source paths, filenames or media URLs are persisted.
+- Scale boundary: storage admits at most one row per revision per slideshow session; selection reads indexed aggregate history only for the current candidate revisions in a batch.
+- Schema: SQLite advances to 19 and PostgreSQL to 26. Offline catalogue migration includes exposure history in critical count verification.
+- Deferred work: maintainer comparison of repeated private Creative Collection runs with freshness disabled and enabled remains required before WI-0124 completion.
+- Commands run: repository CI will provide build, selector, integration, provider, documentation, launcher and package verification evidence for this branch.

@@ -350,9 +350,31 @@
 @code {
     private async Task OnCurrentImagePresentedAsync(SlideshowPresentationEvidence evidence)
     {
+        string? presentedRevisionId = Playback.CurrentRevisionId;
         ImageError = null;
         Playback.MarkCurrentImageReady(evidence);
         _lastTickTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
         await UpdatePrefetchAsync();
+
+        if (presentedRevisionId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/slideshows/exposures",
+                new SlideshowExposureRequest(
+                    _exposureSessionId,
+                    CollectionId,
+                    Creative,
+                    presentedRevisionId));
+            _ = response.IsSuccessStatusCode;
+        }
+        catch
+        {
+            // Presentation history is best-effort and must never interrupt slideshow playback.
+        }
     }
 }

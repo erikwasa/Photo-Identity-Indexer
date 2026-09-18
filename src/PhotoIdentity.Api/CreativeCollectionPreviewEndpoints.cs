@@ -12,6 +12,8 @@ public sealed record CreativeCollectionPreviewCandidateResponse(
     string Kind,
     DateTime? TakenAtLocal,
     string ThumbnailUrl,
+    int ShowCount,
+    DateTimeOffset? LastShownAtUtc,
     CreativeCollectionContextReasonResponse[] ContextReasons);
 
 public sealed record CreativeCollectionSelectionReasonResponse(
@@ -27,6 +29,8 @@ public sealed record CreativeCollectionSelectedCandidateResponse(
     string? MomentId,
     string? PeopleCombinationKey,
     int SelectionScore,
+    int ShowCount,
+    DateTimeOffset? LastShownAtUtc,
     CreativeCollectionSelectionReasonResponse[] SelectionReasons,
     CreativeCollectionContextReasonResponse[] ContextReasons);
 
@@ -40,6 +44,8 @@ public sealed record CreativeCollectionPreviewResponse(
     int TotalCandidateCount,
     bool NoAnchors,
     string SelectionPolicyVersion,
+    bool NoveltyEnabled,
+    string NoveltyPolicyVersion,
     int RequestedTargetCount,
     int SelectedDirectAnchorCount,
     int SelectedContextCount,
@@ -70,13 +76,15 @@ public static class CreativeCollectionPreviewEndpoints
         CancellationToken cancellationToken,
         int targetCount = 100,
         int momentGapMinutes = 30,
-        string contextStrength = "balanced")
+        string contextStrength = "balanced",
+        bool novelty = false)
     {
         if (!TryCreateSettings(
                 id,
                 targetCount,
                 momentGapMinutes,
                 contextStrength,
+                novelty,
                 out SmartCollectionId collectionId,
                 out CreativeCollectionRecipeSettings? settings,
                 out IResult? error))
@@ -100,13 +108,15 @@ public static class CreativeCollectionPreviewEndpoints
         CancellationToken cancellationToken,
         int targetCount = 100,
         int momentGapMinutes = 30,
-        string contextStrength = "balanced")
+        string contextStrength = "balanced",
+        bool novelty = false)
     {
         if (!TryCreateSettings(
                 id,
                 targetCount,
                 momentGapMinutes,
                 contextStrength,
+                novelty,
                 out SmartCollectionId collectionId,
                 out CreativeCollectionRecipeSettings? settings,
                 out IResult? error))
@@ -127,10 +137,14 @@ public static class CreativeCollectionPreviewEndpoints
         CreativeCollectionMaterialization materialized)
     {
         CreativeCollectionPreviewCandidateResponse[] candidates = materialized.Generated.Candidates
-            .Select(ToPreviewCandidate)
+            .Select(candidate => ToPreviewCandidate(
+                candidate,
+                materialized.ExposureHistory.GetValueOrDefault(candidate.RevisionId)))
             .ToArray();
         CreativeCollectionSelectedCandidateResponse[] selected = materialized.Selection.Selected
-            .Select(ToSelectedCandidate)
+            .Select(candidate => ToSelectedCandidate(
+                candidate,
+                materialized.ExposureHistory.GetValueOrDefault(candidate.Candidate.RevisionId)))
             .ToArray();
 
         int representedMoments = selected
@@ -154,6 +168,8 @@ public static class CreativeCollectionPreviewEndpoints
             materialized.Generated.TotalCandidateCount,
             materialized.Generated.NoAnchors,
             materialized.Selection.PolicyVersion,
+            materialized.NoveltyPolicyVersion != CreativeCollectionNoveltyPolicies.Disabled,
+            materialized.NoveltyPolicyVersion,
             materialized.Selection.RequestedTargetCount,
             materialized.Selection.SelectedDirectAnchorCount,
             materialized.Selection.SelectedContextCount,
@@ -186,6 +202,7 @@ public static class CreativeCollectionPreviewEndpoints
         int targetCount,
         int momentGapMinutes,
         string contextStrength,
+        bool novelty,
         out SmartCollectionId collectionId,
         out CreativeCollectionRecipeSettings? settings,
         out IResult? error)
@@ -198,7 +215,8 @@ public static class CreativeCollectionPreviewEndpoints
             settings = CreativeCollectionRecipeSettings.CreateForPreview(
                 targetCount,
                 momentGapMinutes,
-                contextPolicy.Version);
+                contextPolicy.Version,
+                novelty);
             error = null;
             return true;
         }
@@ -213,15 +231,19 @@ public static class CreativeCollectionPreviewEndpoints
     }
 
     private static CreativeCollectionPreviewCandidateResponse ToPreviewCandidate(
-        CreativeCollectionCandidate candidate) => new(
+        CreativeCollectionCandidate candidate,
+        PhotoSlideshowExposureSummary? exposure) => new(
         candidate.RevisionId.ToString(),
         candidate.Kind,
         candidate.TakenAtLocal,
         $"/api/collections/photos/{candidate.RevisionId}/thumbnail",
+        exposure?.ShowCount ?? 0,
+        exposure?.LastShownAtUtc,
         ToContextReasons(candidate.ContextReasons));
 
     private static CreativeCollectionSelectedCandidateResponse ToSelectedCandidate(
-        CreativeCollectionSelectedCandidate selected) => new(
+        CreativeCollectionSelectedCandidate selected,
+        PhotoSlideshowExposureSummary? exposure) => new(
         selected.Candidate.RevisionId.ToString(),
         selected.Candidate.Kind,
         selected.Candidate.TakenAtLocal,
@@ -229,6 +251,8 @@ public static class CreativeCollectionPreviewEndpoints
         selected.MomentId,
         selected.PeopleCombinationKey,
         selected.SelectionScore,
+        exposure?.ShowCount ?? 0,
+        exposure?.LastShownAtUtc,
         selected.Reasons
             .Select(reason => new CreativeCollectionSelectionReasonResponse(
                 reason.Code,

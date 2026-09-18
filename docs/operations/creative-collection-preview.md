@@ -72,6 +72,26 @@ Photo Details exposes the current preference and append-only history:
 - **Avoid** removes the photo from normal Creative selection even when it is a direct anchor. The photo remains visible in ordinary browsing and exact Smart Collection results.
 - **Clear preference** appends a `clear` action and restores automatic selection behavior.
 
+## Slideshow exposure and optional freshness
+
+WI-0124 records presentation history only after the slideshow presentation component reports that a revision was actually displayed. Snapshot membership, prefetching, original preparation and failed image loads do not count as exposure.
+
+Each slideshow page load owns a fresh session identifier. The history table accepts at most one row per immutable revision per session, so repeated callbacks or navigating back to the same photo in that session do not inflate counts. A later slideshow session can record the revision again. The stored presentation state contains only session ID, revision ID, Smart Collection ID, Creative/classic mode and server timestamp.
+
+Creative preview reports `showCount` and `lastShownAtUtc` for eligible candidates. The saved recipe adds an optional **Favor photos not shown recently** control. It is off by default and maps to `m26-slideshow-novelty-balanced-v1`:
+
+| History evidence | Score effect |
+| --- | ---: |
+| Never recorded as presented | +100 |
+| Last shown within 7 days | -100 |
+| Last shown within 30 days | -60 |
+| Last shown within 180 days | -25 |
+| Prior presentation sessions | -5 × count, capped at -40 |
+
+The novelty signal is intentionally bounded. `Avoid` still excludes a photo before scoring, while explicit `Prefer` remains a stronger +220 signal. Turning freshness off bypasses all exposure scoring and preserves the existing deterministic selector behavior.
+
+History lookup is batched and indexed for the current Creative candidate revisions; storage is bounded to one row per revision per slideshow session rather than one row per render callback.
+
 The latest action is effective. Repeating the already-effective preference is idempotent and does not add audit noise. A stronger Pin/Always-include action is intentionally deferred until real use demonstrates that Prefer is insufficient.
 
 ## Materialize a Creative slideshow snapshot
@@ -96,7 +116,7 @@ A saved Creative recipe is separate from its exact Smart Collection definition. 
 - deterministic diversity-selection policy/version; and
 - chronological ordering policy/version.
 
-The normal Smart Collections workspace exposes only two everyday controls before playback: target photo count and context strength. Context strength maps to versioned bounded policies:
+The normal Smart Collections workspace exposes target photo count and context strength plus one optional freshness toggle. Context strength maps to versioned bounded policies:
 
 | Strength | Context cap per anchored moment |
 | --- | ---: |
@@ -116,7 +136,7 @@ GET    /api/smart-collections/{collection-id}/creative-recipe/preview
 POST   /api/smart-collections/{collection-id}/creative-recipe/slideshow-snapshot
 ~~~
 
-The PUT body contains `targetCount` and `contextStrength`. The saved recipe records concrete policy versions so reopening it does not depend on mutable UI defaults. Deleting the anchor Smart Collection deletes its recipe through the catalogue foreign-key boundary.
+The PUT body contains `targetCount`, `contextStrength` and optional `noveltyEnabled` (default `false`). The saved recipe records concrete policy versions so reopening it does not depend on mutable UI defaults. Deleting the anchor Smart Collection deletes its recipe through the catalogue foreign-key boundary.
 
 The Creative slideshow viewer requests the recipe snapshot once and then uses the existing immutable slideshow playback contract. Original preparation receives those same snapshot revision IDs. Classic Smart Collection slideshow snapshot behavior remains unchanged.
 
