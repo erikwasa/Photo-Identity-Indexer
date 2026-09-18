@@ -8,7 +8,9 @@ namespace PhotoIdentity.Api;
 public sealed record CreativeCollectionMaterialization(
     SmartCollectionDefinition Definition,
     CreativeCollectionCandidateSet Generated,
-    CreativeCollectionSelectionResult Selection);
+    CreativeCollectionSelectionResult Selection,
+    IReadOnlyDictionary<AssetRevisionId, PhotoSlideshowExposureSummary> ExposureHistory,
+    string NoveltyPolicyVersion);
 
 public sealed class CreativeCollectionMaterializationService
 {
@@ -18,21 +20,29 @@ public sealed class CreativeCollectionMaterializationService
     private readonly ISmartCollectionQueryRepository _query;
     private readonly CollectionReviewProxyFileResolver _proxyResolver;
     private readonly IPhotoPresentationPreferenceRepository _presentationPreferences;
+    private readonly IPhotoSlideshowExposureRepository _exposures;
+    private readonly TimeProvider _timeProvider;
 
     public CreativeCollectionMaterializationService(
         ISmartCollectionRepository definitions,
         ISmartCollectionQueryRepository query,
         CollectionReviewProxyFileResolver proxyResolver,
-        IPhotoPresentationPreferenceRepository presentationPreferences)
+        IPhotoPresentationPreferenceRepository presentationPreferences,
+        IPhotoSlideshowExposureRepository exposures,
+        TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(definitions);
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(proxyResolver);
         ArgumentNullException.ThrowIfNull(presentationPreferences);
+        ArgumentNullException.ThrowIfNull(exposures);
+        ArgumentNullException.ThrowIfNull(timeProvider);
         _definitions = definitions;
         _query = query;
         _proxyResolver = proxyResolver;
         _presentationPreferences = presentationPreferences;
+        _exposures = exposures;
+        _timeProvider = timeProvider;
     }
 
     public async Task<CreativeCollectionMaterialization?> MaterializeAsync(
@@ -80,7 +90,11 @@ public sealed class CreativeCollectionMaterializationService
             return new CreativeCollectionMaterialization(
                 definition,
                 noCandidates,
-                noSelection);
+                noSelection,
+                new Dictionary<AssetRevisionId, PhotoSlideshowExposureSummary>(),
+                settings.NoveltyEnabled
+                    ? CreativeCollectionNoveltyPolicies.BalancedV1
+                    : CreativeCollectionNoveltyPolicies.Disabled);
         }
 
         IReadOnlyList<SmartCollectionPhoto> cataloguePhotos = await _query.QueryAllAsync(
@@ -112,19 +126,30 @@ public sealed class CreativeCollectionMaterializationService
             await _presentationPreferences.GetEffectiveAsync(
                 generated.Candidates.Select(candidate => candidate.RevisionId),
                 cancellationToken);
+        IReadOnlyDictionary<AssetRevisionId, PhotoSlideshowExposureSummary> exposureHistory =
+            await _exposures.GetSummariesAsync(
+                generated.Candidates.Select(candidate => candidate.RevisionId),
+                cancellationToken);
         CreativeCollectionSelectionResult selection = CreativeCollectionSelector.Select(
             generated,
             momentCandidates,
             moments,
             visualRedundancy,
             presentationPreferences,
+            exposureHistory,
+            settings.NoveltyEnabled,
+            _timeProvider.GetUtcNow().ToUniversalTime(),
             settings.TargetCount,
             CreativeCollectionSelectionPolicy.BalancedV1);
 
         return new CreativeCollectionMaterialization(
             definition,
             generated,
-            selection);
+            selection,
+            exposureHistory,
+            settings.NoveltyEnabled
+                ? CreativeCollectionNoveltyPolicies.BalancedV1
+                : CreativeCollectionNoveltyPolicies.Disabled);
     }
 
     private async Task<PhotoVisualRedundancyResult> BuildAcceptedVisualRedundancyAsync(
