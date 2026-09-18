@@ -40,6 +40,32 @@ public sealed class ReviewProxyTests
     }
 
     [Fact]
+    public void Perceptual_hash_is_deterministic_and_distinguishes_opposite_gradients()
+    {
+        OpenCvPerceptualHashCalculator calculator = new();
+
+        byte[] increasing = EncodeGradient(reverse: false);
+        byte[] decreasing = EncodeGradient(reverse: true);
+
+        PhotoIdentity.Core.Collections.PhotoPerceptualHash64 first = calculator.Compute(increasing);
+        PhotoIdentity.Core.Collections.PhotoPerceptualHash64 replay = calculator.Compute(increasing);
+        PhotoIdentity.Core.Collections.PhotoPerceptualHash64 opposite = calculator.Compute(decreasing);
+
+        Assert.Equal(first, replay);
+        Assert.True(first.HammingDistance(opposite) >= 60);
+        Assert.Equal(16, first.ToString().Length);
+    }
+
+    [Fact]
+    public void Perceptual_hash_rejects_empty_or_invalid_proxy_content()
+    {
+        OpenCvPerceptualHashCalculator calculator = new();
+
+        Assert.Throws<InvalidDataException>(() => calculator.Compute([]));
+        Assert.Throws<InvalidDataException>(() => calculator.Compute([1, 2, 3, 4]));
+    }
+
+    [Fact]
     public async Task Archive_proxy_measure_generates_multiple_candidates_and_reports_only_aggregates()
     {
         string directory = CreateTemporaryDirectory();
@@ -134,6 +160,22 @@ public sealed class ReviewProxyTests
         {
             DeleteTemporaryDirectory(directory);
         }
+    }
+
+    private static byte[] EncodeGradient(bool reverse)
+    {
+        using Mat image = new(new Size(90, 80), MatType.CV_8UC1);
+        for (int row = 0; row < image.Rows; row++)
+        {
+            for (int column = 0; column < image.Cols; column++)
+            {
+                int normalized = column * 255 / Math.Max(1, image.Cols - 1);
+                image.Set(row, column, (byte)(reverse ? 255 - normalized : normalized));
+            }
+        }
+
+        Cv2.ImEncode(".png", image, out byte[] encoded);
+        return encoded;
     }
 
     private static async Task WriteTestJpegAsync(string path, int width, int height)
