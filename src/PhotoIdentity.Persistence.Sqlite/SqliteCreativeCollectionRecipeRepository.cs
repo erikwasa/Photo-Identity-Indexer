@@ -33,6 +33,7 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
                    context_policy_version,
                    selection_policy_version,
                    ordering_policy_version,
+                   novelty_enabled,
                    created_at_utc,
                    updated_at_utc
             FROM creative_collection_recipes
@@ -66,6 +67,7 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
                 context_policy_version,
                 selection_policy_version,
                 ordering_policy_version,
+                novelty_enabled,
                 created_at_utc,
                 updated_at_utc)
             VALUES (
@@ -76,6 +78,7 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
                 $context_policy_version,
                 $selection_policy_version,
                 $ordering_policy_version,
+                $novelty_enabled,
                 $created_at_utc,
                 $updated_at_utc)
             ON CONFLICT(anchor_collection_id) DO UPDATE SET
@@ -85,6 +88,7 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
                 context_policy_version = excluded.context_policy_version,
                 selection_policy_version = excluded.selection_policy_version,
                 ordering_policy_version = excluded.ordering_policy_version,
+                novelty_enabled = excluded.novelty_enabled,
                 updated_at_utc = excluded.updated_at_utc;
             """;
         command.Parameters.AddWithValue("$anchor_collection_id", anchorCollectionId.Value.ToString("D"));
@@ -94,6 +98,7 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
         command.Parameters.AddWithValue("$context_policy_version", settings.ContextPolicyVersion);
         command.Parameters.AddWithValue("$selection_policy_version", settings.SelectionPolicyVersion);
         command.Parameters.AddWithValue("$ordering_policy_version", settings.OrderingPolicyVersion);
+        command.Parameters.AddWithValue("$novelty_enabled", settings.NoveltyEnabled ? 1 : 0);
         command.Parameters.AddWithValue("$created_at_utc", now.ToString("O", CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("$updated_at_utc", now.ToString("O", CultureInfo.InvariantCulture));
         await command.ExecuteNonQueryAsync(cancellationToken);
@@ -124,8 +129,9 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
             reader.GetString(4),
             reader.GetString(5),
             reader.GetString(6),
-            DateTimeOffset.Parse(reader.GetString(7), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-            DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
+            reader.GetInt32(7) != 0,
+            DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
 
         new CreativeCollectionRecipeSettings(
             recipe.TargetCount,
@@ -133,7 +139,8 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
             recipe.MomentPolicyVersion,
             recipe.ContextPolicyVersion,
             recipe.SelectionPolicyVersion,
-            recipe.OrderingPolicyVersion).ValidateSupported();
+            recipe.OrderingPolicyVersion,
+            recipe.NoveltyEnabled).ValidateSupported();
         return recipe;
     }
 }
