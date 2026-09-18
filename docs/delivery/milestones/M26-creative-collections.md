@@ -81,7 +81,7 @@ On 2026-09-18, the maintainer accepted the pursued presentation-quality follow-o
 - WI-0122: Prefer, Avoid and Clear behaved correctly on a representative private Creative Collection; Avoid changed Creative presentation only and the photo remained in the ordinary exact Smart Collection.
 - WI-0124: slideshow show counts updated for actually displayed photos; freshness disabled preserved the stable baseline; freshness enabled produced a sensible different selection with more unseen photos.
 
-WI-0125 is the next ready product-quality follow-on. It keeps M26 in the metadata-first/product layer by adding optional person birth-date precision and explicit family relationships for age- and relationship-oriented stories. WI-0126 through WI-0128 remain optional semantic experiments and are not prerequisites for starting WI-0125.
+On 2026-09-18 the maintainer intentionally put WI-0125 on hold. WI-0126 is the next ready experiment because visible-content tags can add scene/object/activity evidence to Creative Collections while reusing the existing local ONNX runtime, durable review proxies and manual-tag boundaries. WI-0127 and WI-0128 remain optional heavier experiments.
 
 ## Exit criteria
 
