@@ -38,6 +38,7 @@ public static class MomentPreviewEndpoints
     {
         endpoints.MapGet("/api/moments/preview", PreviewAsync);
         endpoints.MapCreativeCollectionPreviewEndpoints();
+        endpoints.MapCreativeCollectionVisualRedundancyEndpoints();
         return endpoints;
     }
 
