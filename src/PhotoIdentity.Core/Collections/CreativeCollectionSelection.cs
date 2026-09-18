@@ -15,6 +15,9 @@ public static class CreativeCollectionSelectionReasonCodes
     public const string NearConsecutive = "near-consecutive";
     public const string VisualRedundancy = "visual-redundancy";
     public const string PresentationPrefer = "presentation-prefer";
+    public const string NoveltyUnseen = "novelty-unseen";
+    public const string NoveltyRecent = "novelty-recent";
+    public const string NoveltyFrequency = "novelty-frequency";
 }
 
 /// <summary>
@@ -108,6 +111,9 @@ public static class CreativeCollectionSelector
             moments,
             visualRedundancy: null,
             presentationPreferences: null,
+            exposureHistory: null,
+            noveltyEnabled: false,
+            noveltyEvaluatedAtUtc: DateTimeOffset.UnixEpoch,
             targetCount,
             policy);
 
@@ -124,6 +130,9 @@ public static class CreativeCollectionSelector
             moments,
             visualRedundancy,
             presentationPreferences: null,
+            exposureHistory: null,
+            noveltyEnabled: false,
+            noveltyEvaluatedAtUtc: DateTimeOffset.UnixEpoch,
             targetCount,
             policy);
 
@@ -133,6 +142,29 @@ public static class CreativeCollectionSelector
         PhotoMomentClusteringResult moments,
         PhotoVisualRedundancyResult? visualRedundancy,
         IReadOnlyDictionary<AssetRevisionId, string>? presentationPreferences,
+        int targetCount,
+        CreativeCollectionSelectionPolicy policy) =>
+        Select(
+            candidates,
+            catalogue,
+            moments,
+            visualRedundancy,
+            presentationPreferences,
+            exposureHistory: null,
+            noveltyEnabled: false,
+            noveltyEvaluatedAtUtc: DateTimeOffset.UnixEpoch,
+            targetCount,
+            policy);
+
+    public static CreativeCollectionSelectionResult Select(
+        CreativeCollectionCandidateSet candidates,
+        IEnumerable<PhotoMomentCandidate> catalogue,
+        PhotoMomentClusteringResult moments,
+        PhotoVisualRedundancyResult? visualRedundancy,
+        IReadOnlyDictionary<AssetRevisionId, string>? presentationPreferences,
+        IReadOnlyDictionary<AssetRevisionId, PhotoSlideshowExposureSummary>? exposureHistory,
+        bool noveltyEnabled,
+        DateTimeOffset noveltyEvaluatedAtUtc,
         int targetCount,
         CreativeCollectionSelectionPolicy policy)
     {
@@ -187,7 +219,8 @@ public static class CreativeCollectionSelector
                     catalogueByRevision[candidate.RevisionId],
                     momentByRevision.GetValueOrDefault(candidate.RevisionId),
                     visualGroupByRevision.GetValueOrDefault(candidate.RevisionId),
-                    presentationPreferences?.GetValueOrDefault(candidate.RevisionId)));
+                    presentationPreferences?.GetValueOrDefault(candidate.RevisionId),
+                    exposureHistory?.GetValueOrDefault(candidate.RevisionId)));
         AssignTemporalBuckets(metadata.Values, policy.TemporalBucketCount);
 
         List<CreativeCollectionSelectedCandidate> selected = [];
@@ -209,6 +242,8 @@ public static class CreativeCollectionSelector
                     temporalBucketCounts,
                     peopleCombinationCounts,
                     visualGroupCounts,
+                    noveltyEnabled,
+                    noveltyEvaluatedAtUtc,
                     policy))
                 .OrderByDescending(candidate => candidate.Score)
                 .ThenBy(candidate => candidate.Metadata.TakenAtLocal.HasValue ? 0 : 1)
@@ -255,7 +290,8 @@ public static class CreativeCollectionSelector
         PhotoMomentCandidate source,
         string? momentId,
         string? visualGroupId,
-        string? presentationPreference)
+        string? presentationPreference,
+        PhotoSlideshowExposureSummary? exposure)
     {
         string? peopleCombinationKey = source.PeopleKeys is null
             ? null
@@ -276,7 +312,8 @@ public static class CreativeCollectionSelector
             momentId,
             peopleCombinationKey,
             visualGroupId,
-            presentationPreference);
+            presentationPreference,
+            exposure);
     }
 
     private static void AssignTemporalBuckets(
@@ -312,6 +349,8 @@ public static class CreativeCollectionSelector
         IReadOnlyDictionary<int, int> temporalBucketCounts,
         IReadOnlyDictionary<string, int> peopleCombinationCounts,
         IReadOnlyDictionary<string, int> visualGroupCounts,
+        bool noveltyEnabled,
+        DateTimeOffset noveltyEvaluatedAtUtc,
         CreativeCollectionSelectionPolicy policy)
     {
         List<CreativeCollectionSelectionReason> reasons = [];
@@ -341,6 +380,53 @@ public static class CreativeCollectionSelector
                 220,
                 "Explicit presentation preference increases this eligible photo's priority.");
             score += 220;
+        }
+
+        if (noveltyEnabled)
+        {
+            if (metadata.Exposure is null || metadata.Exposure.ShowCount == 0)
+            {
+                AddReason(
+                    reasons,
+                    CreativeCollectionSelectionReasonCodes.NoveltyUnseen,
+                    100,
+                    "This photo has not been recorded as presented in a prior slideshow session.");
+                score += 100;
+            }
+            else
+            {
+                if (metadata.Exposure.LastShownAtUtc is DateTimeOffset lastShown)
+                {
+                    TimeSpan age = noveltyEvaluatedAtUtc.ToUniversalTime() - lastShown.ToUniversalTime();
+                    int recencyPenalty = age <= TimeSpan.FromDays(7)
+                        ? -100
+                        : age <= TimeSpan.FromDays(30)
+                            ? -60
+                            : age <= TimeSpan.FromDays(180)
+                                ? -25
+                                : 0;
+                    if (recencyPenalty != 0)
+                    {
+                        AddReason(
+                            reasons,
+                            CreativeCollectionSelectionReasonCodes.NoveltyRecent,
+                            recencyPenalty,
+                            $"Previously presented {Math.Max(0, age.TotalDays):0.#} day(s) before this selection.");
+                        score += recencyPenalty;
+                    }
+                }
+
+                int frequencyPenalty = -Math.Min(40, metadata.Exposure.ShowCount * 5);
+                if (frequencyPenalty != 0)
+                {
+                    AddReason(
+                        reasons,
+                        CreativeCollectionSelectionReasonCodes.NoveltyFrequency,
+                        frequencyPenalty,
+                        $"Previously presented in {metadata.Exposure.ShowCount} slideshow session(s).");
+                    score += frequencyPenalty;
+                }
+            }
         }
 
         if (metadata.MomentId is string momentId)
@@ -477,13 +563,15 @@ public static class CreativeCollectionSelector
             string? momentId,
             string? peopleCombinationKey,
             string? visualGroupId,
-            string? presentationPreference)
+            string? presentationPreference,
+            PhotoSlideshowExposureSummary? exposure)
         {
             TakenAtLocal = takenAtLocal;
             MomentId = momentId;
             PeopleCombinationKey = peopleCombinationKey;
             VisualGroupId = visualGroupId;
             PresentationPreference = presentationPreference;
+            Exposure = exposure;
         }
 
         public DateTime? TakenAtLocal { get; }
@@ -491,6 +579,7 @@ public static class CreativeCollectionSelector
         public string? PeopleCombinationKey { get; }
         public string? VisualGroupId { get; }
         public string? PresentationPreference { get; }
+        public PhotoSlideshowExposureSummary? Exposure { get; }
         public int? TemporalBucket { get; set; }
     }
 
