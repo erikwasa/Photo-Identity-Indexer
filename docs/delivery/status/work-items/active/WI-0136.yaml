@@ -1,12 +1,18 @@
 id: WI-0136
 title: Make slideshow startup and original preparation exception-driven
 milestone: M27
-status: proposed
-owner: unassigned
+status: in_progress
+owner: ai-agent
 document: ../work-items/WI-0136-exception-driven-slideshow-preparation.md
+started_at: 2026-09-17
+last_updated_at: 2026-09-17
+branch: agent/WI-0136-exception-driven-preparation
 blockers:
 - WI-0094
 - WI-0107
 - WI-0108
-blocker_notes: []
-evidence: []
+blocker_notes:
+- Automated implementation is ready in pull request 359; representative proxy-only and prepared-original phone-path acceptance remains pending in the separate verification thread.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/359

@@ -50,7 +50,7 @@ Run representative proxy-only and prepared-original slideshows on the supported 
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: `Slideshows.razor`, `Slideshow.razor`, `SlideshowPreparationExperience`, focused integration tests and delivery handoff/status files.
+- Trade-offs: the existing M22 snapshot, storage-admission, hydration, lease and immutable-verification lifecycle is retained rather than replaced. Routine preparation controls move out of each gallery card into a collapsed parent/operator tool surface; active preparation remains visible only as ambient progress or an exception cue. No-progress recovery now also permits explicit continue-with-available playback.
+- Deferred work: representative proxy-only and prepared-original phone-path verification remains pending in the separate verification thread; WI-0137 still owns the broader real-device slideshow polish pass.
+- Commands run: implementation prepared for the normal build/integration/docs CI gates; manual phone-path acceptance remains pending.
