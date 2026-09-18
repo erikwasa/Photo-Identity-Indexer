@@ -17,7 +17,7 @@ The first private evaluation compares two deliberately simple timestamp-only pol
 
 A gap exactly equal to the configured threshold stays in the current moment. Crossing midnight does not create a boundary by itself.
 
-These are evaluation candidates, not an accepted production default. Select or tune the initial policy only after reviewing representative private archive samples.
+The private representative review completed on 2026-09-18 and selected `m26-time-gap-30m-v1` as the initial default because its boundaries were more coherent overall than the 90-minute candidate. `m26-time-gap-90m-v1` remains an explicit comparison policy for future tuning; moment membership remains derived and regenerable rather than canonical archive truth.
 
 ## Bounded preview
 
