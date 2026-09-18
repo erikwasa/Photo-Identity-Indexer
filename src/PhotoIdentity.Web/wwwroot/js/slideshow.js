@@ -17,6 +17,7 @@
     let wakeLockMessage = null;
     let fullscreenFailed = false;
     let fullscreenMessage = null;
+    let fullscreenMode = null;
     let releasingProtections = false;
     let wakeReacquirePending = false;
 
@@ -51,6 +52,18 @@
         return typeof document.documentElement?.requestFullscreen === "function";
     }
 
+    function currentFullscreenMode() {
+        if (document.fullscreenElement !== null) {
+            return "active";
+        }
+
+        if (!fullscreenSupported()) {
+            return "unsupported";
+        }
+
+        return fullscreenMode || "inactive";
+    }
+
     function orientationSupported() {
         return !!window.screen?.orientation &&
             typeof window.screen.orientation.lock === "function";
@@ -68,7 +81,7 @@
                 active: document.fullscreenElement !== null,
                 failed: fullscreenFailed,
                 message: fullscreenMessage,
-                mode: null
+                mode: currentFullscreenMode()
             },
             orientationLock: {
                 supported: orientationSupported(),
@@ -397,13 +410,15 @@
             if (document.fullscreenElement) {
                 fullscreenFailed = false;
                 fullscreenMessage = null;
+                fullscreenMode = "active";
                 return true;
             }
 
             const element = document.documentElement;
             if (!fullscreenSupported()) {
-                fullscreenFailed = true;
-                fullscreenMessage = "Fullscreen is not supported by this browser.";
+                fullscreenFailed = false;
+                fullscreenMessage = "Fullscreen is not supported by this browser. Using the full-window slideshow fallback.";
+                fullscreenMode = "unsupported";
                 return false;
             }
 
@@ -412,10 +427,12 @@
                 const active = document.fullscreenElement !== null;
                 fullscreenFailed = !active;
                 fullscreenMessage = active ? null : "Fullscreen did not become active.";
+                fullscreenMode = active ? "active" : "rejected";
                 return active;
             } catch (error) {
                 fullscreenFailed = true;
                 fullscreenMessage = error?.message || "The browser rejected fullscreen.";
+                fullscreenMode = "rejected";
                 return false;
             }
         },
@@ -499,8 +516,12 @@
                 if (active) {
                     fullscreenFailed = false;
                     fullscreenMessage = null;
+                    fullscreenMode = "active";
                 } else {
                     orientationActive = false;
+                    fullscreenFailed = false;
+                    fullscreenMessage = "Fullscreen was exited or lost.";
+                    fullscreenMode = "lost";
                 }
 
                 invoke("OnFullscreenChanged", active);
