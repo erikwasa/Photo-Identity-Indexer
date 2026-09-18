@@ -4,7 +4,8 @@ namespace PhotoIdentity.Api;
 
 public sealed record CreativeCollectionRecipeRequest(
     int TargetCount = CreativeCollectionRecipe.DefaultTargetCount,
-    string ContextStrength = "balanced");
+    string ContextStrength = "balanced",
+    bool NoveltyEnabled = false);
 
 public sealed record CreativeCollectionRecipeResponse(
     string AnchorCollectionId,
@@ -16,6 +17,8 @@ public sealed record CreativeCollectionRecipeResponse(
     string ContextPolicyVersion,
     string SelectionPolicyVersion,
     string OrderingPolicyVersion,
+    bool NoveltyEnabled,
+    string NoveltyPolicyVersion,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc);
 
@@ -93,7 +96,8 @@ public static class CreativeCollectionRecipeEndpoints
             CreativeCollectionRecipeSettings settings =
                 CreativeCollectionRecipeSettings.Create(
                     request.TargetCount,
-                    contextPolicy.Version);
+                    contextPolicy.Version,
+                    request.NoveltyEnabled);
             CreativeCollectionRecipe recipe =
                 await recipes.UpsertAsync(collectionId, settings, cancellationToken);
             return Results.Ok(ToResponse(recipe, definition.Name));
@@ -183,7 +187,8 @@ public static class CreativeCollectionRecipeEndpoints
         recipe.MomentPolicyVersion,
         recipe.ContextPolicyVersion,
         recipe.SelectionPolicyVersion,
-        recipe.OrderingPolicyVersion);
+        recipe.OrderingPolicyVersion,
+        recipe.NoveltyEnabled);
 
     private static CreativeCollectionRecipeResponse ToResponse(
         CreativeCollectionRecipe recipe,
@@ -197,6 +202,10 @@ public static class CreativeCollectionRecipeEndpoints
         recipe.ContextPolicyVersion,
         recipe.SelectionPolicyVersion,
         recipe.OrderingPolicyVersion,
+        recipe.NoveltyEnabled,
+        recipe.NoveltyEnabled
+            ? CreativeCollectionNoveltyPolicies.BalancedV1
+            : CreativeCollectionNoveltyPolicies.Disabled,
         recipe.CreatedAtUtc,
         recipe.UpdatedAtUtc);
 
