@@ -235,7 +235,7 @@ milestones:
   - WI-0108
 - id: M25
   title: Face discovery and cluster-assisted identity review
-  status: completed
+  status: in_progress
   document: ../milestones/M25-face-discovery-and-cluster-assisted-review.md
   work_items:
   - WI-0110
@@ -246,6 +246,7 @@ milestones:
   - WI-0115
   - WI-0116
   - WI-0117
+  - WI-0138
 - id: M26
   title: Creative Collections
   status: in_progress
