@@ -110,6 +110,7 @@ public interface IProvisionalFaceClusterRepository
     Task<ProvisionalFaceClusterRun?> TryStartNextRefreshAsync(
         string requestedBy,
         DateTimeOffset requestedAtUtc,
+        TimeSpan? minimumReviewQuietPeriod = null,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ProvisionalFaceClusterInputFace>> ReadInputSnapshotAsync(

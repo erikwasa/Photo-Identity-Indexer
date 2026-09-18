@@ -36,6 +36,7 @@ The milestone introduces provisional face clusters as model-versioned, regenerab
 - [WI-0115](../work-items/WI-0115-cluster-discovery-review-workspace.md) - build the People-to-identify cluster review workflow with representative faces, bulk assignment and exception handling suitable for desktop and mobile.
 - [WI-0116](../work-items/WI-0116-cluster-assisted-known-person-evidence.md) - combine coherent cluster support with known-person evidence to produce stronger advisory suggestions without weakening the ordinary per-face threshold.
 - [WI-0117](../work-items/WI-0117-multi-evidence-auto-assignment-evaluation.md) - evaluate whether multi-exemplar and cluster-level evidence can safely expand opt-in automatic assignment while preserving measured precision and auditability.
+- [WI-0138](../work-items/WI-0138-coalesced-provisional-cluster-refresh.md) - post-acceptance performance follow-up: coalesce review-triggered provisional-cluster replacements so sustained face review does not rebuild multi-thousand-face cluster scopes after every decision.
 
 ## Delivery sequence
 
@@ -47,14 +48,21 @@ The milestone introduces provisional face clusters as model-versioned, regenerab
 6. WI-0115 turns clusters into the primary unknown-person discovery/review workflow.
 7. WI-0116 adds cluster-level support as advisory evidence for known-person matching.
 8. WI-0117 is an explicit quality gate for any broader automatic assignment. It may conclude that automation should remain unchanged.
+9. WI-0138 is a post-acceptance performance correction that preserves WI-0114 clustering semantics while adding a durable review quiet period before automatic replacement work.
 
 WI-0110, WI-0111, WI-0112 and WI-0113 can proceed independently when their dependencies are satisfied. Later clustering work must not block delivery of the simpler review improvements.
 
-## Completion — 2026-09-16
+## Original completion — 2026-09-16
 
 All M25 work items WI-0110 through WI-0117 are completed and maintainer-accepted. The milestone delivered similarity discovery, bounded follow-up regeneration, person-oriented suggestion review, evaluated and productionized provisional clustering, cluster review, cluster-assisted known-person advisory evidence and the final multi-evidence automatic-assignment quality gate.
 
 WI-0117 accepted only the narrow `m25-multi-evidence-auto-v1` expansion after deterministic private selection/holdout evaluation. The existing ordinary High path remains unchanged; the broader policy is separately versioned, exact-model scoped, disabled by default and subordinate to the ordinary automatic-assignment master switch. Production verification completed after PR #349 corrected the active-run timestamp mapping defect: workflow run #1875 passed, real-catalogue automatic actions contained exact provenance, and representative manual correction plus undo behaved correctly through append-only canonical history.
+
+## Post-acceptance performance follow-up — 2026-09-18
+
+Sustained Suggested-groups review later exposed background-work thrash that was not visible in the original bounded acceptance pass. Canonical review mutations correctly invalidated provisional clustering, but the scheduler could immediately rebuild both current scopes between nearby human decisions. A captured log showed dozens of complete ~3.5k- and ~8.1k-face cluster publications while ordinary review-list query latency remained broadly stable, with several suggestion-accept requests spiking into the hundreds of milliseconds near large publications.
+
+WI-0138 reopens M25 narrowly to coalesce automatic review-triggered cluster refreshes. The clustering algorithm, canonical review semantics and explicit replacement paths remain unchanged.
 
 ## Exit criteria
 
@@ -69,6 +77,7 @@ WI-0117 accepted only the narrow `m25-multi-evidence-auto-v1` expansion after de
 - [x] Unknown faces may be intentionally rediscovered/rematched without silently changing their canonical Unknown state.
 - [x] Cluster support may strengthen advisory known-person suggestions, but it cannot by itself create a canonical assignment before WI-0117 acceptance.
 - [x] Any broader automatic-assignment rule is enabled only after WI-0081 is resolved and private reviewed evaluation demonstrates an acceptable precision/unknown-rejection trade-off; otherwise existing automation remains unchanged.
+- [ ] Sustained face review coalesces automatic provisional-cluster refreshes behind a durable quiet period rather than repeatedly rebuilding after individual review mutations.
 
 ## Risks
 

@@ -12,6 +12,7 @@ namespace PhotoIdentity.Api;
 public sealed class ProvisionalFaceClusteringWorker
 {
     private const string AutomaticActor = "system:provisional-cluster-refresh";
+    private static readonly TimeSpan AutomaticRefreshReviewQuietPeriod = TimeSpan.FromSeconds(30);
 
     private readonly IProvisionalFaceClusterRepository _repository;
     private readonly ProvisionalFaceDbscanClusterer _clusterer;
@@ -41,6 +42,7 @@ public sealed class ProvisionalFaceClusteringWorker
             ProvisionalFaceClusterRun? refresh = await _repository.TryStartNextRefreshAsync(
                 AutomaticActor,
                 _timeProvider.GetUtcNow(),
+                AutomaticRefreshReviewQuietPeriod,
                 cancellationToken);
             return refresh is not null;
         }

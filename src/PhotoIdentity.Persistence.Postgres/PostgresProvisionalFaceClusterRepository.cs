@@ -236,9 +236,18 @@ public sealed class PostgresProvisionalFaceClusterRepository : IProvisionalFaceC
     public async Task<ProvisionalFaceClusterRun?> TryStartNextRefreshAsync(
         string requestedBy,
         DateTimeOffset requestedAtUtc,
+        TimeSpan? minimumReviewQuietPeriod = null,
         CancellationToken cancellationToken = default)
     {
         string actor = Required(requestedBy, nameof(requestedBy));
+        TimeSpan reviewQuietPeriod = minimumReviewQuietPeriod ?? TimeSpan.Zero;
+        if (reviewQuietPeriod < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(minimumReviewQuietPeriod),
+                "The automatic refresh review quiet period cannot be negative.");
+        }
+
         List<ProvisionalFaceClusterRun> currentRuns = [];
         await using (NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken))
         await using (NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken))
@@ -266,7 +275,21 @@ public sealed class PostgresProvisionalFaceClusterRepository : IProvisionalFaceC
         foreach (ProvisionalFaceClusterRun current in currentRuns)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (await EvidenceStillMatchesAsync(current, cancellationToken))
+            ProvisionalFaceClusterEvidenceVersion currentEvidence =
+                await ReadCurrentEvidenceVersionAsync(
+                    current.ModelId,
+                    current.ModelHash,
+                    cancellationToken);
+            if (currentEvidence == current.EvidenceVersion)
+            {
+                continue;
+            }
+
+            if (ReviewEvidenceChanged(current.EvidenceVersion, currentEvidence) &&
+                IsWithinReviewQuietPeriod(
+                    currentEvidence.ReviewMutationVersion,
+                    requestedAtUtc,
+                    reviewQuietPeriod))
             {
                 continue;
             }
@@ -695,17 +718,61 @@ public sealed class PostgresProvisionalFaceClusterRepository : IProvisionalFaceC
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(run);
+        ProvisionalFaceClusterEvidenceVersion current = await ReadCurrentEvidenceVersionAsync(
+            run.ModelId,
+            run.ModelHash,
+            cancellationToken);
+        return current == run.EvidenceVersion;
+    }
+
+    private async Task<ProvisionalFaceClusterEvidenceVersion> ReadCurrentEvidenceVersionAsync(
+        ModelId modelId,
+        Sha256Digest modelHash,
+        CancellationToken cancellationToken)
+    {
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(cancellationToken);
         await EnsureSchemaAsync(connection, transaction, cancellationToken);
         ProvisionalFaceClusterEvidenceVersion current = await ReadEvidenceVersionAsync(
             connection,
             transaction,
-            run.ModelId,
-            run.ModelHash,
+            modelId,
+            modelHash,
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return current == run.EvidenceVersion;
+        return current;
+    }
+
+    private static bool ReviewEvidenceChanged(
+        ProvisionalFaceClusterEvidenceVersion captured,
+        ProvisionalFaceClusterEvidenceVersion current) =>
+        captured.ReviewActionId != current.ReviewActionId ||
+        captured.ReviewMutationVersion != current.ReviewMutationVersion;
+
+    private static bool IsWithinReviewQuietPeriod(
+        long reviewMutationVersion,
+        DateTimeOffset requestedAtUtc,
+        TimeSpan reviewQuietPeriod)
+    {
+        if (reviewQuietPeriod <= TimeSpan.Zero || reviewMutationVersion <= 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            DateTimeOffset latestReviewMutationUtc = DateTimeOffset.UnixEpoch.AddTicks(
+                checked(reviewMutationVersion * 10L));
+            return requestedAtUtc.ToUniversalTime() < latestReviewMutationUtc + reviewQuietPeriod;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return false;
+        }
+        catch (OverflowException)
+        {
+            return false;
+        }
     }
 
     private static async Task EnsureSchemaAsync(

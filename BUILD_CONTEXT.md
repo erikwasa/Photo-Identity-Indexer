@@ -4,18 +4,23 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M27 Slideshow presentation experience is ready for its final real-device acceptance item, WI-0137.**
+**WI-0138 is the current focused regression fix: coalesce provisional clustering refreshes during active face review.**
 
-WI-0131 adaptive backdrop, WI-0134 adaptive rhythm and WI-0136 exception-driven preparation were accepted by the maintainer on 2026-09-18 and are now completed. Together with the previously completed M27 core items, that unblocks WI-0137 as the milestone-level device/polish acceptance pass.
+A 2026-09-18 sustained Suggested-groups session showed repeated full provisional-cluster publications after canonical review mutations, including both ~3.5k-face and ~8.1k-face scopes, while ordinary review-list reads remained broadly stable. WI-0138 reopens M25 narrowly to add a durable 30-second review quiet period before automatic replacement clustering.
 
-WI-0137 should evaluate the combined slideshow experience rather than reopening the individual accepted features unless the integrated pass exposes a reproducible regression.
+M27 remains ready for its final real-device acceptance item, WI-0137, after this focused regression work is verified.
 
 ## Next concrete step
 
-Start WI-0137 and run the representative combined slideshow acceptance set on the supported iPhone/browser path and at least one desktop browser. Cover autoplay, transitions/readiness, rapid manual navigation, pause/resume, looping, reduced motion, backdrop/motion/timing defaults, tap-to-play library flow, exception-driven preparation, protected controls, fullscreen/orientation recovery and browser performance/resource behavior.
+Complete WI-0138 CI/live PostgreSQL verification, then run a sustained Suggested-groups review session. Confirm review mutations no longer cause one full cluster replacement per decision, stop reviewing for at least 30 seconds, and confirm stale clustering refreshes afterward. Once accepted, return M25 to completed and continue WI-0137.
 
 ## Relevant files
 
+- docs/delivery/work-items/WI-0138-coalesced-provisional-cluster-refresh.md
+- src/PhotoIdentity.Api/ProvisionalFaceClusteringWorker.cs
+- src/PhotoIdentity.Persistence.Postgres/PostgresProvisionalFaceClusterRepository.cs
+- tests/PhotoIdentity.Persistence.Tests/PostgresProvisionalFaceClusterRepositoryTests.cs
+- docs/architecture/provisional-face-clustering.md
 - docs/delivery/work-items/WI-0137-real-device-slideshow-polish-acceptance.md
 - docs/delivery/status/work-items/active/WI-0137.yaml
 - docs/delivery/work-items/WI-0131-adaptive-slideshow-backdrop.md

@@ -110,6 +110,8 @@ Cluster keys are disposable and run-scoped. No production path updates canonical
 
 "Incremental" refers to maintaining current discovery evidence as the catalogue changes; it does not mean mutating long-lived cluster identities. New exact-model embeddings or canonical review changes make the current run stale. When identity-match regeneration is idle, the background scheduler detects the changed evidence version and starts a bounded replacement run for the same scope.
 
+Automatic review-driven refresh is coalesced behind a 30-second review quiet period. The scheduler derives the latest review-mutation time from the durable `ReviewMutationVersion` captured in cluster evidence, so repeated assignment/Unknown/rejection/reversal actions keep extending the same quiet boundary even across process restart. The current provisional run remains readable while stale; after review activity stops, one replacement opportunity is started per stale scope. An embedding-only evidence change is not delayed when the captured review evidence still matches. Explicit operator clustering starts and the explicit not-same replacement path are not subject to this automatic review debounce.
+
 Because every replacement rebuilds the eligible snapshot, newly analysed faces are incorporated and previous Noise faces are retried automatically. A face that was Noise with too few neighbours can therefore become Core/Border when later evidence creates a dense enough group, without resetting any canonical identity state.
 
 Review reversals also change the captured review mutation version, so reversing an earlier decision invalidates affected derived evidence predictably even when no new review-action row is inserted.
