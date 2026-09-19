@@ -286,6 +286,35 @@ test("layer crossfade keeps readiness diagnostics attached to the foreground ima
     assert.ok(state.visibleAt >= state.readyAt);
 });
 
+
+test("moment chapter transition stays bounded and slightly longer than standard crossfade", async () => {
+    await reset();
+
+    const outgoingLayer = new FakeImage();
+    const incomingLayer = new FakeImage();
+    const incomingImage = new FakeImage();
+    incomingImage.complete = true;
+    incomingImage.naturalWidth = 100;
+    await slideshow.decodePresentationImage(incomingImage);
+
+    const transition = slideshow.transitionPresentationImages(
+        outgoingLayer,
+        incomingLayer,
+        incomingImage,
+        "chapter");
+    await Promise.resolve();
+
+    assert.equal(outgoingLayer.style.transition, "opacity 850ms ease");
+    assert.equal(incomingLayer.style.transition, "opacity 850ms ease");
+
+    incomingLayer.completeTransition();
+    assert.equal(await transition, true);
+
+    const state = slideshow.getPresentationImageState(incomingImage);
+    assert.equal(state.transitionMode, "chapter");
+    assert.equal(state.transitionMilliseconds, 850);
+});
+
 test("reduced motion swaps only after readiness and skips crossfade animation", async () => {
     await reset();
     reducedMotion = true;
