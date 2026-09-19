@@ -85,6 +85,8 @@ On 2026-09-18 the maintainer intentionally put WI-0125 on hold.
 
 On 2026-09-19 the maintainer completed WI-0126 with an explicit no-go for the evaluated zero-shot controlled-vocabulary tagging approach. The private run scored all 185 candidates from durable review proxies with no proxy failures; 20 proxy/original comparisons produced 0.700 top-1 agreement and 0.633 mean top-2 Jaccard overlap. Semantic scoring replaced 8 of 50 selected photos and raised nominal concept coverage from 14 to 16, but the visual review found repeated false labels for categories absent from the tested set. Aggregate output assigned `birthday` to 59 candidates and `wedding` to 29 despite neither being present, with additional false baby/dog labels. The result does not justify persisting automatic tags or enabling the semantic-diversity policy in production. Manual tags and the metadata/presentation-first selector remain unchanged. WI-0127 and WI-0128 remain optional independent experiments rather than follow-on commitments.
 
+WI-0127 is now evaluating the same local CLIP representation directly as normalized whole-image/text embeddings rather than as fixed labels. The experiment is intentionally exact and bounded: review-proxy vectors stay in memory, text-to-image and image-to-image retrieval use direct cosine comparison, embedding diversity is opt-in, and no pgvector/ANN dependency or catalogue persistence is introduced before private usefulness is demonstrated.
+
 ## Exit criteria
 
 - [x] A documented, versioned moment-clustering policy can group representative family-photo sequences using capture-time-first evidence and can leave uncertain photos ungrouped/singleton rather than forcing a result.
