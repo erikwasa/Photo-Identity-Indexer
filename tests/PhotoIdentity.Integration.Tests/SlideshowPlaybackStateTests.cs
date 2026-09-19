@@ -221,6 +221,42 @@ public sealed class SlideshowPlaybackStateTests
         Assert.Equal("group", state.CurrentTiming.Reason);
     }
 
+
+    [Fact]
+    public void Moment_transition_policy_is_standard_without_a_confirmed_boundary()
+    {
+        SlideshowMomentTransitionDecision unannotated =
+            SlideshowMomentTransitionPolicy.Create(null, null);
+        SlideshowMomentTransitionDecision singleton =
+            SlideshowMomentTransitionPolicy.Create(null, "moment-0001");
+        SlideshowMomentTransitionDecision sameMoment =
+            SlideshowMomentTransitionPolicy.Create("moment-0001", "moment-0001");
+
+        Assert.Equal(SlideshowMomentTransitionKind.Standard, unannotated.Kind);
+        Assert.Equal(SlideshowMomentTransitionDecision.StandardMilliseconds, unannotated.TransitionMilliseconds);
+        Assert.Equal(SlideshowMomentTransitionKind.Standard, singleton.Kind);
+        Assert.Equal(SlideshowMomentTransitionKind.Standard, sameMoment.Kind);
+    }
+
+    [Fact]
+    public void Moment_transition_policy_marks_each_confirmed_chapter_boundary()
+    {
+        SlideshowMomentTransitionDecision firstBoundary =
+            SlideshowMomentTransitionPolicy.Create("moment-0001", "moment-0002");
+        SlideshowMomentTransitionDecision secondBoundary =
+            SlideshowMomentTransitionPolicy.Create("moment-0002", "moment-0003");
+
+        Assert.Equal(SlideshowMomentTransitionKind.ChapterBoundary, firstBoundary.Kind);
+        Assert.Equal(
+            SlideshowMomentTransitionDecision.ChapterBoundaryMilliseconds,
+            firstBoundary.TransitionMilliseconds);
+        Assert.Equal(SlideshowMomentTransitionKind.ChapterBoundary, secondBoundary.Kind);
+        Assert.InRange(
+            firstBoundary.TransitionMilliseconds,
+            SlideshowMomentTransitionDecision.StandardMilliseconds,
+            1000);
+    }
+
     [Fact]
     public void Duration_setting_change_preserves_progress_fraction_with_adaptive_policy()
     {
