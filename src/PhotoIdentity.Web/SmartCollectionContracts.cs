@@ -69,14 +69,16 @@ public sealed record SmartCollectionPageResponse(
     string? CollectionName = null);
 
 public sealed record SmartCollectionSlideshowSnapshotItemResponse(
-    string RevisionId);
+    string RevisionId,
+    string? MomentId = null);
 
 public sealed record SmartCollectionSlideshowSnapshotResponse(
     string CollectionId,
     string CollectionName,
     DateTimeOffset CreatedAtUtc,
     SmartCollectionSlideshowSnapshotItemResponse[] Items,
-    int Total);
+    int Total,
+    string? MomentPolicyVersion = null);
 
 public sealed record SmartCollectionErrorResponse(string Error);
 

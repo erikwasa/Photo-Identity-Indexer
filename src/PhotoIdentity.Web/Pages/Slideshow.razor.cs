@@ -84,9 +84,16 @@ public partial class Slideshow : IAsyncDisposable
     private string SlideshowAriaLabel => Snapshot is null
         ? "Photo slideshow"
         : $"{Snapshot.CollectionName} slideshow";
+    private SmartCollectionSlideshowSnapshotItemResponse? CurrentSnapshotItem =>
+        Snapshot is not null &&
+        Playback.CurrentIndex >= 0 &&
+        Playback.CurrentIndex < Snapshot.Items.Length
+            ? Snapshot.Items[Playback.CurrentIndex]
+            : null;
     private string? CurrentImageUrl => Playback.CurrentRevisionId is string revisionId
         ? PlaybackResourceUrl(revisionId)
         : null;
+    private string? CurrentMomentId => CurrentSnapshotItem?.MomentId;
     private bool PreparingOriginals =>
         OriginalPreparation?.State == "preparing";
     private bool PreparationFailed =>

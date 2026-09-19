@@ -1,5 +1,6 @@
 (() => {
     const transitionMilliseconds = 600;
+    const chapterTransitionMilliseconds = 850;
     const presentationStates = new WeakMap();
 
     function now() {
@@ -39,7 +40,13 @@
         return new Promise(resolve => requestAnimationFrame(() => resolve()));
     }
 
-    function waitForOpacityTransition(element) {
+    function transitionDuration(mode) {
+        return mode === "chapter"
+            ? chapterTransitionMilliseconds
+            : transitionMilliseconds;
+    }
+
+    function waitForOpacityTransition(element, durationMilliseconds) {
         if (!element || typeof element.addEventListener !== "function") {
             return Promise.resolve();
         }
@@ -67,7 +74,7 @@
             };
 
             element.addEventListener("transitionend", onTransitionEnd, { once: true });
-            timeoutId = setTimeout(finish, transitionMilliseconds + 100);
+            timeoutId = setTimeout(finish, durationMilliseconds + 100);
         });
     }
 
@@ -146,7 +153,11 @@
         return true;
     }
 
-    async function transitionPresentationImages(outgoing, incoming, visibleImage = incoming) {
+    async function transitionPresentationImages(
+        outgoing,
+        incoming,
+        visibleImage = incoming,
+        transitionMode = "standard") {
         if (!outgoing?.style || !incoming?.style || outgoing === incoming || !visibleImage) {
             return false;
         }
@@ -161,11 +172,12 @@
             return true;
         }
 
-        outgoing.style.transition = `opacity ${transitionMilliseconds}ms ease`;
-        incoming.style.transition = `opacity ${transitionMilliseconds}ms ease`;
+        const durationMilliseconds = transitionDuration(transitionMode);
+        outgoing.style.transition = `opacity ${durationMilliseconds}ms ease`;
+        incoming.style.transition = `opacity ${durationMilliseconds}ms ease`;
         incoming.style.opacity = "0";
 
-        const transitionCompleted = waitForOpacityTransition(incoming);
+        const transitionCompleted = waitForOpacityTransition(incoming, durationMilliseconds);
         await nextAnimationFrame();
         outgoing.style.opacity = "0";
         incoming.style.opacity = "1";
@@ -173,6 +185,9 @@
 
         outgoing.style.transition = "";
         incoming.style.transition = "";
+        const state = stateFor(visibleImage);
+        state.transitionMilliseconds = durationMilliseconds;
+        state.transitionMode = transitionMode === "chapter" ? "chapter" : "standard";
         dispatchVisible(visibleImage, false, true);
         return true;
     }
@@ -180,14 +195,19 @@
     function getPresentationImageState(image) {
         const state = image ? presentationStates.get(image) : null;
         return state
-            ? { ...state, transitionMilliseconds }
+            ? {
+                ...state,
+                transitionMilliseconds: state.transitionMilliseconds ?? transitionMilliseconds,
+                transitionMode: state.transitionMode ?? "standard"
+            }
             : {
                 readyAt: null,
                 visibleAt: null,
                 reducedMotion: false,
                 animated: false,
                 decodeFallback: false,
-                transitionMilliseconds
+                transitionMilliseconds,
+                transitionMode: "standard"
             };
     }
 

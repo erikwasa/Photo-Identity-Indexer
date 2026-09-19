@@ -47,7 +47,7 @@ Evaluate on a representative private Creative Collection after WI-0118 produces 
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: Creative slideshow snapshot contracts/materialization, slideshow page/presentation renderer, moment transition policy, browser transition interop, JavaScript and integration tests, and delivery status.
+- Trade-offs: confirmed moment boundaries use an 850 ms crossfade versus the existing 600 ms crossfade. Same-moment, singleton and unannotated transitions keep the existing behavior; reduced-motion still swaps without animation. No chapter hold, caption or new preference was added.
+- Deferred work: maintainer review on a representative private Creative Collection is intentionally grouped with the remaining M27 presentation items before completion.
+- Commands run: CI build/test/integration, JavaScript tests and documentation validation are expected on the pull request.
