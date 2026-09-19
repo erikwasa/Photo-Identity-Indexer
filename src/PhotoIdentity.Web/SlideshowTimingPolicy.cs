@@ -50,3 +50,39 @@ public static class SlideshowTimingPolicy
             multiplier,
             reason);
 }
+
+
+public enum SlideshowMomentTransitionKind
+{
+    Standard,
+    ChapterBoundary,
+}
+
+public sealed record SlideshowMomentTransitionDecision(
+    SlideshowMomentTransitionKind Kind,
+    int TransitionMilliseconds)
+{
+    public const int StandardMilliseconds = 600;
+    public const int ChapterBoundaryMilliseconds = 850;
+}
+
+public static class SlideshowMomentTransitionPolicy
+{
+    public static SlideshowMomentTransitionDecision Create(
+        string? outgoingMomentId,
+        string? incomingMomentId)
+    {
+        bool chapterBoundary =
+            !string.IsNullOrWhiteSpace(outgoingMomentId) &&
+            !string.IsNullOrWhiteSpace(incomingMomentId) &&
+            !string.Equals(outgoingMomentId, incomingMomentId, StringComparison.Ordinal);
+
+        return chapterBoundary
+            ? new(
+                SlideshowMomentTransitionKind.ChapterBoundary,
+                SlideshowMomentTransitionDecision.ChapterBoundaryMilliseconds)
+            : new(
+                SlideshowMomentTransitionKind.Standard,
+                SlideshowMomentTransitionDecision.StandardMilliseconds);
+    }
+}
