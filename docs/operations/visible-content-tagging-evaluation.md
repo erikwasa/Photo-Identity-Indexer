@@ -42,7 +42,15 @@ Use the tokenizer 'vocab.json' and 'merges.txt' from the same CLIP model family.
 
 The image path is versioned as 'clip-rgb-opencv-cubic-shortest-edge-center-crop-224-v1': shortest edge resized to 224 using cubic interpolation, centered 224-pixel crop, RGB conversion, 1/255 scaling and CLIP mean/std normalization.
 
-A practical starting candidate is an ONNX export of OpenAI CLIP ViT-B/32. Model assets are intentionally **not** committed or packaged by Photo Identity in this experiment. Keep the model/tokenizer files outside the repository and review their upstream licence/redistribution terms before any later production packaging decision. The report records SHA-256 hashes of the exact model, tokenizer vocabulary and merges used.
+The repository includes `models/Get-WI0126ClipModel.ps1` as a convenience for this experiment. It downloads a pinned ONNX Community conversion of OpenAI CLIP ViT-B/32 plus the matching `vocab.json` and `merges.txt` into the operator's local application-data directory. The full float32 ONNX model is used because the evaluator requires float32 `logits_per_image`; the helper verifies the pinned model byte length and SHA-256 before returning its paths.
+
+Model assets remain external to the repository and are not packaged by Photo Identity. Review upstream licence/model-card terms before any later production packaging decision. The evaluation report records SHA-256 hashes of the exact model, tokenizer vocabulary and merges used.
+
+~~~powershell
+$clip = .\models\Get-WI0126ClipModel.ps1
+~~~
+
+The first download is approximately 606 MB. Subsequent runs reuse the verified local model.
 
 ## Run the bounded experiment
 
@@ -56,9 +64,9 @@ dotnet run --project src/PhotoIdentity.Cli -c Release -- semantic-tags evaluate 
   --collection "<saved Smart Collection GUID>" \`
   --proxy-root "<archive derivative root>" \`
   --proxy-profile "<current review proxy profile id>" \`
-  --model "<local CLIP ONNX path>" \`
-  --tokenizer-vocab "<matching vocab.json>" \`
-  --tokenizer-merges "<matching merges.txt>" \`
+  --model $clip.ModelPath \`
+  --tokenizer-vocab $clip.TokenizerVocabularyPath \`
+  --tokenizer-merges $clip.TokenizerMergesPath \`
   --concept-vocabulary experiments/visible-content/wi-0126-vocabulary-v1.json \`
   --target-count 50 \`
   --max-candidates 200 \`
