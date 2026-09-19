@@ -87,6 +87,9 @@
     public string? RevisionId { get; set; }
 
     [Parameter]
+    public string? MomentId { get; set; }
+
+    [Parameter]
     public bool Playing { get; set; } = true;
 
     [Parameter]
@@ -108,7 +111,7 @@
             return;
         }
 
-        PresentationTarget target = new(ImageUrl, RevisionId);
+        PresentationTarget target = new(ImageUrl, RevisionId, MomentId);
         if (_requested is not null && _requested.Target == target)
         {
             return;
@@ -334,12 +337,19 @@
             else
             {
                 _transitioning = true;
+                SlideshowMomentTransitionDecision transition =
+                    SlideshowMomentTransitionPolicy.Create(
+                        VisibleSlot()?.Target.MomentId,
+                        target.MomentId);
                 presented = await JS.InvokeAsync<bool>(
                     "photoIdentitySlideshow.transitionPresentationImages",
                     _lifetime.Token,
                     LayerElement(_visibleLayer.Value),
                     LayerElement(layer),
-                    ImageElement(layer));
+                    ImageElement(layer),
+                    transition.Kind == SlideshowMomentTransitionKind.ChapterBoundary
+                        ? "chapter"
+                        : "standard");
             }
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
@@ -494,7 +504,8 @@
 
     private sealed record PresentationTarget(
         string Url,
-        string? RevisionId);
+        string? RevisionId,
+        string? MomentId);
 
     private sealed record PresentationRequest(
         PresentationTarget Target,
