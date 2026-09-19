@@ -184,10 +184,15 @@ public static class CreativeCollectionPreviewEndpoints
         CreativeCollectionMaterialization materialized,
         DateTimeOffset createdAtUtc)
     {
+        Dictionary<AssetRevisionId, string> visualGroupByRevision = materialized.VisualRedundancy.Groups
+            .SelectMany(group => group.Members.Select(member => (member.RevisionId, group.Id)))
+            .ToDictionary(pair => pair.RevisionId, pair => pair.Id);
+
         SmartCollectionSlideshowSnapshotItemResponse[] items = materialized.Selection.Selected
             .Select(item => new SmartCollectionSlideshowSnapshotItemResponse(
                 item.Candidate.RevisionId.ToString(),
-                item.MomentId))
+                item.MomentId,
+                visualGroupByRevision.GetValueOrDefault(item.Candidate.RevisionId)))
             .ToArray();
 
         return new SmartCollectionSlideshowSnapshotResponse(
@@ -196,7 +201,8 @@ public static class CreativeCollectionPreviewEndpoints
             createdAtUtc,
             items,
             items.Length,
-            materialized.Generated.MomentPolicyVersion);
+            materialized.Generated.MomentPolicyVersion,
+            materialized.VisualRedundancy.PolicyVersion);
     }
 
     private static bool TryCreateSettings(
