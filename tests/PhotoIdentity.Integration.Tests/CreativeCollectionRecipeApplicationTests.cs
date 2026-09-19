@@ -125,6 +125,10 @@ public sealed class CreativeCollectionRecipeApplicationTests
                 Assert.Equal(
                     broadened.SelectedCandidates.Select(candidate => candidate.RevisionId),
                     snapshot.Items.Select(item => item.RevisionId));
+                Assert.Equal(broadened.MomentPolicyVersion, snapshot.MomentPolicyVersion);
+                Assert.Equal(
+                    broadened.SelectedCandidates.Select(candidate => candidate.MomentId),
+                    snapshot.Items.Select(item => item.MomentId));
             }
 
             SqliteSmartCollectionQueryRepository query = new(database);
