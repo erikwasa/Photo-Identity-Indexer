@@ -76,7 +76,8 @@ public sealed record SmartCollectionPageResponse(
 
 public sealed record SmartCollectionSlideshowSnapshotItemResponse(
     string RevisionId,
-    string? MomentId = null);
+    string? MomentId = null,
+    string? VisualGroupId = null);
 
 public sealed record SmartCollectionSlideshowSnapshotResponse(
     string CollectionId,
@@ -84,7 +85,8 @@ public sealed record SmartCollectionSlideshowSnapshotResponse(
     DateTimeOffset CreatedAtUtc,
     SmartCollectionSlideshowSnapshotItemResponse[] Items,
     int Total,
-    string? MomentPolicyVersion = null);
+    string? MomentPolicyVersion = null,
+    string? VisualRedundancyPolicyVersion = null);
 
 public sealed record SlideshowLibraryCollectionResponse(
     string Id,
