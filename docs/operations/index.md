@@ -20,6 +20,7 @@ Use this page to decide which runbook is current. Some files under `docs/operati
 - [Detector pipeline rollout](detector-rollout.md) — maintenance-only migration procedure for an existing catalogue created with a different detector. New permanent-archive analysis already uses the governed CenterFace profile and does not require a rollout first.
 - [Local evaluation workflow](local-evaluation.md) — specialized reproducible model-evaluation tooling. Its original examples use the historical YuNet pilot corpus; do not treat those detector settings as the permanent archive profile.
 - [Multi-model comparison workflow](multi-model-comparison.md) — specialized embedding comparison workflow. The completed FP32/INT8 evidence used the earlier detector population; a future production-model reaffirmation must account for the selected CenterFace population.
+- [Whole-image embedding evaluation](whole-image-embedding-evaluation.md) — bounded WI-0127 exact-vector experiment for semantic retrieval, similar-photo retrieval and Creative Collection diversity; not a production vector-store procedure.
 
 ## Retained M16 detector evidence
 
