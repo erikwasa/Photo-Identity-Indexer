@@ -502,6 +502,57 @@ public sealed class CreativeCollectionSelectorTests
     }
 
     [Fact]
+    public void Embedding_diversity_penalizes_near_identical_vectors_without_changing_default_selection()
+    {
+        DateTime taken = new(2026, 9, 1, 10, 0, 0);
+        PhotoMomentCandidate[] catalogue =
+        [
+            Candidate(1, taken),
+            Candidate(2, taken),
+            Candidate(3, taken),
+        ];
+        (CreativeCollectionCandidateSet generated, PhotoMomentClusteringResult moments) =
+            GenerateAllAnchors(catalogue);
+        Dictionary<AssetRevisionId, IReadOnlyList<float>> embeddings = new()
+        {
+            [Revision(1)] = [1f, 0f],
+            [Revision(2)] = [0.999f, 0.001f],
+            [Revision(3)] = [0f, 1f],
+        };
+
+        CreativeCollectionSelectionResult baseline = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            targetCount: 2,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+        CreativeCollectionSelectionResult diversified = CreativeCollectionSelector.Select(
+            generated,
+            catalogue,
+            moments,
+            visualRedundancy: null,
+            presentationPreferences: null,
+            exposureHistory: null,
+            noveltyEnabled: false,
+            noveltyEvaluatedAtUtc: DateTimeOffset.UnixEpoch,
+            semanticConcepts: null,
+            semanticDiversityEnabled: false,
+            imageEmbeddings: embeddings,
+            embeddingDiversityEnabled: true,
+            targetCount: 2,
+            CreativeCollectionSelectionPolicy.BalancedV1);
+
+        Assert.Equal([Revision(1), Revision(2)],
+            baseline.Selected.Select(item => item.Candidate.RevisionId).ToArray());
+        Assert.Equal([Revision(1), Revision(3)],
+            diversified.Selected.Select(item => item.Candidate.RevisionId).ToArray());
+        Assert.EndsWith(
+            CreativeCollectionEmbeddingDiversityPolicies.BalancedV1,
+            diversified.PolicyVersion,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Same_inputs_target_and_policy_are_deterministic_under_candidate_reordering()
     {
         PhotoMomentCandidate[] catalogue = Enumerable.Range(1, 8)
