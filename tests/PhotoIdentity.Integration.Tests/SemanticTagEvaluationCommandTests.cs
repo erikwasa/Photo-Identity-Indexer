@@ -30,6 +30,7 @@ public sealed class SemanticTagEvaluationCommandTests
         Assert.Equal(200, options.MaximumCandidates);
         Assert.Equal(2, options.ConceptsPerPhoto);
         Assert.Equal(0, options.OriginalComparisonCount);
+        Assert.Null(options.ReviewOutputDirectory);
     }
 
     [Fact]
@@ -49,15 +50,19 @@ public sealed class SemanticTagEvaluationCommandTests
 
         SemanticTagEvaluationCommandOptions options =
             SemanticTagEvaluationCommandOptions.Parse(
-                [.. required, "--compare-originals", "20", "--concepts-per-photo", "3"]);
+                [.. required, "--compare-originals", "20", "--concepts-per-photo", "3", "--review-output", "review-output"]);
 
         Assert.Equal(20, options.OriginalComparisonCount);
         Assert.Equal(3, options.ConceptsPerPhoto);
+        Assert.Equal(Path.GetFullPath("review-output"), options.ReviewOutputDirectory);
         Assert.Throws<ArgumentException>(() =>
             SemanticTagEvaluationCommandOptions.Parse(
                 [.. required, "--compare-originals", "101"]));
         Assert.Throws<ArgumentException>(() =>
             SemanticTagEvaluationCommandOptions.Parse(
                 [.. required, "--max-candidates", "0"]));
+        Assert.Throws<ArgumentException>(() =>
+            SemanticTagEvaluationCommandOptions.Parse(
+                [.. required, "--review-output", "a", "--review-output", "b"]));
     }
 }

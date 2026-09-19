@@ -11,7 +11,8 @@ The evaluator:
 - scores a bounded number of existing durable review proxies with a local CLIP-compatible ONNX model;
 - assigns the top bounded visible-content concepts in memory only;
 - compares the existing Creative selector against the experimental 'm26-visible-content-diversity-v1' bonus;
-- optionally compares the same photos through safely accessible originals when the operator explicitly requests it; and
+- optionally compares the same photos through safely accessible originals when the operator explicitly requests it;
+- optionally writes a private local baseline-versus-semantic thumbnail review page when '--review-output' is supplied; and
 - writes only a privacy-safe aggregate JSON report when '--report' is supplied.
 
 The experiment never changes manual photo tags, Smart Collection membership, people, Places, presentation preferences, slideshow history or source state.
@@ -50,8 +51,23 @@ Use a representative saved Smart Collection that has more candidates than the re
 ~~~powershell
 $env:PHOTOIDENTITY_SEMANTIC_TEST = "<current PostgreSQL connection string>"
 
-dotnet run --project src/PhotoIdentity.Cli -c Release -- semantic-tags evaluate --postgres-connection-env PHOTOIDENTITY_SEMANTIC_TEST --collection "<saved Smart Collection GUID>" --proxy-root "<archive derivative root>" --proxy-profile "<current review proxy profile id>" --model "<local CLIP ONNX path>" --tokenizer-vocab "<matching vocab.json>" --tokenizer-merges "<matching merges.txt>" --concept-vocabulary experiments/visible-content/wi-0126-vocabulary-v1.json --target-count 50 --max-candidates 200 --concepts-per-photo 2 --report artifacts/wi-0126-visible-content-report.json
+dotnet run --project src/PhotoIdentity.Cli -c Release -- semantic-tags evaluate \`
+  --postgres-connection-env PHOTOIDENTITY_SEMANTIC_TEST \`
+  --collection "<saved Smart Collection GUID>" \`
+  --proxy-root "<archive derivative root>" \`
+  --proxy-profile "<current review proxy profile id>" \`
+  --model "<local CLIP ONNX path>" \`
+  --tokenizer-vocab "<matching vocab.json>" \`
+  --tokenizer-merges "<matching merges.txt>" \`
+  --concept-vocabulary experiments/visible-content/wi-0126-vocabulary-v1.json \`
+  --target-count 50 \`
+  --max-candidates 200 \`
+  --concepts-per-photo 2 \`
+  --report artifacts/wi-0126-visible-content-report.json \`
+  --review-output "$env:TEMP\\PhotoIdentity\\WI-0126-review"
 ~~~
+
+The optional review output is intentionally private: it copies only the selected durable review proxies into local 'baseline' and 'semantic' folders and writes an 'index.html' comparison page. Keep this directory outside the repository, do not upload it as a CI artifact, and delete it when the review is complete. The filenames are rank-only and the page contains no revision ids, source paths, collection names or originals.
 
 By default **no source original is opened**. To explicitly compare proxy inference against originals, rerun with a small bounded count such as '--compare-originals 20'.
 
@@ -59,7 +75,7 @@ Only originals that resolve safely under their recorded source root, exist at th
 
 ## Report interpretation
 
-The console and JSON report contain aggregate evidence only. They do not contain Smart Collection names, source paths, filenames, revision ids or PostgreSQL connection strings.
+The console and JSON report contain aggregate evidence only. They do not contain Smart Collection names, source paths, filenames, revision ids or PostgreSQL connection strings. The optional '--review-output' directory is separate from that report and contains private proxy images by design.
 
 Key fields:
 
@@ -76,7 +92,7 @@ The semantic selector bonus is deliberately modest: up to two concepts not yet r
 
 ## Maintainer comparison
 
-For the private acceptance pass, inspect representative thumbnails from both the ordinary and semantic selections rather than judging only the aggregate concept count.
+For the private acceptance pass, open the local review page and inspect representative thumbnails from both the ordinary and semantic selections rather than judging only the aggregate concept count. With the example path above, use `Start-Process "$env:TEMP\\PhotoIdentity\\WI-0126-review\\index.html"`.
 
 Record whether:
 
