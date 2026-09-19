@@ -81,7 +81,9 @@ On 2026-09-18, the maintainer accepted the pursued presentation-quality follow-o
 - WI-0122: Prefer, Avoid and Clear behaved correctly on a representative private Creative Collection; Avoid changed Creative presentation only and the photo remained in the ordinary exact Smart Collection.
 - WI-0124: slideshow show counts updated for actually displayed photos; freshness disabled preserved the stable baseline; freshness enabled produced a sensible different selection with more unseen photos.
 
-On 2026-09-18 the maintainer intentionally put WI-0125 on hold. WI-0126 is the next ready experiment because visible-content tags can add scene/object/activity evidence to Creative Collections while reusing the existing local ONNX runtime, durable review proxies and manual-tag boundaries. WI-0127 and WI-0128 remain optional heavier experiments.
+On 2026-09-18 the maintainer intentionally put WI-0125 on hold.
+
+On 2026-09-19 the maintainer completed WI-0126 with an explicit no-go for the evaluated zero-shot controlled-vocabulary tagging approach. The private run scored all 185 candidates from durable review proxies with no proxy failures; 20 proxy/original comparisons produced 0.700 top-1 agreement and 0.633 mean top-2 Jaccard overlap. Semantic scoring replaced 8 of 50 selected photos and raised nominal concept coverage from 14 to 16, but the visual review found repeated false labels for categories absent from the tested set. Aggregate output assigned `birthday` to 59 candidates and `wedding` to 29 despite neither being present, with additional false baby/dog labels. The result does not justify persisting automatic tags or enabling the semantic-diversity policy in production. Manual tags and the metadata/presentation-first selector remain unchanged. WI-0127 and WI-0128 remain optional independent experiments rather than follow-on commitments.
 
 ## Exit criteria
 

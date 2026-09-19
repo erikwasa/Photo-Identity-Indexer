@@ -1,0 +1,27 @@
+id: WI-0126
+title: Re-evaluate local visible-content tagging for Creative Collections
+milestone: M26
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0126-visible-content-tagging.md
+started_at: 2026-09-18
+completed_at: 2026-09-19
+verified_at: 2026-09-19
+verified_by: maintainer
+last_updated_at: 2026-09-19
+branch: agent/WI-0126-complete-no-go
+blockers:
+- WI-0120
+- WI-0056
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/374
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/376
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/377
+- type: maintainer_verification
+  value: 2026-09-19 private run scored 185/185 proxies with no proxy failures, compared 20 originals, replaced 8 of 50 baseline selections, and was rejected because repeated semantic labels such as birthday and wedding were visibly false for the tested collection.
+- type: decision
+  value: No-go for production zero-shot visible-content tags and m26-visible-content-diversity-v1; retain manual tags and metadata/presentation-first Creative selection unchanged.
