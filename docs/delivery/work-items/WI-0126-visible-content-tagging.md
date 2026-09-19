@@ -35,11 +35,11 @@ People/time metadata can produce useful stories, but whole-photo content such as
 
 ## Acceptance criteria
 
-- [ ] A reproducible local experiment evaluates useful object/scene/activity concepts on a representative private sample.
-- [ ] Proxy-versus-original quality and runtime are measured.
-- [ ] Automatic evidence retains exact pipeline provenance and does not overwrite manual tag history.
-- [ ] The evaluation compares Creative Collection output with and without semantic tags and records the incremental value.
-- [ ] The work concludes with a production integration boundary or an explicit decision not to proceed.
+- [x] A reproducible local experiment evaluates useful object/scene/activity concepts on a representative private sample.
+- [x] Proxy-versus-original quality and runtime are measured.
+- [x] Automatic evidence retains exact pipeline provenance and does not overwrite manual tag history.
+- [x] The evaluation compares Creative Collection output with and without semantic tags and records the incremental value.
+- [x] The work concludes with a production integration boundary or an explicit decision not to proceed.
 
 ## Verification requirements
 
@@ -53,11 +53,16 @@ Automated smoke tests for the experiment/integration contract plus maintainer re
 - Review proxies are the default input. Opening source originals requires an explicit bounded '--compare-originals' count and is used only for proxy/original agreement measurement.
 - The evaluator emits aggregate concept/runtime/selection evidence and never reports private paths, filenames, collection names or revision ids.
 - An explicit '--review-output' option can produce a local-only HTML comparison from copied review proxies so the maintainer can judge whether semantic replacements are actually more useful rather than merely different; this private output is separate from the aggregate report and is not for source control or CI artifacts.
-- A representative private run is still required before deciding whether the experiment justifies production automatic-tag evidence.
+- The representative private run is complete. The current zero-shot controlled-vocabulary approach is a no-go for production automatic-tag evidence and for Creative Collection semantic-diversity scoring.
 
 ## Completion notes
 
-- Files changed: Core experimental semantic diversity scoring, local CLIP ONNX/tokenizer adapter, bounded family-photo concept vocabulary, PostgreSQL CLI evaluator, local visual comparison output, selector/tokenizer/CLI tests, operational evaluation guide and delivery status.
-- Trade-offs: no model weights are bundled; automatic evidence is not persisted before usefulness is demonstrated; semantic scoring is capped below established moment diversity and explicit Prefer.
-- Deferred work: maintainer private evaluation, proxy/original quality/runtime findings, and a go/no-go production integration decision.
-- Commands run: repository CI will provide build/test/documentation evidence; the model-dependent private experiment is intentionally operator-run because model assets and private photos are not part of CI.
+- Implementation evidence: PR #374 added the bounded local CLIP experiment; PR #376 added private baseline-versus-semantic visual review output; PR #377 added pinned model/tokenizer acquisition.
+- Private evaluation sample: 185 Creative Collection candidates, all 185 scored successfully from durable review proxies, with zero unavailable proxies and zero proxy decode failures.
+- Proxy runtime: average 340.8 ms, median 342.0 ms and p95 408.4 ms per photo. The 20-image original comparison averaged 445.3 ms.
+- Proxy/original agreement: top-1 agreement was 0.700 and mean top-2 Jaccard overlap was 0.633. This shows the proxy path is operationally viable, but agreement alone is insufficient when the underlying labels are unreliable.
+- Selection effect: the semantic policy replaced 8 of 50 baseline selections and increased nominal distinct-concept coverage from 14 to 16.
+- Maintainer visual finding: the tested image set contained no birthdays, weddings, babies, dogs or cats, yet the model repeatedly assigned implausible family-event/object labels. Aggregate top concepts included `birthday` for 59 of 185 candidates, `wedding` for 29, `baby` for 9 and `dog` for 1.
+- Decision: **no-go** for persisting this zero-shot controlled-vocabulary output as automatic tag evidence and **no-go** for enabling `m26-visible-content-diversity-v1` in production Creative Collections. The nominal diversity gain is not trustworthy because it is partly driven by false semantic labels.
+- Production boundary: keep manual tags and the existing metadata/presentation-first Creative selector unchanged. Do not write these experimental labels to the catalogue. Retain the experiment tooling as reproducible evidence and as a possible harness for future model comparisons.
+- Scope of conclusion: this rejects the evaluated zero-shot tagging approach, not all future semantic-image work. WI-0127 remains an independent whole-image embedding experiment and should be judged on its own retrieval/diversity evidence.
