@@ -186,7 +186,8 @@ public static class CreativeCollectionPreviewEndpoints
     {
         SmartCollectionSlideshowSnapshotItemResponse[] items = materialized.Selection.Selected
             .Select(item => new SmartCollectionSlideshowSnapshotItemResponse(
-                item.Candidate.RevisionId.ToString()))
+                item.Candidate.RevisionId.ToString(),
+                item.MomentId))
             .ToArray();
 
         return new SmartCollectionSlideshowSnapshotResponse(
@@ -194,7 +195,8 @@ public static class CreativeCollectionPreviewEndpoints
             materialized.Definition.Name,
             createdAtUtc,
             items,
-            items.Length);
+            items.Length,
+            materialized.Generated.MomentPolicyVersion);
     }
 
     private static bool TryCreateSettings(
