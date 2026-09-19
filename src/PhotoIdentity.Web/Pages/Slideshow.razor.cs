@@ -90,6 +90,12 @@ public partial class Slideshow : IAsyncDisposable
         Playback.CurrentIndex < Snapshot.Items.Length
             ? Snapshot.Items[Playback.CurrentIndex]
             : null;
+    private SmartCollectionSlideshowSnapshotItemResponse? PreviousSnapshotItem =>
+        Snapshot is not null &&
+        Playback.CurrentIndex > 0 &&
+        Playback.CurrentIndex - 1 < Snapshot.Items.Length
+            ? Snapshot.Items[Playback.CurrentIndex - 1]
+            : null;
     private string? CurrentImageUrl => Playback.CurrentRevisionId is string revisionId
         ? PlaybackResourceUrl(revisionId)
         : null;
