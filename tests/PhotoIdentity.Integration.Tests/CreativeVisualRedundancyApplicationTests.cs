@@ -116,6 +116,24 @@ public sealed class CreativeVisualRedundancyApplicationTests
             Assert.Equal(
                 [first.Id.ToString(), third.Id.ToString()],
                 normalPreview.SelectedCandidates.Select(candidate => candidate.RevisionId).ToArray());
+
+            using HttpResponseMessage snapshotResponse = await client.PostAsync(
+                $"/api/smart-collections/{saved.Id}/creative-slideshow-snapshot?targetCount=3&momentGapMinutes=30",
+                content: null);
+            snapshotResponse.EnsureSuccessStatusCode();
+            SmartCollectionSlideshowSnapshotResponse snapshot =
+                await snapshotResponse.Content.ReadFromJsonAsync<SmartCollectionSlideshowSnapshotResponse>()
+                ?? throw new InvalidOperationException();
+
+            Assert.Equal(
+                [first.Id.ToString(), second.Id.ToString(), third.Id.ToString()],
+                snapshot.Items.Select(item => item.RevisionId).ToArray());
+            Assert.Equal(
+                PhotoVisualRedundancyPolicy.AcceptedCreativeV1.Version,
+                snapshot.VisualRedundancyPolicyVersion);
+            Assert.False(string.IsNullOrWhiteSpace(snapshot.Items[0].VisualGroupId));
+            Assert.Equal(snapshot.Items[0].VisualGroupId, snapshot.Items[1].VisualGroupId);
+            Assert.Null(snapshot.Items[2].VisualGroupId);
         }
         finally
         {

@@ -48,7 +48,7 @@ Review representative private burst sequences and reject any cadence that feels 
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: Creative materialization/snapshot contracts, slideshow playback/timing state, slideshow presentation wiring, visual-redundancy integration tests, playback policy tests, and delivery status.
+- Trade-offs: the first retained member of a visual-redundancy group keeps normal/adaptive timing. Autoplay-only adjacent continuations use 55% of configured duration, clamped to 1.5-3.0 seconds; manual destinations and loop restarts always use normal/adaptive timing. The accepted WI-0123 visual-group policy is reused rather than recomputed separately for playback.
+- Deferred work: maintainer review on representative private burst/near-duplicate sequences is intentionally grouped with WI-0132 and WI-0139 before WI-0137 completion.
+- Commands run: CI build/test/integration and documentation validation are expected on the pull request.

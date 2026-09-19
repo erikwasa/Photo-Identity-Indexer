@@ -9,6 +9,7 @@ public sealed record CreativeCollectionMaterialization(
     SmartCollectionDefinition Definition,
     CreativeCollectionCandidateSet Generated,
     CreativeCollectionSelectionResult Selection,
+    PhotoVisualRedundancyResult VisualRedundancy,
     IReadOnlyDictionary<AssetRevisionId, PhotoSlideshowExposureSummary> ExposureHistory,
     string NoveltyPolicyVersion);
 
@@ -87,10 +88,15 @@ public sealed class CreativeCollectionMaterializationService
                 noMoments,
                 settings.TargetCount,
                 CreativeCollectionSelectionPolicy.BalancedV1);
+            PhotoVisualRedundancyResult noVisualRedundancy = PhotoVisualRedundancyGrouper.Group(
+                [],
+                noMoments,
+                PhotoVisualRedundancyPolicy.AcceptedCreativeV1);
             return new CreativeCollectionMaterialization(
                 definition,
                 noCandidates,
                 noSelection,
+                noVisualRedundancy,
                 new Dictionary<AssetRevisionId, PhotoSlideshowExposureSummary>(),
                 settings.NoveltyEnabled
                     ? CreativeCollectionNoveltyPolicies.BalancedV1
@@ -146,6 +152,7 @@ public sealed class CreativeCollectionMaterializationService
             definition,
             generated,
             selection,
+            visualRedundancy,
             exposureHistory,
             settings.NoveltyEnabled
                 ? CreativeCollectionNoveltyPolicies.BalancedV1

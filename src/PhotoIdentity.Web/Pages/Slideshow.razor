@@ -353,7 +353,11 @@
     {
         string? presentedRevisionId = Playback.CurrentRevisionId;
         ImageError = null;
-        Playback.MarkCurrentImageReady(evidence);
+        bool compactVisualSequence = SlideshowVisualSequencePacingPolicy.ShouldCompact(
+            PreviousSnapshotItem?.VisualGroupId,
+            CurrentSnapshotItem?.VisualGroupId,
+            Playback.CurrentArrivalKind);
+        Playback.MarkCurrentImageReady(evidence, compactVisualSequence);
         _lastTickTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
         await UpdatePrefetchAsync();
 

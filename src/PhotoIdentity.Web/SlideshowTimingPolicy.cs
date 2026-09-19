@@ -24,9 +24,26 @@ public static class SlideshowTimingPolicy
 
     public static SlideshowTimingDecision Create(
         int configuredDurationSeconds,
-        SlideshowPresentationEvidence? evidence)
+        SlideshowPresentationEvidence? evidence) =>
+        Create(configuredDurationSeconds, evidence, compactVisualSequence: false);
+
+    public static SlideshowTimingDecision Create(
+        int configuredDurationSeconds,
+        SlideshowPresentationEvidence? evidence,
+        bool compactVisualSequence)
     {
         int configuredSeconds = Math.Max(1, configuredDurationSeconds);
+        if (compactVisualSequence)
+        {
+            double compactSeconds = Math.Min(
+                configuredSeconds,
+                Math.Clamp(configuredSeconds * 0.55d, 1.5d, 3d));
+            return new SlideshowTimingDecision(
+                TimeSpan.FromSeconds(compactSeconds),
+                compactSeconds / configuredSeconds,
+                "visual-sequence");
+        }
+
         if (evidence is null || !evidence.ReliableFaceGeometry || evidence.FaceCount < 0)
         {
             return SlideshowTimingDecision.Fallback(configuredSeconds);
@@ -85,4 +102,17 @@ public static class SlideshowMomentTransitionPolicy
                 SlideshowMomentTransitionKind.Standard,
                 SlideshowMomentTransitionDecision.StandardMilliseconds);
     }
+}
+
+
+public static class SlideshowVisualSequencePacingPolicy
+{
+    public static bool ShouldCompact(
+        string? previousVisualGroupId,
+        string? currentVisualGroupId,
+        SlideshowArrivalKind arrivalKind) =>
+        arrivalKind == SlideshowArrivalKind.Autoplay &&
+        !string.IsNullOrWhiteSpace(previousVisualGroupId) &&
+        !string.IsNullOrWhiteSpace(currentVisualGroupId) &&
+        string.Equals(previousVisualGroupId, currentVisualGroupId, StringComparison.Ordinal);
 }

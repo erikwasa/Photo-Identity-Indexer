@@ -4,15 +4,19 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M27 Slideshow presentation experience is batching its remaining presentation integrations before combined maintainer review.**
+**M27 Slideshow presentation experience has its remaining implementation work ready for combined maintainer verification.**
 
-WI-0132 now carries Creative Collection moment annotations into the immutable slideshow snapshot and uses a restrained chapter-boundary crossfade without changing collection membership/order. It remains `in_progress` until the planned combined M27 device review.
+WI-0132 carries Creative Collection moment annotations into the immutable slideshow snapshot and uses a restrained chapter-boundary crossfade without changing collection membership/order.
 
-WI-0139 is also implemented and merged but remains `in_progress` pending the same real-device review of the iPhone no-Fullscreen-API fallback and desktop fullscreen recovery.
+WI-0133 now carries accepted WI-0123 visual-redundancy groups into Creative slideshow snapshots and applies bounded compact timing only to autoplay continuations inside the same group. Manual destinations and loop restarts retain normal/adaptive timing.
+
+WI-0139 provides the no-Fullscreen-API fallback while keeping reduced browser-level protection explicit.
+
+All three remain `in_progress` until the planned combined M27 real-device review.
 
 ## Next concrete step
 
-Implement WI-0133 burst-aware compact pacing, then run the combined M27 review covering WI-0132, WI-0133 and WI-0139 before starting/closing WI-0137.
+After the WI-0133 implementation PR is merged, run the combined M27 review for WI-0132, WI-0133 and WI-0139 on the supported iPhone/browser path and a desktop browser. Then start/complete WI-0137 as the final integrated acceptance gate.
 
 ## Relevant files
 
@@ -21,9 +25,10 @@ Implement WI-0133 burst-aware compact pacing, then run the combined M27 review c
 - docs/delivery/work-items/WI-0139-no-fullscreen-slideshow-fallback.md
 - docs/delivery/work-items/WI-0137-real-device-slideshow-polish-acceptance.md
 - src/PhotoIdentity.Web/Pages/Slideshow.razor
-- src/PhotoIdentity.Web/Components/SlideshowPresentation.razor
+- src/PhotoIdentity.Web/SlideshowPlaybackState.cs
 - src/PhotoIdentity.Web/SlideshowTimingPolicy.cs
-- src/PhotoIdentity.Web/wwwroot/js/slideshow-presentation.js
+- src/PhotoIdentity.Api/CreativeCollectionMaterializationService.cs
+- src/PhotoIdentity.Api/CreativeCollectionPreviewEndpoints.cs
 
 ## Repository validation
 

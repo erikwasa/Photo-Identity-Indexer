@@ -9,10 +9,19 @@ public enum SlideshowAdvanceResult
     ExitRequested,
 }
 
+public enum SlideshowArrivalKind
+{
+    Initial,
+    Autoplay,
+    Manual,
+    Loop,
+}
+
 public sealed class SlideshowPlaybackState
 {
     private IReadOnlyList<string> _revisionIds = [];
     private bool _resetTimerWhenReady;
+    private bool _compactVisualSequence;
     private SlideshowPresentationEvidence _currentEvidence = SlideshowPresentationEvidence.Unavailable;
 
     public SlideshowSettings Settings { get; private set; } = SlideshowSettings.Defaults;
@@ -20,6 +29,7 @@ public sealed class SlideshowPlaybackState
     public string? CurrentRevisionId =>
         CurrentIndex >= 0 && CurrentIndex < _revisionIds.Count ? _revisionIds[CurrentIndex] : null;
     public int Count => _revisionIds.Count;
+    public SlideshowArrivalKind CurrentArrivalKind { get; private set; } = SlideshowArrivalKind.Initial;
     public bool IsPlaying { get; private set; }
     public bool IsImageReady { get; private set; }
     public bool IsDocumentVisible { get; private set; } = true;
@@ -51,7 +61,9 @@ public sealed class SlideshowPlaybackState
             .Distinct(StringComparer.Ordinal)
             .ToArray();
         CurrentIndex = 0;
+        CurrentArrivalKind = SlideshowArrivalKind.Initial;
         ExitRequested = false;
+        _compactVisualSequence = false;
         _currentEvidence = SlideshowPresentationEvidence.Unavailable;
         CurrentTiming = SlideshowTimingDecision.Fallback(Settings.ImageDurationSeconds);
         Remaining = CurrentTiming.EffectiveDuration;
@@ -85,7 +97,8 @@ public sealed class SlideshowPlaybackState
         {
             CurrentTiming = SlideshowTimingPolicy.Create(
                 Settings.ImageDurationSeconds,
-                _currentEvidence);
+                _currentEvidence,
+                _compactVisualSequence);
             Remaining = TimeSpan.FromTicks((long)Math.Round(
                 CurrentTiming.EffectiveDuration.Ticks * (1d - elapsedFraction),
                 MidpointRounding.AwayFromZero));
@@ -105,19 +118,26 @@ public sealed class SlideshowPlaybackState
     }
 
     public void MarkCurrentImageReady() =>
-        MarkCurrentImageReady(SlideshowPresentationEvidence.Unavailable);
+        MarkCurrentImageReady(SlideshowPresentationEvidence.Unavailable, compactVisualSequence: false);
 
-    public void MarkCurrentImageReady(SlideshowPresentationEvidence evidence)
+    public void MarkCurrentImageReady(SlideshowPresentationEvidence evidence) =>
+        MarkCurrentImageReady(evidence, compactVisualSequence: false);
+
+    public void MarkCurrentImageReady(
+        SlideshowPresentationEvidence evidence,
+        bool compactVisualSequence)
     {
         if (CurrentRevisionId is null)
         {
             return;
         }
 
+        _compactVisualSequence = compactVisualSequence;
         _currentEvidence = evidence ?? SlideshowPresentationEvidence.Unavailable;
         CurrentTiming = SlideshowTimingPolicy.Create(
             Settings.ImageDurationSeconds,
-            _currentEvidence);
+            _currentEvidence,
+            _compactVisualSequence);
         IsImageReady = true;
         if (_resetTimerWhenReady)
         {
@@ -129,6 +149,7 @@ public sealed class SlideshowPlaybackState
     public void MarkCurrentImageUnavailable()
     {
         IsImageReady = false;
+        _compactVisualSequence = false;
         _currentEvidence = SlideshowPresentationEvidence.Unavailable;
         CurrentTiming = SlideshowTimingDecision.Fallback(Settings.ImageDurationSeconds);
         Pause();
@@ -169,7 +190,9 @@ public sealed class SlideshowPlaybackState
     }
 
     public SlideshowAdvanceResult NextManual() =>
-        Settings.ManualNavigation ? AdvanceFromCurrent() : SlideshowAdvanceResult.None;
+        Settings.ManualNavigation
+            ? AdvanceFromCurrent(SlideshowArrivalKind.Manual)
+            : SlideshowAdvanceResult.None;
 
     public SlideshowAdvanceResult PreviousManual()
     {
@@ -178,7 +201,7 @@ public sealed class SlideshowPlaybackState
             return SlideshowAdvanceResult.None;
         }
 
-        MoveTo(CurrentIndex - 1);
+        MoveTo(CurrentIndex - 1, SlideshowArrivalKind.Manual);
         return SlideshowAdvanceResult.Moved;
     }
 
@@ -199,7 +222,7 @@ public sealed class SlideshowPlaybackState
             return SlideshowAdvanceResult.None;
         }
 
-        return AdvanceFromCurrent();
+        return AdvanceFromCurrent(SlideshowArrivalKind.Autoplay);
     }
 
     public IReadOnlyList<string> GetPrefetchRevisionIds(int window = 1)
@@ -241,7 +264,7 @@ public sealed class SlideshowPlaybackState
         }
     }
 
-    private SlideshowAdvanceResult AdvanceFromCurrent()
+    private SlideshowAdvanceResult AdvanceFromCurrent(SlideshowArrivalKind arrivalKind)
     {
         if (_revisionIds.Count == 0)
         {
@@ -250,7 +273,7 @@ public sealed class SlideshowPlaybackState
 
         if (CurrentIndex < _revisionIds.Count - 1)
         {
-            MoveTo(CurrentIndex + 1);
+            MoveTo(CurrentIndex + 1, arrivalKind);
             return SlideshowAdvanceResult.Moved;
         }
 
@@ -258,11 +281,11 @@ public sealed class SlideshowPlaybackState
         {
             SlideshowSettings.Stop => StopAtEnd(),
             SlideshowSettings.Exit => RequestExit(),
-            _ => LoopFromEnd(),
+            _ => LoopFromEnd(arrivalKind),
         };
     }
 
-    private SlideshowAdvanceResult LoopFromEnd()
+    private SlideshowAdvanceResult LoopFromEnd(SlideshowArrivalKind arrivalKind)
     {
         if (_revisionIds.Count == 1)
         {
@@ -272,7 +295,11 @@ public sealed class SlideshowPlaybackState
             return SlideshowAdvanceResult.CycledSamePhoto;
         }
 
-        MoveTo(0);
+        MoveTo(
+            0,
+            arrivalKind == SlideshowArrivalKind.Autoplay
+                ? SlideshowArrivalKind.Loop
+                : arrivalKind);
         return SlideshowAdvanceResult.Moved;
     }
 
@@ -291,10 +318,12 @@ public sealed class SlideshowPlaybackState
         return SlideshowAdvanceResult.ExitRequested;
     }
 
-    private void MoveTo(int index)
+    private void MoveTo(int index, SlideshowArrivalKind arrivalKind)
     {
         CurrentIndex = index;
+        CurrentArrivalKind = arrivalKind;
         IsImageReady = false;
+        _compactVisualSequence = false;
         _currentEvidence = SlideshowPresentationEvidence.Unavailable;
         CurrentTiming = SlideshowTimingDecision.Fallback(Settings.ImageDurationSeconds);
         Remaining = CurrentTiming.EffectiveDuration;

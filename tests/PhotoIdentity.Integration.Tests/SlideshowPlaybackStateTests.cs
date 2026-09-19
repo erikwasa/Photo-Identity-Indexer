@@ -222,6 +222,118 @@ public sealed class SlideshowPlaybackStateTests
     }
 
 
+
+    [Fact]
+    public void Visual_sequence_policy_compacts_only_autoplay_continuations_in_the_same_group()
+    {
+        Assert.False(SlideshowVisualSequencePacingPolicy.ShouldCompact(
+            null,
+            "visual-group-0001",
+            SlideshowArrivalKind.Initial));
+        Assert.True(SlideshowVisualSequencePacingPolicy.ShouldCompact(
+            "visual-group-0001",
+            "visual-group-0001",
+            SlideshowArrivalKind.Autoplay));
+        Assert.False(SlideshowVisualSequencePacingPolicy.ShouldCompact(
+            "visual-group-0001",
+            "visual-group-0002",
+            SlideshowArrivalKind.Autoplay));
+        Assert.False(SlideshowVisualSequencePacingPolicy.ShouldCompact(
+            "visual-group-0001",
+            "visual-group-0001",
+            SlideshowArrivalKind.Manual));
+        Assert.False(SlideshowVisualSequencePacingPolicy.ShouldCompact(
+            "visual-group-0001",
+            "visual-group-0001",
+            SlideshowArrivalKind.Loop));
+    }
+
+    [Fact]
+    public void Visual_sequence_duration_is_shorter_but_bounded_for_large_groups()
+    {
+        SlideshowTimingDecision normal = SlideshowTimingPolicy.Create(
+            5,
+            SlideshowPresentationEvidence.Unavailable,
+            compactVisualSequence: false);
+        SlideshowTimingDecision compact = SlideshowTimingPolicy.Create(
+            5,
+            SlideshowPresentationEvidence.Unavailable,
+            compactVisualSequence: true);
+        SlideshowTimingDecision longConfigured = SlideshowTimingPolicy.Create(
+            60,
+            new SlideshowPresentationEvidence(true, 5),
+            compactVisualSequence: true);
+        SlideshowTimingDecision shortConfigured = SlideshowTimingPolicy.Create(
+            2,
+            SlideshowPresentationEvidence.Unavailable,
+            compactVisualSequence: true);
+
+        Assert.Equal(TimeSpan.FromSeconds(5), normal.EffectiveDuration);
+        Assert.Equal(TimeSpan.FromSeconds(2.75), compact.EffectiveDuration);
+        Assert.Equal("visual-sequence", compact.Reason);
+        Assert.Equal(TimeSpan.FromSeconds(3), longConfigured.EffectiveDuration);
+        Assert.Equal(TimeSpan.FromSeconds(1.5), shortConfigured.EffectiveDuration);
+
+        for (int index = 0; index < 20; index++)
+        {
+            SlideshowTimingDecision member = SlideshowTimingPolicy.Create(
+                5,
+                SlideshowPresentationEvidence.Unavailable,
+                compactVisualSequence: true);
+            Assert.Equal(TimeSpan.FromSeconds(2.75), member.EffectiveDuration);
+        }
+    }
+
+    [Fact]
+    public void Manual_destination_and_loop_restart_do_not_inherit_compact_pacing()
+    {
+        SlideshowPlaybackState state = new();
+        state.LoadSnapshot(["a", "b", "c"], SlideshowSettings.Defaults);
+        state.MarkCurrentImageReady();
+
+        Assert.Equal(SlideshowArrivalKind.Initial, state.CurrentArrivalKind);
+        Assert.Equal(
+            SlideshowAdvanceResult.Moved,
+            state.AdvanceTime(TimeSpan.FromSeconds(5)));
+        Assert.Equal("b", state.CurrentRevisionId);
+        Assert.Equal(SlideshowArrivalKind.Autoplay, state.CurrentArrivalKind);
+
+        bool autoplayCompact = SlideshowVisualSequencePacingPolicy.ShouldCompact(
+            "visual-group-0001",
+            "visual-group-0001",
+            state.CurrentArrivalKind);
+        state.MarkCurrentImageReady(
+            SlideshowPresentationEvidence.Unavailable,
+            autoplayCompact);
+        Assert.Equal(TimeSpan.FromSeconds(2.75), state.Remaining);
+
+        Assert.Equal(SlideshowAdvanceResult.Moved, state.NextManual());
+        Assert.Equal("c", state.CurrentRevisionId);
+        Assert.Equal(SlideshowArrivalKind.Manual, state.CurrentArrivalKind);
+        bool manualCompact = SlideshowVisualSequencePacingPolicy.ShouldCompact(
+            "visual-group-0001",
+            "visual-group-0001",
+            state.CurrentArrivalKind);
+        state.MarkCurrentImageReady(
+            SlideshowPresentationEvidence.Unavailable,
+            manualCompact);
+        Assert.Equal(TimeSpan.FromSeconds(5), state.Remaining);
+
+        Assert.Equal(
+            SlideshowAdvanceResult.Moved,
+            state.AdvanceTime(TimeSpan.FromSeconds(5)));
+        Assert.Equal("a", state.CurrentRevisionId);
+        Assert.Equal(SlideshowArrivalKind.Loop, state.CurrentArrivalKind);
+        bool loopCompact = SlideshowVisualSequencePacingPolicy.ShouldCompact(
+            "visual-group-0001",
+            "visual-group-0001",
+            state.CurrentArrivalKind);
+        state.MarkCurrentImageReady(
+            SlideshowPresentationEvidence.Unavailable,
+            loopCompact);
+        Assert.Equal(TimeSpan.FromSeconds(5), state.Remaining);
+    }
+
     [Fact]
     public void Moment_transition_policy_is_standard_without_a_confirmed_boundary()
     {
