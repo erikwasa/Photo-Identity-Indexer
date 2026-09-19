@@ -105,6 +105,11 @@ public static class Program
                         SemanticTagEvaluationCommandOptions.Parse(args.Skip(2).ToArray()),
                         output,
                         cancellationToken),
+                "image-embeddings" when args.Length > 1 && args[1] == "evaluate" =>
+                    await ImageEmbeddingEvaluationCommandRunner.RunAsync(
+                        ImageEmbeddingEvaluationCommandOptions.Parse(args.Skip(2).ToArray()),
+                        output,
+                        cancellationToken),
                 _ => UnknownCommand(args[0], error),
             };
         }
@@ -217,6 +222,22 @@ public static class Program
                                      [--report PATH]
                                      [--review-output DIR]
 
+              image-embeddings evaluate --postgres-connection-env NAME
+                                        --collection COLLECTION_ID
+                                        --proxy-root DIR --proxy-profile ID
+                                        --model PATH
+                                        --tokenizer-vocab PATH
+                                        --tokenizer-merges PATH
+                                        --query TEXT [--query TEXT ...]
+                                        [--target-count COUNT]
+                                        [--moment-gap-minutes MINUTES]
+                                        [--max-candidates COUNT]
+                                        [--retrieval-count COUNT]
+                                        [--similar-seeds COUNT]
+                                        [--neighbors-per-seed COUNT]
+                                        [--report PATH]
+                                        [--review-output DIR]
+
             Catalogue backup is the WI-0102 stopped-source snapshot path. It requires the
             operator to explicitly confirm that Photo Identity has been stopped, opens the
             source SQLite catalogue read-only, verifies the current schema and foreign keys,
@@ -320,6 +341,16 @@ public static class Program
             agreement measurement; zero is the default. Output and reports contain aggregate counts,
             public vocabulary concept ids, hashes and runtime evidence only, never private paths,
             filenames, Smart Collection names or revision ids.
+
+            Image-embeddings evaluate is the WI-0127 bounded whole-image embedding
+            experiment. It reuses the same local CLIP model/tokenizer assets and durable review
+            proxies, emits L2-normalized model-versioned image vectors in memory only, and measures
+            exact text-to-image retrieval, exact image-to-image nearest neighbors and an opt-in
+            embedding-diversity Creative selector. It does not install pgvector or any ANN index,
+            persist vectors, alter canonical metadata or write catalogue evidence. The JSON report
+            contains aggregate runtime/storage/retrieval/selection measurements but omits query
+            text and revision ids; the optional private review page contains the operator's query
+            text and copied review proxies for qualitative retrieval and selection review.
 
             Match regenerate rebuilds ranked suggestions for one exact embedding model
             revision from the current canonical exemplar snapshot while preserving rejected

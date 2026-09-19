@@ -19,6 +19,13 @@ public static class CreativeCollectionSelectionReasonCodes
     public const string NoveltyRecent = "novelty-recent";
     public const string NoveltyFrequency = "novelty-frequency";
     public const string SemanticNewConcept = "semantic-new-concept";
+    public const string EmbeddingSimilarity = "embedding-similarity";
+}
+
+public static class CreativeCollectionEmbeddingDiversityPolicies
+{
+    public const string Disabled = "disabled";
+    public const string BalancedV1 = "m26-image-embedding-diversity-v1";
 }
 
 public static class CreativeCollectionSemanticDiversityPolicies
@@ -200,6 +207,37 @@ public static class CreativeCollectionSelector
         IReadOnlyDictionary<AssetRevisionId, IReadOnlyList<string>>? semanticConcepts,
         bool semanticDiversityEnabled,
         int targetCount,
+        CreativeCollectionSelectionPolicy policy) =>
+        Select(
+            candidates,
+            catalogue,
+            moments,
+            visualRedundancy,
+            presentationPreferences,
+            exposureHistory,
+            noveltyEnabled,
+            noveltyEvaluatedAtUtc,
+            semanticConcepts,
+            semanticDiversityEnabled,
+            imageEmbeddings: null,
+            embeddingDiversityEnabled: false,
+            targetCount,
+            policy);
+
+    public static CreativeCollectionSelectionResult Select(
+        CreativeCollectionCandidateSet candidates,
+        IEnumerable<PhotoMomentCandidate> catalogue,
+        PhotoMomentClusteringResult moments,
+        PhotoVisualRedundancyResult? visualRedundancy,
+        IReadOnlyDictionary<AssetRevisionId, string>? presentationPreferences,
+        IReadOnlyDictionary<AssetRevisionId, PhotoSlideshowExposureSummary>? exposureHistory,
+        bool noveltyEnabled,
+        DateTimeOffset noveltyEvaluatedAtUtc,
+        IReadOnlyDictionary<AssetRevisionId, IReadOnlyList<string>>? semanticConcepts,
+        bool semanticDiversityEnabled,
+        IReadOnlyDictionary<AssetRevisionId, IReadOnlyList<float>>? imageEmbeddings,
+        bool embeddingDiversityEnabled,
+        int targetCount,
         CreativeCollectionSelectionPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(candidates);
@@ -255,7 +293,8 @@ public static class CreativeCollectionSelector
                     visualGroupByRevision.GetValueOrDefault(candidate.RevisionId),
                     presentationPreferences?.GetValueOrDefault(candidate.RevisionId),
                     exposureHistory?.GetValueOrDefault(candidate.RevisionId),
-                    semanticConcepts?.GetValueOrDefault(candidate.RevisionId)));
+                    semanticConcepts?.GetValueOrDefault(candidate.RevisionId),
+                    NormalizeEmbedding(imageEmbeddings?.GetValueOrDefault(candidate.RevisionId))));
         AssignTemporalBuckets(metadata.Values, policy.TemporalBucketCount);
 
         List<CreativeCollectionSelectedCandidate> selected = [];
@@ -265,6 +304,7 @@ public static class CreativeCollectionSelector
         Dictionary<string, int> peopleCombinationCounts = new(StringComparer.Ordinal);
         Dictionary<string, int> visualGroupCounts = new(StringComparer.Ordinal);
         Dictionary<string, int> semanticConceptCounts = new(StringComparer.Ordinal);
+        List<IReadOnlyList<float>> selectedEmbeddings = [];
 
         while (selected.Count < selectionCount)
         {
@@ -279,9 +319,11 @@ public static class CreativeCollectionSelector
                     peopleCombinationCounts,
                     visualGroupCounts,
                     semanticConceptCounts,
+                    selectedEmbeddings,
                     noveltyEnabled,
                     noveltyEvaluatedAtUtc,
                     semanticDiversityEnabled,
+                    embeddingDiversityEnabled,
                     policy))
                 .OrderByDescending(candidate => candidate.Score)
                 .ThenBy(candidate => candidate.Metadata.TakenAtLocal.HasValue ? 0 : 1)
@@ -301,6 +343,10 @@ public static class CreativeCollectionSelector
             {
                 semanticConceptCounts[concept] = semanticConceptCounts.GetValueOrDefault(concept) + 1;
             }
+            if (next.Metadata.ImageEmbedding is not null)
+            {
+                selectedEmbeddings.Add(next.Metadata.ImageEmbedding);
+            }
 
             selected.Add(new CreativeCollectionSelectedCandidate(
                 next.Candidate,
@@ -316,9 +362,16 @@ public static class CreativeCollectionSelector
             .ThenBy(candidate => candidate.Candidate.RevisionId.ToString(), StringComparer.Ordinal)
             .ToArray();
 
-        string effectivePolicyVersion = semanticDiversityEnabled
-            ? $"{policy.Version}+{CreativeCollectionSemanticDiversityPolicies.BalancedV1}"
-            : policy.Version;
+        List<string> effectivePolicies = [policy.Version];
+        if (semanticDiversityEnabled)
+        {
+            effectivePolicies.Add(CreativeCollectionSemanticDiversityPolicies.BalancedV1);
+        }
+        if (embeddingDiversityEnabled)
+        {
+            effectivePolicies.Add(CreativeCollectionEmbeddingDiversityPolicies.BalancedV1);
+        }
+        string effectivePolicyVersion = string.Join("+", effectivePolicies);
 
         return new CreativeCollectionSelectionResult(
             effectivePolicyVersion,
@@ -338,7 +391,8 @@ public static class CreativeCollectionSelector
         string? visualGroupId,
         string? presentationPreference,
         PhotoSlideshowExposureSummary? exposure,
-        IReadOnlyList<string>? semanticConcepts)
+        IReadOnlyList<string>? semanticConcepts,
+        IReadOnlyList<float>? imageEmbedding)
     {
         string? peopleCombinationKey = source.PeopleKeys is null
             ? null
@@ -361,7 +415,8 @@ public static class CreativeCollectionSelector
             visualGroupId,
             presentationPreference,
             exposure,
-            NormalizeSemanticConcepts(semanticConcepts));
+            NormalizeSemanticConcepts(semanticConcepts),
+            imageEmbedding);
     }
 
     private static void AssignTemporalBuckets(
@@ -398,9 +453,11 @@ public static class CreativeCollectionSelector
         IReadOnlyDictionary<string, int> peopleCombinationCounts,
         IReadOnlyDictionary<string, int> visualGroupCounts,
         IReadOnlyDictionary<string, int> semanticConceptCounts,
+        IReadOnlyList<IReadOnlyList<float>> selectedEmbeddings,
         bool noveltyEnabled,
         DateTimeOffset noveltyEvaluatedAtUtc,
         bool semanticDiversityEnabled,
+        bool embeddingDiversityEnabled,
         CreativeCollectionSelectionPolicy policy)
     {
         List<CreativeCollectionSelectionReason> reasons = [];
@@ -551,6 +608,34 @@ public static class CreativeCollectionSelector
             }
         }
 
+        if (embeddingDiversityEnabled &&
+            metadata.ImageEmbedding is not null &&
+            selectedEmbeddings.Count > 0)
+        {
+            double maximumSimilarity = selectedEmbeddings
+                .Max(selectedEmbedding =>
+                    PhotoEmbeddingSimilarity.Cosine(
+                        metadata.ImageEmbedding,
+                        selectedEmbedding));
+            int penalty = maximumSimilarity switch
+            {
+                >= 0.97d => -160,
+                >= 0.92d => -90,
+                >= 0.85d => -40,
+                >= 0.75d => -15,
+                _ => 0,
+            };
+            if (penalty != 0)
+            {
+                AddReason(
+                    reasons,
+                    CreativeCollectionSelectionReasonCodes.EmbeddingSimilarity,
+                    penalty,
+                    $"Most similar already-selected whole-image embedding has cosine similarity {maximumSimilarity:0.000}.");
+                score += penalty;
+            }
+        }
+
         if (metadata.VisualGroupId is string visualGroupId)
         {
             int count = visualGroupCounts.GetValueOrDefault(visualGroupId);
@@ -590,6 +675,34 @@ public static class CreativeCollectionSelector
                 .Distinct(StringComparer.Ordinal)
                 .OrderBy(concept => concept, StringComparer.Ordinal)
                 .ToArray();
+
+    private static IReadOnlyList<float>? NormalizeEmbedding(
+        IReadOnlyList<float>? embedding)
+    {
+        if (embedding is null)
+        {
+            return null;
+        }
+        if (embedding.Count == 0 || embedding.Any(value => !float.IsFinite(value)))
+        {
+            throw new ArgumentException(
+                "Whole-image embedding evidence must contain finite values.",
+                nameof(embedding));
+        }
+
+        double squaredNorm = embedding.Sum(value => (double)value * value);
+        if (!double.IsFinite(squaredNorm) || squaredNorm <= 0)
+        {
+            throw new ArgumentException(
+                "Whole-image embedding evidence must have a positive finite norm.",
+                nameof(embedding));
+        }
+
+        double norm = Math.Sqrt(squaredNorm);
+        return embedding
+            .Select(value => (float)(value / norm))
+            .ToArray();
+    }
 
     private static Dictionary<AssetRevisionId, string> BuildVisualGroupMap(
         PhotoVisualRedundancyResult? visualRedundancy)
@@ -644,7 +757,8 @@ public static class CreativeCollectionSelector
             string? visualGroupId,
             string? presentationPreference,
             PhotoSlideshowExposureSummary? exposure,
-            IReadOnlyList<string> semanticConcepts)
+            IReadOnlyList<string> semanticConcepts,
+            IReadOnlyList<float>? imageEmbedding)
         {
             TakenAtLocal = takenAtLocal;
             MomentId = momentId;
@@ -653,6 +767,7 @@ public static class CreativeCollectionSelector
             PresentationPreference = presentationPreference;
             Exposure = exposure;
             SemanticConcepts = semanticConcepts;
+            ImageEmbedding = imageEmbedding;
         }
 
         public DateTime? TakenAtLocal { get; }
@@ -662,6 +777,7 @@ public static class CreativeCollectionSelector
         public string? PresentationPreference { get; }
         public PhotoSlideshowExposureSummary? Exposure { get; }
         public IReadOnlyList<string> SemanticConcepts { get; }
+        public IReadOnlyList<float>? ImageEmbedding { get; }
         public int? TemporalBucket { get; set; }
     }
 
