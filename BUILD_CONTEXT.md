@@ -4,26 +4,26 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M27 Slideshow presentation experience is ready for its final real-device acceptance item, WI-0137.**
+**M27 Slideshow presentation experience is batching its remaining presentation integrations before combined maintainer review.**
 
-WI-0138 was accepted by the maintainer on 2026-09-18 after sustained face-review verification. The durable 30-second review quiet period prevents repeated full provisional-cluster refreshes during active review, and M25 is completed again.
+WI-0132 now carries Creative Collection moment annotations into the immutable slideshow snapshot and uses a restrained chapter-boundary crossfade without changing collection membership/order. It remains `in_progress` until the planned combined M27 device review.
 
-M27 can now resume its final integrated real-device slideshow acceptance pass.
+WI-0139 is also implemented and merged but remains `in_progress` pending the same real-device review of the iPhone no-Fullscreen-API fallback and desktop fullscreen recovery.
 
 ## Next concrete step
 
-Start WI-0137 and run the representative combined slideshow acceptance set on the supported iPhone/browser path and at least one desktop browser. Cover autoplay, transitions/readiness, rapid manual navigation, pause/resume, looping, reduced motion, backdrop/motion/timing defaults, tap-to-play library flow, exception-driven preparation, protected controls, fullscreen/orientation recovery and browser performance/resource behavior.
+Implement WI-0133 burst-aware compact pacing, then run the combined M27 review covering WI-0132, WI-0133 and WI-0139 before starting/closing WI-0137.
 
 ## Relevant files
 
+- docs/delivery/work-items/WI-0132-moment-aware-slideshow-transitions.md
+- docs/delivery/work-items/WI-0133-burst-aware-slideshow-pacing.md
+- docs/delivery/work-items/WI-0139-no-fullscreen-slideshow-fallback.md
 - docs/delivery/work-items/WI-0137-real-device-slideshow-polish-acceptance.md
-- docs/delivery/status/work-items/active/WI-0137.yaml
-- docs/delivery/work-items/WI-0131-adaptive-slideshow-backdrop.md
-- docs/delivery/work-items/WI-0134-adaptive-slideshow-rhythm.md
-- docs/delivery/work-items/WI-0136-exception-driven-slideshow-preparation.md
-- src/PhotoIdentity.Web/Pages/Slideshows.razor
 - src/PhotoIdentity.Web/Pages/Slideshow.razor
 - src/PhotoIdentity.Web/Components/SlideshowPresentation.razor
+- src/PhotoIdentity.Web/SlideshowTimingPolicy.cs
+- src/PhotoIdentity.Web/wwwroot/js/slideshow-presentation.js
 
 ## Repository validation
 
