@@ -2,7 +2,7 @@ using PhotoIdentity.Web;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
-namespace PhotoIdentity.Integration.Tests;
+namespace PhotoIdentity_Integration_Tests;
 
 public sealed class PhotoCaptureDateEditorModelTests
 {
