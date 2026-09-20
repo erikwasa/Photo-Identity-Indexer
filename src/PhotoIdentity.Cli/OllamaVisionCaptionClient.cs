@@ -47,7 +47,7 @@ internal sealed class OllamaVisionCaptionClient
         ArgumentNullException.ThrowIfNull(baseUri);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
         if (!baseUri.IsAbsoluteUri ||
-            !Uri.IsLoopback(baseUri) ||
+            !baseUri.IsLoopback ||
             (baseUri.Scheme != Uri.UriSchemeHttp &&
              baseUri.Scheme != Uri.UriSchemeHttps))
         {
