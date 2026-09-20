@@ -167,7 +167,8 @@
                             <label class="smart-field">
                                 <span class="field-label">Month</span>
                                 <input type="month"
-                                       @bind="TakenMonth"
+                                       value="@TakenMonth"
+                                       @onchange="args => TakenMonth = args.Value?.ToString() ?? string.Empty"
                                        disabled="@Busy" />
                             </label>
                         }
@@ -176,7 +177,8 @@
                             <label class="smart-field">
                                 <span class="field-label">Date</span>
                                 <input type="date"
-                                       @bind="TakenDate"
+                                       value="@TakenDate"
+                                       @onchange="args => TakenDate = args.Value?.ToString() ?? string.Empty"
                                        disabled="@Busy" />
                             </label>
                         }
@@ -186,13 +188,15 @@
                                 <label class="smart-field">
                                     <span class="field-label">From</span>
                                     <input type="date"
-                                           @bind="TakenFrom"
+                                           value="@TakenFrom"
+                                           @onchange="args => TakenFrom = args.Value?.ToString() ?? string.Empty"
                                            disabled="@Busy" />
                                 </label>
                                 <label class="smart-field">
                                     <span class="field-label">To</span>
                                     <input type="date"
-                                           @bind="TakenTo"
+                                           value="@TakenTo"
+                                           @onchange="args => TakenTo = args.Value?.ToString() ?? string.Empty"
                                            disabled="@Busy" />
                                 </label>
                             </div>
