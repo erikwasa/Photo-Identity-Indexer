@@ -351,9 +351,6 @@ public sealed class SqliteSmartCollectionRepository : ISmartCollectionRepository
                 CHECK (length(filter_json) > 0));
             CREATE INDEX IF NOT EXISTS ix_smart_collections_name
                 ON smart_collections (normalized_name, id);
-            UPDATE smart_collections
-            SET filter_schema_version = 3
-            WHERE filter_schema_version IN (1, 2);
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
