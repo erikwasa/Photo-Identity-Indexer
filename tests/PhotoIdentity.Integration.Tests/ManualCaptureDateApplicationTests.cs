@@ -91,6 +91,11 @@ public sealed class ManualCaptureDateApplicationTests
                     new PhotoCaptureDateMutationRequest("2026-02-30"));
                 Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
 
+                using HttpResponseMessage invalidFormat = await client.PutAsJsonAsync(
+                    url,
+                    new PhotoCaptureDateMutationRequest("not-a-date"));
+                Assert.Equal(HttpStatusCode.BadRequest, invalidFormat.StatusCode);
+
                 PhotoDetailsResponse year = await PutAsync(client, url, "1987");
                 Assert.Equal("manual", year.CaptureDate!.Source);
                 Assert.Equal("year", year.CaptureDate.Precision);
