@@ -31,6 +31,8 @@ Current work items: **24**. Archived terminal items: **131**.
 | [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) Evaluate face discovery and identity processing inside video | M30 | proposed | unassigned | [YAML](work-items/active/WI-0155.yaml) |
 | [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) Evaluate iPhone Live Photo pairing as one logical media experience | M30 | proposed | unassigned | [YAML](work-items/active/WI-0156.yaml) |
 
+| [WI-0157](../work-items/WI-0157-reduced-precision-place-fallback.md) Add reduced-precision place fallback for GPS photos without populated-place matches | M28 | proposed | unassigned | [YAML](work-items/active/WI-0157.yaml) |
+
 Historical items stay queryable without opening the archive directory:
 
 ```powershell
