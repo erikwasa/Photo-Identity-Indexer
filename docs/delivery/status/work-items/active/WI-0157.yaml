@@ -6,7 +6,7 @@ owner: ai-agent
 document: ../work-items/WI-0157-opt-in-local-slideshow-captions.md
 started_at: 2026-09-20
 last_updated_at: 2026-09-20
-branch: agent/WI-0157-opt-in-local-slideshow-captions
+branch: agent/WI-0157-local-slideshow-captions-rebased
 blockers:
 - WI-0128
 - WI-0084
