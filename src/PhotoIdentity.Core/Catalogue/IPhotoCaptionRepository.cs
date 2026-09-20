@@ -56,6 +56,9 @@ public sealed record PhotoGeneratedCaption(
     public bool IsDisplayable =>
         RiskFlags.Count == 0 &&
         !string.IsNullOrWhiteSpace(Content);
+
+    public string? DisplayableContent =>
+        IsDisplayable ? Content : null;
 }
 
 /// <summary>
