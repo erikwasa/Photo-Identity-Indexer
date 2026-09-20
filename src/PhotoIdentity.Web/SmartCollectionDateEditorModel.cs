@@ -50,9 +50,10 @@ public static class SmartCollectionDateEditorModel
                     return false;
                 }
 
+                string yearText = parsedYear.ToString("0000", CultureInfo.InvariantCulture);
                 range = new SmartCollectionDateRangeRequest(
-                    $"{parsedYear:0000}-01-01",
-                    $"{parsedYear:0000}-12-31");
+                    $"{yearText}-01-01",
+                    $"{yearText}-12-31");
                 return true;
 
             case SmartCollectionDateModes.Month:
@@ -63,7 +64,8 @@ public static class SmartCollectionDateEditorModel
                 }
 
                 range = new SmartCollectionDateRangeRequest(
-                    parsedMonth.ToString("yyyy-MM-01", CultureInfo.InvariantCulture),
+                    new DateOnly(parsedMonth.Year, parsedMonth.Month, 1)
+                        .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
                     new DateOnly(
                         parsedMonth.Year,
                         parsedMonth.Month,
