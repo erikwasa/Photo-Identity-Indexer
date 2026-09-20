@@ -34,11 +34,11 @@ The current launch path can navigate successfully but the slideshow then pauses 
 
 ## Acceptance criteria
 
-- [ ] A browser with no standard fullscreen capability can start and play instead of remaining unrecoverably paused.
-- [ ] Supported browsers still request true fullscreen from the activating gesture.
-- [ ] Protected mode reports reduced browser-level protection while retaining application-level parent controls.
-- [ ] Tests distinguish unsupported, rejected and lost-fullscreen states.
-- [ ] Maintainer verification covers the reported iPhone path and a desktop browser.
+- [x] A browser with no standard fullscreen capability can start and play instead of remaining unrecoverably paused.
+- [x] Supported browsers still request true fullscreen from the activating gesture.
+- [x] Protected mode reports reduced browser-level protection while retaining application-level parent controls.
+- [x] Tests distinguish unsupported, rejected and lost-fullscreen states.
+- [x] Maintainer verification covers the reported iPhone path and a desktop browser.
 
 ## Verification requirements
 
@@ -48,5 +48,6 @@ Automated browser/interop state tests plus maintainer verification on the affect
 
 - Files changed: slideshow browser interop, slideshow presentation gating/recovery, protection-state policy/tests, slideshow-library launch regression coverage.
 - Trade-offs: unsupported browsers use the existing fixed full-window slideshow surface but cannot suppress browser chrome/navigation; supported browsers still require real fullscreen and keep strict recovery after rejection or loss.
-- Deferred work: maintainer verification on the reported iPhone/browser path and a desktop browser before completion.
-- Commands run: CI build/test/document validation on the pull request.
+- Deferred work: none for WI-0139; the affected iPhone no-Fullscreen-API path and desktop fullscreen/recovery path were both accepted.
+- Verification: maintainer accepted WI-0139 on 2026-09-20 during the combined WI-0132/WI-0133/WI-0139 slideshow review.
+- Commands run: PR #375 CI run #1983 completed successfully, including build/test/document validation.
