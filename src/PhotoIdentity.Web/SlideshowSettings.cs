@@ -11,7 +11,7 @@ public sealed record SlideshowSettings(
     string AfterLastPhoto,
     bool ProtectedSlideshow,
     bool PrepareOriginals,
-    bool GeneratedCaptions,
+    bool ShowCaptions,
     string CaptionLanguage)
 {
     public const string StorageKey = "photoidentity.slideshow.settings.v1";
@@ -39,7 +39,7 @@ public sealed record SlideshowSettings(
         AfterLastPhoto: Loop,
         ProtectedSlideshow: true,
         PrepareOriginals: false,
-        GeneratedCaptions: false,
+        ShowCaptions: false,
         CaptionLanguage: DefaultCaptionLanguage);
 
     public SlideshowSettings Normalize()
@@ -90,7 +90,7 @@ public sealed record SlideshowSettings(
                 NormalizeEndBehavior(persisted.AfterLastPhoto),
                 persisted.ProtectedSlideshow ?? Defaults.ProtectedSlideshow,
                 persisted.PrepareOriginals ?? Defaults.PrepareOriginals,
-                persisted.GeneratedCaptions ?? Defaults.GeneratedCaptions,
+                persisted.ShowCaptions ?? persisted.GeneratedCaptions ?? Defaults.ShowCaptions,
                 NormalizeCaptionLanguage(persisted.CaptionLanguage));
         }
         catch (JsonException)
@@ -143,6 +143,7 @@ public sealed record SlideshowSettings(
         string? AfterLastPhoto = null,
         bool? ProtectedSlideshow = null,
         bool? PrepareOriginals = null,
+        bool? ShowCaptions = null,
         bool? GeneratedCaptions = null,
         string? CaptionLanguage = null);
 }
