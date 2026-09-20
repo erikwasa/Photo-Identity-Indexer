@@ -285,3 +285,14 @@ work_items:
   - WI-0151
   blocker_notes: []
   evidence: []
+- id: WI-0157
+  title: Add reduced-precision place fallback for GPS photos without populated-place matches
+  milestone: M28
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0157-reduced-precision-place-fallback.md
+  blockers:
+  - WI-0064
+  - WI-0065
+  blocker_notes: []
+  evidence: []
