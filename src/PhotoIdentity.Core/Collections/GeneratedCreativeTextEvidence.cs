@@ -143,7 +143,7 @@ public static partial class GeneratedCreativeTextGuard
     private static partial Regex DateOrYearRegex();
 
     [GeneratedRegex(
-        @"\b\d{1,3}\s*(?:year|years|yr|yrs)(?:\s|-)?old\b",
+        @"\b\d{1,3}\s*(?:-|\s)?\s*(?:year|years|yr|yrs)(?:\s|-)?old\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AgeRegex();
 
