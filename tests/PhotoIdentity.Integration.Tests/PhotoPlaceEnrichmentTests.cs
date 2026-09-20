@@ -173,7 +173,7 @@ public sealed class PhotoPlaceEnrichmentTests
             SqliteCatalogueDatabase database = new(databasePath);
             await database.InitializeAsync();
             SeededRevision unresolved = await CreateRevisionAsync(database, directory, "legacy-no-result.jpg", 'f');
-            SeededRevision resolved = await CreateRevisionAsync(database, directory, "legacy-success.jpg", 'g');
+            SeededRevision resolved = await CreateRevisionAsync(database, directory, "legacy-success.jpg", 'b');
             await SaveGpsAsync(database, unresolved.RevisionId, 59.9, 18.8);
             await SaveGpsAsync(database, resolved.RevisionId, 59.3293, 18.0686);
 
