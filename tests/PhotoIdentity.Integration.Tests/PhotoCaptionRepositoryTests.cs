@@ -114,7 +114,7 @@ public sealed class PhotoCaptionRepositoryTests
                 promptVersion,
                 "thumbnail-480x320",
                 1024,
-                Content: null,
+                null,
                 [GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation],
                 130_000,
                 new DateTimeOffset(2026, 9, 20, 21, 0, 0, TimeSpan.Zero));
@@ -155,6 +155,7 @@ public sealed class PhotoCaptionRepositoryTests
                 GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation,
                 persisted.RiskFlags);
             Assert.False(persisted.IsDisplayable);
+            Assert.Null(persisted.DisplayableContent);
 
             IReadOnlyList<AssetRevisionId> completedCandidates =
                 await repository.GetCandidatesAsync(
