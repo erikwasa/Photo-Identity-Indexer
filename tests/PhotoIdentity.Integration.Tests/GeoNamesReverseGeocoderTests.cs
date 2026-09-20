@@ -218,7 +218,11 @@ public sealed class GeoNamesReverseGeocoderTests
         Assert.Equal(2, handler.RequestUris.Count);
         Assert.EndsWith("/findNearbyPlaceNameJSON", handler.RequestUris[0].AbsolutePath, StringComparison.Ordinal);
         Assert.EndsWith("/countrySubdivisionJSON", handler.RequestUris[1].AbsolutePath, StringComparison.Ordinal);
+        Assert.Contains("lang=local", handler.RequestUris[1].Query);
+        Assert.Contains("username=private-user", handler.RequestUris[1].Query);
         Assert.DoesNotContain("maxRows", handler.RequestUris[1].Query, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("filename", handler.RequestUris[1].Query, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("person", handler.RequestUris[1].Query, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("fallback=countrySubdivision", configuration.ContractKey);
     }
 
