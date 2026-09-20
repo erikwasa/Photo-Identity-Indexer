@@ -21,6 +21,10 @@ public sealed record PhotoCaptionGenerationConfiguration(
     public static readonly Uri DefaultOllamaBaseUri = new("http://127.0.0.1:11434/");
 }
 
+public sealed record LocalPhotoCaptionModel(
+    string Name,
+    string Digest);
+
 public sealed record LocalPhotoCaption(
     string Content,
     string Model,
@@ -62,9 +66,17 @@ public sealed class LocalPhotoCaptionGenerator
         _configuration = configuration;
     }
 
+    public async Task<LocalPhotoCaptionModel> GetInstalledModelAsync(
+        CancellationToken cancellationToken)
+    {
+        HttpClient http = _httpClientFactory.CreateClient(HttpClientName);
+        return await GetInstalledModelAsync(http, cancellationToken);
+    }
+
     public async Task<LocalPhotoCaption> GenerateAsync(
         string proxyPath,
         string language,
+        LocalPhotoCaptionModel model,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(proxyPath);
@@ -78,9 +90,8 @@ public sealed class LocalPhotoCaptionGenerator
                 "The review proxy could not be rendered as a caption thumbnail.");
         }
 
+        ArgumentNullException.ThrowIfNull(model);
         HttpClient http = _httpClientFactory.CreateClient(HttpClientName);
-        LocalVisionModelDescriptor model =
-            await GetInstalledModelAsync(http, cancellationToken);
 
         object request = new
         {
@@ -141,7 +152,7 @@ public sealed class LocalPhotoCaptionGenerator
             elapsedMilliseconds);
     }
 
-    private async Task<LocalVisionModelDescriptor> GetInstalledModelAsync(
+    private async Task<LocalPhotoCaptionModel> GetInstalledModelAsync(
         HttpClient http,
         CancellationToken cancellationToken)
     {
@@ -169,7 +180,7 @@ public sealed class LocalPhotoCaptionGenerator
                 $"Local Ollama model '{_configuration.Model}' is not installed.");
         }
 
-        return new LocalVisionModelDescriptor(
+        return new LocalPhotoCaptionModel(
             model.Name ?? model.Model ?? _configuration.Model,
             NormalizeDigest(model.Digest));
     }
@@ -197,8 +208,6 @@ public sealed class LocalPhotoCaptionGenerator
         PropertyNameCaseInsensitive = true,
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
     };
-
-    private sealed record LocalVisionModelDescriptor(string Name, string Digest);
 
     private sealed record OllamaTagsResponse(
         [property: JsonPropertyName("models")]
