@@ -31,7 +31,7 @@ public sealed class PhotoCaptionRepositoryTests
 
             PhotoCaptionEnrichmentSettings updated =
                 await repository.UpdateSettingsAsync(
-                    enabled: true,
+                    true,
                     PhotoCaptionLanguages.English,
                     new DateTimeOffset(2026, 9, 20, 18, 0, 0, TimeSpan.Zero));
             Assert.True(updated.Enabled);
