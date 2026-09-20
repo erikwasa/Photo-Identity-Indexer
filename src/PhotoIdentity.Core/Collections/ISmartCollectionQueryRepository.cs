@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Core.Collections;
 
@@ -12,7 +13,9 @@ public sealed record SmartCollectionPhoto(
     DateTime? TakenAtLocal,
     double? Latitude,
     double? Longitude,
-    IReadOnlyList<string>? PeopleKeys = null);
+    IReadOnlyList<string>? PeopleKeys = null,
+    PhotoCaptureDateRange? EffectiveCaptureDate = null,
+    string? CaptureDateSource = null);
 
 public sealed record SmartCollectionPhotoPage(
     IReadOnlyList<SmartCollectionPhoto> Items,
