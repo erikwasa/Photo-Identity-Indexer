@@ -52,7 +52,8 @@ public partial class Program
         string? reviewProxyProfileId = builder.Configuration["PhotoIdentity:ReviewProxyProfileId"];
 
         string captionBaseUrl =
-            builder.Configuration["PhotoIdentity:GeneratedCaptions:OllamaBaseUrl"]
+            builder.Configuration["PhotoIdentity:CaptionEnrichment:OllamaBaseUrl"]
+            ?? builder.Configuration["PhotoIdentity:GeneratedCaptions:OllamaBaseUrl"]
             ?? PhotoCaptionGenerationConfiguration.DefaultOllamaBaseUri.AbsoluteUri;
         if (!Uri.TryCreate(captionBaseUrl, UriKind.Absolute, out Uri? captionBaseUri) ||
             !captionBaseUri.IsLoopback ||
@@ -60,30 +61,31 @@ public partial class Program
              captionBaseUri.Scheme != Uri.UriSchemeHttps))
         {
             throw new InvalidOperationException(
-                "PhotoIdentity:GeneratedCaptions:OllamaBaseUrl must be an absolute loopback HTTP(S) URL.");
+                "PhotoIdentity:CaptionEnrichment:OllamaBaseUrl must be an absolute loopback HTTP(S) URL.");
         }
 
-        int captionContextTokens = ParseOptionalInt(
-            builder.Configuration,
-            "PhotoIdentity:GeneratedCaptions:ContextTokens")
+        int captionContextTokens =
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:CaptionEnrichment:ContextTokens")
+            ?? ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeneratedCaptions:ContextTokens")
             ?? PhotoCaptionGenerationConfiguration.DefaultContextTokens;
-        int captionTimeoutSeconds = ParseOptionalInt(
-            builder.Configuration,
-            "PhotoIdentity:GeneratedCaptions:TimeoutSeconds")
+        int captionTimeoutSeconds =
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:CaptionEnrichment:TimeoutSeconds")
+            ?? ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeneratedCaptions:TimeoutSeconds")
             ?? PhotoCaptionGenerationConfiguration.DefaultTimeoutSeconds;
         if (captionContextTokens is < 256 or > 32768)
         {
             throw new InvalidOperationException(
-                "PhotoIdentity:GeneratedCaptions:ContextTokens must be between 256 and 32768.");
+                "PhotoIdentity:CaptionEnrichment:ContextTokens must be between 256 and 32768.");
         }
         if (captionTimeoutSeconds is < 30 or > 1800)
         {
             throw new InvalidOperationException(
-                "PhotoIdentity:GeneratedCaptions:TimeoutSeconds must be between 30 and 1800.");
+                "PhotoIdentity:CaptionEnrichment:TimeoutSeconds must be between 30 and 1800.");
         }
         PhotoCaptionGenerationConfiguration captionConfiguration = new(
             captionBaseUri,
-            builder.Configuration["PhotoIdentity:GeneratedCaptions:Model"]
+            builder.Configuration["PhotoIdentity:CaptionEnrichment:Model"]
+                ?? builder.Configuration["PhotoIdentity:GeneratedCaptions:Model"]
                 ?? PhotoCaptionGenerationConfiguration.DefaultModel,
             captionContextTokens,
             captionTimeoutSeconds);
@@ -301,6 +303,8 @@ public partial class Program
                 context.Request.Path.StartsWithSegments("/api/photo-metadata") ||
                 context.Request.Path.StartsWithSegments("/api/places") ||
                 context.Request.Path.StartsWithSegments("/api/place-enrichment") ||
+                context.Request.Path.StartsWithSegments("/api/caption-enrichment") ||
+                context.Request.Path.StartsWithSegments("/api/photos") ||
                 context.Request.Path.StartsWithSegments("/api/detector-evaluation") ||
                 context.Request.Path.StartsWithSegments("/api/detector-rollout") ||
                 context.Request.Path.StartsWithSegments("/api/archive"))
