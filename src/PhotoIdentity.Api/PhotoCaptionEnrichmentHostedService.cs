@@ -156,12 +156,15 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
 
         string language = PhotoCaptionLanguages.Normalize(settings.Language);
         string promptVersion = PhotoCaptionPrompt.VersionFor(language);
+        LocalPhotoCaptionModel model =
+            await _generator.GetInstalledModelAsync(cancellationToken);
         IReadOnlyList<AssetRevisionId> candidates =
             await _captions.GetCandidatesAsync(
                 _proxyConfiguration.ProfileId!,
                 language,
                 PhotoCaptionGenerationConfiguration.GenerationVersion,
-                _generation.Model,
+                model.Name,
+                model.Digest,
                 promptVersion,
                 PhotoCaptionGenerationConfiguration.ImageMode,
                 _generation.ContextTokens,
@@ -203,6 +206,7 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
         LocalPhotoCaption generated = await _generator.GenerateAsync(
             proxy.Path,
             language,
+            model,
             cancellationToken);
         IReadOnlyList<string> riskFlags =
             GeneratedCreativeTextGuard.Evaluate(generated.Content);
