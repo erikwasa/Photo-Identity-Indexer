@@ -164,6 +164,71 @@ public sealed class PhotoPlaceEnrichmentTests
     }
 
     [Fact]
+    public async Task New_contract_retries_legacy_no_result_without_requerying_legacy_success()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            SeededRevision unresolved = await CreateRevisionAsync(database, directory, "legacy-no-result.jpg", 'f');
+            SeededRevision resolved = await CreateRevisionAsync(database, directory, "legacy-success.jpg", 'b');
+            await SaveGpsAsync(database, unresolved.RevisionId, 59.9, 18.8);
+            await SaveGpsAsync(database, resolved.RevisionId, 59.3293, 18.0686);
+
+            TimeProvider clock = TimeProvider.System;
+            IPhotoPlaceEnrichmentStateRepository enrichment =
+                new SqlitePhotoPlaceEnrichmentRepository(database, clock);
+            await enrichment.MarkSkippedAsync(
+                "geonames",
+                "legacy-populated-place-v1",
+                new PhotoPlaceEnrichmentCandidate(unresolved.RevisionId, 59.9, 18.8),
+                "no-result",
+                "no nearby populated place");
+            await enrichment.MarkSucceededAsync(
+                "geonames",
+                "legacy-populated-place-v1",
+                new PhotoPlaceEnrichmentCandidate(resolved.RevisionId, 59.3293, 18.0686),
+                "Sweden/Stockholm County/Stockholm",
+                "2673730",
+                "SE");
+
+            FakeReverseGeocoder provider = new(
+                [
+                    ReverseGeocodeResponse.Succeeded(new ReverseGeocodePlace(
+                        PhotoPlacePath.Parse("Sweden/Stockholm County/Norrtälje Municipality"),
+                        null,
+                        "SE")),
+                ],
+                "geonames-place-v3");
+            SqlitePhotoPlaceRepository places = new(database, clock);
+            PhotoPlaceEnrichmentService service = new(
+                provider,
+                enrichment,
+                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+
+            PhotoPlaceEnrichmentReport report = await service.ExecuteBatchAsync(limit: 10);
+
+            Assert.Equal(1, report.Candidates);
+            Assert.Equal(1, report.ProviderRequests);
+            Assert.Equal(1, report.Assigned);
+            Assert.Equal(1, provider.CallCount);
+            Assert.Equal(
+                "Sweden/Stockholm County/Norrtälje Municipality",
+                (await places.GetStateAsync(unresolved.RevisionId)).Place?.Value);
+
+            PhotoPlaceEnrichmentReport rerun = await service.ExecuteBatchAsync(limit: 10);
+            Assert.Equal(0, rerun.Candidates);
+            Assert.Equal(1, provider.CallCount);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Explicit_refresh_can_replace_previous_automatic_place_only()
     {
         string directory = CreateTemporaryDirectory();
@@ -293,13 +358,19 @@ public sealed class PhotoPlaceEnrichmentTests
     private sealed class FakeReverseGeocoder : IReverseGeocoder
     {
         private readonly Queue<ReverseGeocodeResponse> _responses;
+        private readonly string _contractKey;
 
-        public FakeReverseGeocoder(IEnumerable<ReverseGeocodeResponse> responses) =>
+        public FakeReverseGeocoder(
+            IEnumerable<ReverseGeocodeResponse> responses,
+            string contractKey = "test-geonames-contract-v1")
+        {
             _responses = new Queue<ReverseGeocodeResponse>(responses);
+            _contractKey = contractKey;
+        }
 
         public string ProviderName => "geonames";
 
-        public string ContractKey => "test-geonames-contract-v1";
+        public string ContractKey => _contractKey;
 
         public int CallCount { get; private set; }
 

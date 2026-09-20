@@ -43,17 +43,17 @@ A country, region, county or municipality-level assignment is still useful for f
 
 ## Acceptance criteria
 
-- [ ] A persisted-GPS photo that resolves through the existing populated-place lookup keeps the existing precise Place behavior.
-- [ ] A persisted-GPS photo with a populated-place `no-result` can receive an automatic country/admin hierarchy when GeoNames provides that hierarchy.
-- [ ] The stored Place never includes a locality/town segment that the fallback response did not actually establish.
-- [ ] Country-only and intermediate administrative results are valid automatic assignments rather than failures.
-- [ ] Manual set and manual clear remain authoritative and cannot be overwritten by fallback enrichment.
-- [ ] Unresolved migration conflicts continue to block automatic assignment.
-- [ ] Existing successful assignments are not broadly reprocessed just because the fallback contract is introduced.
-- [ ] Prior terminal `no-result` attempts can be re-evaluated once under the new fallback behavior without manual database edits.
-- [ ] If both populated-place and administrative fallback return no usable geography, the result remains terminally skipped with a reason distinguishable from the old populated-place-only outcome.
-- [ ] Provider/cache/attempt persistence remains restart-safe and bounded.
-- [ ] Automated tests cover precise success, administrative fallback at multiple hierarchy depths, fallback no-result, manual precedence, conflict blocking, cache reuse and legacy `no-result` requeue.
+- [x] A persisted-GPS photo that resolves through the existing populated-place lookup keeps the existing precise Place behavior.
+- [x] A persisted-GPS photo with a populated-place `no-result` can receive an automatic country/admin hierarchy when GeoNames provides that hierarchy.
+- [x] The stored Place never includes a locality/town segment that the fallback response did not actually establish.
+- [x] Country-only and intermediate administrative results are valid automatic assignments rather than failures.
+- [x] Manual set and manual clear remain authoritative and cannot be overwritten by fallback enrichment.
+- [x] Unresolved migration conflicts continue to block automatic assignment.
+- [x] Existing successful assignments are not broadly reprocessed just because the fallback contract is introduced.
+- [x] Prior terminal `no-result` attempts can be re-evaluated once under the new fallback behavior without manual database edits.
+- [x] If both populated-place and administrative fallback return no usable geography, the result remains terminally skipped with a reason distinguishable from the old populated-place-only outcome.
+- [x] Provider/cache/attempt persistence remains restart-safe and bounded.
+- [x] Automated tests cover precise success, administrative fallback at multiple hierarchy depths, fallback no-result, manual precedence, conflict blocking, cache reuse and legacy `no-result` requeue.
 - [ ] Real-catalogue verification shows the GPS-without-Place population decreases from the recorded 1,337 baseline without changing manually assigned Places.
 
 ## Verification requirements
@@ -62,7 +62,8 @@ Run normal CI plus the live PostgreSQL acceptance suite. On the representative p
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: GeoNames reverse geocoder, PostgreSQL/SQLite enrichment candidate selection, integration tests, PostgreSQL persistence acceptance coverage and delivery status.
+- Trade-offs: the fallback uses GeoNames `countrySubdivisionJSON` only after `findNearbyPlaceNameJSON` returns a genuine no-result, then `countryCodeJSON` only when no subdivision is available. This preserves precise locality when available and deliberately accepts country/admin-only hierarchy rather than expanding the nearby-town radius.
+- Contract transition: `geonames-place-v3` makes the fallback behavior explicit. A new contract retries prior non-success outcomes, including the recorded legacy `no-result` rows, while unchanged coordinates with any prior successful contract are suppressed unless an operator explicitly requests refresh.
+- Deferred work: photos without GPS remain outside automatic reverse-geocoding scope. Real-catalogue acceptance remains for maintainer verification against the recorded 1,337-photo baseline.
+- Commands run: repository CI is the implementation validation surface; live production-catalogue verification remains maintainer-operated.

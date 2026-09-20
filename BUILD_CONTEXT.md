@@ -14,11 +14,11 @@ New and updated saved definitions use filter schema v3. PostgreSQL catalogue sch
 
 The Smart Collection UI reuses the WI-0140 searchable Place picker as an add control and renders selected places as removable chips under an explicit Match any selected place heading. Transient browser state preserves the list while retaining legacy single-place compatibility.
 
-WI-0157 reduced-precision GPS place fallback is also present in M28 as a proposed item from the latest main branch. M26 remains active separately. M29 is ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+WI-0157 reduced-precision GPS place fallback merged in PR #399 and remains in progress pending maintainer verification against the recorded GPS/no-Place baseline. M26 remains active separately. M29 is ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Validate PR #398 through the normal CI gates and merge when green. After merge, WI-0145 is the next planned M28 dependency: explicit photo-list collections for manually assembled slideshows. Desktop/phone verification remains deferred until the requested M28 batch review.
+Validate PR #398 through the normal CI gates after reconciling current main, then merge when green. After merge, WI-0145 is the next planned M28 dependency: explicit photo-list collections for manually assembled slideshows. Desktop/phone verification remains deferred until the requested M28 batch review.
 
 ## Relevant files
 
