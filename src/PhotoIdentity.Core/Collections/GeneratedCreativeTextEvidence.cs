@@ -79,6 +79,10 @@ public static partial class GeneratedCreativeTextGuard
         "son", "daughter", "sister", "brother", "sibling",
         "grandmother", "grandma", "grandfather", "grandpa",
         "wife", "husband", "spouse", "couple", "family",
+        "mamma", "mor", "pappa", "far", "förälder",
+        "son", "dotter", "syster", "bror", "syskon",
+        "mormor", "farmor", "morfar", "farfar",
+        "fru", "make", "maka", "par", "familj",
     ];
 
     private static readonly string[] EventIdentityTerms =
@@ -86,6 +90,9 @@ public static partial class GeneratedCreativeTextGuard
         "birthday", "wedding", "graduation", "funeral",
         "christmas", "easter", "halloween", "anniversary",
         "concert", "festival", "party", "ceremony",
+        "födelsedag", "bröllop", "student", "examen", "begravning",
+        "jul", "påsk", "halloween", "årsdag",
+        "konsert", "festival", "fest", "ceremoni",
     ];
 
     public static IReadOnlyList<string> Evaluate(string content)
@@ -138,17 +145,17 @@ public static partial class GeneratedCreativeTextGuard
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant));
 
     [GeneratedRegex(
-        @"\b(?:19|20)\d{2}\b|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b",
+        @"\b(?:19|20)\d{2}\b|\b(?:january|february|march|april|may|june|july|august|september|october|november|december|januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex DateOrYearRegex();
 
     [GeneratedRegex(
-        @"\b\d{1,3}\s*(?:-|\s)?\s*(?:year|years|yr|yrs)(?:\s|-)?old\b",
+        @"\b(?:\d{1,3}\s*(?:-|\s)?\s*(?:year|years|yr|yrs)(?:\s|-)?old|\d{1,3}\s*(?:-|\s)?\s*år(?:ig|iga|igt|ing)?|\d{1,3}\s+år\s+gammal)\b",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex AgeRegex();
 
     [GeneratedRegex(
-        @"\b[A-Z][a-z]{2,}\b",
+        @"\b[A-ZÅÄÖ][a-zåäö]{2,}\b",
         RegexOptions.CultureInvariant)]
     private static partial Regex PossibleProperNameRegex();
 }
