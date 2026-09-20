@@ -5,8 +5,13 @@ status: in_progress
 owner: ai-agent
 document: ../work-items/WI-0157-reduced-precision-place-fallback.md
 started_at: 2026-09-21
+last_updated_at: 2026-09-21
+branch: agent/wi-0157-implement-place-fallback
 blockers:
 - WI-0064
 - WI-0065
-blocker_notes: []
-evidence: []
+blocker_notes:
+- Automated implementation is ready in pull request 399; real-catalogue verification against the recorded 1,337-photo GPS/no-Place baseline remains maintainer-owned after merge.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/399
