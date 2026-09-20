@@ -80,6 +80,23 @@ public sealed class PostgresSmartCollectionRepositoryTests
                 reopened.Filter.People.Select(person => person.ToString()));
             Assert.Equal(created.Filter.LocationPlace, reopened.Filter.LocationPlace);
 
+            await using (NpgsqlConnection persistedConnection = new(testBuilder.ConnectionString))
+            {
+                await persistedConnection.OpenAsync();
+                await using NpgsqlCommand persistedFilter = persistedConnection.CreateCommand();
+                persistedFilter.CommandText = """
+                    SELECT filter_schema_version, filter_json
+                    FROM smart_collections
+                    WHERE id = @id;
+                    """;
+                persistedFilter.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, created.Id.Value);
+                await using NpgsqlDataReader reader = await persistedFilter.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(2, reader.GetInt32(0));
+                string filterJson = reader.GetString(1);
+                Assert.Contains("\"taken\":{\"from\":\"2025-05-01\",\"to\":\"2025-05-10\"}", filterJson);
+            }
+
             await Assert.ThrowsAsync<SmartCollectionNameConflictException>(() => repository.CreateAsync(
                 "summer 2025",
                 new SmartCollectionFilter()));
