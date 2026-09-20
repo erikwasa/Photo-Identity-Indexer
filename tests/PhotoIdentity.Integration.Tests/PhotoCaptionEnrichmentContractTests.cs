@@ -1,5 +1,6 @@
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Catalogue;
+using PhotoIdentity.Core.Identifiers;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -44,7 +45,63 @@ public sealed class PhotoCaptionEnrichmentContractTests
         Assert.Equal(1024, PhotoCaptionGenerationConfiguration.DefaultContextTokens);
         Assert.Equal(600, PhotoCaptionGenerationConfiguration.DefaultTimeoutSeconds);
         Assert.Equal("thumbnail-480x320", PhotoCaptionGenerationConfiguration.ImageMode);
+        Assert.Equal("wi-0128-photo-caption-v2", PhotoCaptionGenerationConfiguration.GenerationVersion);
+        Assert.Equal("wi-0128-photo-caption-v1", PhotoCaptionGenerationConfiguration.LegacyGenerationVersion);
         Assert.True(PhotoCaptionGenerationConfiguration.DefaultOllamaBaseUri.IsLoopback);
+    }
+
+    [Fact]
+    public void Retained_v1_caption_can_be_promoted_without_model_rerun()
+    {
+        PhotoGeneratedCaption legacy = new(
+            AssetRevisionId.New(),
+            PhotoCaptionLanguages.Swedish,
+            PhotoCaptionGenerationConfiguration.LegacyGenerationVersion,
+            "qwen2.5vl:3b",
+            new string('a', 64),
+            PhotoCaptionPrompt.VersionFor(PhotoCaptionLanguages.Swedish),
+            PhotoCaptionGenerationConfiguration.ImageMode,
+            1024,
+            "En person står vid havet. Han håller en kamera.",
+            [PhotoIdentity.Core.Collections.GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation],
+            130_000,
+            new DateTimeOffset(2026, 9, 20, 22, 23, 0, TimeSpan.Zero));
+        LocalPhotoCaptionModel model =
+            new("qwen2.5vl:3b", new string('a', 64));
+
+        Assert.True(
+            PhotoCaptionEnrichmentHostedService.CanPromoteLegacyEvidence(
+                legacy,
+                model,
+                PhotoCaptionPrompt.VersionFor(PhotoCaptionLanguages.Swedish),
+                1024));
+    }
+
+    [Fact]
+    public void Legacy_caption_without_retained_text_still_requires_model_regeneration()
+    {
+        PhotoGeneratedCaption legacy = new(
+            AssetRevisionId.New(),
+            PhotoCaptionLanguages.Swedish,
+            PhotoCaptionGenerationConfiguration.LegacyGenerationVersion,
+            "qwen2.5vl:3b",
+            new string('a', 64),
+            PhotoCaptionPrompt.VersionFor(PhotoCaptionLanguages.Swedish),
+            PhotoCaptionGenerationConfiguration.ImageMode,
+            1024,
+            null,
+            [PhotoIdentity.Core.Collections.GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation],
+            130_000,
+            new DateTimeOffset(2026, 9, 20, 22, 23, 0, TimeSpan.Zero));
+        LocalPhotoCaptionModel model =
+            new("qwen2.5vl:3b", new string('a', 64));
+
+        Assert.False(
+            PhotoCaptionEnrichmentHostedService.CanPromoteLegacyEvidence(
+                legacy,
+                model,
+                PhotoCaptionPrompt.VersionFor(PhotoCaptionLanguages.Swedish),
+                1024));
     }
 
     [Fact]
