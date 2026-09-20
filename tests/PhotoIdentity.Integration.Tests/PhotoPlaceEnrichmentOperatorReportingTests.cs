@@ -130,6 +130,54 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
     }
 
     [Fact]
+    public async Task Administrative_no_result_is_reported_distinctly_without_exposing_provider_text()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            AssetRevisionId revisionId = await CreateRevisionWithGpsAsync(database, directory);
+
+            IReverseGeocoder provider = new NoResultGeocoder("administrative-no-result");
+            TimeProvider clock = TimeProvider.System;
+            SqlitePhotoPlaceRepository places = new(database, clock);
+            PhotoPlaceEnrichmentService service = new(
+                provider,
+                new SqlitePhotoPlaceEnrichmentRepository(database, clock),
+                new SqliteAutomaticPhotoPlaceRepository(database, places, clock));
+
+            PhotoPlaceEnrichmentReport report = await service.ExecuteBatchAsync(limit: 5);
+
+            Assert.Equal(1, report.NoResult);
+            PhotoPlaceEnrichmentIssue issue = Assert.Single(report.Issues!);
+            Assert.Equal(revisionId.ToString(), issue.RevisionId);
+            Assert.Equal("administrative-no-result", issue.ProviderCode);
+            Assert.Contains("administrative geography", issue.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("raw-provider-message", issue.Message, StringComparison.OrdinalIgnoreCase);
+
+            await using SqliteConnection connection = await database.OpenConnectionAsync();
+            using SqliteCommand command = connection.CreateCommand();
+            command.CommandText = """
+                SELECT status, last_error_code
+                FROM photo_place_enrichment_attempts
+                WHERE asset_revision_id = $revision_id
+                  AND provider = 'geonames';
+                """;
+            command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("skipped", reader.GetString(0));
+            Assert.Equal("administrative-no-result", reader.GetString(1));
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Provider_place_hierarchy_longer_than_ordinary_tag_limit_is_persisted_and_assigned()
     {
         string directory = CreateTemporaryDirectory();
@@ -271,11 +319,11 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
         }
     }
 
-    private sealed class NoResultGeocoder : IReverseGeocoder
+    private sealed class NoResultGeocoder(string errorCode = "15") : IReverseGeocoder
     {
         public string ProviderName => "geonames";
 
-        public string ContractKey => "no-result-reporting-test-v1";
+        public string ContractKey => $"no-result-reporting-test-{errorCode}";
 
         public Task<ReverseGeocodeResponse> ReverseGeocodeAsync(
             ReverseGeocodeQuery query,
@@ -284,7 +332,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             query.Validate();
             return Task.FromResult(new ReverseGeocodeResponse(
                 ReverseGeocodeStatus.NoResult,
-                ErrorCode: "15",
+                ErrorCode: errorCode,
                 ErrorMessage: "raw-provider-message: no result found",
                 ProviderRequestCount: 1));
         }
