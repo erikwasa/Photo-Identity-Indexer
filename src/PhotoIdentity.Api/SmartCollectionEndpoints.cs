@@ -401,7 +401,7 @@ public static class SmartCollectionEndpoints
         IEnumerable<string>? locationPlaces = location?.Places is not null
             ? location.Places
             : location?.Place is not null
-                ? [location.Place]
+                ? new[] { location.Place! }
                 : fallbackLocationPlaces;
 
         return new SmartCollectionFilter(
