@@ -46,8 +46,7 @@ V1 settings are global across collections and slideshow sessions **within the sa
 | After last photo | Loop | Choices: Loop, Stop on last photo, Exit slideshow. |
 | Protected slideshow | On | Hide ordinary exit/settings controls and require the parent unlock gesture. |
 | Prepare originals | Off | Explicitly prepare and retain best-quality originals for uninterrupted playback when storage policy permits. |
-| Show photo captions | Off | Display already-generated caption evidence for the current photo. Slideshow playback never queues or generates captions. |
-| Caption language | Svenska | Choices: Svenska or English. This is a display-language preference only. |
+| Show photo captions | Off | Display already-generated caption evidence for the current photo using the archive enrichment language. Slideshow playback never queues or generates captions. |
 
 `Exit slideshow` is intentionally available as an end behavior but is not the toddler-safe default. Loop is the default.
 
@@ -55,7 +54,7 @@ V1 settings are global across collections and slideshow sessions **within the sa
 
 Slideshow caption display is a **consumer** of the archive's generated-caption evidence. Generation is controlled globally from Settings and runs independently in the background; opening or watching a slideshow never causes model inference.
 
-When **Show photo captions** is enabled, the slideshow performs one read-only lookup for the current immutable revision and selected display language. If a guard-passing caption has already been enriched and persisted, it is shown. If evidence is missing or blocked, the slideshow simply shows no caption. It does not POST a generation request, poll for completion or alter playback timing.
+When **Show photo captions** is enabled, the slideshow performs one read-only lookup for the current immutable revision using the globally configured archive-enrichment language. If a guard-passing caption has already been enriched and persisted, it is shown. If evidence is missing or blocked, the slideshow simply shows no caption. It does not POST a generation request, poll for completion or alter playback timing.
 
 Caption evidence remains derived photo data with revision/model/prompt/image-mode/context provenance. The generated-text guard screens unsupported relationship, event, date/year, age and possible proper-name/location claims before evidence becomes displayable. Swedish and English evidence are stored separately.
 
