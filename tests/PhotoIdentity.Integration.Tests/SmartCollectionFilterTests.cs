@@ -40,6 +40,39 @@ public sealed class SmartCollectionFilterTests
     }
 
     [Fact]
+    public void Multiple_named_places_are_canonicalized_deduplicated_and_ancestor_collapsed()
+    {
+        SmartCollectionFilter filter = new(locationPlaces:
+        [
+            "Sweden/Stockholm region/Stockholm",
+            " sweden / stockholm region ",
+            "Norway/Oslo",
+            "NORWAY/OSLO",
+        ]);
+
+        Assert.Equal(
+            ["places/norway/oslo", "places/sweden/stockholm region"],
+            filter.LocationPlaces);
+        Assert.Null(filter.LocationPlace);
+    }
+
+    [Fact]
+    public void Named_place_selection_is_bounded()
+    {
+        string[] places = Enumerable.Range(1, SmartCollectionFilter.MaximumLocationPlaces + 1)
+            .Select(index => $"Country {index}")
+            .ToArray();
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(
+            () => new SmartCollectionFilter(locationPlaces: places));
+
+        Assert.Contains(
+            SmartCollectionFilter.MaximumLocationPlaces.ToString(),
+            exception.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Invalid_location_bounds_are_rejected()
     {
         Assert.Throws<ArgumentException>(() => new SmartCollectionGeoBounds(60, 20, 50, 30));
