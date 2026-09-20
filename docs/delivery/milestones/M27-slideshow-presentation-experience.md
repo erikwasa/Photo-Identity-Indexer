@@ -76,19 +76,32 @@ These integrations may remain proposed until their M26 dependencies prove useful
 
 ## Exit criteria
 
-- [ ] Ordinary slideshow advancement does not visibly flash black, show partially decoded content or expose abrupt single-element replacement during successful playback.
-- [ ] The incoming photo is staged and decode-ready before the transition begins, with loading time excluded from configured display duration.
-- [ ] Transition/motion work keeps browser memory bounded and does not regress the M24 slideshow latency diagnostics on representative phone playback.
-- [ ] `prefers-reduced-motion` produces a calm presentation without unnecessary transforms while preserving seamless image replacement.
-- [ ] Automatic motion/framing never knowingly crops detected faces; uncertain or unsuitable photos fall back to static presentation.
-- [ ] Contained portrait/landscape photos have a deliberate presentation treatment that avoids a sterile empty-screen feel without obscuring the source photo.
-- [ ] The persisted image duration remains the user's pace preference; any automatic variation is bounded, deterministic and does not become another normal setting.
-- [ ] `/slideshows` is visually collection-first, uses automatic representative covers and supports starting playback by activating the collection card itself.
-- [ ] Routine original preparation/status UI is absent from the normal happy path; actionable failures and recovery remain explicit and parent-safe.
-- [ ] Moment/burst presentation integrations, when enabled, change pacing/transition language only and do not silently change slideshow membership.
-- [ ] Browsers without the standard Fullscreen API can still start an immersive full-viewport slideshow, with reduced browser-level protection reported explicitly rather than entering an unrecoverable pause loop.
-- [ ] Real-device acceptance covers autoplay, manual navigation, protected controls, orientation/fullscreen recovery, no-fullscreen fallback, reduced motion, mixed aspect ratios, slow image readiness and repeated loops.
-- [ ] Automated tests cover transition lifecycle, timer/reset semantics, bounded staging, fallback behavior and the simplified library/startup states.
+- [x] Ordinary slideshow advancement does not visibly flash black, show partially decoded content or expose abrupt single-element replacement during successful playback.
+- [x] The incoming photo is staged and decode-ready before the transition begins, with loading time excluded from configured display duration.
+- [x] Transition/motion work keeps browser memory bounded and does not regress the M24 slideshow latency diagnostics on representative phone playback.
+- [x] `prefers-reduced-motion` produces a calm presentation without unnecessary transforms while preserving seamless image replacement.
+- [x] Automatic motion/framing never knowingly crops detected faces; uncertain or unsuitable photos fall back to static presentation.
+- [x] Contained portrait/landscape photos have a deliberate presentation treatment that avoids a sterile empty-screen feel without obscuring the source photo.
+- [x] The persisted image duration remains the user's pace preference; any automatic variation is bounded, deterministic and does not become another normal setting.
+- [x] `/slideshows` is visually collection-first, uses automatic representative covers and supports starting playback by activating the collection card itself.
+- [x] Routine original preparation/status UI is absent from the normal happy path; actionable failures and recovery remain explicit and parent-safe.
+- [x] Moment/burst presentation integrations, when enabled, change pacing/transition language only and do not silently change slideshow membership.
+- [x] Browsers without the standard Fullscreen API can still start an immersive full-viewport slideshow, with reduced browser-level protection reported explicitly rather than entering an unrecoverable pause loop.
+- [x] Real-device acceptance covers autoplay, manual navigation, protected controls, orientation/fullscreen recovery, no-fullscreen fallback, reduced motion, mixed aspect ratios, slow image readiness and repeated loops.
+- [x] Automated tests cover transition lifecycle, timer/reset semantics, bounded staging, fallback behavior and the simplified library/startup states.
+
+## Closeout evidence
+
+M27 was accepted on 2026-09-20 after the final WI-0137 representative real-device pass.
+
+- **Phone:** iPhone 16e on iOS 27 using the supported iPhone browser path; exact browser build was not recorded.
+- **Desktop:** Windows with Microsoft Edge; exact Edge build was not recorded.
+- The combined pass covered autoplay, rapid/manual navigation, pause/resume, looping, protected parent controls, desktop fullscreen loss/recovery, the no-standard-Fullscreen-API phone fallback, reduced motion, mixed aspect ratios and deliberately slower image readiness.
+- The maintainer reported the combined slideshow experience worked as expected with no reproducible black flash, partial-frame exposure, transition corruption or progressive slowdown.
+- Phone browser diagnostics captured 25 presentation samples: 23 prefetch hits and 2 misses, 617.12 ms average visible-presentation time (677 ms max), 68.6 ms average Resource Timing (119 ms max), 26 viewer-preview opens and zero hash reads. Timing remained bounded rather than growing with slideshow position.
+- The ~617 ms presentation average is consistent with the accepted 600 ms standard crossfade because WI-0129 measures through final visible-layer completion. The lower 68.6 ms Resource Timing compares favorably with the earlier ~157 ms M24 transfer baseline.
+- The broader 81-count `api-collection-request` family is not treated as a direct regression against the old WI-0108 count because M27 now adds collection-family requests such as per-photo slideshow face geometry and visual-library traffic. The image-serving-specific preview count remained effectively one per displayed image and prefetch reuse remained high.
+- All M27 non-configurable presentation defaults were accepted unchanged; no viewer-facing transition/motion/backdrop controls were added.
 
 ## Risks
 
