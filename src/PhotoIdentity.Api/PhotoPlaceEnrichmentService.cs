@@ -154,7 +154,12 @@ public sealed class PhotoPlaceEnrichmentService
                 else if (response.Status == ReverseGeocodeStatus.NoResult)
                 {
                     noResult++;
-                    string message = "GeoNames found no nearby populated place for this photo's persisted GPS coordinates.";
+                    string message = string.Equals(
+                        response.ErrorCode,
+                        "administrative-no-result",
+                        StringComparison.Ordinal)
+                        ? "GeoNames found neither a nearby populated place nor usable administrative geography for this photo's persisted GPS coordinates."
+                        : "GeoNames found no nearby populated place for this photo's persisted GPS coordinates.";
                     await _enrichment.MarkSkippedAsync(
                         _geocoder.ProviderName,
                         _geocoder.ContractKey,
