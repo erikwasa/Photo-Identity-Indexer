@@ -205,7 +205,7 @@ public sealed class PostgresPhotoCaptureDateRepositoryTests
     }
 
     private static string QuoteIdentifier(string identifier) =>
-        """ + identifier.Replace(""", """", StringComparison.Ordinal) + """;
+        "\"" + identifier.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
 
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
