@@ -73,7 +73,7 @@ public sealed class NarrationEvaluationCommandTests
                 "--review-output", "review",
             ]);
 
-        Assert.True(Uri.IsLoopback(options.OllamaBaseUri));
+        Assert.True(options.OllamaBaseUri.IsLoopback);
         Assert.Equal(20, options.SampleCount);
         Assert.Equal(Path.GetFullPath("report.json"), options.ReportPath);
         Assert.Equal(Path.GetFullPath("review"), options.ReviewOutputDirectory);
