@@ -4,26 +4,27 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M27 Slideshow presentation experience is completed.**
+**M28 Library curation and metadata editing is underway with WI-0140: searchable shared Place picker.**
 
-WI-0137 passed the final real-device acceptance on 2026-09-20 using an iPhone 16e on iOS 27 and Windows with Microsoft Edge. The combined slideshow flow, protected/fullscreen recovery, no-fullscreen fallback, reduced motion, slower readiness and performance diagnostics were accepted without further M27 runtime tuning.
+PR #391 replaces the shared full-hierarchy Place `<select>` with a local searchable combobox used unchanged by both Photo Details and Smart Collections. Search matches leaf names, canonical paths and parent paths; selection still emits the exact canonical Place path, while Photo Details keeps its separate free-form Place path field for creating new vocabulary.
 
-Phone diagnostics over 25 displayed presentations showed 23 prefetch hits / 2 misses, 68.6 ms average Resource Timing, 26 viewer-preview opens and zero hash reads, with no systematic latency growth. The current M27 transition, motion, backdrop and adaptive pacing constants remain the accepted defaults.
+The result list is bounded to 24 rendered matches, provides explicit clear-selection behavior and supports Arrow Up/Down, Home, End, Enter and Escape. Focused model coverage protects fragment filtering, duplicate locality disambiguation, canonical-value preservation and keyboard navigation. Desktop and phone interaction acceptance remains pending before WI-0140 can complete.
 
-M26 remains active with WI-0128 caption quality accepted and the product integration being corrected to archive-level photo enrichment. Caption generation is global/background/default-off; slideshows and other consumers only read persisted evidence. M28 and M29 are ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+M26 remains active with WI-0128 caption quality accepted and product integration being corrected to archive-level photo enrichment; caption generation is global/background/default-off and consumers only read persisted evidence. M29 is ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Continue the selected active/ready roadmap work. Do not reopen M27 presentation tuning unless new evidence identifies a reproducible regression.
+Validate PR #391 through the normal build/integration/docs gates. Then verify the Place picker on desktop and phone in both Photo Details and Smart Collections before completing WI-0140. WI-0141 can proceed independently if another M28 item is desired before manual review.
 
 ## Relevant files
 
-- docs/delivery/milestones/M27-slideshow-presentation-experience.md
-- docs/delivery/work-items/WI-0137-real-device-slideshow-polish-acceptance.md
-- docs/delivery/status/work-items/archive/WI-0137.yaml
-- docs/operations/slideshow-browser-performance-diagnostics.md
-- docs/delivery/milestones/M26-creative-collections.md
-- docs/delivery/status/work-items/active/WI-0128.yaml
+- docs/delivery/milestones/M28-library-curation-metadata-editing.md
+- docs/delivery/work-items/WI-0140-searchable-place-picker.md
+- docs/delivery/status/work-items/active/WI-0140.yaml
+- src/PhotoIdentity.Web/Components/PlacePicker.razor
+- src/PhotoIdentity.Web/Components/PlacePicker.razor.css
+- src/PhotoIdentity.Web/Components/PlacePickerModel.cs
+- tests/PhotoIdentity.Integration.Tests/PlacePickerModelTests.cs
 
 ## Repository validation
 
