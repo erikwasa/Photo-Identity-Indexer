@@ -4,7 +4,6 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Web.Components;
@@ -12,7 +11,7 @@ namespace PhotoIdentity.Web.Components;
 public partial class SmartCollectionsWorkspace
 {
     private const int PageSize = 40;
-    private static int MaximumSelectedPlaces => SmartCollectionFilter.MaximumLocationPlaces;
+    private const int MaximumSelectedPlaces = 16;
     private static readonly JsonSerializerOptions NavigationJsonOptions = new(JsonSerializerDefaults.Web);
 
     [Inject]
@@ -1154,9 +1153,9 @@ public partial class SmartCollectionsWorkspace
             SelectedPlaces.Remove(descendant);
         }
 
-        if (SelectedPlaces.Count >= SmartCollectionFilter.MaximumLocationPlaces)
+        if (SelectedPlaces.Count >= MaximumSelectedPlaces)
         {
-            Error = $"Choose at most {SmartCollectionFilter.MaximumLocationPlaces} named places.";
+            Error = $"Choose at most {MaximumSelectedPlaces} named places.";
             return;
         }
 
