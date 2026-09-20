@@ -1,6 +1,9 @@
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Catalogue;
+using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
@@ -80,7 +83,107 @@ public sealed class PhotoCaptionRepositoryTests
         }
     }
 
+    [Fact]
+    public async Task Legacy_blocked_caption_without_text_is_retried_and_regenerated_text_is_retained()
+    {
+        string directory = Path.Combine(
+            Path.GetTempPath(),
+            "photoidentity-caption-retry-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            SqliteCatalogueDatabase database =
+                new(Path.Combine(directory, "catalogue.db"));
+            await database.InitializeAsync();
+
+            AssetRevisionId revisionId = AssetRevisionId.New();
+            await SeedRevisionAsync(database, revisionId);
+            await SeedReviewProxyAsync(database, revisionId);
+
+            SqlitePhotoCaptionRepository repository = new(database);
+            string modelDigest = new('a', 64);
+            const string promptVersion = "prompt-sv-v1";
+
+            PhotoGeneratedCaption legacyBlocked = new(
+                revisionId,
+                PhotoCaptionLanguages.Swedish,
+                PhotoCaptionGenerationVersion,
+                "qwen2.5vl:3b",
+                modelDigest,
+                promptVersion,
+                "thumbnail-480x320",
+                1024,
+                Content: null,
+                [GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation],
+                130_000,
+                new DateTimeOffset(2026, 9, 20, 21, 0, 0, TimeSpan.Zero));
+            await repository.SaveAsync(legacyBlocked);
+
+            IReadOnlyList<AssetRevisionId> retryCandidates =
+                await repository.GetCandidatesAsync(
+                    ReviewProxyProfileId,
+                    PhotoCaptionLanguages.Swedish,
+                    PhotoCaptionGenerationVersion,
+                    "qwen2.5vl:3b",
+                    modelDigest,
+                    promptVersion,
+                    "thumbnail-480x320",
+                    1024,
+                    8);
+
+            Assert.Contains(revisionId, retryCandidates);
+
+            const string blockedText = "En person står bredvid Volvo.";
+            PhotoGeneratedCaption regeneratedBlocked = legacyBlocked with
+            {
+                Content = blockedText,
+                GenerationMilliseconds = 129_500,
+                GeneratedAtUtc = new DateTimeOffset(
+                    2026, 9, 20, 21, 5, 0, TimeSpan.Zero),
+            };
+            await repository.SaveAsync(regeneratedBlocked);
+
+            PhotoGeneratedCaption? persisted =
+                await repository.GetLatestAsync(
+                    revisionId,
+                    PhotoCaptionLanguages.Swedish);
+
+            Assert.NotNull(persisted);
+            Assert.Equal(blockedText, persisted.Content);
+            Assert.Contains(
+                GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation,
+                persisted.RiskFlags);
+            Assert.False(persisted.IsDisplayable);
+
+            IReadOnlyList<AssetRevisionId> completedCandidates =
+                await repository.GetCandidatesAsync(
+                    ReviewProxyProfileId,
+                    PhotoCaptionLanguages.Swedish,
+                    PhotoCaptionGenerationVersion,
+                    "qwen2.5vl:3b",
+                    modelDigest,
+                    promptVersion,
+                    "thumbnail-480x320",
+                    1024,
+                    8);
+
+            Assert.DoesNotContain(revisionId, completedCandidates);
+        }
+        finally
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch
+            {
+            }
+        }
+    }
+
     private const string PhotoCaptionGenerationVersion = "wi-0128-photo-caption-v1";
+    private const string ReviewProxyProfileId = "jpeg-1600-q78";
 
     private static async Task SeedRevisionAsync(
         SqliteCatalogueDatabase database,
@@ -118,6 +221,26 @@ public sealed class PhotoCaptionRepositoryTests
         command.Parameters.AddWithValue("$hash", new string('b', 64));
         command.Parameters.AddWithValue("$now", now);
         await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task SeedReviewProxyAsync(
+        SqliteCatalogueDatabase database,
+        AssetRevisionId revisionId)
+    {
+        DateTimeOffset now = new(2026, 9, 20, 20, 55, 0, TimeSpan.Zero);
+        SqliteArchiveReviewProxyRepository repository = new(database);
+        ReviewProxyProfile profile = new(ReviewProxyProfileId, 1600, 78);
+        await repository.RegisterProfileAsync(profile, now);
+        await repository.RecordCompletionAsync(
+            new ArchiveReviewProxyRecord(
+                revisionId,
+                profile.Id,
+                120_000,
+                new Sha256Digest(new string('c', 64)),
+                640,
+                480,
+                now.AddMinutes(1),
+                $"review/{profile.Id}/{revisionId}.jpg"));
     }
 
     private static string directoryPath(string sourceId) =>
