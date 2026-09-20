@@ -13,7 +13,8 @@ public sealed record PhotoCaptionGenerationConfiguration(
     int ContextTokens,
     int TimeoutSeconds)
 {
-    public const string GenerationVersion = "wi-0128-photo-caption-v1";
+    public const string GenerationVersion = "wi-0128-photo-caption-v2";
+    public const string LegacyGenerationVersion = "wi-0128-photo-caption-v1";
     public const string ImageMode = "thumbnail-480x320";
     public const string DefaultModel = "qwen2.5vl:3b";
     public const int DefaultContextTokens = 1024;
