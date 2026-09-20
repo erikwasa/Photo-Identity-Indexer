@@ -244,7 +244,9 @@ public sealed class SmartCollectionPlaceLocationTests
                 await create.Content.ReadFromJsonAsync<SmartCollectionDefinitionResponse>()
                 ?? throw new InvalidOperationException();
             Assert.Equal("sweden/stockholm region", created.Filter.Location?.Place);
-            Assert.Equal(["sweden/stockholm region"], created.Filter.Location?.Places);
+            string[] createdPlaces = created.Filter.Location?.Places
+                ?? throw new InvalidOperationException("Created location places were missing.");
+            Assert.Equal(["sweden/stockholm region"], createdPlaces);
             Assert.Equal(59, created.Filter.Location?.South);
 
             using HttpResponseMessage multiCreate = await client.PostAsJsonAsync(
@@ -262,9 +264,11 @@ public sealed class SmartCollectionPlaceLocationTests
                 await multiCreate.Content.ReadFromJsonAsync<SmartCollectionDefinitionResponse>()
                 ?? throw new InvalidOperationException();
             Assert.Null(multi.Filter.Location?.Place);
+            string[] multiPlaces = multi.Filter.Location?.Places
+                ?? throw new InvalidOperationException("Multi-location places were missing.");
             Assert.Equal(
                 ["norway/oslo", "sweden/stockholm region"],
-                multi.Filter.Location?.Places);
+                multiPlaces);
 
             using HttpResponseMessage rejected = await client.PostAsJsonAsync(
                 "/api/smart-collections/query",
