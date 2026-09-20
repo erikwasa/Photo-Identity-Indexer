@@ -33,11 +33,11 @@ The current filter stores one LocationPlace, preventing straightforward Stockhol
 
 ## Acceptance criteria
 
-- [ ] Two or more Places match any selected hierarchy.
-- [ ] Existing single-place collections retain results.
-- [ ] Ancestor/duplicate selections normalize predictably.
-- [ ] PostgreSQL queries remain bounded.
-- [ ] UI communicates OR semantics without a rule builder.
+- [x] Two or more Places match any selected hierarchy.
+- [x] Existing single-place collections retain results.
+- [x] Ancestor/duplicate selections normalize predictably.
+- [x] PostgreSQL queries remain bounded.
+- [x] UI communicates OR semantics without a rule builder.
 
 ## Verification requirements
 
@@ -45,7 +45,7 @@ Core/schema compatibility, PostgreSQL query tests and UI verification.
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: core multi-place normalization, Smart Collection filter schema v3 persistence and migrations, PostgreSQL/SQLite query adapters, API/web contracts, searchable multi-selection UI, transient navigation state, compatibility/query tests and delivery tracking.
+- Trade-offs: named-place selections are bounded to 16 normalized hierarchies. Duplicate paths are removed and descendants collapse under a selected ancestor before the bound is applied. Named places use ANY semantics internally while the optional GPS rectangle remains an independent AND criterion. The legacy single `Place` API and v1/v2 persisted definitions remain readable; new/updated definitions use filter schema v3.
+- Deferred work: desktop/phone interaction verification remains bundled with the later M28 verification pass. Arbitrary boolean location builders and multiple GPS rectangles remain out of scope.
+- Commands run: implementation prepared through the GitHub connector; PR #398 runs the normal build, integration, documentation, package and PostgreSQL verification gates.
