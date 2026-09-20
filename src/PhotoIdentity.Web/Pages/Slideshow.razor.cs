@@ -28,7 +28,6 @@ public partial class Slideshow : IAsyncDisposable
     private CancellationTokenSource? _captionPollingCancellation;
     private Task? _timerTask;
     private Task? _preparationTask;
-    private Task? _captionPollingTask;
     private long _lastTickTimestamp;
     private long? _pointerId;
     private long? _exitPointerId;
@@ -1435,7 +1434,7 @@ public partial class Slideshow : IAsyncDisposable
             {
                 CancellationTokenSource polling = new();
                 _captionPollingCancellation = polling;
-                _captionPollingTask = PollCaptionAsync(
+                _ = PollCaptionAsync(
                     revisionId,
                     caption.Language,
                     polling.Token);
@@ -1531,7 +1530,6 @@ public partial class Slideshow : IAsyncDisposable
             polling.Dispose();
         }
 
-        _captionPollingTask = null;
     }
 
     private async Task ExitSlideshowAsync()
