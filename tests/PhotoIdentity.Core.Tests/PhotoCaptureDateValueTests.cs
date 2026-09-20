@@ -35,13 +35,24 @@ public sealed class PhotoCaptureDateValueTests
     }
 
     [Theory]
-    [InlineData("2026-02-30")]
-    [InlineData("2026-13")]
     [InlineData("2026/09/20")]
-    [InlineData("")]
-    public void Rejects_invalid_or_unsupported_values(string input)
+    [InlineData("not-a-date")]
+    public void Rejects_unsupported_formats(string input)
     {
-        Assert.ThrowsAny<ArgumentException>(() => PhotoCaptureDateValue.Parse(input));
+        Assert.Throws<FormatException>(() => PhotoCaptureDateValue.Parse(input));
+    }
+
+    [Fact]
+    public void Rejects_invalid_calendar_components()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => PhotoCaptureDateValue.Parse("2026-13"));
+        Assert.Throws<ArgumentOutOfRangeException>(() => PhotoCaptureDateValue.Parse("2026-02-30"));
+    }
+
+    [Fact]
+    public void Rejects_blank_values()
+    {
+        Assert.Throws<ArgumentException>(() => PhotoCaptureDateValue.Parse(""));
     }
 
     [Fact]
