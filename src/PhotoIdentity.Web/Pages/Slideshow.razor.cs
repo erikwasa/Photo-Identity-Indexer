@@ -25,8 +25,10 @@ public partial class Slideshow : IAsyncDisposable
     private CancellationTokenSource? _parentUnlockCancellation;
     private CancellationTokenSource? _exitHoldCancellation;
     private CancellationTokenSource? _preparationCancellation;
+    private CancellationTokenSource? _captionPollingCancellation;
     private Task? _timerTask;
     private Task? _preparationTask;
+    private Task? _captionPollingTask;
     private long _lastTickTimestamp;
     private long? _pointerId;
     private long? _exitPointerId;
@@ -76,6 +78,7 @@ public partial class Slideshow : IAsyncDisposable
     private bool SettingsOpen { get; set; }
     private string? Error { get; set; }
     private string? ImageError { get; set; }
+    private string? CurrentCaption { get; set; }
 
     private string CollectionLabel => Snapshot?.CollectionName ?? "the saved collection";
     private string PageTitleText => Snapshot is null
@@ -737,6 +740,12 @@ public partial class Slideshow : IAsyncDisposable
         bool orientationChanged =
             !string.Equals(previous.Orientation, next.Orientation, StringComparison.Ordinal);
         bool prepareOriginalsChanged = previous.PrepareOriginals != next.PrepareOriginals;
+        bool captionSettingsChanged =
+            previous.GeneratedCaptions != next.GeneratedCaptions ||
+            !string.Equals(
+                previous.CaptionLanguage,
+                next.CaptionLanguage,
+                StringComparison.Ordinal);
 
         await ApplyAndPersistSettingsAsync(next);
 
@@ -752,6 +761,17 @@ public partial class Slideshow : IAsyncDisposable
             catch (JSException)
             {
                 ProtectionStatusKnown = false;
+            }
+        }
+
+        if (captionSettingsChanged)
+        {
+            ResetCaptionTracking();
+            if (Settings.GeneratedCaptions &&
+                Playback.IsImageReady &&
+                Playback.CurrentRevisionId is string revisionId)
+            {
+                await RequestCaptionAsync(revisionId);
             }
         }
 
@@ -1355,6 +1375,7 @@ public partial class Slideshow : IAsyncDisposable
         {
             case SlideshowAdvanceResult.Moved:
                 ImageError = null;
+                ResetCaptionTracking();
                 _lastTickTimestamp = Stopwatch.GetTimestamp();
                 await UpdatePrefetchAsync();
                 StateHasChanged();
@@ -1378,6 +1399,141 @@ public partial class Slideshow : IAsyncDisposable
         await JS.InvokeVoidAsync("photoIdentitySlideshow.setPrefetchUrls", (object)urls);
     }
 
+    private async Task RequestCaptionAsync(string revisionId)
+    {
+        ResetCaptionTracking();
+
+        if (!Settings.GeneratedCaptions ||
+            !string.Equals(Playback.CurrentRevisionId, revisionId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                $"api/slideshows/captions/{Uri.EscapeDataString(revisionId)}",
+                new SlideshowCaptionRequest(Settings.CaptionLanguage));
+            if (!response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            SlideshowCaptionResponse? caption =
+                await response.Content.ReadFromJsonAsync<SlideshowCaptionResponse>();
+            if (caption is null)
+            {
+                return;
+            }
+
+            if (ApplyCaptionResponse(revisionId, caption))
+            {
+                return;
+            }
+
+            if (caption.Status == "pending")
+            {
+                CancellationTokenSource polling = new();
+                _captionPollingCancellation = polling;
+                _captionPollingTask = PollCaptionAsync(
+                    revisionId,
+                    caption.Language,
+                    polling.Token);
+            }
+        }
+        catch
+        {
+            // Local captioning is optional presentation enhancement and must never interrupt playback.
+        }
+    }
+
+    private async Task PollCaptionAsync(
+        string revisionId,
+        string language,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+
+                using HttpResponseMessage response = await Http.GetAsync(
+                    $"api/slideshows/captions/{Uri.EscapeDataString(revisionId)}?language={Uri.EscapeDataString(language)}",
+                    cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return;
+                }
+
+                SlideshowCaptionResponse? caption =
+                    await response.Content.ReadFromJsonAsync<SlideshowCaptionResponse>(
+                        cancellationToken: cancellationToken);
+                if (caption is null)
+                {
+                    return;
+                }
+
+                if (ApplyCaptionResponse(revisionId, caption))
+                {
+                    return;
+                }
+
+                if (caption.Status != "pending")
+                {
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch
+        {
+            // Caption polling is best effort and isolated from slideshow playback.
+        }
+    }
+
+    private bool ApplyCaptionResponse(
+        string revisionId,
+        SlideshowCaptionResponse response)
+    {
+        if (!Settings.GeneratedCaptions ||
+            !string.Equals(Playback.CurrentRevisionId, revisionId, StringComparison.Ordinal) ||
+            !string.Equals(
+                response.Language,
+                Settings.CaptionLanguage,
+                StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (response.Status == "available" &&
+            !string.IsNullOrWhiteSpace(response.Caption))
+        {
+            CurrentCaption = response.Caption.Trim();
+            _ = InvokeAsync(StateHasChanged);
+            return true;
+        }
+
+        return response.Status is "blocked" or "failed" or "queue-full" or "missing";
+    }
+
+    private void ResetCaptionTracking()
+    {
+        CurrentCaption = null;
+
+        CancellationTokenSource? polling = _captionPollingCancellation;
+        _captionPollingCancellation = null;
+        if (polling is not null)
+        {
+            polling.Cancel();
+            polling.Dispose();
+        }
+
+        _captionPollingTask = null;
+    }
+
     private async Task ExitSlideshowAsync()
     {
         _deliberateExit = true;
@@ -1385,6 +1541,7 @@ public partial class Slideshow : IAsyncDisposable
         _navigationGate.Reset();
         CancelParentUnlockTimer();
         CancelExitHoldInternal();
+        ResetCaptionTracking();
         await EndOriginalPreparationAsync();
 
         try
@@ -1468,6 +1625,7 @@ public partial class Slideshow : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _timerCancellation.Cancel();
+        ResetCaptionTracking();
         CancelParentUnlockTimer();
         CancelExitHoldInternal();
         _navigationGate.Reset();
