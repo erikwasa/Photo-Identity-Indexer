@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 26;
+    public const int CurrentSchemaVersion = 27;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1151,6 +1151,46 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
 
             CREATE INDEX IF NOT EXISTS ix_photo_slideshow_exposures_revision
                 ON photo_slideshow_exposures (asset_revision_id, shown_at_utc DESC);
+            """),
+        new(27, "manual-capture-date-overrides", """
+            CREATE TABLE IF NOT EXISTS photo_capture_date_actions (
+                id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                asset_revision_id uuid NOT NULL,
+                action_kind text NOT NULL CHECK (action_kind IN ('set', 'clear')),
+                precision text NULL CHECK (precision IN ('year', 'month', 'day')),
+                capture_year smallint NULL CHECK (capture_year IS NULL OR capture_year BETWEEN 1 AND 9999),
+                capture_month smallint NULL CHECK (capture_month IS NULL OR capture_month BETWEEN 1 AND 12),
+                capture_day smallint NULL CHECK (capture_day IS NULL OR capture_day BETWEEN 1 AND 31),
+                actor text NOT NULL CHECK (btrim(actor) <> ''),
+                created_at_utc timestamp with time zone NOT NULL,
+                CONSTRAINT fk_photo_capture_date_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE CASCADE,
+                CHECK (
+                    (action_kind = 'clear'
+                        AND precision IS NULL
+                        AND capture_year IS NULL
+                        AND capture_month IS NULL
+                        AND capture_day IS NULL)
+                    OR
+                    (action_kind = 'set'
+                        AND capture_year IS NOT NULL
+                        AND (
+                            (precision = 'year'
+                                AND capture_month IS NULL
+                                AND capture_day IS NULL)
+                            OR
+                            (precision = 'month'
+                                AND capture_month IS NOT NULL
+                                AND capture_day IS NULL)
+                            OR
+                            (precision = 'day'
+                                AND capture_month IS NOT NULL
+                                AND capture_day IS NOT NULL))))
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_photo_capture_date_actions_revision
+                ON photo_capture_date_actions (asset_revision_id, id DESC);
             """),
     ];
 

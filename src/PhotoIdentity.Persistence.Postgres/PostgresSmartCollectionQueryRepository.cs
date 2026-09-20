@@ -3,6 +3,7 @@ using Npgsql;
 using NpgsqlTypes;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Postgres;
 
@@ -99,6 +100,66 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             INNER JOIN photo_tags ON photo_tags.id = latest_place_action.tag_id
             WHERE latest_place_action.row_number = 1
               AND latest_place_action.action_kind = 'set'
+        ),
+        latest_capture_date_action AS (
+            SELECT
+                photo_capture_date_actions.asset_revision_id,
+                photo_capture_date_actions.action_kind,
+                photo_capture_date_actions.precision,
+                photo_capture_date_actions.capture_year,
+                photo_capture_date_actions.capture_month,
+                photo_capture_date_actions.capture_day,
+                ROW_NUMBER() OVER (
+                    PARTITION BY photo_capture_date_actions.asset_revision_id
+                    ORDER BY photo_capture_date_actions.id DESC) AS row_number
+            FROM photo_capture_date_actions
+        ),
+        effective_capture_dates AS (
+            SELECT
+                asset_revisions.id AS revision_id,
+                CASE
+                    WHEN latest_capture_date_action.action_kind = 'set' THEN
+                        make_date(
+                            latest_capture_date_action.capture_year,
+                            COALESCE(latest_capture_date_action.capture_month, 1),
+                            COALESCE(latest_capture_date_action.capture_day, 1))
+                    WHEN photo_capture_metadata.taken_at_local IS NOT NULL THEN
+                        photo_capture_metadata.taken_at_local::date
+                    ELSE NULL
+                END AS date_from,
+                CASE
+                    WHEN latest_capture_date_action.action_kind = 'set'
+                         AND latest_capture_date_action.precision = 'day' THEN
+                        make_date(
+                            latest_capture_date_action.capture_year,
+                            latest_capture_date_action.capture_month,
+                            latest_capture_date_action.capture_day)
+                    WHEN latest_capture_date_action.action_kind = 'set'
+                         AND latest_capture_date_action.precision = 'month' THEN
+                        (
+                            make_date(
+                                latest_capture_date_action.capture_year,
+                                latest_capture_date_action.capture_month,
+                                1)
+                            + interval '1 month'
+                            - interval '1 day')::date
+                    WHEN latest_capture_date_action.action_kind = 'set' THEN
+                        make_date(latest_capture_date_action.capture_year, 12, 31)
+                    WHEN photo_capture_metadata.taken_at_local IS NOT NULL THEN
+                        photo_capture_metadata.taken_at_local::date
+                    ELSE NULL
+                END AS date_to,
+                CASE
+                    WHEN latest_capture_date_action.action_kind = 'set' THEN 'manual'
+                    WHEN photo_capture_metadata.taken_at_local IS NOT NULL THEN 'extracted'
+                    ELSE NULL
+                END AS source
+            FROM asset_revisions
+            LEFT JOIN latest_capture_date_action
+                ON latest_capture_date_action.asset_revision_id = asset_revisions.id
+               AND latest_capture_date_action.row_number = 1
+            LEFT JOIN photo_capture_metadata
+                ON photo_capture_metadata.asset_revision_id = asset_revisions.id
         )
         """;
 
@@ -146,6 +207,8 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 INNER JOIN assets ON assets.id = asset_revisions.asset_id
                 LEFT JOIN photo_capture_metadata
                     ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+                LEFT JOIN effective_capture_dates
+                    ON effective_capture_dates.revision_id = asset_revisions.id
                 WHERE assets.deleted_at_utc IS NULL
                   {where};
                 """;
@@ -172,15 +235,22 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                     SELECT revision_people.person_id::text
                     FROM revision_people
                     WHERE revision_people.revision_id = asset_revisions.id
-                    ORDER BY revision_people.person_id::text)
+                    ORDER BY revision_people.person_id::text),
+                effective_capture_dates.date_from,
+                effective_capture_dates.date_to,
+                effective_capture_dates.source
             FROM asset_revisions
             INNER JOIN assets ON assets.id = asset_revisions.asset_id
             LEFT JOIN photo_capture_metadata
                 ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+            LEFT JOIN effective_capture_dates
+                ON effective_capture_dates.revision_id = asset_revisions.id
             WHERE assets.deleted_at_utc IS NULL
               {where}
             ORDER BY
-                photo_capture_metadata.taken_at_local DESC,
+                effective_capture_dates.date_from DESC NULLS LAST,
+                effective_capture_dates.date_to DESC NULLS LAST,
+                photo_capture_metadata.taken_at_local DESC NULLS LAST,
                 asset_revisions.observed_at_utc DESC,
                 asset_revisions.id
             LIMIT @limit OFFSET @offset;
@@ -231,17 +301,24 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 photo_capture_metadata.taken_at_local,
                 photo_capture_metadata.latitude,
                 photo_capture_metadata.longitude,
-                COALESCE(people_by_revision.people_keys, ARRAY[]::text[])
+                COALESCE(people_by_revision.people_keys, ARRAY[]::text[]),
+                effective_capture_dates.date_from,
+                effective_capture_dates.date_to,
+                effective_capture_dates.source
             FROM asset_revisions
             INNER JOIN assets ON assets.id = asset_revisions.asset_id
             LEFT JOIN photo_capture_metadata
                 ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+            LEFT JOIN effective_capture_dates
+                ON effective_capture_dates.revision_id = asset_revisions.id
             LEFT JOIN people_by_revision
                 ON people_by_revision.revision_id = asset_revisions.id
             WHERE assets.deleted_at_utc IS NULL
               {where}
             ORDER BY
-                photo_capture_metadata.taken_at_local DESC,
+                effective_capture_dates.date_from DESC NULLS LAST,
+                effective_capture_dates.date_to DESC NULLS LAST,
+                photo_capture_metadata.taken_at_local DESC NULLS LAST,
                 asset_revisions.observed_at_utc DESC,
                 asset_revisions.id;
             """;
@@ -278,11 +355,15 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             SELECT
                 asset_revisions.id,
                 asset_revisions.observed_at_utc,
-                photo_capture_metadata.taken_at_local
+                photo_capture_metadata.taken_at_local,
+                effective_capture_dates.date_from,
+                effective_capture_dates.source
             FROM asset_revisions
             INNER JOIN assets ON assets.id = asset_revisions.asset_id
             LEFT JOIN photo_capture_metadata
                 ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+            LEFT JOIN effective_capture_dates
+                ON effective_capture_dates.revision_id = asset_revisions.id
             WHERE assets.deleted_at_utc IS NULL
               {where};
             """;
@@ -297,7 +378,9 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 candidates.Add(new SlideshowSnapshotCandidate(
                     AssetRevisionId.From(reader.GetGuid(0)),
                     reader.GetFieldValue<DateTimeOffset>(1),
-                    reader.IsDBNull(2) ? null : reader.GetDateTime(2)));
+                    reader.IsDBNull(2) ? null : reader.GetDateTime(2),
+                    reader.IsDBNull(3) ? null : reader.GetFieldValue<DateOnly>(3),
+                    reader.IsDBNull(4) ? null : reader.GetString(4)));
             }
         }
 
@@ -324,11 +407,32 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         reader.IsDBNull(6) ? null : reader.GetDateTime(6),
         reader.IsDBNull(7) ? null : reader.GetDouble(7),
         reader.IsDBNull(8) ? null : reader.GetDouble(8),
-        reader.GetFieldValue<string[]>(9));
+        reader.GetFieldValue<string[]>(9),
+        ReadEffectiveRange(reader, 10, 11),
+        reader.IsDBNull(12) ? null : reader.GetString(12));
 
-    private static DateTime EffectiveSlideshowTime(SlideshowSnapshotCandidate candidate) =>
-        candidate.TakenAtLocal
-        ?? DateTime.SpecifyKind(candidate.ObservedAtUtc.UtcDateTime, DateTimeKind.Unspecified);
+    private static DateTime EffectiveSlideshowTime(SlideshowSnapshotCandidate candidate)
+    {
+        if (candidate.CaptureDateSource == PhotoCaptureDateSources.Manual &&
+            candidate.EffectiveTakenFrom is DateOnly manualDate)
+        {
+            return manualDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
+        }
+
+        return candidate.TakenAtLocal
+            ?? candidate.EffectiveTakenFrom?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified)
+            ?? DateTime.SpecifyKind(candidate.ObservedAtUtc.UtcDateTime, DateTimeKind.Unspecified);
+    }
+
+    private static PhotoCaptureDateRange? ReadEffectiveRange(
+        NpgsqlDataReader reader,
+        int fromOrdinal,
+        int toOrdinal) =>
+        reader.IsDBNull(fromOrdinal) || reader.IsDBNull(toOrdinal)
+            ? null
+            : new PhotoCaptureDateRange(
+                reader.GetFieldValue<DateOnly>(fromOrdinal),
+                reader.GetFieldValue<DateOnly>(toOrdinal));
 
     private static string BuildWhere(SmartCollectionFilter filter)
     {
@@ -390,8 +494,8 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
 
         if (filter.Taken is not null)
         {
-            predicates.Add("AND photo_capture_metadata.taken_at_local >= @taken_from");
-            predicates.Add("AND photo_capture_metadata.taken_at_local <= @taken_to");
+            predicates.Add("AND effective_capture_dates.date_from <= @taken_to");
+            predicates.Add("AND effective_capture_dates.date_to >= @taken_from");
         }
 
         return predicates.Count == 0 ? string.Empty : string.Join(Environment.NewLine, predicates);
@@ -426,19 +530,15 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
 
         if (filter.Taken is not null)
         {
-            command.Parameters.AddWithValue("taken_from", NpgsqlDbType.Timestamp, FormatDateStart(filter.Taken.From));
-            command.Parameters.AddWithValue("taken_to", NpgsqlDbType.Timestamp, FormatDateEnd(filter.Taken.To));
+            command.Parameters.AddWithValue("taken_from", NpgsqlDbType.Date, filter.Taken.From);
+            command.Parameters.AddWithValue("taken_to", NpgsqlDbType.Date, filter.Taken.To);
         }
     }
-
-    private static DateTime FormatDateStart(DateOnly value) =>
-        value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
-
-    private static DateTime FormatDateEnd(DateOnly value) =>
-        value.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Unspecified);
 
     private sealed record SlideshowSnapshotCandidate(
         AssetRevisionId RevisionId,
         DateTimeOffset ObservedAtUtc,
-        DateTime? TakenAtLocal);
+        DateTime? TakenAtLocal,
+        DateOnly? EffectiveTakenFrom,
+        string? CaptureDateSource);
 }

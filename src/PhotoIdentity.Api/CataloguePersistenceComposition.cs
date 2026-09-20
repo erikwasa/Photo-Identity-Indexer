@@ -223,6 +223,8 @@ internal static class CataloguePersistenceComposition
 
         services.AddSingleton<PostgresPhotoCaptureMetadataRepository>();
         services.AddSingleton<IPhotoCaptureMetadataRepository>(sp => sp.GetRequiredService<PostgresPhotoCaptureMetadataRepository>());
+        services.AddSingleton<PostgresPhotoCaptureDateRepository>();
+        services.AddSingleton<IPhotoCaptureDateRepository>(sp => sp.GetRequiredService<PostgresPhotoCaptureDateRepository>());
         services.AddSingleton<PostgresPhotoMetadataBackfillRepository>();
         services.AddSingleton<IPhotoMetadataBackfillRepository>(sp => sp.GetRequiredService<PostgresPhotoMetadataBackfillRepository>());
         services.AddSingleton<PostgresExtendedPhotoMetadataRepository>();

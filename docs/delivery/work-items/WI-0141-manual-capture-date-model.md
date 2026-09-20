@@ -34,11 +34,11 @@ The current capture model stores one exact extracted timestamp. Reusing it for m
 
 ## Acceptance criteria
 
-- [ ] `YYYY`, `YYYY-MM` and `YYYY-MM-DD` can be stored with explicit precision/provenance.
-- [ ] Metadata reinspection cannot overwrite the manual override.
-- [ ] Clearing reveals the extracted capture value again.
-- [ ] Query code can consume an effective inclusive date range.
-- [ ] PostgreSQL persistence and reversibility are covered.
+- [x] `YYYY`, `YYYY-MM` and `YYYY-MM-DD` can be stored with explicit precision/provenance.
+- [x] Metadata reinspection cannot overwrite the manual override.
+- [x] Clearing reveals the extracted capture value again.
+- [x] Query code can consume an effective inclusive date range.
+- [x] PostgreSQL persistence and reversibility are covered.
 
 ## Verification requirements
 
@@ -46,7 +46,7 @@ Repository/persistence tests are required; manual UI verification belongs to WI-
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: Core capture-date precision/range/state contracts, PostgreSQL schema v27 and manual-date repository, PostgreSQL Smart Collection effective-date projection/filtering, DI composition, focused Core/persistence tests, PostgreSQL runtime docs and delivery tracking.
+- Trade-offs: extracted `taken_at_local` remains untouched as source evidence. Manual dates are append-only set/clear actions and expose an inclusive date range; year/month precision is never converted into a persisted fake day or time. Smart Collection date filtering uses range overlap. Slideshow ordering may use the range start only as a deterministic presentation key, not as asserted capture precision.
+- Deferred work: Photo Details read/edit HTTP/UI support belongs to WI-0142; structured Smart Collection date controls belong to WI-0143. No SQLite manual-date implementation is added because WI-0141 targets the supported PostgreSQL model and M29 is already scheduled to remove SQLite runtime support.
+- Commands run: implementation prepared through the GitHub connector; PR #392 runs the normal build/Core/persistence/integration/docs/package/PostgreSQL CI gates.
