@@ -94,7 +94,9 @@ Maintainer verification should:
 
 - Caption enrichment settings are durable catalogue state, not browser-local slideshow state. The default is `enabled=false`, language `sv`.
 - PostgreSQL and SQLite persist versioned `photo_generated_captions` evidence tied to immutable asset revisions.
-- The background worker independently selects current photo revisions that have the configured durable review proxy and lack caption evidence for the active language/generation policy.
+- Guard-blocked generated text is retained internally with its risk flags for diagnosis and future guard tuning, but `DisplayableContent` and the consumer API redact it; Photo Details and slideshows receive blocked status with no caption text.
+- Pre-fix blocked rows that stored `content = NULL` are treated as incomplete evidence and become eligible for one automatic regeneration under the same generation policy. Once regenerated text is retained, they are no longer candidates.
+- The background worker independently selects current photo revisions that have the configured durable review proxy and lack complete caption evidence for the active language/generation policy.
 - Generation is strictly serial and does not depend on what the user views.
 - The default production generation policy reuses the accepted probe: `qwen2.5vl:3b`, loopback Ollama, temporary 480x320 JPEG, 1024 context tokens.
 - The ordinary Photo page reads and presents the stored caption as derived evidence.
@@ -106,6 +108,7 @@ Maintainer verification should:
 
 - Trade-off: archive-wide enrichment can take a long time on current hardware. This is acceptable because it is opt-in background enrichment rather than a synchronous user-flow dependency.
 - Generated captions remain regenerable model evidence, not archive truth and not a replacement for tags, Places, people or extracted metadata.
+- Maintainer production sampling on 2026-09-20 exposed a guard-diagnostics gap: eight blocked Swedish captions were all flagged only as `possible-proper-name-or-location`, while the original blocked text had been discarded. The follow-up retains blocked raw output internally, keeps it non-displayable, and retries only legacy blocked rows whose text is missing so the heuristic can be tuned from evidence rather than guesses.
 - Caption generation is intentionally independent of M26 Creative Collection materialization even though Creative Collections were the original experiment consumer.
 - Dedicated caption-text/semantic query features can be added later as consumers of the persisted evidence without changing the producer lifecycle.
 - Commands/evidence: repository CI plus private maintainer evaluation using `qwen2.5vl:3b`, full-proxy and 480x320 thumbnail probes.
