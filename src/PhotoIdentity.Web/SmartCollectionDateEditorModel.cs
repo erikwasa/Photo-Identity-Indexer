@@ -200,11 +200,14 @@ public static class SmartCollectionDateEditorModel
         };
     }
 
-    private static bool TryParseYear(string? value, out int year) =>
-        value?.Trim() is string text &&
-        text.Length == 4 &&
-        int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out year) &&
-        year is >= 1 and <= 9999;
+    private static bool TryParseYear(string? value, out int year)
+    {
+        year = 0;
+        string text = value?.Trim() ?? string.Empty;
+        return text.Length == 4 &&
+            int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out year) &&
+            year is >= 1 and <= 9999;
+    }
 
     private static bool TryParseMonth(string? value, out DateOnly month)
     {
