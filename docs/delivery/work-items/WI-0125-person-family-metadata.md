@@ -1,7 +1,7 @@
 ---
 id: WI-0125
 title: Add birth dates and family relationships for age-aware Creative Collections
-milestone: M26
+milestone: M31
 status_source: ../status/work-items.yaml
 depends_on: [WI-0121, WI-0060]
 related_adrs: []
@@ -43,6 +43,10 @@ For a family archive, age and relationship context can unlock high-value collect
 ## Verification requirements
 
 Automated domain/persistence/UI tests plus maintainer verification using private representative people and photos.
+
+## Scheduling note
+
+Maintainer deferred this item on 2026-09-18. On 2026-09-20 it moved from M26 to the unscheduled M31 Family story metadata milestone so the idea remains available without blocking completion of Creative Collections.
 
 ## Completion notes
 
