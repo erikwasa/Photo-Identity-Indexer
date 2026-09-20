@@ -336,10 +336,10 @@ public sealed class SlideshowCaptionService : BackgroundService, ISlideshowCapti
             _configuration.CacheRoot,
             SlideshowCaptionGenerationConfiguration.GenerationVersion,
             language,
-            revisionId + ".json");
+            revisionId.ToString() + ".json");
 
     private static string Key(AssetRevisionId revisionId, string language) =>
-        revisionId + "|" + language;
+        revisionId.ToString() + "|" + language;
 
     private sealed record CaptionWorkItem(
         AssetRevisionId RevisionId,
