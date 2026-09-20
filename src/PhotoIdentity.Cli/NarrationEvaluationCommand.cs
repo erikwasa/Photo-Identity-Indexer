@@ -310,6 +310,8 @@ internal static class NarrationEvaluationCommandRunner
         List<NarrationReviewItem> reviewItems = [];
         int unavailableProxies = 0;
         int generationFailures = 0;
+        Dictionary<string, int> generationFailureKinds =
+            new(StringComparer.Ordinal);
 
         foreach (CreativeCollectionSelectedCandidate selected in selectedForReview)
         {
@@ -367,21 +369,46 @@ internal static class NarrationEvaluationCommandRunner
             catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 generationFailures++;
+                IncrementFailure(generationFailureKinds, "timeout");
             }
-            catch (Exception exception) when (
-                exception is HttpRequestException or
-                InvalidDataException or
-                IOException or
-                UnauthorizedAccessException)
+            catch (HttpRequestException)
             {
                 generationFailures++;
+                IncrementFailure(generationFailureKinds, "http-transport");
+            }
+            catch (InvalidDataException)
+            {
+                generationFailures++;
+                IncrementFailure(generationFailureKinds, "invalid-response");
+            }
+            catch (UnauthorizedAccessException)
+            {
+                generationFailures++;
+                IncrementFailure(generationFailureKinds, "proxy-access");
+            }
+            catch (IOException)
+            {
+                generationFailures++;
+                IncrementFailure(generationFailureKinds, "proxy-io");
             }
         }
 
         if (reviewItems.Count == 0)
         {
+            string failureSummary = generationFailureKinds.Count == 0
+                ? "none"
+                : string.Join(
+                    ", ",
+                    generationFailureKinds
+                        .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                        .Select(pair => $"{pair.Key}={pair.Value}"));
             throw new InvalidOperationException(
-                "No local generated captions were produced for the bounded review sample.");
+                $"No local generated captions were produced. " +
+                $"sample={selectedForReview.Length}, " +
+                $"proxy-unavailable={unavailableProxies}, " +
+                $"generation-failures={generationFailures} " +
+                $"({failureSummary}), " +
+                $"timeout-seconds={options.TimeoutSeconds}.");
         }
 
         NarrationEvaluationReport report = BuildReport(
@@ -392,7 +419,8 @@ internal static class NarrationEvaluationCommandRunner
             reviewItems,
             selectedForReview.Length,
             unavailableProxies,
-            generationFailures);
+            generationFailures,
+            generationFailureKinds);
 
         if (options.ReportPath is string reportPath)
         {
@@ -426,6 +454,12 @@ internal static class NarrationEvaluationCommandRunner
         output.WriteLine($"selected-count: {selection.SelectedCount}");
         output.WriteLine($"sample-requested: {selectedForReview.Length}");
         output.WriteLine($"captions-generated: {reviewItems.Count}");
+        output.WriteLine($"generation-failures: {generationFailures}");
+        foreach ((string kind, int count) in generationFailureKinds
+                     .OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            output.WriteLine($"generation-failure-{kind}: {count}");
+        }
         output.WriteLine($"guard-passed: {report.Guard.PassedCount}");
         output.WriteLine($"guard-flagged: {report.Guard.FlaggedCount}");
         output.WriteLine($"average-caption-ms: {report.Runtime.AverageClientMilliseconds:0.0}");
@@ -444,7 +478,8 @@ internal static class NarrationEvaluationCommandRunner
         IReadOnlyList<NarrationReviewItem> reviewItems,
         int requestedCount,
         int unavailableProxies,
-        int generationFailures)
+        int generationFailures,
+        IReadOnlyDictionary<string, int> generationFailureKinds)
     {
         double[] clientMilliseconds = reviewItems
             .Select(item => item.Generated.ClientMilliseconds)
@@ -486,7 +521,8 @@ internal static class NarrationEvaluationCommandRunner
                 requestedCount,
                 reviewItems.Count,
                 unavailableProxies,
-                generationFailures),
+                generationFailures,
+                generationFailureKinds),
             new NarrationRuntimeEvidence(
                 AverageClientMilliseconds: clientMilliseconds.Average(),
                 MedianClientMilliseconds: Percentile(clientMilliseconds, 0.50),
@@ -673,6 +709,15 @@ internal static class NarrationEvaluationCommandRunner
         }
     }
 
+    private static void IncrementFailure(
+        IDictionary<string, int> counts,
+        string key)
+    {
+        counts[key] = counts.TryGetValue(key, out int current)
+            ? current + 1
+            : 1;
+    }
+
     private static double Percentile(
         IReadOnlyList<double> ordered,
         double percentile)
@@ -724,7 +769,8 @@ internal sealed record NarrationSampleEvidence(
     int RequestedCaptionCount,
     int GeneratedCaptionCount,
     int ProxyUnavailableCount,
-    int GenerationFailureCount);
+    int GenerationFailureCount,
+    IReadOnlyDictionary<string, int> GenerationFailureKinds);
 
 internal sealed record NarrationRuntimeEvidence(
     double AverageClientMilliseconds,
