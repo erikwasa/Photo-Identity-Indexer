@@ -212,12 +212,43 @@
                     <fieldset class="smart-filter-card">
                         <legend>Location</legend>
 
-                        <PlacePicker Label="Named place"
-                                     EmptyLabel="Any named place"
-                                     Value="@SelectedPlace"
-                                     ValueChanged="@((string? value) => SelectedPlace = value)"
-                                     Disabled="@Busy" />
-                        <small class="smart-help">Selecting a parent such as Sweden includes photos assigned anywhere below that place hierarchy.</small>
+                        <PlacePicker Label="Add named place"
+                                     EmptyLabel="Search named places"
+                                     Value="@PendingPlace"
+                                     ValueChanged="AddPlaceAsync"
+                                     Disabled="@(Busy || SelectedPlaces.Count >= SmartCollectionFilter.MaximumLocationPlaces)" />
+
+                        @if (SelectedPlaces.Count > 0)
+                        {
+                            <div class="smart-place-selection" aria-label="Selected named places">
+                                <div class="smart-place-selection-heading">
+                                    <strong>Match any selected place</strong>
+                                    <span>@SelectedPlaces.Count / @SmartCollectionFilter.MaximumLocationPlaces</span>
+                                </div>
+                                <div class="smart-place-chips">
+                                    @foreach (string place in SelectedPlaces.OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
+                                    {
+                                        <span class="smart-place-chip">
+                                            <span>@place</span>
+                                            <button type="button"
+                                                    aria-label="Remove @place"
+                                                    disabled="@Busy"
+                                                    @onclick="() => RemovePlace(place)">
+                                                Remove
+                                            </button>
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <small class="smart-help">No named place filter. Photos from any named or unnamed location remain eligible.</small>
+                        }
+
+                        <small class="smart-help">
+                            Named places use OR semantics. Selecting a parent such as Sweden includes all descendants and makes nested selections redundant.
+                        </small>
 
                         <label class="smart-location-toggle">
                             <input type="checkbox" @bind="UseLocation" disabled="@Busy" />
@@ -242,7 +273,7 @@
                                 <input type="text" inputmode="decimal" @bind="East" disabled="@(!UseLocation || Busy)" />
                             </label>
                         </div>
-                        <small class="smart-help">Named place and GPS are independent. If both are populated, both must match. Missing GPS metadata will not match a populated GPS rectangle.</small>
+                        <small class="smart-help">The named-place group and GPS rectangle are independent. If both are populated, a photo must match any selected place AND the GPS rectangle. Missing GPS metadata will not match a populated rectangle.</small>
                     </fieldset>
                 </div>
 
