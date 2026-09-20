@@ -42,7 +42,10 @@ public sealed class NavigationContextTests
             "17.0",
             "60.0",
             "18.0",
-            "Sweden/Stockholm region/Norrtälje");
+            "Sweden/Stockholm region/Norrtälje",
+            TakenMode: SmartCollectionDateModes.Range,
+            TakenFrom: "2025-05-01",
+            TakenTo: "2025-05-10");
 
         string json = SmartCollectionNavigation.SerializeTransientState(state);
         SmartCollectionTransientNavigationState? restored = SmartCollectionNavigation.DeserializeTransientState(json);
@@ -61,6 +64,9 @@ public sealed class NavigationContextTests
         Assert.Equal(state.North, restored.North);
         Assert.Equal(state.East, restored.East);
         Assert.Equal(state.Place, restored.Place);
+        Assert.Equal(SmartCollectionDateModes.Range, restored.TakenMode);
+        Assert.Equal("2025-05-01", restored.TakenFrom);
+        Assert.Equal("2025-05-10", restored.TakenTo);
     }
 
     [Fact]
