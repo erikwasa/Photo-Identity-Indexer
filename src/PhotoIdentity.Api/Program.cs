@@ -211,7 +211,7 @@ public partial class Program
         builder.Services.AddSingleton<SlideshowCaptionService>();
         builder.Services.AddSingleton<ISlideshowCaptionService>(
             services => services.GetRequiredService<SlideshowCaptionService>());
-        builder.Services.AddHostedService(
+        builder.Services.AddHostedService<SlideshowCaptionService>(
             services => services.GetRequiredService<SlideshowCaptionService>());
         builder.Services.AddSingleton<IReverseGeocoder, GeoNamesReverseGeocoder>();
         builder.Services.AddSingleton<PhotoPlaceEnrichmentService>();
