@@ -49,6 +49,23 @@
         <span>Protected slideshow</span>
     </label>
 
+    <label>
+        <input type="checkbox" checked="@Settings.GeneratedCaptions" @onchange="ChangeGeneratedCaptionsAsync" />
+        <span>Generated captions (local AI)</span>
+    </label>
+
+    @if (Settings.GeneratedCaptions)
+    {
+        <label class="slideshow-settings-field">
+            <span>Caption language</span>
+            <select value="@Settings.CaptionLanguage" @onchange="ChangeCaptionLanguageAsync">
+                <option value="@SlideshowSettings.SwedishCaptionLanguage">Svenska</option>
+                <option value="@SlideshowSettings.EnglishCaptionLanguage">English</option>
+            </select>
+        </label>
+        <small>Captions are generated gradually on this computer and reused when available.</small>
+    }
+
     @if (ShowPrepareOriginals)
     {
         <label>
@@ -106,6 +123,15 @@
 
     private Task ChangeProtectedAsync(ChangeEventArgs args) =>
         EmitAsync(Settings with { ProtectedSlideshow = ParseChecked(args) });
+
+    private Task ChangeGeneratedCaptionsAsync(ChangeEventArgs args) =>
+        EmitAsync(Settings with { GeneratedCaptions = ParseChecked(args) });
+
+    private Task ChangeCaptionLanguageAsync(ChangeEventArgs args) =>
+        EmitAsync(Settings with
+        {
+            CaptionLanguage = args.Value?.ToString() ?? SlideshowSettings.DefaultCaptionLanguage,
+        });
 
     private Task ChangePrepareOriginalsAsync(ChangeEventArgs args) =>
         EmitAsync(Settings with { PrepareOriginals = ParseChecked(args) });

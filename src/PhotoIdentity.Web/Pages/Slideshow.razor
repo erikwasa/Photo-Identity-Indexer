@@ -167,6 +167,11 @@
                                Presented="OnCurrentImagePresentedAsync"
                                Failed="OnCurrentImageError" />
 
+        @if (Settings.GeneratedCaptions && !string.IsNullOrWhiteSpace(CurrentCaption))
+        {
+            <div class="slideshow-caption" aria-live="polite">@CurrentCaption</div>
+        }
+
         @if (!string.IsNullOrWhiteSpace(ImageError))
         {
             <div class="slideshow-image-error" role="alert">@ImageError</div>
@@ -364,6 +369,11 @@
         if (presentedRevisionId is null)
         {
             return;
+        }
+
+        if (Settings.GeneratedCaptions)
+        {
+            await RequestCaptionAsync(presentedRevisionId);
         }
 
         try
