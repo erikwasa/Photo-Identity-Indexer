@@ -2233,6 +2233,41 @@ public sealed class PostgresCatalogueDatabaseTests
                     10,
                     refresh: true));
 
+            const string fallbackContract = "nearby-place-with-admin-fallback-v2";
+            Assert.Single(
+                await enrichmentState.GetCandidatesAsync(
+                    geoProvider,
+                    fallbackContract,
+                    10,
+                    refresh: false));
+            await enrichmentState.MarkSucceededAsync(
+                geoProvider,
+                fallbackContract,
+                movedCandidate,
+                "Sweden/Stockholm County",
+                providerResultId: null,
+                countryCode: "SE");
+            Assert.Empty(
+                await enrichmentState.GetCandidatesAsync(
+                    geoProvider,
+                    fallbackContract,
+                    10,
+                    refresh: false));
+
+            const string laterContract = "nearby-place-with-admin-fallback-v3";
+            Assert.Empty(
+                await enrichmentState.GetCandidatesAsync(
+                    geoProvider,
+                    laterContract,
+                    10,
+                    refresh: false));
+            Assert.Single(
+                await enrichmentState.GetCandidatesAsync(
+                    geoProvider,
+                    laterContract,
+                    10,
+                    refresh: true));
+
             // WI-0099 acceptance: exercise independent archive/background writers
             // concurrently against PostgreSQL. These operations previously shared
             // SQLite's single-writer ceiling and could participate in host-stopping
