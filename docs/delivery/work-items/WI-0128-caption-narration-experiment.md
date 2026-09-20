@@ -38,9 +38,9 @@ Titles, chapter text and short contextual captions could make a slideshow feel m
 
 - [x] A bounded local experiment compares deterministic text against at least one practical generative approach if a viable local candidate exists.
 - [x] Generated text is clearly derived/versioned and separated from canonical facts.
-- [ ] The evaluation records factual-error behavior, usefulness, runtime and model/package cost.
+- [x] The evaluation records factual-error behavior, usefulness, runtime and model/package cost.
 - [x] Names, relationships, locations and events are not accepted as generated facts when canonical evidence is absent.
-- [ ] The outcome records a go/no-go recommendation and, if positive, a bounded integration path that remains optional during playback.
+- [x] The outcome records a go/no-go recommendation and, if positive, a bounded integration path that remains optional during playback.
 
 ## Verification requirements
 
@@ -56,11 +56,12 @@ Automated guard/smoke tests for any prototype contract plus maintainer review of
 - The evaluator refuses non-loopback model endpoints, so proxy bytes cannot be sent to an external host through this command.
 - The aggregate report includes model digest/package size, runtime/token counts, guard statistics and failure counts while omitting generated captions and all private identifiers/paths.
 - The optional private HTML page shows image, deterministic text, generated caption and guard outcome for qualitative maintainer review.
-- A representative private run is still required to measure visible factual errors, usefulness/repetition, actual runtime/package cost and the final go/no-go decision.
+- Maintainer acceptance on 2026-09-20 found the four-photo thumbnail sample useful 4/4 with 0 observed factual errors and all four outputs passing the guard. The four-photo run averaged 95,858.8 ms per caption on the maintainer machine. A preceding full-proxy single-photo run took 373,568.2 ms and the first thumbnail single-photo probe took 118,081.4 ms. The selected model package was 3,200,627,168 bytes. The result is a positive usefulness decision with a bounded opt-in product path; runtime remains expensive and further tuning is deferred.
 
 ## Completion notes
 
 - Files changed: generated-text evidence/guard contract, loopback-only Ollama vision client, bounded narration evaluator, model setup helper, unit/integration tests, CLI help and operator runbook.
-- Trade-offs: the experiment intentionally depends on an external local Ollama runtime rather than adding a multi-gigabyte VLM/runtime to the Photo Identity package. That keeps the production package unchanged but makes the experiment an explicit operator setup.
-- Deferred work: private visual review and final go/no-go; no generated-text persistence, Web UI integration or slideshow narration is added before that evidence.
-- Commands run: repository CI will provide build/test/documentation evidence; the model/photo-dependent acceptance run remains a maintainer-run private experiment.
+- Trade-offs: the experiment intentionally depends on an external local Ollama runtime rather than adding a multi-gigabyte VLM/runtime to the Photo Identity package. That keeps the production package unchanged but makes generation an explicit operator capability. The measured latency makes synchronous caption generation inappropriate on current hardware.
+- Decision: go for bounded optional integration through WI-0157. Captions remain presentation-only, generated locally, guarded before display and reusable as regenerable derived cache entries. Ordinary slideshow playback remains independent of the model.
+- Deferred work: faster model/hardware tuning and dedicated semantic search remain separate follow-ons.
+- Commands run: repository CI plus private maintainer evaluation using `qwen2.5vl:3b`, full-proxy and 480x320 thumbnail probes.
