@@ -290,6 +290,7 @@ milestones:
   - WI-0144
   - WI-0145
   - WI-0146
+  - WI-0157
 - id: M29
   title: PostgreSQL-only catalogue cleanup
   status: ready
