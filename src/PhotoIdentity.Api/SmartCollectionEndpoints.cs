@@ -11,7 +11,8 @@ public sealed record SmartCollectionLocationRequest(
     double? West = null,
     double? North = null,
     double? East = null,
-    string? Place = null);
+    string? Place = null,
+    string[]? Places = null);
 
 public sealed record SmartCollectionDateRangeRequest(
     string From,
@@ -201,13 +202,15 @@ public static class SmartCollectionEndpoints
                 return Results.NotFound();
             }
 
-            string? fallbackLocationPlace = request.Location?.Place is null
-                ? existing.Filter.LocationPlace
-                : null;
+            IReadOnlyList<string>? fallbackLocationPlaces =
+                request.Location is null ||
+                (request.Location.Place is null && request.Location.Places is null)
+                    ? existing.Filter.LocationPlaces
+                    : null;
             SmartCollectionDefinition? definition = await repository.UpdateAsync(
                 collectionId,
                 request.Name,
-                ToFilter(request, fallbackLocationPlace),
+                ToFilter(request, fallbackLocationPlaces),
                 cancellationToken);
             return definition is null
                 ? Results.NotFound()
@@ -338,12 +341,12 @@ public static class SmartCollectionEndpoints
             request.Location,
             request.Taken,
             request.TakenRange,
-            fallbackLocationPlace: null);
+            fallbackLocationPlaces: null);
     }
 
     private static SmartCollectionFilter ToFilter(
         SmartCollectionDefinitionRequest request,
-        string? fallbackLocationPlace = null)
+        IReadOnlyList<string>? fallbackLocationPlaces = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         return ToFilter(
@@ -354,7 +357,7 @@ public static class SmartCollectionEndpoints
             request.Location,
             request.Taken,
             request.TakenRange,
-            fallbackLocationPlace);
+            fallbackLocationPlaces);
     }
 
     private static SmartCollectionFilter ToFilter(
@@ -365,7 +368,7 @@ public static class SmartCollectionEndpoints
         SmartCollectionLocationRequest? location,
         string? taken,
         SmartCollectionDateRangeRequest? takenRange,
-        string? fallbackLocationPlace)
+        IReadOnlyList<string>? fallbackLocationPlaces)
     {
         ValidateGenericTags(tags);
 
@@ -388,18 +391,27 @@ public static class SmartCollectionEndpoints
             : string.IsNullOrWhiteSpace(taken)
                 ? null
                 : SmartCollectionDateRange.Parse(taken);
-        string? locationPlace = location?.Place is null
-            ? fallbackLocationPlace
-            : location.Place;
+        if (location?.Places is not null && !string.IsNullOrWhiteSpace(location.Place))
+        {
+            throw new ArgumentException(
+                "Specify either Places or the legacy single Place value, not both.",
+                nameof(location));
+        }
+
+        IEnumerable<string>? locationPlaces = location?.Places is not null
+            ? location.Places
+            : location?.Place is not null
+                ? [location.Place]
+                : fallbackLocationPlaces;
 
         return new SmartCollectionFilter(
-            parsedPeople,
-            peopleMatch,
-            tags,
-            tagMatch,
-            parsedLocation,
-            parsedTaken,
-            locationPlace);
+            people: parsedPeople,
+            peopleMatch: peopleMatch,
+            tags: tags,
+            tagMatch: tagMatch,
+            location: parsedLocation,
+            taken: parsedTaken,
+            locationPlaces: locationPlaces);
     }
 
     private static SmartCollectionDateRange ParseTakenRange(
@@ -516,16 +528,19 @@ public static class SmartCollectionEndpoints
         filter.PeopleMatch,
         filter.Tags.ToArray(),
         filter.TagMatch,
-        filter.Location is null && filter.LocationPlace is null
+        filter.Location is null && filter.LocationPlaces.Count == 0
             ? null
             : new SmartCollectionLocationRequest(
                 filter.Location?.South,
                 filter.Location?.West,
                 filter.Location?.North,
                 filter.Location?.East,
-                filter.LocationPlace is null
-                    ? null
-                    : PhotoPlacePath.Parse(filter.LocationPlace).DisplayValue),
+                filter.LocationPlaces.Count == 1
+                    ? PhotoPlacePath.Parse(filter.LocationPlaces[0]).DisplayValue
+                    : null,
+                filter.LocationPlaces
+                    .Select(value => PhotoPlacePath.Parse(value).DisplayValue)
+                    .ToArray()),
         filter.Taken is null
             ? null
             : new SmartCollectionDateRangeResponse(
