@@ -1,0 +1,22 @@
+id: WI-0127
+title: Evaluate whole-image embeddings for semantic Creative Collections
+milestone: M26
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0127-whole-image-embeddings.md
+started_at: 2026-09-19
+completed_at: 2026-09-20
+verified_at: 2026-09-20
+verified_by: maintainer
+last_updated_at: 2026-09-20
+branch: agent/WI-0127-complete-split-decision
+blockers:
+- WI-0120
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/381
+- type: maintainer_verification
+  value: 2026-09-20 private run embedded 185/185 proxies with no proxy failures, evaluated 8 semantic queries and 4 similar-photo seeds, and compared 50-photo metadata-only versus embedding-diversified Creative selections.
+- type: decision
+  value: Semantic text-to-photo retrieval is promising for future dedicated product work; similar-photo retrieval was inconsistent and embedding-based Creative diversity did not materially improve selection, so M26 will not add vector persistence or ANN infrastructure.
