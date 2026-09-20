@@ -1,0 +1,24 @@
+id: WI-0128
+title: Evaluate local captions and story narration for Creative Collections
+milestone: M26
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0128-caption-narration-experiment.md
+started_at: 2026-09-20
+completed_at: 2026-09-20
+verified_at: 2026-09-20
+verified_by: maintainer
+last_updated_at: 2026-09-20
+branch: agent/WI-0128-local-caption-evaluation
+blockers:
+- WI-0121
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/383
+- type: maintainer_verification
+  value: 2026-09-20 private thumbnail run generated 4/4 captions with zero generation failures; maintainer judged captions useful 4/4, observed no factual errors, and all four passed the generated-text guard.
+- type: performance
+  value: Full-proxy single caption took 373568.2 ms; thumbnail single caption took 118081.4 ms; four-photo thumbnail sample averaged 95858.8 ms per caption with qwen2.5vl:3b package size 3200627168 bytes.
+- type: decision
+  value: Local captions provide enough value to retain as a bounded opt-in presentation feature; synchronous generation is too slow on current hardware, so WI-0157 productizes gradual background generation and reuse while leaving tuning for later.
