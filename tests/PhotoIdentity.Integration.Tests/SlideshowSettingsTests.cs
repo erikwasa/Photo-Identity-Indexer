@@ -18,6 +18,8 @@ public sealed class SlideshowSettingsTests
         Assert.Equal(SlideshowSettings.Loop, settings.AfterLastPhoto);
         Assert.True(settings.ProtectedSlideshow);
         Assert.False(settings.PrepareOriginals);
+        Assert.False(settings.GeneratedCaptions);
+        Assert.Equal(SlideshowSettings.SwedishCaptionLanguage, settings.CaptionLanguage);
     }
 
     [Fact]
@@ -31,7 +33,9 @@ public sealed class SlideshowSettingsTests
             Orientation: SlideshowSettings.LandscapeOrientation,
             AfterLastPhoto: SlideshowSettings.Stop,
             ProtectedSlideshow: false,
-            PrepareOriginals: true);
+            PrepareOriginals: true,
+            GeneratedCaptions: true,
+            CaptionLanguage: SlideshowSettings.EnglishCaptionLanguage);
 
         SlideshowSettings actual = SlideshowSettings.FromJson(expected.ToJson());
 
@@ -60,7 +64,9 @@ public sealed class SlideshowSettingsTests
               "orientation": "sideways",
               "afterLastPhoto": "surprise",
               "protectedSlideshow": false,
-              "prepareOriginals": true
+              "prepareOriginals": true,
+              "generatedCaptions": true,
+              "captionLanguage": "en"
             }
             """);
 
@@ -72,6 +78,8 @@ public sealed class SlideshowSettingsTests
         Assert.Equal(SlideshowSettings.Loop, settings.AfterLastPhoto);
         Assert.False(settings.ProtectedSlideshow);
         Assert.True(settings.PrepareOriginals);
+        Assert.True(settings.GeneratedCaptions);
+        Assert.Equal(SlideshowSettings.EnglishCaptionLanguage, settings.CaptionLanguage);
     }
 
     [Fact]
@@ -97,6 +105,8 @@ public sealed class SlideshowSettingsTests
         Assert.Equal(SlideshowSettings.Stop, settings.AfterLastPhoto);
         Assert.False(settings.ProtectedSlideshow);
         Assert.True(settings.PrepareOriginals);
+        Assert.False(settings.GeneratedCaptions);
+        Assert.Equal(SlideshowSettings.SwedishCaptionLanguage, settings.CaptionLanguage);
     }
 
     [Theory]
@@ -109,6 +119,20 @@ public sealed class SlideshowSettingsTests
         SlideshowSettings settings = (SlideshowSettings.Defaults with { Orientation = value }).Normalize();
 
         Assert.Equal(expected, settings.Orientation);
+    }
+
+    [Theory]
+    [InlineData("sv", SlideshowSettings.SwedishCaptionLanguage)]
+    [InlineData("EN", SlideshowSettings.EnglishCaptionLanguage)]
+    [InlineData("invalid", SlideshowSettings.SwedishCaptionLanguage)]
+    public void Caption_language_normalizes_supported_values(string value, string expected)
+    {
+        SlideshowSettings settings = (SlideshowSettings.Defaults with
+        {
+            CaptionLanguage = value,
+        }).Normalize();
+
+        Assert.Equal(expected, settings.CaptionLanguage);
     }
 
     [Theory]
