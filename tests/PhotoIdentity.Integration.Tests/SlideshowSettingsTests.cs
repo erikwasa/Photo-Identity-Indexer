@@ -18,7 +18,7 @@ public sealed class SlideshowSettingsTests
         Assert.Equal(SlideshowSettings.Loop, settings.AfterLastPhoto);
         Assert.True(settings.ProtectedSlideshow);
         Assert.False(settings.PrepareOriginals);
-        Assert.False(settings.GeneratedCaptions);
+        Assert.False(settings.ShowCaptions);
         Assert.Equal(SlideshowSettings.SwedishCaptionLanguage, settings.CaptionLanguage);
     }
 
@@ -34,7 +34,7 @@ public sealed class SlideshowSettingsTests
             AfterLastPhoto: SlideshowSettings.Stop,
             ProtectedSlideshow: false,
             PrepareOriginals: true,
-            GeneratedCaptions: true,
+            ShowCaptions: true,
             CaptionLanguage: SlideshowSettings.EnglishCaptionLanguage);
 
         SlideshowSettings actual = SlideshowSettings.FromJson(expected.ToJson());
@@ -78,7 +78,7 @@ public sealed class SlideshowSettingsTests
         Assert.Equal(SlideshowSettings.Loop, settings.AfterLastPhoto);
         Assert.False(settings.ProtectedSlideshow);
         Assert.True(settings.PrepareOriginals);
-        Assert.True(settings.GeneratedCaptions);
+        Assert.True(settings.ShowCaptions);
         Assert.Equal(SlideshowSettings.EnglishCaptionLanguage, settings.CaptionLanguage);
     }
 
@@ -105,7 +105,7 @@ public sealed class SlideshowSettingsTests
         Assert.Equal(SlideshowSettings.Stop, settings.AfterLastPhoto);
         Assert.False(settings.ProtectedSlideshow);
         Assert.True(settings.PrepareOriginals);
-        Assert.False(settings.GeneratedCaptions);
+        Assert.False(settings.ShowCaptions);
         Assert.Equal(SlideshowSettings.SwedishCaptionLanguage, settings.CaptionLanguage);
     }
 
