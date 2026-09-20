@@ -198,7 +198,7 @@ public partial class SmartCollectionsWorkspace
         if (definition.Filter.Location is SmartCollectionLocationRequest location)
         {
             foreach (string place in location.Places ??
-                (string.IsNullOrWhiteSpace(location.Place) ? [] : [location.Place]))
+                (string.IsNullOrWhiteSpace(location.Place) ? [] : new[] { location.Place! }))
             {
                 AddPlaceCore(place);
             }
@@ -258,7 +258,7 @@ public partial class SmartCollectionsWorkspace
         ApplyTakenState(takenState);
         SelectedPlaces.Clear();
         foreach (string place in state.Places ??
-            (string.IsNullOrWhiteSpace(state.Place) ? [] : [state.Place]))
+            (string.IsNullOrWhiteSpace(state.Place) ? [] : new[] { state.Place! }))
         {
             AddPlaceCore(place);
         }
@@ -1096,7 +1096,7 @@ public partial class SmartCollectionsWorkspace
         }
 
         string[] places = filter.Location.Places ??
-            (string.IsNullOrWhiteSpace(filter.Location.Place) ? [] : [filter.Location.Place]);
+            (string.IsNullOrWhiteSpace(filter.Location.Place) ? [] : new[] { filter.Location.Place! });
         bool hasGps = filter.Location.South.HasValue &&
             filter.Location.West.HasValue &&
             filter.Location.North.HasValue &&
