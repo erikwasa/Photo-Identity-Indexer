@@ -71,7 +71,7 @@ internal sealed record NarrationEvaluationCommandOptions(
                     break;
                 case "--ollama-base-url":
                     if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? parsedUri) ||
-                        !Uri.IsLoopback(parsedUri) ||
+                        !parsedUri.IsLoopback ||
                         (parsedUri.Scheme != Uri.UriSchemeHttp &&
                          parsedUri.Scheme != Uri.UriSchemeHttps))
                     {
