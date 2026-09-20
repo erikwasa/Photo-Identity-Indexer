@@ -68,7 +68,7 @@ public sealed class SmartCollectionLocationUpdateCompatibilityTests
                 await explicitClear.Content.ReadFromJsonAsync<SmartCollectionDefinitionResponse>()
                 ?? throw new InvalidOperationException("Clear response was empty.");
             Assert.Null(cleared.Filter.Location?.Place);
-            Assert.Empty(cleared.Filter.Location?.Places ?? []);
+            Assert.Empty(cleared.Filter.Location?.Places ?? Array.Empty<string>());
             Assert.Equal(59.1, cleared.Filter.Location?.South);
         }
         finally
