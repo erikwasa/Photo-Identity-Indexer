@@ -54,7 +54,12 @@ public partial class SmartCollectionsWorkspace
     private string Name { get; set; } = "";
     private string PeopleMatch { get; set; } = "all";
     private string TagMatch { get; set; } = "all";
-    private string Taken { get; set; } = "";
+    private string TakenMode { get; set; } = SmartCollectionDateModes.Any;
+    private string TakenYear { get; set; } = "";
+    private string TakenMonth { get; set; } = "";
+    private string TakenDate { get; set; } = "";
+    private string TakenFrom { get; set; } = "";
+    private string TakenTo { get; set; } = "";
     private string? SelectedPlace { get; set; }
     private bool UseLocation { get; set; }
     private string South { get; set; } = "";
@@ -147,7 +152,7 @@ public partial class SmartCollectionsWorkspace
         SelectedTags.Clear();
         PeopleMatch = "all";
         TagMatch = "all";
-        Taken = "";
+        ResetTakenEditor();
         SelectedPlace = null;
         UseLocation = false;
         South = West = North = East = "";
@@ -184,7 +189,7 @@ public partial class SmartCollectionsWorkspace
 
         PeopleMatch = definition.Filter.PeopleMatch;
         TagMatch = definition.Filter.TagMatch;
-        Taken = ToEditableTaken(definition.Filter.Taken);
+        ApplyTakenState(SmartCollectionDateEditorModel.FromRange(definition.Filter.Taken));
         if (definition.Filter.Location is SmartCollectionLocationRequest location)
         {
             SelectedPlace = location.Place;
@@ -229,7 +234,16 @@ public partial class SmartCollectionsWorkspace
 
         PeopleMatch = state.PeopleMatch;
         TagMatch = state.TagMatch;
-        Taken = state.Taken;
+        SmartCollectionDateEditorState takenState = string.IsNullOrWhiteSpace(state.TakenMode)
+            ? SmartCollectionDateEditorModel.FromLegacyExpression(state.Taken)
+            : new SmartCollectionDateEditorState(
+                state.TakenMode!,
+                state.TakenYear ?? "",
+                state.TakenMonth ?? "",
+                state.TakenDate ?? "",
+                state.TakenFrom ?? "",
+                state.TakenTo ?? "");
+        ApplyTakenState(takenState);
         SelectedPlace = state.Place;
         UseLocation = state.UseLocation;
         South = state.South;
@@ -851,13 +865,19 @@ public partial class SmartCollectionsWorkspace
             PeopleMatch,
             SelectedTags.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
             TagMatch,
-            Taken,
+            "",
             UseLocation,
             South,
             West,
             North,
             East,
-            SelectedPlace);
+            SelectedPlace,
+            TakenMode,
+            TakenYear,
+            TakenMonth,
+            TakenDate,
+            TakenFrom,
+            TakenTo);
 
         try
         {
@@ -923,6 +943,11 @@ public partial class SmartCollectionsWorkspace
             location = new SmartCollectionLocationRequest(Place: string.Empty);
         }
 
+        if (!TryBuildTakenRange(out SmartCollectionDateRangeRequest? takenRange))
+        {
+            return false;
+        }
+
         request = new SmartCollectionDefinitionRequest(
             Name.Trim(),
             SelectedPeople.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
@@ -930,7 +955,8 @@ public partial class SmartCollectionsWorkspace
             SelectedTags.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
             TagMatch,
             location,
-            string.IsNullOrWhiteSpace(Taken) ? null : Taken.Trim());
+            Taken: null,
+            TakenRange: takenRange);
         return true;
     }
 
@@ -942,15 +968,21 @@ public partial class SmartCollectionsWorkspace
             return false;
         }
 
+        if (!TryBuildTakenRange(out SmartCollectionDateRangeRequest? takenRange))
+        {
+            return false;
+        }
+
         request = new SmartCollectionQueryRequest(
             SelectedPeople.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
             PeopleMatch,
             SelectedTags.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
             TagMatch,
             location,
-            string.IsNullOrWhiteSpace(Taken) ? null : Taken.Trim(),
-            Math.Max(0, offset),
-            PageSize);
+            Taken: null,
+            Offset: Math.Max(0, offset),
+            Limit: PageSize,
+            TakenRange: takenRange);
         return true;
     }
 
@@ -1031,9 +1063,8 @@ public partial class SmartCollectionsWorkspace
         ? "Any tags"
         : $"Tags {filter.TagMatch}: {string.Join(", ", filter.Tags)}";
 
-    private static string DateSummary(SmartCollectionFilterResponse filter) => filter.Taken is null
-        ? "Any taken date"
-        : $"Taken {filter.Taken.From} to {filter.Taken.To}";
+    private static string DateSummary(SmartCollectionFilterResponse filter) =>
+        SmartCollectionDateEditorModel.Summary(filter.Taken);
 
     private static string LocationSummary(SmartCollectionFilterResponse filter)
     {
@@ -1065,16 +1096,36 @@ public partial class SmartCollectionsWorkspace
             : "Any location";
     }
 
-    private static string ToEditableTaken(SmartCollectionDateRangeResponse? range)
+    private bool TryBuildTakenRange(out SmartCollectionDateRangeRequest? range)
     {
-        if (range is null)
+        if (SmartCollectionDateEditorModel.TryBuildRange(
+                TakenMode,
+                TakenYear,
+                TakenMonth,
+                TakenDate,
+                TakenFrom,
+                TakenTo,
+                out range,
+                out string? error))
         {
-            return "";
+            return true;
         }
 
-        string from = range.From.Replace('-', '/');
-        string to = range.To.Replace('-', '/');
-        return string.Equals(from, to, StringComparison.Ordinal) ? from : $"{from}-{to}";
+        Error = error;
+        return false;
+    }
+
+    private void ResetTakenEditor() =>
+        ApplyTakenState(new SmartCollectionDateEditorState(SmartCollectionDateModes.Any));
+
+    private void ApplyTakenState(SmartCollectionDateEditorState state)
+    {
+        TakenMode = state.Mode;
+        TakenYear = state.Year;
+        TakenMonth = state.Month;
+        TakenDate = state.Date;
+        TakenFrom = state.From;
+        TakenTo = state.To;
     }
 
     private static string PhotoDate(SmartCollectionPhotoResponse photo) => photo.TakenAtLocal is DateTime taken
