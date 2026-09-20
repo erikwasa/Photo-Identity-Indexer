@@ -186,6 +186,11 @@ public sealed class CatalogueMigrationCommandTests
             INSERT INTO photo_presentation_preference_actions (
                 id, asset_revision_id, action_kind, preference_kind, actor, created_at_utc)
             VALUES (81, $revision, 'set', 'prefer', 'maintainer', $now);
+            UPDATE photo_caption_enrichment_settings
+            SET enabled = 1,
+                language = 'en',
+                updated_at_utc = $now
+            WHERE id = 1;
             """;
         seed.Parameters.AddWithValue("$source", sourceId.ToString());
         seed.Parameters.AddWithValue("$asset", assetId.ToString());
@@ -261,6 +266,11 @@ public sealed class CatalogueMigrationCommandTests
             await ScalarLongAsync(
                 verify,
                 "SELECT COUNT(*) FROM photo_presentation_preference_actions WHERE id = 81 AND preference_kind = 'prefer';"));
+        Assert.Equal(
+            1L,
+            await ScalarLongAsync(
+                verify,
+                "SELECT COUNT(*) FROM photo_caption_enrichment_settings WHERE id = 1 AND enabled = true AND language = 'en';"));
 
         await using NpgsqlCommand insertEmbedding = verify.CreateCommand();
         insertEmbedding.CommandText = """
