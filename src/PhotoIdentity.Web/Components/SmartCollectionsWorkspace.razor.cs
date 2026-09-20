@@ -43,6 +43,7 @@ public partial class SmartCollectionsWorkspace
     private IReadOnlyList<SmartCollectionDefinitionResponse> Definitions { get; set; } = [];
     private HashSet<string> SelectedPeople { get; } = new(StringComparer.Ordinal);
     private HashSet<string> SelectedTags { get; } = new(StringComparer.OrdinalIgnoreCase);
+    private HashSet<string> SelectedPlaces { get; } = new(StringComparer.OrdinalIgnoreCase);
     private SmartCollectionPageResponse? Results { get; set; }
     private CreativeCollectionRecipeResponse? CreativeRecipe { get; set; }
     private CreativeCollectionPreviewResponse? CreativePreview { get; set; }
@@ -60,7 +61,7 @@ public partial class SmartCollectionsWorkspace
     private string TakenDate { get; set; } = "";
     private string TakenFrom { get; set; } = "";
     private string TakenTo { get; set; } = "";
-    private string? SelectedPlace { get; set; }
+    private string? PendingPlace { get; set; }
     private bool UseLocation { get; set; }
     private string South { get; set; } = "";
     private string West { get; set; } = "";
@@ -153,7 +154,8 @@ public partial class SmartCollectionsWorkspace
         PeopleMatch = "all";
         TagMatch = "all";
         ResetTakenEditor();
-        SelectedPlace = null;
+        SelectedPlaces.Clear();
+        PendingPlace = null;
         UseLocation = false;
         South = West = North = East = "";
         Results = null;
@@ -190,9 +192,16 @@ public partial class SmartCollectionsWorkspace
         PeopleMatch = definition.Filter.PeopleMatch;
         TagMatch = definition.Filter.TagMatch;
         ApplyTakenState(SmartCollectionDateEditorModel.FromRange(definition.Filter.Taken));
+        SelectedPlaces.Clear();
         if (definition.Filter.Location is SmartCollectionLocationRequest location)
         {
-            SelectedPlace = location.Place;
+            foreach (string place in location.Places ??
+                (string.IsNullOrWhiteSpace(location.Place) ? [] : [location.Place]))
+            {
+                AddPlaceCore(place);
+            }
+
+            PendingPlace = null;
             UseLocation = location.South.HasValue &&
                 location.West.HasValue &&
                 location.North.HasValue &&
@@ -204,7 +213,8 @@ public partial class SmartCollectionsWorkspace
         }
         else
         {
-            SelectedPlace = null;
+            SelectedPlaces.Clear();
+            PendingPlace = null;
             UseLocation = false;
             South = West = North = East = "";
         }
@@ -244,7 +254,13 @@ public partial class SmartCollectionsWorkspace
                 state.TakenFrom ?? "",
                 state.TakenTo ?? "");
         ApplyTakenState(takenState);
-        SelectedPlace = state.Place;
+        SelectedPlaces.Clear();
+        foreach (string place in state.Places ??
+            (string.IsNullOrWhiteSpace(state.Place) ? [] : [state.Place]))
+        {
+            AddPlaceCore(place);
+        }
+        PendingPlace = null;
         UseLocation = state.UseLocation;
         South = state.South;
         West = state.West;
@@ -871,13 +887,14 @@ public partial class SmartCollectionsWorkspace
             West,
             North,
             East,
-            SelectedPlace,
+            Place: null,
             TakenMode,
             TakenYear,
             TakenMonth,
             TakenDate,
             TakenFrom,
-            TakenTo);
+            TakenTo,
+            Places: SelectedPlaces.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray());
 
         try
         {
@@ -940,7 +957,7 @@ public partial class SmartCollectionsWorkspace
 
         if (EditingId is not null && location is null)
         {
-            location = new SmartCollectionLocationRequest(Place: string.Empty);
+            location = new SmartCollectionLocationRequest(Places: []);
         }
 
         if (!TryBuildTakenRange(out SmartCollectionDateRangeRequest? takenRange))
@@ -988,13 +1005,15 @@ public partial class SmartCollectionsWorkspace
 
     private bool TryBuildLocation(out SmartCollectionLocationRequest? location)
     {
-        string? place = string.IsNullOrWhiteSpace(SelectedPlace) ? null : SelectedPlace.Trim();
+        string[] places = SelectedPlaces
+            .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         location = null;
         if (!UseLocation)
         {
-            if (place is not null)
+            if (places.Length > 0)
             {
-                location = new SmartCollectionLocationRequest(Place: place);
+                location = new SmartCollectionLocationRequest(Places: places);
             }
 
             return true;
@@ -1025,7 +1044,8 @@ public partial class SmartCollectionsWorkspace
             west,
             north,
             east,
-            place ?? string.Empty);
+            Place: null,
+            Places: places);
         return true;
     }
 
@@ -1073,28 +1093,84 @@ public partial class SmartCollectionsWorkspace
             return "Any location";
         }
 
-        string? place = string.IsNullOrWhiteSpace(filter.Location.Place)
-            ? null
-            : filter.Location.Place;
+        string[] places = filter.Location.Places ??
+            (string.IsNullOrWhiteSpace(filter.Location.Place) ? [] : [filter.Location.Place]);
         bool hasGps = filter.Location.South.HasValue &&
             filter.Location.West.HasValue &&
             filter.Location.North.HasValue &&
             filter.Location.East.HasValue;
-
-        if (place is not null && hasGps)
+        string? placeSummary = places.Length switch
         {
-            return $"Place {place} · GPS {filter.Location.South!.Value:G6},{filter.Location.West!.Value:G6} to {filter.Location.North!.Value:G6},{filter.Location.East!.Value:G6}";
+            0 => null,
+            1 => $"Place {places[0]}",
+            _ => $"Places (any): {string.Join(", ", places)}",
+        };
+
+        if (placeSummary is not null && hasGps)
+        {
+            return $"{placeSummary} · GPS {filter.Location.South!.Value:G6},{filter.Location.West!.Value:G6} to {filter.Location.North!.Value:G6},{filter.Location.East!.Value:G6}";
         }
 
-        if (place is not null)
+        if (placeSummary is not null)
         {
-            return $"Place {place}";
+            return placeSummary;
         }
 
         return hasGps
             ? $"GPS {filter.Location.South!.Value:G6},{filter.Location.West!.Value:G6} to {filter.Location.North!.Value:G6},{filter.Location.East!.Value:G6}"
             : "Any location";
     }
+
+    private Task AddPlaceAsync(string? value)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            AddPlaceCore(value);
+        }
+
+        PendingPlace = null;
+        return Task.CompletedTask;
+    }
+
+    private void AddPlaceCore(string value)
+    {
+        string candidate = value.Trim().Trim('/');
+        if (candidate.Length == 0)
+        {
+            return;
+        }
+
+        if (SelectedPlaces.Any(existing => IsSameOrAncestor(existing, candidate)))
+        {
+            return;
+        }
+
+        foreach (string descendant in SelectedPlaces
+            .Where(existing => IsStrictAncestor(candidate, existing))
+            .ToArray())
+        {
+            SelectedPlaces.Remove(descendant);
+        }
+
+        if (SelectedPlaces.Count >= SmartCollectionFilter.MaximumLocationPlaces)
+        {
+            Error = $"Choose at most {SmartCollectionFilter.MaximumLocationPlaces} named places.";
+            return;
+        }
+
+        SelectedPlaces.Add(candidate);
+    }
+
+    private void RemovePlace(string value) => SelectedPlaces.Remove(value);
+
+    private static bool IsSameOrAncestor(string ancestor, string candidate) =>
+        string.Equals(ancestor, candidate, StringComparison.OrdinalIgnoreCase) ||
+        IsStrictAncestor(ancestor, candidate);
+
+    private static bool IsStrictAncestor(string ancestor, string candidate) =>
+        candidate.Length > ancestor.Length &&
+        candidate.StartsWith(ancestor, StringComparison.OrdinalIgnoreCase) &&
+        candidate[ancestor.Length] == '/';
 
     private bool TryBuildTakenRange(out SmartCollectionDateRangeRequest? range)
     {
