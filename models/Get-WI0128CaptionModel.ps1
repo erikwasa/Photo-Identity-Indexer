@@ -11,7 +11,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if (-not $BaseUrl.IsAbsoluteUri -or
-    -not [System.Uri]::IsLoopback($BaseUrl) -or
+    -not $BaseUrl.IsLoopback -or
     ($BaseUrl.Scheme -ne 'http' -and $BaseUrl.Scheme -ne 'https')) {
     throw 'BaseUrl must be an absolute loopback HTTP(S) URL.'
 }
