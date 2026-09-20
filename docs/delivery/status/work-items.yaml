@@ -90,40 +90,10 @@ work_items:
   blocker_notes:
   - Bounded local caption evaluation is in progress; completion remains pending CI and representative private maintainer review of usefulness and factual errors.
   evidence: []
-- id: WI-0132
-  title: Add moment-aware transition language to slideshow playback
-  milestone: M27
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0132-moment-aware-slideshow-transitions.md
-  started_at: 2026-09-19
-  last_updated_at: 2026-09-19
-  branch: agent/WI-0132-moment-transitions
-  blockers:
-  - WI-0129
-  - WI-0118
-  blocker_notes:
-  - Implementation and automated coverage are on the work branch; completion remains pending CI and maintainer review together with the remaining M27 presentation items on a representative private Creative Collection.
-  evidence: []
-- id: WI-0133
-  title: Add burst-aware compact pacing to slideshow playback
-  milestone: M27
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0133-burst-aware-slideshow-pacing.md
-  started_at: 2026-09-19
-  last_updated_at: 2026-09-19
-  branch: agent/WI-0133-burst-pacing
-  blockers:
-  - WI-0129
-  - WI-0123
-  blocker_notes:
-  - Implementation and automated coverage are on the work branch; completion remains pending CI and the planned combined M27 maintainer review on representative private burst/near-duplicate sequences.
-  evidence: []
 - id: WI-0137
   title: Tune and verify the polished slideshow experience on real devices
   milestone: M27
-  status: proposed
+  status: ready
   owner: unassigned
   document: ../work-items/WI-0137-real-device-slideshow-polish-acceptance.md
   blockers:
@@ -135,21 +105,6 @@ work_items:
   - WI-0136
   - WI-0139
   blocker_notes: []
-  evidence: []
-- id: WI-0139
-  title: Allow slideshow playback when browser fullscreen is unavailable
-  milestone: M27
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0139-no-fullscreen-slideshow-fallback.md
-  started_at: 2026-09-19
-  last_updated_at: 2026-09-19
-  branch: agent/WI-0139-fullscreen-fallback
-  blockers:
-  - WI-0084
-  - WI-0136
-  blocker_notes:
-  - Implementation and automated regression coverage are on the work branch; completion remains pending CI plus maintainer verification on the affected iPhone path and a desktop browser.
   evidence: []
 - id: WI-0140
   title: Replace long place dropdowns with a searchable place picker

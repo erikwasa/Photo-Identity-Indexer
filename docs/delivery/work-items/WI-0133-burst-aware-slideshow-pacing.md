@@ -35,12 +35,12 @@ Several near-identical consecutive photos can make a family slideshow feel repet
 
 ## Acceptance criteria
 
-- [ ] Adjacent annotated burst members can use a shorter bounded presentation cadence than unrelated photos.
-- [ ] Non-burst photos retain normal/adaptive M27 timing.
-- [ ] Manual navigation does not trap the viewer in automatic fast-forward behavior.
-- [ ] Burst pacing cannot change immutable slideshow membership/order.
-- [ ] One- and two-frame groups behave sensibly and very large groups have a bounded policy.
-- [ ] Tests cover entry/exit from a burst, manual navigation during a burst and loop boundaries.
+- [x] Adjacent annotated burst members can use a shorter bounded presentation cadence than unrelated photos.
+- [x] Non-burst photos retain normal/adaptive M27 timing.
+- [x] Manual navigation does not trap the viewer in automatic fast-forward behavior.
+- [x] Burst pacing cannot change immutable slideshow membership/order.
+- [x] One- and two-frame groups behave sensibly and very large groups have a bounded policy.
+- [x] Tests cover entry/exit from a burst, manual navigation during a burst and loop boundaries.
 
 ## Verification requirements
 
@@ -50,5 +50,6 @@ Review representative private burst sequences and reject any cadence that feels 
 
 - Files changed: Creative materialization/snapshot contracts, slideshow playback/timing state, slideshow presentation wiring, visual-redundancy integration tests, playback policy tests, and delivery status.
 - Trade-offs: the first retained member of a visual-redundancy group keeps normal/adaptive timing. Autoplay-only adjacent continuations use 55% of configured duration, clamped to 1.5-3.0 seconds; manual destinations and loop restarts always use normal/adaptive timing. The accepted WI-0123 visual-group policy is reused rather than recomputed separately for playback.
-- Deferred work: maintainer review on representative private burst/near-duplicate sequences is intentionally grouped with WI-0132 and WI-0139 before WI-0137 completion.
-- Commands run: CI build/test/integration and documentation validation are expected on the pull request.
+- Deferred work: none for WI-0133; the combined M27 maintainer review confirmed the compact burst/near-duplicate cadence works as expected.
+- Verification: maintainer accepted WI-0133 on 2026-09-20 during the combined WI-0132/WI-0133/WI-0139 slideshow review.
+- Commands run: PR #380 CI run #1995 completed successfully, including build/test/integration and documentation validation.
