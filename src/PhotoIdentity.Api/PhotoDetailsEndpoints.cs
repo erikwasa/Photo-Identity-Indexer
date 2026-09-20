@@ -15,6 +15,8 @@ public static class PhotoDetailsEndpoints
         endpoints.MapGet("/api/collections/photos/{revisionId}/details", GetPhotoDetailsAsync);
         endpoints.MapPost("/api/collections/photos/{revisionId}/people", AddManualPersonAsync);
         endpoints.MapDelete("/api/collections/photos/{revisionId}/people/{personId}", RemoveManualPersonAsync);
+        endpoints.MapPut("/api/collections/photos/{revisionId}/capture-date", SetCaptureDateAsync);
+        endpoints.MapDelete("/api/collections/photos/{revisionId}/capture-date", ClearCaptureDateAsync);
         endpoints.MapPhotoPresentationPreferenceEndpoints();
         return endpoints;
     }
@@ -22,6 +24,7 @@ public static class PhotoDetailsEndpoints
     private static async Task<IResult> GetPhotoDetailsAsync(
         string revisionId,
         IPhotoDetailsRepository repository,
+        IServiceProvider services,
         CancellationToken cancellationToken)
     {
         if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
@@ -35,7 +38,7 @@ public static class PhotoDetailsEndpoints
             return Results.NotFound();
         }
 
-        return Results.Ok(ToResponse(details));
+        return Results.Ok(await ToResponseAsync(details, services, cancellationToken));
     }
 
     private static async Task<IResult> AddManualPersonAsync(
@@ -43,6 +46,7 @@ public static class PhotoDetailsEndpoints
         PhotoPersonMutationRequest request,
         IPhotoPersonRepository repository,
         IPhotoDetailsRepository detailsRepository,
+        IServiceProvider services,
         CancellationToken cancellationToken)
     {
         if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
@@ -64,7 +68,7 @@ public static class PhotoDetailsEndpoints
                 cancellationToken);
             PhotoDetails details = await detailsRepository.GetAsync(parsedRevisionId, cancellationToken)
                 ?? throw new KeyNotFoundException($"Asset revision '{parsedRevisionId}' was not found.");
-            return Results.Ok(ToResponse(details));
+            return Results.Ok(await ToResponseAsync(details, services, cancellationToken));
         }
         catch (KeyNotFoundException exception)
         {
@@ -85,6 +89,7 @@ public static class PhotoDetailsEndpoints
         string personId,
         IPhotoPersonRepository repository,
         IPhotoDetailsRepository detailsRepository,
+        IServiceProvider services,
         CancellationToken cancellationToken)
     {
         if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
@@ -106,7 +111,7 @@ public static class PhotoDetailsEndpoints
                 cancellationToken);
             PhotoDetails details = await detailsRepository.GetAsync(parsedRevisionId, cancellationToken)
                 ?? throw new KeyNotFoundException($"Asset revision '{parsedRevisionId}' was not found.");
-            return Results.Ok(ToResponse(details));
+            return Results.Ok(await ToResponseAsync(details, services, cancellationToken));
         }
         catch (KeyNotFoundException exception)
         {
@@ -122,7 +127,124 @@ public static class PhotoDetailsEndpoints
         }
     }
 
-    private static PhotoDetailsResponse ToResponse(PhotoDetails details)
+    private static async Task<IResult> SetCaptureDateAsync(
+        string revisionId,
+        PhotoCaptureDateMutationRequest request,
+        IPhotoDetailsRepository detailsRepository,
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
+        {
+            return Results.BadRequest(new PhotoCaptureDateErrorResponse("The asset revision identifier is invalid."));
+        }
+
+        IPhotoCaptureDateRepository? repository = services.GetService<IPhotoCaptureDateRepository>();
+        if (repository is null)
+        {
+            return Results.Conflict(new PhotoCaptureDateErrorResponse(
+                "Manual capture-date editing is available only when PostgreSQL is the selected catalogue provider."));
+        }
+
+        PhotoCaptureDateValue value;
+        try
+        {
+            value = PhotoCaptureDateValue.Parse(request.Value);
+        }
+        catch (FormatException exception)
+        {
+            return Results.BadRequest(new PhotoCaptureDateErrorResponse(exception.Message));
+        }
+        catch (ArgumentException exception)
+        {
+            return Results.BadRequest(new PhotoCaptureDateErrorResponse(exception.Message));
+        }
+
+        try
+        {
+            PhotoCaptureDateState state = await repository.SetManualAsync(
+                parsedRevisionId,
+                value,
+                LocalMaintainerActor,
+                cancellationToken);
+            PhotoDetails details = await detailsRepository.GetAsync(parsedRevisionId, cancellationToken)
+                ?? throw new KeyNotFoundException($"Asset revision '{parsedRevisionId}' was not found.");
+            return Results.Ok(ToResponse(details, state, canEditCaptureDate: true));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return Results.NotFound(new PhotoCaptureDateErrorResponse(exception.Message));
+        }
+    }
+
+    private static async Task<IResult> ClearCaptureDateAsync(
+        string revisionId,
+        IPhotoDetailsRepository detailsRepository,
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseRevisionId(revisionId, out AssetRevisionId parsedRevisionId))
+        {
+            return Results.BadRequest(new PhotoCaptureDateErrorResponse("The asset revision identifier is invalid."));
+        }
+
+        IPhotoCaptureDateRepository? repository = services.GetService<IPhotoCaptureDateRepository>();
+        if (repository is null)
+        {
+            return Results.Conflict(new PhotoCaptureDateErrorResponse(
+                "Manual capture-date editing is available only when PostgreSQL is the selected catalogue provider."));
+        }
+
+        try
+        {
+            PhotoCaptureDateState state = await repository.ClearManualAsync(
+                parsedRevisionId,
+                LocalMaintainerActor,
+                cancellationToken);
+            PhotoDetails details = await detailsRepository.GetAsync(parsedRevisionId, cancellationToken)
+                ?? throw new KeyNotFoundException($"Asset revision '{parsedRevisionId}' was not found.");
+            return Results.Ok(ToResponse(details, state, canEditCaptureDate: true));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return Results.NotFound(new PhotoCaptureDateErrorResponse(exception.Message));
+        }
+    }
+
+    private static async Task<PhotoDetailsResponse> ToResponseAsync(
+        PhotoDetails details,
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
+        IPhotoCaptureDateRepository? captureDates = services.GetService<IPhotoCaptureDateRepository>();
+        if (captureDates is not null)
+        {
+            PhotoCaptureDateState state = await captureDates.GetStateAsync(
+                details.RevisionId,
+                cancellationToken);
+            return ToResponse(details, state, canEditCaptureDate: true);
+        }
+
+        DateTime? extracted = details.CaptureMetadata?.TakenAtLocal;
+        PhotoCaptureDateRange? range = extracted is null
+            ? null
+            : new PhotoCaptureDateRange(
+                DateOnly.FromDateTime(extracted.Value),
+                DateOnly.FromDateTime(extracted.Value));
+        PhotoCaptureDateState fallback = new(
+            details.RevisionId,
+            extracted,
+            null,
+            range,
+            range is null ? null : PhotoCaptureDateSources.Extracted,
+            []);
+        return ToResponse(details, fallback, canEditCaptureDate: false);
+    }
+
+    private static PhotoDetailsResponse ToResponse(
+        PhotoDetails details,
+        PhotoCaptureDateState captureDate,
+        bool canEditCaptureDate)
     {
         string fileName = FileNameOnly(details.SourceKey);
         return new PhotoDetailsResponse(
@@ -133,7 +255,28 @@ public static class PhotoDetailsEndpoints
                 person.DisplayName,
                 person.ConfirmedFaceCount,
                 person.ManualPresence)).ToArray(),
-            ToMetadataResponse(details.CaptureMetadata, details.ExtendedMetadata));
+            ToMetadataResponse(details.CaptureMetadata, details.ExtendedMetadata),
+            ToCaptureDateResponse(captureDate, canEditCaptureDate));
+    }
+
+    private static PhotoCaptureDateResponse ToCaptureDateResponse(
+        PhotoCaptureDateState state,
+        bool canEditCaptureDate)
+    {
+        string? precision = state.ManualDate?.Precision;
+        if (precision is null && state.EffectiveSource == PhotoCaptureDateSources.Extracted)
+        {
+            precision = "timestamp";
+        }
+
+        return new PhotoCaptureDateResponse(
+            state.EffectiveRange?.From.ToString("yyyy-MM-dd"),
+            state.EffectiveRange?.To.ToString("yyyy-MM-dd"),
+            state.EffectiveSource,
+            precision,
+            state.ManualDate?.ToString(),
+            state.ExtractedTakenAtLocal,
+            canEditCaptureDate);
     }
 
     private static PhotoMetadataResponse? ToMetadataResponse(

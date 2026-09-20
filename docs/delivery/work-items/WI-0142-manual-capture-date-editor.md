@@ -34,11 +34,11 @@ Family archive photos sometimes lack trustworthy EXIF dates, but approximate yea
 
 ## Acceptance criteria
 
-- [ ] The user can assign year, year-month or full date.
-- [ ] Manual dates are visibly distinct from extracted metadata.
-- [ ] Clearing restores extracted value when present.
+- [x] The user can assign year, year-month or full date.
+- [x] Manual dates are visibly distinct from extracted metadata.
+- [x] Clearing restores extracted value when present.
 - [ ] Edits survive restart on phone and desktop.
-- [ ] Tests cover validation, replace and clear.
+- [x] Tests cover validation, replace and clear.
 
 ## Verification requirements
 
@@ -46,7 +46,7 @@ Automated HTTP/UI coverage plus maintainer verification at all three precision l
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: Photo Details capture-date contracts/endpoints, the new responsive `PhotoCaptureDateEditor`, Photo viewer composition, extracted-metadata labeling, editor-model coverage, PostgreSQL application coverage and delivery tracking.
+- Trade-offs: the editor uses one compact text field for `YYYY`, `YYYY-MM` or `YYYY-MM-DD`, preserving imprecision while staying practical on phone. Extracted metadata remains visible separately and is never rewritten. The temporary SQLite compatibility provider projects extracted dates read-only; manual mutation remains PostgreSQL-only ahead of M29.
+- Deferred work: maintainer verification at all three precision levels, including desktop and phone plus restart behavior, is intentionally bundled with the later M28 verification pass. Structured Smart Collection date controls remain WI-0143.
+- Commands run: implementation prepared through the GitHub connector; PR #394 runs the normal build/integration/docs/package/PostgreSQL CI gates.

@@ -55,6 +55,10 @@ public sealed class PhotoDetailsMetadataApplicationTests
             Assert.Equal("35mm Prime", returned.LensModel);
             Assert.Equal("ISO 200", returned.Iso);
             Assert.Equal("42 metres", returned.GpsAltitude);
+            Assert.Equal("extracted", response.CaptureDate!.Source);
+            Assert.Equal("timestamp", response.CaptureDate.Precision);
+            Assert.Equal("2025-05-06", response.CaptureDate.EffectiveFrom);
+            Assert.False(response.CaptureDate.CanEdit);
             PhotoMetadataTagResponse rawTag = Assert.Single(returned.Tags);
             Assert.Equal("Exif IFD0", rawTag.Directory);
             Assert.Equal("Make", rawTag.Name);

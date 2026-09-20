@@ -17,7 +17,7 @@
             @if (Metadata.TakenAtLocal is DateTime taken)
             {
                 <div>
-                    <dt>Photo taken</dt>
+                    <dt>Extracted capture time</dt>
                     <dd class="photo-metadata-value-nowrap" title="@TakenLabel(taken, Metadata.UtcOffsetMinutes)">@TakenLabel(taken, Metadata.UtcOffsetMinutes)</dd>
                 </div>
             }

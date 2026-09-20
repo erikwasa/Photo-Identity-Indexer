@@ -1,0 +1,86 @@
+.photo-capture-date-editor {
+    display: grid;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--border);
+}
+
+.photo-capture-date-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.photo-capture-date-heading h3,
+.photo-capture-date-heading p {
+    margin: 0;
+}
+
+.photo-capture-date-source,
+.photo-capture-date-summary span,
+.photo-capture-date-summary small,
+.photo-capture-date-help {
+    color: var(--muted);
+}
+
+.photo-capture-date-source {
+    font-size: 0.9rem;
+    text-align: right;
+}
+
+.photo-capture-date-read {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.photo-capture-date-summary {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.photo-capture-date-summary strong {
+    font-size: 1.05rem;
+    overflow-wrap: anywhere;
+}
+
+.photo-capture-date-field {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.photo-capture-date-field input {
+    width: min(100%, 22rem);
+    font-variant-numeric: tabular-nums;
+}
+
+.photo-capture-date-help {
+    margin: 0;
+}
+
+.photo-capture-date-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+}
+
+.photo-capture-date-notice {
+    margin-top: 0.25rem;
+}
+
+@media (max-width: 640px) {
+    .photo-capture-date-read {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .photo-capture-date-read .button,
+    .photo-capture-date-actions .button,
+    .photo-capture-date-field input {
+        width: 100%;
+    }
+}

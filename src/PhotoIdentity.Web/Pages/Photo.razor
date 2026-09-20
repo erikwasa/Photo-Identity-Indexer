@@ -72,6 +72,10 @@
                 <div><dt>File name</dt><dd>@Details.FileName</dd></div>
             </dl>
 
+            <PhotoCaptureDateEditor RevisionId="@RevisionId"
+                                    Details="@Details"
+                                    DetailsChanged="@((PhotoDetailsResponse details) => Details = details)" />
+
             <PhotoMetadataPanel Metadata="@Details.Metadata" />
 
             <div class="metadata-card">

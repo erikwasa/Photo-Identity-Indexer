@@ -1,0 +1,236 @@
+@using System.Globalization
+@using PhotoIdentity.Web.Contracts
+@inject HttpClient Http
+
+<section class="photo-capture-date-editor" aria-labelledby="photo-capture-date-heading">
+    <div class="photo-capture-date-heading">
+        <div>
+            <p class="eyebrow">Capture date</p>
+            <h3 id="photo-capture-date-heading">Effective date</h3>
+        </div>
+        <span class="photo-capture-date-source">@PhotoCaptureDateEditorModel.SourceLabel(State?.Source)</span>
+    </div>
+
+    @if (!Editing)
+    {
+        <div class="photo-capture-date-read">
+            <div class="photo-capture-date-summary">
+                <strong>@PhotoCaptureDateEditorModel.EffectiveLabel(State)</strong>
+                @if (State?.Source is not null)
+                {
+                    <span>@PhotoCaptureDateEditorModel.PrecisionLabel(State.Precision)</span>
+                }
+                @if (State?.Source == "manual" && State.ExtractedTakenAtLocal is DateTime extracted)
+                {
+                    <small>Extracted metadata remains @ExtractedLabel(extracted).</small>
+                }
+            </div>
+
+            @if (State?.CanEdit == true)
+            {
+                <button type="button"
+                        class="button secondary"
+                        disabled="@Busy"
+                        @onclick="BeginEditing">
+                    Edit capture date
+                </button>
+            }
+        </div>
+    }
+    else
+    {
+        <label class="photo-capture-date-field" for="photo-capture-date-input">
+            <span class="field-label">Manual capture date</span>
+            <input id="photo-capture-date-input"
+                   type="text"
+                   maxlength="10"
+                   inputmode="text"
+                   autocomplete="off"
+                   autocapitalize="off"
+                   spellcheck="false"
+                   placeholder="YYYY, YYYY-MM or YYYY-MM-DD"
+                   disabled="@Busy"
+                   @bind="InputValue"
+                   @bind:event="oninput" />
+        </label>
+
+        <p class="photo-capture-date-help">
+            Enter only what is known. Year-only and year-month values stay imprecise; the app does not invent a day or time.
+        </p>
+
+        <div class="photo-capture-date-actions">
+            <button type="button"
+                    class="button primary"
+                    disabled="@(Busy || string.IsNullOrWhiteSpace(InputValue))"
+                    @onclick="SaveAsync">
+                @(Busy ? "Saving…" : State?.Source == "manual" ? "Replace date" : "Set date")
+            </button>
+            @if (State?.Source == "manual")
+            {
+                <button type="button"
+                        class="button secondary"
+                        disabled="@Busy"
+                        @onclick="ClearAsync">
+                    Clear manual date
+                </button>
+            }
+            <button type="button"
+                    class="button secondary"
+                    disabled="@Busy"
+                    @onclick="CancelEditing">
+                Cancel
+            </button>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="notice error photo-capture-date-notice" role="alert">@Error</div>
+    }
+
+    @if (State?.CanEdit == false)
+    {
+        <p class="photo-capture-date-help">Manual capture-date editing is available in the PostgreSQL catalogue.</p>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public string RevisionId { get; set; } = string.Empty;
+
+    [Parameter]
+    public PhotoDetailsResponse? Details { get; set; }
+
+    [Parameter]
+    public EventCallback<PhotoDetailsResponse> DetailsChanged { get; set; }
+
+    private PhotoCaptureDateResponse? State => Details?.CaptureDate;
+    private string InputValue { get; set; } = string.Empty;
+    private bool Busy { get; set; }
+    private bool Editing { get; set; }
+    private string? Error { get; set; }
+
+    private string Url =>
+        $"api/collections/photos/{Uri.EscapeDataString(RevisionId)}/capture-date";
+
+    protected override void OnParametersSet()
+    {
+        if (!Editing)
+        {
+            InputValue = State?.ManualValue ?? string.Empty;
+        }
+    }
+
+    private void BeginEditing()
+    {
+        InputValue = State?.ManualValue
+            ?? State?.EffectiveFrom
+            ?? string.Empty;
+        Error = null;
+        Editing = true;
+    }
+
+    private void CancelEditing()
+    {
+        InputValue = State?.ManualValue ?? string.Empty;
+        Error = null;
+        Editing = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (Busy)
+        {
+            return;
+        }
+
+        if (!PhotoCaptureDateEditorModel.TryNormalize(InputValue, out string normalized, out string? validationError))
+        {
+            Error = validationError;
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                Url,
+                new PhotoCaptureDateMutationRequest(normalized));
+            await ReadUpdatedDetailsAsync(response, "Capture date could not be saved.");
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ClearAsync()
+    {
+        if (Busy)
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.DeleteAsync(Url);
+            await ReadUpdatedDetailsAsync(response, "Capture date could not be cleared.");
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task ReadUpdatedDetailsAsync(
+        HttpResponseMessage response,
+        string fallback)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(await ReadErrorAsync(response, fallback));
+        }
+
+        PhotoDetailsResponse updated = await response.Content.ReadFromJsonAsync<PhotoDetailsResponse>()
+            ?? throw new InvalidOperationException("The capture-date response was empty.");
+        Details = updated;
+        InputValue = updated.CaptureDate?.ManualValue ?? string.Empty;
+        Editing = false;
+        await DetailsChanged.InvokeAsync(updated);
+    }
+
+    private static async Task<string> ReadErrorAsync(
+        HttpResponseMessage response,
+        string fallback)
+    {
+        try
+        {
+            PhotoCaptureDateErrorResponse? error =
+                await response.Content.ReadFromJsonAsync<PhotoCaptureDateErrorResponse>();
+            if (!string.IsNullOrWhiteSpace(error?.Error))
+            {
+                return error.Error;
+            }
+        }
+        catch
+        {
+        }
+
+        return $"{fallback} HTTP {(int)response.StatusCode}.";
+    }
+
+    private static string ExtractedLabel(DateTime value) =>
+        DateTime.SpecifyKind(value, DateTimeKind.Unspecified)
+            .ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+}

@@ -29,12 +29,26 @@ public sealed record PhotoMetadataResponse(
     string? GpsAltitude,
     IReadOnlyList<PhotoMetadataTagResponse> Tags);
 
+public sealed record PhotoCaptureDateResponse(
+    string? EffectiveFrom,
+    string? EffectiveTo,
+    string? Source,
+    string? Precision,
+    string? ManualValue,
+    DateTime? ExtractedTakenAtLocal,
+    bool CanEdit);
+
 public sealed record PhotoDetailsResponse(
     string RevisionId,
     string FileName,
     IReadOnlyList<PhotoDetailsPersonResponse> People,
-    PhotoMetadataResponse? Metadata = null);
+    PhotoMetadataResponse? Metadata = null,
+    PhotoCaptureDateResponse? CaptureDate = null);
 
 public sealed record PhotoPersonMutationRequest(string PersonId);
 
+public sealed record PhotoCaptureDateMutationRequest(string Value);
+
 public sealed record PhotoPersonErrorResponse(string Error);
+
+public sealed record PhotoCaptureDateErrorResponse(string Error);
