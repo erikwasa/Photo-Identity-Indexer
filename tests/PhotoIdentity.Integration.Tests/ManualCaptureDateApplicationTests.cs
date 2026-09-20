@@ -66,7 +66,7 @@ public sealed class ManualCaptureDateApplicationTests
                     new DateTimeOffset(2026, 9, 20, 20, 0, 0, TimeSpan.Zero));
             }
 
-            Action<WebHostBuilder> configure = builder =>
+            Action<IWebHostBuilder> configure = builder =>
             {
                 builder.UseSetting("PhotoIdentity:CatalogueProvider", "postgresql");
                 builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", testBuilder.ConnectionString);
