@@ -1,0 +1,156 @@
+@using System.Net.Http.Json
+@using PhotoIdentity.Web.Contracts
+@inject HttpClient Http
+
+<section class="review-filter-panel" aria-labelledby="caption-enrichment-settings-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Photo enrichment</p>
+            <h2 id="caption-enrichment-settings-heading">Automatic photo captions</h2>
+        </div>
+        @if (Status is not null)
+        {
+            <span class="model-summary">Captions: @(Status.Enabled ? Status.State : "disabled")</span>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="notice error" role="alert">@Error</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Message))
+    {
+        <div class="notice success" role="status">@Message</div>
+    }
+
+    @if (Loading)
+    {
+        <div class="empty-state compact" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <p>Loading caption enrichment status…</p>
+        </div>
+    }
+    else if (Status is not null)
+    {
+        <div class="review-filter-grid">
+            <div>
+                <label>
+                    <input type="checkbox" @bind="Enabled" disabled="@Saving" />
+                    <span>Enable automatic caption enrichment</span>
+                </label>
+                <p>Default is off. When enabled, the server gradually captions eligible current photos independently of slideshows and collections.</p>
+            </div>
+            <div>
+                <label class="field-label" for="caption-enrichment-language">Generated language</label>
+                <select id="caption-enrichment-language" @bind="Language" disabled="@Saving">
+                    <option value="sv">Svenska</option>
+                    <option value="en">English</option>
+                </select>
+                <p>Changing language starts building a separate caption evidence set; existing captions are retained.</p>
+            </div>
+            <div>
+                <span class="field-label">Worker state</span>
+                <strong>@Status.State</strong>
+                <p>@Status.Message</p>
+            </div>
+            <div>
+                <span class="field-label">Model</span>
+                <strong>@Status.Model</strong>
+                <p>Generation policy: @Status.GenerationVersion</p>
+            </div>
+        </div>
+
+        <div class="card-actions">
+            <button type="button"
+                    class="button primary"
+                    disabled="@Saving"
+                    @onclick="SaveAsync">
+                @(Saving ? "Saving…" : "Save caption enrichment settings")
+            </button>
+            <button type="button"
+                    class="button secondary"
+                    disabled="@Saving"
+                    @onclick="LoadAsync">
+                Refresh
+            </button>
+        </div>
+
+        <p class="field-help">
+            Caption generation uses only the configured durable review proxy, reduced to a temporary 480×320 image, and sends it only to the local loopback Ollama runtime.
+            Generated captions are versioned derived photo evidence. Smart Collections, slideshows and future features may consume that evidence, but they do not trigger generation.
+        </p>
+    }
+</section>
+
+@code {
+    private PhotoCaptionEnrichmentStatusResponse? Status { get; set; }
+    private bool Loading { get; set; } = true;
+    private bool Saving { get; set; }
+    private bool Enabled { get; set; }
+    private string Language { get; set; } = "sv";
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            Status = await Http.GetFromJsonAsync<PhotoCaptionEnrichmentStatusResponse>(
+                "api/caption-enrichment/status");
+            if (Status is not null)
+            {
+                Enabled = Status.Enabled;
+                Language = Status.Language;
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        Saving = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                "api/caption-enrichment/settings",
+                new PhotoCaptionEnrichmentSettingsRequest(Enabled, Language));
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            Status = await response.Content.ReadFromJsonAsync<PhotoCaptionEnrichmentStatusResponse>();
+            if (Status is not null)
+            {
+                Enabled = Status.Enabled;
+                Language = Status.Language;
+            }
+            Message = Enabled
+                ? "Automatic caption enrichment is enabled."
+                : "Automatic caption enrichment is disabled.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Saving = false;
+        }
+    }
+}
