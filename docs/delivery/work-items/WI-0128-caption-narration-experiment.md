@@ -100,6 +100,7 @@ Maintainer verification should:
 - The ordinary Photo page reads and presents the stored caption as derived evidence.
 - Slideshow **Show photo captions** is a display preference only. The slideshow performs a read-only lookup for the current revision using the globally configured enrichment language; missing evidence simply means no caption is shown.
 - The former slideshow-owned POST/queue/polling caption service introduced in PR #388 is removed by the corrective follow-up.
+- Corrective PR #390 owns the archive-enrichment restructuring and CI verification.
 
 ## Completion notes
 
