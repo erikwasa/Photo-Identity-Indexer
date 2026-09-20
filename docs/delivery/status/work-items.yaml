@@ -66,7 +66,7 @@ work_items:
   evidence: []
 - id: WI-0125
   title: Add birth dates and family relationships for age-aware Creative Collections
-  milestone: M26
+  milestone: M31
   status: proposed
   owner: unassigned
   document: ../work-items/WI-0125-person-family-metadata.md
@@ -74,21 +74,7 @@ work_items:
   - WI-0121
   - WI-0060
   blocker_notes:
-  - Maintainer intentionally deferred this item on 2026-09-18; there is no technical dependency blocker, and it can be resumed when age/family-story metadata becomes a priority.
-  evidence: []
-- id: WI-0128
-  title: Evaluate local captions and story narration for Creative Collections
-  milestone: M26
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0128-caption-narration-experiment.md
-  started_at: 2026-09-20
-  last_updated_at: 2026-09-20
-  branch: agent/WI-0128-local-caption-evaluation
-  blockers:
-  - WI-0121
-  blocker_notes:
-  - Bounded local caption evaluation is in progress; completion remains pending CI and representative private maintainer review of usefulness and factual errors.
+  - Maintainer intentionally deferred this item on 2026-09-18. It moved from M26 to the unscheduled M31 Family story metadata milestone on 2026-09-20 so Creative Collections can close without cancelling the idea.
   evidence: []
 - id: WI-0132
   title: Add moment-aware transition language to slideshow playback
@@ -327,4 +313,19 @@ work_items:
   blockers:
   - WI-0151
   blocker_notes: []
+  evidence: []
+- id: WI-0157
+  title: Add opt-in local multilingual slideshow captions
+  milestone: M26
+  status: in_review
+  owner: ai-agent
+  document: ../work-items/WI-0157-opt-in-local-slideshow-captions.md
+  started_at: 2026-09-20
+  last_updated_at: 2026-09-20
+  branch: agent/WI-0157-opt-in-local-slideshow-captions
+  blockers:
+  - WI-0128
+  - WI-0084
+  blocker_notes:
+  - Implementation is complete on the work branch. WI-0128 and WI-0084 are completed; final completion waits for CI and maintainer slideshow verification of generation, reuse, Swedish output and the off switch.
   evidence: []
