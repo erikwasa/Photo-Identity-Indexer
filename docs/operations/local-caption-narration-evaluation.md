@@ -140,3 +140,27 @@ A no-go is valid if deterministic text is sufficient, captions hallucinate too o
 ## Production boundary
 
 Even if the experiment is positive, production narration must remain optional during playback and generated text must remain regenerable derived evidence with exact model/prompt provenance. It must never become canonical photo metadata.
+
+
+## Performance fallback probe
+
+If the baseline 1600-pixel proxy run is too slow, do not create a new durable proxy profile just for the experiment. The evaluator can derive a temporary 480x320 JPEG thumbnail in memory and request a smaller Ollama context:
+
+~~~powershell
+dotnet run --project src/PhotoIdentity.Cli -c Release -- narration evaluate `
+  --postgres-connection-env PHOTOIDENTITY_NARRATION_TEST `
+  --collection $collectionId `
+  --proxy-root $proxyRoot `
+  --proxy-profile "jpeg-1600-q78" `
+  --ollama-base-url $captionModel.BaseUrl `
+  --model $captionModel.Model `
+  --caption-image-mode thumbnail `
+  --ollama-context 1024 `
+  --target-count 50 `
+  --sample-count 1 `
+  --timeout-seconds 600
+~~~
+
+This is a performance/feasibility probe, not a production default. The report records both the caption image mode and requested Ollama context so results from the full review proxy and temporary thumbnail are not conflated.
+
+If the thumbnail/context probe materially improves runtime, repeat a small qualitative sample before deciding whether the reduced visual detail is still good enough. If it remains measured in minutes per caption, record the local generative path as impractical on the maintainer hardware rather than spending time on a full 12-photo review.
