@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Web.Components;
@@ -11,6 +12,7 @@ namespace PhotoIdentity.Web.Components;
 public partial class SmartCollectionsWorkspace
 {
     private const int PageSize = 40;
+    private static int MaximumSelectedPlaces => SmartCollectionFilter.MaximumLocationPlaces;
     private static readonly JsonSerializerOptions NavigationJsonOptions = new(JsonSerializerDefaults.Web);
 
     [Inject]
