@@ -81,6 +81,11 @@ internal static class CatalogueMigrationCommandRunner
             "sqlite_sequence",
         };
 
+    private static readonly string[] TargetBootstrapTablesReplacedBySource =
+    [
+        "photo_caption_enrichment_settings",
+    ];
+
     private static readonly string[] CriticalTables =
     [
         "sources",
@@ -151,6 +156,12 @@ internal static class CatalogueMigrationCommandRunner
         Dictionary<string, SourceTable> sourceTables = await ReadSourceTablesAsync(source, cancellationToken);
         Dictionary<string, TargetTable> targetTables = await ReadTargetTablesAsync(target, transaction, cancellationToken);
         await AssertNoUnmappedSourceStateAsync(source, sourceTables, targetTables, cancellationToken);
+        await ClearTargetBootstrapRowsAsync(
+            target,
+            transaction,
+            sourceTables,
+            targetTables,
+            cancellationToken);
 
         IReadOnlyList<string> orderedTables = await OrderByForeignKeysAsync(
             target,
@@ -358,6 +369,27 @@ internal static class CatalogueMigrationCommandRunner
             pair => pair.Key,
             pair => new TargetTable(pair.Key, pair.Value),
             StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static async Task ClearTargetBootstrapRowsAsync(
+        NpgsqlConnection target,
+        NpgsqlTransaction transaction,
+        IReadOnlyDictionary<string, SourceTable> sourceTables,
+        IReadOnlyDictionary<string, TargetTable> targetTables,
+        CancellationToken cancellationToken)
+    {
+        foreach (string table in TargetBootstrapTablesReplacedBySource)
+        {
+            if (!sourceTables.ContainsKey(table) || !targetTables.ContainsKey(table))
+            {
+                continue;
+            }
+
+            await using NpgsqlCommand command = target.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = $"DELETE FROM {QuotePostgres(table)};";
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
     }
 
     private static async Task AssertNoUnmappedSourceStateAsync(
