@@ -1,8 +1,8 @@
 @inject HttpClient Http
 
 <div class="place-picker">
-    <label class="place-picker-field" for="@ControlId">
-        <span class="field-label">@Label</span>
+    <div class="place-picker-field">
+        <label class="field-label" for="@ControlId">@Label</label>
         <div class="place-picker-search-row">
             <input id="@ControlId"
                    type="search"
@@ -10,6 +10,7 @@
                    placeholder="@SearchPlaceholder"
                    autocomplete="off"
                    aria-autocomplete="list"
+                   aria-haspopup="listbox"
                    aria-expanded="@ResultsOpen"
                    aria-controls="@ListboxId"
                    aria-activedescendant="@ActiveDescendant"
@@ -28,7 +29,7 @@
                 </button>
             }
         </div>
-    </label>
+    </div>
 
     @if (!string.IsNullOrWhiteSpace(Value))
     {
@@ -51,7 +52,7 @@
         <div id="@ListboxId"
              class="place-picker-results"
              role="listbox"
-             aria-label="@($"{Label} search results")">
+             aria-label="@ResultsLabel">
             @if (VisiblePlaces.Count == 0)
             {
                 <p>No places match this search.</p>
@@ -148,6 +149,7 @@ else if (!string.IsNullOrWhiteSpace(Value))
     private string SearchPlaceholder => string.IsNullOrWhiteSpace(Value)
         ? EmptyLabel
         : "Search for another place";
+    private string ResultsLabel => $"{Label} search results";
 
     private string? ActiveDescendant =>
         ResultsOpen && ActiveIndex >= 0 && ActiveIndex < VisiblePlaces.Count
