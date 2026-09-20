@@ -16,6 +16,9 @@ public static class PhotoCaptionEndpoints
             "/api/caption-enrichment/settings",
             UpdateSettingsAsync);
         endpoints.MapGet(
+            "/api/photos/{revisionId}/caption",
+            GetCurrentCaptionAsync);
+        endpoints.MapGet(
             "/api/photos/{revisionId}/captions/{language}",
             GetCaptionAsync);
         return endpoints;
@@ -73,6 +76,20 @@ public static class PhotoCaptionEndpoints
             worker.NextAttemptAtUtc,
             generation.Model,
             PhotoCaptionGenerationConfiguration.GenerationVersion));
+    }
+
+    private static async Task<IResult> GetCurrentCaptionAsync(
+        string revisionId,
+        IPhotoCaptionRepository repository,
+        CancellationToken cancellationToken)
+    {
+        PhotoCaptionEnrichmentSettings settings =
+            await repository.GetSettingsAsync(cancellationToken);
+        return await GetCaptionAsync(
+            revisionId,
+            settings.Language,
+            repository,
+            cancellationToken);
     }
 
     private static async Task<IResult> GetCaptionAsync(
