@@ -78,6 +78,7 @@ public sealed class SqlitePhotoCaptionRepository : IPhotoCaptionRepository
         string language,
         string generationVersion,
         string modelId,
+        string modelDigest,
         string promptVersion,
         string imageMode,
         int contextTokens,
@@ -87,6 +88,7 @@ public sealed class SqlitePhotoCaptionRepository : IPhotoCaptionRepository
         ArgumentException.ThrowIfNullOrWhiteSpace(reviewProxyProfileId);
         ArgumentException.ThrowIfNullOrWhiteSpace(generationVersion);
         ArgumentException.ThrowIfNullOrWhiteSpace(modelId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(modelDigest);
         ArgumentException.ThrowIfNullOrWhiteSpace(promptVersion);
         ArgumentException.ThrowIfNullOrWhiteSpace(imageMode);
         string normalizedLanguage = PhotoCaptionLanguages.Normalize(language);
@@ -120,6 +122,7 @@ public sealed class SqlitePhotoCaptionRepository : IPhotoCaptionRepository
                AND caption.language = $language
                AND caption.generation_version = $generation_version
                AND caption.model_id = $model_id
+               AND caption.model_digest = $model_digest
                AND caption.prompt_version = $prompt_version
                AND caption.image_mode = $image_mode
                AND caption.context_tokens = $context_tokens
@@ -132,6 +135,7 @@ public sealed class SqlitePhotoCaptionRepository : IPhotoCaptionRepository
         command.Parameters.AddWithValue("$language", normalizedLanguage);
         command.Parameters.AddWithValue("$generation_version", generationVersion.Trim());
         command.Parameters.AddWithValue("$model_id", modelId.Trim());
+        command.Parameters.AddWithValue("$model_digest", modelDigest.Trim().ToLowerInvariant());
         command.Parameters.AddWithValue("$prompt_version", promptVersion.Trim());
         command.Parameters.AddWithValue("$image_mode", imageMode.Trim());
         command.Parameters.AddWithValue("$context_tokens", contextTokens);
