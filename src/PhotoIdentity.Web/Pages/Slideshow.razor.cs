@@ -739,11 +739,7 @@ public partial class Slideshow : IAsyncDisposable
             !string.Equals(previous.Orientation, next.Orientation, StringComparison.Ordinal);
         bool prepareOriginalsChanged = previous.PrepareOriginals != next.PrepareOriginals;
         bool captionSettingsChanged =
-            previous.ShowCaptions != next.ShowCaptions ||
-            !string.Equals(
-                previous.CaptionLanguage,
-                next.CaptionLanguage,
-                StringComparison.Ordinal);
+            previous.ShowCaptions != next.ShowCaptions;
 
         await ApplyAndPersistSettingsAsync(next);
 
@@ -1411,12 +1407,11 @@ public partial class Slideshow : IAsyncDisposable
         {
             PhotoCaptionResponse? caption =
                 await Http.GetFromJsonAsync<PhotoCaptionResponse>(
-                    $"api/photos/{Uri.EscapeDataString(revisionId)}/captions/{Uri.EscapeDataString(Settings.CaptionLanguage)}");
+                    $"api/photos/{Uri.EscapeDataString(revisionId)}/caption");
             if (caption is null ||
                 caption.Status != "available" ||
                 string.IsNullOrWhiteSpace(caption.Caption) ||
-                !string.Equals(Playback.CurrentRevisionId, revisionId, StringComparison.Ordinal) ||
-                !string.Equals(caption.Language, Settings.CaptionLanguage, StringComparison.Ordinal))
+                !string.Equals(Playback.CurrentRevisionId, revisionId, StringComparison.Ordinal))
             {
                 return;
             }
