@@ -66,8 +66,8 @@ public sealed record GeoNamesReverseGeocodingConfiguration
         : Language;
 
     public string ContractKey => UsesSwedenLocalElseEnglishPolicy
-        ? $"geonames-place-v3|{BaseUri.AbsoluteUri.ToLowerInvariant()}|primary=findNearbyPlaceName|fallback=countrySubdivision|langPolicy=se-local-else-en|localCountry=true|style=FULL|maxRows=1"
-        : $"geonames-place-v3|{BaseUri.AbsoluteUri.ToLowerInvariant()}|primary=findNearbyPlaceName|fallback=countrySubdivision|lang={Language.ToLowerInvariant()}|localCountry=true|style=FULL|maxRows=1";
+        ? $"geonames-place-v3|{BaseUri.AbsoluteUri.ToLowerInvariant()}|primary=findNearbyPlaceName|fallback=countrySubdivision+countryCode|langPolicy=se-local-else-en|localCountry=true|style=FULL|maxRows=1"
+        : $"geonames-place-v3|{BaseUri.AbsoluteUri.ToLowerInvariant()}|primary=findNearbyPlaceName|fallback=countrySubdivision+countryCode|lang={Language.ToLowerInvariant()}|localCountry=true|style=FULL|maxRows=1";
 }
 
 public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
@@ -76,6 +76,7 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
     {
         PopulatedPlace,
         AdministrativeSubdivision,
+        Country,
     }
 
     private readonly GeoNamesReverseGeocodingConfiguration _configuration;
@@ -167,11 +168,27 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
             language,
             RequestKind.AdministrativeSubdivision,
             cancellationToken);
-        return administrative with
+        if (administrative.Status != ReverseGeocodeStatus.NoResult)
+        {
+            return administrative with
+            {
+                ProviderRequestCount =
+                    populatedPlace.ProviderRequestCount +
+                    administrative.ProviderRequestCount,
+            };
+        }
+
+        ReverseGeocodeResponse country = await SendRequestAsync(
+            query,
+            language,
+            RequestKind.Country,
+            cancellationToken);
+        return country with
         {
             ProviderRequestCount =
                 populatedPlace.ProviderRequestCount +
-                administrative.ProviderRequestCount,
+                administrative.ProviderRequestCount +
+                country.ProviderRequestCount,
         };
     }
 
@@ -209,9 +226,13 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
             }
 
             string json = await response.Content.ReadAsStringAsync(cancellationToken);
-            ReverseGeocodeResponse parsed = requestKind == RequestKind.PopulatedPlace
-                ? ParsePopulatedPlaceResponse(json)
-                : ParseAdministrativeResponse(json);
+            ReverseGeocodeResponse parsed = requestKind switch
+            {
+                RequestKind.PopulatedPlace => ParsePopulatedPlaceResponse(json),
+                RequestKind.AdministrativeSubdivision => ParseAdministrativeResponse(json),
+                RequestKind.Country => ParseCountryResponse(json),
+                _ => throw new InvalidOperationException("Unsupported GeoNames request kind."),
+            };
             return parsed with { ProviderRequestCount = 1 };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -257,9 +278,13 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
         string language,
         RequestKind requestKind)
     {
-        string endpointName = requestKind == RequestKind.PopulatedPlace
-            ? "findNearbyPlaceNameJSON"
-            : "countrySubdivisionJSON";
+        string endpointName = requestKind switch
+        {
+            RequestKind.PopulatedPlace => "findNearbyPlaceNameJSON",
+            RequestKind.AdministrativeSubdivision => "countrySubdivisionJSON",
+            RequestKind.Country => "countryCodeJSON",
+            _ => throw new InvalidOperationException("Unsupported GeoNames request kind."),
+        };
         Uri endpoint = new(_configuration.BaseUri, endpointName);
         List<string> parameters =
         [
@@ -356,6 +381,31 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
             "administrative");
     }
 
+    private static ReverseGeocodeResponse ParseCountryResponse(string json)
+    {
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement root = document.RootElement;
+        ReverseGeocodeResponse? statusResponse = ParseProviderStatus(root);
+        if (statusResponse is not null)
+        {
+            return statusResponse.Status == ReverseGeocodeStatus.NoResult
+                ? GeographyNoResult()
+                : statusResponse;
+        }
+
+        string? country = ReadString(root, "countryName");
+        if (string.IsNullOrWhiteSpace(country))
+        {
+            return GeographyNoResult();
+        }
+
+        return BuildPlaceResponse(
+            [country],
+            providerResultId: null,
+            ReadString(root, "countryCode"),
+            "country");
+    }
+
     private static ReverseGeocodeResponse BuildPlaceResponse(
         IReadOnlyCollection<string> segments,
         string? providerResultId,
@@ -383,7 +433,13 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
         new(
             ReverseGeocodeStatus.NoResult,
             ErrorCode: "administrative-no-result",
-            ErrorMessage: "GeoNames returned no populated place and no usable administrative geography for these coordinates.");
+            ErrorMessage: "GeoNames returned no populated place and no usable administrative subdivision for these coordinates.");
+
+    private static ReverseGeocodeResponse GeographyNoResult() =>
+        new(
+            ReverseGeocodeStatus.NoResult,
+            ErrorCode: "geography-no-result",
+            ErrorMessage: "GeoNames returned no populated place, administrative subdivision or country for these coordinates.");
 
     private static ReverseGeocodeResponse? ParseProviderStatus(JsonElement root)
     {
