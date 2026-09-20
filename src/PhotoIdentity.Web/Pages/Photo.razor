@@ -357,7 +357,7 @@
             }
 
             Caption = await Http.GetFromJsonAsync<PhotoCaptionResponse>(
-                $"api/photos/{Uri.EscapeDataString(RevisionId)}/captions/{Uri.EscapeDataString(CaptionStatus.Language)}");
+                $"api/photos/{Uri.EscapeDataString(RevisionId)}/caption");
         }
         catch
         {
