@@ -13,7 +13,7 @@ Current work items: **24**. Archived terminal items: **131**.
 | [WI-0091](../work-items/WI-0091-archive-lifecycle-review.md) Add archive lifecycle review and exclusion workflows | M23 | proposed | unassigned | [YAML](work-items/active/WI-0091.yaml) |
 | [WI-0125](../work-items/WI-0125-person-family-metadata.md) Add birth dates and family relationships for age-aware Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0125.yaml) |
 | [WI-0128](../work-items/WI-0128-caption-narration-experiment.md) Evaluate local captions and story narration for Creative Collections | M26 | in_progress | ai-agent | [YAML](work-items/active/WI-0128.yaml) |
-| [WI-0140](../work-items/WI-0140-searchable-place-picker.md) Replace long place dropdowns with a searchable place picker | M28 | ready | unassigned | [YAML](work-items/active/WI-0140.yaml) |
+| [WI-0140](../work-items/WI-0140-searchable-place-picker.md) Replace long place dropdowns with a searchable place picker | M28 | in_progress | ai-agent | [YAML](work-items/active/WI-0140.yaml) |
 | [WI-0141](../work-items/WI-0141-manual-capture-date-model.md) Add manual capture-date overrides with provenance and precision | M28 | ready | unassigned | [YAML](work-items/active/WI-0141.yaml) |
 | [WI-0142](../work-items/WI-0142-manual-capture-date-editor.md) Add manual and imprecise capture-date editing to Photo Details | M28 | proposed | unassigned | [YAML](work-items/active/WI-0142.yaml) |
 | [WI-0143](../work-items/WI-0143-structured-smart-collection-date-controls.md) Replace Smart Collection date free text with structured controls | M28 | proposed | unassigned | [YAML](work-items/active/WI-0143.yaml) |
