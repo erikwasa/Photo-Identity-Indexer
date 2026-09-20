@@ -364,12 +364,15 @@ internal static class NarrationEvaluationCommandRunner
                     evidence,
                     generatedCaption));
             }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                generationFailures++;
+            }
             catch (Exception exception) when (
                 exception is HttpRequestException or
                 InvalidDataException or
                 IOException or
-                UnauthorizedAccessException or
-                TaskCanceledException)
+                UnauthorizedAccessException)
             {
                 generationFailures++;
             }
