@@ -7,6 +7,10 @@ public sealed record SmartCollectionLocationRequest(
     double? East = null,
     string? Place = null);
 
+public sealed record SmartCollectionDateRangeRequest(
+    string From,
+    string To);
+
 public sealed record SmartCollectionDefinitionRequest(
     string Name,
     string[]? People = null,
@@ -14,7 +18,8 @@ public sealed record SmartCollectionDefinitionRequest(
     string[]? Tags = null,
     string? TagMatch = null,
     SmartCollectionLocationRequest? Location = null,
-    string? Taken = null);
+    string? Taken = null,
+    SmartCollectionDateRangeRequest? TakenRange = null);
 
 public sealed record SmartCollectionQueryRequest(
     string[]? People = null,
@@ -24,7 +29,8 @@ public sealed record SmartCollectionQueryRequest(
     SmartCollectionLocationRequest? Location = null,
     string? Taken = null,
     int Offset = 0,
-    int Limit = 40);
+    int Limit = 40,
+    SmartCollectionDateRangeRequest? TakenRange = null);
 
 public sealed record SmartCollectionDateRangeResponse(
     string From,

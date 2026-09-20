@@ -105,6 +105,18 @@ public sealed class ManualCaptureDateApplicationTests
                 Assert.Equal(extractedAtLocal, year.CaptureDate.ExtractedTakenAtLocal);
                 Assert.Equal(extractedAtLocal, year.Metadata!.TakenAtLocal);
 
+                using HttpResponseMessage structuredQuery = await client.PostAsJsonAsync(
+                    "/api/smart-collections/query",
+                    new SmartCollectionQueryRequest(
+                        TakenRange: new SmartCollectionDateRangeRequest(
+                            "1987-06-15",
+                            "1987-06-15")));
+                structuredQuery.EnsureSuccessStatusCode();
+                SmartCollectionPageResponse structuredPage = Assert.IsType<SmartCollectionPageResponse>(
+                    await structuredQuery.Content.ReadFromJsonAsync<SmartCollectionPageResponse>());
+                SmartCollectionPhotoResponse matched = Assert.Single(structuredPage.Items);
+                Assert.Equal(revisionId.ToString(), matched.RevisionId);
+
                 PhotoDetailsResponse month = await PutAsync(client, url, "1987-04");
                 Assert.Equal("month", month.CaptureDate!.Precision);
                 Assert.Equal("1987-04", month.CaptureDate.ManualValue);

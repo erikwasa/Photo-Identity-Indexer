@@ -13,6 +13,10 @@ public sealed record SmartCollectionLocationRequest(
     double? East = null,
     string? Place = null);
 
+public sealed record SmartCollectionDateRangeRequest(
+    string From,
+    string To);
+
 public sealed record SmartCollectionQueryRequest(
     string[]? People = null,
     string? PeopleMatch = null,
@@ -21,7 +25,8 @@ public sealed record SmartCollectionQueryRequest(
     SmartCollectionLocationRequest? Location = null,
     string? Taken = null,
     int Offset = 0,
-    int Limit = 40);
+    int Limit = 40,
+    SmartCollectionDateRangeRequest? TakenRange = null);
 
 public sealed record SmartCollectionDefinitionRequest(
     string Name,
@@ -30,7 +35,8 @@ public sealed record SmartCollectionDefinitionRequest(
     string[]? Tags = null,
     string? TagMatch = null,
     SmartCollectionLocationRequest? Location = null,
-    string? Taken = null);
+    string? Taken = null,
+    SmartCollectionDateRangeRequest? TakenRange = null);
 
 public sealed record SmartCollectionDateRangeResponse(
     string From,
@@ -331,6 +337,7 @@ public static class SmartCollectionEndpoints
             request.TagMatch,
             request.Location,
             request.Taken,
+            request.TakenRange,
             fallbackLocationPlace: null);
     }
 
@@ -346,6 +353,7 @@ public static class SmartCollectionEndpoints
             request.TagMatch,
             request.Location,
             request.Taken,
+            request.TakenRange,
             fallbackLocationPlace);
     }
 
@@ -356,6 +364,7 @@ public static class SmartCollectionEndpoints
         string? tagMatch,
         SmartCollectionLocationRequest? location,
         string? taken,
+        SmartCollectionDateRangeRequest? takenRange,
         string? fallbackLocationPlace)
     {
         ValidateGenericTags(tags);
@@ -367,9 +376,18 @@ public static class SmartCollectionEndpoints
             .ToArray();
 
         SmartCollectionGeoBounds? parsedLocation = ParseBounds(location);
-        SmartCollectionDateRange? parsedTaken = string.IsNullOrWhiteSpace(taken)
-            ? null
-            : SmartCollectionDateRange.Parse(taken);
+        if (!string.IsNullOrWhiteSpace(taken) && takenRange is not null)
+        {
+            throw new ArgumentException(
+                "Specify either the structured taken range or the legacy taken expression, not both.",
+                nameof(takenRange));
+        }
+
+        SmartCollectionDateRange? parsedTaken = takenRange is not null
+            ? ParseTakenRange(takenRange)
+            : string.IsNullOrWhiteSpace(taken)
+                ? null
+                : SmartCollectionDateRange.Parse(taken);
         string? locationPlace = location?.Place is null
             ? fallbackLocationPlace
             : location.Place;
@@ -382,6 +400,38 @@ public static class SmartCollectionEndpoints
             parsedLocation,
             parsedTaken,
             locationPlace);
+    }
+
+    private static SmartCollectionDateRange ParseTakenRange(
+        SmartCollectionDateRangeRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!DateOnly.TryParseExact(
+                request.From?.Trim(),
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out DateOnly from))
+        {
+            throw new ArgumentException(
+                "Taken range From must use YYYY-MM-DD.",
+                nameof(request));
+        }
+
+        if (!DateOnly.TryParseExact(
+                request.To?.Trim(),
+                "yyyy-MM-dd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out DateOnly to))
+        {
+            throw new ArgumentException(
+                "Taken range To must use YYYY-MM-DD.",
+                nameof(request));
+        }
+
+        return new SmartCollectionDateRange(from, to);
     }
 
     private static void ValidateGenericTags(string[]? tags)

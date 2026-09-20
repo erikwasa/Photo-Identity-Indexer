@@ -136,14 +136,77 @@
                 <div class="smart-filter-grid smart-secondary-grid">
                     <fieldset class="smart-filter-card">
                         <legend>Taken time</legend>
+
                         <label class="smart-field">
-                            <span class="field-label">Date expression</span>
-                            <input type="text"
-                                   placeholder="2016 · 2020-2021 · 2025/05/01-2025/05/10"
-                                   @bind="Taken"
-                                   disabled="@Busy" />
+                            <span class="field-label">Date filter</span>
+                            <select @bind="TakenMode" disabled="@Busy">
+                                <option value="@SmartCollectionDateModes.Any">Any date</option>
+                                <option value="@SmartCollectionDateModes.Year">Year</option>
+                                <option value="@SmartCollectionDateModes.Month">Month</option>
+                                <option value="@SmartCollectionDateModes.Date">Exact date</option>
+                                <option value="@SmartCollectionDateModes.Range">Date range</option>
+                            </select>
                         </label>
-                        <small class="smart-help">Blank means any photographic capture date. Missing capture metadata will not match a populated date filter.</small>
+
+                        @if (TakenMode == SmartCollectionDateModes.Year)
+                        {
+                            <label class="smart-field">
+                                <span class="field-label">Year</span>
+                                <input type="number"
+                                       min="1"
+                                       max="9999"
+                                       step="1"
+                                       inputmode="numeric"
+                                       placeholder="2025"
+                                       @bind="TakenYear"
+                                       disabled="@Busy" />
+                            </label>
+                        }
+                        else if (TakenMode == SmartCollectionDateModes.Month)
+                        {
+                            <label class="smart-field">
+                                <span class="field-label">Month</span>
+                                <input type="month"
+                                       value="@TakenMonth"
+                                       @onchange="args => TakenMonth = args.Value?.ToString() ?? string.Empty"
+                                       disabled="@Busy" />
+                            </label>
+                        }
+                        else if (TakenMode == SmartCollectionDateModes.Date)
+                        {
+                            <label class="smart-field">
+                                <span class="field-label">Date</span>
+                                <input type="date"
+                                       value="@TakenDate"
+                                       @onchange="args => TakenDate = args.Value?.ToString() ?? string.Empty"
+                                       disabled="@Busy" />
+                            </label>
+                        }
+                        else if (TakenMode == SmartCollectionDateModes.Range)
+                        {
+                            <div class="smart-date-range">
+                                <label class="smart-field">
+                                    <span class="field-label">From</span>
+                                    <input type="date"
+                                           value="@TakenFrom"
+                                           @onchange="args => TakenFrom = args.Value?.ToString() ?? string.Empty"
+                                           disabled="@Busy" />
+                                </label>
+                                <label class="smart-field">
+                                    <span class="field-label">To</span>
+                                    <input type="date"
+                                           value="@TakenTo"
+                                           @onchange="args => TakenTo = args.Value?.ToString() ?? string.Empty"
+                                           disabled="@Busy" />
+                                </label>
+                            </div>
+                        }
+
+                        <small class="smart-help">
+                            Any date applies no date filter, so photos without a capture date remain eligible.
+                            Other modes require an effective capture date; missing dates do not match.
+                            Imprecise manual dates match when their inclusive range overlaps this filter.
+                        </small>
                     </fieldset>
 
                     <fieldset class="smart-filter-card">
