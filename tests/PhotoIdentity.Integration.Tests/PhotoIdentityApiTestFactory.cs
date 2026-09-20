@@ -24,6 +24,7 @@ internal class WebApplicationFactory<TEntryPoint> :
             builder.ConfigureServices(services =>
             {
                 RemoveHostedService<PhotoIdentity.Api.PhotoPlaceEnrichmentHostedService>(services);
+                RemoveHostedService<PhotoIdentity.Api.PhotoCaptionEnrichmentHostedService>(services);
                 RemoveHostedService<PhotoIdentity.Api.ArchiveAdvancementHostedService>(services);
                 RemoveHostedService<PhotoIdentity.Api.IdentityMatchRegenerationHostedService>(services);
             });
