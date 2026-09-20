@@ -1,17 +1,92 @@
 @inject HttpClient Http
 
-<label class="place-picker-field">
-    <span class="field-label">@Label</span>
-    <select value="@CanonicalValue"
-            disabled="@(Disabled || Loading)"
-            @onchange="HandleChangedAsync">
-        <option value="">@EmptyLabel</option>
-        @foreach (PhotoPlaceDefinitionResponse place in OrderedPlaces)
-        {
-            <option value="@place.Value">@IndentedLabel(place)</option>
-        }
-    </select>
-</label>
+<div class="place-picker">
+    <label class="place-picker-field" for="@ControlId">
+        <span class="field-label">@Label</span>
+        <div class="place-picker-search-row">
+            <input id="@ControlId"
+                   type="search"
+                   role="combobox"
+                   placeholder="@SearchPlaceholder"
+                   autocomplete="off"
+                   aria-autocomplete="list"
+                   aria-expanded="@ResultsOpen"
+                   aria-controls="@ListboxId"
+                   aria-activedescendant="@ActiveDescendant"
+                   disabled="@(Disabled || Loading)"
+                   value="@SearchText"
+                   @oninput="HandleSearchInput"
+                   @onfocus="OpenResults"
+                   @onkeydown="HandleKeyDownAsync" />
+            @if (!string.IsNullOrWhiteSpace(Value))
+            {
+                <button type="button"
+                        class="button secondary place-picker-clear"
+                        disabled="@(Disabled || Loading)"
+                        @onclick="ClearAsync">
+                    Clear
+                </button>
+            }
+        </div>
+    </label>
+
+    @if (!string.IsNullOrWhiteSpace(Value))
+    {
+        <div class="place-picker-selected" aria-label="Selected place">
+            @if (SelectedDefinition is PhotoPlaceDefinitionResponse selected)
+            {
+                <strong>@selected.Name</strong>
+                <span>@selected.Value</span>
+            }
+            else
+            {
+                <strong>Current place</strong>
+                <span>@Value</span>
+            }
+        </div>
+    }
+
+    @if (ResultsOpen && !Disabled && !Loading)
+    {
+        <div id="@ListboxId"
+             class="place-picker-results"
+             role="listbox"
+             aria-label="@($"{Label} search results")">
+            @if (VisiblePlaces.Count == 0)
+            {
+                <p>No places match this search.</p>
+            }
+            else
+            {
+                @for (int index = 0; index < VisiblePlaces.Count; index++)
+                {
+                    PhotoPlaceDefinitionResponse place = VisiblePlaces[index];
+                    <button id="@OptionId(index)"
+                            type="button"
+                            class="place-picker-option @(index == ActiveIndex ? "active" : "")"
+                            role="option"
+                            aria-selected="@IsSelected(place)"
+                            @onmouseenter="() => ActiveIndex = index"
+                            @onclick="() => SelectAsync(place)">
+                        <span class="place-picker-option-name">@place.Name</span>
+                        @if (!string.IsNullOrWhiteSpace(place.ParentValue))
+                        {
+                            <span class="place-picker-option-parent">In @place.ParentValue</span>
+                        }
+                        <span class="place-picker-option-path">@place.Value</span>
+                    </button>
+                }
+
+                @if (FilteredPlaces.Count > MaximumRenderedResults)
+                {
+                    <small class="place-picker-help">
+                        Showing the first @MaximumRenderedResults of @FilteredPlaces.Count matches. Type more to narrow the list.
+                    </small>
+                }
+            }
+        </div>
+    }
+</div>
 
 @if (Loading)
 {
@@ -31,6 +106,9 @@ else if (!string.IsNullOrWhiteSpace(Value))
 }
 
 @code {
+    private const int MaximumRenderedResults = 24;
+    private readonly string generatedId = $"place-picker-{Guid.NewGuid():N}";
+
     [Parameter]
     public string Label { get; set; } = "Named place";
 
@@ -49,14 +127,32 @@ else if (!string.IsNullOrWhiteSpace(Value))
     private IReadOnlyList<PhotoPlaceDefinitionResponse> Places { get; set; } = [];
     private bool Loading { get; set; } = true;
     private string? Error { get; set; }
+    private string SearchText { get; set; } = string.Empty;
+    private bool ResultsOpen { get; set; }
+    private int ActiveIndex { get; set; } = -1;
 
-    private IReadOnlyList<PhotoPlaceDefinitionResponse> OrderedPlaces => Places
-        .OrderBy(place => place.Value, StringComparer.OrdinalIgnoreCase)
-        .ThenBy(place => place.Id, StringComparer.Ordinal)
-        .ToArray();
+    private string ControlId => generatedId;
+    private string ListboxId => $"{generatedId}-results";
 
-    private string CanonicalValue => ResolveDefinition(Value)?.Value ?? Value ?? string.Empty;
-    private string DisplayPath => ResolveDefinition(Value)?.Value ?? Value ?? string.Empty;
+    private IReadOnlyList<PhotoPlaceDefinitionResponse> OrderedPlaces =>
+        PlacePickerModel.SearchCandidates(Places, null);
+
+    private IReadOnlyList<PhotoPlaceDefinitionResponse> FilteredPlaces =>
+        PlacePickerModel.SearchCandidates(Places, SearchText);
+
+    private IReadOnlyList<PhotoPlaceDefinitionResponse> VisiblePlaces =>
+        FilteredPlaces.Take(MaximumRenderedResults).ToArray();
+
+    private PhotoPlaceDefinitionResponse? SelectedDefinition => ResolveDefinition(Value);
+    private string DisplayPath => SelectedDefinition?.Value ?? Value ?? string.Empty;
+    private string SearchPlaceholder => string.IsNullOrWhiteSpace(Value)
+        ? EmptyLabel
+        : "Search for another place";
+
+    private string? ActiveDescendant =>
+        ResultsOpen && ActiveIndex >= 0 && ActiveIndex < VisiblePlaces.Count
+            ? OptionId(ActiveIndex)
+            : null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -74,21 +170,82 @@ else if (!string.IsNullOrWhiteSpace(Value))
         }
     }
 
-    private async Task HandleChangedAsync(ChangeEventArgs args)
+    private void HandleSearchInput(ChangeEventArgs args)
     {
-        string? selected = args.Value?.ToString();
-        await ValueChanged.InvokeAsync(string.IsNullOrWhiteSpace(selected) ? null : selected);
+        SearchText = args.Value?.ToString() ?? string.Empty;
+        ResultsOpen = true;
+        ActiveIndex = -1;
     }
+
+    private void OpenResults()
+    {
+        if (!Disabled && !Loading)
+        {
+            ResultsOpen = true;
+            ActiveIndex = -1;
+        }
+    }
+
+    private async Task HandleKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (Disabled || Loading)
+        {
+            return;
+        }
+
+        switch (args.Key)
+        {
+            case "ArrowDown":
+            case "ArrowUp":
+            case "Home":
+            case "End":
+                ResultsOpen = true;
+                ActiveIndex = PlacePickerModel.MoveActiveIndex(
+                    ActiveIndex,
+                    VisiblePlaces.Count,
+                    args.Key);
+                break;
+
+            case "Enter":
+                if (ResultsOpen &&
+                    ActiveIndex >= 0 &&
+                    ActiveIndex < VisiblePlaces.Count)
+                {
+                    await SelectAsync(VisiblePlaces[ActiveIndex]);
+                }
+                break;
+
+            case "Escape":
+                ResultsOpen = false;
+                ActiveIndex = -1;
+                break;
+        }
+    }
+
+    private async Task SelectAsync(PhotoPlaceDefinitionResponse place)
+    {
+        SearchText = string.Empty;
+        ResultsOpen = false;
+        ActiveIndex = -1;
+        await ValueChanged.InvokeAsync(place.Value);
+    }
+
+    private async Task ClearAsync()
+    {
+        SearchText = string.Empty;
+        ResultsOpen = false;
+        ActiveIndex = -1;
+        await ValueChanged.InvokeAsync(null);
+    }
+
+    private bool IsSelected(PhotoPlaceDefinitionResponse place) =>
+        string.Equals(place.Value, Value, StringComparison.OrdinalIgnoreCase);
+
+    private string OptionId(int index) => $"{generatedId}-option-{index}";
 
     private PhotoPlaceDefinitionResponse? ResolveDefinition(string? value) =>
         string.IsNullOrWhiteSpace(value)
             ? null
-            : Places.FirstOrDefault(place => string.Equals(place.Value, value, StringComparison.OrdinalIgnoreCase));
-
-    private static string IndentedLabel(PhotoPlaceDefinitionResponse place)
-    {
-        int depth = place.Value.Count(character => character == '/');
-        string indent = string.Concat(Enumerable.Repeat("\u00a0\u00a0", depth));
-        return $"{indent}{place.Name}";
-    }
+            : Places.FirstOrDefault(place =>
+                string.Equals(place.Value, value, StringComparison.OrdinalIgnoreCase));
 }
