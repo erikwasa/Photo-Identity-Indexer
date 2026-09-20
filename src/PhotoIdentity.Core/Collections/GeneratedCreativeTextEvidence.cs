@@ -124,7 +124,9 @@ public static partial class GeneratedCreativeTextGuard
         MatchCollection possibleProperNames = PossibleProperNameRegex().Matches(normalized);
         for (int index = 0; index < possibleProperNames.Count; index++)
         {
-            if (possibleProperNames[index].Index > 0)
+            if (!IsSentenceInitialCapitalizedWord(
+                    normalized,
+                    possibleProperNames[index].Index))
             {
                 flags.Add(GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation);
                 break;
@@ -135,6 +137,31 @@ public static partial class GeneratedCreativeTextGuard
             .Distinct(StringComparer.Ordinal)
             .OrderBy(value => value, StringComparer.Ordinal)
             .ToArray();
+    }
+
+    private static bool IsSentenceInitialCapitalizedWord(
+        string content,
+        int matchIndex)
+    {
+        if (matchIndex <= 0)
+        {
+            return true;
+        }
+
+        for (int index = matchIndex - 1; index >= 0; index--)
+        {
+            char character = content[index];
+            if (char.IsWhiteSpace(character) ||
+                character is '"' or '\'' or '“' or '”' or '‘' or '’' or
+                    '(' or ')' or '[' or ']' or '{' or '}')
+            {
+                continue;
+            }
+
+            return character is '.' or '!' or '?';
+        }
+
+        return true;
     }
 
     private static bool ContainsTerm(string content, IEnumerable<string> terms) =>
