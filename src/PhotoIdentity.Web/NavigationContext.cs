@@ -21,7 +21,8 @@ public sealed record SmartCollectionTransientNavigationState(
     string? TakenMonth = null,
     string? TakenDate = null,
     string? TakenFrom = null,
-    string? TakenTo = null);
+    string? TakenTo = null,
+    string[]? Places = null);
 
 public static class SmartCollectionNavigation
 {
