@@ -259,10 +259,10 @@ milestones:
   - WI-0122
   - WI-0123
   - WI-0124
-  - WI-0125
   - WI-0126
   - WI-0127
   - WI-0128
+  - WI-0157
 - id: M27
   title: Slideshow presentation experience
   status: in_progress
@@ -310,3 +310,9 @@ milestones:
   - WI-0154
   - WI-0155
   - WI-0156
+- id: M31
+  title: Family story metadata
+  status: ready
+  document: ../milestones/M31-family-story-metadata.md
+  work_items:
+  - WI-0125
