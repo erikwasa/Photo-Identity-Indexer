@@ -4,31 +4,28 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M27 Slideshow presentation experience has its remaining implementation work ready for combined maintainer verification.**
+**M27 Slideshow presentation experience has completed WI-0132, WI-0133 and WI-0139 after combined maintainer verification.**
 
-WI-0132 carries Creative Collection moment annotations into the immutable slideshow snapshot and uses a restrained chapter-boundary crossfade without changing collection membership/order.
+The maintainer accepted the moment-aware chapter transition treatment, burst/near-duplicate compact pacing, and no-Fullscreen-API fallback on 2026-09-20. Their implementation PRs and CI evidence are recorded in the archived work-item status shards.
 
-WI-0133 now carries accepted WI-0123 visual-redundancy groups into Creative slideshow snapshots and applies bounded compact timing only to autoplay continuations inside the same group. Manual destinations and loop restarts retain normal/adaptive timing.
-
-WI-0139 provides the no-Fullscreen-API fallback while keeping reduced browser-level protection explicit.
-
-All three remain `in_progress` until the planned combined M27 real-device review.
+WI-0137 is now the only remaining M27 work item and is `ready`. It owns the final integrated real-device acceptance/tuning pass before M27 can be completed.
 
 ## Next concrete step
 
-After the WI-0133 implementation PR is merged, run the combined M27 review for WI-0132, WI-0133 and WI-0139 on the supported iPhone/browser path and a desktop browser. Then start/complete WI-0137 as the final integrated acceptance gate.
+Run WI-0137 across the representative supported iPhone/browser path and at least one desktop browser, covering the combined slideshow experience rather than re-verifying each completed work item in isolation.
 
 ## Relevant files
 
-- docs/delivery/work-items/WI-0132-moment-aware-slideshow-transitions.md
-- docs/delivery/work-items/WI-0133-burst-aware-slideshow-pacing.md
-- docs/delivery/work-items/WI-0139-no-fullscreen-slideshow-fallback.md
 - docs/delivery/work-items/WI-0137-real-device-slideshow-polish-acceptance.md
+- docs/delivery/status/work-items/active/WI-0137.yaml
+- docs/delivery/status/work-items/archive/WI-0132.yaml
+- docs/delivery/status/work-items/archive/WI-0133.yaml
+- docs/delivery/status/work-items/archive/WI-0139.yaml
+- docs/delivery/milestones/M27-slideshow-presentation-experience.md
 - src/PhotoIdentity.Web/Pages/Slideshow.razor
+- src/PhotoIdentity.Web/Components/SlideshowPresentation.razor
 - src/PhotoIdentity.Web/SlideshowPlaybackState.cs
 - src/PhotoIdentity.Web/SlideshowTimingPolicy.cs
-- src/PhotoIdentity.Api/CreativeCollectionMaterializationService.cs
-- src/PhotoIdentity.Api/CreativeCollectionPreviewEndpoints.cs
 
 ## Repository validation
 
