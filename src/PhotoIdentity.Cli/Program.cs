@@ -248,6 +248,8 @@ public static class Program
                                  --proxy-root DIR --proxy-profile ID
                                  [--ollama-base-url LOOPBACK_URL]
                                  [--model NAME]
+                                 [--caption-image-mode proxy|thumbnail]
+                                 [--ollama-context TOKENS]
                                  [--target-count COUNT]
                                  [--moment-gap-minutes MINUTES]
                                  [--sample-count COUNT]
