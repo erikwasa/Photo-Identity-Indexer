@@ -127,7 +127,7 @@ public static class PhotoCaptionEndpoints
             parsed.ToString(),
             normalizedLanguage,
             caption.IsDisplayable ? "available" : "blocked",
-            caption.IsDisplayable ? caption.Content : null,
+            caption.DisplayableContent,
             caption.GeneratedAtUtc));
     }
 }
