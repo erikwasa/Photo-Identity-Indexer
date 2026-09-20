@@ -216,14 +216,14 @@
                                      EmptyLabel="Search named places"
                                      Value="@PendingPlace"
                                      ValueChanged="AddPlaceAsync"
-                                     Disabled="@(Busy || SelectedPlaces.Count >= SmartCollectionFilter.MaximumLocationPlaces)" />
+                                     Disabled="@(Busy || SelectedPlaces.Count >= MaximumSelectedPlaces)" />
 
                         @if (SelectedPlaces.Count > 0)
                         {
                             <div class="smart-place-selection" aria-label="Selected named places">
                                 <div class="smart-place-selection-heading">
                                     <strong>Match any selected place</strong>
-                                    <span>@SelectedPlaces.Count / @SmartCollectionFilter.MaximumLocationPlaces</span>
+                                    <span>@SelectedPlaces.Count / @MaximumSelectedPlaces</span>
                                 </div>
                                 <div class="smart-place-chips">
                                     @foreach (string place in SelectedPlaces.OrderBy(value => value, StringComparer.OrdinalIgnoreCase))
