@@ -243,13 +243,6 @@ public sealed record SmartCollectionFilter
             .ThenBy(value => value, StringComparer.Ordinal)
             .ToArray();
 
-        if (canonical.Length > MaximumLocationPlaces)
-        {
-            throw new ArgumentException(
-                $"A smart collection can contain at most {MaximumLocationPlaces} named places.",
-                parameterName);
-        }
-
         List<string> normalized = [];
         foreach (string candidate in canonical)
         {
@@ -261,6 +254,13 @@ public sealed record SmartCollectionFilter
             {
                 normalized.Add(candidate);
             }
+        }
+
+        if (normalized.Count > MaximumLocationPlaces)
+        {
+            throw new ArgumentException(
+                $"A smart collection can contain at most {MaximumLocationPlaces} named places after ancestor normalization.",
+                parameterName);
         }
 
         return normalized;
