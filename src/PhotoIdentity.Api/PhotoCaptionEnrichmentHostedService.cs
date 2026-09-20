@@ -211,7 +211,8 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
         if (CanPromoteLegacyEvidence(
                 legacy,
                 model,
-                promptVersion))
+                promptVersion,
+                _generation.ContextTokens))
         {
             IReadOnlyList<string> promotedRiskFlags =
                 GeneratedCreativeTextGuard.Evaluate(legacy!.Content!);
@@ -279,10 +280,11 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
         return ContinueDelay;
     }
 
-    private bool CanPromoteLegacyEvidence(
+    internal static bool CanPromoteLegacyEvidence(
         PhotoGeneratedCaption? caption,
         LocalPhotoCaptionModel model,
-        string promptVersion) =>
+        string promptVersion,
+        int contextTokens) =>
         caption is not null &&
         string.Equals(
             caption.GenerationVersion,
@@ -302,7 +304,7 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
             caption.ImageMode,
             PhotoCaptionGenerationConfiguration.ImageMode,
             StringComparison.Ordinal) &&
-        caption.ContextTokens == _generation.ContextTokens;
+        caption.ContextTokens == contextTokens;
 
     private static string LanguageLabel(string language) =>
         language == PhotoCaptionLanguages.Swedish ? "Swedish" : "English";
