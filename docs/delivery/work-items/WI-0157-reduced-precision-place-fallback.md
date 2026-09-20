@@ -63,7 +63,7 @@ Run normal CI plus the live PostgreSQL acceptance suite. On the representative p
 ## Completion notes
 
 - Files changed: GeoNames reverse geocoder, PostgreSQL/SQLite enrichment candidate selection, integration tests, PostgreSQL persistence acceptance coverage and delivery status.
-- Trade-offs: the fallback uses GeoNames `countrySubdivisionJSON` only after `findNearbyPlaceNameJSON` returns a genuine no-result. This preserves precise locality when available and deliberately accepts country/admin-only hierarchy rather than expanding the nearby-town radius.
+- Trade-offs: the fallback uses GeoNames `countrySubdivisionJSON` only after `findNearbyPlaceNameJSON` returns a genuine no-result, then `countryCodeJSON` only when no subdivision is available. This preserves precise locality when available and deliberately accepts country/admin-only hierarchy rather than expanding the nearby-town radius.
 - Contract transition: `geonames-place-v3` makes the fallback behavior explicit. A new contract retries prior non-success outcomes, including the recorded legacy `no-result` rows, while unchanged coordinates with any prior successful contract are suppressed unless an operator explicitly requests refresh.
 - Deferred work: photos without GPS remain outside automatic reverse-geocoding scope. Real-catalogue acceptance remains for maintainer verification against the recorded 1,337-photo baseline.
 - Commands run: repository CI is the implementation validation surface; live production-catalogue verification remains maintainer-operated.
