@@ -151,6 +151,10 @@ public static class PhotoDetailsEndpoints
         {
             value = PhotoCaptureDateValue.Parse(request.Value);
         }
+        catch (FormatException exception)
+        {
+            return Results.BadRequest(new PhotoCaptureDateErrorResponse(exception.Message));
+        }
         catch (ArgumentException exception)
         {
             return Results.BadRequest(new PhotoCaptureDateErrorResponse(exception.Message));
