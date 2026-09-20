@@ -4,31 +4,32 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M28 Library curation and metadata editing is continuing with WI-0141: manual capture-date overrides with provenance and precision.**
+**M28 Library curation and metadata editing is continuing with WI-0142: manual and imprecise capture-date editing in Photo Details.**
 
-WI-0140's searchable shared Place picker merged in PR #391. Its requested desktop/phone interaction acceptance is intentionally deferred until the current batch of M28 work is ready for maintainer verification.
+WI-0140's searchable shared Place picker merged in PR #391 and WI-0141's provenance/precision capture-date model merged in PR #392. Their requested maintainer verification is intentionally being bundled with the later M28 verification pass.
 
-PR #392 implements the WI-0141 foundation. PostgreSQL schema v27 stores manual capture dates as append-only set/clear actions separate from extracted `photo_capture_metadata`. The model preserves exact year/year-month/full-date precision and derives an inclusive effective range instead of inventing missing day/time values. Reinspection may replace extracted metadata while the manual action remains authoritative; clearing reveals the latest extracted value again.
+PR #394 adds the Photo Details consumer for WI-0141. The details response now exposes effective capture-date source, precision, range and preserved extracted timestamp. PostgreSQL-backed PUT/DELETE mutations set or clear the manual date. The new responsive editor accepts `YYYY`, `YYYY-MM` or `YYYY-MM-DD`, shows manual versus extracted provenance explicitly and never rewrites source metadata. The existing metadata grid labels the raw source value as `Extracted capture time`.
 
-PostgreSQL Smart Collection queries now filter against the effective date range using overlap semantics and expose the effective range/source alongside raw extracted `TakenAtLocal`. Focused tests cover precision, metadata refresh, reversibility and imprecise-date filtering. Photo Details editing remains WI-0142 scope.
+Automated coverage validates editor input, server validation, year/month/day replacement, persistence across an API-host restart and clear-to-extracted behavior. The remaining WI-0142 acceptance item is the bundled desktop/phone verification.
 
-M26 remains active with WI-0128 caption quality accepted and product integration being corrected to archive-level photo enrichment; caption generation is global/background/default-off and consumers only read persisted evidence. M29 is ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+M26 remains active separately. M29 is ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Validate PR #392 through the normal CI gates and merge when green. Afterward WI-0142 and WI-0143 become ready consumers of the capture-date model; the maintainer can verify WI-0140 together with the later M28 UI changes as requested.
+Validate PR #394 through CI and merge when green. After merge, WI-0143 can consume the effective date-range model for structured Smart Collection controls while manual verification remains deferred until the requested M28 batch review.
 
 ## Relevant files
 
 - docs/delivery/milestones/M28-library-curation-metadata-editing.md
-- docs/delivery/work-items/WI-0141-manual-capture-date-model.md
-- docs/delivery/status/work-items/active/WI-0141.yaml
-- src/PhotoIdentity.Core/Sources/PhotoCaptureDate.cs
-- src/PhotoIdentity.Core/Sources/IPhotoCaptureDateRepository.cs
-- src/PhotoIdentity.Persistence.Postgres/PostgresPhotoCaptureDateRepository.cs
-- src/PhotoIdentity.Persistence.Postgres/PostgresSmartCollectionQueryRepository.cs
-- tests/PhotoIdentity.Core.Tests/PhotoCaptureDateValueTests.cs
-- tests/PhotoIdentity.Persistence.Tests/PostgresPhotoCaptureDateRepositoryTests.cs
+- docs/delivery/work-items/WI-0142-manual-capture-date-editor.md
+- docs/delivery/status/work-items/active/WI-0142.yaml
+- src/PhotoIdentity.Api/PhotoDetailsEndpoints.cs
+- src/PhotoIdentity.Web/Components/PhotoCaptureDateEditor.razor
+- src/PhotoIdentity.Web/Components/PhotoCaptureDateEditor.razor.css
+- src/PhotoIdentity.Web/PhotoCaptureDateEditorModel.cs
+- src/PhotoIdentity.Web/PhotoDetailsContracts.cs
+- tests/PhotoIdentity.Integration.Tests/ManualCaptureDateApplicationTests.cs
+- tests/PhotoIdentity.Integration.Tests/PhotoCaptureDateEditorModelTests.cs
 
 ## Repository validation
 
