@@ -66,12 +66,18 @@ public sealed record GeoNamesReverseGeocodingConfiguration
         : Language;
 
     public string ContractKey => UsesSwedenLocalElseEnglishPolicy
-        ? $"findNearbyPlaceName-v2|{BaseUri.AbsoluteUri.ToLowerInvariant()}|langPolicy=se-local-else-en|localCountry=true|style=FULL|maxRows=1"
-        : $"findNearbyPlaceName-v1|{BaseUri.AbsoluteUri.ToLowerInvariant()}|lang={Language.ToLowerInvariant()}|localCountry=true|style=FULL|maxRows=1";
+        ? $"geonames-place-v3|{BaseUri.AbsoluteUri.ToLowerInvariant()}|primary=findNearbyPlaceName|fallback=countrySubdivision|langPolicy=se-local-else-en|localCountry=true|style=FULL|maxRows=1"
+        : $"geonames-place-v3|{BaseUri.AbsoluteUri.ToLowerInvariant()}|primary=findNearbyPlaceName|fallback=countrySubdivision|lang={Language.ToLowerInvariant()}|localCountry=true|style=FULL|maxRows=1";
 }
 
 public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
 {
+    private enum RequestKind
+    {
+        PopulatedPlace,
+        AdministrativeSubdivision,
+    }
+
     private readonly GeoNamesReverseGeocodingConfiguration _configuration;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly TimeProvider _timeProvider;
@@ -111,10 +117,16 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
 
         if (!_configuration.UsesSwedenLocalElseEnglishPolicy)
         {
-            return await SendRequestAsync(query, _configuration.Language, cancellationToken);
+            return await ReverseGeocodeForLanguageAsync(
+                query,
+                _configuration.Language,
+                cancellationToken);
         }
 
-        ReverseGeocodeResponse local = await SendRequestAsync(query, "local", cancellationToken);
+        ReverseGeocodeResponse local = await ReverseGeocodeForLanguageAsync(
+            query,
+            "local",
+            cancellationToken);
         if (local.Status != ReverseGeocodeStatus.Success || local.Place is null)
         {
             return local;
@@ -125,21 +137,53 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
             return local;
         }
 
-        ReverseGeocodeResponse english = await SendRequestAsync(query, "en", cancellationToken);
+        ReverseGeocodeResponse english = await ReverseGeocodeForLanguageAsync(
+            query,
+            "en",
+            cancellationToken);
         return english with
         {
             ProviderRequestCount = local.ProviderRequestCount + english.ProviderRequestCount,
         };
     }
 
-    private async Task<ReverseGeocodeResponse> SendRequestAsync(
+    private async Task<ReverseGeocodeResponse> ReverseGeocodeForLanguageAsync(
         ReverseGeocodeQuery query,
         string language,
         CancellationToken cancellationToken)
     {
+        ReverseGeocodeResponse populatedPlace = await SendRequestAsync(
+            query,
+            language,
+            RequestKind.PopulatedPlace,
+            cancellationToken);
+        if (populatedPlace.Status != ReverseGeocodeStatus.NoResult)
+        {
+            return populatedPlace;
+        }
+
+        ReverseGeocodeResponse administrative = await SendRequestAsync(
+            query,
+            language,
+            RequestKind.AdministrativeSubdivision,
+            cancellationToken);
+        return administrative with
+        {
+            ProviderRequestCount =
+                populatedPlace.ProviderRequestCount +
+                administrative.ProviderRequestCount,
+        };
+    }
+
+    private async Task<ReverseGeocodeResponse> SendRequestAsync(
+        ReverseGeocodeQuery query,
+        string language,
+        RequestKind requestKind,
+        CancellationToken cancellationToken)
+    {
         await WaitForRequestSlotAsync(cancellationToken);
 
-        Uri requestUri = BuildRequestUri(query, language);
+        Uri requestUri = BuildRequestUri(query, language, requestKind);
         try
         {
             HttpClient client = _httpClientFactory.CreateClient("GeoNames");
@@ -165,7 +209,10 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
             }
 
             string json = await response.Content.ReadAsStringAsync(cancellationToken);
-            return ParseResponse(json) with { ProviderRequestCount = 1 };
+            ReverseGeocodeResponse parsed = requestKind == RequestKind.PopulatedPlace
+                ? ParsePopulatedPlaceResponse(json)
+                : ParseAdministrativeResponse(json);
+            return parsed with { ProviderRequestCount = 1 };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -205,51 +252,40 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
         }
     }
 
-    private Uri BuildRequestUri(ReverseGeocodeQuery query, string language)
+    private Uri BuildRequestUri(
+        ReverseGeocodeQuery query,
+        string language,
+        RequestKind requestKind)
     {
-        Uri endpoint = new(_configuration.BaseUri, "findNearbyPlaceNameJSON");
-        string queryString = string.Join(
-            "&",
+        string endpointName = requestKind == RequestKind.PopulatedPlace
+            ? "findNearbyPlaceNameJSON"
+            : "countrySubdivisionJSON";
+        Uri endpoint = new(_configuration.BaseUri, endpointName);
+        List<string> parameters =
+        [
             $"lat={Uri.EscapeDataString(query.Latitude.ToString("R", CultureInfo.InvariantCulture))}",
             $"lng={Uri.EscapeDataString(query.Longitude.ToString("R", CultureInfo.InvariantCulture))}",
-            "maxRows=1",
-            "style=FULL",
-            "localCountry=true",
-            $"lang={Uri.EscapeDataString(language)}",
-            $"username={Uri.EscapeDataString(_configuration.Username!)}");
-        return new UriBuilder(endpoint) { Query = queryString }.Uri;
+        ];
+        if (requestKind == RequestKind.PopulatedPlace)
+        {
+            parameters.Add("maxRows=1");
+            parameters.Add("style=FULL");
+            parameters.Add("localCountry=true");
+        }
+
+        parameters.Add($"lang={Uri.EscapeDataString(language)}");
+        parameters.Add($"username={Uri.EscapeDataString(_configuration.Username!)}");
+        return new UriBuilder(endpoint) { Query = string.Join("&", parameters) }.Uri;
     }
 
-    private static ReverseGeocodeResponse ParseResponse(string json)
+    private static ReverseGeocodeResponse ParsePopulatedPlaceResponse(string json)
     {
         using JsonDocument document = JsonDocument.Parse(json);
         JsonElement root = document.RootElement;
-        if (root.TryGetProperty("status", out JsonElement status))
+        ReverseGeocodeResponse? statusResponse = ParseProviderStatus(root);
+        if (statusResponse is not null)
         {
-            int code = status.TryGetProperty("value", out JsonElement value) && value.TryGetInt32(out int parsed)
-                ? parsed
-                : -1;
-            string? message = status.TryGetProperty("message", out JsonElement messageElement)
-                ? messageElement.GetString()
-                : null;
-            return code switch
-            {
-                15 => new ReverseGeocodeResponse(ReverseGeocodeStatus.NoResult, ErrorCode: "15", ErrorMessage: message),
-                13 or 18 or 19 or 20 or 22 => new ReverseGeocodeResponse(
-                    ReverseGeocodeStatus.Deferred,
-                    ErrorCode: code.ToString(CultureInfo.InvariantCulture),
-                    ErrorMessage: message,
-                    StopBatch: true),
-                10 or 14 or 21 or 23 or 24 or 27 => new ReverseGeocodeResponse(
-                    ReverseGeocodeStatus.Failure,
-                    ErrorCode: code.ToString(CultureInfo.InvariantCulture),
-                    ErrorMessage: message,
-                    StopBatch: true),
-                _ => new ReverseGeocodeResponse(
-                    ReverseGeocodeStatus.Failure,
-                    ErrorCode: code.ToString(CultureInfo.InvariantCulture),
-                    ErrorMessage: message),
-            };
+            return statusResponse;
         }
 
         if (!root.TryGetProperty("geonames", out JsonElement geonames) ||
@@ -281,30 +317,129 @@ public sealed class GeoNamesReverseGeocoder : IReverseGeocoder, IDisposable
         AddDistinctSegment(segments, ReadString(item, "adminName4"));
         AddDistinctSegment(segments, locality);
 
+        return BuildPlaceResponse(
+            segments,
+            ReadIdentifier(item, "geonameId"),
+            ReadString(item, "countryCode"),
+            "populated-place");
+    }
+
+    private static ReverseGeocodeResponse ParseAdministrativeResponse(string json)
+    {
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement root = document.RootElement;
+        ReverseGeocodeResponse? statusResponse = ParseProviderStatus(root);
+        if (statusResponse is not null)
+        {
+            return statusResponse.Status == ReverseGeocodeStatus.NoResult
+                ? AdministrativeNoResult()
+                : statusResponse;
+        }
+
+        string? country = ReadString(root, "countryName");
+        if (string.IsNullOrWhiteSpace(country))
+        {
+            return AdministrativeNoResult();
+        }
+
+        List<string> segments = [];
+        AddDistinctSegment(segments, country);
+        AddDistinctSegment(segments, ReadString(root, "adminName1"));
+        AddDistinctSegment(segments, ReadString(root, "adminName2"));
+        AddDistinctSegment(segments, ReadString(root, "adminName3"));
+        AddDistinctSegment(segments, ReadString(root, "adminName4"));
+
+        return BuildPlaceResponse(
+            segments,
+            ReadIdentifier(root, "geonameId"),
+            ReadString(root, "countryCode"),
+            "administrative");
+    }
+
+    private static ReverseGeocodeResponse BuildPlaceResponse(
+        IReadOnlyCollection<string> segments,
+        string? providerResultId,
+        string? countryCode,
+        string resultKind)
+    {
         try
         {
             PhotoPlacePath place = PhotoPlacePath.Parse(string.Join('/', segments));
-            string? providerResultId = item.TryGetProperty("geonameId", out JsonElement geonameId)
-                ? geonameId.ToString()
-                : null;
             return ReverseGeocodeResponse.Succeeded(new ReverseGeocodePlace(
                 place,
                 providerResultId,
-                ReadString(item, "countryCode")));
+                countryCode));
         }
         catch (ArgumentException exception)
         {
             return new ReverseGeocodeResponse(
                 ReverseGeocodeStatus.Failure,
-                ErrorCode: "invalid-place-path",
+                ErrorCode: $"invalid-{resultKind}-place-path",
                 ErrorMessage: exception.Message);
         }
+    }
+
+    private static ReverseGeocodeResponse AdministrativeNoResult() =>
+        new(
+            ReverseGeocodeStatus.NoResult,
+            ErrorCode: "administrative-no-result",
+            ErrorMessage: "GeoNames returned no populated place and no usable administrative geography for these coordinates.");
+
+    private static ReverseGeocodeResponse? ParseProviderStatus(JsonElement root)
+    {
+        if (!root.TryGetProperty("status", out JsonElement status))
+        {
+            return null;
+        }
+
+        int code = status.TryGetProperty("value", out JsonElement value) && value.TryGetInt32(out int parsed)
+            ? parsed
+            : -1;
+        string? message = status.TryGetProperty("message", out JsonElement messageElement)
+            ? messageElement.GetString()
+            : null;
+        return code switch
+        {
+            15 => new ReverseGeocodeResponse(
+                ReverseGeocodeStatus.NoResult,
+                ErrorCode: "15",
+                ErrorMessage: message),
+            13 or 18 or 19 or 20 or 22 => new ReverseGeocodeResponse(
+                ReverseGeocodeStatus.Deferred,
+                ErrorCode: code.ToString(CultureInfo.InvariantCulture),
+                ErrorMessage: message,
+                StopBatch: true),
+            10 or 14 or 21 or 23 or 24 or 27 => new ReverseGeocodeResponse(
+                ReverseGeocodeStatus.Failure,
+                ErrorCode: code.ToString(CultureInfo.InvariantCulture),
+                ErrorMessage: message,
+                StopBatch: true),
+            _ => new ReverseGeocodeResponse(
+                ReverseGeocodeStatus.Failure,
+                ErrorCode: code.ToString(CultureInfo.InvariantCulture),
+                ErrorMessage: message),
+        };
     }
 
     private static string? ReadString(JsonElement item, string propertyName) =>
         item.TryGetProperty(propertyName, out JsonElement value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()?.Trim()
             : null;
+
+    private static string? ReadIdentifier(JsonElement item, string propertyName)
+    {
+        if (!item.TryGetProperty(propertyName, out JsonElement value))
+        {
+            return null;
+        }
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString()?.Trim(),
+            JsonValueKind.Number => value.ToString(),
+            _ => null,
+        };
+    }
 
     private static void AddDistinctSegment(ICollection<string> segments, string? value)
     {
