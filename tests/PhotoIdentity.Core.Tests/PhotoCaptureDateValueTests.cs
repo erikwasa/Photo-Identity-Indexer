@@ -1,7 +1,7 @@
 using PhotoIdentity.Core.Sources;
 using Xunit;
 
-namespace PhotoIdentity_Core_Tests;
+namespace PhotoIdentity.Core.Tests;
 
 public sealed class PhotoCaptureDateValueTests
 {
