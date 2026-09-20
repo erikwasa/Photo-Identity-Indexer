@@ -4,32 +4,33 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M28 Library curation and metadata editing is continuing with WI-0142: manual and imprecise capture-date editing in Photo Details.**
+**M28 Library curation and metadata editing is continuing with WI-0143: structured Smart Collection date controls.**
 
-WI-0140's searchable shared Place picker merged in PR #391 and WI-0141's provenance/precision capture-date model merged in PR #392. Their requested maintainer verification is intentionally being bundled with the later M28 verification pass.
+WI-0140's searchable shared Place picker merged in PR #391, WI-0141's provenance/precision capture-date model merged in PR #392, and WI-0142's Photo Details capture-date editor merged in PR #394. Their requested maintainer interaction checks remain intentionally bundled with the later M28 verification pass.
 
-PR #394 adds the Photo Details consumer for WI-0141. The details response now exposes effective capture-date source, precision, range and preserved extracted timestamp. PostgreSQL-backed PUT/DELETE mutations set or clear the manual date. The new responsive editor accepts `YYYY`, `YYYY-MM` or `YYYY-MM-DD`, shows manual versus extracted provenance explicitly and never rewrites source metadata. The existing metadata grid labels the raw source value as `Extracted capture time`.
+PR #396 removes the Smart Collection date mini-language from the UI. Taken time now offers Any date, Year, Month, Exact date and Date range controls. New UI requests send explicit inclusive `takenRange.from`/`takenRange.to` bounds; the API retains the legacy `Taken` string only for compatibility with older callers.
 
-Automated coverage validates editor input, server validation, year/month/day replacement, persistence across an API-host restart and clear-to-extracted behavior. The remaining WI-0142 acceptance item is the bundled desktop/phone verification.
+Saved Smart Collections already persist explicit date bounds under versioned filter schema v2, so WI-0143 does not need a storage migration. Existing saved ranges reopen into the closest equivalent structured mode. Any date explicitly leaves undated photos eligible; populated modes require an effective capture date. WI-0141's overlap rule remains authoritative for imprecise manual dates, and live PostgreSQL coverage verifies a structured one-day request can match a manual year-only date.
 
 M26 remains active separately. M29 is ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Validate PR #394 through CI and merge when green. After merge, WI-0143 can consume the effective date-range model for structured Smart Collection controls while manual verification remains deferred until the requested M28 batch review.
+Validate PR #396 through the normal CI gates and merge when green. After merge, WI-0144 can build on the merged searchable Place picker to support multiple named locations while desktop/phone verification remains deferred until the requested M28 batch review.
 
 ## Relevant files
 
 - docs/delivery/milestones/M28-library-curation-metadata-editing.md
-- docs/delivery/work-items/WI-0142-manual-capture-date-editor.md
-- docs/delivery/status/work-items/active/WI-0142.yaml
-- src/PhotoIdentity.Api/PhotoDetailsEndpoints.cs
-- src/PhotoIdentity.Web/Components/PhotoCaptureDateEditor.razor
-- src/PhotoIdentity.Web/Components/PhotoCaptureDateEditor.razor.css
-- src/PhotoIdentity.Web/PhotoCaptureDateEditorModel.cs
-- src/PhotoIdentity.Web/PhotoDetailsContracts.cs
+- docs/delivery/work-items/WI-0143-structured-smart-collection-date-controls.md
+- docs/delivery/status/work-items/active/WI-0143.yaml
+- src/PhotoIdentity.Api/SmartCollectionEndpoints.cs
+- src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor
+- src/PhotoIdentity.Web/Components/SmartCollectionsWorkspace.razor.cs
+- src/PhotoIdentity.Web/SmartCollectionDateEditorModel.cs
+- src/PhotoIdentity.Web/SmartCollectionContracts.cs
+- tests/PhotoIdentity.Integration.Tests/SmartCollectionDateEditorModelTests.cs
+- tests/PhotoIdentity.Integration.Tests/StructuredSmartCollectionDateApplicationTests.cs
 - tests/PhotoIdentity.Integration.Tests/ManualCaptureDateApplicationTests.cs
-- tests/PhotoIdentity.Integration.Tests/PhotoCaptureDateEditorModelTests.cs
 
 ## Repository validation
 
