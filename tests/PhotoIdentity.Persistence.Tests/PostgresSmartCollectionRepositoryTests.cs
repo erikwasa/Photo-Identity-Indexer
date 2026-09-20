@@ -101,6 +101,40 @@ public sealed class PostgresSmartCollectionRepositoryTests
                 Assert.Contains("\"places\":[\"places/norway/oslo\",\"places/sweden/stockholm\"]", filterJson);
             }
 
+            SmartCollectionId legacyV2Id = SmartCollectionId.New();
+            await using (NpgsqlConnection legacyConnection = new(testBuilder.ConnectionString))
+            {
+                await legacyConnection.OpenAsync();
+                await using NpgsqlCommand insertLegacy = legacyConnection.CreateCommand();
+                insertLegacy.CommandText = """
+                    INSERT INTO smart_collections (
+                        id,
+                        normalized_name,
+                        display_name,
+                        filter_schema_version,
+                        filter_json,
+                        created_at_utc,
+                        updated_at_utc)
+                    VALUES (
+                        @id,
+                        'legacy stockholm',
+                        'Legacy Stockholm',
+                        2,
+                        '{"people":[],"peopleMatch":"all","tags":[],"tagMatch":"all","location":{"place":"places/sweden/stockholm","south":null,"west":null,"north":null,"east":null},"taken":null}'::jsonb,
+                        @now,
+                        @now);
+                    """;
+                insertLegacy.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, legacyV2Id.Value);
+                insertLegacy.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, DateTimeOffset.UtcNow);
+                await insertLegacy.ExecuteNonQueryAsync();
+            }
+
+            SmartCollectionDefinition legacyV2 =
+                await repository.GetAsync(legacyV2Id)
+                ?? throw new InvalidOperationException("Legacy v2 Smart Collection could not be reopened.");
+            Assert.Equal(["places/sweden/stockholm"], legacyV2.Filter.LocationPlaces);
+            Assert.Equal("places/sweden/stockholm", legacyV2.Filter.LocationPlace);
+
             await Assert.ThrowsAsync<SmartCollectionNameConflictException>(() => repository.CreateAsync(
                 "summer 2025",
                 new SmartCollectionFilter()));
@@ -127,6 +161,7 @@ public sealed class PostgresSmartCollectionRepositoryTests
             Assert.True(await repository.DeleteAsync(created.Id));
             Assert.False(await repository.DeleteAsync(created.Id));
             Assert.Null(await repository.GetAsync(created.Id));
+            Assert.True(await repository.DeleteAsync(legacyV2Id));
 
             await using NpgsqlConnection verificationConnection = new(testBuilder.ConnectionString);
             await verificationConnection.OpenAsync();
