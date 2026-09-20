@@ -4,28 +4,29 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M27 Slideshow presentation experience has completed WI-0132, WI-0133 and WI-0139 after combined maintainer verification.**
+**WI-0137 is in progress as the final M27 real-device acceptance/tuning gate.**
 
-The maintainer accepted the moment-aware chapter transition treatment, burst/near-duplicate compact pacing, and no-Fullscreen-API fallback on 2026-09-20. Their implementation PRs and CI evidence are recorded in the archived work-item status shards.
+WI-0132, WI-0133 and WI-0139 are completed and archived after combined maintainer verification. WI-0137 now has a repeatable acceptance protocol covering the supported iPhone/browser path, desktop true fullscreen/recovery, reduced motion, slower image readiness, protected controls, looping and the existing M24 browser-performance diagnostics.
 
-WI-0137 is now the only remaining M27 work item and is `ready`. It owns the final integrated real-device acceptance/tuning pass before M27 can be completed.
+No new runtime feature is planned for WI-0137 unless the acceptance pass exposes a reproducible defect. The current M27 visual/timing constants are recorded in the work item so they can be accepted or tuned centrally without adding viewer-facing settings.
 
 ## Next concrete step
 
-Run WI-0137 across the representative supported iPhone/browser path and at least one desktop browser, covering the combined slideshow experience rather than re-verifying each completed work item in isolation.
+Run the WI-0137 protocol in `docs/delivery/work-items/WI-0137-real-device-slideshow-polish-acceptance.md` on the supported iPhone/browser path and at least one desktop browser. Capture the browser diagnostics report after at least 10 displayed photos and record device/browser versions plus any repeatable visual or performance defects.
+
+If the pass is clean, update WI-0137 and M27 to completed with the maintainer evidence. If a defect is found, fix only that evidence-backed issue and repeat the affected slice.
 
 ## Relevant files
 
 - docs/delivery/work-items/WI-0137-real-device-slideshow-polish-acceptance.md
+- docs/operations/slideshow-browser-performance-diagnostics.md
+- docs/operations/slideshow-performance-diagnostics.md
 - docs/delivery/status/work-items/active/WI-0137.yaml
-- docs/delivery/status/work-items/archive/WI-0132.yaml
-- docs/delivery/status/work-items/archive/WI-0133.yaml
-- docs/delivery/status/work-items/archive/WI-0139.yaml
 - docs/delivery/milestones/M27-slideshow-presentation-experience.md
-- src/PhotoIdentity.Web/Pages/Slideshow.razor
 - src/PhotoIdentity.Web/Components/SlideshowPresentation.razor
-- src/PhotoIdentity.Web/SlideshowPlaybackState.cs
+- src/PhotoIdentity.Web/SlideshowMotionPolicy.cs
 - src/PhotoIdentity.Web/SlideshowTimingPolicy.cs
+- src/PhotoIdentity.Web/wwwroot/js/slideshow-presentation.js
 
 ## Repository validation
 
