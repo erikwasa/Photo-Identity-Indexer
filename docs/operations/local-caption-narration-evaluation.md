@@ -164,3 +164,57 @@ dotnet run --project src/PhotoIdentity.Cli -c Release -- narration evaluate `
 This is a performance/feasibility probe, not a production default. The report records both the caption image mode and requested Ollama context so results from the full review proxy and temporary thumbnail are not conflated.
 
 If the thumbnail/context probe materially improves runtime, repeat a small qualitative sample before deciding whether the reduced visual detail is still good enough. If it remains measured in minutes per caption, record the local generative path as impractical on the maintainer hardware rather than spending time on a full 12-photo review.
+
+
+## Retained opt-in slideshow integration
+
+The positive WI-0128 result is retained by WI-0157 as an optional slideshow feature. The experiment remains useful for tuning, but production playback uses a stricter bounded integration:
+
+- **Generated captions (local AI)** is off by default in slideshow settings.
+- Caption language can be **Svenska** or **English**; Swedish is the default.
+- Only the configured durable review proxy is opened. Photo Identity derives a temporary 480x320 JPEG in memory before model inference.
+- The Ollama endpoint remains loopback-only.
+- One bounded background worker performs inference. Playback never waits for a caption.
+- Only photos encountered while captions are enabled are queued; enabling the setting does not bulk-caption the archive.
+- Guard-passing text is cached under the local application data generated-caption cache with revision/language/model/prompt/image-mode/context provenance.
+- Guard-blocked output is never displayed.
+- Generated captions remain derived presentation data and never become canonical catalogue metadata.
+
+The default product configuration reuses the successful probe:
+
+~~~text
+Model: qwen2.5vl:3b
+Ollama endpoint: http://127.0.0.1:11434/
+Image mode: temporary 480x320 thumbnail
+Requested context: 1024
+Request timeout: 600 seconds
+Queue capacity: 8
+~~~
+
+Optional configuration keys are:
+
+~~~text
+PhotoIdentity:GeneratedCaptions:CacheRoot
+PhotoIdentity:GeneratedCaptions:OllamaBaseUrl
+PhotoIdentity:GeneratedCaptions:Model
+PhotoIdentity:GeneratedCaptions:ContextTokens
+PhotoIdentity:GeneratedCaptions:TimeoutSeconds
+PhotoIdentity:GeneratedCaptions:QueueCapacity
+~~~
+
+The configured Ollama URL is rejected unless it is an absolute loopback HTTP(S) address. Ollama/model installation remains an explicit operator action; Photo Identity does not download a model when the slideshow setting is enabled.
+
+### Accepted private evidence
+
+On 2026-09-20:
+
+- one full 1600-pixel proxy caption took 373,568.2 ms;
+- the first 480x320 thumbnail probe took 118,081.4 ms;
+- a four-photo thumbnail sample averaged 95,858.8 ms per caption;
+- all 4 captions generated successfully;
+- the maintainer judged all 4 useful;
+- no factual errors were observed in the four-photo review;
+- all 4 captions passed the guard; and
+- the qwen2.5vl:3b package reported 3,200,627,168 bytes.
+
+The production decision is therefore **useful but latency-constrained**: accumulate captions gradually and reuse them, while leaving model/runtime optimization for later.
