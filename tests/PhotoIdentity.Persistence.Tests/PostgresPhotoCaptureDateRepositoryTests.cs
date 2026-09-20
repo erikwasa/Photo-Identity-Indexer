@@ -6,7 +6,7 @@ using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
 using Xunit;
 
-namespace PhotoIdentity_Persistence_Tests;
+namespace PhotoIdentity.Persistence.Tests;
 
 public sealed class PostgresPhotoCaptureDateRepositoryTests
 {
