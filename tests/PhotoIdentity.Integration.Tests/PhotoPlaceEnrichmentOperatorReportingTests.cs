@@ -130,7 +130,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
     }
 
     [Fact]
-    public async Task Administrative_no_result_is_reported_distinctly_without_exposing_provider_text()
+    public async Task Geography_no_result_is_reported_distinctly_without_exposing_provider_text()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -140,7 +140,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             await database.InitializeAsync();
             AssetRevisionId revisionId = await CreateRevisionWithGpsAsync(database, directory);
 
-            IReverseGeocoder provider = new NoResultGeocoder("administrative-no-result");
+            IReverseGeocoder provider = new NoResultGeocoder("geography-no-result");
             TimeProvider clock = TimeProvider.System;
             SqlitePhotoPlaceRepository places = new(database, clock);
             PhotoPlaceEnrichmentService service = new(
@@ -153,8 +153,8 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             Assert.Equal(1, report.NoResult);
             PhotoPlaceEnrichmentIssue issue = Assert.Single(report.Issues!);
             Assert.Equal(revisionId.ToString(), issue.RevisionId);
-            Assert.Equal("administrative-no-result", issue.ProviderCode);
-            Assert.Contains("administrative geography", issue.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal("geography-no-result", issue.ProviderCode);
+            Assert.Contains("administrative subdivision or country", issue.Message, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("raw-provider-message", issue.Message, StringComparison.OrdinalIgnoreCase);
 
             await using SqliteConnection connection = await database.OpenConnectionAsync();
@@ -169,7 +169,7 @@ public sealed class PhotoPlaceEnrichmentOperatorReportingTests
             await using SqliteDataReader reader = await command.ExecuteReaderAsync();
             Assert.True(await reader.ReadAsync());
             Assert.Equal("skipped", reader.GetString(0));
-            Assert.Equal("administrative-no-result", reader.GetString(1));
+            Assert.Equal("geography-no-result", reader.GetString(1));
         }
         finally
         {
