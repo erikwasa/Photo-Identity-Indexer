@@ -9,7 +9,7 @@ using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Web.Contracts;
 using Xunit;
 
-namespace PhotoIdentity.Integration.Tests;
+namespace PhotoIdentity_Integration_Tests;
 
 public sealed class ManualCaptureDateApplicationTests
 {
