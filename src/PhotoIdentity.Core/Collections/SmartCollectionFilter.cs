@@ -144,6 +144,8 @@ public sealed record SmartCollectionDateRange
 
 public sealed record SmartCollectionFilter
 {
+    public const int MaximumLocationPlaces = 16;
+
     public SmartCollectionFilter(
         IEnumerable<PersonId>? people = null,
         string? peopleMatch = null,
@@ -151,7 +153,8 @@ public sealed record SmartCollectionFilter
         string? tagMatch = null,
         SmartCollectionGeoBounds? location = null,
         SmartCollectionDateRange? taken = null,
-        string? locationPlace = null)
+        string? locationPlace = null,
+        IEnumerable<string>? locationPlaces = null)
     {
         People = (people ?? []).Distinct().ToArray();
         if (People.Count > 100)
@@ -172,7 +175,7 @@ public sealed record SmartCollectionFilter
         if (legacyPlaceTags.Length > 1)
         {
             throw new ArgumentException(
-                "A legacy Smart Collection cannot migrate more than one distinct Places tag into the single named-place Location criterion.",
+                "A legacy Smart Collection cannot migrate more than one distinct Places tag.",
                 nameof(tags));
         }
 
@@ -199,21 +202,36 @@ public sealed record SmartCollectionFilter
         TagMatch = normalizedTagMatch;
         Location = location;
 
-        string? explicitLocationPlace = string.IsNullOrWhiteSpace(locationPlace)
+        List<string> rawPlaces = [];
+        string? explicitLegacyLocationPlace = string.IsNullOrWhiteSpace(locationPlace)
             ? null
             : PhotoPlacePath.Parse(locationPlace).CanonicalNormalizedValue;
-        string? legacyLocationPlace = legacyPlaceTags.Length == 0
+        string? migratedLegacyLocationPlace = legacyPlaceTags.Length == 0
             ? null
             : PhotoPlacePath.FromCanonicalTagPath(legacyPlaceTags[0]).CanonicalNormalizedValue;
-        if (explicitLocationPlace is not null && legacyLocationPlace is not null &&
-            !string.Equals(explicitLocationPlace, legacyLocationPlace, StringComparison.Ordinal))
+        if (explicitLegacyLocationPlace is not null &&
+            migratedLegacyLocationPlace is not null &&
+            !string.Equals(explicitLegacyLocationPlace, migratedLegacyLocationPlace, StringComparison.Ordinal))
         {
             throw new ArgumentException(
                 "The legacy Places tag and named-place Location criterion refer to different canonical places.",
                 nameof(locationPlace));
         }
 
-        LocationPlace = explicitLocationPlace ?? legacyLocationPlace;
+        if (explicitLegacyLocationPlace is not null)
+        {
+            rawPlaces.Add(explicitLegacyLocationPlace);
+        }
+
+        rawPlaces.AddRange((locationPlaces ?? []).Where(value => !string.IsNullOrWhiteSpace(value)));
+
+        if (migratedLegacyLocationPlace is not null)
+        {
+            rawPlaces.Add(migratedLegacyLocationPlace);
+        }
+
+        LocationPlaces = NormalizeLocationPlaces(rawPlaces, nameof(locationPlaces));
+        LocationPlace = LocationPlaces.Count == 1 ? LocationPlaces[0] : null;
         Taken = taken;
     }
 
@@ -222,6 +240,44 @@ public sealed record SmartCollectionFilter
     public IReadOnlyList<string> Tags { get; }
     public string TagMatch { get; }
     public SmartCollectionGeoBounds? Location { get; }
+    public IReadOnlyList<string> LocationPlaces { get; }
+
+    // Compatibility accessor for callers that still expect the pre-v3 single-place shape.
     public string? LocationPlace { get; }
+
     public SmartCollectionDateRange? Taken { get; }
+
+    private static IReadOnlyList<string> NormalizeLocationPlaces(
+        IEnumerable<string> values,
+        string parameterName)
+    {
+        string[] canonical = values
+            .Select(value => PhotoPlacePath.Parse(value).CanonicalNormalizedValue)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value.Count(character => character == '/'))
+            .ThenBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+
+        List<string> normalized = [];
+        foreach (string candidate in canonical)
+        {
+            bool coveredByAncestor = normalized.Any(ancestor =>
+                candidate.Length > ancestor.Length &&
+                candidate.StartsWith(ancestor, StringComparison.Ordinal) &&
+                candidate[ancestor.Length] == '/');
+            if (!coveredByAncestor)
+            {
+                normalized.Add(candidate);
+            }
+        }
+
+        if (normalized.Count > MaximumLocationPlaces)
+        {
+            throw new ArgumentException(
+                $"A smart collection can contain at most {MaximumLocationPlaces} named places after ancestor normalization.",
+                parameterName);
+        }
+
+        return normalized;
+    }
 }

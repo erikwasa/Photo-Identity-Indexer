@@ -5,7 +5,8 @@ public sealed record SmartCollectionLocationRequest(
     double? West = null,
     double? North = null,
     double? East = null,
-    string? Place = null);
+    string? Place = null,
+    string[]? Places = null);
 
 public sealed record SmartCollectionDateRangeRequest(
     string From,

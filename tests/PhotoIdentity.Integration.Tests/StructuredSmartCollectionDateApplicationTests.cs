@@ -54,7 +54,7 @@ public sealed class StructuredSmartCollectionDateApplicationTests
 
                 await using SqliteDataReader reader = await persisted.ExecuteReaderAsync();
                 Assert.True(await reader.ReadAsync());
-                Assert.Equal(2, reader.GetInt32(0));
+                Assert.Equal(3, reader.GetInt32(0));
                 string json = reader.GetString(1);
                 Assert.Contains("\"taken\":{\"from\":\"2020-01-01\",\"to\":\"2021-12-31\"}", json);
                 Assert.DoesNotContain("2020-2021", json, StringComparison.Ordinal);

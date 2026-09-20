@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 20;
+    public const int CurrentSchemaVersion = 21;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -888,6 +888,36 @@ public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
         PRAGMA user_version = 20;
         """;
 
+    private const string VersionTwentyOneMigration = """
+        CREATE TABLE smart_collections_v21 (
+            id TEXT NOT NULL PRIMARY KEY,
+            normalized_name TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            filter_schema_version INTEGER NOT NULL CHECK (filter_schema_version IN (1, 2, 3)),
+            filter_json TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            CHECK (length(normalized_name) BETWEEN 1 AND 120),
+            CHECK (length(display_name) BETWEEN 1 AND 120),
+            CHECK (length(filter_json) > 0)
+        );
+        INSERT INTO smart_collections_v21 (
+            id, normalized_name, display_name, filter_schema_version,
+            filter_json, created_at_utc, updated_at_utc)
+        SELECT
+            id, normalized_name, display_name, filter_schema_version,
+            filter_json, created_at_utc, updated_at_utc
+        FROM smart_collections;
+        DROP TABLE smart_collections;
+        ALTER TABLE smart_collections_v21 RENAME TO smart_collections;
+        CREATE INDEX ix_smart_collections_name
+            ON smart_collections (normalized_name, id);
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (21, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 21;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -1044,6 +1074,15 @@ public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
         if (version < 20)
         {
             await ApplyMigrationAsync(connection, VersionTwentyMigration, cancellationToken);
+            version = 20;
+        }
+
+        if (version < 21)
+        {
+            await ApplyMigrationWithForeignKeysDisabledAsync(
+                connection,
+                VersionTwentyOneMigration,
+                cancellationToken);
         }
     }
 

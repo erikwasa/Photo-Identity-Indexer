@@ -11,7 +11,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 
 public sealed class PostgresSmartCollectionRepository : ISmartCollectionRepository
 {
-    private const int FilterSchemaVersion = 2;
+    private const int FilterSchemaVersion = 3;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly PostgresCatalogueDatabase _database;
@@ -204,7 +204,7 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
     private static SmartCollectionDefinition ReadDefinition(NpgsqlDataReader reader)
     {
         int filterSchemaVersion = reader.GetInt32(2);
-        if (filterSchemaVersion is not 1 and not FilterSchemaVersion)
+        if (filterSchemaVersion is < 1 or > FilterSchemaVersion)
         {
             throw new InvalidDataException(
                 $"Smart collection filter schema version {filterSchemaVersion} is not supported.");
@@ -219,13 +219,13 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
     }
 
     private static SmartCollectionFilter CanonicalizeFilter(SmartCollectionFilter filter) => new(
-        filter.People.OrderBy(person => person.ToString(), StringComparer.Ordinal),
-        filter.PeopleMatch,
-        filter.Tags.OrderBy(tag => tag, StringComparer.Ordinal),
-        filter.TagMatch,
-        filter.Location,
-        filter.Taken,
-        filter.LocationPlace);
+        people: filter.People.OrderBy(person => person.ToString(), StringComparer.Ordinal),
+        peopleMatch: filter.PeopleMatch,
+        tags: filter.Tags.OrderBy(tag => tag, StringComparer.Ordinal),
+        tagMatch: filter.TagMatch,
+        location: filter.Location,
+        taken: filter.Taken,
+        locationPlaces: filter.LocationPlaces);
 
     private static string SerializeFilter(SmartCollectionFilter filter)
     {
@@ -234,14 +234,15 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
             filter.PeopleMatch,
             filter.Tags.ToArray(),
             filter.TagMatch,
-            filter.Location is null && filter.LocationPlace is null
+            filter.Location is null && filter.LocationPlaces.Count == 0
                 ? null
                 : new PersistedLocation(
-                    filter.LocationPlace,
-                    filter.Location?.South,
-                    filter.Location?.West,
-                    filter.Location?.North,
-                    filter.Location?.East),
+                    Place: null,
+                    South: filter.Location?.South,
+                    West: filter.Location?.West,
+                    North: filter.Location?.North,
+                    East: filter.Location?.East,
+                    Places: filter.LocationPlaces.ToArray()),
             filter.Taken is null
                 ? null
                 : new PersistedTaken(
@@ -265,7 +266,8 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
             payload.Taken is null
                 ? null
                 : new SmartCollectionDateRange(ParseDate(payload.Taken.From), ParseDate(payload.Taken.To)),
-            payload.Location?.Place);
+            locationPlace: payload.Location?.Place,
+            locationPlaces: payload.Location?.Places);
     }
 
     private static SmartCollectionGeoBounds? ParseBounds(PersistedLocation? location)
@@ -322,7 +324,8 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
         double? South = null,
         double? West = null,
         double? North = null,
-        double? East = null);
+        double? East = null,
+        string[]? Places = null);
 
     private sealed record PersistedTaken(string From, string To);
 }

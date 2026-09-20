@@ -17,7 +17,7 @@ Current work items: **25**. Archived terminal items: **131**.
 | [WI-0141](../work-items/WI-0141-manual-capture-date-model.md) Add manual capture-date overrides with provenance and precision | M28 | in_progress | ai-agent | [YAML](work-items/active/WI-0141.yaml) |
 | [WI-0142](../work-items/WI-0142-manual-capture-date-editor.md) Add manual and imprecise capture-date editing to Photo Details | M28 | in_progress | ai-agent | [YAML](work-items/active/WI-0142.yaml) |
 | [WI-0143](../work-items/WI-0143-structured-smart-collection-date-controls.md) Replace Smart Collection date free text with structured controls | M28 | in_progress | ai-agent | [YAML](work-items/active/WI-0143.yaml) |
-| [WI-0144](../work-items/WI-0144-smart-collection-multiple-locations.md) Allow Smart Collections to match any of multiple named locations | M28 | proposed | unassigned | [YAML](work-items/active/WI-0144.yaml) |
+| [WI-0144](../work-items/WI-0144-smart-collection-multiple-locations.md) Allow Smart Collections to match any of multiple named locations | M28 | in_progress | ai-agent | [YAML](work-items/active/WI-0144.yaml) |
 | [WI-0145](../work-items/WI-0145-manual-slideshow-collection-model.md) Add explicit photo-list collections for manually assembled slideshows | M28 | ready | unassigned | [YAML](work-items/active/WI-0145.yaml) |
 | [WI-0146](../work-items/WI-0146-manual-slideshow-curation-ui.md) Add manual slideshow curation and launch UI | M28 | proposed | unassigned | [YAML](work-items/active/WI-0146.yaml) |
 | [WI-0147](../work-items/WI-0147-postgres-only-runtime-composition.md) Make PostgreSQL the unconditional runtime catalogue | M29 | ready | unassigned | [YAML](work-items/active/WI-0147.yaml) |

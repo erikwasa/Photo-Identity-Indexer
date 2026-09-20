@@ -470,19 +470,20 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 """);
         }
 
-        if (filter.LocationPlace is not null)
+        if (filter.LocationPlaces.Count > 0)
         {
-            predicates.Add("""
+            string places = string.Join(
+                " OR ",
+                Enumerable.Range(0, filter.LocationPlaces.Count).Select(index =>
+                    $"(effective_revision_places.normalized_value = @location_place_{index} " +
+                    $"OR substr(effective_revision_places.normalized_value, 1, length(@location_place_{index}) + 1) = @location_place_{index} || '/')"));
+
+            predicates.Add($"""
                 AND EXISTS (
                     SELECT 1
                     FROM effective_revision_places
                     WHERE effective_revision_places.revision_id = asset_revisions.id
-                      AND (
-                          effective_revision_places.normalized_value = @location_place
-                          OR substr(
-                              effective_revision_places.normalized_value,
-                              1,
-                              length(@location_place) + 1) = @location_place || '/'))
+                      AND ({places}))
                 """);
         }
 
@@ -515,9 +516,12 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         }
         command.Parameters.AddWithValue("tag_count", NpgsqlDbType.Integer, filter.Tags.Count);
 
-        if (filter.LocationPlace is not null)
+        for (int index = 0; index < filter.LocationPlaces.Count; index++)
         {
-            command.Parameters.AddWithValue("location_place", NpgsqlDbType.Text, filter.LocationPlace);
+            command.Parameters.AddWithValue(
+                $"location_place_{index}",
+                NpgsqlDbType.Text,
+                filter.LocationPlaces[index]);
         }
 
         if (filter.Location is not null)

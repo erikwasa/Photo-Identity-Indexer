@@ -45,7 +45,8 @@ public sealed class NavigationContextTests
             "Sweden/Stockholm region/Norrtälje",
             TakenMode: SmartCollectionDateModes.Range,
             TakenFrom: "2025-05-01",
-            TakenTo: "2025-05-10");
+            TakenTo: "2025-05-10",
+            Places: ["Sweden/Stockholm region", "Sweden/Uppsala län"]);
 
         string json = SmartCollectionNavigation.SerializeTransientState(state);
         SmartCollectionTransientNavigationState? restored = SmartCollectionNavigation.DeserializeTransientState(json);
@@ -67,6 +68,7 @@ public sealed class NavigationContextTests
         Assert.Equal(SmartCollectionDateModes.Range, restored.TakenMode);
         Assert.Equal("2025-05-01", restored.TakenFrom);
         Assert.Equal("2025-05-10", restored.TakenTo);
+        Assert.Equal(state.Places, restored.Places);
     }
 
     [Fact]

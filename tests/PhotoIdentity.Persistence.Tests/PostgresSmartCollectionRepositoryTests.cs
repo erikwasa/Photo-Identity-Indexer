@@ -61,13 +61,16 @@ public sealed class PostgresSmartCollectionRepositoryTests
                     tagMatch: SmartCollectionMatchModes.All,
                     location: new SmartCollectionGeoBounds(40, 10, 44, 15),
                     taken: SmartCollectionDateRange.Parse("2025/05/01-2025/05/10"),
-                    locationPlace: "Sweden/Stockholm"));
+                    locationPlaces: ["Sweden/Stockholm", "Norway/Oslo"]));
 
             Assert.Equal("Summer 2025", created.Name);
             Assert.Equal(SmartCollectionMatchModes.Any, created.Filter.PeopleMatch);
             Assert.Equal(SmartCollectionMatchModes.All, created.Filter.TagMatch);
             Assert.Equal(["family", "trips/italy"], created.Filter.Tags);
-            Assert.Equal("places/sweden/stockholm", created.Filter.LocationPlace);
+            Assert.Equal(
+                ["places/norway/oslo", "places/sweden/stockholm"],
+                created.Filter.LocationPlaces);
+            Assert.Null(created.Filter.LocationPlace);
             Assert.Equal(new DateOnly(2025, 5, 1), created.Filter.Taken?.From);
             Assert.Equal(new DateOnly(2025, 5, 10), created.Filter.Taken?.To);
 
@@ -79,7 +82,7 @@ public sealed class PostgresSmartCollectionRepositoryTests
             Assert.Equal(
                 created.Filter.People.Select(person => person.ToString()),
                 reopened.Filter.People.Select(person => person.ToString()));
-            Assert.Equal(created.Filter.LocationPlace, reopened.Filter.LocationPlace);
+            Assert.Equal(created.Filter.LocationPlaces, reopened.Filter.LocationPlaces);
 
             await using (NpgsqlConnection persistedConnection = new(testBuilder.ConnectionString))
             {
@@ -93,12 +96,56 @@ public sealed class PostgresSmartCollectionRepositoryTests
                 persistedFilter.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, created.Id.Value);
                 await using NpgsqlDataReader reader = await persistedFilter.ExecuteReaderAsync();
                 Assert.True(await reader.ReadAsync());
-                Assert.Equal(2, reader.GetInt32(0));
+                Assert.Equal(3, reader.GetInt32(0));
                 using JsonDocument filterDocument = JsonDocument.Parse(reader.GetString(1));
                 JsonElement taken = filterDocument.RootElement.GetProperty("taken");
                 Assert.Equal("2025-05-01", taken.GetProperty("from").GetString());
                 Assert.Equal("2025-05-10", taken.GetProperty("to").GetString());
+
+                string[] persistedPlaces = filterDocument.RootElement
+                    .GetProperty("location")
+                    .GetProperty("places")
+                    .EnumerateArray()
+                    .Select(value => value.GetString() ?? string.Empty)
+                    .ToArray();
+                Assert.Equal(
+                    ["places/norway/oslo", "places/sweden/stockholm"],
+                    persistedPlaces);
             }
+
+            SmartCollectionId legacyV2Id = SmartCollectionId.New();
+            await using (NpgsqlConnection legacyConnection = new(testBuilder.ConnectionString))
+            {
+                await legacyConnection.OpenAsync();
+                await using NpgsqlCommand insertLegacy = legacyConnection.CreateCommand();
+                insertLegacy.CommandText = """
+                    INSERT INTO smart_collections (
+                        id,
+                        normalized_name,
+                        display_name,
+                        filter_schema_version,
+                        filter_json,
+                        created_at_utc,
+                        updated_at_utc)
+                    VALUES (
+                        @id,
+                        'legacy stockholm',
+                        'Legacy Stockholm',
+                        2,
+                        '{"people":[],"peopleMatch":"all","tags":[],"tagMatch":"all","location":{"place":"places/sweden/stockholm","south":null,"west":null,"north":null,"east":null},"taken":null}'::jsonb,
+                        @now,
+                        @now);
+                    """;
+                insertLegacy.Parameters.AddWithValue("id", NpgsqlDbType.Uuid, legacyV2Id.Value);
+                insertLegacy.Parameters.AddWithValue("now", NpgsqlDbType.TimestampTz, DateTimeOffset.UtcNow);
+                await insertLegacy.ExecuteNonQueryAsync();
+            }
+
+            SmartCollectionDefinition legacyV2 =
+                await repository.GetAsync(legacyV2Id)
+                ?? throw new InvalidOperationException("Legacy v2 Smart Collection could not be reopened.");
+            Assert.Equal(["places/sweden/stockholm"], legacyV2.Filter.LocationPlaces);
+            Assert.Equal("places/sweden/stockholm", legacyV2.Filter.LocationPlace);
 
             await Assert.ThrowsAsync<SmartCollectionNameConflictException>(() => repository.CreateAsync(
                 "summer 2025",
@@ -126,6 +173,7 @@ public sealed class PostgresSmartCollectionRepositoryTests
             Assert.True(await repository.DeleteAsync(created.Id));
             Assert.False(await repository.DeleteAsync(created.Id));
             Assert.Null(await repository.GetAsync(created.Id));
+            Assert.True(await repository.DeleteAsync(legacyV2Id));
 
             await using NpgsqlConnection verificationConnection = new(testBuilder.ConnectionString);
             await verificationConnection.OpenAsync();
@@ -479,6 +527,13 @@ public sealed class PostgresSmartCollectionRepositoryTests
 
             PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
             PostgresSmartCollectionQueryRepository query = new(database, definitions, TimeProvider.System);
+
+            SmartCollectionPhotoPage anyNamedPlace = await query.QueryAsync(
+                new SmartCollectionFilter(locationPlaces: ["Sweden", "Norway/Oslo"]));
+            Assert.Equal(2, anyNamedPlace.Total);
+            Assert.Contains(anyNamedPlace.Items, item => item.RevisionId == matching);
+            Assert.Contains(anyNamedPlace.Items, item => item.RevisionId == wrongLocation);
+
             SmartCollectionFilter filter = new(
                 people: [alice],
                 peopleMatch: SmartCollectionMatchModes.All,
@@ -486,7 +541,7 @@ public sealed class PostgresSmartCollectionRepositoryTests
                 tagMatch: SmartCollectionMatchModes.All,
                 location: new SmartCollectionGeoBounds(40, 10, 44, 15),
                 taken: SmartCollectionDateRange.Parse("2025/05/01-2025/05/10"),
-                locationPlace: "Sweden");
+                locationPlaces: ["Sweden", "Norway/Oslo"]);
 
             SmartCollectionPhotoPage result = await query.QueryAsync(filter);
 

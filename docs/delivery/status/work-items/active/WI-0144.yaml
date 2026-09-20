@@ -1,11 +1,17 @@
 id: WI-0144
 title: Allow Smart Collections to match any of multiple named locations
 milestone: M28
-status: proposed
-owner: unassigned
+status: in_progress
+owner: ai-agent
 document: ../work-items/WI-0144-smart-collection-multiple-locations.md
+started_at: 2026-09-20
+last_updated_at: 2026-09-20
+branch: agent/WI-0144-multiple-smart-collection-locations
 blockers:
 - WI-0063
 - WI-0140
-blocker_notes: []
-evidence: []
+blocker_notes:
+- Automated implementation is ready in pull request 398; desktop/phone multi-selection verification is intentionally bundled with the later M28 verification pass.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/398
