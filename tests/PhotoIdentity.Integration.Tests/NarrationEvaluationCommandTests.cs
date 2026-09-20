@@ -23,6 +23,8 @@ public sealed class NarrationEvaluationCommandTests
         Assert.Equal(collection, options.CollectionId.Value);
         Assert.Equal(OllamaVisionCaptionClient.DefaultBaseUri, options.OllamaBaseUri);
         Assert.Equal(OllamaVisionCaptionClient.DefaultModel, options.Model);
+        Assert.Equal("proxy", options.CaptionImageMode);
+        Assert.Equal(4096, options.OllamaContextTokens);
         Assert.Equal(50, options.TargetCount);
         Assert.Equal(30, options.MomentGapMinutes);
         Assert.Equal(12, options.SampleCount);
@@ -61,6 +63,18 @@ public sealed class NarrationEvaluationCommandTests
                 "--model", "one",
                 "--model", "two",
             ]));
+        Assert.Throws<ArgumentException>(() =>
+            NarrationEvaluationCommandOptions.Parse(
+            [
+                .. required,
+                "--caption-image-mode", "original",
+            ]));
+        Assert.Throws<ArgumentException>(() =>
+            NarrationEvaluationCommandOptions.Parse(
+            [
+                .. required,
+                "--ollama-context", "128",
+            ]));
 
         NarrationEvaluationCommandOptions options =
             NarrationEvaluationCommandOptions.Parse(
@@ -68,12 +82,16 @@ public sealed class NarrationEvaluationCommandTests
                 .. required,
                 "--ollama-base-url", "http://localhost:11434",
                 "--model", "qwen2.5vl:3b",
+                "--caption-image-mode", "thumbnail",
+                "--ollama-context", "1024",
                 "--sample-count", "20",
                 "--report", "report.json",
                 "--review-output", "review",
             ]);
 
         Assert.True(options.OllamaBaseUri.IsLoopback);
+        Assert.Equal("thumbnail", options.CaptionImageMode);
+        Assert.Equal(1024, options.OllamaContextTokens);
         Assert.Equal(20, options.SampleCount);
         Assert.Equal(Path.GetFullPath("report.json"), options.ReportPath);
         Assert.Equal(Path.GetFullPath("review"), options.ReviewOutputDirectory);
