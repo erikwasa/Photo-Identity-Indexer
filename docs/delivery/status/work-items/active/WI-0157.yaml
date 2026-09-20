@@ -1,9 +1,10 @@
 id: WI-0157
 title: Add reduced-precision place fallback for GPS photos without populated-place matches
 milestone: M28
-status: proposed
-owner: unassigned
+status: in_progress
+owner: ai-agent
 document: ../work-items/WI-0157-reduced-precision-place-fallback.md
+started_at: 2026-09-21
 blockers:
 - WI-0064
 - WI-0065
