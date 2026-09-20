@@ -124,6 +124,7 @@ public sealed class PostgresPhotoCaptionRepository : IPhotoCaptionRepository
                AND caption.prompt_version = @prompt_version
                AND caption.image_mode = @image_mode
                AND caption.context_tokens = @context_tokens
+               AND caption.content IS NOT NULL
             WHERE asset.deleted_at_utc IS NULL
               AND caption.asset_revision_id IS NULL
             ORDER BY asset.source_key, revision.id
