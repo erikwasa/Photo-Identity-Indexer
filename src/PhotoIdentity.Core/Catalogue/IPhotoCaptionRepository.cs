@@ -78,6 +78,7 @@ public interface IPhotoCaptionRepository
         string language,
         string generationVersion,
         string modelId,
+        string modelDigest,
         string promptVersion,
         string imageMode,
         int contextTokens,
