@@ -136,6 +136,28 @@
     transition: width 100ms linear;
 }
 
+.slideshow-caption {
+    position: fixed;
+    right: max(1rem, env(safe-area-inset-right));
+    bottom: calc(max(1.25rem, env(safe-area-inset-bottom)) + 0.75rem);
+    left: max(1rem, env(safe-area-inset-left));
+    z-index: 3;
+    width: fit-content;
+    max-width: min(52rem, calc(100vw - 2rem));
+    margin-inline: auto;
+    padding: 0.7rem 1rem;
+    border-radius: 0.8rem;
+    background: rgb(0 0 0 / 68%);
+    box-shadow: 0 0.35rem 1.25rem rgb(0 0 0 / 32%);
+    color: #fff;
+    font-size: clamp(1rem, 2.4vw, 1.35rem);
+    line-height: 1.35;
+    text-align: center;
+    text-shadow: 0 1px 2px #000;
+    backdrop-filter: blur(6px);
+    pointer-events: none;
+}
+
 .slideshow-image-error {
     position: fixed;
     right: 1rem;
