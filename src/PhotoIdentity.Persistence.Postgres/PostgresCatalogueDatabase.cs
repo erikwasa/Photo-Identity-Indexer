@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 28;
+    public const int CurrentSchemaVersion = 29;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1237,6 +1237,14 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
                     asset_revision_id,
                     language,
                     generated_at_utc DESC);
+            """),
+        new(29, "smart-collection-multiple-locations", """
+            ALTER TABLE smart_collections
+                DROP CONSTRAINT smart_collections_filter_schema_version_check;
+
+            ALTER TABLE smart_collections
+                ADD CONSTRAINT smart_collections_filter_schema_version_check
+                CHECK (filter_schema_version IN (1, 2, 3));
             """),
     ];
 
