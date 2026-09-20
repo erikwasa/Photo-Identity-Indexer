@@ -55,8 +55,7 @@ public sealed class GeneratedCreativeTextEvidenceTests
             revision,
             new DateTime(2026, 9, 20, 10, 30, 0),
             CreativeCollectionCandidateKinds.DirectAnchor,
-            "direct-anchor",
-            "moment-1");
+            []);
 
         string caption = CreativeCollectionDeterministicCaption.Build(
             candidate,
