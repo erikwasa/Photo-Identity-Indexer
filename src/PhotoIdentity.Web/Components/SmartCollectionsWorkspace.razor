@@ -216,7 +216,7 @@
                                      EmptyLabel="Search named places"
                                      Value="@PendingPlace"
                                      ValueChanged="AddPlaceAsync"
-                                     Disabled="@(Busy || SelectedPlaces.Count >= MaximumSelectedPlaces)" />
+                                     Disabled="@Busy" />
 
                         @if (SelectedPlaces.Count > 0)
                         {
