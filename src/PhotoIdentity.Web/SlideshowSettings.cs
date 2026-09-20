@@ -10,7 +10,9 @@ public sealed record SlideshowSettings(
     string Orientation,
     string AfterLastPhoto,
     bool ProtectedSlideshow,
-    bool PrepareOriginals)
+    bool PrepareOriginals,
+    bool GeneratedCaptions,
+    string CaptionLanguage)
 {
     public const string StorageKey = "photoidentity.slideshow.settings.v1";
     public const string CurrentOrientation = "current";
@@ -19,6 +21,9 @@ public sealed record SlideshowSettings(
     public const string Loop = "loop";
     public const string Stop = "stop";
     public const string Exit = "exit";
+    public const string SwedishCaptionLanguage = "sv";
+    public const string EnglishCaptionLanguage = "en";
+    public const string DefaultCaptionLanguage = SwedishCaptionLanguage;
     public const int DefaultImageDurationSeconds = 5;
     public const int MinimumImageDurationSeconds = 1;
     public const int MaximumImageDurationSeconds = 60;
@@ -33,7 +38,9 @@ public sealed record SlideshowSettings(
         Orientation: CurrentOrientation,
         AfterLastPhoto: Loop,
         ProtectedSlideshow: true,
-        PrepareOriginals: false);
+        PrepareOriginals: false,
+        GeneratedCaptions: false,
+        CaptionLanguage: DefaultCaptionLanguage);
 
     public SlideshowSettings Normalize()
     {
@@ -42,11 +49,13 @@ public sealed record SlideshowSettings(
             : DefaultImageDurationSeconds;
         string endBehavior = NormalizeEndBehavior(AfterLastPhoto);
         string orientation = NormalizeOrientation(Orientation);
+        string captionLanguage = NormalizeCaptionLanguage(CaptionLanguage);
         return this with
         {
             ImageDurationSeconds = duration,
             Orientation = orientation,
             AfterLastPhoto = endBehavior,
+            CaptionLanguage = captionLanguage,
         };
     }
 
@@ -80,7 +89,9 @@ public sealed record SlideshowSettings(
                 NormalizeOrientation(persisted.Orientation),
                 NormalizeEndBehavior(persisted.AfterLastPhoto),
                 persisted.ProtectedSlideshow ?? Defaults.ProtectedSlideshow,
-                persisted.PrepareOriginals ?? Defaults.PrepareOriginals);
+                persisted.PrepareOriginals ?? Defaults.PrepareOriginals,
+                persisted.GeneratedCaptions ?? Defaults.GeneratedCaptions,
+                NormalizeCaptionLanguage(persisted.CaptionLanguage));
         }
         catch (JsonException)
         {
@@ -97,6 +108,17 @@ public sealed record SlideshowSettings(
             PortraitOrientation => PortraitOrientation,
             LandscapeOrientation => LandscapeOrientation,
             _ => CurrentOrientation,
+        };
+    }
+
+    private static string NormalizeCaptionLanguage(string? value)
+    {
+        string normalized = value?.Trim().ToLowerInvariant() ?? DefaultCaptionLanguage;
+        return normalized switch
+        {
+            SwedishCaptionLanguage => SwedishCaptionLanguage,
+            EnglishCaptionLanguage => EnglishCaptionLanguage,
+            _ => DefaultCaptionLanguage,
         };
     }
 
@@ -120,5 +142,7 @@ public sealed record SlideshowSettings(
         string? Orientation = null,
         string? AfterLastPhoto = null,
         bool? ProtectedSlideshow = null,
-        bool? PrepareOriginals = null);
+        bool? PrepareOriginals = null,
+        bool? GeneratedCaptions = null,
+        string? CaptionLanguage = null);
 }

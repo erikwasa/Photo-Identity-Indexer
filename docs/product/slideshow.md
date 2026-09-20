@@ -46,8 +46,20 @@ V1 settings are global across collections and slideshow sessions **within the sa
 | After last photo | Loop | Choices: Loop, Stop on last photo, Exit slideshow. |
 | Protected slideshow | On | Hide ordinary exit/settings controls and require the parent unlock gesture. |
 | Prepare originals | Off | Explicitly prepare and retain best-quality originals for uninterrupted playback when storage policy permits. |
+| Generated captions (local AI) | Off | Queue bounded local caption generation for photos encountered during playback; ordinary playback never waits for inference. |
+| Caption language | Svenska | Choices: Svenska or English. This preference is used only when generated captions are enabled. |
 
 `Exit slideshow` is intentionally available as an end behavior but is not the toddler-safe default. Loop is the default.
+
+## Optional local generated captions
+
+Generated captions are an M26 presentation enhancement and remain disabled by default. When enabled, Photo Identity submits only an existing durable review proxy, reduced in memory to a 480x320 JPEG, to the configured loopback Ollama runtime. It does not send photos to remote model APIs and it does not make generated prose canonical photo metadata.
+
+Caption generation is deliberately asynchronous because the accepted maintainer hardware measurement remains roughly 96 seconds per thumbnail caption. A single bounded server worker generates only photos encountered while caption-enabled playback is running. The slideshow continues at normal speed; an uncached photo may therefore show no caption on its first view. Successful guarded captions are stored in a local regenerable derived cache and appear immediately on later views. Queue pressure never blocks slideshow playback.
+
+The generated-text guard screens unsupported relationship, event, date/year, age and possible proper-name/location claims before display. Flagged output is retained only as blocked derived evidence and is not shown. Swedish and English have separate versioned prompts/cache entries; Swedish is the default presentation language.
+
+The local Ollama runtime and model are operator-managed prerequisites rather than package dependencies. Caption failure or runtime absence is non-fatal to slideshow playback.
 
 ## Protected slideshow mode
 
