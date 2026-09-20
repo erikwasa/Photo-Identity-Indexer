@@ -167,7 +167,7 @@
                                Presented="OnCurrentImagePresentedAsync"
                                Failed="OnCurrentImageError" />
 
-        @if (Settings.GeneratedCaptions && !string.IsNullOrWhiteSpace(CurrentCaption))
+        @if (Settings.ShowCaptions && !string.IsNullOrWhiteSpace(CurrentCaption))
         {
             <div class="slideshow-caption" aria-live="polite">@CurrentCaption</div>
         }
@@ -371,9 +371,9 @@
             return;
         }
 
-        if (Settings.GeneratedCaptions)
+        if (Settings.ShowCaptions)
         {
-            await RequestCaptionAsync(presentedRevisionId);
+            await LoadCaptionAsync(presentedRevisionId);
         }
 
         try
