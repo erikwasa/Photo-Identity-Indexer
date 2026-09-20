@@ -1,0 +1,15 @@
+id: WI-0157
+title: Add opt-in local multilingual slideshow captions
+milestone: M26
+status: in_progress
+owner: ai-agent
+document: ../work-items/WI-0157-opt-in-local-slideshow-captions.md
+started_at: 2026-09-20
+last_updated_at: 2026-09-20
+branch: agent/WI-0157-opt-in-local-slideshow-captions
+blockers:
+- WI-0128
+- WI-0084
+blocker_notes:
+- WI-0128 has positive maintainer evidence and is completed in this integration branch; WI-0084 is already completed. Final completion waits for CI and maintainer slideshow verification.
+evidence: []
