@@ -15,7 +15,13 @@ public sealed record SmartCollectionTransientNavigationState(
     string West,
     string North,
     string East,
-    string? Place = null);
+    string? Place = null,
+    string? TakenMode = null,
+    string? TakenYear = null,
+    string? TakenMonth = null,
+    string? TakenDate = null,
+    string? TakenFrom = null,
+    string? TakenTo = null);
 
 public static class SmartCollectionNavigation
 {
