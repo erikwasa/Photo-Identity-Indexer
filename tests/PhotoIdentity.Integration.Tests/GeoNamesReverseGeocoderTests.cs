@@ -178,6 +178,118 @@ public sealed class GeoNamesReverseGeocoderTests
     }
 
     [Fact]
+    public async Task Populated_place_no_result_falls_back_to_administrative_hierarchy_without_inventing_locality()
+    {
+        CapturingHandler handler = new(request =>
+        {
+            string path = request.RequestUri?.AbsolutePath ?? "";
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(path.EndsWith("/countrySubdivisionJSON", StringComparison.Ordinal)
+                    ? """
+                        {
+                          "countryName": "Sverige",
+                          "countryCode": "SE",
+                          "adminName1": "Stockholms län",
+                          "adminName2": "Norrtälje kommun"
+                        }
+                        """
+                    : """{ "geonames": [] }""")
+            };
+        });
+        using HttpClient client = new(handler);
+        GeoNamesReverseGeocodingConfiguration configuration = new(
+            "private-user",
+            null,
+            "local",
+            minimumRequestIntervalMilliseconds: 0);
+        using GeoNamesReverseGeocoder geocoder = new(
+            configuration,
+            new SingleClientFactory(client),
+            TimeProvider.System);
+
+        ReverseGeocodeResponse response = await geocoder.ReverseGeocodeAsync(
+            new ReverseGeocodeQuery(59.9, 18.8));
+
+        Assert.Equal(ReverseGeocodeStatus.Success, response.Status);
+        Assert.Equal("Sverige/Stockholms län/Norrtälje kommun", response.Place?.Place.DisplayValue);
+        Assert.Equal("SE", response.Place?.CountryCode);
+        Assert.Equal(2, response.ProviderRequestCount);
+        Assert.Equal(2, handler.RequestUris.Count);
+        Assert.EndsWith("/findNearbyPlaceNameJSON", handler.RequestUris[0].AbsolutePath, StringComparison.Ordinal);
+        Assert.EndsWith("/countrySubdivisionJSON", handler.RequestUris[1].AbsolutePath, StringComparison.Ordinal);
+        Assert.Contains("lang=local", handler.RequestUris[1].Query);
+        Assert.Contains("username=private-user", handler.RequestUris[1].Query);
+        Assert.DoesNotContain("maxRows", handler.RequestUris[1].Query, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("filename", handler.RequestUris[1].Query, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("person", handler.RequestUris[1].Query, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("fallback=countrySubdivision+countryCode", configuration.ContractKey);
+    }
+
+    [Fact]
+    public async Task Administrative_fallback_accepts_country_only_result()
+    {
+        CapturingHandler handler = new(request =>
+        {
+            string path = request.RequestUri?.AbsolutePath ?? "";
+            string response = path.EndsWith("/countryCodeJSON", StringComparison.Ordinal)
+                ? """
+                    {
+                      "countryName": "Iceland",
+                      "countryCode": "IS"
+                    }
+                    """
+                : path.EndsWith("/countrySubdivisionJSON", StringComparison.Ordinal)
+                    ? """{ "status": { "message": "no subdivision", "value": 15 } }"""
+                    : """{ "geonames": [] }""";
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(response)
+            };
+        });
+        using HttpClient client = new(handler);
+        using GeoNamesReverseGeocoder geocoder = new(
+            new GeoNamesReverseGeocodingConfiguration("private-user", null, "en", 0),
+            new SingleClientFactory(client),
+            TimeProvider.System);
+
+        ReverseGeocodeResponse response = await geocoder.ReverseGeocodeAsync(
+            new ReverseGeocodeQuery(64.9, -18.6));
+
+        Assert.Equal(ReverseGeocodeStatus.Success, response.Status);
+        Assert.Equal("Iceland", response.Place?.Place.DisplayValue);
+        Assert.Equal("IS", response.Place?.CountryCode);
+        Assert.Equal(3, response.ProviderRequestCount);
+        Assert.Equal(3, handler.RequestUris.Count);
+        Assert.EndsWith("/countryCodeJSON", handler.RequestUris[2].AbsolutePath, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Administrative_and_country_fallback_no_result_is_terminal_and_distinguishable()
+    {
+        CapturingHandler handler = new(request => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(
+                request.RequestUri?.AbsolutePath.EndsWith("/countrySubdivisionJSON", StringComparison.Ordinal) == true
+                    ? "{}"
+                    : """{ "geonames": [] }""")
+        });
+        using HttpClient client = new(handler);
+        using GeoNamesReverseGeocoder geocoder = new(
+            new GeoNamesReverseGeocodingConfiguration("private-user", null, "en", 0),
+            new SingleClientFactory(client),
+            TimeProvider.System);
+
+        ReverseGeocodeResponse response = await geocoder.ReverseGeocodeAsync(
+            new ReverseGeocodeQuery(0, -140));
+
+        Assert.Equal(ReverseGeocodeStatus.NoResult, response.Status);
+        Assert.Equal("geography-no-result", response.ErrorCode);
+        Assert.Contains("administrative subdivision or country", response.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(3, response.ProviderRequestCount);
+    }
+
+    [Fact]
     public void Configuration_rejects_demo_account_non_https_service_urls_and_invalid_pacing()
     {
         Assert.Throws<InvalidOperationException>(() =>

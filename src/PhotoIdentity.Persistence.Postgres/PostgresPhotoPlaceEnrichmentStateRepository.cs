@@ -57,7 +57,19 @@ public sealed class PostgresPhotoPlaceEnrichmentStateRepository :
             WHERE metadata.latitude IS NOT NULL
               AND metadata.longitude IS NOT NULL
               AND (
-                    attempt.asset_revision_id IS NULL
+                    (
+                        attempt.asset_revision_id IS NULL
+                        AND (
+                            @refresh
+                            OR NOT EXISTS (
+                                SELECT 1
+                                FROM photo_place_enrichment_attempts AS prior
+                                WHERE prior.asset_revision_id = metadata.asset_revision_id
+                                  AND prior.provider = @provider
+                                  AND prior.contract_key <> @contract_key
+                                  AND prior.latitude = metadata.latitude
+                                  AND prior.longitude = metadata.longitude
+                                  AND prior.status = 'succeeded')))
                     OR attempt.latitude <> metadata.latitude
                     OR attempt.longitude <> metadata.longitude
                     OR (
