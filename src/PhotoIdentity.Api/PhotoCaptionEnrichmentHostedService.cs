@@ -203,6 +203,39 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
             return MissingProxyDelay;
         }
 
+        PhotoGeneratedCaption? legacy =
+            await _captions.GetLatestAsync(
+                selectedRevision.Value,
+                language,
+                cancellationToken);
+        if (CanPromoteLegacyEvidence(
+                legacy,
+                model,
+                promptVersion))
+        {
+            IReadOnlyList<string> promotedRiskFlags =
+                GeneratedCreativeTextGuard.Evaluate(legacy!.Content!);
+            now = _timeProvider.GetUtcNow();
+            await _captions.SaveAsync(
+                legacy with
+                {
+                    GenerationVersion =
+                        PhotoCaptionGenerationConfiguration.GenerationVersion,
+                    RiskFlags = promotedRiskFlags,
+                    GeneratedAtUtc = now,
+                },
+                cancellationToken);
+
+            _state.Update(
+                "running",
+                promotedRiskFlags.Count == 0
+                    ? $"Re-evaluated and accepted one {LanguageLabel(language)} caption under the current claim guard."
+                    : "Re-evaluated one retained caption under the current claim guard; it remains blocked.",
+                now,
+                now.Add(ContinueDelay));
+            return ContinueDelay;
+        }
+
         LocalPhotoCaption generated = await _generator.GenerateAsync(
             proxy.Path,
             language,
@@ -245,6 +278,31 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
             now.Add(ContinueDelay));
         return ContinueDelay;
     }
+
+    private bool CanPromoteLegacyEvidence(
+        PhotoGeneratedCaption? caption,
+        LocalPhotoCaptionModel model,
+        string promptVersion) =>
+        caption is not null &&
+        string.Equals(
+            caption.GenerationVersion,
+            PhotoCaptionGenerationConfiguration.LegacyGenerationVersion,
+            StringComparison.Ordinal) &&
+        !string.IsNullOrWhiteSpace(caption.Content) &&
+        string.Equals(caption.ModelId, model.Name, StringComparison.Ordinal) &&
+        string.Equals(
+            caption.ModelDigest,
+            model.Digest,
+            StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(
+            caption.PromptVersion,
+            promptVersion,
+            StringComparison.Ordinal) &&
+        string.Equals(
+            caption.ImageMode,
+            PhotoCaptionGenerationConfiguration.ImageMode,
+            StringComparison.Ordinal) &&
+        caption.ContextTokens == _generation.ContextTokens;
 
     private static string LanguageLabel(string language) =>
         language == PhotoCaptionLanguages.Swedish ? "Swedish" : "English";
