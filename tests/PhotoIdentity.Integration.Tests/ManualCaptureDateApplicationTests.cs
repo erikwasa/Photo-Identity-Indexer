@@ -216,5 +216,5 @@ public sealed class ManualCaptureDateApplicationTests
     }
 
     private static string QuoteIdentifier(string value) =>
-        '"' + value.Replace(""", """", StringComparison.Ordinal) + '"';
+        "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
 }
