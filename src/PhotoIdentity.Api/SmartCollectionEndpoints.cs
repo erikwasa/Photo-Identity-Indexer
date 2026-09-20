@@ -391,18 +391,22 @@ public static class SmartCollectionEndpoints
             : string.IsNullOrWhiteSpace(taken)
                 ? null
                 : SmartCollectionDateRange.Parse(taken);
-        if (location?.Places is not null && !string.IsNullOrWhiteSpace(location.Place))
+        if (location?.Places is { Length: > 0 } && !string.IsNullOrWhiteSpace(location.Place))
         {
             throw new ArgumentException(
-                "Specify either Places or the legacy single Place value, not both.",
+                "Specify either populated Places or the legacy single Place value, not both.",
                 nameof(location));
         }
 
-        IEnumerable<string>? locationPlaces = location?.Places is not null
+        IEnumerable<string>? locationPlaces = location?.Places is { Length: > 0 }
             ? location.Places
-            : location?.Place is not null
+            : !string.IsNullOrWhiteSpace(location?.Place)
                 ? new[] { location.Place! }
-                : fallbackLocationPlaces;
+                : location?.Places is not null
+                    ? location.Places
+                    : location?.Place is not null
+                        ? new[] { location.Place }
+                        : fallbackLocationPlaces;
 
         return new SmartCollectionFilter(
             people: parsedPeople,
