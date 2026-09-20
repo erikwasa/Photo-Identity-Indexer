@@ -36,15 +36,15 @@ Transition duration, subtle motion, backdrop strength and timing bounds are perc
 
 ## Acceptance criteria
 
-- [ ] Maintainer real-device review confirms normal autoplay no longer feels like abrupt hard cuts.
-- [ ] No reproducible black flash, partially decoded frame or transition-state corruption remains in the representative acceptance set.
-- [ ] Rapid taps/swipes and loop boundaries remain stable.
-- [ ] Reduced-motion mode is calm and complete rather than visually broken.
-- [ ] Motion/backdrop defaults are either accepted, tuned or explicitly disabled with rationale; they are not exposed as settings merely to avoid choosing defaults.
-- [ ] `/slideshows` supports the intended choose -> tap -> watch path on both true-fullscreen browsers and the documented no-fullscreen fallback path.
-- [ ] Preparation failures still expose sufficient recovery information without polluting successful starts.
-- [ ] Browser diagnostics show no unacceptable playback-latency or resource-retention regression from M24.
-- [ ] M27 completion notes record tested devices/browser versions, representative scenarios and final tuned constants.
+- [x] Maintainer real-device review confirms normal autoplay no longer feels like abrupt hard cuts.
+- [x] No reproducible black flash, partially decoded frame or transition-state corruption remains in the representative acceptance set.
+- [x] Rapid taps/swipes and loop boundaries remain stable.
+- [x] Reduced-motion mode is calm and complete rather than visually broken.
+- [x] Motion/backdrop defaults are either accepted, tuned or explicitly disabled with rationale; they are not exposed as settings merely to avoid choosing defaults.
+- [x] `/slideshows` supports the intended choose -> tap -> watch path on both true-fullscreen browsers and the documented no-fullscreen fallback path.
+- [x] Preparation failures still expose sufficient recovery information without polluting successful starts.
+- [x] Browser diagnostics show no unacceptable playback-latency or resource-retention regression from M24.
+- [x] M27 completion notes record tested devices/browser versions, representative scenarios and final tuned constants.
 
 ## Verification requirements
 
@@ -151,7 +151,10 @@ Before completing WI-0137, record:
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: WI-0137/M27 delivery status, work-item and milestone acceptance documentation, generated roadmap/current-work views, and build handoff context. No slideshow runtime code changed during final acceptance.
+- Trade-offs: the current M27 defaults were accepted unchanged. Standard/chapter crossfades remain 600/850 ms; subtle motion remains 1.03x with conservative face-safe/static fallback; the accepted backdrop and adaptive dwell/burst timing policies remain as documented. Exact browser build numbers were not recorded, but the tested platforms were iPhone 16e on iOS 27 and Windows with Microsoft Edge.
+- Maintainer verification: the representative real-device pass completed successfully on 2026-09-20. Autoplay, manual navigation, looping, protected controls, fullscreen/no-fullscreen recovery, reduced-motion behavior, mixed-aspect presentation, slower-readiness handling and the overall slideshow experience worked as expected.
+- Performance evidence: 25 phone presentation samples produced 23 prefetch hits and 2 misses. Visible presentation averaged 617.12 ms and peaked at 677 ms, matching the intentional 600 ms transition envelope rather than showing progressive loading delay. Browser Resource Timing averaged 68.6 ms and peaked at 119 ms, materially below the earlier ~157 ms M24 transfer baseline. The server recorded 26 viewer-preview opens for 25 presentations and no hash reads, with no systematic latency growth by sequence position.
+- Diagnostics interpretation: the broader `api-collection-request` count was 81, but that family now includes M27-era collection requests such as slideshow face-geometry and visual-library traffic. Because viewer-preview opens stayed effectively one-per-presentation, prefetch reuse was 92%, hash reads were zero and perceived playback remained responsive, this does not reproduce the pre-WI-0108 request-amplification defect.
+- Deferred work: none for M27. Later optional caption work belongs to M26; video remains intentionally deferred under M30.
+- Commands/evidence: PR #387 CI run #2013 passed; maintainer ran `.\measure-slideshow-browser-performance.ps1 -Reset`, the representative phone/desktop acceptance flow, and `.\measure-slideshow-browser-performance.ps1` against PostgreSQL schema version 26.

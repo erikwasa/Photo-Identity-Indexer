@@ -1,0 +1,30 @@
+id: WI-0137
+title: Tune and verify the polished slideshow experience on real devices
+milestone: M27
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0137-real-device-slideshow-polish-acceptance.md
+started_at: 2026-09-20
+completed_at: 2026-09-20
+verified_at: 2026-09-20
+verified_by: maintainer
+last_updated_at: 2026-09-20
+branch: agent/WI-0137-real-device-acceptance
+blockers:
+- WI-0129
+- WI-0130
+- WI-0131
+- WI-0134
+- WI-0135
+- WI-0136
+- WI-0139
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/387
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/35529239515
+- type: verification
+  value: '2026-09-20 maintainer real-device acceptance: iPhone 16e on iOS 27 and Windows desktop with Microsoft Edge; autoplay, navigation, looping, protected/fullscreen recovery, reduced-motion/slow-readiness checks and overall presentation worked as expected. Exact browser build versions were not recorded.'
+- type: verification
+  value: '2026-09-20 phone diagnostics after 25 presentation samples: 23 prefetch hits / 2 misses; presentation average 617.12 ms and max 677 ms, consistent with the intentional 600 ms crossfade; Resource Timing average 68.6 ms and max 119 ms; 26 viewer-preview opens; zero hash reads; no systematic latency growth.'
