@@ -194,10 +194,10 @@ Request timeout: 600 seconds
 Optional runtime configuration keys are:
 
 ~~~text
-PhotoIdentity:GeneratedCaptions:OllamaBaseUrl
-PhotoIdentity:GeneratedCaptions:Model
-PhotoIdentity:GeneratedCaptions:ContextTokens
-PhotoIdentity:GeneratedCaptions:TimeoutSeconds
+PhotoIdentity:CaptionEnrichment:OllamaBaseUrl
+PhotoIdentity:CaptionEnrichment:Model
+PhotoIdentity:CaptionEnrichment:ContextTokens
+PhotoIdentity:CaptionEnrichment:TimeoutSeconds
 ~~~
 
 The configured Ollama URL is rejected unless it is an absolute loopback HTTP(S) address. Ollama/model installation remains an explicit operator action; enabling archive enrichment does not download a model.
