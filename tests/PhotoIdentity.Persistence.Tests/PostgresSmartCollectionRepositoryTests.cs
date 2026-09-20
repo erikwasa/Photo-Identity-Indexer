@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Npgsql;
 using NpgsqlTypes;
 using PhotoIdentity.Core.Collections;
@@ -93,8 +94,10 @@ public sealed class PostgresSmartCollectionRepositoryTests
                 await using NpgsqlDataReader reader = await persistedFilter.ExecuteReaderAsync();
                 Assert.True(await reader.ReadAsync());
                 Assert.Equal(2, reader.GetInt32(0));
-                string filterJson = reader.GetString(1);
-                Assert.Contains("\"taken\":{\"from\":\"2025-05-01\",\"to\":\"2025-05-10\"}", filterJson);
+                using JsonDocument filterDocument = JsonDocument.Parse(reader.GetString(1));
+                JsonElement taken = filterDocument.RootElement.GetProperty("taken");
+                Assert.Equal("2025-05-01", taken.GetProperty("from").GetString());
+                Assert.Equal("2025-05-10", taken.GetProperty("to").GetString());
             }
 
             await Assert.ThrowsAsync<SmartCollectionNameConflictException>(() => repository.CreateAsync(
