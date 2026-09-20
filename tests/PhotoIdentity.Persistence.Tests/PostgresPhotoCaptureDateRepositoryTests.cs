@@ -78,6 +78,17 @@ public sealed class PostgresPhotoCaptureDateRepositoryTests
             Assert.Equal(new DateOnly(1999, 12, 31), year.EffectiveRange.To);
             Assert.Single(year.History);
 
+            PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
+            PostgresSmartCollectionQueryRepository query = new(database, definitions, TimeProvider.System);
+            SmartCollectionPhotoPage yearOverlap = await query.QueryAsync(
+                new SmartCollectionFilter(
+                    taken: new SmartCollectionDateRange(
+                        new DateOnly(1999, 6, 15),
+                        new DateOnly(1999, 6, 15))));
+            SmartCollectionPhoto yearPhoto = Assert.Single(yearOverlap.Items);
+            Assert.Equal(PhotoCaptureDateSources.Manual, yearPhoto.CaptureDateSource);
+            Assert.Equal(year.ManualDate.InclusiveRange, yearPhoto.EffectiveCaptureDate);
+
             DateTime refreshedExtracted = new(2025, 1, 2, 3, 4, 5, DateTimeKind.Unspecified);
             await extracted.SavePhotoMetadataAsync(
                 revisionId,
@@ -106,8 +117,6 @@ public sealed class PostgresPhotoCaptureDateRepositoryTests
             PhotoCaptureDateState duplicate = await dates.SetManualAsync(revisionId, exactValue, "test");
             Assert.Equal(3, duplicate.History.Count);
 
-            PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
-            PostgresSmartCollectionQueryRepository query = new(database, definitions, TimeProvider.System);
             SmartCollectionPhotoPage manualMatch = await query.QueryAsync(
                 new SmartCollectionFilter(
                     taken: new SmartCollectionDateRange(
