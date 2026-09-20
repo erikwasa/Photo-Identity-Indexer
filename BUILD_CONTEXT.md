@@ -10,7 +10,7 @@ WI-0137 passed the final real-device acceptance on 2026-09-20 using an iPhone 16
 
 Phone diagnostics over 25 displayed presentations showed 23 prefetch hits / 2 misses, 68.6 ms average Resource Timing, 26 viewer-preview opens and zero hash reads, with no systematic latency growth. The current M27 transition, motion, backdrop and adaptive pacing constants remain the accepted defaults.
 
-M26 remains active, with WI-0128 local caption evaluation/opt-in slideshow captions still tracked separately. M28 and M29 are ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+M26 remains active with WI-0128 caption quality accepted and the product integration being corrected to archive-level photo enrichment. Caption generation is global/background/default-off; slideshows and other consumers only read persisted evidence. M28 and M29 are ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
