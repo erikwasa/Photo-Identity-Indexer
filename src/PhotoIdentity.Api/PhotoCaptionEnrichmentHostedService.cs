@@ -211,18 +211,13 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
         IReadOnlyList<string> riskFlags =
             GeneratedCreativeTextGuard.Evaluate(generated.Content);
 
-        string? acceptedContent = null;
-        if (riskFlags.Count == 0)
-        {
-            GeneratedCreativeTextEvidence evidence = new(
-                selectedRevision.Value,
-                generated.Model,
-                generated.ModelDigest,
-                generated.PromptVersion,
-                generated.Content,
-                riskFlags);
-            acceptedContent = evidence.Content;
-        }
+        GeneratedCreativeTextEvidence evidence = new(
+            selectedRevision.Value,
+            generated.Model,
+            generated.ModelDigest,
+            generated.PromptVersion,
+            generated.Content,
+            riskFlags);
 
         now = _timeProvider.GetUtcNow();
         await _captions.SaveAsync(
@@ -235,8 +230,8 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
                 generated.PromptVersion,
                 PhotoCaptionGenerationConfiguration.ImageMode,
                 _generation.ContextTokens,
-                acceptedContent,
-                riskFlags,
+                evidence.Content,
+                evidence.RiskFlags,
                 generated.ClientMilliseconds,
                 now),
             cancellationToken);
