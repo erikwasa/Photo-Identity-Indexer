@@ -1,0 +1,52 @@
+using PhotoIdentity.Core.Sources;
+using Xunit;
+
+namespace PhotoIdentity_Core_Tests;
+
+public sealed class PhotoCaptureDateValueTests
+{
+    [Theory]
+    [InlineData("1987", "year", "1987-01-01", "1987-12-31")]
+    [InlineData("2000-02", "month", "2000-02-01", "2000-02-29")]
+    [InlineData("2026-09-20", "day", "2026-09-20", "2026-09-20")]
+    public void Parses_supported_precision_without_storing_invented_components(
+        string input,
+        string precision,
+        string from,
+        string to)
+    {
+        PhotoCaptureDateValue value = PhotoCaptureDateValue.Parse(input);
+
+        Assert.Equal(precision, value.Precision);
+        Assert.Equal(input, value.ToString());
+        Assert.Equal(DateOnly.Parse(from), value.InclusiveRange.From);
+        Assert.Equal(DateOnly.Parse(to), value.InclusiveRange.To);
+
+        if (precision == PhotoCaptureDatePrecisions.Year)
+        {
+            Assert.Null(value.Month);
+            Assert.Null(value.Day);
+        }
+        else if (precision == PhotoCaptureDatePrecisions.Month)
+        {
+            Assert.NotNull(value.Month);
+            Assert.Null(value.Day);
+        }
+    }
+
+    [Theory]
+    [InlineData("2026-02-30")]
+    [InlineData("2026-13")]
+    [InlineData("2026/09/20")]
+    [InlineData("")]
+    public void Rejects_invalid_or_unsupported_values(string input)
+    {
+        Assert.ThrowsAny<ArgumentException>(() => PhotoCaptureDateValue.Parse(input));
+    }
+
+    [Fact]
+    public void Day_requires_month()
+    {
+        Assert.Throws<ArgumentException>(() => new PhotoCaptureDateValue(2026, day: 20));
+    }
+}
