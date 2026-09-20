@@ -141,13 +141,19 @@ work_items:
 - id: WI-0143
   title: Replace Smart Collection date free text with structured controls
   milestone: M28
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0143-structured-smart-collection-date-controls.md
+  started_at: 2026-09-20
+  last_updated_at: 2026-09-20
+  branch: agent/WI-0143-structured-smart-collection-dates
   blockers:
   - WI-0141
-  blocker_notes: []
-  evidence: []
+  blocker_notes:
+  - Automated implementation is ready in pull request 396; desktop/phone interaction verification is intentionally bundled with the later M28 verification pass.
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/396
 - id: WI-0144
   title: Allow Smart Collections to match any of multiple named locations
   milestone: M28
