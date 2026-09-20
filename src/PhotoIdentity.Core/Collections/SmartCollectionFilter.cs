@@ -203,16 +203,31 @@ public sealed record SmartCollectionFilter
         Location = location;
 
         List<string> rawPlaces = [];
-        if (!string.IsNullOrWhiteSpace(locationPlace))
+        string? explicitLegacyLocationPlace = string.IsNullOrWhiteSpace(locationPlace)
+            ? null
+            : PhotoPlacePath.Parse(locationPlace).CanonicalNormalizedValue;
+        string? migratedLegacyLocationPlace = legacyPlaceTags.Length == 0
+            ? null
+            : PhotoPlacePath.FromCanonicalTagPath(legacyPlaceTags[0]).CanonicalNormalizedValue;
+        if (explicitLegacyLocationPlace is not null &&
+            migratedLegacyLocationPlace is not null &&
+            !string.Equals(explicitLegacyLocationPlace, migratedLegacyLocationPlace, StringComparison.Ordinal))
         {
-            rawPlaces.Add(locationPlace);
+            throw new ArgumentException(
+                "The legacy Places tag and named-place Location criterion refer to different canonical places.",
+                nameof(locationPlace));
+        }
+
+        if (explicitLegacyLocationPlace is not null)
+        {
+            rawPlaces.Add(explicitLegacyLocationPlace);
         }
 
         rawPlaces.AddRange((locationPlaces ?? []).Where(value => !string.IsNullOrWhiteSpace(value)));
 
-        if (legacyPlaceTags.Length == 1)
+        if (migratedLegacyLocationPlace is not null)
         {
-            rawPlaces.Add(PhotoPlacePath.FromCanonicalTagPath(legacyPlaceTags[0]).CanonicalNormalizedValue);
+            rawPlaces.Add(migratedLegacyLocationPlace);
         }
 
         LocationPlaces = NormalizeLocationPlaces(rawPlaces, nameof(locationPlaces));
