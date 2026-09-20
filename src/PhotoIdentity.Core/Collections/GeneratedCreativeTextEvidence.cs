@@ -114,7 +114,8 @@ public static partial class GeneratedCreativeTextGuard
             flags.Add(GeneratedCreativeTextRiskCodes.AgeClaim);
         }
 
-        if (PossibleProperNameRegex().IsMatch(normalized))
+        if (PossibleProperNameRegex().Matches(normalized)
+            .Any(match => match.Index > 0))
         {
             flags.Add(GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation);
         }
@@ -143,7 +144,7 @@ public static partial class GeneratedCreativeTextGuard
     private static partial Regex AgeRegex();
 
     [GeneratedRegex(
-        @"(?<!^)(?<![.!?]\s)\b[A-Z][a-z]{2,}\b",
+        @"\b[A-Z][a-z]{2,}\b",
         RegexOptions.CultureInvariant)]
     private static partial Regex PossibleProperNameRegex();
 }
