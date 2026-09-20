@@ -1,10 +1,16 @@
 id: WI-0142
 title: Add manual and imprecise capture-date editing to Photo Details
 milestone: M28
-status: proposed
-owner: unassigned
+status: in_progress
+owner: ai-agent
 document: ../work-items/WI-0142-manual-capture-date-editor.md
+started_at: 2026-09-20
+last_updated_at: 2026-09-20
+branch: agent/WI-0142-manual-capture-date-editor
 blockers:
 - WI-0141
-blocker_notes: []
-evidence: []
+blocker_notes:
+- Automated implementation is ready in pull request 394; desktop/phone verification at all three precision levels is intentionally bundled with the later M28 verification pass.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/394
