@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 19;
+    public const int CurrentSchemaVersion = 20;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -839,6 +839,55 @@ public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
         PRAGMA user_version = 19;
         """;
 
+    private const string VersionTwentyMigration = """
+        CREATE TABLE IF NOT EXISTS photo_caption_enrichment_settings (
+            id INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+            enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+            language TEXT NOT NULL CHECK (language IN ('sv', 'en')),
+            updated_at_utc TEXT NOT NULL
+        );
+
+        INSERT OR IGNORE INTO photo_caption_enrichment_settings (
+            id, enabled, language, updated_at_utc)
+        VALUES (
+            1, 0, 'sv', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+
+        CREATE TABLE IF NOT EXISTS photo_generated_captions (
+            asset_revision_id TEXT NOT NULL,
+            language TEXT NOT NULL CHECK (language IN ('sv', 'en')),
+            generation_version TEXT NOT NULL CHECK (length(trim(generation_version)) > 0),
+            model_id TEXT NOT NULL CHECK (length(trim(model_id)) > 0),
+            model_digest TEXT NOT NULL CHECK (length(model_digest) = 64),
+            prompt_version TEXT NOT NULL CHECK (length(trim(prompt_version)) > 0),
+            image_mode TEXT NOT NULL CHECK (length(trim(image_mode)) > 0),
+            context_tokens INTEGER NOT NULL CHECK (context_tokens > 0),
+            content TEXT NULL,
+            risk_flags_json TEXT NOT NULL,
+            generation_milliseconds REAL NOT NULL CHECK (generation_milliseconds >= 0),
+            generated_at_utc TEXT NOT NULL,
+            PRIMARY KEY (
+                asset_revision_id,
+                language,
+                generation_version,
+                model_id,
+                model_digest,
+                prompt_version,
+                image_mode,
+                context_tokens),
+            FOREIGN KEY (asset_revision_id) REFERENCES asset_revisions (id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS ix_photo_generated_captions_revision_language
+            ON photo_generated_captions (
+                asset_revision_id,
+                language,
+                generated_at_utc DESC);
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (20, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 20;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -989,6 +1038,12 @@ public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
         if (version < 19)
         {
             await ApplyVersionNineteenMigrationAsync(connection, cancellationToken);
+            version = 19;
+        }
+
+        if (version < 20)
+        {
+            await ApplyMigrationAsync(connection, VersionTwentyMigration, cancellationToken);
         }
     }
 
