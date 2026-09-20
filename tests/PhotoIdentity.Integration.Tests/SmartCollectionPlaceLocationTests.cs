@@ -53,6 +53,17 @@ public sealed class SmartCollectionPlaceLocationTests
             SmartCollectionPhotoPage bareLeaf = await query.QueryAsync(
                 new SmartCollectionFilter(locationPlace: "Stockholm"));
             Assert.Empty(bareLeaf.Items);
+
+            SmartCollectionPhotoPage multiple = await query.QueryAsync(
+                new SmartCollectionFilter(locationPlaces:
+                [
+                    "Sweden/Stockholm region/Stockholm",
+                    "USA/Illinois",
+                ]));
+            Assert.Equal(2, multiple.Total);
+            Assert.Contains(multiple.Items, photo => photo.RevisionId == stockholm.Id);
+            Assert.Contains(multiple.Items, photo => photo.RevisionId == illinoisSpringfield.Id);
+            Assert.DoesNotContain(multiple.Items, photo => photo.RevisionId == norrtalje.Id);
         }
         finally
         {
@@ -233,7 +244,27 @@ public sealed class SmartCollectionPlaceLocationTests
                 await create.Content.ReadFromJsonAsync<SmartCollectionDefinitionResponse>()
                 ?? throw new InvalidOperationException();
             Assert.Equal("sweden/stockholm region", created.Filter.Location?.Place);
+            Assert.Equal(["sweden/stockholm region"], created.Filter.Location?.Places);
             Assert.Equal(59, created.Filter.Location?.South);
+
+            using HttpResponseMessage multiCreate = await client.PostAsJsonAsync(
+                "/api/smart-collections",
+                new SmartCollectionDefinitionRequest(
+                    "Stockholm or Oslo",
+                    Location: new SmartCollectionLocationRequest(
+                        Places:
+                        [
+                            "Sweden/Stockholm region",
+                            "Norway/Oslo",
+                        ])));
+            multiCreate.EnsureSuccessStatusCode();
+            SmartCollectionDefinitionResponse multi =
+                await multiCreate.Content.ReadFromJsonAsync<SmartCollectionDefinitionResponse>()
+                ?? throw new InvalidOperationException();
+            Assert.Null(multi.Filter.Location?.Place);
+            Assert.Equal(
+                ["norway/oslo", "sweden/stockholm region"],
+                multi.Filter.Location?.Places);
 
             using HttpResponseMessage rejected = await client.PostAsJsonAsync(
                 "/api/smart-collections/query",
