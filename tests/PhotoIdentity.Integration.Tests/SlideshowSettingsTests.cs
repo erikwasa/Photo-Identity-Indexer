@@ -19,7 +19,6 @@ public sealed class SlideshowSettingsTests
         Assert.True(settings.ProtectedSlideshow);
         Assert.False(settings.PrepareOriginals);
         Assert.False(settings.ShowCaptions);
-        Assert.Equal(SlideshowSettings.SwedishCaptionLanguage, settings.CaptionLanguage);
     }
 
     [Fact]
@@ -34,8 +33,7 @@ public sealed class SlideshowSettingsTests
             AfterLastPhoto: SlideshowSettings.Stop,
             ProtectedSlideshow: false,
             PrepareOriginals: true,
-            ShowCaptions: true,
-            CaptionLanguage: SlideshowSettings.EnglishCaptionLanguage);
+            ShowCaptions: true);
 
         SlideshowSettings actual = SlideshowSettings.FromJson(expected.ToJson());
 
@@ -79,7 +77,6 @@ public sealed class SlideshowSettingsTests
         Assert.False(settings.ProtectedSlideshow);
         Assert.True(settings.PrepareOriginals);
         Assert.True(settings.ShowCaptions);
-        Assert.Equal(SlideshowSettings.EnglishCaptionLanguage, settings.CaptionLanguage);
     }
 
     [Fact]
@@ -106,7 +103,6 @@ public sealed class SlideshowSettingsTests
         Assert.False(settings.ProtectedSlideshow);
         Assert.True(settings.PrepareOriginals);
         Assert.False(settings.ShowCaptions);
-        Assert.Equal(SlideshowSettings.SwedishCaptionLanguage, settings.CaptionLanguage);
     }
 
     [Theory]
@@ -119,20 +115,6 @@ public sealed class SlideshowSettingsTests
         SlideshowSettings settings = (SlideshowSettings.Defaults with { Orientation = value }).Normalize();
 
         Assert.Equal(expected, settings.Orientation);
-    }
-
-    [Theory]
-    [InlineData("sv", SlideshowSettings.SwedishCaptionLanguage)]
-    [InlineData("EN", SlideshowSettings.EnglishCaptionLanguage)]
-    [InlineData("invalid", SlideshowSettings.SwedishCaptionLanguage)]
-    public void Caption_language_normalizes_supported_values(string value, string expected)
-    {
-        SlideshowSettings settings = (SlideshowSettings.Defaults with
-        {
-            CaptionLanguage = value,
-        }).Normalize();
-
-        Assert.Equal(expected, settings.CaptionLanguage);
     }
 
     [Theory]
