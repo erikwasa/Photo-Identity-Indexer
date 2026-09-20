@@ -114,10 +114,14 @@ public static partial class GeneratedCreativeTextGuard
             flags.Add(GeneratedCreativeTextRiskCodes.AgeClaim);
         }
 
-        if (PossibleProperNameRegex().Matches(normalized)
-            .Any(match => match.Index > 0))
+        MatchCollection possibleProperNames = PossibleProperNameRegex().Matches(normalized);
+        for (int index = 0; index < possibleProperNames.Count; index++)
         {
-            flags.Add(GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation);
+            if (possibleProperNames[index].Index > 0)
+            {
+                flags.Add(GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation);
+                break;
+            }
         }
 
         return flags
