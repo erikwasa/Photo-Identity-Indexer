@@ -39,6 +39,30 @@ public sealed class GeneratedCreativeTextEvidenceTests
         Assert.Contains(GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation, flags);
     }
 
+    [Theory]
+    [InlineData("En person klädd i en svart och vit mönstrad klänning står i en inomhusmiljö. Personens ansikte är inte tydligt synligt. Hållningen är osäker.")]
+    [InlineData("En man i mörk kostym håller i en glas med dryck. Han sitter på en mörk fåtölj. I bakgrunden syns några människor och en julgran.")]
+    [InlineData("En man står på en brygga med havet i bakgrunden. Han är klädd i en svart vattenskjorta och håller en kamera i handen. Han har en livboj på bryggan.")]
+    public void Guard_ignores_capitalization_at_sentence_boundaries(string caption)
+    {
+        IReadOnlyList<string> flags = GeneratedCreativeTextGuard.Evaluate(caption);
+
+        Assert.DoesNotContain(
+            GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation,
+            flags);
+    }
+
+    [Fact]
+    public void Guard_still_flags_proper_name_or_location_inside_later_sentence()
+    {
+        IReadOnlyList<string> flags = GeneratedCreativeTextGuard.Evaluate(
+            "En person står vid havet. Han tittar mot Stockholm.");
+
+        Assert.Contains(
+            GeneratedCreativeTextRiskCodes.PossibleProperNameOrLocation,
+            flags);
+    }
+
     [Fact]
     public void Guard_accepts_neutral_visible_content()
     {
