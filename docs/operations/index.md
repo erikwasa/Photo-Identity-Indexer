@@ -21,6 +21,7 @@ Use this page to decide which runbook is current. Some files under `docs/operati
 - [Local evaluation workflow](local-evaluation.md) — specialized reproducible model-evaluation tooling. Its original examples use the historical YuNet pilot corpus; do not treat those detector settings as the permanent archive profile.
 - [Multi-model comparison workflow](multi-model-comparison.md) — specialized embedding comparison workflow. The completed FP32/INT8 evidence used the earlier detector population; a future production-model reaffirmation must account for the selected CenterFace population.
 - [Whole-image embedding evaluation](whole-image-embedding-evaluation.md) — bounded WI-0127 exact-vector experiment for semantic retrieval, similar-photo retrieval and Creative Collection diversity; not a production vector-store procedure.
+- [Local caption and narration evaluation](local-caption-narration-evaluation.md) — bounded WI-0128 loopback-only vision-caption experiment comparing deterministic Creative text with guarded local generated captions; not a production narration path.
 
 ## Retained M16 detector evidence
 
