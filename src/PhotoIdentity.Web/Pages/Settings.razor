@@ -6,7 +6,7 @@
     <div>
         <p class="eyebrow">Operator settings</p>
         <h1>Settings</h1>
-        <p>Manage permanent archive coverage, inspect bounded archive storage policy, run location enrichment, and configure the confidence policy used for future identity matching runs.</p>
+        <p>Manage permanent archive coverage, inspect bounded archive storage policy, configure background photo enrichment, and configure the confidence policy used for future identity matching runs.</p>
     </div>
     <button class="button secondary" @onclick="Refresh">Refresh</button>
 </section>
@@ -14,6 +14,7 @@
 <ArchiveCoverageSettings RefreshVersion="@RefreshVersion" />
 <ArchiveStorageSettings RefreshVersion="@RefreshVersion" />
 <GeoNamesPlaceEnrichmentSettings />
+<PhotoCaptionEnrichmentSettings />
 <IdentityMatchingSettings RefreshVersion="@RefreshVersion" />
 <MultiEvidenceAutoAssignmentSettings RefreshVersion="@RefreshVersion" />
 
