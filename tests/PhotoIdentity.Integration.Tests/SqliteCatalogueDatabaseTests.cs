@@ -83,6 +83,16 @@ public sealed class SqliteCatalogueDatabaseTests
                 await ReadInt64Async(
                     connection,
                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'detector_reconciliation_plans';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    connection,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'photo_caption_enrichment_settings';"));
+            Assert.Equal(
+                1,
+                await ReadInt64Async(
+                    connection,
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'photo_generated_captions';"));
         }
         finally
         {

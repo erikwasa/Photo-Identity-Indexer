@@ -18,8 +18,7 @@ public sealed class SlideshowSettingsTests
         Assert.Equal(SlideshowSettings.Loop, settings.AfterLastPhoto);
         Assert.True(settings.ProtectedSlideshow);
         Assert.False(settings.PrepareOriginals);
-        Assert.False(settings.GeneratedCaptions);
-        Assert.Equal(SlideshowSettings.SwedishCaptionLanguage, settings.CaptionLanguage);
+        Assert.False(settings.ShowCaptions);
     }
 
     [Fact]
@@ -34,8 +33,7 @@ public sealed class SlideshowSettingsTests
             AfterLastPhoto: SlideshowSettings.Stop,
             ProtectedSlideshow: false,
             PrepareOriginals: true,
-            GeneratedCaptions: true,
-            CaptionLanguage: SlideshowSettings.EnglishCaptionLanguage);
+            ShowCaptions: true);
 
         SlideshowSettings actual = SlideshowSettings.FromJson(expected.ToJson());
 
@@ -78,8 +76,7 @@ public sealed class SlideshowSettingsTests
         Assert.Equal(SlideshowSettings.Loop, settings.AfterLastPhoto);
         Assert.False(settings.ProtectedSlideshow);
         Assert.True(settings.PrepareOriginals);
-        Assert.True(settings.GeneratedCaptions);
-        Assert.Equal(SlideshowSettings.EnglishCaptionLanguage, settings.CaptionLanguage);
+        Assert.True(settings.ShowCaptions);
     }
 
     [Fact]
@@ -105,8 +102,7 @@ public sealed class SlideshowSettingsTests
         Assert.Equal(SlideshowSettings.Stop, settings.AfterLastPhoto);
         Assert.False(settings.ProtectedSlideshow);
         Assert.True(settings.PrepareOriginals);
-        Assert.False(settings.GeneratedCaptions);
-        Assert.Equal(SlideshowSettings.SwedishCaptionLanguage, settings.CaptionLanguage);
+        Assert.False(settings.ShowCaptions);
     }
 
     [Theory]
@@ -119,20 +115,6 @@ public sealed class SlideshowSettingsTests
         SlideshowSettings settings = (SlideshowSettings.Defaults with { Orientation = value }).Normalize();
 
         Assert.Equal(expected, settings.Orientation);
-    }
-
-    [Theory]
-    [InlineData("sv", SlideshowSettings.SwedishCaptionLanguage)]
-    [InlineData("EN", SlideshowSettings.EnglishCaptionLanguage)]
-    [InlineData("invalid", SlideshowSettings.SwedishCaptionLanguage)]
-    public void Caption_language_normalizes_supported_values(string value, string expected)
-    {
-        SlideshowSettings settings = (SlideshowSettings.Defaults with
-        {
-            CaptionLanguage = value,
-        }).Normalize();
-
-        Assert.Equal(expected, settings.CaptionLanguage);
     }
 
     [Theory]

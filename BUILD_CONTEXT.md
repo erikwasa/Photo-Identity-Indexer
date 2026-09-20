@@ -12,7 +12,7 @@ PR #392 implements the WI-0141 foundation. PostgreSQL schema v27 stores manual c
 
 PostgreSQL Smart Collection queries now filter against the effective date range using overlap semantics and expose the effective range/source alongside raw extracted `TakenAtLocal`. Focused tests cover precision, metadata refresh, reversibility and imprecise-date filtering. Photo Details editing remains WI-0142 scope.
 
-M26 remains active with WI-0128 tracked separately. M29 is ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+M26 remains active with WI-0128 caption quality accepted and product integration being corrected to archive-level photo enrichment; caption generation is global/background/default-off and consumers only read persisted evidence. M29 is ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 

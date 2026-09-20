@@ -51,57 +51,44 @@ public partial class Program
         string? reviewProxyRoot = builder.Configuration["PhotoIdentity:ReviewProxyRoot"];
         string? reviewProxyProfileId = builder.Configuration["PhotoIdentity:ReviewProxyProfileId"];
 
-        string captionCacheRoot =
-            builder.Configuration["PhotoIdentity:GeneratedCaptions:CacheRoot"]
-            ?? Path.Combine(defaultApplicationRoot, "generated-captions");
         string captionBaseUrl =
-            builder.Configuration["PhotoIdentity:GeneratedCaptions:OllamaBaseUrl"]
-            ?? SlideshowCaptionGenerationConfiguration.DefaultOllamaBaseUri.AbsoluteUri;
+            builder.Configuration["PhotoIdentity:CaptionEnrichment:OllamaBaseUrl"]
+            ?? builder.Configuration["PhotoIdentity:GeneratedCaptions:OllamaBaseUrl"]
+            ?? PhotoCaptionGenerationConfiguration.DefaultOllamaBaseUri.AbsoluteUri;
         if (!Uri.TryCreate(captionBaseUrl, UriKind.Absolute, out Uri? captionBaseUri) ||
             !captionBaseUri.IsLoopback ||
             (captionBaseUri.Scheme != Uri.UriSchemeHttp &&
              captionBaseUri.Scheme != Uri.UriSchemeHttps))
         {
             throw new InvalidOperationException(
-                "PhotoIdentity:GeneratedCaptions:OllamaBaseUrl must be an absolute loopback HTTP(S) URL.");
+                "PhotoIdentity:CaptionEnrichment:OllamaBaseUrl must be an absolute loopback HTTP(S) URL.");
         }
 
-        int captionContextTokens = ParseOptionalInt(
-            builder.Configuration,
-            "PhotoIdentity:GeneratedCaptions:ContextTokens")
-            ?? SlideshowCaptionGenerationConfiguration.DefaultContextTokens;
-        int captionTimeoutSeconds = ParseOptionalInt(
-            builder.Configuration,
-            "PhotoIdentity:GeneratedCaptions:TimeoutSeconds")
-            ?? SlideshowCaptionGenerationConfiguration.DefaultTimeoutSeconds;
-        int captionQueueCapacity = ParseOptionalInt(
-            builder.Configuration,
-            "PhotoIdentity:GeneratedCaptions:QueueCapacity")
-            ?? SlideshowCaptionGenerationConfiguration.DefaultQueueCapacity;
+        int captionContextTokens =
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:CaptionEnrichment:ContextTokens")
+            ?? ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeneratedCaptions:ContextTokens")
+            ?? PhotoCaptionGenerationConfiguration.DefaultContextTokens;
+        int captionTimeoutSeconds =
+            ParseOptionalInt(builder.Configuration, "PhotoIdentity:CaptionEnrichment:TimeoutSeconds")
+            ?? ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeneratedCaptions:TimeoutSeconds")
+            ?? PhotoCaptionGenerationConfiguration.DefaultTimeoutSeconds;
         if (captionContextTokens is < 256 or > 32768)
         {
             throw new InvalidOperationException(
-                "PhotoIdentity:GeneratedCaptions:ContextTokens must be between 256 and 32768.");
+                "PhotoIdentity:CaptionEnrichment:ContextTokens must be between 256 and 32768.");
         }
         if (captionTimeoutSeconds is < 30 or > 1800)
         {
             throw new InvalidOperationException(
-                "PhotoIdentity:GeneratedCaptions:TimeoutSeconds must be between 30 and 1800.");
+                "PhotoIdentity:CaptionEnrichment:TimeoutSeconds must be between 30 and 1800.");
         }
-        if (captionQueueCapacity is < 1 or > 64)
-        {
-            throw new InvalidOperationException(
-                "PhotoIdentity:GeneratedCaptions:QueueCapacity must be between 1 and 64.");
-        }
-
-        SlideshowCaptionGenerationConfiguration captionConfiguration = new(
-            captionCacheRoot,
+        PhotoCaptionGenerationConfiguration captionConfiguration = new(
             captionBaseUri,
-            builder.Configuration["PhotoIdentity:GeneratedCaptions:Model"]
-                ?? SlideshowCaptionGenerationConfiguration.DefaultModel,
+            builder.Configuration["PhotoIdentity:CaptionEnrichment:Model"]
+                ?? builder.Configuration["PhotoIdentity:GeneratedCaptions:Model"]
+                ?? PhotoCaptionGenerationConfiguration.DefaultModel,
             captionContextTokens,
-            captionTimeoutSeconds,
-            captionQueueCapacity);
+            captionTimeoutSeconds);
 
         int? automaticGeoNamesMinimumRequestInterval = ParseOptionalInt(
             builder.Configuration,
@@ -170,6 +157,7 @@ public partial class Program
             automaticGeoNamesMinimumRequestInterval,
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:AutomaticIdlePollIntervalMilliseconds")));
         builder.Services.AddSingleton<PhotoPlaceEnrichmentWorkerState>();
+        builder.Services.AddSingleton<PhotoCaptionEnrichmentWorkerState>();
         builder.Services.AddSingleton<CreativeCollectionMaterializationService>();
 
         builder.Services.AddSingleton<ArchiveSourceCatalogueScanner>();
@@ -205,14 +193,10 @@ public partial class Program
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddHttpClient("GeoNames");
         builder.Services.AddHttpClient(
-            "LocalSlideshowCaption",
+            LocalPhotoCaptionGenerator.HttpClientName,
             client => client.Timeout = TimeSpan.FromSeconds(captionConfiguration.TimeoutSeconds));
-        builder.Services.AddSingleton<LocalSlideshowCaptionGenerator>();
-        builder.Services.AddSingleton<SlideshowCaptionService>();
-        builder.Services.AddSingleton<ISlideshowCaptionService>(
-            services => services.GetRequiredService<SlideshowCaptionService>());
-        builder.Services.AddHostedService<SlideshowCaptionService>(
-            services => services.GetRequiredService<SlideshowCaptionService>());
+        builder.Services.AddSingleton<LocalPhotoCaptionGenerator>();
+        builder.Services.AddHostedService<PhotoCaptionEnrichmentHostedService>();
         builder.Services.AddSingleton<IReverseGeocoder, GeoNamesReverseGeocoder>();
         builder.Services.AddSingleton<PhotoPlaceEnrichmentService>();
         builder.Services.AddHostedService<PhotoPlaceEnrichmentHostedService>();
@@ -319,6 +303,8 @@ public partial class Program
                 context.Request.Path.StartsWithSegments("/api/photo-metadata") ||
                 context.Request.Path.StartsWithSegments("/api/places") ||
                 context.Request.Path.StartsWithSegments("/api/place-enrichment") ||
+                context.Request.Path.StartsWithSegments("/api/caption-enrichment") ||
+                context.Request.Path.StartsWithSegments("/api/photos") ||
                 context.Request.Path.StartsWithSegments("/api/detector-evaluation") ||
                 context.Request.Path.StartsWithSegments("/api/detector-rollout") ||
                 context.Request.Path.StartsWithSegments("/api/archive"))
@@ -358,7 +344,7 @@ public partial class Program
         app.MapMomentPreviewEndpoints();
         app.MapSlideshowOriginalPreparationEndpoints();
         app.MapSlideshowExposureEndpoints();
-        app.MapSlideshowCaptionEndpoints();
+        app.MapPhotoCaptionEndpoints();
         app.MapPhotoMetadataEndpoints();
         app.MapCollectionProxyEndpoints();
         app.MapCollectionViewerPreviewEndpoints();

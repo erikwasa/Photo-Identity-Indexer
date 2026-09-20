@@ -2,77 +2,61 @@ using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Imaging.OpenCv;
 
 namespace PhotoIdentity.Api;
 
-public sealed record SlideshowCaptionGenerationConfiguration(
-    string CacheRoot,
+public sealed record PhotoCaptionGenerationConfiguration(
     Uri OllamaBaseUri,
     string Model,
     int ContextTokens,
-    int TimeoutSeconds,
-    int QueueCapacity)
+    int TimeoutSeconds)
 {
-    public const string GenerationVersion = "wi-0157-slideshow-caption-v1";
+    public const string GenerationVersion = "wi-0128-photo-caption-v1";
+    public const string ImageMode = "thumbnail-480x320";
     public const string DefaultModel = "qwen2.5vl:3b";
     public const int DefaultContextTokens = 1024;
     public const int DefaultTimeoutSeconds = 600;
-    public const int DefaultQueueCapacity = 8;
     public static readonly Uri DefaultOllamaBaseUri = new("http://127.0.0.1:11434/");
 }
 
-public sealed record LocalSlideshowCaption(
+public sealed record LocalPhotoCaptionModel(
+    string Name,
+    string Digest);
+
+public sealed record LocalPhotoCaption(
     string Content,
     string Model,
     string ModelDigest,
     string PromptVersion,
     double ClientMilliseconds);
 
-public static class SlideshowCaptionLanguage
-{
-    public const string Swedish = "sv";
-    public const string English = "en";
-
-    public static bool TryNormalize(string? value, out string language)
-    {
-        string normalized = value?.Trim().ToLowerInvariant() ?? Swedish;
-        if (normalized is Swedish or English)
-        {
-            language = normalized;
-            return true;
-        }
-
-        language = string.Empty;
-        return false;
-    }
-}
-
-public static class SlideshowCaptionPrompt
+public static class PhotoCaptionPrompt
 {
     public static string VersionFor(string language) =>
-        language == SlideshowCaptionLanguage.Swedish
-            ? "wi-0157-neutral-visible-caption-sv-v1"
-            : "wi-0157-neutral-visible-caption-en-v1";
+        PhotoCaptionLanguages.Normalize(language) == PhotoCaptionLanguages.Swedish
+            ? "wi-0128-neutral-visible-caption-sv-v1"
+            : "wi-0128-neutral-visible-caption-en-v1";
 
     public static string TextFor(string language) =>
-        language == SlideshowCaptionLanguage.Swedish
+        PhotoCaptionLanguages.Normalize(language) == PhotoCaptionLanguages.Swedish
             ? "Beskriv det här privata familjefotot. Skriv exakt en kort neutral mening på högst 20 ord på svenska som endast beskriver direkt synliga personer, föremål, miljö och handlingar. Identifiera eller gissa inte namn, relationer, ålder, yrke, nationalitet eller känslor. Ange eller härled inte exakta platser, datum, årtal, helgdagar, händelser, ceremonier, firanden eller tillfällen. Härled inte händelsetyp som bröllop, födelsedag, konsert, fest, examen eller festival. Om något är osäkert, utelämna det. Returnera endast meningen."
             : "Caption this private family photo. Write exactly one short neutral sentence of at most 20 words describing only directly visible people, objects, setting, and actions. Do not identify or guess any person's name, relationship, age, occupation, nationality, or emotion. Do not name or infer exact locations, dates, years, holidays, events, ceremonies, celebrations, or occasions. Do not infer an event type such as wedding, birthday, concert, party, graduation, or festival. If something is uncertain, omit it. Return only the sentence.";
 }
 
-public sealed class LocalSlideshowCaptionGenerator
+public sealed class LocalPhotoCaptionGenerator
 {
-    private const string HttpClientName = "LocalSlideshowCaption";
+    public const string HttpClientName = "LocalPhotoCaption";
 
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly OpenCvThumbnailRenderer _thumbnailRenderer;
-    private readonly SlideshowCaptionGenerationConfiguration _configuration;
+    private readonly PhotoCaptionGenerationConfiguration _configuration;
 
-    public LocalSlideshowCaptionGenerator(
+    public LocalPhotoCaptionGenerator(
         IHttpClientFactory httpClientFactory,
         OpenCvThumbnailRenderer thumbnailRenderer,
-        SlideshowCaptionGenerationConfiguration configuration)
+        PhotoCaptionGenerationConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(httpClientFactory);
         ArgumentNullException.ThrowIfNull(thumbnailRenderer);
@@ -82,27 +66,32 @@ public sealed class LocalSlideshowCaptionGenerator
         _configuration = configuration;
     }
 
-    public async Task<LocalSlideshowCaption> GenerateAsync(
+    public async Task<LocalPhotoCaptionModel> GetInstalledModelAsync(
+        CancellationToken cancellationToken)
+    {
+        HttpClient http = _httpClientFactory.CreateClient(HttpClientName);
+        return await GetInstalledModelAsync(http, cancellationToken);
+    }
+
+    public async Task<LocalPhotoCaption> GenerateAsync(
         string proxyPath,
         string language,
+        LocalPhotoCaptionModel model,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(proxyPath);
-        if (!SlideshowCaptionLanguage.TryNormalize(language, out string normalizedLanguage))
-        {
-            throw new ArgumentException("Caption language must be 'sv' or 'en'.", nameof(language));
-        }
+        string normalizedLanguage = PhotoCaptionLanguages.Normalize(language);
 
         EncodedThumbnail? thumbnail =
             await _thumbnailRenderer.RenderAsync(proxyPath, cancellationToken);
         if (thumbnail is null)
         {
-            throw new InvalidDataException("The review proxy could not be rendered as a caption thumbnail.");
+            throw new InvalidDataException(
+                "The review proxy could not be rendered as a caption thumbnail.");
         }
 
+        ArgumentNullException.ThrowIfNull(model);
         HttpClient http = _httpClientFactory.CreateClient(HttpClientName);
-        LocalVisionModelDescriptor model =
-            await GetInstalledModelAsync(http, cancellationToken);
 
         object request = new
         {
@@ -112,7 +101,7 @@ public sealed class LocalSlideshowCaptionGenerator
                 new
                 {
                     role = "user",
-                    content = SlideshowCaptionPrompt.TextFor(normalizedLanguage),
+                    content = PhotoCaptionPrompt.TextFor(normalizedLanguage),
                     images = new[] { Convert.ToBase64String(thumbnail.Content) },
                 },
             },
@@ -155,15 +144,15 @@ public sealed class LocalSlideshowCaptionGenerator
                 "Local Ollama caption was empty or exceeded the bounded length.");
         }
 
-        return new LocalSlideshowCaption(
+        return new LocalPhotoCaption(
             caption,
             model.Name,
             model.Digest,
-            SlideshowCaptionPrompt.VersionFor(normalizedLanguage),
+            PhotoCaptionPrompt.VersionFor(normalizedLanguage),
             elapsedMilliseconds);
     }
 
-    private async Task<LocalVisionModelDescriptor> GetInstalledModelAsync(
+    private async Task<LocalPhotoCaptionModel> GetInstalledModelAsync(
         HttpClient http,
         CancellationToken cancellationToken)
     {
@@ -191,7 +180,7 @@ public sealed class LocalSlideshowCaptionGenerator
                 $"Local Ollama model '{_configuration.Model}' is not installed.");
         }
 
-        return new LocalVisionModelDescriptor(
+        return new LocalPhotoCaptionModel(
             model.Name ?? model.Model ?? _configuration.Model,
             NormalizeDigest(model.Digest));
     }
@@ -219,8 +208,6 @@ public sealed class LocalSlideshowCaptionGenerator
         PropertyNameCaseInsensitive = true,
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
     };
-
-    private sealed record LocalVisionModelDescriptor(string Name, string Digest);
 
     private sealed record OllamaTagsResponse(
         [property: JsonPropertyName("models")]

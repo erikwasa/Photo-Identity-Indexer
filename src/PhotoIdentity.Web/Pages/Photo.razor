@@ -74,6 +74,36 @@
 
             <PhotoMetadataPanel Metadata="@Details.Metadata" />
 
+            <div class="metadata-card">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Derived photo evidence</p>
+                        <h3>Generated caption</h3>
+                    </div>
+                    @if (CaptionStatus is not null)
+                    {
+                        <span>@CaptionStatus.Language</span>
+                    }
+                </div>
+                @if (LoadingCaption)
+                {
+                    <p>Loading generated caption…</p>
+                }
+                else if (Caption?.Status == "available" && !string.IsNullOrWhiteSpace(Caption.Caption))
+                {
+                    <p>@Caption.Caption</p>
+                    <p class="field-help">Generated automatically from the photo's durable review proxy. This is derived evidence, not canonical metadata.</p>
+                }
+                else if (Caption?.Status == "blocked")
+                {
+                    <p class="field-help">A generated caption exists but was blocked by the conservative claim guard.</p>
+                }
+                else
+                {
+                    <p class="field-help">No generated caption is available for this photo in the configured enrichment language.</p>
+                }
+            </div>
+
             <PhotoPlaceEditor RevisionId="@RevisionId" />
 
             <ManualPhotoPeopleEditor RevisionId="@RevisionId"
@@ -212,9 +242,12 @@
 
     private CollectionOriginalAccessResponse? Original { get; set; }
     private PhotoDetailsResponse? Details { get; set; }
+    private PhotoCaptionEnrichmentStatusResponse? CaptionStatus { get; set; }
+    private PhotoCaptionResponse? Caption { get; set; }
     private IReadOnlyList<PhotoTagResponse> Tags { get; set; } = [];
     private bool LoadingStatus { get; set; }
     private bool LoadingDetails { get; set; }
+    private bool LoadingCaption { get; set; }
     private bool LoadingTags { get; set; }
     private bool Busy { get; set; }
     private bool TagBusy { get; set; }
@@ -253,7 +286,9 @@
         UseProxyFallback = false;
         TagInput = string.Empty;
         Details = null;
-        await Task.WhenAll(LoadStatusAsync(), LoadDetailsAsync(), LoadTagsAsync());
+        Caption = null;
+        CaptionStatus = null;
+        await Task.WhenAll(LoadStatusAsync(), LoadDetailsAsync(), LoadCaptionAsync(), LoadTagsAsync());
         StartPollingIfNeeded();
     }
 
@@ -305,6 +340,32 @@
         finally
         {
             LoadingDetails = false;
+        }
+    }
+
+    private async Task LoadCaptionAsync()
+    {
+        LoadingCaption = true;
+        try
+        {
+            CaptionStatus = await Http.GetFromJsonAsync<PhotoCaptionEnrichmentStatusResponse>(
+                "api/caption-enrichment/status");
+            if (CaptionStatus is null)
+            {
+                Caption = null;
+                return;
+            }
+
+            Caption = await Http.GetFromJsonAsync<PhotoCaptionResponse>(
+                $"api/photos/{Uri.EscapeDataString(RevisionId)}/caption");
+        }
+        catch
+        {
+            Caption = null;
+        }
+        finally
+        {
+            LoadingCaption = false;
         }
     }
 

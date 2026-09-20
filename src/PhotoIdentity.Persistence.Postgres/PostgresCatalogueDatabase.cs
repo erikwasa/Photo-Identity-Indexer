@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 27;
+    public const int CurrentSchemaVersion = 28;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1191,6 +1191,52 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
 
             CREATE INDEX IF NOT EXISTS ix_photo_capture_date_actions_revision
                 ON photo_capture_date_actions (asset_revision_id, id DESC);
+            """),
+        new(28, "photo-caption-enrichment", """
+            CREATE TABLE IF NOT EXISTS photo_caption_enrichment_settings (
+                id smallint NOT NULL PRIMARY KEY CHECK (id = 1),
+                enabled boolean NOT NULL,
+                language text NOT NULL CHECK (language IN ('sv', 'en')),
+                updated_at_utc timestamp with time zone NOT NULL
+            );
+
+            INSERT INTO photo_caption_enrichment_settings (
+                id, enabled, language, updated_at_utc)
+            VALUES (1, false, 'sv', CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO NOTHING;
+
+            CREATE TABLE IF NOT EXISTS photo_generated_captions (
+                asset_revision_id uuid NOT NULL,
+                language text NOT NULL CHECK (language IN ('sv', 'en')),
+                generation_version text NOT NULL CHECK (btrim(generation_version) <> ''),
+                model_id text NOT NULL CHECK (btrim(model_id) <> ''),
+                model_digest text NOT NULL CHECK (model_digest ~ '^[0-9a-f]{64}$'),
+                prompt_version text NOT NULL CHECK (btrim(prompt_version) <> ''),
+                image_mode text NOT NULL CHECK (btrim(image_mode) <> ''),
+                context_tokens integer NOT NULL CHECK (context_tokens > 0),
+                content text NULL,
+                risk_flags text[] NOT NULL DEFAULT ARRAY[]::text[],
+                generation_milliseconds double precision NOT NULL CHECK (generation_milliseconds >= 0),
+                generated_at_utc timestamp with time zone NOT NULL,
+                PRIMARY KEY (
+                    asset_revision_id,
+                    language,
+                    generation_version,
+                    model_id,
+                    model_digest,
+                    prompt_version,
+                    image_mode,
+                    context_tokens),
+                CONSTRAINT fk_photo_generated_captions_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id) ON DELETE CASCADE
+            );
+
+            CREATE INDEX IF NOT EXISTS ix_photo_generated_captions_revision_language
+                ON photo_generated_captions (
+                    asset_revision_id,
+                    language,
+                    generated_at_utc DESC);
             """),
     ];
 

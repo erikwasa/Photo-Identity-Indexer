@@ -166,21 +166,22 @@ This is a performance/feasibility probe, not a production default. The report re
 If the thumbnail/context probe materially improves runtime, repeat a small qualitative sample before deciding whether the reduced visual detail is still good enough. If it remains measured in minutes per caption, record the local generative path as impractical on the maintainer hardware rather than spending time on a full 12-photo review.
 
 
-## Retained opt-in slideshow integration
+## Retained archive caption enrichment
 
-The positive WI-0128 result is retained directly by WI-0128 as an optional slideshow feature. The experiment remains useful for tuning, but production playback uses a stricter bounded integration:
+The positive WI-0128 result is retained as optional **photo enrichment**. Production generation is independent of slideshows and Smart Collections:
 
-- **Generated captions (local AI)** is off by default in slideshow settings.
-- Caption language can be **Svenska** or **English**; Swedish is the default.
+- **Settings → Automatic photo captions** is a durable server-side setting and defaults to off.
+- Caption generation language can be **Svenska** or **English**; Swedish is the default.
+- When enabled, one background worker gradually selects current photo revisions that already have the configured durable review proxy and lack caption evidence for the active generation policy.
 - Only the configured durable review proxy is opened. Photo Identity derives a temporary 480x320 JPEG in memory before model inference.
 - The Ollama endpoint remains loopback-only.
-- One bounded background worker performs inference. Playback never waits for a caption.
-- Only photos encountered while captions are enabled are queued; enabling the setting does not bulk-caption the archive.
-- Guard-passing text is cached under the local application data generated-caption cache with revision/language/model/prompt/image-mode/context provenance.
-- Guard-blocked output is never displayed.
-- Generated captions remain derived presentation data and never become canonical catalogue metadata.
+- Generation is serial and continues independently of what the user views. Opening a photo, Smart Collection or slideshow never queues caption work.
+- Guard-passing and guard-blocked results are persisted as versioned revision-bound derived evidence with model/prompt/image-mode/context provenance.
+- Guard-blocked output is not exposed as a displayable caption.
+- Generated captions never become canonical catalogue metadata.
+- Photo details, slideshow presentation and future query/search features may read the persisted evidence without owning its lifecycle.
 
-The default product configuration reuses the successful probe:
+The default product generation configuration reuses the successful probe:
 
 ~~~text
 Model: qwen2.5vl:3b
@@ -188,21 +189,18 @@ Ollama endpoint: http://127.0.0.1:11434/
 Image mode: temporary 480x320 thumbnail
 Requested context: 1024
 Request timeout: 600 seconds
-Queue capacity: 8
 ~~~
 
-Optional configuration keys are:
+Optional runtime configuration keys are:
 
 ~~~text
-PhotoIdentity:GeneratedCaptions:CacheRoot
-PhotoIdentity:GeneratedCaptions:OllamaBaseUrl
-PhotoIdentity:GeneratedCaptions:Model
-PhotoIdentity:GeneratedCaptions:ContextTokens
-PhotoIdentity:GeneratedCaptions:TimeoutSeconds
-PhotoIdentity:GeneratedCaptions:QueueCapacity
+PhotoIdentity:CaptionEnrichment:OllamaBaseUrl
+PhotoIdentity:CaptionEnrichment:Model
+PhotoIdentity:CaptionEnrichment:ContextTokens
+PhotoIdentity:CaptionEnrichment:TimeoutSeconds
 ~~~
 
-The configured Ollama URL is rejected unless it is an absolute loopback HTTP(S) address. Ollama/model installation remains an explicit operator action; Photo Identity does not download a model when the slideshow setting is enabled.
+The configured Ollama URL is rejected unless it is an absolute loopback HTTP(S) address. Ollama/model installation remains an explicit operator action; enabling archive enrichment does not download a model.
 
 ### Accepted private evidence
 

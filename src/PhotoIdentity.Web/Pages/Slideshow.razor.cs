@@ -25,7 +25,6 @@ public partial class Slideshow : IAsyncDisposable
     private CancellationTokenSource? _parentUnlockCancellation;
     private CancellationTokenSource? _exitHoldCancellation;
     private CancellationTokenSource? _preparationCancellation;
-    private CancellationTokenSource? _captionPollingCancellation;
     private Task? _timerTask;
     private Task? _preparationTask;
     private long _lastTickTimestamp;
@@ -740,11 +739,7 @@ public partial class Slideshow : IAsyncDisposable
             !string.Equals(previous.Orientation, next.Orientation, StringComparison.Ordinal);
         bool prepareOriginalsChanged = previous.PrepareOriginals != next.PrepareOriginals;
         bool captionSettingsChanged =
-            previous.GeneratedCaptions != next.GeneratedCaptions ||
-            !string.Equals(
-                previous.CaptionLanguage,
-                next.CaptionLanguage,
-                StringComparison.Ordinal);
+            previous.ShowCaptions != next.ShowCaptions;
 
         await ApplyAndPersistSettingsAsync(next);
 
@@ -766,11 +761,11 @@ public partial class Slideshow : IAsyncDisposable
         if (captionSettingsChanged)
         {
             ResetCaptionTracking();
-            if (Settings.GeneratedCaptions &&
+            if (Settings.ShowCaptions &&
                 Playback.IsImageReady &&
                 Playback.CurrentRevisionId is string revisionId)
             {
-                await RequestCaptionAsync(revisionId);
+                await LoadCaptionAsync(revisionId);
             }
         }
 
@@ -1398,11 +1393,11 @@ public partial class Slideshow : IAsyncDisposable
         await JS.InvokeVoidAsync("photoIdentitySlideshow.setPrefetchUrls", (object)urls);
     }
 
-    private async Task RequestCaptionAsync(string revisionId)
+    private async Task LoadCaptionAsync(string revisionId)
     {
         ResetCaptionTracking();
 
-        if (!Settings.GeneratedCaptions ||
+        if (!Settings.ShowCaptions ||
             !string.Equals(Playback.CurrentRevisionId, revisionId, StringComparison.Ordinal))
         {
             return;
@@ -1410,126 +1405,29 @@ public partial class Slideshow : IAsyncDisposable
 
         try
         {
-            using HttpResponseMessage response = await Http.PostAsJsonAsync(
-                $"api/slideshows/captions/{Uri.EscapeDataString(revisionId)}",
-                new SlideshowCaptionRequest(Settings.CaptionLanguage));
-            if (!response.IsSuccessStatusCode)
+            PhotoCaptionResponse? caption =
+                await Http.GetFromJsonAsync<PhotoCaptionResponse>(
+                    $"api/photos/{Uri.EscapeDataString(revisionId)}/caption");
+            if (caption is null ||
+                caption.Status != "available" ||
+                string.IsNullOrWhiteSpace(caption.Caption) ||
+                !string.Equals(Playback.CurrentRevisionId, revisionId, StringComparison.Ordinal))
             {
                 return;
             }
 
-            SlideshowCaptionResponse? caption =
-                await response.Content.ReadFromJsonAsync<SlideshowCaptionResponse>();
-            if (caption is null)
-            {
-                return;
-            }
-
-            if (ApplyCaptionResponse(revisionId, caption))
-            {
-                return;
-            }
-
-            if (caption.Status == "pending")
-            {
-                CancellationTokenSource polling = new();
-                _captionPollingCancellation = polling;
-                _ = PollCaptionAsync(
-                    revisionId,
-                    caption.Language,
-                    polling.Token);
-            }
+            CurrentCaption = caption.Caption.Trim();
+            StateHasChanged();
         }
         catch
         {
-            // Local captioning is optional presentation enhancement and must never interrupt playback.
+            // Captions are optional derived evidence; a read failure must never interrupt playback.
         }
-    }
-
-    private async Task PollCaptionAsync(
-        string revisionId,
-        string language,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
-
-                using HttpResponseMessage response = await Http.GetAsync(
-                    $"api/slideshows/captions/{Uri.EscapeDataString(revisionId)}?language={Uri.EscapeDataString(language)}",
-                    cancellationToken);
-                if (!response.IsSuccessStatusCode)
-                {
-                    return;
-                }
-
-                SlideshowCaptionResponse? caption =
-                    await response.Content.ReadFromJsonAsync<SlideshowCaptionResponse>(
-                        cancellationToken: cancellationToken);
-                if (caption is null)
-                {
-                    return;
-                }
-
-                if (ApplyCaptionResponse(revisionId, caption))
-                {
-                    return;
-                }
-
-                if (caption.Status != "pending")
-                {
-                    return;
-                }
-            }
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-        }
-        catch
-        {
-            // Caption polling is best effort and isolated from slideshow playback.
-        }
-    }
-
-    private bool ApplyCaptionResponse(
-        string revisionId,
-        SlideshowCaptionResponse response)
-    {
-        if (!Settings.GeneratedCaptions ||
-            !string.Equals(Playback.CurrentRevisionId, revisionId, StringComparison.Ordinal) ||
-            !string.Equals(
-                response.Language,
-                Settings.CaptionLanguage,
-                StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        if (response.Status == "available" &&
-            !string.IsNullOrWhiteSpace(response.Caption))
-        {
-            CurrentCaption = response.Caption.Trim();
-            _ = InvokeAsync(StateHasChanged);
-            return true;
-        }
-
-        return response.Status is "blocked" or "failed" or "queue-full" or "missing";
     }
 
     private void ResetCaptionTracking()
     {
         CurrentCaption = null;
-
-        CancellationTokenSource? polling = _captionPollingCancellation;
-        _captionPollingCancellation = null;
-        if (polling is not null)
-        {
-            polling.Cancel();
-            polling.Dispose();
-        }
-
     }
 
     private async Task ExitSlideshowAsync()
