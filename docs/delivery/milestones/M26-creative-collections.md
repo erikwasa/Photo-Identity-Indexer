@@ -55,13 +55,14 @@ The same workflow must remain useful for archives with little or no GPS/location
 - [WI-0122](../work-items/WI-0122-photo-presentation-preferences.md) - add explicit photo-level Prefer/Avoid presentation preferences without changing archive truth.
 - [WI-0123](../work-items/WI-0123-near-duplicate-burst-groups.md) - detect burst/near-duplicate visual groups so selection can suppress repetitive frames.
 - [WI-0124](../work-items/WI-0124-slideshow-history-novelty.md) - track presentation history and optionally favor photos that have not been shown recently.
-- [WI-0125](../work-items/WI-0125-person-family-metadata.md) - add optional birth-date and family-relationship metadata for age/relationship-oriented family stories.
+- WI-0125 birth-date/family-relationship metadata was intentionally deferred and moved to [M31](M31-family-story-metadata.md) so it remains available without holding M26 open.
 
 ### Candidate follow-on semantic experiments
 
 - [WI-0126](../work-items/WI-0126-visible-content-tagging.md) - re-evaluate local visible-content tagging with Creative Collection quality as the concrete consumer.
 - [WI-0127](../work-items/WI-0127-whole-image-embeddings.md) - evaluate whole-image embeddings for semantic retrieval, visual similarity and diversity before adopting vector infrastructure.
 - [WI-0128](../work-items/WI-0128-caption-narration-experiment.md) - evaluate optional local captions/story narration only after the simpler Creative Collection product is useful.
+- [WI-0157](../work-items/WI-0157-opt-in-local-slideshow-captions.md) - productize the positive caption result as an off-by-default, local-only, multilingual slideshow enhancement with bounded background generation and derived caching.
 
 ## Delivery sequence
 
@@ -87,7 +88,9 @@ On 2026-09-19 the maintainer completed WI-0126 with an explicit no-go for the ev
 
 On 2026-09-20 the maintainer completed WI-0127 with a split decision. The private run embedded all 185 candidates from durable review proxies with zero proxy failures. The 512-dimensional float32 vectors averaged 64.6 ms per proxy and require 2,048 raw bytes each (about 204.8 MB per 100,000 photos before database/index overhead). Semantic text-to-photo retrieval was strong: for the seven queries individually scored in the maintainer note, 7/8 or 8/8 returned photos were relevant. Similar-photo retrieval was inconsistent, with only two of four seeds producing meaningfully related neighbors. Embedding diversity replaced 8 of 50 baseline selections but the maintainer judged the replacements as merely different; mean pairwise cosine changed only from 0.5371 to 0.5354 and p95 from 0.7119 to 0.7008. Therefore M26 will not persist embeddings, add pgvector/ANN infrastructure or enable embedding-based Creative diversity. The semantic-retrieval result is retained as a promising future search direction that should be productized separately if prioritized.
 
-WI-0128 is now the final active M26 experiment. It compares deterministic catalogue-derived presentation text with guarded captions from a local vision model through a loopback-only Ollama endpoint. Generated text remains private derived evidence, is never persisted, and is independently screened for unsupported names/locations, relationships, ages, dates and event identities before any future production path could be considered.
+On 2026-09-20 the maintainer accepted WI-0128 as a positive bounded experiment. A four-photo 480x320 thumbnail run generated 4/4 captions with zero generation failures; all four passed the guard, the maintainer judged all four useful and observed no factual errors. Average runtime was 95,858.8 ms per caption on the maintainer hardware with the 3,200,627,168-byte qwen2.5vl:3b package. A full-proxy single caption took 373,568.2 ms and the first thumbnail probe took 118,081.4 ms. The quality result justified optional product integration, while the latency ruled out synchronous generation.
+
+WI-0157 is therefore the final M26 productization slice. Generated captions remain off by default, loopback-only, guarded and presentation-only. A single bounded background worker generates only photos encountered during caption-enabled playback; successful captions are cached as regenerable derived evidence so later slideshow views can reuse them without paying inference cost again. Swedish and English are selectable, with Swedish the default caption language.
 
 ## Exit criteria
 
