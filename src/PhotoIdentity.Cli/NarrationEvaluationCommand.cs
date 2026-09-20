@@ -419,7 +419,8 @@ internal static class NarrationEvaluationCommandRunner
             reviewItems,
             selectedForReview.Length,
             unavailableProxies,
-            generationFailures);
+            generationFailures,
+            generationFailureKinds);
 
         if (options.ReportPath is string reportPath)
         {
@@ -453,6 +454,12 @@ internal static class NarrationEvaluationCommandRunner
         output.WriteLine($"selected-count: {selection.SelectedCount}");
         output.WriteLine($"sample-requested: {selectedForReview.Length}");
         output.WriteLine($"captions-generated: {reviewItems.Count}");
+        output.WriteLine($"generation-failures: {generationFailures}");
+        foreach ((string kind, int count) in generationFailureKinds
+                     .OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            output.WriteLine($"generation-failure-{kind}: {count}");
+        }
         output.WriteLine($"guard-passed: {report.Guard.PassedCount}");
         output.WriteLine($"guard-flagged: {report.Guard.FlaggedCount}");
         output.WriteLine($"average-caption-ms: {report.Runtime.AverageClientMilliseconds:0.0}");
