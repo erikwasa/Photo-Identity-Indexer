@@ -1,6 +1,6 @@
 ---
 id: WI-0128
-title: Evaluate and productize local photo captions as derived archive evidence
+title: Evaluate local captions and story narration for Creative Collections
 milestone: M26
 status_source: ../status/work-items.yaml
 depends_on: [WI-0121]
@@ -8,7 +8,7 @@ related_adrs: []
 affected_modules: [PhotoIdentity.Core, PhotoIdentity.Cli, PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Core.Tests, PhotoIdentity.Integration.Tests, models, docs]
 ---
 
-# WI-0128: Evaluate and productize local photo captions as derived archive evidence
+# WI-0128: Evaluate local captions and story narration for Creative Collections
 
 ## Objective
 
