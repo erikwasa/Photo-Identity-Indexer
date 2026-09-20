@@ -110,6 +110,11 @@ public static class Program
                         ImageEmbeddingEvaluationCommandOptions.Parse(args.Skip(2).ToArray()),
                         output,
                         cancellationToken),
+                "narration" when args.Length > 1 && args[1] == "evaluate" =>
+                    await NarrationEvaluationCommandRunner.RunAsync(
+                        NarrationEvaluationCommandOptions.Parse(args.Skip(2).ToArray()),
+                        output,
+                        cancellationToken),
                 _ => UnknownCommand(args[0], error),
             };
         }
@@ -238,6 +243,18 @@ public static class Program
                                         [--report PATH]
                                         [--review-output DIR]
 
+              narration evaluate --postgres-connection-env NAME
+                                 --collection COLLECTION_ID
+                                 --proxy-root DIR --proxy-profile ID
+                                 [--ollama-base-url LOOPBACK_URL]
+                                 [--model NAME]
+                                 [--target-count COUNT]
+                                 [--moment-gap-minutes MINUTES]
+                                 [--sample-count COUNT]
+                                 [--timeout-seconds SECONDS]
+                                 [--report PATH]
+                                 [--review-output DIR]
+
             Catalogue backup is the WI-0102 stopped-source snapshot path. It requires the
             operator to explicitly confirm that Photo Identity has been stopped, opens the
             source SQLite catalogue read-only, verifies the current schema and foreign keys,
@@ -351,6 +368,15 @@ public static class Program
             contains aggregate runtime/storage/retrieval/selection measurements but omits query
             text and revision ids; the optional private review page contains the operator's query
             text and copied review proxies for qualitative retrieval and selection review.
+
+            Narration evaluate is the WI-0128 bounded local caption experiment. It
+            sends only existing durable review proxies to an operator-controlled Ollama endpoint
+            that must resolve to loopback, compares model captions with deterministic catalogue-
+            derived text, and applies a conservative guard against names/locations, relationships,
+            ages, dates and event-identity claims. Generated captions remain in memory and the
+            optional private review page only; the aggregate JSON report contains model provenance,
+            package size, runtime and guard counts but no captions, filenames, collection names or
+            revision ids. It never persists generated text or writes catalogue evidence.
 
             Match regenerate rebuilds ranked suggestions for one exact embedding model
             revision from the current canonical exemplar snapshot while preserving rejected

@@ -12,7 +12,7 @@ Current work items: **28**. Archived terminal items: **127**.
 | [WI-0090](../work-items/WI-0090-exclusion-purge-service.md) Purge excluded photo data and derivatives safely | M23 | proposed | unassigned | [YAML](work-items/active/WI-0090.yaml) |
 | [WI-0091](../work-items/WI-0091-archive-lifecycle-review.md) Add archive lifecycle review and exclusion workflows | M23 | proposed | unassigned | [YAML](work-items/active/WI-0091.yaml) |
 | [WI-0125](../work-items/WI-0125-person-family-metadata.md) Add birth dates and family relationships for age-aware Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0125.yaml) |
-| [WI-0128](../work-items/WI-0128-caption-narration-experiment.md) Evaluate local captions and story narration for Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0128.yaml) |
+| [WI-0128](../work-items/WI-0128-caption-narration-experiment.md) Evaluate local captions and story narration for Creative Collections | M26 | in_progress | ai-agent | [YAML](work-items/active/WI-0128.yaml) |
 | [WI-0132](../work-items/WI-0132-moment-aware-slideshow-transitions.md) Add moment-aware transition language to slideshow playback | M27 | in_progress | ai-agent | [YAML](work-items/active/WI-0132.yaml) |
 | [WI-0133](../work-items/WI-0133-burst-aware-slideshow-pacing.md) Add burst-aware compact pacing to slideshow playback | M27 | in_progress | ai-agent | [YAML](work-items/active/WI-0133.yaml) |
 | [WI-0137](../work-items/WI-0137-real-device-slideshow-polish-acceptance.md) Tune and verify the polished slideshow experience on real devices | M27 | proposed | unassigned | [YAML](work-items/active/WI-0137.yaml) |
