@@ -64,7 +64,7 @@ public sealed class GeneratedCreativeTextEvidenceTests
         Assert.Equal(
             "Direct collection match · captured 2026-09-20 · 2 identified people recorded.",
             caption);
-        Assert.DoesNotContain("person-a", caption, StringComparison.Ordinal);
-        Assert.DoesNotContain("person-b", caption, StringComparison.Ordinal);
+        Assert.DoesNotContain("person-a", caption);
+        Assert.DoesNotContain("person-b", caption);
     }
 }
