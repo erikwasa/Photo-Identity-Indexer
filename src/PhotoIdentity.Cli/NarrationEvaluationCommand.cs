@@ -30,6 +30,7 @@ internal sealed record NarrationEvaluationCommandOptions(
         string? proxyProfile = null;
         Uri ollamaBaseUri = OllamaVisionCaptionClient.DefaultBaseUri;
         string model = OllamaVisionCaptionClient.DefaultModel;
+        bool modelSpecified = false;
         int targetCount = 50;
         int momentGapMinutes = 30;
         int sampleCount = 12;
@@ -80,7 +81,16 @@ internal sealed record NarrationEvaluationCommandOptions(
                     ollamaBaseUri = parsedUri;
                     break;
                 case "--model":
-                    model = Single(null, value, option);
+                    if (modelSpecified)
+                    {
+                        throw new ArgumentException(
+                            "Option '--model' may be supplied only once.");
+                    }
+                    model = string.IsNullOrWhiteSpace(value)
+                        ? throw new ArgumentException(
+                            "Option '--model' requires a non-empty value.")
+                        : value.Trim();
+                    modelSpecified = true;
                     break;
                 case "--target-count":
                     targetCount = PositiveInt(value, option, 1000);
