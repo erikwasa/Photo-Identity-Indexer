@@ -98,7 +98,7 @@ Maintainer verification should:
 - Generation is strictly serial and does not depend on what the user views.
 - The default production generation policy reuses the accepted probe: `qwen2.5vl:3b`, loopback Ollama, temporary 480x320 JPEG, 1024 context tokens.
 - The ordinary Photo page reads and presents the stored caption as derived evidence.
-- Slideshow **Show photo captions** is a display preference only. The slideshow performs a read-only lookup for the current revision/language; missing evidence simply means no caption is shown.
+- Slideshow **Show photo captions** is a display preference only. The slideshow performs a read-only lookup for the current revision using the globally configured enrichment language; missing evidence simply means no caption is shown.
 - The former slideshow-owned POST/queue/polling caption service introduced in PR #388 is removed by the corrective follow-up.
 
 ## Completion notes
