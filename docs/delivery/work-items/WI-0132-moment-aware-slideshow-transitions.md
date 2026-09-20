@@ -35,11 +35,11 @@ A slideshow currently presents every adjacent photo with the same semantics. Mom
 
 ## Acceptance criteria
 
-- [ ] A slideshow with moment annotations can distinguish within-moment from between-moment transitions without new viewer controls.
-- [ ] A slideshow without annotations behaves exactly as the core M27 renderer specifies.
-- [ ] Moment annotations cannot add/remove/reorder revision IDs after the immutable sequence is established.
-- [ ] Transition differences remain bounded and do not materially extend total playback time unpredictably.
-- [ ] Tests cover annotated and unannotated sequences, singleton moments and consecutive moment boundaries.
+- [x] A slideshow with moment annotations can distinguish within-moment from between-moment transitions without new viewer controls.
+- [x] A slideshow without annotations behaves exactly as the core M27 renderer specifies.
+- [x] Moment annotations cannot add/remove/reorder revision IDs after the immutable sequence is established.
+- [x] Transition differences remain bounded and do not materially extend total playback time unpredictably.
+- [x] Tests cover annotated and unannotated sequences, singleton moments and consecutive moment boundaries.
 
 ## Verification requirements
 
@@ -49,5 +49,6 @@ Evaluate on a representative private Creative Collection after WI-0118 produces 
 
 - Files changed: Creative slideshow snapshot contracts/materialization, slideshow page/presentation renderer, moment transition policy, browser transition interop, JavaScript and integration tests, and delivery status.
 - Trade-offs: confirmed moment boundaries use an 850 ms crossfade versus the existing 600 ms crossfade. Same-moment, singleton and unannotated transitions keep the existing behavior; reduced-motion still swaps without animation. No chapter hold, caption or new preference was added.
-- Deferred work: maintainer review on a representative private Creative Collection is intentionally grouped with the remaining M27 presentation items before completion.
-- Commands run: CI build/test/integration, JavaScript tests and documentation validation are expected on the pull request.
+- Deferred work: none for WI-0132; the combined M27 maintainer review confirmed the chapter-boundary treatment works as expected.
+- Verification: maintainer accepted WI-0132 on 2026-09-20 during the combined WI-0132/WI-0133/WI-0139 slideshow review.
+- Commands run: PR #378 CI run #1989 completed successfully, including build/test/integration, JavaScript tests and documentation validation.
