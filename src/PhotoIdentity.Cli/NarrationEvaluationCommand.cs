@@ -4,6 +4,7 @@ using System.Text.Json;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Imaging.OpenCv;
 using PhotoIdentity.Persistence.Postgres;
 
 namespace PhotoIdentity.Cli;
@@ -15,6 +16,8 @@ internal sealed record NarrationEvaluationCommandOptions(
     string ProxyProfile,
     Uri OllamaBaseUri,
     string Model,
+    string CaptionImageMode,
+    int OllamaContextTokens,
     int TargetCount,
     int MomentGapMinutes,
     int SampleCount,
@@ -31,6 +34,8 @@ internal sealed record NarrationEvaluationCommandOptions(
         Uri ollamaBaseUri = OllamaVisionCaptionClient.DefaultBaseUri;
         string model = OllamaVisionCaptionClient.DefaultModel;
         bool modelSpecified = false;
+        string captionImageMode = "proxy";
+        int ollamaContextTokens = 4096;
         int targetCount = 50;
         int momentGapMinutes = 30;
         int sampleCount = 12;
@@ -92,6 +97,23 @@ internal sealed record NarrationEvaluationCommandOptions(
                         : value.Trim();
                     modelSpecified = true;
                     break;
+                case "--caption-image-mode":
+                    captionImageMode = value.Trim().ToLowerInvariant() switch
+                    {
+                        "proxy" => "proxy",
+                        "thumbnail" => "thumbnail",
+                        _ => throw new ArgumentException(
+                            "Option '--caption-image-mode' must be proxy or thumbnail."),
+                    };
+                    break;
+                case "--ollama-context":
+                    ollamaContextTokens = PositiveInt(value, option, 32768);
+                    if (ollamaContextTokens < 256)
+                    {
+                        throw new ArgumentException(
+                            "Option '--ollama-context' must be between 256 and 32768.");
+                    }
+                    break;
                 case "--target-count":
                     targetCount = PositiveInt(value, option, 1000);
                     break;
@@ -144,6 +166,8 @@ internal sealed record NarrationEvaluationCommandOptions(
             proxyProfile.Trim(),
             ollamaBaseUri,
             model.Trim(),
+            captionImageMode,
+            ollamaContextTokens,
             targetCount,
             momentGapMinutes,
             sampleCount,
@@ -216,7 +240,9 @@ internal static class NarrationEvaluationCommandRunner
         OllamaVisionCaptionClient captionClient = new(
             httpClient,
             options.OllamaBaseUri,
-            options.Model);
+            options.Model,
+            options.OllamaContextTokens);
+        OpenCvThumbnailRenderer thumbnailRenderer = new();
         LocalVisionModelDescriptor model =
             await captionClient.GetInstalledModelAsync(cancellationToken);
 
@@ -342,8 +368,32 @@ internal static class NarrationEvaluationCommandRunner
 
             try
             {
-                byte[] imageBytes =
-                    await File.ReadAllBytesAsync(proxyPath, cancellationToken);
+                byte[] imageBytes;
+                if (options.CaptionImageMode == "thumbnail")
+                {
+                    EncodedThumbnail? thumbnail =
+                        await thumbnailRenderer.RenderAsync(
+                            proxyPath,
+                            cancellationToken);
+                    if (thumbnail is null)
+                    {
+                        generationFailures++;
+                        IncrementFailure(
+                            generationFailureKinds,
+                            "thumbnail-render");
+                        continue;
+                    }
+
+                    imageBytes = thumbnail.Content;
+                }
+                else
+                {
+                    imageBytes =
+                        await File.ReadAllBytesAsync(
+                            proxyPath,
+                            cancellationToken);
+                }
+
                 LocalVisionCaptionResult generatedCaption =
                     await captionClient.CaptionAsync(
                         imageBytes,
@@ -464,6 +514,8 @@ internal static class NarrationEvaluationCommandRunner
         output.WriteLine($"guard-flagged: {report.Guard.FlaggedCount}");
         output.WriteLine($"average-caption-ms: {report.Runtime.AverageClientMilliseconds:0.0}");
         output.WriteLine($"model-package-bytes: {model.SizeBytes}");
+        output.WriteLine($"caption-image-mode: {options.CaptionImageMode}");
+        output.WriteLine($"ollama-context: {options.OllamaContextTokens}");
         output.WriteLine("loopback-only: true");
         output.WriteLine("external-photo-uploads: false");
         output.WriteLine("catalogue-writes: 0");
@@ -514,6 +566,8 @@ internal static class NarrationEvaluationCommandRunner
                 OllamaVisionCaptionClient.PromptVersion,
                 CreativeCollectionGeneratedTextPolicies.DeterministicCaptionV1,
                 options.ProxyProfile,
+                options.CaptionImageMode,
+                options.OllamaContextTokens,
                 LoopbackOnly: true),
             new NarrationSampleEvidence(
                 generated.TotalCandidateCount,
@@ -761,6 +815,8 @@ internal sealed record NarrationPipelineEvidence(
     string PromptVersion,
     string DeterministicCaptionVersion,
     string ProxyProfile,
+    string CaptionImageMode,
+    int OllamaContextTokens,
     bool LoopbackOnly);
 
 internal sealed record NarrationSampleEvidence(

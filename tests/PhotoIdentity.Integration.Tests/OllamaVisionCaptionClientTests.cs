@@ -27,7 +27,8 @@ public sealed class OllamaVisionCaptionClientTests
         OllamaVisionCaptionClient client = new(
             http,
             new Uri("http://127.0.0.1:11434/"),
-            "qwen2.5vl:3b");
+            "qwen2.5vl:3b",
+            contextTokens: 1024);
 
         LocalVisionModelDescriptor model =
             await client.GetInstalledModelAsync(CancellationToken.None);
@@ -45,6 +46,10 @@ public sealed class OllamaVisionCaptionClientTests
             StringComparison.Ordinal);
         Assert.Contains(
             Convert.ToBase64String(new byte[] { 1, 2, 3, 4 }),
+            handler.ChatRequestBody,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "\"num_ctx\":1024",
             handler.ChatRequestBody,
             StringComparison.Ordinal);
         Assert.Equal(2, handler.Requests.Count);

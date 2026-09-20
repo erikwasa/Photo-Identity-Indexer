@@ -248,6 +248,8 @@ public static class Program
                                  --proxy-root DIR --proxy-profile ID
                                  [--ollama-base-url LOOPBACK_URL]
                                  [--model NAME]
+                                 [--caption-image-mode proxy|thumbnail]
+                                 [--ollama-context TOKENS]
                                  [--target-count COUNT]
                                  [--moment-gap-minutes MINUTES]
                                  [--sample-count COUNT]
@@ -370,7 +372,8 @@ public static class Program
             text and copied review proxies for qualitative retrieval and selection review.
 
             Narration evaluate is the WI-0128 bounded local caption experiment. It
-            sends only existing durable review proxies to an operator-controlled Ollama endpoint
+            sends either existing durable review proxies or explicitly requested temporary
+            in-memory thumbnails to an operator-controlled Ollama endpoint
             that must resolve to loopback, compares model captions with deterministic catalogue-
             derived text, and applies a conservative guard against names/locations, relationships,
             ages, dates and event-identity claims. Generated captions remain in memory and the

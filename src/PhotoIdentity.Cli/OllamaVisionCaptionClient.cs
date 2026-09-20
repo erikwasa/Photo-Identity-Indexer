@@ -37,15 +37,23 @@ internal sealed class OllamaVisionCaptionClient
     private readonly HttpClient _httpClient;
     private readonly Uri _baseUri;
     private readonly string _model;
+    private readonly int _contextTokens;
 
     public OllamaVisionCaptionClient(
         HttpClient httpClient,
         Uri baseUri,
-        string model)
+        string model,
+        int contextTokens = 4096)
     {
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(baseUri);
         ArgumentException.ThrowIfNullOrWhiteSpace(model);
+        if (contextTokens is < 256 or > 32768)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(contextTokens),
+                "Ollama context tokens must be between 256 and 32768.");
+        }
         if (!baseUri.IsAbsoluteUri ||
             !baseUri.IsLoopback ||
             (baseUri.Scheme != Uri.UriSchemeHttp &&
@@ -59,6 +67,7 @@ internal sealed class OllamaVisionCaptionClient
         _httpClient = httpClient;
         _baseUri = EnsureTrailingSlash(baseUri);
         _model = model.Trim();
+        _contextTokens = contextTokens;
     }
 
     public async Task<LocalVisionModelDescriptor> GetInstalledModelAsync(
@@ -128,6 +137,7 @@ internal sealed class OllamaVisionCaptionClient
                 temperature = 0,
                 seed = 0,
                 num_predict = 80,
+                num_ctx = _contextTokens,
             },
         };
 
