@@ -6,9 +6,9 @@ owner: ai-agent
 document: ../work-items/WI-0128-caption-narration-experiment.md
 started_at: 2026-09-20
 last_updated_at: 2026-09-20
-branch: agent/WI-0128-local-caption-evaluation
+branch: agent/WI-0128-archive-caption-enrichment
 blockers:
 - WI-0121
 blocker_notes:
-- Bounded local caption evaluation is in progress; completion remains pending CI and representative private maintainer review of usefulness and factual errors.
+- Bounded caption quality evaluation was accepted on 2026-09-20; completion now remains pending CI and maintainer verification of the corrected archive-level enrichment producer/consumer boundary.
 evidence: []
