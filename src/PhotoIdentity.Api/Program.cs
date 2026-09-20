@@ -51,12 +51,9 @@ public partial class Program
         string? reviewProxyRoot = builder.Configuration["PhotoIdentity:ReviewProxyRoot"];
         string? reviewProxyProfileId = builder.Configuration["PhotoIdentity:ReviewProxyProfileId"];
 
-        string captionCacheRoot =
-            builder.Configuration["PhotoIdentity:GeneratedCaptions:CacheRoot"]
-            ?? Path.Combine(defaultApplicationRoot, "generated-captions");
         string captionBaseUrl =
             builder.Configuration["PhotoIdentity:GeneratedCaptions:OllamaBaseUrl"]
-            ?? SlideshowCaptionGenerationConfiguration.DefaultOllamaBaseUri.AbsoluteUri;
+            ?? PhotoCaptionGenerationConfiguration.DefaultOllamaBaseUri.AbsoluteUri;
         if (!Uri.TryCreate(captionBaseUrl, UriKind.Absolute, out Uri? captionBaseUri) ||
             !captionBaseUri.IsLoopback ||
             (captionBaseUri.Scheme != Uri.UriSchemeHttp &&
@@ -69,15 +66,11 @@ public partial class Program
         int captionContextTokens = ParseOptionalInt(
             builder.Configuration,
             "PhotoIdentity:GeneratedCaptions:ContextTokens")
-            ?? SlideshowCaptionGenerationConfiguration.DefaultContextTokens;
+            ?? PhotoCaptionGenerationConfiguration.DefaultContextTokens;
         int captionTimeoutSeconds = ParseOptionalInt(
             builder.Configuration,
             "PhotoIdentity:GeneratedCaptions:TimeoutSeconds")
-            ?? SlideshowCaptionGenerationConfiguration.DefaultTimeoutSeconds;
-        int captionQueueCapacity = ParseOptionalInt(
-            builder.Configuration,
-            "PhotoIdentity:GeneratedCaptions:QueueCapacity")
-            ?? SlideshowCaptionGenerationConfiguration.DefaultQueueCapacity;
+            ?? PhotoCaptionGenerationConfiguration.DefaultTimeoutSeconds;
         if (captionContextTokens is < 256 or > 32768)
         {
             throw new InvalidOperationException(
@@ -88,20 +81,12 @@ public partial class Program
             throw new InvalidOperationException(
                 "PhotoIdentity:GeneratedCaptions:TimeoutSeconds must be between 30 and 1800.");
         }
-        if (captionQueueCapacity is < 1 or > 64)
-        {
-            throw new InvalidOperationException(
-                "PhotoIdentity:GeneratedCaptions:QueueCapacity must be between 1 and 64.");
-        }
-
-        SlideshowCaptionGenerationConfiguration captionConfiguration = new(
-            captionCacheRoot,
+        PhotoCaptionGenerationConfiguration captionConfiguration = new(
             captionBaseUri,
             builder.Configuration["PhotoIdentity:GeneratedCaptions:Model"]
-                ?? SlideshowCaptionGenerationConfiguration.DefaultModel,
+                ?? PhotoCaptionGenerationConfiguration.DefaultModel,
             captionContextTokens,
-            captionTimeoutSeconds,
-            captionQueueCapacity);
+            captionTimeoutSeconds);
 
         int? automaticGeoNamesMinimumRequestInterval = ParseOptionalInt(
             builder.Configuration,
@@ -170,6 +155,7 @@ public partial class Program
             automaticGeoNamesMinimumRequestInterval,
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:GeoNames:AutomaticIdlePollIntervalMilliseconds")));
         builder.Services.AddSingleton<PhotoPlaceEnrichmentWorkerState>();
+        builder.Services.AddSingleton<PhotoCaptionEnrichmentWorkerState>();
         builder.Services.AddSingleton<CreativeCollectionMaterializationService>();
 
         builder.Services.AddSingleton<ArchiveSourceCatalogueScanner>();
@@ -205,14 +191,10 @@ public partial class Program
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddHttpClient("GeoNames");
         builder.Services.AddHttpClient(
-            "LocalSlideshowCaption",
+            LocalPhotoCaptionGenerator.HttpClientName,
             client => client.Timeout = TimeSpan.FromSeconds(captionConfiguration.TimeoutSeconds));
-        builder.Services.AddSingleton<LocalSlideshowCaptionGenerator>();
-        builder.Services.AddSingleton<SlideshowCaptionService>();
-        builder.Services.AddSingleton<ISlideshowCaptionService>(
-            services => services.GetRequiredService<SlideshowCaptionService>());
-        builder.Services.AddHostedService<SlideshowCaptionService>(
-            services => services.GetRequiredService<SlideshowCaptionService>());
+        builder.Services.AddSingleton<LocalPhotoCaptionGenerator>();
+        builder.Services.AddHostedService<PhotoCaptionEnrichmentHostedService>();
         builder.Services.AddSingleton<IReverseGeocoder, GeoNamesReverseGeocoder>();
         builder.Services.AddSingleton<PhotoPlaceEnrichmentService>();
         builder.Services.AddHostedService<PhotoPlaceEnrichmentHostedService>();
@@ -358,7 +340,7 @@ public partial class Program
         app.MapMomentPreviewEndpoints();
         app.MapSlideshowOriginalPreparationEndpoints();
         app.MapSlideshowExposureEndpoints();
-        app.MapSlideshowCaptionEndpoints();
+        app.MapPhotoCaptionEndpoints();
         app.MapPhotoMetadataEndpoints();
         app.MapCollectionProxyEndpoints();
         app.MapCollectionViewerPreviewEndpoints();
