@@ -37,8 +37,14 @@ public partial class Slideshows : IAsyncDisposable
     [Inject]
     public NavigationManager Navigation { get; set; } = default!;
 
+    private sealed record SlideshowLibraryEntry(
+        string Id,
+        string Name,
+        bool Manual,
+        string? CoverRevisionId);
+
     private SlideshowSettings Settings { get; set; } = SlideshowSettings.Defaults;
-    private IReadOnlyList<SlideshowLibraryCollectionResponse> Collections { get; set; } = [];
+    private IReadOnlyList<SlideshowLibraryEntry> Collections { get; set; } = [];
     private bool Loading { get; set; } = true;
     private string? Error { get; set; }
 
@@ -77,18 +83,52 @@ public partial class Slideshows : IAsyncDisposable
         Error = null;
         try
         {
-            SlideshowLibraryCollectionResponse[]? collections =
+            SlideshowLibraryCollectionResponse[] smartCollections =
                 await Http.GetFromJsonAsync<SlideshowLibraryCollectionResponse[]>(
                     "api/slideshows/collections",
-                    _lifetime.Token);
-            Collections = collections ?? [];
+                    _lifetime.Token)
+                ?? [];
+
+            PhotoListCollectionResponse[] manualCollections = [];
+            using (HttpResponseMessage manualResponse = await Http.GetAsync(
+                       "api/photo-list-collections",
+                       _lifetime.Token))
+            {
+                if (manualResponse.IsSuccessStatusCode)
+                {
+                    manualCollections =
+                        await manualResponse.Content.ReadFromJsonAsync<PhotoListCollectionResponse[]>(
+                            cancellationToken: _lifetime.Token)
+                        ?? [];
+                }
+                else if (manualResponse.StatusCode != HttpStatusCode.NotFound)
+                {
+                    throw new HttpRequestException(
+                        $"Manual slideshows could not be loaded. HTTP {(int)manualResponse.StatusCode}.");
+                }
+            }
+
+            Collections = smartCollections
+                .Select(collection => new SlideshowLibraryEntry(
+                    collection.Id,
+                    collection.Name,
+                    Manual: false,
+                    CoverRevisionId: null))
+                .Concat(manualCollections.Select(collection => new SlideshowLibraryEntry(
+                    collection.Id,
+                    collection.Name,
+                    Manual: true,
+                    CoverRevisionId: collection.RevisionIds.FirstOrDefault())))
+                .OrderBy(collection => collection.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(collection => collection.Id, StringComparer.Ordinal)
+                .ToArray();
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
         }
         catch (Exception exception)
         {
-            Error = $"Saved Smart Collections could not be loaded: {exception.Message}";
+            Error = $"Saved slideshows could not be loaded: {exception.Message}";
         }
         finally
         {
@@ -112,7 +152,7 @@ public partial class Slideshows : IAsyncDisposable
         }
     }
 
-    private async Task StartSlideshowAsync(SlideshowLibraryCollectionResponse collection)
+    private async Task StartSlideshowAsync(SlideshowLibraryEntry collection)
     {
         if (IsBusy(collection.Id))
         {
@@ -123,10 +163,11 @@ public partial class Slideshows : IAsyncDisposable
             JS,
             Navigation,
             collection.Id,
-            "/slideshows");
+            "/slideshows",
+            manual: collection.Manual);
     }
 
-    private async Task PrepareOriginalsAsync(SlideshowLibraryCollectionResponse collection)
+    private async Task PrepareOriginalsAsync(SlideshowLibraryEntry collection)
     {
         if (!_starting.Add(collection.Id) || IsServerPreparationActive(collection.Id))
         {
@@ -138,8 +179,11 @@ public partial class Slideshows : IAsyncDisposable
 
         try
         {
+            string snapshotPath = collection.Manual
+                ? $"api/photo-list-collections/{Uri.EscapeDataString(collection.Id)}/slideshow-snapshot"
+                : $"api/smart-collections/{Uri.EscapeDataString(collection.Id)}/slideshow-snapshot";
             using HttpResponseMessage snapshotResponse = await Http.PostAsync(
-                $"api/smart-collections/{Uri.EscapeDataString(collection.Id)}/slideshow-snapshot",
+                snapshotPath,
                 content: null,
                 _lifetime.Token);
             if (!snapshotResponse.IsSuccessStatusCode)
