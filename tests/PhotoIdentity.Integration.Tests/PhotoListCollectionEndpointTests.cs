@@ -17,7 +17,7 @@ public sealed class PhotoListCollectionEndpointTests
     public async Task Api_covers_lifecycle_membership_and_playback_compatible_snapshot()
     {
         InMemoryRepository repository = new();
-        WebApplicationBuilder builder = WebApplication.CreateBuilder();
+        WebApplicationBuilder builder = WebApplication.CreateBuilder([]);
         builder.WebHost.UseTestServer();
         builder.Services.AddSingleton<IPhotoListCollectionRepository>(repository);
 
