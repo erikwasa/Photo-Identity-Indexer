@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 30;
+    public const int CurrentSchemaVersion = 31;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1263,6 +1263,39 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
                     OR longitude IS NULL
                     OR latitude <> 0
                     OR longitude <> 0);
+            """),
+        new(31, "explicit-photo-list-collections", """
+            CREATE TABLE photo_list_collections (
+                id uuid NOT NULL PRIMARY KEY,
+                normalized_name text NOT NULL
+                    CHECK (btrim(normalized_name) <> ''),
+                display_name text NOT NULL
+                    CHECK (btrim(display_name) <> ''),
+                created_at_utc timestamp with time zone NOT NULL,
+                updated_at_utc timestamp with time zone NOT NULL,
+                UNIQUE (normalized_name),
+                CHECK (updated_at_utc >= created_at_utc)
+            );
+
+            CREATE TABLE photo_list_collection_items (
+                collection_id uuid NOT NULL,
+                position integer NOT NULL
+                    CHECK (position BETWEEN 0 AND 4999),
+                asset_revision_id uuid NOT NULL,
+                PRIMARY KEY (collection_id, position),
+                UNIQUE (collection_id, asset_revision_id),
+                CONSTRAINT fk_photo_list_collection_item_collection
+                    FOREIGN KEY (collection_id)
+                    REFERENCES photo_list_collections (id)
+                    ON DELETE CASCADE,
+                CONSTRAINT fk_photo_list_collection_item_revision
+                    FOREIGN KEY (asset_revision_id)
+                    REFERENCES asset_revisions (id)
+                    ON DELETE CASCADE
+            );
+
+            CREATE INDEX ix_photo_list_collection_items_revision
+                ON photo_list_collection_items (asset_revision_id);
             """),
     ];
 
