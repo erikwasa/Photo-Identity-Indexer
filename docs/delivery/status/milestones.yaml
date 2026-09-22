@@ -281,7 +281,7 @@ milestones:
   - WI-0139
 - id: M28
   title: Library curation and metadata editing
-  status: ready
+  status: in_progress
   document: ../milestones/M28-library-curation-metadata-editing.md
   work_items:
   - WI-0140
