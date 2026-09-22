@@ -9,7 +9,7 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// </summary>
 public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 29;
+    public const int CurrentSchemaVersion = 30;
 
     private const long MigrationAdvisoryLockKey = 504091701;
 
@@ -1245,6 +1245,24 @@ public sealed partial class PostgresCatalogueDatabase : IAsyncDisposable, ICatal
             ALTER TABLE smart_collections
                 ADD CONSTRAINT smart_collections_filter_schema_version_check
                 CHECK (filter_schema_version IN (1, 2, 3));
+            """),
+        new(30, "normalize-zero-zero-gps", """
+            UPDATE photo_capture_metadata
+            SET latitude = NULL,
+                longitude = NULL
+            WHERE latitude = 0
+              AND longitude = 0;
+
+            ALTER TABLE photo_capture_metadata
+                DROP CONSTRAINT IF EXISTS ck_photo_capture_metadata_non_zero_zero;
+
+            ALTER TABLE photo_capture_metadata
+                ADD CONSTRAINT ck_photo_capture_metadata_non_zero_zero
+                CHECK (
+                    latitude IS NULL
+                    OR longitude IS NULL
+                    OR latitude <> 0
+                    OR longitude <> 0);
             """),
     ];
 
