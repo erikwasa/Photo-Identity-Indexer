@@ -60,7 +60,7 @@ The local vision model remains comparatively expensive on the maintainer hardwar
 - [x] Caption evidence is durably persisted per immutable revision with model digest, prompt version, language, image mode, context and generation runtime.
 - [x] Guard-blocked output is retained only as blocked derived evidence and is never exposed as a displayable caption.
 - [x] Photo details and slideshow presentation consume persisted caption evidence without triggering generation.
-- [ ] Production caption output is constrained to one complete short sentence (at most 20 words) without exposing token-limit fragments or extra model prose.
+- [x] Production caption output is constrained to one complete short sentence (at most 20 words) without exposing token-limit fragments or extra model prose.
 - [ ] Maintainer verification confirms background caption generation progresses with no slideshow/collection open, persisted captions survive restart, and consumers only read the stored evidence.
 
 ## Verification requirements
@@ -100,7 +100,7 @@ Maintainer verification should:
 - Pre-fix blocked rows that stored `content = NULL` are treated as incomplete evidence and become eligible for one automatic regeneration under the same generation policy. Once regenerated text is retained, they are no longer candidates.
 - The background worker independently selects current photo revisions that have the configured durable review proxy and lack complete caption evidence for the active language/generation policy.
 - Generation is strictly serial and does not depend on what the user views.
-- The default production generation policy reuses the accepted probe: `qwen2.5vl:3b`, loopback Ollama, temporary 480x320 JPEG, 1024 context tokens.
+- The default production generation policy uses `wi-0128-photo-caption-v3`: `qwen2.5vl:3b`, loopback Ollama, temporary 480x320 JPEG, 1024 context tokens, followed by deterministic one-sentence/20-word output normalization before guard evaluation and persistence.
 - The ordinary Photo page reads and presents the stored caption as derived evidence.
 - Slideshow **Show photo captions** is a display preference only. The slideshow performs a read-only lookup for the current revision using the globally configured enrichment language; missing evidence simply means no caption is shown.
 - The former slideshow-owned POST/queue/polling caption service introduced in PR #388 is removed by the corrective follow-up.
@@ -113,6 +113,7 @@ Maintainer verification should:
 - Maintainer production sampling on 2026-09-20 exposed a guard-diagnostics gap: eight blocked Swedish captions were all flagged only as `possible-proper-name-or-location`, while the original blocked text had been discarded. The follow-up retains blocked raw output internally, keeps it non-displayable, and retries only legacy blocked rows whose text is missing so the heuristic can be tuned from evidence rather than guesses.
 - Follow-up inspection of regenerated blocked output showed the proper-name/location heuristic was treating ordinary sentence-initial capitalization such as `Han`, `Personens` and `Hållningen` as a possible name/location. Generation policy `wi-0128-photo-caption-v2` now ignores capitalization at sentence boundaries while still flagging capitalized words embedded inside sentences. Retained v1 text is re-evaluated and promoted to v2 without rerunning the vision model; v1 rows whose text was lost still regenerate once.
 - Maintainer production sampling on 2026-09-22 inspected the 30 most recent Swedish v2 rows. All 30 had empty risk flags, confirming the sentence-boundary correction eliminated the observed false-positive pattern. The same sample exposed a separate output-shape problem: the model frequently ignored the one-sentence/20-word prompt, produced several sentences, and several stored outputs ended mid-word or mid-sentence. Some Swedish wording was also awkward. WI-0128 therefore remains in progress pending deterministic output normalization and another production sample.
+- Generation policy `wi-0128-photo-caption-v3` now deterministically collapses whitespace, keeps only the first complete sentence, and enforces the 20-word bound. A long first sentence may be shortened only at a clause boundary within the bound; output that cannot yield a complete bounded sentence is retained as blocked evidence with `caption-output-format`. Claim guarding runs against the normalized sentence. Retained v1/v2 text is promoted locally to v3 without rerunning vision inference when it can be normalized; only legacy text that cannot be normalized falls back to a fresh model run.
 - Caption generation is intentionally independent of M26 Creative Collection materialization even though Creative Collections were the original experiment consumer.
 - Dedicated caption-text/semantic query features can be added later as consumers of the persisted evidence without changing the producer lifecycle.
 - Commands/evidence: repository CI plus private maintainer evaluation using `qwen2.5vl:3b`, full-proxy and 480x320 thumbnail probes.
