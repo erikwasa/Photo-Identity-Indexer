@@ -103,6 +103,27 @@ public sealed class PhotoCaptionEnrichmentContractTests
     }
 
     [Fact]
+    public void Invalid_format_evidence_is_retained_but_not_displayable()
+    {
+        PhotoGeneratedCaption evidence = new(
+            AssetRevisionId.New(),
+            PhotoCaptionLanguages.Swedish,
+            PhotoCaptionGenerationConfiguration.GenerationVersion,
+            "qwen2.5vl:3b",
+            new string('a', 64),
+            PhotoCaptionPrompt.VersionFor(PhotoCaptionLanguages.Swedish),
+            PhotoCaptionGenerationConfiguration.ImageMode,
+            1024,
+            "En modelltext som slutar mitt i en mening utan avslutning",
+            [PhotoCaptionOutputNormalizer.InvalidFormatRiskCode],
+            130_000,
+            new DateTimeOffset(2026, 9, 22, 17, 0, 0, TimeSpan.Zero));
+
+        Assert.False(evidence.IsDisplayable);
+        Assert.Null(evidence.DisplayableContent);
+    }
+
+    [Fact]
     public void Retained_v1_caption_can_be_promoted_without_model_rerun()
     {
         PhotoGeneratedCaption legacy = new(
