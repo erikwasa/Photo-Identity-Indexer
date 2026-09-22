@@ -97,6 +97,8 @@ On 2026-09-22 the maintainer sampled the 30 most recent Swedish `wi-0128-photo-c
 
 The next explicit Creative Collection product gap is WI-0158: Creative Collections need their own names and durable identities, multiple Creative Collections must be able to share one anchor Smart Collection, and the read-only Slideshows page must make those named Creative Collections directly discoverable and launchable.
 
+With WI-0128 completed and no M26 item currently started, the milestone lifecycle returns to **ready**. WI-0158 is the next ready M26 item; WI-0125 remains intentionally deferred/proposed.
+
 ## Exit criteria
 
 - [x] A documented, versioned moment-clustering policy can group representative family-photo sequences using capture-time-first evidence and can leave uncertain photos ungrouped/singleton rather than forcing a result.
