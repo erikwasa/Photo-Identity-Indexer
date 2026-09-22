@@ -17,6 +17,26 @@ public sealed class PhotoCaptureMetadataTests
     }
 
     [Fact]
+    public void Zero_zero_coordinates_are_normalized_to_missing_location()
+    {
+        PhotoCaptureMetadata metadata = new(
+            takenAtLocal: new DateTime(2025, 5, 10, 13, 45, 22),
+            latitude: 0,
+            longitude: 0);
+
+        Assert.Null(metadata.Latitude);
+        Assert.Null(metadata.Longitude);
+        Assert.False(metadata.HasLocation);
+        Assert.True(metadata.HasCaptureTime);
+        Assert.True(metadata.HasAnyValue);
+
+        PhotoCaptureMetadata primeMeridian = new(latitude: 51.4779, longitude: 0);
+        Assert.True(primeMeridian.HasLocation);
+        Assert.Equal(51.4779, primeMeridian.Latitude);
+        Assert.Equal(0, primeMeridian.Longitude);
+    }
+
+    [Fact]
     public async Task Invalid_image_metadata_returns_empty_metadata()
     {
         using MemoryStream stream = new([1, 2, 3, 4]);
