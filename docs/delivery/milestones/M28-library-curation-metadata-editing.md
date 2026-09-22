@@ -47,4 +47,4 @@ Photo Identity makes common family-library corrections and curation tasks direct
 - [x] Smart Collections can match any of multiple selected Place hierarchies.
 - [ ] Manual slideshow collections remain explicit revision lists rather than mutable Smart Collection results.
 - [ ] Explicit collections can be curated and launched through normal slideshow playback.
-- [ ] GPS-backed photos can retain useful country/administrative Place hierarchy when no populated-place match exists, without inventing locality precision.
+- [x] GPS-backed photos can retain useful country/administrative Place hierarchy when no populated-place match exists, without inventing locality precision.
