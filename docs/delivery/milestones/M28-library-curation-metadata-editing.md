@@ -41,10 +41,10 @@ Photo Identity makes common family-library corrections and curation tasks direct
 
 ## Exit criteria
 
-- [ ] Place assignment/filtering no longer requires scrolling a long dropdown.
-- [ ] Manual dates preserve year-only/year-month uncertainty with provenance and survive metadata reinspection.
-- [ ] Smart Collection date filtering is structured and searches effective dates consistently.
-- [ ] Smart Collections can match any of multiple selected Place hierarchies.
+- [x] Place assignment/filtering no longer requires scrolling a long dropdown.
+- [x] Manual dates preserve year-only/year-month uncertainty with provenance and survive metadata reinspection.
+- [x] Smart Collection date filtering is structured and searches effective dates consistently.
+- [x] Smart Collections can match any of multiple selected Place hierarchies.
 - [ ] Manual slideshow collections remain explicit revision lists rather than mutable Smart Collection results.
 - [ ] Explicit collections can be curated and launched through normal slideshow playback.
 - [ ] GPS-backed photos can retain useful country/administrative Place hierarchy when no populated-place match exists, without inventing locality precision.
