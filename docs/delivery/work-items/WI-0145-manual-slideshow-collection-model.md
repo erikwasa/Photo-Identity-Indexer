@@ -34,11 +34,11 @@ A manually assembled slideshow is different from a Smart Collection, which inten
 
 ## Acceptance criteria
 
-- [ ] An explicit collection persists a named ordered revision list.
-- [ ] Its snapshot uses the existing playback resource boundary.
-- [ ] Smart Collections remain unchanged.
-- [ ] Missing/excluded items follow documented safety rules.
-- [ ] Persistence/API tests cover lifecycle and membership.
+- [x] An explicit collection persists a named ordered revision list.
+- [x] Its snapshot uses the existing playback resource boundary.
+- [x] Smart Collections remain unchanged.
+- [x] Missing/excluded items follow documented safety rules.
+- [x] Persistence/API tests cover lifecycle and membership.
 
 ## Verification requirements
 
@@ -46,7 +46,8 @@ Core/PostgreSQL/API tests before WI-0146 adds UI.
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: Core photo-list collection model/repository contract, PostgreSQL schema v31 and repository, PostgreSQL runtime composition, dedicated API endpoints, focused HTTP contract and live PostgreSQL persistence tests, and delivery tracking.
+- Trade-offs: photo-list collections are a separate aggregate and table family from Smart Collections. Membership is a unique ordered list of at most 5,000 immutable revision IDs and updates replace that list atomically. Create/update rejects missing or already source-removed revisions. Stored membership may retain a revision whose asset is later marked removed, but slideshow snapshot creation omits it; hard revision deletion/purge cascades membership removal so privacy deletion wins over album retention. Snapshot order is the stored manual order, not capture-time order.
+- Playback boundary: `POST /api/photo-list-collections/{id}/slideshow-snapshot` returns the existing lightweight `SmartCollectionSlideshowSnapshotResponse` shape, so playback continues to resolve pixels/resources lazily from revision IDs without source paths or filenames in the manifest.
+- Deferred work: WI-0146 owns the curation/launch UI. The API is mapped only for the PostgreSQL catalogue; SQLite receives no new compatibility implementation because M29 is already scheduled to remove SQLite runtime support.
+- Commands run: implementation prepared through the GitHub connector; PR CI runs build/integration/docs/package gates and `verify-postgres.ps1` exercises the live PostgreSQL acceptance test when configured.
