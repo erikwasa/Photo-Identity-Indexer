@@ -30,13 +30,13 @@ else if (Collections.Count == 0)
 {
     <section class="slideshow-library-state">
         <h2>No slideshows yet</h2>
-        <p>Saved Smart Collections will appear here when they are available.</p>
+        <p>Saved Smart Collections and manual slideshows will appear here when they are available.</p>
     </section>
 }
 else
 {
     <section class="slideshow-library-grid" aria-label="Slideshows">
-        @foreach (SlideshowLibraryCollectionResponse collection in Collections)
+        @foreach (SlideshowLibraryEntry collection in Collections)
         {
             SlideshowOriginalPreparationResponse? preparation = PreparationFor(collection.Id);
             bool preparing = preparation?.State == "preparing";
@@ -50,10 +50,16 @@ else
                         disabled="@busy"
                         aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(collection.Name)"
                         @onclick="() => StartSlideshowAsync(collection)">
-                    <SlideshowLibraryCover CollectionId="@collection.Id" />
+                    <SlideshowLibraryCover CollectionId="@collection.Id"
+                                           Manual="@collection.Manual"
+                                           CoverRevisionId="@collection.CoverRevisionId" />
                     <span class="slideshow-library-card-shade" aria-hidden="true"></span>
                     <span class="slideshow-library-card-copy">
                         <span class="slideshow-library-card-title">@collection.Name</span>
+                        @if (collection.Manual)
+                        {
+                            <span class="slideshow-library-card-kind">Manual · @((collection.CoverRevisionId is null) ? "empty" : "explicit photos")</span>
+                        }
                         <span class="slideshow-library-card-cue">
                             <span class="slideshow-library-play-mark" aria-hidden="true">▶</span>
                             @if (starting)
@@ -75,6 +81,13 @@ else
                         </span>
                     </span>
                 </button>
+                @if (collection.Manual)
+                {
+                    <a class="slideshow-library-review"
+                       href="@($"/manual-collections/{collection.Id}")">
+                        Review photos
+                    </a>
+                }
             </article>
         }
     </section>
@@ -100,7 +113,7 @@ else
                 Optional: prepare best-quality originals ahead of time. Ordinary playback follows the saved Prepare originals preference automatically.
             </p>
 
-            @foreach (SlideshowLibraryCollectionResponse collection in Collections)
+            @foreach (SlideshowLibraryEntry collection in Collections)
             {
                 SlideshowOriginalPreparationResponse? preparation = PreparationFor(collection.Id);
                 bool preparing = preparation?.State == "preparing";
@@ -174,5 +187,5 @@ else
 
 <section class="slideshow-library-boundary">
     <strong>Viewing only</strong>
-    <p>Slideshow browsing does not edit Smart Collections or photo metadata.</p>
+    <p>Slideshow playback does not edit Smart Collections or photo metadata. Manual slideshow membership is edited only through its Review photos view or a photo's Manual slideshow control.</p>
 </section>
