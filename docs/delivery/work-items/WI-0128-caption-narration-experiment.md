@@ -61,7 +61,7 @@ The local vision model remains comparatively expensive on the maintainer hardwar
 - [x] Guard-blocked output is retained only as blocked derived evidence and is never exposed as a displayable caption.
 - [x] Photo details and slideshow presentation consume persisted caption evidence without triggering generation.
 - [x] Production caption output is constrained to one complete short sentence (at most 20 words) without exposing token-limit fragments or extra model prose.
-- [ ] Maintainer verification confirms background caption generation progresses with no slideshow/collection open, persisted captions survive restart, and consumers only read the stored evidence.
+- [x] Maintainer verification confirms background caption generation progresses with no slideshow/collection open, persisted captions survive restart, and consumers only read the stored evidence.
 
 ## Verification requirements
 
@@ -117,3 +117,5 @@ Maintainer verification should:
 - Caption generation is intentionally independent of M26 Creative Collection materialization even though Creative Collections were the original experiment consumer.
 - Dedicated caption-text/semantic query features can be added later as consumers of the persisted evidence without changing the producer lifecycle.
 - Commands/evidence: repository CI plus private maintainer evaluation using `qwen2.5vl:3b`, full-proxy and 480x320 thumbnail probes.
+- Final maintainer verification on 2026-09-22 accepted WI-0128. A fresh 30-row Swedish `wi-0128-photo-caption-v3` sample contained complete single-sentence captions within the 20-word display bound; the strict SQL validation returned zero displayable violations. Guarded relationship output remained non-displayable. Photo Details persistence across restart, slideshow read-only consumption for present/missing/blocked captions, and stopping new work when enrichment was disabled were also accepted.
+- WI-0128 is complete. Remaining Swedish grammar/style imperfections are model-quality limitations, not failures of the caption lifecycle, normalization or claim-guard contracts.
