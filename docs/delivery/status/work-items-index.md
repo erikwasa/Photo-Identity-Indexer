@@ -14,7 +14,7 @@ Current work items: **19**. Archived terminal items: **137**.
 | [WI-0125](../work-items/WI-0125-person-family-metadata.md) Add birth dates and family relationships for age-aware Creative Collections | M26 | proposed | unassigned | [YAML](work-items/active/WI-0125.yaml) |
 | [WI-0128](../work-items/WI-0128-caption-narration-experiment.md) Evaluate local captions and story narration for Creative Collections | M26 | in_progress | ai-agent | [YAML](work-items/active/WI-0128.yaml) |
 | [WI-0145](../work-items/WI-0145-manual-slideshow-collection-model.md) Add explicit photo-list collections for manually assembled slideshows | M28 | in_progress | ai-agent | [YAML](work-items/active/WI-0145.yaml) |
-| [WI-0146](../work-items/WI-0146-manual-slideshow-curation-ui.md) Add manual slideshow curation and launch UI | M28 | proposed | unassigned | [YAML](work-items/active/WI-0146.yaml) |
+| [WI-0146](../work-items/WI-0146-manual-slideshow-curation-ui.md) Add manual slideshow curation and launch UI | M28 | in_progress | ai-agent | [YAML](work-items/active/WI-0146.yaml) |
 | [WI-0147](../work-items/WI-0147-postgres-only-runtime-composition.md) Make PostgreSQL the unconditional runtime catalogue | M29 | ready | unassigned | [YAML](work-items/active/WI-0147.yaml) |
 | [WI-0148](../work-items/WI-0148-retire-sqlite-test-tool-dependencies.md) Retire SQLite-dependent tests and compatibility tools that no longer protect supported behavior | M29 | proposed | unassigned | [YAML](work-items/active/WI-0148.yaml) |
 | [WI-0149](../work-items/WI-0149-remove-sqlite-implementation.md) Remove the SQLite implementation and obsolete migration-era active references | M29 | proposed | unassigned | [YAML](work-items/active/WI-0149.yaml) |
