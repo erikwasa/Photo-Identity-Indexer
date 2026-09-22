@@ -47,5 +47,6 @@ Core/filter compatibility, API persistence and desktop/phone UI verification.
 
 - Files changed: structured Smart Collection date request contracts/API parsing, responsive Any/Year/Month/Exact/Range controls, editor-state and transient-navigation compatibility helpers, model/API/PostgreSQL integration coverage and delivery tracking.
 - Trade-offs: the UI now sends explicit inclusive `from`/`to` bounds and never constructs the old mini-language. The legacy `Taken` request remains accepted for older callers. Existing saved filters already use canonical bounds under filter schema v2, so no persistence migration/version bump is needed; reopening infers the closest equivalent structured control while preserving semantics.
-- Deferred work: desktop/phone interaction verification is intentionally bundled with the later M28 verification pass. Natural-language dates remain out of scope.
+- Deferred work: natural-language dates remain out of scope.
+- Verification: maintainer accepted WI-0143 on 2026-09-22 during the combined M28 desktop/phone review.
 - Commands run: implementation prepared through the GitHub connector; PR #396 runs the normal build/integration/docs/package/PostgreSQL CI gates.

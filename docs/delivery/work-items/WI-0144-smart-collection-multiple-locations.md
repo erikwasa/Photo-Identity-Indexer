@@ -47,5 +47,6 @@ Core/schema compatibility, PostgreSQL query tests and UI verification.
 
 - Files changed: core multi-place normalization, Smart Collection filter schema v3 persistence and migrations, PostgreSQL/SQLite query adapters, API/web contracts, searchable multi-selection UI, transient navigation state, compatibility/query tests and delivery tracking.
 - Trade-offs: named-place selections are bounded to 16 normalized hierarchies. Duplicate paths are removed and descendants collapse under a selected ancestor before the bound is applied. Named places use ANY semantics internally while the optional GPS rectangle remains an independent AND criterion. The legacy single `Place` API and v1/v2 persisted definitions remain readable; new/updated definitions use filter schema v3.
-- Deferred work: desktop/phone interaction verification remains bundled with the later M28 verification pass. Arbitrary boolean location builders and multiple GPS rectangles remain out of scope.
+- Deferred work: arbitrary boolean location builders and multiple GPS rectangles remain out of scope.
+- Verification: maintainer accepted WI-0144 on 2026-09-22 during the combined M28 desktop/phone review.
 - Commands run: implementation prepared through the GitHub connector; PR #398 runs the normal build, integration, documentation, package and PostgreSQL verification gates.

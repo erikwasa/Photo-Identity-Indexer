@@ -36,7 +36,7 @@ The shared PlacePicker currently renders the complete hierarchy as a select drop
 - [x] Typing a place fragment narrows the reusable vocabulary.
 - [x] Selection stores the same canonical Place path.
 - [x] Photo Details and Smart Collections use the same component.
-- [ ] Keyboard/mobile interaction has focused coverage.
+- [x] Keyboard/mobile interaction has focused coverage.
 
 ## Verification requirements
 
@@ -46,5 +46,6 @@ Automated component/integration coverage plus a desktop and phone interaction ch
 
 - Files changed: shared `PlacePicker` Razor/CSS, new `PlacePickerModel`, focused integration tests and delivery status/handoff files.
 - Trade-offs: filtering stays client-side against the already-loaded Place vocabulary and renders at most 24 matches at once. Search matches leaf name, canonical value and parent value; the authoritative selected value remains the unchanged canonical Place path.
-- Deferred work: maintainer desktop and phone interaction verification remains required before completion. Server-side Place search remains intentionally deferred until vocabulary size is measured to justify it.
+- Deferred work: server-side Place search remains intentionally deferred until vocabulary size is measured to justify it.
+- Verification: maintainer accepted WI-0140 on 2026-09-22 during the combined M28 desktop/phone review.
 - Commands run: implementation prepared through the GitHub connector; normal build/integration/docs CI runs on PR #391 because this agent session has no local repository checkout.

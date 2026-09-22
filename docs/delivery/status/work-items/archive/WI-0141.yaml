@@ -1,0 +1,22 @@
+id: WI-0141
+title: Add manual capture-date overrides with provenance and precision
+milestone: M28
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0141-manual-capture-date-model.md
+started_at: 2026-09-20
+completed_at: 2026-09-22
+verified_at: 2026-09-22
+verified_by: maintainer
+last_updated_at: 2026-09-22
+branch: agent/WI-0141-manual-capture-date-model
+blockers:
+- WI-0050
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/392
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/35534088325
+- type: verification
+  value: '2026-09-22 maintainer M28 manual verification through WI-0142: manual capture-date provenance/precision model works as expected.'
