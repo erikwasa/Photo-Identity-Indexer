@@ -75,10 +75,22 @@ public sealed class PhotoCaptionEnrichmentContractTests
     }
 
     [Fact]
-    public void Output_normalizer_shortens_long_sentence_at_safe_clause_boundary()
+    public void Output_normalizer_preserves_complete_sentence_within_word_limit()
     {
         const string raw =
             "En grupp människor står tillsammans utomhus med blå tröjor och svarta shorts, medan flera andra personer syns bakom dem.";
+
+        Assert.True(PhotoCaptionOutputNormalizer.TryNormalize(
+            raw,
+            out string normalized));
+        Assert.Equal(raw, normalized);
+    }
+
+    [Fact]
+    public void Output_normalizer_shortens_long_sentence_at_safe_clause_boundary()
+    {
+        const string raw =
+            "En grupp människor står tillsammans utomhus med blå tröjor och svarta shorts, medan flera andra personer syns bakom dem nära byggnaden under kvällsljuset.";
 
         Assert.True(PhotoCaptionOutputNormalizer.TryNormalize(
             raw,
