@@ -180,6 +180,7 @@ public sealed class SqlitePhotoPlaceEnrichmentRepository : IPhotoPlaceEnrichment
                AND attempt.contract_key = $contract_key
             WHERE metadata.latitude IS NOT NULL
               AND metadata.longitude IS NOT NULL
+              AND NOT (metadata.latitude = 0 AND metadata.longitude = 0)
               AND (
                     (
                         attempt.asset_revision_id IS NULL

@@ -107,6 +107,132 @@ public sealed class PostgresCatalogueDatabaseTests
     }
 
     [Fact]
+    public async Task InitializeAsync_NormalizesLegacyZeroZeroGps_AndRejectsReintroduction()
+    {
+        string? adminConnectionString = Environment.GetEnvironmentVariable(
+            "PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(adminConnectionString))
+        {
+            return;
+        }
+
+        string databaseName = $"photoidentity_zero_zero_gps_{Guid.NewGuid():N}";
+        string quotedDatabaseName = QuoteIdentifier(databaseName);
+        NpgsqlConnectionStringBuilder adminBuilder = new(adminConnectionString)
+        {
+            Pooling = false,
+        };
+
+        await using NpgsqlConnection adminConnection = new(adminBuilder.ConnectionString);
+        await adminConnection.OpenAsync();
+        await using (NpgsqlCommand createDatabase = adminConnection.CreateCommand())
+        {
+            createDatabase.CommandText = $"CREATE DATABASE {quotedDatabaseName};";
+            await createDatabase.ExecuteNonQueryAsync();
+        }
+
+        try
+        {
+            NpgsqlConnectionStringBuilder testBuilder = new(adminConnectionString)
+            {
+                Database = databaseName,
+                Pooling = false,
+            };
+
+            await using PostgresCatalogueDatabase database = new(testBuilder.ConnectionString);
+            await database.InitializeAsync();
+
+            Guid sourceId = Guid.NewGuid();
+            Guid assetId = Guid.NewGuid();
+            Guid revisionId = Guid.NewGuid();
+            await using (NpgsqlConnection seed = new(testBuilder.ConnectionString))
+            {
+                await seed.OpenAsync();
+                await using NpgsqlCommand command = seed.CreateCommand();
+                command.CommandText = """
+                    ALTER TABLE photo_capture_metadata
+                        DROP CONSTRAINT IF EXISTS ck_photo_capture_metadata_non_zero_zero;
+
+                    DELETE FROM photo_identity_schema_migrations
+                    WHERE version = 30;
+
+                    INSERT INTO sources (id, kind, root_locator, created_at_utc)
+                    VALUES (@source_id, 'test', 'zero-zero-root', CURRENT_TIMESTAMP);
+
+                    INSERT INTO assets (id, source_id, source_key, created_at_utc)
+                    VALUES (@asset_id, @source_id, 'zero-zero.jpg', CURRENT_TIMESTAMP);
+
+                    INSERT INTO asset_revisions (
+                        id, asset_id, content_sha256, size_bytes, observed_at_utc, media_type)
+                    VALUES (
+                        @revision_id, @asset_id, repeat('a', 64), 1, CURRENT_TIMESTAMP, 'image/jpeg');
+
+                    INSERT INTO photo_capture_metadata (
+                        asset_revision_id,
+                        taken_at_local,
+                        utc_offset_minutes,
+                        latitude,
+                        longitude,
+                        extracted_at_utc)
+                    VALUES (
+                        @revision_id,
+                        NULL,
+                        NULL,
+                        0,
+                        0,
+                        CURRENT_TIMESTAMP);
+                    """;
+                command.Parameters.AddWithValue("source_id", sourceId);
+                command.Parameters.AddWithValue("asset_id", assetId);
+                command.Parameters.AddWithValue("revision_id", revisionId);
+                await command.ExecuteNonQueryAsync();
+            }
+
+            await database.InitializeAsync();
+
+            await using NpgsqlConnection verification = new(testBuilder.ConnectionString);
+            await verification.OpenAsync();
+            await using (NpgsqlCommand read = verification.CreateCommand())
+            {
+                read.CommandText = """
+                    SELECT
+                        latitude IS NULL,
+                        longitude IS NULL,
+                        (SELECT COUNT(*)
+                         FROM photo_identity_schema_migrations
+                         WHERE version = 30)
+                    FROM photo_capture_metadata
+                    WHERE asset_revision_id = @revision_id;
+                    """;
+                read.Parameters.AddWithValue("revision_id", revisionId);
+                await using NpgsqlDataReader reader = await read.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.True(reader.GetBoolean(0));
+                Assert.True(reader.GetBoolean(1));
+                Assert.Equal(1L, reader.GetInt64(2));
+            }
+
+            await using NpgsqlCommand invalid = verification.CreateCommand();
+            invalid.CommandText = """
+                UPDATE photo_capture_metadata
+                SET latitude = 0,
+                    longitude = 0
+                WHERE asset_revision_id = @revision_id;
+                """;
+            invalid.Parameters.AddWithValue("revision_id", revisionId);
+            await Assert.ThrowsAsync<PostgresException>(
+                () => invalid.ExecuteNonQueryAsync());
+        }
+        finally
+        {
+            await using NpgsqlCommand dropDatabase = adminConnection.CreateCommand();
+            dropDatabase.CommandText =
+                $"DROP DATABASE IF EXISTS {quotedDatabaseName} WITH (FORCE);";
+            await dropDatabase.ExecuteNonQueryAsync();
+        }
+    }
+
+    [Fact]
     public async Task InitializeAsync_IsVersionedAndIdempotent_WhenLivePostgresIsConfigured()
     {
         string? adminConnectionString = Environment.GetEnvironmentVariable(

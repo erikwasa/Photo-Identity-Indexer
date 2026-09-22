@@ -5,7 +5,7 @@ milestone: M28
 status_source: ../status/work-items.yaml
 depends_on: [WI-0064, WI-0065]
 related_adrs: []
-affected_modules: [PhotoIdentity.Api, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Persistence.Tests, PhotoIdentity.Integration.Tests, docs]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Api, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Persistence.Tests, PhotoIdentity.Integration.Tests, docs]
 ---
 
 # WI-0157: Add reduced-precision place fallback for GPS photos without populated-place matches
@@ -16,9 +16,9 @@ Recover useful automatic Place assignments for photos that have persisted GPS co
 
 ## Why
 
-The accepted production catalogue currently contains 17,863 current images. Of these, 1,337 have persisted GPS coordinates but no effective named Place. All 1,337 were processed exactly once by automatic GeoNames enrichment and were terminally marked `skipped` with `no-result` because `findNearbyPlaceNameJSON` returned no populated place.
+The representative catalogue contains 17,863 current images. Initial diagnostics reported 1,337 images with persisted coordinates but no effective named Place, and those rows motivated the reduced-precision fallback. Maintainer verification after the fallback shipped established that all 1,337 coordinate pairs were exactly `(0,0)`, so the original backlog was placeholder/invalid GPS rather than genuine unresolved geographic positions.
 
-A country, region, county or municipality-level assignment is still useful for family-library browsing and Smart Collections. The current all-or-nothing populated-place lookup discards that useful lower-precision evidence.
+A country, region, county or municipality-level assignment remains useful for genuine GPS positions where populated-place lookup fails. Exact `(0,0)` must instead be treated as missing GPS so it never spends provider requests or appears as a real location candidate.
 
 ## In scope
 
@@ -27,7 +27,10 @@ A country, region, county or municipality-level assignment is still useful for f
 - Build the canonical `Places/...` path only from administrative segments actually returned by the provider.
 - Accept reduced precision, including country-only or intermediate administrative hierarchy, when that is all the provider can establish.
 - Preserve automatic provenance and make the fallback contract/version distinguishable in enrichment state.
-- Requeue the existing terminal `no-result` population in a controlled bounded way so the current 1,337-photo backlog can benefit from the fallback.
+- Requeue prior genuine terminal `no-result` attempts in a controlled bounded way when provider behavior changes.
+- Normalize exact `(0,0)` capture coordinates to missing GPS at the domain boundary.
+- Migrate existing `(0,0)` capture metadata to `NULL,NULL` and prevent PostgreSQL from accepting the pair again.
+- Exclude `(0,0)` defensively from enrichment candidate queries in both supported persistence adapters.
 - Avoid unnecessarily re-querying photos that already have successful effective automatic/manual Places solely because this fallback is introduced.
 - Preserve manual set/clear precedence, migration-conflict blocking, provider pacing, cache semantics and retry/defer behavior.
 - Report fallback outcomes separately enough for operator verification without exposing private coordinates or source paths.
@@ -54,16 +57,17 @@ A country, region, county or municipality-level assignment is still useful for f
 - [x] If both populated-place and administrative fallback return no usable geography, the result remains terminally skipped with a reason distinguishable from the old populated-place-only outcome.
 - [x] Provider/cache/attempt persistence remains restart-safe and bounded.
 - [x] Automated tests cover precise success, administrative fallback at multiple hierarchy depths, fallback no-result, manual precedence, conflict blocking, cache reuse and legacy `no-result` requeue.
-- [ ] Real-catalogue verification shows the GPS-without-Place population decreases from the recorded 1,337 baseline without changing manually assigned Places.
+- [ ] Real-catalogue verification after zero-zero normalization shows the current 1,337 placeholder coordinate rows no longer count as GPS, no non-zero GPS-without-Place candidates remain in this catalogue, and manually assigned Places remain unchanged.
 
 ## Verification requirements
 
-Run normal CI plus the live PostgreSQL acceptance suite. On the representative production catalogue, record aggregate counts before and after fallback enrichment: effective automatic/manual/migrated Places, GPS-without-Place, fallback assignments by hierarchy depth and remaining no-result rows. Inspect a small representative sample of fallback assignments in Photo Details/Smart Collections and confirm that displayed hierarchy is useful without claiming a more precise locality than the provider returned. Do not record private coordinates or source paths in repository evidence.
+Run normal CI plus the live PostgreSQL acceptance suite. On the representative catalogue, restart against the upgraded schema and confirm the 1,337 exact `(0,0)` capture rows are normalized to `NULL,NULL`, the GPS-without-Place count falls to zero, and the three existing manual Places remain unchanged. For any future genuine non-zero GPS/no-Place candidates, verify fallback assignments in Photo Details/Smart Collections and confirm that displayed hierarchy is useful without claiming a more precise locality than the provider returned. Do not record private coordinates or source paths in repository evidence.
 
 ## Completion notes
 
 - Files changed: GeoNames reverse geocoder, PostgreSQL/SQLite enrichment candidate selection, integration tests, PostgreSQL persistence acceptance coverage and delivery status.
 - Trade-offs: the fallback uses GeoNames `countrySubdivisionJSON` only after `findNearbyPlaceNameJSON` returns a genuine no-result, then `countryCodeJSON` only when no subdivision is available. This preserves precise locality when available and deliberately accepts country/admin-only hierarchy rather than expanding the nearby-town radius.
 - Contract transition: `geonames-place-v3` makes the fallback behavior explicit. A new contract retries prior non-success outcomes, including the recorded legacy `no-result` rows, while unchanged coordinates with any prior successful contract are suppressed unless an operator explicitly requests refresh.
-- Deferred work: photos without GPS remain outside automatic reverse-geocoding scope. Real-catalogue acceptance remains for maintainer verification against the recorded 1,337-photo baseline.
+- Follow-up correction: maintainer verification proved all 1,337 originally reported GPS/no-Place rows were exactly `(0,0)`. The follow-up normalizes that pair to missing GPS in Core, cleans existing PostgreSQL/SQLite catalogue rows, adds a PostgreSQL guard constraint and excludes the pair from enrichment candidates defensively.
+- Deferred work: photos without genuine GPS remain outside automatic reverse-geocoding scope. The current catalogue contains no non-zero GPS/no-Place candidates with which to demonstrate a real fallback assignment.
 - Commands run: repository CI is the implementation validation surface; live production-catalogue verification remains maintainer-operated.
