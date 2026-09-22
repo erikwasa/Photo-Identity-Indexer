@@ -57,7 +57,7 @@ A country, region, county or municipality-level assignment remains useful for ge
 - [x] If both populated-place and administrative fallback return no usable geography, the result remains terminally skipped with a reason distinguishable from the old populated-place-only outcome.
 - [x] Provider/cache/attempt persistence remains restart-safe and bounded.
 - [x] Automated tests cover precise success, administrative fallback at multiple hierarchy depths, fallback no-result, manual precedence, conflict blocking, cache reuse and legacy `no-result` requeue.
-- [ ] Real-catalogue verification after zero-zero normalization shows the current 1,337 placeholder coordinate rows no longer count as GPS, no non-zero GPS-without-Place candidates remain in this catalogue, and manually assigned Places remain unchanged.
+- [x] Real-catalogue verification after zero-zero normalization shows the current 1,337 placeholder coordinate rows no longer count as GPS, no non-zero GPS-without-Place candidates remain in this catalogue, and manually assigned Places remain unchanged.
 
 ## Verification requirements
 
@@ -70,4 +70,5 @@ Run normal CI plus the live PostgreSQL acceptance suite. On the representative c
 - Contract transition: `geonames-place-v3` makes the fallback behavior explicit. A new contract retries prior non-success outcomes, including the recorded legacy `no-result` rows, while unchanged coordinates with any prior successful contract are suppressed unless an operator explicitly requests refresh.
 - Follow-up correction: maintainer verification proved all 1,337 originally reported GPS/no-Place rows were exactly `(0,0)`. The follow-up normalizes that pair to missing GPS in Core, cleans existing PostgreSQL/SQLite catalogue rows, adds a PostgreSQL guard constraint and excludes the pair from enrichment candidates defensively.
 - Deferred work: photos without genuine GPS remain outside automatic reverse-geocoding scope. The current catalogue contains no non-zero GPS/no-Place candidates with which to demonstrate a real fallback assignment.
-- Commands run: repository CI is the implementation validation surface; live production-catalogue verification remains maintainer-operated.
+- Verification: PR #403 passed repository workflow run #2080. Maintainer verification on 2026-09-22 confirmed PostgreSQL schema v30 applied, exact `(0,0)` capture rows were removed from the GPS population, no non-zero GPS-without-Place candidates remained, the PostgreSQL guard constraint was present, existing Place assignments were preserved, and automatic enrichment settled without the placeholder backlog.
+- Status: completed on 2026-09-22 after maintainer acceptance.
