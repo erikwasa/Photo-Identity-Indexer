@@ -128,6 +128,8 @@ This is a **read-only UI boundary, not an authorization boundary**. Photo Identi
 
 Starting a slideshow from the slideshow library should return there on deliberate Exit.
 
+WI-0158 extends this library to named **Creative Collections**. A Creative Collection will have its own durable identity and display name, multiple Creative Collections may reference the same Smart Collection anchor with different recipe settings, and `/slideshows` will list those named Creative Collections as first-class launchable sources alongside ordinary Smart Collections. The library remains read-only: creation, recipe editing, renaming and deletion stay in the operator Creative/Smart Collection workflow while discovery and playback are available here.
+
 ## Snapshot contract
 
 A slideshow snapshot represents the complete Smart Collection result set at one logical point in time, not the current 40-item UI page and not a series of live offset queries.

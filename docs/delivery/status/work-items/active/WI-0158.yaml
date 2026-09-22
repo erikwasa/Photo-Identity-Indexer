@@ -1,0 +1,10 @@
+id: WI-0158
+title: Make named Creative Collections first-class slideshow library entries
+milestone: M26
+status: ready
+owner: unassigned
+document: ../work-items/WI-0158-named-creative-collections-slideshow-library.md
+blockers:
+- WI-0121
+blocker_notes: []
+evidence: []

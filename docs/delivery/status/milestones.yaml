@@ -249,7 +249,7 @@ milestones:
   - WI-0138
 - id: M26
   title: Creative Collections
-  status: in_progress
+  status: ready
   document: ../milestones/M26-creative-collections.md
   work_items:
   - WI-0118
@@ -263,6 +263,7 @@ milestones:
   - WI-0126
   - WI-0127
   - WI-0128
+  - WI-0158
 - id: M27
   title: Slideshow presentation experience
   status: completed
