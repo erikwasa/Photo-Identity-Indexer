@@ -76,20 +76,6 @@ work_items:
   blocker_notes:
   - Maintainer intentionally deferred this item on 2026-09-18; there is no technical dependency blocker, and it can be resumed when age/family-story metadata becomes a priority.
   evidence: []
-- id: WI-0128
-  title: Evaluate local captions and story narration for Creative Collections
-  milestone: M26
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0128-caption-narration-experiment.md
-  started_at: 2026-09-20
-  last_updated_at: 2026-09-22
-  branch: agent/WI-0128-caption-output-normalization
-  blockers:
-  - WI-0121
-  blocker_notes:
-  - The 2026-09-22 production sample verified the v2 sentence-boundary guard fix and led to v3 deterministic output normalization; completion now remains pending CI/merge and a fresh maintainer production sample plus final consumer-boundary verification.
-  evidence: []
 - id: WI-0145
   title: Add explicit photo-list collections for manually assembled slideshows
   milestone: M28
@@ -235,3 +221,13 @@ work_items:
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/399
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/403
+- id: WI-0158
+  title: Make named Creative Collections first-class slideshow library entries
+  milestone: M26
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0158-named-creative-collections-slideshow-library.md
+  blockers:
+  - WI-0121
+  blocker_notes: []
+  evidence: []
