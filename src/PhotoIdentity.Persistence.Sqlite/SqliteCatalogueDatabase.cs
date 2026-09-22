@@ -8,7 +8,7 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
 {
-    public const int CurrentSchemaVersion = 21;
+    public const int CurrentSchemaVersion = 22;
 
     private const string VersionOneSchema = """
         CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -918,6 +918,18 @@ public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
         PRAGMA user_version = 21;
         """;
 
+    private const string VersionTwentyTwoMigration = """
+        UPDATE photo_capture_metadata
+        SET latitude = NULL,
+            longitude = NULL
+        WHERE latitude = 0
+          AND longitude = 0;
+
+        INSERT OR IGNORE INTO schema_migrations (version, applied_at_utc)
+            VALUES (22, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+        PRAGMA user_version = 22;
+        """;
+
     private readonly string _connectionString;
 
     public SqliteCatalogueDatabase(string databasePath)
@@ -1082,6 +1094,15 @@ public sealed class SqliteCatalogueDatabase : ICatalogueStoreInitializer
             await ApplyMigrationWithForeignKeysDisabledAsync(
                 connection,
                 VersionTwentyOneMigration,
+                cancellationToken);
+            version = 21;
+        }
+
+        if (version < 22)
+        {
+            await ApplyMigrationAsync(
+                connection,
+                VersionTwentyTwoMigration,
                 cancellationToken);
         }
     }
