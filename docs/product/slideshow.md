@@ -56,7 +56,7 @@ Slideshow caption display is a **consumer** of the archive's generated-caption e
 
 When **Show photo captions** is enabled, the slideshow performs one read-only lookup for the current immutable revision using the globally configured archive-enrichment language. If a guard-passing caption has already been enriched and persisted, it is shown. If evidence is missing or blocked, the slideshow simply shows no caption. It does not POST a generation request, poll for completion or alter playback timing.
 
-Caption evidence remains derived photo data with revision/model/prompt/image-mode/context provenance. The generated-text guard screens unsupported relationship, event, date/year, age and possible proper-name/location claims before evidence becomes displayable. Swedish and English evidence are stored separately.
+Caption evidence remains derived photo data with revision/model/prompt/image-mode/context provenance. Production caption output is normalized to one complete sentence of at most 20 words before the generated-text guard screens unsupported relationship, event, date/year, age and possible proper-name/location claims. Malformed/token-truncated output remains blocked and is never exposed to slideshow presentation. Swedish and English evidence are stored separately.
 
 The local Ollama runtime and model belong to the archive-enrichment producer, not to the slideshow feature.
 

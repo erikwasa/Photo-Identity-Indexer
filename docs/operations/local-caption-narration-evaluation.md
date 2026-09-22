@@ -50,7 +50,7 @@ The versioned prompt asks for exactly one short neutral sentence describing only
 - holidays, events, ceremonies, celebrations or occasions; and
 - event categories such as wedding, birthday, concert, party, graduation or festival.
 
-`GeneratedCreativeTextGuard` independently scans the returned caption for relationship, event, date/year, age and possible proper-name/location claims. A flagged caption is experimental unsafe derived output. It must not be treated as a fact or persisted.
+`GeneratedCreativeTextGuard` independently scans the returned caption for relationship, event, date/year, age and possible proper-name/location claims. A flagged caption remains unsafe derived output and must not be treated as a fact or exposed as a displayable caption. Production enrichment may retain blocked raw text internally with its risk flags so guard behavior can be diagnosed and corrected without losing evidence.
 
 The guard is intentionally conservative. A false-positive guard flag is preferable to silently accepting an unsupported family-history claim.
 
@@ -216,3 +216,14 @@ On 2026-09-20:
 - the qwen2.5vl:3b package reported 3,200,627,168 bytes.
 
 The production decision is therefore **useful but latency-constrained**: accumulate captions gradually and reuse them, while leaving model/runtime optimization for later.
+
+### Production quality follow-up
+
+Maintainer sampling on 2026-09-22 inspected the 30 most recent Swedish `wi-0128-photo-caption-v2` rows.
+
+- All 30 rows had empty risk flags, confirming the sentence-boundary proper-name/location correction removed the observed false-positive pattern.
+- The model did not reliably follow the prompt's output-shape instruction: many captions contained multiple sentences even though exactly one sentence was requested.
+- Several stored outputs ended mid-word or mid-sentence, showing that a token-bounded raw model response is not itself a safe display contract.
+- Some captions contained awkward Swedish wording. Language quality remains model-dependent and is distinct from the factual-claim guard.
+
+The corrective production contract is therefore stronger than the prompt alone. Generation policy `wi-0128-photo-caption-v3` deterministically collapses whitespace, keeps the first complete sentence and enforces at most 20 words before claim-guard evaluation and persistence. If the first sentence exceeds the bound, it may be shortened only at a clause boundary inside the limit. Output that cannot produce a complete bounded sentence is retained internally with `caption-output-format` and is not displayable. Retained v1/v2 captions are normalized and promoted locally where possible so archive-wide correction does not require another vision-model pass. WI-0128 remains in progress until this behavior is confirmed with a fresh production sample.
