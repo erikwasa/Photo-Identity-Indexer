@@ -69,6 +69,32 @@ public sealed class SlideshowLibraryAcceptanceTests
     }
 
     [Fact]
+    public async Task Manual_library_launch_routes_to_manual_snapshot_playback()
+    {
+        List<string> events = [];
+        RecordingJsRuntime js = new(events);
+        RecordingNavigationManager navigation = new(events);
+        string collectionId = Guid.NewGuid().ToString("D");
+
+        string? notice = await SlideshowLibraryLaunch.RequestFullscreenAndNavigateAsync(
+            js,
+            navigation,
+            collectionId,
+            $"/manual-collections/{collectionId}",
+            manual: true);
+
+        Assert.Null(notice);
+        Assert.Equal(new[] { "fullscreen", "navigate" }, events);
+        Assert.Equal(
+            $"/slideshow/{collectionId}?return=%2Fmanual-collections%2F{collectionId}&manual=true",
+            navigation.LastRelativeUri);
+        Assert.Equal(
+            $"/manual-collections/{collectionId}",
+            PhotoIdentity.Web.Pages.Slideshow.NormalizeReturnUrl(
+                $"/manual-collections/{collectionId}"));
+    }
+
+    [Fact]
     public void Prepared_receipt_is_path_free_and_matches_the_same_revision_set_only()
     {
         string first = Guid.NewGuid().ToString("D");
