@@ -116,7 +116,11 @@
 
             <PhotoPresentationPreferenceEditor RevisionId="@RevisionId" />
         }
+    </section>
 
+    <PhotoListCollectionPicker RevisionId="@RevisionId" />
+
+    <section class="metadata-card photo-tag-panel" aria-labelledby="photo-tags-heading">
         @if (!string.IsNullOrWhiteSpace(DetailsError))
         {
             <div class="notice error photo-details-notice" role="alert">@DetailsError</div>
