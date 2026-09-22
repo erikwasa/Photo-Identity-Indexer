@@ -1,0 +1,35 @@
+.manual-slideshow-card {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0 0 1.5rem;
+}
+
+.manual-slideshow-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.manual-slideshow-row input,
+.manual-slideshow-row select {
+    min-width: 0;
+}
+
+.manual-slideshow-new-label {
+    margin-top: 0.35rem;
+}
+
+.manual-slideshow-notice {
+    margin-top: 0.25rem;
+}
+
+@media (max-width: 700px) {
+    .manual-slideshow-row {
+        grid-template-columns: 1fr;
+    }
+
+    .manual-slideshow-row .button {
+        width: 100%;
+    }
+}
