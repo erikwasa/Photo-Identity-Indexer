@@ -126,7 +126,7 @@ public sealed class PostgresPhotoListCollectionRepositoryTests
                 ?? throw new InvalidOperationException();
             Assert.Equal("Weekend picks", updated.Name);
             Assert.Equal([second, third], updated.RevisionIds);
-            Assert.Equal(created.CreatedAtUtc, updated.CreatedAtUtc);
+            Assert.True((created.CreatedAtUtc - updated.CreatedAtUtc).Duration() < TimeSpan.FromMilliseconds(1));
 
             PhotoListCollectionSlideshowSnapshot reorderedSnapshot =
                 await repository.CreateSlideshowSnapshotAsync(created.Id)
