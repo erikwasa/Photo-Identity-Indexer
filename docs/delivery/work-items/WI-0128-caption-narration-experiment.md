@@ -60,6 +60,7 @@ The local vision model remains comparatively expensive on the maintainer hardwar
 - [x] Caption evidence is durably persisted per immutable revision with model digest, prompt version, language, image mode, context and generation runtime.
 - [x] Guard-blocked output is retained only as blocked derived evidence and is never exposed as a displayable caption.
 - [x] Photo details and slideshow presentation consume persisted caption evidence without triggering generation.
+- [ ] Production caption output is constrained to one complete short sentence (at most 20 words) without exposing token-limit fragments or extra model prose.
 - [ ] Maintainer verification confirms background caption generation progresses with no slideshow/collection open, persisted captions survive restart, and consumers only read the stored evidence.
 
 ## Verification requirements
@@ -75,7 +76,8 @@ Maintainer verification should:
 5. restart Photo Identity and confirm the caption remains available without regeneration;
 6. open a slideshow with **Show photo captions** enabled and confirm an existing caption can be displayed;
 7. use an uncaptained photo in a slideshow and confirm viewing it does **not** enqueue/generate a caption;
-8. disable automatic enrichment and confirm existing evidence remains readable while new caption generation stops.
+8. disable automatic enrichment and confirm existing evidence remains readable while new caption generation stops;
+9. inspect a fresh production sample and confirm displayable captions are one complete sentence of at most 20 words, with no mid-word or mid-sentence token-limit fragments.
 
 ## Implementation status
 
@@ -110,6 +112,7 @@ Maintainer verification should:
 - Generated captions remain regenerable model evidence, not archive truth and not a replacement for tags, Places, people or extracted metadata.
 - Maintainer production sampling on 2026-09-20 exposed a guard-diagnostics gap: eight blocked Swedish captions were all flagged only as `possible-proper-name-or-location`, while the original blocked text had been discarded. The follow-up retains blocked raw output internally, keeps it non-displayable, and retries only legacy blocked rows whose text is missing so the heuristic can be tuned from evidence rather than guesses.
 - Follow-up inspection of regenerated blocked output showed the proper-name/location heuristic was treating ordinary sentence-initial capitalization such as `Han`, `Personens` and `Hållningen` as a possible name/location. Generation policy `wi-0128-photo-caption-v2` now ignores capitalization at sentence boundaries while still flagging capitalized words embedded inside sentences. Retained v1 text is re-evaluated and promoted to v2 without rerunning the vision model; v1 rows whose text was lost still regenerate once.
+- Maintainer production sampling on 2026-09-22 inspected the 30 most recent Swedish v2 rows. All 30 had empty risk flags, confirming the sentence-boundary correction eliminated the observed false-positive pattern. The same sample exposed a separate output-shape problem: the model frequently ignored the one-sentence/20-word prompt, produced several sentences, and several stored outputs ended mid-word or mid-sentence. Some Swedish wording was also awkward. WI-0128 therefore remains in progress pending deterministic output normalization and another production sample.
 - Caption generation is intentionally independent of M26 Creative Collection materialization even though Creative Collections were the original experiment consumer.
 - Dedicated caption-text/semantic query features can be added later as consumers of the persisted evidence without changing the producer lifecycle.
 - Commands/evidence: repository CI plus private maintainer evaluation using `qwen2.5vl:3b`, full-proxy and 480x320 thumbnail probes.
