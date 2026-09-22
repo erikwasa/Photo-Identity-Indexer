@@ -31,6 +31,8 @@
 }
 
 .slideshow-library-card {
+    display: grid;
+    gap: 0.45rem;
     min-width: 0;
 }
 
@@ -107,6 +109,13 @@
     text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5);
 }
 
+.slideshow-library-card-kind {
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.78rem;
+    font-weight: 750;
+    letter-spacing: 0.02em;
+}
+
 .slideshow-library-card-cue {
     display: flex;
     align-items: center;
@@ -127,6 +136,29 @@
     background: rgba(0, 0, 0, 0.24);
     font-size: 0.7rem;
     transition: transform 120ms ease;
+}
+
+.slideshow-library-review {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    margin: 0 0.2rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 0.65rem;
+    color: var(--ink);
+    font-size: 0.9rem;
+    font-weight: 750;
+    text-decoration: none;
+}
+
+.slideshow-library-review:hover {
+    background: color-mix(in srgb, var(--surface) 80%, var(--ink) 8%);
+}
+
+.slideshow-library-review:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
 }
 
 .slideshow-library-card-tools {
