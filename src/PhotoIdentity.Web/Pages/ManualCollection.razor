@@ -1,0 +1,296 @@
+@page "/manual-collections/{CollectionId:guid}"
+@layout ConsumerLayout
+@using System.Net.Http.Json
+@using PhotoIdentity.Web.Contracts
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<PageTitle>@PageTitleText</PageTitle>
+
+<section class="manual-collection-header">
+    <div>
+        <p class="eyebrow">Manual slideshow</p>
+        <h1>@(Collection?.Name ?? "Review slideshow")</h1>
+        <p>Review the exact photos and order that will be used for playback.</p>
+    </div>
+    <a class="button secondary" href="/slideshows">Back to slideshows</a>
+</section>
+
+@if (Loading)
+{
+    <section class="manual-collection-state" role="status">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading slideshow…</p>
+    </section>
+}
+else if (!string.IsNullOrWhiteSpace(Error))
+{
+    <section class="manual-collection-state" role="alert">
+        <strong>Manual slideshow could not be loaded</strong>
+        <p>@Error</p>
+        <button type="button" class="button secondary" @onclick="LoadAsync">Retry</button>
+    </section>
+}
+else if (Collection is not null)
+{
+    <section class="manual-collection-tools">
+        <div class="manual-collection-name">
+            <label class="field-label" for="manual-collection-name">Slideshow name</label>
+            <div class="manual-collection-name-row">
+                <input id="manual-collection-name"
+                       type="text"
+                       maxlength="120"
+                       disabled="@Busy"
+                       @bind="Name"
+                       @bind:event="oninput" />
+                <button type="button"
+                        class="button secondary"
+                        disabled="@(Busy || string.IsNullOrWhiteSpace(Name) || Name == Collection.Name)"
+                        @onclick="SaveNameAsync">
+                    Save name
+                </button>
+            </div>
+        </div>
+
+        <div class="manual-collection-actions">
+            <span>@ItemCountLabel</span>
+            <button type="button"
+                    class="button primary"
+                    disabled="@(Busy || Collection.RevisionIds.Length == 0)"
+                    @onclick="StartSlideshowAsync">
+                Start slideshow
+            </button>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(Notice))
+    {
+        <div class="notice manual-collection-notice" role="status">@Notice</div>
+    }
+
+    @if (Collection.RevisionIds.Length == 0)
+    {
+        <section class="manual-collection-state">
+            <h2>No photos in this slideshow</h2>
+            <p>Open a photo and use its Manual slideshow control to add photos here.</p>
+        </section>
+    }
+    else
+    {
+        <section class="manual-collection-grid" aria-label="Manual slideshow photos">
+            @for (int index = 0; index < Collection.RevisionIds.Length; index++)
+            {
+                string revisionId = Collection.RevisionIds[index];
+                int itemIndex = index;
+                <article class="manual-collection-card">
+                    <a class="manual-collection-image-link"
+                       href="@PhotoUrl(revisionId)"
+                       aria-label="@($"Open photo {itemIndex + 1}")">
+                        <img src="@PreviewUrl(revisionId)"
+                             alt=""
+                             loading="lazy"
+                             decoding="async" />
+                    </a>
+                    <div class="manual-collection-card-body">
+                        <strong>Photo @(itemIndex + 1)</strong>
+                        <div class="manual-collection-card-actions">
+                            <button type="button"
+                                    class="button secondary"
+                                    disabled="@(Busy || itemIndex == 0)"
+                                    aria-label="@($"Move photo {itemIndex + 1} earlier")"
+                                    @onclick="() => MoveAsync(itemIndex, -1)">
+                                ↑
+                            </button>
+                            <button type="button"
+                                    class="button secondary"
+                                    disabled="@(Busy || itemIndex == Collection.RevisionIds.Length - 1)"
+                                    aria-label="@($"Move photo {itemIndex + 1} later")"
+                                    @onclick="() => MoveAsync(itemIndex, 1)">
+                                ↓
+                            </button>
+                            <button type="button"
+                                    class="button secondary"
+                                    disabled="@Busy"
+                                    @onclick="() => RemoveAsync(itemIndex)">
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                </article>
+            }
+        </section>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid CollectionId { get; set; }
+
+    private PhotoListCollectionResponse? Collection { get; set; }
+    private string Name { get; set; } = string.Empty;
+    private bool Loading { get; set; } = true;
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private string? Notice { get; set; }
+
+    private string PageTitleText => Collection is null
+        ? "Manual slideshow · Photo Identity"
+        : $"{Collection.Name} · Photo Identity";
+
+    private string ItemCountLabel => Collection?.RevisionIds.Length == 1
+        ? "1 photo"
+        : $"{Collection?.RevisionIds.Length ?? 0} photos";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        Notice = null;
+        try
+        {
+            Collection = await Http.GetFromJsonAsync<PhotoListCollectionResponse>(
+                $"api/photo-list-collections/{CollectionId:D}");
+            if (Collection is null)
+            {
+                Error = "The manual slideshow response was empty.";
+                return;
+            }
+
+            Name = Collection.Name;
+        }
+        catch (Exception exception)
+        {
+            Collection = null;
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task SaveNameAsync()
+    {
+        if (Collection is null || Busy || string.IsNullOrWhiteSpace(Name))
+        {
+            return;
+        }
+
+        await SaveAsync(Name, Collection.RevisionIds, "Slideshow name saved.");
+    }
+
+    private async Task RemoveAsync(int index)
+    {
+        if (Collection is null || Busy || index < 0 || index >= Collection.RevisionIds.Length)
+        {
+            return;
+        }
+
+        string[] revisionIds = Collection.RevisionIds
+            .Where((_, itemIndex) => itemIndex != index)
+            .ToArray();
+        await SaveAsync(Collection.Name, revisionIds, "Photo removed.");
+    }
+
+    private async Task MoveAsync(int index, int delta)
+    {
+        if (Collection is null || Busy)
+        {
+            return;
+        }
+
+        int destination = index + delta;
+        if (index < 0 ||
+            index >= Collection.RevisionIds.Length ||
+            destination < 0 ||
+            destination >= Collection.RevisionIds.Length)
+        {
+            return;
+        }
+
+        string[] revisionIds = Collection.RevisionIds.ToArray();
+        (revisionIds[index], revisionIds[destination]) =
+            (revisionIds[destination], revisionIds[index]);
+
+        await SaveAsync(Collection.Name, revisionIds, "Photo order saved.");
+    }
+
+    private async Task SaveAsync(
+        string name,
+        string[] revisionIds,
+        string successMessage)
+    {
+        if (Collection is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        Notice = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                $"api/photo-list-collections/{CollectionId:D}",
+                new PhotoListCollectionRequest(name, revisionIds));
+            if (!response.IsSuccessStatusCode)
+            {
+                PhotoListCollectionErrorResponse? error = null;
+                try
+                {
+                    error = await response.Content.ReadFromJsonAsync<PhotoListCollectionErrorResponse>();
+                }
+                catch
+                {
+                }
+
+                throw new InvalidOperationException(
+                    error?.Error ?? $"Update failed with HTTP {(int)response.StatusCode}.");
+            }
+
+            Collection =
+                await response.Content.ReadFromJsonAsync<PhotoListCollectionResponse>()
+                ?? throw new InvalidOperationException("The manual slideshow response was empty.");
+            Name = Collection.Name;
+            Notice = successMessage;
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task StartSlideshowAsync()
+    {
+        if (Collection is null || Collection.RevisionIds.Length == 0 || Busy)
+        {
+            return;
+        }
+
+        _ = await SlideshowLibraryLaunch.RequestFullscreenAndNavigateAsync(
+            JS,
+            Navigation,
+            Collection.Id,
+            $"/manual-collections/{Collection.Id}",
+            manual: true);
+    }
+
+    private string PhotoUrl(string revisionId)
+    {
+        string returnUrl = Uri.EscapeDataString($"/manual-collections/{CollectionId:D}");
+        return $"/photo/{Uri.EscapeDataString(revisionId)}?returnUrl={returnUrl}";
+    }
+
+    private static string PreviewUrl(string revisionId) =>
+        $"/api/collections/photos/{Uri.EscapeDataString(revisionId)}/viewer-preview";
+}

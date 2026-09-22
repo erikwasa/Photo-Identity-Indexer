@@ -23,22 +23,40 @@
 
 @code {
     private readonly CancellationTokenSource _lifetime = new();
-    private string? _loadedCollectionId;
+    private string? _loadedKey;
     private string? _coverUrl;
 
     [Parameter, EditorRequired]
     public string CollectionId { get; set; } = string.Empty;
 
+    [Parameter]
+    public bool Manual { get; set; }
+
+    [Parameter]
+    public string? CoverRevisionId { get; set; }
+
     protected override async Task OnParametersSetAsync()
     {
+        string key = $"{CollectionId}|{Manual}|{CoverRevisionId}";
         if (string.IsNullOrWhiteSpace(CollectionId) ||
-            string.Equals(_loadedCollectionId, CollectionId, StringComparison.OrdinalIgnoreCase))
+            string.Equals(_loadedKey, key, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }
 
-        _loadedCollectionId = CollectionId;
+        _loadedKey = key;
         _coverUrl = null;
+
+        if (Manual)
+        {
+            if (!string.IsNullOrWhiteSpace(CoverRevisionId))
+            {
+                _coverUrl =
+                    $"/api/collections/photos/{Uri.EscapeDataString(CoverRevisionId)}/viewer-preview";
+            }
+
+            return;
+        }
 
         try
         {

@@ -376,20 +376,23 @@
             await LoadCaptionAsync(presentedRevisionId);
         }
 
-        try
+        if (!Manual)
         {
-            using HttpResponseMessage response = await Http.PostAsJsonAsync(
-                "api/slideshows/exposures",
-                new SlideshowExposureRequest(
-                    _exposureSessionId,
-                    CollectionId,
-                    Creative,
-                    presentedRevisionId));
-            _ = response.IsSuccessStatusCode;
-        }
-        catch
-        {
-            // Presentation history is best-effort and must never interrupt slideshow playback.
+            try
+            {
+                using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                    "api/slideshows/exposures",
+                    new SlideshowExposureRequest(
+                        _exposureSessionId,
+                        CollectionId,
+                        Creative,
+                        presentedRevisionId));
+                _ = response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                // Presentation history is best-effort and must never interrupt slideshow playback.
+            }
         }
     }
 }

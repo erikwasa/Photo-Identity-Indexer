@@ -1,0 +1,291 @@
+@using System.Net.Http.Json
+@using PhotoIdentity.Web.Contracts
+@inject HttpClient Http
+
+<section class="metadata-card manual-slideshow-card" aria-labelledby="manual-slideshow-heading">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Manual slideshow</p>
+            <h3 id="manual-slideshow-heading">Add this photo to a slideshow</h3>
+        </div>
+        @if (!Loading)
+        {
+            <span>@Collections.Count saved</span>
+        }
+    </div>
+
+    @if (Loading)
+    {
+        <p class="field-help">Loading manual slideshows…</p>
+    }
+    else
+    {
+        @if (Collections.Count > 0)
+        {
+            <label class="field-label" for="manual-slideshow-collection">Choose slideshow</label>
+            <div class="manual-slideshow-row">
+                <select id="manual-slideshow-collection"
+                        disabled="@Busy"
+                        value="@SelectedId"
+                        @onchange="HandleCollectionChanged">
+                    @foreach (PhotoListCollectionResponse collection in Collections)
+                    {
+                        <option value="@collection.Id">@collection.Name (@collection.RevisionIds.Length)</option>
+                    }
+                </select>
+                @if (SelectedCollection is not null)
+                {
+                    <button type="button"
+                            class="button @(SelectedContainsRevision ? "secondary" : "primary")"
+                            disabled="@Busy"
+                            @onclick="ToggleMembershipAsync">
+                        @(Busy
+                            ? "Saving…"
+                            : SelectedContainsRevision
+                                ? "Remove photo"
+                                : "Add photo")
+                    </button>
+                    <a class="button secondary"
+                       href="@($"/manual-collections/{SelectedCollection.Id}")">
+                        Review
+                    </a>
+                }
+            </div>
+        }
+        else
+        {
+            <p class="field-help">No manual slideshows yet. Create one below with this photo as its first item.</p>
+        }
+
+        <label class="field-label manual-slideshow-new-label" for="manual-slideshow-name">Create new slideshow</label>
+        <div class="manual-slideshow-row">
+            <input id="manual-slideshow-name"
+                   type="text"
+                   maxlength="120"
+                   autocomplete="off"
+                   placeholder="e.g. Summer favorites"
+                   disabled="@Busy"
+                   @bind="NewCollectionName"
+                   @bind:event="oninput"
+                   @onkeydown="HandleNameKeyDown" />
+            <button type="button"
+                    class="button primary"
+                    disabled="@(Busy || string.IsNullOrWhiteSpace(NewCollectionName))"
+                    @onclick="CreateAsync">
+                @(Busy ? "Saving…" : "Create with this photo")
+            </button>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Notice))
+    {
+        <div class="notice manual-slideshow-notice" role="status">@Notice</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="notice error manual-slideshow-notice" role="alert">@Error</div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public string RevisionId { get; set; } = string.Empty;
+
+    private IReadOnlyList<PhotoListCollectionResponse> Collections { get; set; } = [];
+    private string? SelectedId { get; set; }
+    private string NewCollectionName { get; set; } = string.Empty;
+    private bool Loading { get; set; } = true;
+    private bool Busy { get; set; }
+    private string? Notice { get; set; }
+    private string? Error { get; set; }
+
+    private PhotoListCollectionResponse? SelectedCollection =>
+        Collections.FirstOrDefault(
+            collection => string.Equals(
+                collection.Id,
+                SelectedId,
+                StringComparison.OrdinalIgnoreCase));
+
+    private bool SelectedContainsRevision =>
+        SelectedCollection?.RevisionIds.Contains(
+            RevisionId,
+            StringComparer.OrdinalIgnoreCase) == true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync(string? selectId = null)
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            PhotoListCollectionResponse[]? collections =
+                await Http.GetFromJsonAsync<PhotoListCollectionResponse[]>(
+                    "api/photo-list-collections");
+            Collections = collections ?? [];
+
+            string? requested = selectId ?? SelectedId;
+            SelectedId = Collections.Any(
+                    item => string.Equals(
+                        item.Id,
+                        requested,
+                        StringComparison.OrdinalIgnoreCase))
+                ? requested
+                : Collections.FirstOrDefault()?.Id;
+        }
+        catch (HttpRequestException exception)
+        {
+            Collections = [];
+            Error = $"Manual slideshows could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private void HandleCollectionChanged(ChangeEventArgs args)
+    {
+        SelectedId = args.Value?.ToString();
+        Notice = null;
+        Error = null;
+    }
+
+    private async Task ToggleMembershipAsync()
+    {
+        PhotoListCollectionResponse? collection = SelectedCollection;
+        if (collection is null || Busy)
+        {
+            return;
+        }
+
+        string[] revisionIds = SelectedContainsRevision
+            ? collection.RevisionIds
+                .Where(
+                    value => !string.Equals(
+                        value,
+                        RevisionId,
+                        StringComparison.OrdinalIgnoreCase))
+                .ToArray()
+            : [.. collection.RevisionIds, RevisionId];
+
+        await UpdateAsync(
+            collection,
+            revisionIds,
+            SelectedContainsRevision ? "Photo removed." : "Photo added.");
+    }
+
+    private async Task UpdateAsync(
+        PhotoListCollectionResponse collection,
+        string[] revisionIds,
+        string successMessage)
+    {
+        Busy = true;
+        Error = null;
+        Notice = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PutAsJsonAsync(
+                $"api/photo-list-collections/{Uri.EscapeDataString(collection.Id)}",
+                new PhotoListCollectionRequest(collection.Name, revisionIds));
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(
+                    await ReadErrorAsync(response, "The manual slideshow could not be updated."));
+            }
+
+            PhotoListCollectionResponse updated =
+                await response.Content.ReadFromJsonAsync<PhotoListCollectionResponse>()
+                ?? throw new InvalidOperationException("The manual slideshow response was empty.");
+
+            Collections = Collections
+                .Select(item => string.Equals(
+                        item.Id,
+                        updated.Id,
+                        StringComparison.OrdinalIgnoreCase)
+                    ? updated
+                    : item)
+                .ToArray();
+            SelectedId = updated.Id;
+            Notice = successMessage;
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (Busy || string.IsNullOrWhiteSpace(NewCollectionName))
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        Notice = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/photo-list-collections",
+                new PhotoListCollectionRequest(NewCollectionName, [RevisionId]));
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(
+                    await ReadErrorAsync(response, "The manual slideshow could not be created."));
+            }
+
+            PhotoListCollectionResponse created =
+                await response.Content.ReadFromJsonAsync<PhotoListCollectionResponse>()
+                ?? throw new InvalidOperationException("The manual slideshow response was empty.");
+
+            NewCollectionName = string.Empty;
+            await LoadAsync(created.Id);
+            Notice = $"Created “{created.Name}” with this photo.";
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task HandleNameKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await CreateAsync();
+        }
+    }
+
+    private static async Task<string> ReadErrorAsync(
+        HttpResponseMessage response,
+        string fallback)
+    {
+        try
+        {
+            PhotoListCollectionErrorResponse? error =
+                await response.Content.ReadFromJsonAsync<PhotoListCollectionErrorResponse>();
+            if (!string.IsNullOrWhiteSpace(error?.Error))
+            {
+                return error.Error;
+            }
+        }
+        catch
+        {
+        }
+
+        return $"{fallback} HTTP {(int)response.StatusCode}.";
+    }
+}

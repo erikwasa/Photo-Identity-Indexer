@@ -60,6 +60,10 @@ public partial class Slideshow : IAsyncDisposable
     [SupplyParameterFromQuery(Name = "creative")]
     public bool Creative { get; set; }
 
+    [Parameter]
+    [SupplyParameterFromQuery(Name = "manual")]
+    public bool Manual { get; set; }
+
     private SlideshowSettings Settings { get; set; } = SlideshowSettings.Defaults;
     private SmartCollectionSlideshowSnapshotResponse? Snapshot { get; set; }
     private SlideshowOriginalPreparationResponse? OriginalPreparation { get; set; }
@@ -193,18 +197,22 @@ public partial class Slideshow : IAsyncDisposable
         bool beginOriginalPreparation = false;
         try
         {
-            string snapshotPath = Creative
-                ? $"api/smart-collections/{CollectionId:D}/creative-recipe/slideshow-snapshot"
-                : $"api/smart-collections/{CollectionId:D}/slideshow-snapshot";
+            string snapshotPath = Manual
+                ? $"api/photo-list-collections/{CollectionId:D}/slideshow-snapshot"
+                : Creative
+                    ? $"api/smart-collections/{CollectionId:D}/creative-recipe/slideshow-snapshot"
+                    : $"api/smart-collections/{CollectionId:D}/slideshow-snapshot";
             using HttpResponseMessage response = await Http.PostAsync(
                 snapshotPath,
                 content: null);
             if (!response.IsSuccessStatusCode)
             {
                 Error = response.StatusCode == System.Net.HttpStatusCode.NotFound
-                    ? Creative
-                        ? "The saved Creative Collection recipe no longer exists."
-                        : "The saved Smart Collection no longer exists."
+                    ? Manual
+                        ? "The saved manual slideshow no longer exists."
+                        : Creative
+                            ? "The saved Creative Collection recipe no longer exists."
+                            : "The saved Smart Collection no longer exists."
                     : $"The slideshow snapshot could not be created. Status {(int)response.StatusCode}.";
                 return;
             }
@@ -1510,7 +1518,8 @@ public partial class Slideshow : IAsyncDisposable
 
         if (trimmed.Equals("/smart-collections", StringComparison.Ordinal) ||
             trimmed.StartsWith("/smart-collections?", StringComparison.Ordinal) ||
-            trimmed.StartsWith("/smart-collections#", StringComparison.Ordinal))
+            trimmed.StartsWith("/smart-collections#", StringComparison.Ordinal) ||
+            trimmed.StartsWith("/manual-collections/", StringComparison.Ordinal))
         {
             return trimmed;
         }

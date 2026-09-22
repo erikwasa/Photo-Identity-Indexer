@@ -94,12 +94,16 @@ work_items:
 - id: WI-0146
   title: Add manual slideshow curation and launch UI
   milestone: M28
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0146-manual-slideshow-curation-ui.md
+  started_at: 2026-09-22
+  last_updated_at: 2026-09-22
+  branch: agent/WI-0146-manual-slideshow-curation-ui
   blockers:
   - WI-0145
-  blocker_notes: []
+  blocker_notes:
+  - UI, playback routing and focused automated coverage are implemented on the work branch; completion remains pending CI/merge and combined WI-0145/WI-0146 maintainer desktop/phone verification.
   evidence: []
 - id: WI-0147
   title: Make PostgreSQL the unconditional runtime catalogue
