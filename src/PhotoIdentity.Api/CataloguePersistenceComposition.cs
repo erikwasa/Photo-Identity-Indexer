@@ -218,6 +218,8 @@ internal static class CataloguePersistenceComposition
         services.AddSingleton<ISmartCollectionQueryRepository>(sp => sp.GetRequiredService<PostgresSmartCollectionQueryRepository>());
         services.AddSingleton<PostgresSmartCollectionRepository>();
         services.AddSingleton<ISmartCollectionRepository>(sp => sp.GetRequiredService<PostgresSmartCollectionRepository>());
+        services.AddSingleton<PostgresPhotoListCollectionRepository>();
+        services.AddSingleton<IPhotoListCollectionRepository>(sp => sp.GetRequiredService<PostgresPhotoListCollectionRepository>());
         services.AddSingleton<PostgresCreativeCollectionRecipeRepository>();
         services.AddSingleton<ICreativeCollectionRecipeRepository>(sp => sp.GetRequiredService<PostgresCreativeCollectionRecipeRepository>());
         services.AddSingleton<PostgresPhotoPresentationPreferenceRepository>();

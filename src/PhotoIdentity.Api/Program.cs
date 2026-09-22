@@ -341,6 +341,10 @@ public partial class Program
         app.MapCollectionEndpoints();
         app.MapPhotoDetailsEndpoints();
         app.MapSmartCollectionEndpoints();
+        if (catalogueProvider == CatalogueProviderKind.Postgres)
+        {
+            app.MapPhotoListCollectionEndpoints();
+        }
         app.MapMomentPreviewEndpoints();
         app.MapSlideshowOriginalPreparationEndpoints();
         app.MapSlideshowExposureEndpoints();
