@@ -1,0 +1,23 @@
+id: WI-0145
+title: Add explicit photo-list collections for manually assembled slideshows
+milestone: M28
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0145-manual-slideshow-collection-model.md
+started_at: 2026-09-22
+completed_at: 2026-09-22
+verified_at: 2026-09-22
+verified_by: ai-agent
+last_updated_at: 2026-09-22
+branch: agent/WI-0145-explicit-photo-list-collections
+blockers:
+- WI-0083
+- WI-0094
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/407
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/35771344337
+- type: verification
+  value: Automated Core/PostgreSQL/API verification requirements passed before the WI-0146 UI layer; end-to-end desktop/phone curation remains WI-0146 acceptance scope.

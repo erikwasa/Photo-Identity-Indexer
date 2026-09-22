@@ -76,21 +76,6 @@ work_items:
   blocker_notes:
   - Maintainer intentionally deferred this item on 2026-09-18; there is no technical dependency blocker, and it can be resumed when age/family-story metadata becomes a priority.
   evidence: []
-- id: WI-0145
-  title: Add explicit photo-list collections for manually assembled slideshows
-  milestone: M28
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0145-manual-slideshow-collection-model.md
-  started_at: 2026-09-22
-  last_updated_at: 2026-09-22
-  branch: agent/WI-0145-explicit-photo-list-collections
-  blockers:
-  - WI-0083
-  - WI-0094
-  blocker_notes:
-  - Core, PostgreSQL persistence, API and focused tests are implemented on the work branch; completion remains pending CI and merge.
-  evidence: []
 - id: WI-0146
   title: Add manual slideshow curation and launch UI
   milestone: M28
@@ -103,7 +88,7 @@ work_items:
   blockers:
   - WI-0145
   blocker_notes:
-  - UI, playback routing and focused automated coverage are implemented on the work branch; completion remains pending CI/merge and combined WI-0145/WI-0146 maintainer desktop/phone verification.
+  - UI, playback routing and focused automated coverage merged in PR #410; completion remains pending maintainer desktop/phone verification of create/add/remove/reorder/library/launch/playback behavior.
   evidence: []
 - id: WI-0147
   title: Make PostgreSQL the unconditional runtime catalogue
