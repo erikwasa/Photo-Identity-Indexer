@@ -5,10 +5,10 @@ status: in_progress
 owner: ai-agent
 document: ../work-items/WI-0128-caption-narration-experiment.md
 started_at: 2026-09-20
-last_updated_at: 2026-09-20
-branch: agent/WI-0128-archive-caption-enrichment
+last_updated_at: 2026-09-22
+branch: agent/WI-0128-caption-output-normalization
 blockers:
 - WI-0121
 blocker_notes:
-- Bounded caption quality evaluation was accepted on 2026-09-20; completion now remains pending CI and maintainer verification of the corrected archive-level enrichment producer/consumer boundary.
+- The 2026-09-22 production sample verified the v2 sentence-boundary guard fix but exposed multi-sentence and token-truncated caption output; completion now remains pending deterministic output normalization plus final maintainer verification.
 evidence: []
