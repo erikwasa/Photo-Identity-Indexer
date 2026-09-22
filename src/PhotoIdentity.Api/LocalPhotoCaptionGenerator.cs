@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Imaging.OpenCv;
 
@@ -13,7 +14,8 @@ public sealed record PhotoCaptionGenerationConfiguration(
     int ContextTokens,
     int TimeoutSeconds)
 {
-    public const string GenerationVersion = "wi-0128-photo-caption-v2";
+    public const string GenerationVersion = "wi-0128-photo-caption-v3";
+    public const string SentenceAwareGenerationVersion = "wi-0128-photo-caption-v2";
     public const string LegacyGenerationVersion = "wi-0128-photo-caption-v1";
     public const string ImageMode = "thumbnail-480x320";
     public const string DefaultModel = "qwen2.5vl:3b";
@@ -44,6 +46,59 @@ public static class PhotoCaptionPrompt
         PhotoCaptionLanguages.Normalize(language) == PhotoCaptionLanguages.Swedish
             ? "Beskriv det här privata familjefotot. Skriv exakt en kort neutral mening på högst 20 ord på svenska som endast beskriver direkt synliga personer, föremål, miljö och handlingar. Identifiera eller gissa inte namn, relationer, ålder, yrke, nationalitet eller känslor. Ange eller härled inte exakta platser, datum, årtal, helgdagar, händelser, ceremonier, firanden eller tillfällen. Härled inte händelsetyp som bröllop, födelsedag, konsert, fest, examen eller festival. Om något är osäkert, utelämna det. Returnera endast meningen."
             : "Caption this private family photo. Write exactly one short neutral sentence of at most 20 words describing only directly visible people, objects, setting, and actions. Do not identify or guess any person's name, relationship, age, occupation, nationality, or emotion. Do not name or infer exact locations, dates, years, holidays, events, ceremonies, celebrations, or occasions. Do not infer an event type such as wedding, birthday, concert, party, graduation, or festival. If something is uncertain, omit it. Return only the sentence.";
+}
+
+public static class PhotoCaptionOutputNormalizer
+{
+    public const int MaximumWords = 20;
+    public const string InvalidFormatRiskCode = "caption-output-format";
+
+    private static readonly char[] SentenceTerminators = ['.', '!', '?'];
+    private static readonly char[] ClauseTerminators = [',', ';', ':', '–', '—'];
+
+    public static bool TryNormalize(string rawContent, out string normalizedCaption)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(rawContent);
+
+        string compact = Regex.Replace(rawContent.Trim(), @"\s+", " ");
+        int sentenceEnd = compact.IndexOfAny(SentenceTerminators);
+        if (sentenceEnd < 0)
+        {
+            normalizedCaption = string.Empty;
+            return false;
+        }
+
+        string firstSentence = compact[..(sentenceEnd + 1)].Trim();
+        if (WordCount(firstSentence) <= MaximumWords)
+        {
+            normalizedCaption = firstSentence;
+            return true;
+        }
+
+        MatchCollection words = Regex.Matches(firstSentence, @"\S+");
+        int boundedEnd = words[MaximumWords - 1].Index +
+            words[MaximumWords - 1].Length;
+        string boundedPrefix = firstSentence[..boundedEnd];
+        int clauseEnd = boundedPrefix.LastIndexOfAny(ClauseTerminators);
+        if (clauseEnd <= 0)
+        {
+            normalizedCaption = string.Empty;
+            return false;
+        }
+
+        string clause = boundedPrefix[..clauseEnd].Trim();
+        if (WordCount(clause) < 5)
+        {
+            normalizedCaption = string.Empty;
+            return false;
+        }
+
+        normalizedCaption = clause.TrimEnd('.', '!', '?') + ".";
+        return true;
+    }
+
+    private static int WordCount(string content) =>
+        Regex.Matches(content, @"\S+").Count;
 }
 
 public sealed class LocalPhotoCaptionGenerator
