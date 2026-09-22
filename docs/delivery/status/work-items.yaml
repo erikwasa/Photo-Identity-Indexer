@@ -88,7 +88,7 @@ work_items:
   blockers:
   - WI-0145
   blocker_notes:
-  - UI, playback routing and focused automated coverage are implemented on the work branch; completion remains pending CI/merge and combined WI-0145/WI-0146 maintainer desktop/phone verification.
+  - UI, playback routing and focused automated coverage merged in PR #410; completion remains pending maintainer desktop/phone verification of create/add/remove/reorder/library/launch/playback behavior.
   evidence: []
 - id: WI-0147
   title: Make PostgreSQL the unconditional runtime catalogue
