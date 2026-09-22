@@ -13,7 +13,7 @@ Photo Identity can turn exact Smart Collection matches into a bounded, story-ori
 
 The milestone is intentionally metadata-first. Capture time is the primary signal for moment grouping; identified people, tags, source/path proximity and location may strengthen a grouping when available, but GPS or named-place metadata is never required. Creative grouping and selection are derived, regenerable presentation decisions rather than canonical facts about the archive.
 
-WI-0118 through WI-0120 are the core proof-of-value sequence. WI-0121 through WI-0128 are deliberately recorded as candidate follow-on work so useful ideas are not lost while M26 is evaluated. They are not an assertion that every feature must ship: a follow-on may conclude with a measured no-go/retirement decision recorded through the normal work-item lifecycle rather than forcing unnecessary implementation.
+WI-0118 through WI-0120 are the core proof-of-value sequence. WI-0121 through WI-0128 plus WI-0158 are deliberately recorded as follow-on product/quality work so useful ideas are not lost while M26 is evaluated. They are not an assertion that every feature must ship: a follow-on may conclude with a measured no-go/retirement decision recorded through the normal work-item lifecycle rather than forcing unnecessary implementation.
 
 ## Delivery principles
 
@@ -56,6 +56,7 @@ The same workflow must remain useful for archives with little or no GPS/location
 - [WI-0123](../work-items/WI-0123-near-duplicate-burst-groups.md) - detect burst/near-duplicate visual groups so selection can suppress repetitive frames.
 - [WI-0124](../work-items/WI-0124-slideshow-history-novelty.md) - track presentation history and optionally favor photos that have not been shown recently.
 - [WI-0125](../work-items/WI-0125-person-family-metadata.md) - add optional birth-date and family-relationship metadata for age/relationship-oriented family stories.
+- [WI-0158](../work-items/WI-0158-named-creative-collections-slideshow-library.md) - make Creative Collections named first-class objects, allow multiple variants per Smart Collection and expose them from the Slideshows page.
 
 ### Candidate follow-on semantic experiments
 
@@ -71,6 +72,7 @@ The same workflow must remain useful for archives with little or no GPS/location
 4. If the core result is useful, WI-0121 is the natural productization step. WI-0122 through WI-0125 are then individually selectable product/quality improvements and should be prioritized from measured everyday value rather than treated as one mandatory block.
 5. WI-0126 and WI-0127 are independent semantic experiments. Either may be skipped, rejected or selected based on incremental quality versus runtime/storage complexity.
 6. WI-0128 is intentionally late and optional; deterministic titles/templates should remain a valid simpler alternative to generative narration.
+7. WI-0158 lifts the deliberately narrow WI-0121 one-recipe-per-Smart-Collection shape into named, independently manageable Creative Collections that can be discovered and launched from the Slideshows page.
 
 Each stage should remain independently inspectable so unsuccessful heuristics/models can be replaced or retired without changing canonical Smart Collection or slideshow semantics.
 
@@ -89,9 +91,11 @@ On 2026-09-20 the maintainer completed WI-0127 with a split decision. The privat
 
 On 2026-09-20 the maintainer accepted the WI-0128 bounded experiment as a positive result. A four-photo 480x320 thumbnail run generated 4/4 captions with zero generation failures; all four passed the guard, all four were judged useful and no factual errors were observed. Average runtime was 95,858.8 ms per caption on the maintainer hardware with the 3,200,627,168-byte qwen2.5vl:3b package. A full-proxy single caption took 373,568.2 ms and the first thumbnail probe took 118,081.4 ms. The quality result justified optional product integration, while the latency ruled out synchronous generation.
 
-WI-0128 now productizes that positive result as **optional archive enrichment**, not as slideshow-owned processing. Caption generation is globally enabled/disabled in Settings (default off), runs as a single local background worker over eligible current revisions with durable review proxies, and persists versioned caption evidence independently of collections or playback. Photo details, slideshows, Smart Collections and future search/story features are consumers of that evidence; opening a consumer must never trigger generation. Swedish and English generation are supported, with Swedish the default. M26 remains in progress until maintainer verification confirms enrichment progresses without any slideshow/collection open and consumers only read persisted evidence.
+WI-0128 productized that positive result as **optional archive enrichment**, not as slideshow-owned processing. Caption generation is globally enabled/disabled in Settings (default off), runs as a single local background worker over eligible current revisions with durable review proxies, and persists versioned caption evidence independently of collections or playback. Photo details, slideshows, Smart Collections and future search/story features are consumers of that evidence; opening a consumer never triggers generation. Swedish and English generation are supported, with Swedish the default.
 
-On 2026-09-22 the maintainer sampled the 30 most recent Swedish `wi-0128-photo-caption-v2` rows. All 30 had empty risk flags, confirming the sentence-boundary proper-name/location correction. The same sample exposed a separate output-quality defect: many model responses ignored the requested single-sentence/20-word shape and several stored outputs ended mid-word or mid-sentence. WI-0128 therefore adds generation policy `wi-0128-photo-caption-v3`, which deterministically normalizes output to one complete sentence of at most 20 words before claim guarding and persistence. Retained v1/v2 text is promoted locally when possible; malformed output that cannot produce a bounded complete sentence remains blocked rather than becoming presentation text. M26 remains in progress pending fresh production sampling and the final producer/consumer verification.
+On 2026-09-22 the maintainer sampled the 30 most recent Swedish `wi-0128-photo-caption-v2` rows. All 30 had empty risk flags, confirming the sentence-boundary proper-name/location correction. The same sample exposed a separate output-quality defect: many model responses ignored the requested single-sentence/20-word shape and several stored outputs ended mid-word or mid-sentence. WI-0128 therefore adds generation policy `wi-0128-photo-caption-v3`, which deterministically normalizes output to one complete sentence of at most 20 words before claim guarding and persistence. Retained v1/v2 text is promoted locally when possible; malformed output that cannot produce a bounded complete sentence remains blocked rather than becoming presentation text. Final maintainer verification later on 2026-09-22 accepted v3: a fresh 30-row Swedish sample stayed within the one-sentence/20-word display contract, the strict SQL validation returned zero displayable violations, blocked relationship evidence remained non-displayable, captions persisted across restart, slideshow consumption remained read-only, and disabling enrichment stopped new work. WI-0128 is therefore complete.
+
+The next explicit Creative Collection product gap is WI-0158: Creative Collections need their own names and durable identities, multiple Creative Collections must be able to share one anchor Smart Collection, and the read-only Slideshows page must make those named Creative Collections directly discoverable and launchable.
 
 ## Exit criteria
 
