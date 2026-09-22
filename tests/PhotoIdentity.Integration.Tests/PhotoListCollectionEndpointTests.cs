@@ -79,6 +79,59 @@ public sealed class PhotoListCollectionEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
     }
 
+    [Fact]
+    public async Task Api_supports_create_add_remove_and_launch_curation_flow()
+    {
+        InMemoryRepository repository = new();
+        WebApplicationBuilder builder = WebApplication.CreateBuilder([]);
+        builder.WebHost.UseTestServer();
+        builder.Services.AddSingleton<IPhotoListCollectionRepository>(repository);
+
+        await using WebApplication app = builder.Build();
+        app.MapPhotoListCollectionEndpoints();
+        await app.StartAsync();
+
+        using HttpClient client = app.GetTestClient();
+        string first = Guid.NewGuid().ToString("D");
+        string second = Guid.NewGuid().ToString("D");
+
+        using HttpResponseMessage createResponse = await client.PostAsJsonAsync(
+            "/api/photo-list-collections",
+            new PhotoListCollectionRequest("Phone favorites", [first]));
+        createResponse.EnsureSuccessStatusCode();
+        PhotoListCollectionResponse created =
+            await createResponse.Content.ReadFromJsonAsync<PhotoListCollectionResponse>()
+            ?? throw new InvalidOperationException();
+        Assert.Equal([first], created.RevisionIds);
+
+        using HttpResponseMessage addResponse = await client.PutAsJsonAsync(
+            $"/api/photo-list-collections/{created.Id}",
+            new PhotoListCollectionRequest(created.Name, [first, second]));
+        addResponse.EnsureSuccessStatusCode();
+        PhotoListCollectionResponse added =
+            await addResponse.Content.ReadFromJsonAsync<PhotoListCollectionResponse>()
+            ?? throw new InvalidOperationException();
+        Assert.Equal([first, second], added.RevisionIds);
+
+        using HttpResponseMessage removeResponse = await client.PutAsJsonAsync(
+            $"/api/photo-list-collections/{created.Id}",
+            new PhotoListCollectionRequest(created.Name, [second]));
+        removeResponse.EnsureSuccessStatusCode();
+        PhotoListCollectionResponse removed =
+            await removeResponse.Content.ReadFromJsonAsync<PhotoListCollectionResponse>()
+            ?? throw new InvalidOperationException();
+        Assert.Equal([second], removed.RevisionIds);
+
+        using HttpResponseMessage snapshotResponse = await client.PostAsync(
+            $"/api/photo-list-collections/{created.Id}/slideshow-snapshot",
+            content: null);
+        snapshotResponse.EnsureSuccessStatusCode();
+        SmartCollectionSlideshowSnapshotResponse snapshot =
+            await snapshotResponse.Content.ReadFromJsonAsync<SmartCollectionSlideshowSnapshotResponse>()
+            ?? throw new InvalidOperationException();
+        Assert.Equal([second], snapshot.Items.Select(item => item.RevisionId).ToArray());
+    }
+
     private sealed class InMemoryRepository : IPhotoListCollectionRepository
     {
         private readonly Dictionary<PhotoListCollectionId, PhotoListCollectionDefinition> _items = [];
