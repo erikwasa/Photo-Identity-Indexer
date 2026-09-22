@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
@@ -43,6 +44,71 @@ public sealed class PhotoCaptureMetadataTests
         PhotoCaptureMetadata metadata = await new MetadataExtractorPhotoMetadataReader()
             .ReadAsync(stream, "image/jpeg");
         Assert.False(metadata.HasAnyValue);
+    }
+
+    [Fact]
+    public async Task Sqlite_upgrade_normalizes_existing_zero_zero_coordinates()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            "PhotoIdentity.MetadataTests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            SqliteCatalogueDatabase database = new(Path.Combine(root, "catalogue.db"));
+            await database.InitializeAsync();
+            SqliteAssetCatalogueRepository repository = new(database);
+            DateTimeOffset observed = new(2026, 9, 22, 0, 0, 0, TimeSpan.Zero);
+            SourceId sourceId = SourceId.New();
+            AssetId assetId = AssetId.New();
+            CatalogueSource source = new(sourceId, "local-folder", root, observed);
+            CatalogueAsset asset = new(assetId, sourceId, "zero-zero.jpg", observed);
+            CatalogueAssetRevision revision = new(
+                AssetRevisionId.New(),
+                assetId,
+                new Sha256Digest(new string('b', 64)),
+                1234,
+                observed,
+                "image/jpeg",
+                640,
+                480);
+            await repository.SaveRevisionAsync(source, asset, revision);
+            await repository.SavePhotoMetadataAsync(
+                revision.Id,
+                new PhotoCaptureMetadata(takenAtLocal: new DateTime(2025, 1, 2, 3, 4, 5)),
+                observed);
+
+            await using (SqliteConnection connection = await database.OpenConnectionAsync())
+            {
+                using SqliteCommand command = connection.CreateCommand();
+                command.CommandText = """
+                    UPDATE photo_capture_metadata
+                    SET latitude = 0,
+                        longitude = 0
+                    WHERE asset_revision_id = $revision_id;
+
+                    DELETE FROM schema_migrations
+                    WHERE version = 22;
+
+                    PRAGMA user_version = 21;
+                    """;
+                command.Parameters.AddWithValue("$revision_id", revision.Id.ToString());
+                await command.ExecuteNonQueryAsync();
+            }
+
+            await database.InitializeAsync();
+
+            PhotoCaptureMetadata actual = Assert.IsType<PhotoCaptureMetadata>(
+                await repository.GetPhotoMetadataAsync(revision.Id));
+            Assert.Null(actual.Latitude);
+            Assert.Null(actual.Longitude);
+            Assert.False(actual.HasLocation);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     [Fact]
