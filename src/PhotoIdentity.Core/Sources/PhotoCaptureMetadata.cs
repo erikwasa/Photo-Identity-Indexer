@@ -28,6 +28,11 @@ public sealed record PhotoCaptureMetadata
             throw new ArgumentOutOfRangeException(nameof(latitude), "Latitude must be between -90 and 90 degrees.");
         if (longitude is < -180 or > 180)
             throw new ArgumentOutOfRangeException(nameof(longitude), "Longitude must be between -180 and 180 degrees.");
+        if (latitude is 0d && longitude is 0d)
+        {
+            latitude = null;
+            longitude = null;
+        }
         if (utcOffset is not null &&
             (utcOffset.Value < TimeSpan.FromHours(-14) || utcOffset.Value > TimeSpan.FromHours(14)))
             throw new ArgumentOutOfRangeException(nameof(utcOffset), "Capture UTC offset must be between -14 and +14 hours.");
