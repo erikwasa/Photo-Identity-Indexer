@@ -212,16 +212,20 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
                 legacy,
                 model,
                 promptVersion,
-                _generation.ContextTokens))
+                _generation.ContextTokens) &&
+            PhotoCaptionOutputNormalizer.TryNormalize(
+                legacy!.Content!,
+                out string promotedContent))
         {
             IReadOnlyList<string> promotedRiskFlags =
-                GeneratedCreativeTextGuard.Evaluate(legacy!.Content!);
+                GeneratedCreativeTextGuard.Evaluate(promotedContent);
             now = _timeProvider.GetUtcNow();
             await _captions.SaveAsync(
                 legacy with
                 {
                     GenerationVersion =
                         PhotoCaptionGenerationConfiguration.GenerationVersion,
+                    Content = promotedContent,
                     RiskFlags = promotedRiskFlags,
                     GeneratedAtUtc = now,
                 },
@@ -230,8 +234,8 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
             _state.Update(
                 "running",
                 promotedRiskFlags.Count == 0
-                    ? $"Re-evaluated and accepted one {LanguageLabel(language)} caption under the current claim guard."
-                    : "Re-evaluated one retained caption under the current claim guard; it remains blocked.",
+                    ? $"Normalized and accepted one retained {LanguageLabel(language)} caption without rerunning the vision model."
+                    : "Normalized one retained caption under the current policy; the claim guard still blocks it.",
                 now,
                 now.Add(ContinueDelay));
             return ContinueDelay;
@@ -242,15 +246,32 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
             language,
             model,
             cancellationToken);
-        IReadOnlyList<string> riskFlags =
-            GeneratedCreativeTextGuard.Evaluate(generated.Content);
+
+        string persistedContent;
+        IReadOnlyList<string> riskFlags;
+        if (PhotoCaptionOutputNormalizer.TryNormalize(
+                generated.Content,
+                out string normalizedContent))
+        {
+            persistedContent = normalizedContent;
+            riskFlags = GeneratedCreativeTextGuard.Evaluate(normalizedContent);
+        }
+        else
+        {
+            persistedContent = generated.Content.Trim();
+            riskFlags = GeneratedCreativeTextGuard.Evaluate(persistedContent)
+                .Append(PhotoCaptionOutputNormalizer.InvalidFormatRiskCode)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(value => value, StringComparer.Ordinal)
+                .ToArray();
+        }
 
         GeneratedCreativeTextEvidence evidence = new(
             selectedRevision.Value,
             generated.Model,
             generated.ModelDigest,
             generated.PromptVersion,
-            generated.Content,
+            persistedContent,
             riskFlags);
 
         now = _timeProvider.GetUtcNow();
@@ -286,10 +307,14 @@ public sealed class PhotoCaptionEnrichmentHostedService : BackgroundService
         string promptVersion,
         int contextTokens) =>
         caption is not null &&
-        string.Equals(
-            caption.GenerationVersion,
-            PhotoCaptionGenerationConfiguration.LegacyGenerationVersion,
-            StringComparison.Ordinal) &&
+        (string.Equals(
+             caption.GenerationVersion,
+             PhotoCaptionGenerationConfiguration.LegacyGenerationVersion,
+             StringComparison.Ordinal) ||
+         string.Equals(
+             caption.GenerationVersion,
+             PhotoCaptionGenerationConfiguration.SentenceAwareGenerationVersion,
+             StringComparison.Ordinal)) &&
         !string.IsNullOrWhiteSpace(caption.Content) &&
         string.Equals(caption.ModelId, model.Name, StringComparison.Ordinal) &&
         string.Equals(
