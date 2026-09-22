@@ -62,6 +62,33 @@ public sealed class PhotoPlaceEnrichmentTests
     }
 
     [Fact]
+    public async Task Zero_zero_coordinates_are_never_reverse_geocoding_candidates()
+    {
+        string directory = CreateTemporaryDirectory();
+        try
+        {
+            string databasePath = Path.Combine(directory, "catalogue.db");
+            SqliteCatalogueDatabase database = new(databasePath);
+            await database.InitializeAsync();
+            SeededRevision seeded = await CreateRevisionAsync(database, directory, "zero-zero.jpg", 'c');
+            await SaveGpsAsync(database, seeded.RevisionId, 0, 0);
+
+            FakeReverseGeocoder provider = new([]);
+            PhotoPlaceEnrichmentService service = CreateService(database, provider);
+
+            PhotoPlaceEnrichmentReport report = await service.ExecuteBatchAsync(limit: 10);
+
+            Assert.Equal(0, report.Candidates);
+            Assert.Equal(0, report.ProviderRequests);
+            Assert.Equal(0, provider.CallCount);
+        }
+        finally
+        {
+            DeleteTemporaryDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task Manual_clear_is_terminal_precedence_and_does_not_spend_provider_credit()
     {
         string directory = CreateTemporaryDirectory();
