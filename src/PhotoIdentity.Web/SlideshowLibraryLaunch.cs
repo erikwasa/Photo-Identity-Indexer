@@ -9,7 +9,8 @@ public static class SlideshowLibraryLaunch
         IJSRuntime js,
         NavigationManager navigation,
         string collectionId,
-        string returnUrl)
+        string returnUrl,
+        bool manual = false)
     {
         ArgumentNullException.ThrowIfNull(js);
         ArgumentNullException.ThrowIfNull(navigation);
@@ -27,8 +28,9 @@ public static class SlideshowLibraryLaunch
         }
 
         string encodedReturn = Uri.EscapeDataString(returnUrl);
+        string manualQuery = manual ? "&manual=true" : string.Empty;
         navigation.NavigateTo(
-            $"/slideshow/{Uri.EscapeDataString(collectionId)}?return={encodedReturn}");
+            $"/slideshow/{Uri.EscapeDataString(collectionId)}?return={encodedReturn}{manualQuery}");
         return notice;
     }
 }
