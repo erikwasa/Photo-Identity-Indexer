@@ -10,7 +10,8 @@ public static class SlideshowLibraryLaunch
         NavigationManager navigation,
         string collectionId,
         string returnUrl,
-        bool manual = false)
+        bool manual = false,
+        bool creative = false)
     {
         ArgumentNullException.ThrowIfNull(js);
         ArgumentNullException.ThrowIfNull(navigation);
@@ -29,8 +30,9 @@ public static class SlideshowLibraryLaunch
 
         string encodedReturn = Uri.EscapeDataString(returnUrl);
         string manualQuery = manual ? "&manual=true" : string.Empty;
+        string creativeQuery = creative ? "&creative=true" : string.Empty;
         navigation.NavigateTo(
-            $"/slideshow/{Uri.EscapeDataString(collectionId)}?return={encodedReturn}{manualQuery}");
+            $"/slideshow/{Uri.EscapeDataString(collectionId)}?return={encodedReturn}{manualQuery}{creativeQuery}");
         return notice;
     }
 }
