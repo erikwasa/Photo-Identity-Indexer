@@ -1,7 +1,7 @@
 id: WI-0159
 title: Keep Smart Collection context while navigating photos
 milestone: M28
-status: proposed
+status: ready
 owner: unassigned
 document: ../work-items/WI-0159-smart-collection-photo-navigation.md
 blockers:
