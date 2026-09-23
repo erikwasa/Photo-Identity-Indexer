@@ -225,7 +225,9 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
         tagMatch: filter.TagMatch,
         location: filter.Location,
         taken: filter.Taken,
-        locationPlaces: filter.LocationPlaces);
+        locationPlaces: filter.LocationPlaces,
+        age: filter.Age,
+        relationship: filter.Relationship);
 
     private static string SerializeFilter(SmartCollectionFilter filter)
     {
@@ -247,7 +249,18 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
                 ? null
                 : new PersistedTaken(
                     filter.Taken.From.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    filter.Taken.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)));
+                    filter.Taken.To.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+            filter.Age is null
+                ? null
+                : new PersistedAge(
+                    filter.Age.PersonId.ToString(),
+                    filter.Age.MinimumYears,
+                    filter.Age.MaximumYears),
+            filter.Relationship is null
+                ? null
+                : new PersistedRelationship(
+                    filter.Relationship.PersonId.ToString(),
+                    filter.Relationship.Kinds.ToArray()));
         return JsonSerializer.Serialize(payload, JsonOptions);
     }
 
@@ -267,7 +280,18 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
                 ? null
                 : new SmartCollectionDateRange(ParseDate(payload.Taken.From), ParseDate(payload.Taken.To)),
             locationPlace: payload.Location?.Place,
-            locationPlaces: payload.Location?.Places);
+            locationPlaces: payload.Location?.Places,
+            age: payload.Age is null
+                ? null
+                : new SmartCollectionAgeCriterion(
+                    ParsePersonId(payload.Age.PersonId),
+                    payload.Age.MinimumYears,
+                    payload.Age.MaximumYears),
+            relationship: payload.Relationship is null
+                ? null
+                : new SmartCollectionRelationshipCriterion(
+                    ParsePersonId(payload.Relationship.PersonId),
+                    payload.Relationship.Kinds));
     }
 
     private static SmartCollectionGeoBounds? ParseBounds(PersistedLocation? location)
@@ -317,7 +341,9 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
         string[] Tags,
         string TagMatch,
         PersistedLocation? Location,
-        PersistedTaken? Taken);
+        PersistedTaken? Taken,
+        PersistedAge? Age = null,
+        PersistedRelationship? Relationship = null);
 
     private sealed record PersistedLocation(
         string? Place = null,
@@ -328,4 +354,6 @@ public sealed class PostgresSmartCollectionRepository : ISmartCollectionReposito
         string[]? Places = null);
 
     private sealed record PersistedTaken(string From, string To);
+    private sealed record PersistedAge(string PersonId, int MinimumYears, int MaximumYears);
+    private sealed record PersistedRelationship(string PersonId, string[] Kinds);
 }
