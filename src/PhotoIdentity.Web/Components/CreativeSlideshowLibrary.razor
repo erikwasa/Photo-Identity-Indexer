@@ -4,31 +4,38 @@
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
 
-@if (Loading)
-{
-    <section class="slideshow-library-state" role="status">
-        <div class="spinner" aria-hidden="true"></div>
-        <p>Finding Creative Collections…</p>
-    </section>
-}
-else if (!string.IsNullOrWhiteSpace(Error))
-{
-    <section class="slideshow-library-state" role="alert">
-        <strong>Creative Collections could not be loaded</strong>
-        <p>@Error</p>
-    </section>
-}
-else if (Items.Count > 0)
-{
-    <section aria-labelledby="creative-slideshow-library-heading">
-        <div class="slideshow-library-header">
-            <div>
-                <p class="eyebrow">Creative Collections</p>
-                <h2 id="creative-slideshow-library-heading">Saved creative slideshows</h2>
-                <p>Each entry keeps its own recipe while using its source Smart Collection as the exact anchor.</p>
-            </div>
+<section aria-labelledby="creative-slideshow-library-heading">
+    <div class="slideshow-library-header">
+        <div>
+            <p class="eyebrow">Creative Collections</p>
+            <h2 id="creative-slideshow-library-heading">Saved creative slideshows</h2>
+            <p>Each entry keeps its own recipe while using its source Smart Collection as the exact anchor.</p>
         </div>
+        <a class="button secondary" href="/creative-collections">Manage Creative Collections</a>
+    </div>
 
+    @if (Loading)
+    {
+        <section class="slideshow-library-state" role="status">
+            <div class="spinner" aria-hidden="true"></div>
+            <p>Finding Creative Collections…</p>
+        </section>
+    }
+    else if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <section class="slideshow-library-state" role="alert">
+            <strong>Creative Collections could not be loaded</strong>
+            <p>@Error</p>
+        </section>
+    }
+    else if (Items.Count == 0)
+    {
+        <section class="slideshow-library-state">
+            <p>No named Creative Collections yet. Create one from a Smart Collection to keep several independent creative recipes.</p>
+        </section>
+    }
+    else
+    {
         <div class="slideshow-library-grid" aria-label="Creative Collections">
             @foreach (CreativeCollectionRecipeResponse item in Items)
             {
@@ -52,8 +59,8 @@ else if (Items.Count > 0)
                 </article>
             }
         </div>
-    </section>
-}
+    }
+</section>
 
 @code {
     private readonly HashSet<string> Starting = new(StringComparer.OrdinalIgnoreCase);
