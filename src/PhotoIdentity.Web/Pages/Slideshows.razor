@@ -29,8 +29,8 @@ else if (!string.IsNullOrWhiteSpace(Error))
 else if (Collections.Count == 0)
 {
     <section class="slideshow-library-state">
-        <h2>No slideshows yet</h2>
-        <p>Saved Smart Collections and manual slideshows will appear here when they are available.</p>
+        <h2>No Smart or manual slideshows yet</h2>
+        <p>Saved Smart Collections and manual slideshows will appear here when they are available. Saved Creative Collections are listed below.</p>
     </section>
 }
 else
@@ -92,6 +92,8 @@ else
         }
     </section>
 }
+
+<CreativeSlideshowLibrary />
 
 <details class="slideshow-library-settings">
     <summary>Playback preferences</summary>
@@ -187,5 +189,5 @@ else
 
 <section class="slideshow-library-boundary">
     <strong>Viewing only</strong>
-    <p>Slideshow playback does not edit Smart Collections or photo metadata. Manual slideshow membership is edited only through its Review photos view or a photo's Manual slideshow control.</p>
+    <p>Slideshow playback does not edit Smart Collections or photo metadata. Manual slideshow membership is edited only through its Review photos view or a photo's Manual slideshow control. Creative Collection recipes are edited from Smart Collections.</p>
 </section>
