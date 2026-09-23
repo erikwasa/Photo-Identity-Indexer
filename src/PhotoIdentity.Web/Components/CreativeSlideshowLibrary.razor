@@ -1,0 +1,102 @@
+@using System.Net.Http.Json
+@using PhotoIdentity.Web.Contracts
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+@if (Loading)
+{
+    <section class="slideshow-library-state" role="status">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Finding Creative Collections…</p>
+    </section>
+}
+else if (!string.IsNullOrWhiteSpace(Error))
+{
+    <section class="slideshow-library-state" role="alert">
+        <strong>Creative Collections could not be loaded</strong>
+        <p>@Error</p>
+    </section>
+}
+else if (Items.Count > 0)
+{
+    <section aria-labelledby="creative-slideshow-library-heading">
+        <div class="slideshow-library-header">
+            <div>
+                <p class="eyebrow">Creative Collections</p>
+                <h2 id="creative-slideshow-library-heading">Saved creative slideshows</h2>
+                <p>Each entry keeps its own recipe while using its source Smart Collection as the exact anchor.</p>
+            </div>
+        </div>
+
+        <div class="slideshow-library-grid" aria-label="Creative Collections">
+            @foreach (CreativeCollectionRecipeResponse item in Items)
+            {
+                <article class="slideshow-library-card">
+                    <button type="button"
+                            class="slideshow-library-primary"
+                            disabled="@Starting.Contains(item.Id)"
+                            aria-label="Play @item.Name"
+                            @onclick="() => StartAsync(item)">
+                        <SlideshowLibraryCover CollectionId="@item.AnchorCollectionId" />
+                        <span class="slideshow-library-card-shade" aria-hidden="true"></span>
+                        <span class="slideshow-library-card-copy">
+                            <span class="slideshow-library-card-title">@item.Name</span>
+                            <span class="slideshow-library-card-kind">Creative · from @item.AnchorCollectionName</span>
+                            <span class="slideshow-library-card-cue">
+                                <span class="slideshow-library-play-mark" aria-hidden="true">▶</span>
+                                <span>@(Starting.Contains(item.Id) ? "Starting…" : "Play creative slideshow")</span>
+                            </span>
+                        </span>
+                    </button>
+                </article>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private readonly HashSet<string> Starting = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<CreativeCollectionRecipeResponse> Items { get; set; } = [];
+    private bool Loading { get; set; } = true;
+    private string? Error { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            Items = await Http.GetFromJsonAsync<CreativeCollectionRecipeResponse[]>(
+                "api/creative-collections") ?? [];
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task StartAsync(CreativeCollectionRecipeResponse item)
+    {
+        if (!Starting.Add(item.Id))
+        {
+            return;
+        }
+
+        try
+        {
+            _ = await SlideshowLibraryLaunch.RequestFullscreenAndNavigateAsync(
+                JS,
+                Navigation,
+                item.Id,
+                "/slideshows",
+                creative: true);
+        }
+        finally
+        {
+            Starting.Remove(item.Id);
+        }
+    }
+}
