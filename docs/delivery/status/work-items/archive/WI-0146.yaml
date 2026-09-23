@@ -1,0 +1,20 @@
+id: WI-0146
+title: Add manual slideshow curation and launch UI
+milestone: M28
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0146-manual-slideshow-curation-ui.md
+started_at: 2026-09-22
+completed_at: 2026-09-23
+verified_at: 2026-09-23
+verified_by: maintainer
+last_updated_at: 2026-09-23
+branch: agent/WI-0146-manual-slideshow-curation-ui
+blockers:
+- WI-0145
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/410
+- type: verification
+  value: Maintainer verified WI-0145 and WI-0146 together on desktop and phone and reported both working as expected.
