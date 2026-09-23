@@ -1,5 +1,7 @@
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.People;
 using PhotoIdentity.Core.Review;
+using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Api;
@@ -14,6 +16,10 @@ public static class PersonMaintenanceEndpoints
         group.MapGet("/maintenance", GetPeopleAsync);
         group.MapGet("/maintenance/history", GetHistoryAsync);
         group.MapGet("/{id}/representative-face", GetRepresentativeFaceAsync);
+        group.MapGet("/{id}/family", GetFamilyAsync);
+        group.MapPut("/{id}/birth", SetBirthAsync);
+        group.MapPost("/{id}/relationships", AddRelationshipAsync);
+        group.MapDelete("/{id}/relationships/{relationshipId:long}", DeleteRelationshipAsync);
         group.MapPut("/{id}/favorite", SetFavoriteAsync);
         group.MapPut("/{id}/smart-collection-visibility", SetSmartCollectionVisibilityAsync);
         group.MapPut("/{id}/featured-face", SetFeaturedFaceAsync);
@@ -85,6 +91,159 @@ public static class PersonMaintenanceEndpoints
         catch (KeyNotFoundException)
         {
             return Results.NotFound();
+        }
+    }
+
+    private static async Task<IResult> GetFamilyAsync(
+        string id,
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
+        if (!TryPersonId(id, out PersonId personId))
+        {
+            return BadRequest("The person identifier is invalid.");
+        }
+
+        if (!TryFamilyRepository(services, out PostgresPersonFamilyMetadataRepository? repository, out IResult? unsupported))
+        {
+            return unsupported!;
+        }
+
+        try
+        {
+            PersonFamilyMetadata metadata = await repository!.GetAsync(personId, cancellationToken);
+            return Results.Ok(ToResponse(metadata));
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+    }
+
+    private static async Task<IResult> SetBirthAsync(
+        string id,
+        SetPersonBirthDateRequest request,
+        IServiceProvider services,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        if (!TryPersonId(id, out PersonId personId))
+        {
+            return BadRequest("The person identifier is invalid.");
+        }
+
+        if (!TryFamilyRepository(services, out PostgresPersonFamilyMetadataRepository? repository, out IResult? unsupported))
+        {
+            return unsupported!;
+        }
+
+        try
+        {
+            PersonBirthDate? birthDate;
+            if (request.Year is null)
+            {
+                if (request.Month is not null || request.Day is not null || !string.IsNullOrWhiteSpace(request.Precision))
+                {
+                    return BadRequest("Clearing a birth date requires year, month, day and precision to be empty.");
+                }
+
+                birthDate = null;
+            }
+            else
+            {
+                birthDate = new PersonBirthDate(
+                    request.Year.Value,
+                    request.Month,
+                    request.Day,
+                    request.Precision ?? string.Empty);
+            }
+
+            await repository!.SetBirthDateAsync(
+                personId,
+                birthDate,
+                request.Actor,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
+            return Results.Ok(ToResponse(await repository.GetAsync(personId, cancellationToken)));
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+    }
+
+    private static async Task<IResult> AddRelationshipAsync(
+        string id,
+        AddPersonFamilyRelationshipRequest request,
+        IServiceProvider services,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        if (!TryPersonId(id, out PersonId personId) ||
+            !TryPersonId(request.RelatedPersonId, out PersonId relatedPersonId))
+        {
+            return BadRequest("The person or related-person identifier is invalid.");
+        }
+
+        if (!TryFamilyRepository(services, out PostgresPersonFamilyMetadataRepository? repository, out IResult? unsupported))
+        {
+            return unsupported!;
+        }
+
+        try
+        {
+            PersonFamilyRelationship relationship = await repository!.AddRelationshipAsync(
+                personId,
+                relatedPersonId,
+                request.Kind,
+                request.Actor,
+                timeProvider.GetUtcNow(),
+                cancellationToken);
+            return Results.Ok(ToResponse(relationship));
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+    }
+
+    private static async Task<IResult> DeleteRelationshipAsync(
+        string id,
+        long relationshipId,
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
+        if (!TryPersonId(id, out PersonId personId))
+        {
+            return BadRequest("The person identifier is invalid.");
+        }
+
+        if (!TryFamilyRepository(services, out PostgresPersonFamilyMetadataRepository? repository, out IResult? unsupported))
+        {
+            return unsupported!;
+        }
+
+        try
+        {
+            return await repository!.DeleteRelationshipAsync(personId, relationshipId, cancellationToken)
+                ? Results.NoContent()
+                : Results.NotFound();
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
         }
     }
 
@@ -265,6 +424,26 @@ public static class PersonMaintenanceEndpoints
         }
     }
 
+    private static bool TryFamilyRepository(
+        IServiceProvider services,
+        out PostgresPersonFamilyMetadataRepository? repository,
+        out IResult? error)
+    {
+        PostgresCatalogueDatabase? database = services.GetService<PostgresCatalogueDatabase>();
+        if (database is null)
+        {
+            repository = null;
+            error = Results.Problem(
+                statusCode: StatusCodes.Status501NotImplemented,
+                detail: "Person family metadata is available on the PostgreSQL catalogue only.");
+            return false;
+        }
+
+        repository = new PostgresPersonFamilyMetadataRepository(database);
+        error = null;
+        return true;
+    }
+
     private static PersonMaintenancePersonResponse ToResponse(
         PersonMaintenancePerson person,
         int photoCount,
@@ -299,6 +478,25 @@ public static class PersonMaintenanceEndpoints
             action.Note,
             action.CreatedAtUtc,
             action.Reversible);
+
+    private static PersonFamilyMetadataResponse ToResponse(PersonFamilyMetadata metadata) => new(
+        metadata.PersonId.ToString(),
+        metadata.BirthDate is null
+            ? null
+            : new PersonBirthDateResponse(
+                metadata.BirthDate.Year,
+                metadata.BirthDate.Month,
+                metadata.BirthDate.Day,
+                metadata.BirthDate.Precision),
+        metadata.Relationships.Select(ToResponse).ToArray());
+
+    private static PersonFamilyRelationshipResponse ToResponse(PersonFamilyRelationship relationship) => new(
+        relationship.Id,
+        relationship.RelatedPersonId.ToString(),
+        relationship.RelatedPersonDisplayName,
+        relationship.Kind,
+        relationship.Actor,
+        relationship.CreatedAtUtc);
 
     private static bool TryPersonId(string value, out PersonId id)
     {
