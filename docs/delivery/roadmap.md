@@ -30,7 +30,7 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M23 | Source-copy lifecycle and privacy exclusion | ready |
 | M24 | PostgreSQL catalogue migration and archive-scale operation | completed |
 | M25 | Face discovery and cluster-assisted identity review | completed |
-| M26 | Creative Collections | ready |
+| M26 | Creative Collections | in_progress |
 | M27 | Slideshow presentation experience | completed |
 | M28 | Library curation and metadata editing | in_progress |
 | M29 | PostgreSQL-only catalogue cleanup | ready |
