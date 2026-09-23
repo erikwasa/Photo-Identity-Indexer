@@ -160,12 +160,48 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                AND latest_capture_date_action.row_number = 1
             LEFT JOIN photo_capture_metadata
                 ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+        ),
+        person_birth_ranges AS (
+            SELECT
+                person_id,
+                CASE precision
+                    WHEN 'year' THEN make_date(birth_year, 1, 1)
+                    WHEN 'month' THEN make_date(birth_year, birth_month, 1)
+                    ELSE make_date(birth_year, birth_month, birth_day)
+                END AS date_from,
+                CASE precision
+                    WHEN 'year' THEN make_date(birth_year, 12, 31)
+                    WHEN 'month' THEN (
+                        make_date(birth_year, birth_month, 1)
+                        + interval '1 month'
+                        - interval '1 day')::date
+                    ELSE make_date(birth_year, birth_month, birth_day)
+                END AS date_to
+            FROM person_birth_metadata
+        ),
+        person_relationship_view AS (
+            SELECT
+                source_person_id AS person_id,
+                target_person_id AS related_person_id,
+                relationship_kind
+            FROM person_relationships
+            UNION ALL
+            SELECT
+                target_person_id AS person_id,
+                source_person_id AS related_person_id,
+                CASE relationship_kind
+                    WHEN 'parent' THEN 'child'
+                    WHEN 'grandparent' THEN 'grandchild'
+                    ELSE relationship_kind
+                END AS relationship_kind
+            FROM person_relationships
         )
         """;
 
     private readonly PostgresCatalogueDatabase _database;
     private readonly ISmartCollectionRepository _definitions;
     private readonly TimeProvider _timeProvider;
+    private readonly Lazy<Task> _familySchema;
 
     public PostgresSmartCollectionQueryRepository(
         PostgresCatalogueDatabase database,
@@ -178,6 +214,9 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         _database = database;
         _definitions = definitions;
         _timeProvider = timeProvider;
+        _familySchema = new Lazy<Task>(
+            () => PostgresPersonFamilyMetadataRepository.EnsureSchemaAsync(_database),
+            LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     public async Task<SmartCollectionPhotoPage> QueryAsync(
@@ -193,6 +232,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             throw new ArgumentOutOfRangeException(nameof(limit), "Smart-collection page size must be between 1 and 200.");
         }
 
+        await EnsureFamilySchemaAsync(cancellationToken);
         string where = BuildWhere(filter);
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
@@ -276,6 +316,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
     {
         ArgumentNullException.ThrowIfNull(filter);
 
+        await EnsureFamilySchemaAsync(cancellationToken);
         string where = BuildWhere(filter);
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
@@ -346,6 +387,7 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             return null;
         }
 
+        await EnsureFamilySchemaAsync(cancellationToken);
         string where = BuildWhere(definition.Filter);
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
@@ -396,6 +438,9 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             _timeProvider.GetUtcNow().ToUniversalTime(),
             revisionIds);
     }
+
+    private async Task EnsureFamilySchemaAsync(CancellationToken cancellationToken) =>
+        await _familySchema.Value.WaitAsync(cancellationToken);
 
     private static SmartCollectionPhoto ReadPhoto(NpgsqlDataReader reader) => new(
         AssetRevisionId.From(reader.GetGuid(0)),
@@ -499,6 +544,50 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
             predicates.Add("AND effective_capture_dates.date_to >= @taken_from");
         }
 
+        if (filter.Age is not null)
+        {
+            predicates.Add("""
+                AND EXISTS (
+                    SELECT 1
+                    FROM revision_people
+                    WHERE revision_people.revision_id = asset_revisions.id
+                      AND revision_people.person_id = @age_person_id)
+                AND EXISTS (
+                    SELECT 1
+                    FROM person_birth_ranges
+                    WHERE person_birth_ranges.person_id = @age_person_id
+                      AND effective_capture_dates.date_from IS NOT NULL
+                      AND effective_capture_dates.date_to IS NOT NULL
+                      AND effective_capture_dates.date_to >= person_birth_ranges.date_from
+                      AND date_part(
+                            'year',
+                            age(effective_capture_dates.date_to, person_birth_ranges.date_from)) >= @age_minimum
+                      AND (
+                            effective_capture_dates.date_from < person_birth_ranges.date_to
+                            OR date_part(
+                                'year',
+                                age(effective_capture_dates.date_from, person_birth_ranges.date_to)) <= @age_maximum))
+                """);
+        }
+
+        if (filter.Relationship is not null)
+        {
+            string relationshipKinds = string.Join(
+                ", ",
+                Enumerable.Range(0, filter.Relationship.Kinds.Count)
+                    .Select(index => $"@relationship_kind_{index}"));
+            predicates.Add($"""
+                AND EXISTS (
+                    SELECT 1
+                    FROM revision_people
+                    INNER JOIN person_relationship_view
+                        ON person_relationship_view.related_person_id = revision_people.person_id
+                    WHERE revision_people.revision_id = asset_revisions.id
+                      AND person_relationship_view.person_id = @relationship_person_id
+                      AND person_relationship_view.relationship_kind IN ({relationshipKinds}))
+                """);
+        }
+
         return predicates.Count == 0 ? string.Empty : string.Join(Environment.NewLine, predicates);
     }
 
@@ -536,6 +625,28 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         {
             command.Parameters.AddWithValue("taken_from", NpgsqlDbType.Date, filter.Taken.From);
             command.Parameters.AddWithValue("taken_to", NpgsqlDbType.Date, filter.Taken.To);
+        }
+
+        if (filter.Age is not null)
+        {
+            command.Parameters.AddWithValue("age_person_id", NpgsqlDbType.Uuid, filter.Age.PersonId.Value);
+            command.Parameters.AddWithValue("age_minimum", NpgsqlDbType.Integer, filter.Age.MinimumYears);
+            command.Parameters.AddWithValue("age_maximum", NpgsqlDbType.Integer, filter.Age.MaximumYears);
+        }
+
+        if (filter.Relationship is not null)
+        {
+            command.Parameters.AddWithValue(
+                "relationship_person_id",
+                NpgsqlDbType.Uuid,
+                filter.Relationship.PersonId.Value);
+            for (int index = 0; index < filter.Relationship.Kinds.Count; index++)
+            {
+                command.Parameters.AddWithValue(
+                    $"relationship_kind_{index}",
+                    NpgsqlDbType.Text,
+                    filter.Relationship.Kinds[index]);
+            }
         }
     }
 
