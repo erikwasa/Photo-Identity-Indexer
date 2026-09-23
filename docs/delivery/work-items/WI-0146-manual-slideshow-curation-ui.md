@@ -37,7 +37,7 @@ The explicit collection model is useful only when adding/removing photos is ligh
 - [x] A user can create a named manual collection and add photos during browsing.
 - [x] Membership can be reviewed and removed independently of Smart Collection filters.
 - [x] It appears in the slideshow library and launches normally.
-- [ ] Phone interaction remains usable.
+- [x] Phone interaction remains usable.
 - [x] Primary create/add/remove/launch flow is tested.
 
 ## Verification requirements
@@ -48,5 +48,5 @@ Automated integration tests plus maintainer desktop/phone curation and playback 
 
 - Files changed: Photo Details manual-slideshow picker, manual collection review/reorder page, slideshow library integration, manual playback routing, library cover handling, Web contracts, focused integration tests, and delivery tracking.
 - Trade-offs: curation remains intentionally lightweight. New collections start with the current Photo Details revision, adding from other photos appends deterministically, and the review page offers remove plus one-step move up/down rather than a complex playlist editor. Manual collections reuse the existing slideshow snapshot/playback/original-preparation pipeline but skip Smart Collection exposure writes because their IDs live in a separate aggregate.
-- Deferred work: maintainer desktop/phone verification is intentionally deferred so WI-0145 and WI-0146 can be reviewed together end-to-end after this PR merges. The phone acceptance checkbox remains open until that pass.
-- Commands run: implementation prepared through the GitHub connector; PR CI supplies build, integration, package and docs validation.
+- Verification: implementation merged in PR #410. Its code/build/integration/package portions passed; the PR-level failure was the already-repaired generated-documentation lifecycle mismatch. The maintainer subsequently verified WI-0145 and WI-0146 together on desktop and phone and reported both working as expected.
+- Lifecycle: WI-0146 is complete. Follow-on Smart Collection browsing improvements are tracked separately in WI-0159 through WI-0161.
