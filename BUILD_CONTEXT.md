@@ -4,17 +4,17 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M26 Creative Collections is actively implementing WI-0125: birth dates and family relationships for age-aware family stories. M28 separately remains in verification for WI-0146.**
+**M26 Creative Collections is actively implementing WI-0125: birth dates and family relationships for age-aware family stories. M28 remains active with the new Smart Collection browsing follow-ups.**
 
 WI-0125 was explicitly reactivated by the maintainer on 2026-09-23. The active branch adds partial birth-date precision, explicit family relationships with inverse semantics, deterministic age ranges, People maintenance UI, and age/relationship Smart Collection criteria that remain exact anchors for the existing Creative Collection path.
 
 The same planning pass recorded four requested follow-ups: WI-0159 for previous/next navigation while viewing a Smart Collection photo, WI-0160 for bounded infinite scrolling, WI-0161 for compact effective Place labels instead of raw GPS under photo cards, and WI-0162 for scaling the successful WI-0127 semantic text-to-photo direction, combining it with WI-0128 generated-caption search, and saving result sets as explicit slideshow collections.
 
-WI-0140 through WI-0145 and WI-0157 are completed. WI-0146 merged in PR #410 and remains open only for maintainer desktop/phone verification of create/add/remove/reorder/library/launch/playback behavior. WI-0159 is therefore proposed behind WI-0146; WI-0160 follows WI-0159. WI-0161 and WI-0162 are ready independently. M29 remains ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+WI-0140 through WI-0146 and WI-0157 are completed. WI-0146 merged in PR #410 and the maintainer subsequently verified WI-0145/WI-0146 together on desktop and phone. That acceptance makes WI-0159 ready; WI-0160 follows WI-0159. WI-0161 and WI-0162 are ready independently. M29 remains ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Complete CI/live PostgreSQL verification for WI-0125, then run maintainer verification with representative private people/photos. WI-0146 can be closed independently when its existing desktop/phone verification is accepted.
+Complete CI/live PostgreSQL verification for WI-0125, then run maintainer verification with representative private people/photos. The next M28 browsing item, WI-0159, is now ready independently.
 
 ## Relevant files
 
