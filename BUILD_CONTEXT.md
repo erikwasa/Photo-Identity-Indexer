@@ -4,25 +4,30 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M28 Library curation and metadata editing is verifying WI-0146: manual slideshow curation and launch UI.**
+**M26 Creative Collections is actively implementing WI-0125: birth dates and family relationships for age-aware family stories. M28 separately remains in verification for WI-0146.**
 
-WI-0140 through WI-0145 and WI-0157 are completed. WI-0145's explicit photo-list collection backend merged in PR #407 with successful CI run #2095: separate named ordered revision lists, PostgreSQL persistence, lifecycle API and playback-compatible snapshots are now part of `main`.
+WI-0125 was explicitly reactivated by the maintainer on 2026-09-23. The active branch adds partial birth-date precision, explicit family relationships with inverse semantics, deterministic age ranges, People maintenance UI, and age/relationship Smart Collection criteria that remain exact anchors for the existing Creative Collection path.
 
-WI-0146 merged in PR #410 and adds Photo Details create/add/remove controls, a lightweight review/reorder page, slideshow-library entries and normal manual snapshot playback. Its implementation/integration/package jobs passed; the merged PR's documentation validation failure was caused by stale M28 lifecycle output and is corrected by the WI-0145 completion follow-up. WI-0146 remains open only for maintainer desktop/phone verification.
+The same planning pass recorded four requested follow-ups: WI-0159 for previous/next navigation while viewing a Smart Collection photo, WI-0160 for bounded infinite scrolling, WI-0161 for compact effective Place labels instead of raw GPS under photo cards, and WI-0162 for scaling the successful WI-0127 semantic text-to-photo direction, combining it with WI-0128 generated-caption search, and saving result sets as explicit slideshow collections.
 
-M26 is ready with WI-0158 as the next named-Creative-Collection product item; WI-0125 remains deferred. M29 is ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+WI-0140 through WI-0145 and WI-0157 are completed. WI-0146 merged in PR #410 and remains open only for maintainer desktop/phone verification of create/add/remove/reorder/library/launch/playback behavior. WI-0159 is therefore proposed behind WI-0146; WI-0160 follows WI-0159. WI-0161 and WI-0162 are ready independently. M29 remains ready. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Run the WI-0146 maintainer desktop/phone review covering create/add/remove/reorder, slideshow-library discovery, launch/return routing and playback. If accepted, complete WI-0146 and M28.
+Complete CI/live PostgreSQL verification for WI-0125, then run maintainer verification with representative private people/photos. WI-0146 can be closed independently when its existing desktop/phone verification is accepted.
 
 ## Relevant files
 
-- docs/delivery/milestones/M28-library-curation-metadata-editing.md
-- docs/delivery/work-items/WI-0145-manual-slideshow-collection-model.md
-- docs/delivery/status/work-items/archive/WI-0145.yaml
-- docs/delivery/work-items/WI-0146-manual-slideshow-curation-ui.md
-- docs/delivery/status/work-items/active/WI-0146.yaml
+- docs/delivery/milestones/M26-creative-collections.md
+- docs/delivery/work-items/WI-0125-person-family-metadata.md
+- docs/delivery/status/work-items/active/WI-0125.yaml
+- src/PhotoIdentity.Core/People/PersonFamilyMetadata.cs
+- src/PhotoIdentity.Persistence.Postgres/PostgresPersonFamilyMetadataRepository.cs
+- src/PhotoIdentity.Web/Pages/People.razor
+- docs/delivery/work-items/WI-0159-smart-collection-photo-navigation.md
+- docs/delivery/work-items/WI-0160-smart-collection-infinite-scroll.md
+- docs/delivery/work-items/WI-0161-smart-collection-place-labels.md
+- docs/delivery/work-items/WI-0162-semantic-caption-search-slideshow-collections.md
 
 ## Repository validation
 
