@@ -30,7 +30,6 @@ public static class CreativeCollectionRecipeEndpoints
     public static IEndpointRouteBuilder MapCreativeCollectionRecipeEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
-        // First-class WI-0158 routes.
         endpoints.MapGet("/api/creative-collections", ListAsync);
         endpoints.MapGet("/api/creative-collections/{id:guid}", GetByIdAsync);
         endpoints.MapPut("/api/creative-collections/{id:guid}", UpdateByIdAsync);
@@ -40,7 +39,7 @@ public static class CreativeCollectionRecipeEndpoints
         endpoints.MapGet("/api/smart-collections/{id:guid}/creative-collections", ListForAnchorAsync);
         endpoints.MapPost("/api/smart-collections/{id:guid}/creative-collections", CreateForAnchorAsync);
 
-        // Compatibility routes retained for the original WI-0121 single-recipe clients.
+        // Compatibility routes retained for original WI-0121 callers and the existing slideshow player.
         endpoints.MapGet("/api/smart-collections/{id:guid}/creative-recipe", GetAsync);
         endpoints.MapPut("/api/smart-collections/{id:guid}/creative-recipe", UpsertAsync);
         endpoints.MapDelete("/api/smart-collections/{id:guid}/creative-recipe", DeleteAsync);
@@ -248,24 +247,7 @@ public static class CreativeCollectionRecipeEndpoints
             return Results.NotFound();
         }
 
-        CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
-            recipe.AnchorCollectionId,
-            Settings(recipe),
-            cancellationToken);
-        if (materialized is null)
-        {
-            return Results.NotFound();
-        }
-
-        SmartCollectionSlideshowSnapshotResponse response =
-            CreativeCollectionPreviewEndpoints.ToSnapshotResponse(
-                materialized,
-                timeProvider.GetUtcNow().ToUniversalTime()) with
-            {
-                CollectionId = recipe.Id.ToString(),
-                CollectionName = recipe.Name,
-            };
-        return Results.Ok(response);
+        return await MaterializeSnapshotAsync(recipe, materializer, timeProvider, cancellationToken);
     }
 
     private static async Task<IResult> GetAsync(
@@ -380,26 +362,47 @@ public static class CreativeCollectionRecipeEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        if (!TryGetId(id, out SmartCollectionId collectionId, out IResult? error))
+        if (id == Guid.Empty)
         {
-            return error!;
+            return Results.BadRequest(new { error = "Creative collection identifier cannot be empty." });
         }
 
-        CreativeCollectionRecipe? recipe = await recipes.GetAsync(collectionId, cancellationToken);
+        SmartCollectionId anchorId = SmartCollectionId.From(id);
+        CreativeCollectionRecipe? recipe = await recipes.GetAsync(anchorId, cancellationToken);
         if (recipe is null)
+        {
+            recipe = await recipes.GetAsync(CreativeCollectionId.From(id), cancellationToken);
+        }
+
+        return recipe is null
+            ? Results.NotFound()
+            : await MaterializeSnapshotAsync(recipe, materializer, timeProvider, cancellationToken);
+    }
+
+    private static async Task<IResult> MaterializeSnapshotAsync(
+        CreativeCollectionRecipe recipe,
+        CreativeCollectionMaterializationService materializer,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
+            recipe.AnchorCollectionId,
+            Settings(recipe),
+            cancellationToken);
+        if (materialized is null)
         {
             return Results.NotFound();
         }
 
-        CreativeCollectionMaterialization? materialized = await materializer.MaterializeAsync(
-            collectionId,
-            Settings(recipe),
-            cancellationToken);
-        return materialized is null
-            ? Results.NotFound()
-            : Results.Ok(CreativeCollectionPreviewEndpoints.ToSnapshotResponse(
+        SmartCollectionSlideshowSnapshotResponse response =
+            CreativeCollectionPreviewEndpoints.ToSnapshotResponse(
                 materialized,
-                timeProvider.GetUtcNow().ToUniversalTime()));
+                timeProvider.GetUtcNow().ToUniversalTime()) with
+            {
+                CollectionId = recipe.Id.ToString(),
+                CollectionName = recipe.Name,
+            };
+        return Results.Ok(response);
     }
 
     private static CreativeCollectionRecipeSettings Settings(CreativeCollectionRecipeRequest request)
