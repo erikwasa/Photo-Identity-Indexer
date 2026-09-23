@@ -18,6 +18,15 @@ public sealed record SmartCollectionDateRangeRequest(
     string From,
     string To);
 
+public sealed record SmartCollectionAgeRequest(
+    string PersonId,
+    int MinimumYears,
+    int MaximumYears);
+
+public sealed record SmartCollectionRelationshipRequest(
+    string PersonId,
+    string[] Kinds);
+
 public sealed record SmartCollectionQueryRequest(
     string[]? People = null,
     string? PeopleMatch = null,
@@ -27,7 +36,9 @@ public sealed record SmartCollectionQueryRequest(
     string? Taken = null,
     int Offset = 0,
     int Limit = 40,
-    SmartCollectionDateRangeRequest? TakenRange = null);
+    SmartCollectionDateRangeRequest? TakenRange = null,
+    SmartCollectionAgeRequest? Age = null,
+    SmartCollectionRelationshipRequest? Relationship = null);
 
 public sealed record SmartCollectionDefinitionRequest(
     string Name,
@@ -37,7 +48,9 @@ public sealed record SmartCollectionDefinitionRequest(
     string? TagMatch = null,
     SmartCollectionLocationRequest? Location = null,
     string? Taken = null,
-    SmartCollectionDateRangeRequest? TakenRange = null);
+    SmartCollectionDateRangeRequest? TakenRange = null,
+    SmartCollectionAgeRequest? Age = null,
+    SmartCollectionRelationshipRequest? Relationship = null);
 
 public sealed record SmartCollectionDateRangeResponse(
     string From,
@@ -49,7 +62,9 @@ public sealed record SmartCollectionFilterResponse(
     string[] Tags,
     string TagMatch,
     SmartCollectionLocationRequest? Location,
-    SmartCollectionDateRangeResponse? Taken);
+    SmartCollectionDateRangeResponse? Taken,
+    SmartCollectionAgeRequest? Age = null,
+    SmartCollectionRelationshipRequest? Relationship = null);
 
 public sealed record SmartCollectionDefinitionResponse(
     string Id,
@@ -341,6 +356,8 @@ public static class SmartCollectionEndpoints
             request.Location,
             request.Taken,
             request.TakenRange,
+            request.Age,
+            request.Relationship,
             fallbackLocationPlaces: null);
     }
 
@@ -357,6 +374,8 @@ public static class SmartCollectionEndpoints
             request.Location,
             request.Taken,
             request.TakenRange,
+            request.Age,
+            request.Relationship,
             fallbackLocationPlaces);
     }
 
@@ -368,6 +387,8 @@ public static class SmartCollectionEndpoints
         SmartCollectionLocationRequest? location,
         string? taken,
         SmartCollectionDateRangeRequest? takenRange,
+        SmartCollectionAgeRequest? age,
+        SmartCollectionRelationshipRequest? relationship,
         IReadOnlyList<string>? fallbackLocationPlaces)
     {
         ValidateGenericTags(tags);
@@ -415,7 +436,18 @@ public static class SmartCollectionEndpoints
             tagMatch: tagMatch,
             location: parsedLocation,
             taken: parsedTaken,
-            locationPlaces: locationPlaces);
+            locationPlaces: locationPlaces,
+            age: age is null
+                ? null
+                : new SmartCollectionAgeCriterion(
+                    ParsePersonId(age.PersonId),
+                    age.MinimumYears,
+                    age.MaximumYears),
+            relationship: relationship is null
+                ? null
+                : new SmartCollectionRelationshipCriterion(
+                    ParsePersonId(relationship.PersonId),
+                    relationship.Kinds ?? []));
     }
 
     private static SmartCollectionDateRange ParseTakenRange(
@@ -549,7 +581,18 @@ public static class SmartCollectionEndpoints
             ? null
             : new SmartCollectionDateRangeResponse(
                 filter.Taken.From.ToString("yyyy-MM-dd"),
-                filter.Taken.To.ToString("yyyy-MM-dd")));
+                filter.Taken.To.ToString("yyyy-MM-dd")),
+        filter.Age is null
+            ? null
+            : new SmartCollectionAgeRequest(
+                filter.Age.PersonId.ToString(),
+                filter.Age.MinimumYears,
+                filter.Age.MaximumYears),
+        filter.Relationship is null
+            ? null
+            : new SmartCollectionRelationshipRequest(
+                filter.Relationship.PersonId.ToString(),
+                filter.Relationship.Kinds.ToArray()));
 
     private static bool TryGetId(
         Guid id,
