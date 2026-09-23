@@ -19,47 +19,59 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
         _timeProvider = timeProvider;
     }
 
-    public async Task<CreativeCollectionRecipe?> GetAsync(
+    public Task<IReadOnlyList<CreativeCollectionRecipe>> ListAsync(
+        CancellationToken cancellationToken = default) =>
+        ListCoreAsync(anchorCollectionId: null, cancellationToken);
+
+    public Task<IReadOnlyList<CreativeCollectionRecipe>> ListForAnchorAsync(
         SmartCollectionId anchorCollectionId,
+        CancellationToken cancellationToken = default) =>
+        ListCoreAsync(anchorCollectionId, cancellationToken);
+
+    public async Task<CreativeCollectionRecipe?> GetAsync(
+        CreativeCollectionId id,
         CancellationToken cancellationToken = default)
     {
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT anchor_collection_id,
-                   target_count,
-                   moment_gap_minutes,
-                   moment_policy_version,
-                   context_policy_version,
-                   selection_policy_version,
-                   ordering_policy_version,
-                   novelty_enabled,
-                   created_at_utc,
-                   updated_at_utc
+        command.CommandText = $"""
+            {SelectColumns}
             FROM creative_collection_recipes
-            WHERE anchor_collection_id = $anchor_collection_id;
+            WHERE id = $id;
             """;
-        command.Parameters.AddWithValue("$anchor_collection_id", anchorCollectionId.Value.ToString("D"));
+        command.Parameters.AddWithValue("$id", id.Value.ToString("D"));
 
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken)
-            ? ReadRecipe(reader)
-            : null;
+        return await reader.ReadAsync(cancellationToken) ? ReadRecipe(reader) : null;
     }
 
-    public async Task<CreativeCollectionRecipe> UpsertAsync(
+    public async Task<CreativeCollectionRecipe?> GetAsync(
         SmartCollectionId anchorCollectionId,
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<CreativeCollectionRecipe> recipes =
+            await ListForAnchorAsync(anchorCollectionId, cancellationToken);
+        return recipes.FirstOrDefault();
+    }
+
+    public async Task<CreativeCollectionRecipe> CreateAsync(
+        SmartCollectionId anchorCollectionId,
+        string name,
         CreativeCollectionRecipeSettings settings,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
         settings.ValidateSupported();
+        string displayName = CreativeCollectionName.Parse(name).DisplayValue;
+        CreativeCollectionId id = CreativeCollectionId.New();
         DateTimeOffset now = _timeProvider.GetUtcNow().ToUniversalTime();
 
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
             INSERT INTO creative_collection_recipes (
+                id,
+                display_name,
                 anchor_collection_id,
                 target_count,
                 moment_gap_minutes,
@@ -71,6 +83,8 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
                 created_at_utc,
                 updated_at_utc)
             VALUES (
+                $id,
+                $display_name,
                 $anchor_collection_id,
                 $target_count,
                 $moment_gap_minutes,
@@ -80,18 +94,167 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
                 $ordering_policy_version,
                 $novelty_enabled,
                 $created_at_utc,
-                $updated_at_utc)
-            ON CONFLICT(anchor_collection_id) DO UPDATE SET
-                target_count = excluded.target_count,
-                moment_gap_minutes = excluded.moment_gap_minutes,
-                moment_policy_version = excluded.moment_policy_version,
-                context_policy_version = excluded.context_policy_version,
-                selection_policy_version = excluded.selection_policy_version,
-                ordering_policy_version = excluded.ordering_policy_version,
-                novelty_enabled = excluded.novelty_enabled,
-                updated_at_utc = excluded.updated_at_utc;
+                $updated_at_utc);
             """;
+        AddRecipeParameters(command, id, anchorCollectionId, displayName, settings, now, includeCreatedAt: true);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        return await GetAsync(id, cancellationToken)
+            ?? throw new InvalidOperationException("Creative Collection was not persisted.");
+    }
+
+    public async Task<CreativeCollectionRecipe> UpdateAsync(
+        CreativeCollectionId id,
+        string name,
+        CreativeCollectionRecipeSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        settings.ValidateSupported();
+        string displayName = CreativeCollectionName.Parse(name).DisplayValue;
+        DateTimeOffset now = _timeProvider.GetUtcNow().ToUniversalTime();
+
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = """
+            UPDATE creative_collection_recipes
+            SET display_name = $display_name,
+                target_count = $target_count,
+                moment_gap_minutes = $moment_gap_minutes,
+                moment_policy_version = $moment_policy_version,
+                context_policy_version = $context_policy_version,
+                selection_policy_version = $selection_policy_version,
+                ordering_policy_version = $ordering_policy_version,
+                novelty_enabled = $novelty_enabled,
+                updated_at_utc = $updated_at_utc
+            WHERE id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", id.Value.ToString("D"));
+        command.Parameters.AddWithValue("$display_name", displayName);
+        AddSettingsParameters(command, settings, now);
+        if (await command.ExecuteNonQueryAsync(cancellationToken) == 0)
+        {
+            throw new KeyNotFoundException($"Creative Collection '{id}' was not found.");
+        }
+
+        return await GetAsync(id, cancellationToken)
+            ?? throw new InvalidOperationException("Creative Collection update could not be read back.");
+    }
+
+    public async Task<bool> DeleteAsync(
+        CreativeCollectionId id,
+        CancellationToken cancellationToken = default)
+    {
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM creative_collection_recipes WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", id.Value.ToString("D"));
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
+    public async Task<CreativeCollectionRecipe> UpsertAsync(
+        SmartCollectionId anchorCollectionId,
+        CreativeCollectionRecipeSettings settings,
+        CancellationToken cancellationToken = default)
+    {
+        CreativeCollectionRecipe? existing = await GetAsync(anchorCollectionId, cancellationToken);
+        if (existing is not null)
+        {
+            return await UpdateAsync(existing.Id, existing.Name, settings, cancellationToken);
+        }
+
+        return await CreateAsync(
+            anchorCollectionId,
+            await FallbackNameAsync(anchorCollectionId, cancellationToken),
+            settings,
+            cancellationToken);
+    }
+
+    public async Task<bool> DeleteAsync(
+        SmartCollectionId anchorCollectionId,
+        CancellationToken cancellationToken = default)
+    {
+        CreativeCollectionRecipe? existing = await GetAsync(anchorCollectionId, cancellationToken);
+        return existing is not null && await DeleteAsync(existing.Id, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<CreativeCollectionRecipe>> ListCoreAsync(
+        SmartCollectionId? anchorCollectionId,
+        CancellationToken cancellationToken)
+    {
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = anchorCollectionId is null
+            ? $"""
+                {SelectColumns}
+                FROM creative_collection_recipes
+                ORDER BY lower(display_name), created_at_utc, id;
+                """
+            : $"""
+                {SelectColumns}
+                FROM creative_collection_recipes
+                WHERE anchor_collection_id = $anchor_collection_id
+                ORDER BY created_at_utc, id;
+                """;
+        if (anchorCollectionId is SmartCollectionId anchor)
+        {
+            command.Parameters.AddWithValue("$anchor_collection_id", anchor.Value.ToString("D"));
+        }
+
+        List<CreativeCollectionRecipe> result = [];
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            result.Add(ReadRecipe(reader));
+        }
+
+        return result;
+    }
+
+    private async Task<string> FallbackNameAsync(
+        SmartCollectionId anchorCollectionId,
+        CancellationToken cancellationToken)
+    {
+        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        using SqliteCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT display_name FROM smart_collections WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", anchorCollectionId.Value.ToString("D"));
+        string anchorName = (string?)await command.ExecuteScalarAsync(cancellationToken) ?? "Smart Collection";
+        return FallbackName(anchorName);
+    }
+
+    private static string FallbackName(string anchorName)
+    {
+        const string suffix = " Creative";
+        string trimmed = anchorName.Trim();
+        int prefixLength = Math.Min(trimmed.Length, CreativeCollectionName.MaximumLength - suffix.Length);
+        return $"{trimmed[..prefixLength]}{suffix}";
+    }
+
+    private static void AddRecipeParameters(
+        SqliteCommand command,
+        CreativeCollectionId id,
+        SmartCollectionId anchorCollectionId,
+        string displayName,
+        CreativeCollectionRecipeSettings settings,
+        DateTimeOffset now,
+        bool includeCreatedAt)
+    {
+        command.Parameters.AddWithValue("$id", id.Value.ToString("D"));
+        command.Parameters.AddWithValue("$display_name", displayName);
         command.Parameters.AddWithValue("$anchor_collection_id", anchorCollectionId.Value.ToString("D"));
+        AddSettingsParameters(command, settings, now);
+        if (includeCreatedAt)
+        {
+            command.Parameters.AddWithValue("$created_at_utc", now.ToString("O", CultureInfo.InvariantCulture));
+        }
+    }
+
+    private static void AddSettingsParameters(
+        SqliteCommand command,
+        CreativeCollectionRecipeSettings settings,
+        DateTimeOffset now)
+    {
         command.Parameters.AddWithValue("$target_count", settings.TargetCount);
         command.Parameters.AddWithValue("$moment_gap_minutes", settings.MomentGapMinutes);
         command.Parameters.AddWithValue("$moment_policy_version", settings.MomentPolicyVersion);
@@ -99,40 +262,26 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
         command.Parameters.AddWithValue("$selection_policy_version", settings.SelectionPolicyVersion);
         command.Parameters.AddWithValue("$ordering_policy_version", settings.OrderingPolicyVersion);
         command.Parameters.AddWithValue("$novelty_enabled", settings.NoveltyEnabled ? 1 : 0);
-        command.Parameters.AddWithValue("$created_at_utc", now.ToString("O", CultureInfo.InvariantCulture));
         command.Parameters.AddWithValue("$updated_at_utc", now.ToString("O", CultureInfo.InvariantCulture));
-        await command.ExecuteNonQueryAsync(cancellationToken);
-
-        return await GetAsync(anchorCollectionId, cancellationToken)
-            ?? throw new InvalidOperationException("Creative Collection recipe was not persisted.");
-    }
-
-    public async Task<bool> DeleteAsync(
-        SmartCollectionId anchorCollectionId,
-        CancellationToken cancellationToken = default)
-    {
-        await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText =
-            "DELETE FROM creative_collection_recipes WHERE anchor_collection_id = $anchor_collection_id;";
-        command.Parameters.AddWithValue("$anchor_collection_id", anchorCollectionId.Value.ToString("D"));
-        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 
     private static CreativeCollectionRecipe ReadRecipe(SqliteDataReader reader)
     {
         CreativeCollectionRecipe recipe = new(
-            SmartCollectionId.From(Guid.Parse(reader.GetString(0))),
-            reader.GetInt32(1),
-            reader.GetInt32(2),
-            reader.GetString(3),
-            reader.GetString(4),
+            CreativeCollectionId.From(Guid.Parse(reader.GetString(0))),
+            reader.GetString(1),
+            SmartCollectionId.From(Guid.Parse(reader.GetString(2))),
+            reader.GetInt32(3),
+            reader.GetInt32(4),
             reader.GetString(5),
             reader.GetString(6),
-            reader.GetInt32(7) != 0,
-            DateTimeOffset.Parse(reader.GetString(8), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
-            DateTimeOffset.Parse(reader.GetString(9), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
+            reader.GetString(7),
+            reader.GetString(8),
+            reader.GetInt32(9) != 0,
+            DateTimeOffset.Parse(reader.GetString(10), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+            DateTimeOffset.Parse(reader.GetString(11), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
 
+        _ = CreativeCollectionName.Parse(recipe.Name);
         new CreativeCollectionRecipeSettings(
             recipe.TargetCount,
             recipe.MomentGapMinutes,
@@ -143,4 +292,19 @@ public sealed class SqliteCreativeCollectionRecipeRepository : ICreativeCollecti
             recipe.NoveltyEnabled).ValidateSupported();
         return recipe;
     }
+
+    private const string SelectColumns = """
+        SELECT id,
+               display_name,
+               anchor_collection_id,
+               target_count,
+               moment_gap_minutes,
+               moment_policy_version,
+               context_policy_version,
+               selection_policy_version,
+               ordering_policy_version,
+               novelty_enabled,
+               created_at_utc,
+               updated_at_utc
+        """;
 }
