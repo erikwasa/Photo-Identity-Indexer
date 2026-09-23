@@ -1,5 +1,6 @@
 using System.Globalization;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.People;
 using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Tags;
 
@@ -106,8 +107,7 @@ public sealed record SmartCollectionDateRange
             ValidateYear(fromYear);
             ValidateYear(toYear);
             return new SmartCollectionDateRange(
-                new DateOnly(fromYear, 1, 1),
-                new DateOnly(toYear, 12, 31));
+                new DateOnly(fromYear, 1, 1), new DateOnly(toYear, 12, 31));
         }
 
         if (text.Length == 21 && text[4] == '/' && text[7] == '/' && text[10] == '-' && text[15] == '/' && text[18] == '/')
@@ -142,6 +142,55 @@ public sealed record SmartCollectionDateRange
     }
 }
 
+public sealed record SmartCollectionAgeCriterion
+{
+    public SmartCollectionAgeCriterion(PersonId personId, int minimumYears, int maximumYears)
+    {
+        if (minimumYears is < 0 or > 130)
+        {
+            throw new ArgumentOutOfRangeException(nameof(minimumYears), "Minimum age must be between 0 and 130.");
+        }
+
+        if (maximumYears is < 0 or > 130)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumYears), "Maximum age must be between 0 and 130.");
+        }
+
+        if (minimumYears > maximumYears)
+        {
+            throw new ArgumentException("Minimum age cannot be greater than maximum age.");
+        }
+
+        PersonId = personId;
+        MinimumYears = minimumYears;
+        MaximumYears = maximumYears;
+    }
+
+    public PersonId PersonId { get; }
+    public int MinimumYears { get; }
+    public int MaximumYears { get; }
+}
+
+public sealed record SmartCollectionRelationshipCriterion
+{
+    public SmartCollectionRelationshipCriterion(PersonId personId, IEnumerable<string> kinds)
+    {
+        PersonId = personId;
+        Kinds = (kinds ?? [])
+            .Select(PersonRelationshipKinds.Normalize)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(value => value, StringComparer.Ordinal)
+            .ToArray();
+        if (Kinds.Count == 0)
+        {
+            throw new ArgumentException("At least one family relationship kind is required.", nameof(kinds));
+        }
+    }
+
+    public PersonId PersonId { get; }
+    public IReadOnlyList<string> Kinds { get; }
+}
+
 public sealed record SmartCollectionFilter
 {
     public const int MaximumLocationPlaces = 16;
@@ -154,7 +203,9 @@ public sealed record SmartCollectionFilter
         SmartCollectionGeoBounds? location = null,
         SmartCollectionDateRange? taken = null,
         string? locationPlace = null,
-        IEnumerable<string>? locationPlaces = null)
+        IEnumerable<string>? locationPlaces = null,
+        SmartCollectionAgeCriterion? age = null,
+        SmartCollectionRelationshipCriterion? relationship = null)
     {
         People = (people ?? []).Distinct().ToArray();
         if (People.Count > 100)
@@ -233,6 +284,8 @@ public sealed record SmartCollectionFilter
         LocationPlaces = NormalizeLocationPlaces(rawPlaces, nameof(locationPlaces));
         LocationPlace = LocationPlaces.Count == 1 ? LocationPlaces[0] : null;
         Taken = taken;
+        Age = age;
+        Relationship = relationship;
     }
 
     public IReadOnlyList<PersonId> People { get; }
@@ -246,6 +299,8 @@ public sealed record SmartCollectionFilter
     public string? LocationPlace { get; }
 
     public SmartCollectionDateRange? Taken { get; }
+    public SmartCollectionAgeCriterion? Age { get; }
+    public SmartCollectionRelationshipCriterion? Relationship { get; }
 
     private static IReadOnlyList<string> NormalizeLocationPlaces(
         IEnumerable<string> values,
