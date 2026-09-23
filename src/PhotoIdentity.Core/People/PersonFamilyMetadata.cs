@@ -36,7 +36,7 @@ public sealed record PersonBirthDate
         }
         else
         {
-            if (month is < 1 or > 12)
+            if (month is null || month is < 1 or > 12)
             {
                 throw new ArgumentOutOfRangeException(nameof(month), "Month- or day-precision birth metadata requires a month between 1 and 12.");
             }
