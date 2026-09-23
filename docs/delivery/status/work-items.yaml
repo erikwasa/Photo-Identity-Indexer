@@ -207,7 +207,7 @@ work_items:
   blockers:
   - WI-0121
   blocker_notes:
-  - Named Creative Collection persistence, lifecycle APIs, management UI, slideshow-library discovery and direct playback routing are implemented in PR #414; completion remains pending CI and maintainer desktop/phone verification.
+  - 'Named Creative Collection persistence, lifecycle APIs, management UI, slideshow-library discovery and direct playback routing are implemented in PR #414; completion remains pending CI and maintainer desktop/phone verification.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/414
