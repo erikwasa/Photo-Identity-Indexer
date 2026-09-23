@@ -54,7 +54,7 @@ Photo Identity makes common family-library corrections and curation tasks direct
 - [x] Smart Collection date filtering is structured and searches effective dates consistently.
 - [x] Smart Collections can match any of multiple selected Place hierarchies.
 - [x] Manual slideshow collections remain explicit revision lists rather than mutable Smart Collection results.
-- [ ] Explicit collections can be curated and launched through normal slideshow playback.
+- [x] Explicit collections can be curated and launched through normal slideshow playback.
 - [x] GPS-backed photos can retain useful country/administrative Place hierarchy when no populated-place match exists, without inventing locality precision.
 - [ ] Smart Collection Photo Details can traverse neighboring results without returning to the collection between photos.
 - [ ] Long Smart Collection result sets can be browsed with bounded infinite scrolling instead of explicit paging.
