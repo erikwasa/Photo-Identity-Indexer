@@ -91,13 +91,15 @@ public sealed record SmartCollectionSlideshowSnapshotResponse(
 
 public sealed record SmartCollectionErrorResponse(string Error);
 
-
 public sealed record CreativeCollectionRecipeRequest(
     int TargetCount = 50,
     string ContextStrength = "balanced",
-    bool NoveltyEnabled = false);
+    bool NoveltyEnabled = false,
+    string? Name = null);
 
 public sealed record CreativeCollectionRecipeResponse(
+    string Id,
+    string Name,
     string AnchorCollectionId,
     string AnchorCollectionName,
     int TargetCount,
