@@ -165,7 +165,7 @@ public static class PersonRelationshipKinds
         Grandchild => Grandparent,
         Spouse => Spouse,
         Sibling => Sibling,
-        _ => throw new UnreachableException(),
+        _ => throw new InvalidOperationException("Unsupported relationship kind."),
     };
 
     public static bool IsSymmetric(string value)
