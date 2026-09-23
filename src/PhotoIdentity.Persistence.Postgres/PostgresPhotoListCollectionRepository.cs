@@ -100,7 +100,7 @@ public sealed class PostgresPhotoListCollectionRepository : IPhotoListCollection
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = DefinitionSelect + """
+        command.CommandText = DefinitionSelect + "\n" + """
             GROUP BY
                 collection.id,
                 collection.display_name,
@@ -128,7 +128,7 @@ public sealed class PostgresPhotoListCollectionRepository : IPhotoListCollection
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = DefinitionSelect + """
+        command.CommandText = DefinitionSelect + "\n" + """
             WHERE collection.id = @id
             GROUP BY
                 collection.id,
