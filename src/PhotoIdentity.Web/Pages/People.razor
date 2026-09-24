@@ -8,7 +8,7 @@
     <div>
         <p class="eyebrow">Canonical identity maintenance</p>
         <h1>Maintain people</h1>
-        <p>Rename a person with reversible audit history, consolidate duplicates with an explicitly irreversible merge, inspect each person's representative portrait, keep frequently used people at the top of selectors, and control whether each person is offered in Smart Collection people selection.</p>
+        <p>Rename and merge identities, choose representative portraits, control Smart Collection visibility, and maintain optional birth dates and family relationships for age-aware family stories.</p>
     </div>
 
     <form class="person-creator" @onsubmit="CreatePersonAsync" @onsubmit:preventDefault>
@@ -122,7 +122,7 @@ else
         <section class="maintenance-card danger-zone">
             <p class="eyebrow">Irreversible operation</p>
             <h2>Merge duplicate people</h2>
-            <p>Labels, reviewed assignments and suggestions move to the surviving person. If either person is a favorite, the survivor remains a favorite. An existing featured photo on the survivor wins; otherwise a valid featured photo from the retired person carries over.</p>
+            <p>Labels, reviewed assignments and suggestions move to the surviving person. Family metadata follows the survivor deterministically: existing survivor birth metadata wins and relationships are rewired without self-links or duplicates.</p>
 
             <label class="field-label" for="merge-target">Surviving person</label>
             <select id="merge-target" @bind="MergeTargetId" disabled="@(MergeTargets.Count == 0)">
@@ -144,6 +144,116 @@ else
             </button>
         </section>
     </div>
+
+    <section class="audit-section">
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">Family story metadata</p>
+                <h2>Birth date and relationships</h2>
+            </div>
+            <span>Manual metadata only</span>
+        </div>
+
+        <div class="maintenance-grid">
+            <section class="maintenance-card">
+                <label class="field-label" for="family-person">Person</label>
+                <select id="family-person" value="@FamilyPersonId" @onchange="FamilyPersonChangedAsync">
+                    @foreach (PersonMaintenancePersonResponse person in ActivePeople)
+                    {
+                        <option value="@person.Id">@PersonSelectLabel(person)</option>
+                    }
+                </select>
+
+                <label class="field-label spaced" for="birth-precision">Known birth precision</label>
+                <select id="birth-precision" @bind="BirthPrecision" @bind:after="BirthPrecisionChanged">
+                    <option value="year">Year only</option>
+                    <option value="month">Year and month</option>
+                    <option value="day">Exact day</option>
+                </select>
+
+                <label class="field-label spaced" for="birth-year">Year</label>
+                <input id="birth-year" type="number" min="1" max="9999" @bind="BirthYear" />
+
+                @if (BirthPrecision is "month" or "day")
+                {
+                    <label class="field-label spaced" for="birth-month">Month</label>
+                    <input id="birth-month" type="number" min="1" max="12" @bind="BirthMonth" />
+                }
+
+                @if (BirthPrecision == "day")
+                {
+                    <label class="field-label spaced" for="birth-day">Day</label>
+                    <input id="birth-day" type="number" min="1" max="31" @bind="BirthDay" />
+                }
+
+                <div class="inline-field spaced">
+                    <button class="button primary"
+                            disabled="@(Busy || BirthYear is null)"
+                            @onclick="SaveBirthAsync">
+                        Save birth metadata
+                    </button>
+                    <button class="button secondary"
+                            disabled="@(Busy || FamilyMetadata?.BirthDate is null)"
+                            @onclick="ClearBirthAsync">
+                        Clear
+                    </button>
+                </div>
+            </section>
+
+            <section class="maintenance-card">
+                <h3>Add relationship</h3>
+                <p>Choose the relationship from <strong>@FamilyPersonName</strong>'s perspective. The inverse relationship is shown automatically for the other person.</p>
+
+                <label class="field-label" for="relationship-kind">Relationship</label>
+                <select id="relationship-kind" @bind="RelationshipKind">
+                    <option value="parent">Parent</option>
+                    <option value="child">Child</option>
+                    <option value="spouse">Spouse</option>
+                    <option value="sibling">Sibling</option>
+                    <option value="grandparent">Grandparent</option>
+                    <option value="grandchild">Grandchild</option>
+                </select>
+
+                <label class="field-label spaced" for="relationship-person">Related person</label>
+                <select id="relationship-person" @bind="RelationshipTargetId" disabled="@(FamilyRelationshipTargets.Count == 0)">
+                    @foreach (PersonMaintenancePersonResponse person in FamilyRelationshipTargets)
+                    {
+                        <option value="@person.Id">@PersonSelectLabel(person)</option>
+                    }
+                </select>
+
+                <button class="button primary full-width"
+                        disabled="@(Busy || string.IsNullOrWhiteSpace(RelationshipTargetId) || FamilyRelationshipTargets.Count == 0)"
+                        @onclick="AddRelationshipAsync">
+                    Add relationship
+                </button>
+
+                @if (FamilyMetadata?.Relationships.Length > 0)
+                {
+                    <ul class="timeline">
+                        @foreach (PersonFamilyRelationshipResponse relationship in FamilyMetadata.Relationships)
+                        {
+                            <li>
+                                <div>
+                                    <strong>@RelationshipLabel(relationship.Kind): @relationship.RelatedPersonDisplayName</strong>
+                                    <button type="button"
+                                            class="button secondary"
+                                            disabled="@Busy"
+                                            @onclick="() => RemoveRelationshipAsync(relationship.Id)">
+                                        Remove
+                                    </button>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <p>No family relationships recorded for this person.</p>
+                }
+            </section>
+        </div>
+    </section>
 
     <section class="audit-section person-history">
         <div class="section-heading">
@@ -188,11 +298,19 @@ else
 
     private IReadOnlyList<PersonMaintenancePersonResponse> ActivePeople { get; set; } = [];
     private IReadOnlyList<PersonMaintenanceActionResponse> History { get; set; } = [];
+    private PersonFamilyMetadataResponse? FamilyMetadata { get; set; }
     private string SelectedPersonId { get; set; } = "";
     private string RenameDisplayName { get; set; } = "";
     private string MergeTargetId { get; set; } = "";
     private string NewPersonName { get; set; } = "";
     private string Note { get; set; } = "";
+    private string FamilyPersonId { get; set; } = "";
+    private string BirthPrecision { get; set; } = "year";
+    private int? BirthYear { get; set; }
+    private int? BirthMonth { get; set; }
+    private int? BirthDay { get; set; }
+    private string RelationshipKind { get; set; } = "parent";
+    private string RelationshipTargetId { get; set; } = "";
     private bool ConfirmMerge { get; set; }
     private bool Loading { get; set; } = true;
     private bool Busy { get; set; }
@@ -205,8 +323,14 @@ else
     private IReadOnlyList<PersonMaintenancePersonResponse> MergeTargets =>
         ActivePeople.Where(person => person.Id != SelectedPersonId).ToArray();
 
+    private IReadOnlyList<PersonMaintenancePersonResponse> FamilyRelationshipTargets =>
+        ActivePeople.Where(person => person.Id != FamilyPersonId).ToArray();
+
     private string MergeTargetName =>
         MergeTargets.FirstOrDefault(person => person.Id == MergeTargetId)?.DisplayName ?? "selected person";
+
+    private string FamilyPersonName =>
+        ActivePeople.FirstOrDefault(person => person.Id == FamilyPersonId)?.DisplayName ?? "this person";
 
     protected override async Task OnInitializedAsync()
     {
@@ -230,6 +354,12 @@ else
             History = await Http.GetFromJsonAsync<PersonMaintenanceActionResponse[]>(
                 "api/review/people/maintenance/history?limit=100") ?? [];
             ResetSelection();
+            if (ActivePeople.All(person => person.Id != FamilyPersonId))
+            {
+                FamilyPersonId = ActivePeople.FirstOrDefault()?.Id ?? "";
+            }
+
+            await LoadFamilyAsync();
         }
         catch (Exception exception)
         {
@@ -256,6 +386,117 @@ else
         RenameDisplayName = SelectedPerson?.DisplayName ?? "";
         MergeTargetId = MergeTargets.FirstOrDefault()?.Id ?? "";
         ConfirmMerge = false;
+    }
+
+    private async Task FamilyPersonChangedAsync(ChangeEventArgs args)
+    {
+        FamilyPersonId = args.Value?.ToString() ?? "";
+        await LoadFamilyAsync();
+    }
+
+    private async Task LoadFamilyAsync()
+    {
+        FamilyMetadata = null;
+        BirthYear = null;
+        BirthMonth = null;
+        BirthDay = null;
+        BirthPrecision = "year";
+        RelationshipTargetId = FamilyRelationshipTargets.FirstOrDefault()?.Id ?? "";
+
+        if (string.IsNullOrWhiteSpace(FamilyPersonId))
+        {
+            return;
+        }
+
+        using HttpResponseMessage response = await Http.GetAsync(
+            $"api/review/people/{Uri.EscapeDataString(FamilyPersonId)}/family");
+        await RequireSuccessAsync(response);
+        FamilyMetadata = await response.Content.ReadFromJsonAsync<PersonFamilyMetadataResponse>();
+        if (FamilyMetadata?.BirthDate is PersonBirthDateResponse birth)
+        {
+            BirthYear = birth.Year;
+            BirthMonth = birth.Month;
+            BirthDay = birth.Day;
+            BirthPrecision = birth.Precision;
+        }
+    }
+
+    private void BirthPrecisionChanged()
+    {
+        if (BirthPrecision == "year")
+        {
+            BirthMonth = null;
+            BirthDay = null;
+        }
+        else if (BirthPrecision == "month")
+        {
+            BirthDay = null;
+        }
+    }
+
+    private async Task SaveBirthAsync()
+    {
+        if (BirthYear is null)
+        {
+            return;
+        }
+
+        await ApplyFamilyAsync(
+            () => Http.PutAsJsonAsync(
+                $"api/review/people/{Uri.EscapeDataString(FamilyPersonId)}/birth",
+                new SetPersonBirthDateRequest(BirthYear, BirthMonth, BirthDay, BirthPrecision, Actor)),
+            $"Saved birth metadata for {FamilyPersonName}.");
+    }
+
+    private async Task ClearBirthAsync()
+    {
+        await ApplyFamilyAsync(
+            () => Http.PutAsJsonAsync(
+                $"api/review/people/{Uri.EscapeDataString(FamilyPersonId)}/birth",
+                new SetPersonBirthDateRequest(null, null, null, null, Actor)),
+            $"Cleared birth metadata for {FamilyPersonName}.");
+    }
+
+    private async Task AddRelationshipAsync()
+    {
+        string relatedName = ActivePeople.FirstOrDefault(person => person.Id == RelationshipTargetId)?.DisplayName ?? "person";
+        await ApplyFamilyAsync(
+            () => Http.PostAsJsonAsync(
+                $"api/review/people/{Uri.EscapeDataString(FamilyPersonId)}/relationships",
+                new AddPersonFamilyRelationshipRequest(RelationshipTargetId, RelationshipKind, Actor)),
+            $"Added {RelationshipLabel(RelationshipKind).ToLowerInvariant()} relationship with {relatedName}.");
+    }
+
+    private async Task RemoveRelationshipAsync(long relationshipId)
+    {
+        await ApplyFamilyAsync(
+            () => Http.DeleteAsync(
+                $"api/review/people/{Uri.EscapeDataString(FamilyPersonId)}/relationships/{relationshipId}"),
+            "Removed family relationship.");
+    }
+
+    private async Task ApplyFamilyAsync(
+        Func<Task<HttpResponseMessage>> sendAsync,
+        string successMessage)
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await sendAsync();
+            await RequireSuccessAsync(response);
+            Message = successMessage;
+            await LoadFamilyAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
     }
 
     private async Task CreatePersonAsync()
@@ -354,6 +595,17 @@ else
 
     private static string PersonSelectLabel(PersonMaintenancePersonResponse person) =>
         person.IsFavorite ? $"{person.DisplayName} — Favorite" : person.DisplayName;
+
+    private static string RelationshipLabel(string kind) => kind switch
+    {
+        "parent" => "Parent",
+        "child" => "Child",
+        "spouse" => "Spouse",
+        "sibling" => "Sibling",
+        "grandparent" => "Grandparent",
+        "grandchild" => "Grandchild",
+        _ => kind,
+    };
 
     private static string ActionLabel(PersonMaintenanceActionResponse action) => action.Kind switch
     {

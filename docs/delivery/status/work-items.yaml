@@ -67,14 +67,17 @@ work_items:
 - id: WI-0125
   title: Add birth dates and family relationships for age-aware Creative Collections
   milestone: M26
-  status: proposed
-  owner: unassigned
+  status: in_progress
+  owner: ai-agent
   document: ../work-items/WI-0125-person-family-metadata.md
+  started_at: 2026-09-23
+  last_updated_at: 2026-09-23
+  branch: agent/WI-0125-person-family-metadata
   blockers:
   - WI-0121
   - WI-0060
   blocker_notes:
-  - Maintainer intentionally deferred this item on 2026-09-18; there is no technical dependency blocker, and it can be resumed when age/family-story metadata becomes a priority.
+  - Reactivated by the maintainer on 2026-09-23. Implementation is adding partial birth dates, explicit family relationships, deterministic age ranges, People maintenance UI, and Smart Collection age/relationship criteria for Creative Collection anchors.
   evidence: []
 - id: WI-0147
   title: Make PostgreSQL the unconditional runtime catalogue
@@ -197,3 +200,46 @@ work_items:
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/414
+- id: WI-0159
+  title: Keep Smart Collection context while navigating photos
+  milestone: M28
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0159-smart-collection-photo-navigation.md
+  blockers:
+  - WI-0146
+  blocker_notes: []
+  evidence: []
+- id: WI-0160
+  title: Replace Smart Collection paging with infinite scroll
+  milestone: M28
+  status: proposed
+  owner: unassigned
+  document: ../work-items/WI-0160-smart-collection-infinite-scroll.md
+  blockers:
+  - WI-0159
+  blocker_notes: []
+  evidence: []
+- id: WI-0161
+  title: Show compact effective Place labels on Smart Collection photos
+  milestone: M28
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0161-smart-collection-place-labels.md
+  blockers:
+  - WI-0144
+  - WI-0157
+  blocker_notes: []
+  evidence: []
+- id: WI-0162
+  title: Scale semantic photo search and create slideshow collections from caption search
+  milestone: M26
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0162-semantic-caption-search-slideshow-collections.md
+  blockers:
+  - WI-0127
+  - WI-0128
+  - WI-0145
+  blocker_notes: []
+  evidence: []

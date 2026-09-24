@@ -189,6 +189,37 @@ public sealed record PersonMaintenanceActionResponse(
     DateTimeOffset CreatedAtUtc,
     bool Reversible);
 
+public sealed record PersonBirthDateResponse(
+    int Year,
+    int? Month,
+    int? Day,
+    string Precision);
+
+public sealed record PersonFamilyRelationshipResponse(
+    long Id,
+    string RelatedPersonId,
+    string RelatedPersonDisplayName,
+    string Kind,
+    string Actor,
+    DateTimeOffset CreatedAtUtc);
+
+public sealed record PersonFamilyMetadataResponse(
+    string PersonId,
+    PersonBirthDateResponse? BirthDate,
+    PersonFamilyRelationshipResponse[] Relationships);
+
+public sealed record SetPersonBirthDateRequest(
+    int? Year,
+    int? Month,
+    int? Day,
+    string? Precision,
+    string Actor);
+
+public sealed record AddPersonFamilyRelationshipRequest(
+    string RelatedPersonId,
+    string Kind,
+    string Actor);
+
 public sealed record PersonAuditFaceResponse(
     string Id,
     string ImageUrl,

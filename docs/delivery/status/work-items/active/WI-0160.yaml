@@ -1,0 +1,10 @@
+id: WI-0160
+title: Replace Smart Collection paging with infinite scroll
+milestone: M28
+status: proposed
+owner: unassigned
+document: ../work-items/WI-0160-smart-collection-infinite-scroll.md
+blockers:
+- WI-0159
+blocker_notes: []
+evidence: []

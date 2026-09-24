@@ -264,6 +264,7 @@ milestones:
   - WI-0127
   - WI-0128
   - WI-0158
+  - WI-0162
 - id: M27
   title: Slideshow presentation experience
   status: completed
@@ -281,7 +282,7 @@ milestones:
   - WI-0139
 - id: M28
   title: Library curation and metadata editing
-  status: completed
+  status: ready
   document: ../milestones/M28-library-curation-metadata-editing.md
   work_items:
   - WI-0140
@@ -292,6 +293,9 @@ milestones:
   - WI-0145
   - WI-0146
   - WI-0157
+  - WI-0159
+  - WI-0160
+  - WI-0161
 - id: M29
   title: PostgreSQL-only catalogue cleanup
   status: ready
