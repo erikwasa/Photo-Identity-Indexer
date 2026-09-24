@@ -95,6 +95,28 @@ public sealed class SlideshowLibraryAcceptanceTests
     }
 
     [Fact]
+    public async Task Creative_library_launch_routes_named_identity_through_existing_creative_player()
+    {
+        List<string> events = [];
+        RecordingJsRuntime js = new(events);
+        RecordingNavigationManager navigation = new(events);
+        string creativeCollectionId = Guid.NewGuid().ToString("D");
+
+        string? notice = await SlideshowLibraryLaunch.RequestFullscreenAndNavigateAsync(
+            js,
+            navigation,
+            creativeCollectionId,
+            "/slideshows",
+            creative: true);
+
+        Assert.Null(notice);
+        Assert.Equal(new[] { "fullscreen", "navigate" }, events);
+        Assert.Equal(
+            $"/slideshow/{creativeCollectionId}?return=%2Fslideshows&creative=true",
+            navigation.LastRelativeUri);
+    }
+
+    [Fact]
     public void Prepared_receipt_is_path_free_and_matches_the_same_revision_set_only()
     {
         string first = Guid.NewGuid().ToString("D");

@@ -22,7 +22,7 @@ Current work items: **17**. Archived terminal items: **140**.
 | [WI-0154](../work-items/WI-0154-video-slideshow-playback.md) Integrate video clips into slideshow playback | M30 | proposed | unassigned | [YAML](work-items/active/WI-0154.yaml) |
 | [WI-0155](../work-items/WI-0155-video-face-processing-evaluation.md) Evaluate face discovery and identity processing inside video | M30 | proposed | unassigned | [YAML](work-items/active/WI-0155.yaml) |
 | [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) Evaluate iPhone Live Photo pairing as one logical media experience | M30 | proposed | unassigned | [YAML](work-items/active/WI-0156.yaml) |
-| [WI-0158](../work-items/WI-0158-named-creative-collections-slideshow-library.md) Make named Creative Collections first-class slideshow library entries | M26 | ready | unassigned | [YAML](work-items/active/WI-0158.yaml) |
+| [WI-0158](../work-items/WI-0158-named-creative-collections-slideshow-library.md) Make named Creative Collections first-class slideshow library entries | M26 | in_progress | ai-agent | [YAML](work-items/active/WI-0158.yaml) |
 
 Historical items stay queryable without opening the archive directory:
 

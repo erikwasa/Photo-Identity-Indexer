@@ -1,0 +1,477 @@
+@page "/creative-collections"
+@using System.Net
+@using System.Net.Http.Json
+@using PhotoIdentity.Web.Contracts
+@inject HttpClient Http
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<PageTitle>Creative Collections · Photo Identity</PageTitle>
+
+<section class="smart-workspace" aria-labelledby="creative-collections-heading">
+    <div class="smart-workspace-heading">
+        <div>
+            <p class="eyebrow">Creative Collections</p>
+            <h2 id="creative-collections-heading">Named creative slideshows</h2>
+            <p>Create several independent Creative Collections from the same Smart Collection and tune each recipe separately.</p>
+        </div>
+        <a class="button secondary" href="/slideshows">View slideshows</a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="notice error" role="alert">@Error</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(Notice))
+    {
+        <div class="notice" role="status">@Notice</div>
+    }
+
+    @if (Loading)
+    {
+        <div class="smart-loading" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <span>Loading Creative Collections…</span>
+        </div>
+    }
+    else if (SmartCollections.Count == 0)
+    {
+        <div class="empty-state compact">
+            <p>Create a Smart Collection first. Creative Collections always keep a Smart Collection as their exact anchor.</p>
+            <a class="button primary" href="/smart-collections">Open Smart Collections</a>
+        </div>
+    }
+    else
+    {
+        <div class="smart-layout">
+            <aside class="smart-saved-list" aria-label="Creative Collection source and saved variants">
+                <div class="smart-subheading">
+                    <strong>Source Smart Collection</strong>
+                </div>
+                <label class="smart-field">
+                    <span class="field-label">Anchor</span>
+                    <select value="@SelectedAnchorId" @onchange="ChangeAnchorAsync" disabled="@Busy">
+                        @foreach (SmartCollectionDefinitionResponse collection in SmartCollections)
+                        {
+                            <option value="@collection.Id">@collection.Name</option>
+                        }
+                    </select>
+                </label>
+
+                <div class="smart-subheading">
+                    <strong>Saved Creative Collections</strong>
+                    <span>@AnchorRecipes.Count</span>
+                </div>
+                <button type="button" class="button secondary" disabled="@Busy" @onclick="NewRecipe">
+                    New Creative Collection
+                </button>
+
+                @if (AnchorRecipes.Count == 0)
+                {
+                    <p class="smart-muted">No Creative Collections use this anchor yet.</p>
+                }
+                else
+                {
+                    @foreach (CreativeCollectionRecipeResponse recipe in AnchorRecipes)
+                    {
+                        <article class="smart-saved-card @(SelectedRecipeId == recipe.Id ? "selected" : "")">
+                            <button type="button"
+                                    class="smart-open-button"
+                                    disabled="@Busy"
+                                    @onclick="() => SelectRecipe(recipe)">
+                                <strong>@recipe.Name</strong>
+                                <span>@recipe.TargetCount photos · @recipe.ContextStrength context</span>
+                                <span>Freshness @(recipe.NoveltyEnabled ? "on" : "off")</span>
+                            </button>
+                        </article>
+                    }
+                }
+            </aside>
+
+            <div class="smart-editor">
+                <div class="smart-subheading">
+                    <strong>@(SelectedRecipeId is null ? "New Creative Collection" : "Edit Creative Collection")</strong>
+                    <span>Anchor: @SelectedAnchorName</span>
+                </div>
+
+                <label class="smart-field">
+                    <span class="field-label">Creative Collection name</span>
+                    <input type="text"
+                           maxlength="120"
+                           @bind="RecipeName"
+                           @bind:after="ClearPreview"
+                           disabled="@Busy" />
+                </label>
+
+                <div class="creative-controls">
+                    <label class="smart-field">
+                        <span class="field-label">Target photos</span>
+                        <input type="number"
+                               min="1"
+                               max="1000"
+                               inputmode="numeric"
+                               @bind="TargetCount"
+                               @bind:after="ClearPreview"
+                               disabled="@Busy" />
+                    </label>
+
+                    <label class="smart-field">
+                        <span class="field-label">Context</span>
+                        <select @bind="ContextStrength" @bind:after="ClearPreview" disabled="@Busy">
+                            <option value="focused">Focused</option>
+                            <option value="balanced">Balanced</option>
+                            <option value="broad">Broad</option>
+                        </select>
+                    </label>
+
+                    <label class="smart-location-toggle">
+                        <input type="checkbox"
+                               @bind="NoveltyEnabled"
+                               @bind:after="ClearPreview"
+                               disabled="@Busy" />
+                        <span>Favor photos not shown recently</span>
+                    </label>
+                </div>
+
+                <p class="smart-help">
+                    Each named Creative Collection owns these settings independently. The source Smart Collection remains unchanged and supplies the exact anchor photos.
+                </p>
+
+                <div class="smart-actions">
+                    <button type="button" class="button secondary" disabled="@Busy" @onclick="PreviewAsync">
+                        Preview current recipe
+                    </button>
+                    <button type="button" class="button secondary" disabled="@Busy" @onclick="SaveAsync">
+                        Save Creative Collection
+                    </button>
+                    <button type="button" class="button primary" disabled="@Busy" @onclick="SaveAndStartAsync">
+                        Save &amp; start slideshow
+                    </button>
+                    @if (SelectedRecipeId is not null)
+                    {
+                        <button type="button" class="button secondary" disabled="@Busy" @onclick="DeleteAsync">
+                            Delete Creative Collection
+                        </button>
+                    }
+                </div>
+
+                @if (Preview is CreativeCollectionPreviewResponse preview)
+                {
+                    <div class="creative-summary" aria-label="Creative Collection preview counts">
+                        <div class="creative-stat"><strong>@preview.DirectAnchorCount</strong><span>anchors</span></div>
+                        <div class="creative-stat"><strong>+@preview.AddedContextCount</strong><span>context</span></div>
+                        <div class="creative-stat"><strong>@preview.SelectedCount</strong><span>selected</span></div>
+                        <div class="creative-stat"><strong>@preview.RepresentedMomentCount</strong><span>moments</span></div>
+                    </div>
+
+                    @if (preview.NoAnchors)
+                    {
+                        <div class="empty-state compact">
+                            <p>No photos currently match the anchor Smart Collection.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="creative-preview-grid" aria-label="Creative Collection selected photos">
+                            @foreach (CreativeCollectionSelectedCandidateResponse photo in preview.SelectedCandidates.Take(60))
+                            {
+                                <article class="creative-preview-card">
+                                    <img src="@photo.ThumbnailUrl"
+                                         alt="Creative Collection selected photo"
+                                         loading="lazy"
+                                         decoding="async" />
+                                    <div>
+                                        <span class="creative-kind @(photo.Kind == "direct-anchor" ? "anchor" : "context")">
+                                            @(photo.Kind == "direct-anchor" ? "Anchor" : "Context")
+                                        </span>
+                                        <strong>@(photo.TakenAtLocal?.ToString("yyyy-MM-dd") ?? "Date unavailable")</strong>
+                                    </div>
+                                </article>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<SmartCollectionDefinitionResponse> SmartCollections { get; set; } = [];
+    private IReadOnlyList<CreativeCollectionRecipeResponse> Recipes { get; set; } = [];
+    private CreativeCollectionPreviewResponse? Preview { get; set; }
+    private string? SelectedAnchorId { get; set; }
+    private string? SelectedRecipeId { get; set; }
+    private string RecipeName { get; set; } = string.Empty;
+    private int TargetCount { get; set; } = 50;
+    private string ContextStrength { get; set; } = "balanced";
+    private bool NoveltyEnabled { get; set; }
+    private bool Loading { get; set; } = true;
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+    private string? Notice { get; set; }
+
+    private IReadOnlyList<CreativeCollectionRecipeResponse> AnchorRecipes => Recipes
+        .Where(recipe => string.Equals(recipe.AnchorCollectionId, SelectedAnchorId, StringComparison.Ordinal))
+        .OrderBy(recipe => recipe.Name, StringComparer.OrdinalIgnoreCase)
+        .ThenBy(recipe => recipe.Id, StringComparer.Ordinal)
+        .ToArray();
+
+    private string SelectedAnchorName => SmartCollections
+        .FirstOrDefault(collection => string.Equals(collection.Id, SelectedAnchorId, StringComparison.Ordinal))?.Name
+        ?? "Smart Collection";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await ReloadAsync();
+            SelectedAnchorId = SmartCollections.FirstOrDefault()?.Id;
+            NewRecipe();
+        }
+        catch (Exception exception)
+        {
+            Error = $"Creative Collections could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task ReloadAsync()
+    {
+        SmartCollectionDefinitionResponse[] smart =
+            await Http.GetFromJsonAsync<SmartCollectionDefinitionResponse[]>("api/smart-collections") ?? [];
+        CreativeCollectionRecipeResponse[] creative =
+            await Http.GetFromJsonAsync<CreativeCollectionRecipeResponse[]>("api/creative-collections") ?? [];
+        SmartCollections = smart
+            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.Id, StringComparer.Ordinal)
+            .ToArray();
+        Recipes = creative;
+    }
+
+    private Task ChangeAnchorAsync(ChangeEventArgs args)
+    {
+        SelectedAnchorId = args.Value?.ToString();
+        NewRecipe();
+        return Task.CompletedTask;
+    }
+
+    private void NewRecipe()
+    {
+        SelectedRecipeId = null;
+        RecipeName = $"{SelectedAnchorName} Creative";
+        if (RecipeName.Length > 120)
+        {
+            RecipeName = RecipeName[..120];
+        }
+        TargetCount = 50;
+        ContextStrength = "balanced";
+        NoveltyEnabled = false;
+        Preview = null;
+        Error = null;
+        Notice = null;
+    }
+
+    private void SelectRecipe(CreativeCollectionRecipeResponse recipe)
+    {
+        SelectedAnchorId = recipe.AnchorCollectionId;
+        SelectedRecipeId = recipe.Id;
+        RecipeName = recipe.Name;
+        TargetCount = recipe.TargetCount;
+        ContextStrength = recipe.ContextStrength;
+        NoveltyEnabled = recipe.NoveltyEnabled;
+        Preview = null;
+        Error = null;
+        Notice = null;
+    }
+
+    private bool Validate()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedAnchorId))
+        {
+            Error = "Choose a source Smart Collection.";
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(RecipeName))
+        {
+            Error = "Creative Collection name is required.";
+            return false;
+        }
+        if (TargetCount is < 1 or > 1000)
+        {
+            Error = "Target photos must be between 1 and 1000.";
+            return false;
+        }
+        if (ContextStrength is not ("focused" or "balanced" or "broad"))
+        {
+            Error = "Context must be Focused, Balanced or Broad.";
+            return false;
+        }
+        return true;
+    }
+
+    private async Task PreviewAsync()
+    {
+        if (!Validate())
+        {
+            return;
+        }
+        Busy = true;
+        Error = null;
+        Notice = null;
+        try
+        {
+            string strength = Uri.EscapeDataString(ContextStrength);
+            Preview = await Http.GetFromJsonAsync<CreativeCollectionPreviewResponse>(
+                $"api/smart-collections/{Uri.EscapeDataString(SelectedAnchorId!)}/creative-preview?targetCount={TargetCount}&momentGapMinutes=30&contextStrength={strength}&novelty={NoveltyEnabled.ToString().ToLowerInvariant()}");
+        }
+        catch (Exception exception)
+        {
+            Error = $"The Creative Collection preview could not be generated: {exception.Message}";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task<CreativeCollectionRecipeResponse?> SaveCoreAsync()
+    {
+        if (!Validate())
+        {
+            return null;
+        }
+
+        CreativeCollectionRecipeRequest request = new(TargetCount, ContextStrength, NoveltyEnabled, RecipeName.Trim());
+        using HttpResponseMessage response = SelectedRecipeId is null
+            ? await Http.PostAsJsonAsync(
+                $"api/smart-collections/{Uri.EscapeDataString(SelectedAnchorId!)}/creative-collections",
+                request)
+            : await Http.PutAsJsonAsync(
+                $"api/creative-collections/{Uri.EscapeDataString(SelectedRecipeId)}",
+                request);
+        if (!response.IsSuccessStatusCode)
+        {
+            Error = await ReadErrorAsync(response, "The Creative Collection could not be saved.");
+            return null;
+        }
+
+        CreativeCollectionRecipeResponse saved =
+            await response.Content.ReadFromJsonAsync<CreativeCollectionRecipeResponse>()
+            ?? throw new InvalidOperationException("The saved Creative Collection response was empty.");
+        SelectedRecipeId = saved.Id;
+        RecipeName = saved.Name;
+        TargetCount = saved.TargetCount;
+        ContextStrength = saved.ContextStrength;
+        NoveltyEnabled = saved.NoveltyEnabled;
+        await ReloadAsync();
+        return saved;
+    }
+
+    private async Task SaveAsync()
+    {
+        Busy = true;
+        Error = null;
+        Notice = null;
+        try
+        {
+            CreativeCollectionRecipeResponse? saved = await SaveCoreAsync();
+            if (saved is not null)
+            {
+                Notice = $"Creative Collection '{saved.Name}' saved.";
+            }
+        }
+        catch (Exception exception)
+        {
+            Error = $"The Creative Collection could not be saved: {exception.Message}";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task SaveAndStartAsync()
+    {
+        Busy = true;
+        Error = null;
+        Notice = null;
+        try
+        {
+            CreativeCollectionRecipeResponse? saved = await SaveCoreAsync();
+            if (saved is null)
+            {
+                return;
+            }
+
+            _ = await SlideshowLibraryLaunch.RequestFullscreenAndNavigateAsync(
+                JS,
+                Navigation,
+                saved.Id,
+                "/creative-collections",
+                creative: true);
+        }
+        catch (Exception exception)
+        {
+            Error = $"The Creative Collection could not be started: {exception.Message}";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (SelectedRecipeId is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        Notice = null;
+        string deletedName = RecipeName;
+        try
+        {
+            using HttpResponseMessage response = await Http.DeleteAsync(
+                $"api/creative-collections/{Uri.EscapeDataString(SelectedRecipeId)}");
+            if (response.StatusCode != HttpStatusCode.NoContent)
+            {
+                Error = await ReadErrorAsync(response, "The Creative Collection could not be deleted.");
+                return;
+            }
+
+            await ReloadAsync();
+            NewRecipe();
+            Notice = $"Deleted {deletedName}.";
+        }
+        catch (Exception exception)
+        {
+            Error = $"The Creative Collection could not be deleted: {exception.Message}";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private void ClearPreview() => Preview = null;
+
+    private static async Task<string> ReadErrorAsync(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            SmartCollectionErrorResponse? payload =
+                await response.Content.ReadFromJsonAsync<SmartCollectionErrorResponse>();
+            return string.IsNullOrWhiteSpace(payload?.Error) ? fallback : payload.Error;
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+}
