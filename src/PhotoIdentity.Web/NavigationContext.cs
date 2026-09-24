@@ -73,19 +73,11 @@ public static class SmartCollectionNavigation
         };
     }
 
-    public static string BuildPhotoUrl(string revisionId, string returnUrl, int? resultIndex = null)
+    public static string BuildPhotoUrl(string revisionId, string returnUrl)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(revisionId);
         ArgumentException.ThrowIfNullOrWhiteSpace(returnUrl);
-        if (resultIndex is < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(resultIndex));
-        }
-
-        string url = $"/photo/{Uri.EscapeDataString(revisionId)}?returnUrl={Uri.EscapeDataString(returnUrl)}";
-        return resultIndex is int index
-            ? $"{url}&smartIndex={index.ToString(CultureInfo.InvariantCulture)}"
-            : url;
+        return $"/photo/{Uri.EscapeDataString(revisionId)}?returnUrl={Uri.EscapeDataString(returnUrl)}";
     }
 
     public static int PageOffsetForIndex(int index, int pageSize = ResultPageSize)
@@ -93,6 +85,46 @@ public static class SmartCollectionNavigation
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
         return index / pageSize * pageSize;
+    }
+
+    public static bool TryParsePhotoUrl(
+        string url,
+        out string? revisionId,
+        out string? returnUrl)
+    {
+        revisionId = null;
+        returnUrl = null;
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return false;
+        }
+
+        Uri parsed;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out parsed!))
+        {
+            if (!Uri.TryCreate(new Uri("https://photoidentity.local"), url, out parsed!))
+            {
+                return false;
+            }
+        }
+
+        const string photoPrefix = "/photo/";
+        if (!parsed.AbsolutePath.StartsWith(photoPrefix, StringComparison.Ordinal) ||
+            parsed.AbsolutePath.Length <= photoPrefix.Length)
+        {
+            return false;
+        }
+
+        string rawRevisionId = parsed.AbsolutePath[photoPrefix.Length..];
+        if (rawRevisionId.Contains('/'))
+        {
+            return false;
+        }
+
+        revisionId = Uri.UnescapeDataString(rawRevisionId);
+        Dictionary<string, string> query = ParseQuery(parsed.PathAndQuery);
+        query.TryGetValue("returnUrl", out returnUrl);
+        return !string.IsNullOrWhiteSpace(revisionId) && !string.IsNullOrWhiteSpace(returnUrl);
     }
 
     public static bool TryParseWorkspaceContext(
