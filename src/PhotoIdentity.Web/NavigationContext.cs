@@ -99,10 +99,10 @@ public static class SmartCollectionNavigation
             return false;
         }
 
-        Uri parsed;
-        if (!Uri.TryCreate(url, UriKind.Absolute, out parsed!))
+        Uri? parsed;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out parsed))
         {
-            if (!Uri.TryCreate(new Uri("https://photoidentity.local"), url, out parsed!))
+            if (!Uri.TryCreate(new Uri("https://photoidentity.local"), url, out parsed))
             {
                 return false;
             }
