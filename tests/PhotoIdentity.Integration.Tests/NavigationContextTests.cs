@@ -78,10 +78,10 @@ public sealed class NavigationContextTests
         Assert.Equal(state.Tags, request.Tags);
         Assert.Equal(state.TagMatch, request.TagMatch);
         Assert.NotNull(request.Location);
-        Assert.Equal(59, request.Location.South);
-        Assert.Equal(17, request.Location.West);
-        Assert.Equal(60, request.Location.North);
-        Assert.Equal(18, request.Location.East);
+        Assert.Equal(59d, request.Location.South!.Value);
+        Assert.Equal(17d, request.Location.West!.Value);
+        Assert.Equal(60d, request.Location.North!.Value);
+        Assert.Equal(18d, request.Location.East!.Value);
         Assert.Equal(state.Places, request.Location.Places);
         Assert.Equal("2025-05-01", request.TakenRange?.From);
         Assert.Equal("2025-05-10", request.TakenRange?.To);
