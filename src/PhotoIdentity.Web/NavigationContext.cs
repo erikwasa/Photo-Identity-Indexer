@@ -26,14 +26,19 @@ public sealed record SmartCollectionTransientNavigationState(
     string? TakenTo = null,
     string[]? Places = null,
     SmartCollectionAgeRequest? Age = null,
-    SmartCollectionRelationshipRequest? Relationship = null,
-    SmartCollectionQueryRequest? NavigationQuery = null);
+    SmartCollectionRelationshipRequest? Relationship = null);
 
 public sealed record SmartCollectionWorkspaceContext(
     string Mode,
     string? CollectionId,
     string? PreviewKey,
     int Offset);
+
+public sealed record SmartCollectionPhotoNavigationResolution(
+    int Index,
+    int Total,
+    string? PreviousRevisionId,
+    string? NextRevisionId);
 
 public static class SmartCollectionNavigation
 {
@@ -137,6 +142,136 @@ public static class SmartCollectionNavigation
         return false;
     }
 
+    public static bool TryBuildTransientQuery(
+        SmartCollectionTransientNavigationState state,
+        int offset,
+        int limit,
+        out SmartCollectionQueryRequest? request)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        request = null;
+        if (offset < 0 || limit is < 1 or > 200)
+        {
+            return false;
+        }
+
+        string[] places = state.Places ??
+            (string.IsNullOrWhiteSpace(state.Place) ? [] : [state.Place!]);
+        SmartCollectionLocationRequest? location;
+        if (state.UseLocation)
+        {
+            if (!TryCoordinate(state.South, -90, 90, out double south) ||
+                !TryCoordinate(state.West, -180, 180, out double west) ||
+                !TryCoordinate(state.North, -90, 90, out double north) ||
+                !TryCoordinate(state.East, -180, 180, out double east) ||
+                south > north || west > east)
+            {
+                return false;
+            }
+
+            location = new SmartCollectionLocationRequest(
+                south,
+                west,
+                north,
+                east,
+                Place: null,
+                Places: places);
+        }
+        else
+        {
+            location = places.Length == 0
+                ? null
+                : new SmartCollectionLocationRequest(Places: places);
+        }
+
+        SmartCollectionDateEditorState takenState = string.IsNullOrWhiteSpace(state.TakenMode)
+            ? SmartCollectionDateEditorModel.FromLegacyExpression(state.Taken)
+            : new SmartCollectionDateEditorState(
+                state.TakenMode!,
+                state.TakenYear ?? string.Empty,
+                state.TakenMonth ?? string.Empty,
+                state.TakenDate ?? string.Empty,
+                state.TakenFrom ?? string.Empty,
+                state.TakenTo ?? string.Empty);
+        if (!SmartCollectionDateEditorModel.TryBuildRange(
+                takenState.Mode,
+                takenState.Year,
+                takenState.Month,
+                takenState.Date,
+                takenState.From,
+                takenState.To,
+                out SmartCollectionDateRangeRequest? takenRange,
+                out _))
+        {
+            return false;
+        }
+
+        request = new SmartCollectionQueryRequest(
+            state.People,
+            state.PeopleMatch,
+            state.Tags,
+            state.TagMatch,
+            location,
+            Taken: null,
+            Offset: offset,
+            Limit: limit,
+            TakenRange: takenRange,
+            Age: state.Age,
+            Relationship: state.Relationship);
+        return true;
+    }
+
+    public static bool TryResolvePhotoNavigation(
+        SmartCollectionPageResponse page,
+        string revisionId,
+        int expectedIndex,
+        out SmartCollectionPhotoNavigationResolution? navigation)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        ArgumentException.ThrowIfNullOrWhiteSpace(revisionId);
+        navigation = null;
+        if (expectedIndex < 0 || expectedIndex >= page.Total)
+        {
+            return false;
+        }
+
+        int localIndex = expectedIndex - page.Offset;
+        if (localIndex < 0 || localIndex >= page.Items.Length ||
+            !string.Equals(page.Items[localIndex].RevisionId, revisionId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        string? previous = null;
+        if (expectedIndex > 0)
+        {
+            if (localIndex == 0)
+            {
+                return false;
+            }
+
+            previous = page.Items[localIndex - 1].RevisionId;
+        }
+
+        string? next = null;
+        if (expectedIndex + 1 < page.Total)
+        {
+            if (localIndex + 1 >= page.Items.Length)
+            {
+                return false;
+            }
+
+            next = page.Items[localIndex + 1].RevisionId;
+        }
+
+        navigation = new SmartCollectionPhotoNavigationResolution(
+            expectedIndex,
+            page.Total,
+            previous,
+            next);
+        return true;
+    }
+
     public static string PreviewStorageKey(string previewKey)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(previewKey);
@@ -154,6 +289,12 @@ public static class SmartCollectionNavigation
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
         return JsonSerializer.Deserialize<SmartCollectionTransientNavigationState>(json, NavigationJsonOptions);
     }
+
+    private static bool TryCoordinate(string value, double minimum, double maximum, out double parsed) =>
+        double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out parsed) &&
+        double.IsFinite(parsed) &&
+        parsed >= minimum &&
+        parsed <= maximum;
 
     private static Dictionary<string, string> ParseQuery(string url)
     {
