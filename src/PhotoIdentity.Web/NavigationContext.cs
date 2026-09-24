@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using PhotoIdentity.Web.Contracts;
 
@@ -25,10 +26,19 @@ public sealed record SmartCollectionTransientNavigationState(
     string? TakenTo = null,
     string[]? Places = null,
     SmartCollectionAgeRequest? Age = null,
-    SmartCollectionRelationshipRequest? Relationship = null);
+    SmartCollectionRelationshipRequest? Relationship = null,
+    SmartCollectionQueryRequest? NavigationQuery = null);
+
+public sealed record SmartCollectionWorkspaceContext(
+    string Mode,
+    string? CollectionId,
+    string? PreviewKey,
+    int Offset);
 
 public static class SmartCollectionNavigation
 {
+    public const int ResultPageSize = 40;
+
     private const string WorkspaceRoot = "/smart-collections";
     private const string PreviewStoragePrefix = "photo-identity.smart-collections.preview.";
     private static readonly JsonSerializerOptions NavigationJsonOptions = new(JsonSerializerDefaults.Web);
@@ -45,11 +55,86 @@ public static class SmartCollectionNavigation
         return $"{WorkspaceRoot}?mode=transient&preview={Uri.EscapeDataString(previewKey)}&offset={Math.Max(0, offset)}";
     }
 
-    public static string BuildPhotoUrl(string revisionId, string returnUrl)
+    public static string BuildWorkspaceUrl(SmartCollectionWorkspaceContext context, int offset)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return context.Mode switch
+        {
+            "saved" when !string.IsNullOrWhiteSpace(context.CollectionId) =>
+                BuildSavedWorkspaceUrl(context.CollectionId, offset),
+            "transient" when !string.IsNullOrWhiteSpace(context.PreviewKey) =>
+                BuildTransientWorkspaceUrl(context.PreviewKey, offset),
+            _ => throw new ArgumentException("Smart Collection workspace context is incomplete.", nameof(context)),
+        };
+    }
+
+    public static string BuildPhotoUrl(string revisionId, string returnUrl, int? resultIndex = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(revisionId);
         ArgumentException.ThrowIfNullOrWhiteSpace(returnUrl);
-        return $"/photo/{Uri.EscapeDataString(revisionId)}?returnUrl={Uri.EscapeDataString(returnUrl)}";
+        if (resultIndex is < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(resultIndex));
+        }
+
+        string url = $"/photo/{Uri.EscapeDataString(revisionId)}?returnUrl={Uri.EscapeDataString(returnUrl)}";
+        return resultIndex is int index
+            ? $"{url}&smartIndex={index.ToString(CultureInfo.InvariantCulture)}"
+            : url;
+    }
+
+    public static int PageOffsetForIndex(int index, int pageSize = ResultPageSize)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
+        return index / pageSize * pageSize;
+    }
+
+    public static bool TryParseWorkspaceContext(
+        string? normalizedReturnUrl,
+        out SmartCollectionWorkspaceContext? context)
+    {
+        context = null;
+        if (!PhotoReturnContext.IsSmartCollectionsReturn(normalizedReturnUrl))
+        {
+            return false;
+        }
+
+        Dictionary<string, string> query = ParseQuery(normalizedReturnUrl!);
+        query.TryGetValue("mode", out string? mode);
+        query.TryGetValue("offset", out string? offsetText);
+        if (!int.TryParse(offsetText, NumberStyles.None, CultureInfo.InvariantCulture, out int offset) || offset < 0)
+        {
+            return false;
+        }
+
+        if (string.Equals(mode, "saved", StringComparison.OrdinalIgnoreCase) &&
+            query.TryGetValue("collection", out string? collectionId) &&
+            Guid.TryParse(collectionId, out Guid parsedCollectionId) &&
+            parsedCollectionId != Guid.Empty)
+        {
+            context = new SmartCollectionWorkspaceContext(
+                "saved",
+                collectionId,
+                null,
+                offset);
+            return true;
+        }
+
+        if (string.Equals(mode, "transient", StringComparison.OrdinalIgnoreCase) &&
+            query.TryGetValue("preview", out string? previewKey) &&
+            previewKey.Length == 32 &&
+            Guid.TryParseExact(previewKey, "N", out _))
+        {
+            context = new SmartCollectionWorkspaceContext(
+                "transient",
+                null,
+                previewKey,
+                offset);
+            return true;
+        }
+
+        return false;
     }
 
     public static string PreviewStorageKey(string previewKey)
@@ -68,6 +153,32 @@ public static class SmartCollectionNavigation
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
         return JsonSerializer.Deserialize<SmartCollectionTransientNavigationState>(json, NavigationJsonOptions);
+    }
+
+    private static Dictionary<string, string> ParseQuery(string url)
+    {
+        Dictionary<string, string> values = new(StringComparer.OrdinalIgnoreCase);
+        int question = url.IndexOf('?');
+        if (question < 0 || question == url.Length - 1)
+        {
+            return values;
+        }
+
+        int fragment = url.IndexOf('#', question + 1);
+        string query = fragment < 0
+            ? url[(question + 1)..]
+            : url[(question + 1)..fragment];
+        foreach (string pair in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int equals = pair.IndexOf('=');
+            string rawKey = equals < 0 ? pair : pair[..equals];
+            string rawValue = equals < 0 ? string.Empty : pair[(equals + 1)..];
+            string key = Uri.UnescapeDataString(rawKey.Replace("+", " ", StringComparison.Ordinal));
+            string value = Uri.UnescapeDataString(rawValue.Replace("+", " ", StringComparison.Ordinal));
+            values[key] = value;
+        }
+
+        return values;
     }
 }
 
