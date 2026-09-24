@@ -1,4 +1,5 @@
 using System.Text.Json;
+using PhotoIdentity.Web.Contracts;
 
 namespace PhotoIdentity.Web;
 
@@ -22,7 +23,9 @@ public sealed record SmartCollectionTransientNavigationState(
     string? TakenDate = null,
     string? TakenFrom = null,
     string? TakenTo = null,
-    string[]? Places = null);
+    string[]? Places = null,
+    SmartCollectionAgeRequest? Age = null,
+    SmartCollectionRelationshipRequest? Relationship = null);
 
 public static class SmartCollectionNavigation
 {
