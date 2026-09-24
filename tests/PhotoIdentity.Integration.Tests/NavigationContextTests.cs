@@ -73,7 +73,9 @@ public sealed class NavigationContextTests
         Assert.Equal("2025-05-10", restored.TakenTo);
         Assert.Equal(state.Places, restored.Places);
         Assert.Equal(state.Age, restored.Age);
-        Assert.Equal(state.Relationship, restored.Relationship);
+        Assert.NotNull(restored.Relationship);
+        Assert.Equal(state.Relationship!.PersonId, restored.Relationship.PersonId);
+        Assert.Equal(state.Relationship.Kinds, restored.Relationship.Kinds);
     }
 
     [Fact]
