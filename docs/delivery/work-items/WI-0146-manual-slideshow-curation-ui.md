@@ -48,5 +48,6 @@ Automated integration tests plus maintainer desktop/phone curation and playback 
 
 - Files changed: Photo Details manual-slideshow picker, manual collection review/reorder page, slideshow library integration, manual playback routing, library cover handling, Web contracts, focused integration tests, and delivery tracking.
 - Trade-offs: curation remains intentionally lightweight. New collections start with the current Photo Details revision, adding from other photos appends deterministically, and the review page offers remove plus one-step move up/down rather than a complex playlist editor. Manual collections reuse the existing slideshow snapshot/playback/original-preparation pipeline but skip Smart Collection exposure writes because their IDs live in a separate aggregate.
-- Verification: implementation merged in PR #410. Its code/build/integration/package portions passed; the PR-level failure was the already-repaired generated-documentation lifecycle mismatch. The maintainer subsequently verified WI-0145 and WI-0146 together on desktop and phone and reported both working as expected.
-- Lifecycle: WI-0146 is complete. Follow-on Smart Collection browsing improvements are tracked separately in WI-0159 through WI-0161.
+- Verification evidence: PR #410 merged on 2026-09-22. On 2026-09-23 the maintainer verified the combined WI-0145/WI-0146 flow on desktop and phone: create, add, remove, reorder, persistence, slideshow-library discovery, launch/return routing and normal playback all worked as expected.
+- Deferred work: none for WI-0146.
+- Lifecycle: WI-0146 is complete and maintainer-verified.

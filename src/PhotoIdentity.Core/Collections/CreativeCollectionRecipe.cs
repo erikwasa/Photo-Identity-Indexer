@@ -1,4 +1,87 @@
+using System.Text;
+
 namespace PhotoIdentity.Core.Collections;
+
+public readonly record struct CreativeCollectionId
+{
+    private CreativeCollectionId(Guid value)
+    {
+        if (value == Guid.Empty)
+        {
+            throw new ArgumentException("Creative collection identifier cannot be empty.", nameof(value));
+        }
+
+        Value = value;
+    }
+
+    public Guid Value { get; }
+
+    public static CreativeCollectionId New() => new(Guid.NewGuid());
+
+    public static CreativeCollectionId From(Guid value) => new(value);
+
+    public override string ToString() => Value.ToString("D");
+}
+
+public sealed record CreativeCollectionName
+{
+    public const int MaximumLength = 120;
+
+    private CreativeCollectionName(string displayValue)
+    {
+        DisplayValue = displayValue;
+    }
+
+    public string DisplayValue { get; }
+
+    public static CreativeCollectionName Parse(string value)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+
+        string compatibilityNormalized = value.Normalize(NormalizationForm.FormKC);
+        StringBuilder display = new(compatibilityNormalized.Length);
+        bool pendingSpace = false;
+
+        foreach (char character in compatibilityNormalized.Trim())
+        {
+            if (char.IsControl(character) && !char.IsWhiteSpace(character))
+            {
+                throw new ArgumentException("Creative collection names cannot contain control characters.", nameof(value));
+            }
+
+            if (char.IsWhiteSpace(character))
+            {
+                pendingSpace = display.Length > 0;
+                continue;
+            }
+
+            if (pendingSpace)
+            {
+                display.Append(' ');
+                pendingSpace = false;
+            }
+
+            display.Append(character);
+        }
+
+        string displayValue = display.ToString();
+        if (displayValue.Length == 0)
+        {
+            throw new ArgumentException("Creative collection names cannot be empty.", nameof(value));
+        }
+
+        if (displayValue.Length > MaximumLength)
+        {
+            throw new ArgumentException(
+                $"Creative collection names cannot exceed {MaximumLength} characters.",
+                nameof(value));
+        }
+
+        return new CreativeCollectionName(displayValue);
+    }
+
+    public override string ToString() => DisplayValue;
+}
 
 public static class CreativeCollectionOrderingPolicies
 {
@@ -6,6 +89,8 @@ public static class CreativeCollectionOrderingPolicies
 }
 
 public sealed record CreativeCollectionRecipe(
+    CreativeCollectionId Id,
+    string Name,
     SmartCollectionId AnchorCollectionId,
     int TargetCount,
     int MomentGapMinutes,

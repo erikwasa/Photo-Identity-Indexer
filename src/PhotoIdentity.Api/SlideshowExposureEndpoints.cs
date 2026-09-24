@@ -28,6 +28,7 @@ public static class SlideshowExposureEndpoints
     private static async Task<IResult> RecordAsync(
         SlideshowExposureRequest request,
         IPhotoSlideshowExposureRepository repository,
+        ICreativeCollectionRecipeRepository creativeCollections,
         CancellationToken cancellationToken)
     {
         if (request.SessionId == Guid.Empty ||
@@ -40,10 +41,22 @@ public static class SlideshowExposureEndpoints
 
         try
         {
+            SmartCollectionId collectionId = SmartCollectionId.From(request.CollectionId);
+            if (request.Creative)
+            {
+                CreativeCollectionRecipe? named = await creativeCollections.GetAsync(
+                    CreativeCollectionId.From(request.CollectionId),
+                    cancellationToken);
+                if (named is not null)
+                {
+                    collectionId = named.AnchorCollectionId;
+                }
+            }
+
             AssetRevisionId revisionId = AssetRevisionId.From(revisionGuid);
             bool recorded = await repository.RecordPresentedAsync(
                 request.SessionId,
-                SmartCollectionId.From(request.CollectionId),
+                collectionId,
                 request.Creative,
                 revisionId,
                 cancellationToken);

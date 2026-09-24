@@ -43,14 +43,14 @@ The desired everyday workflow is different: one Smart Collection should be able 
 
 ## Acceptance criteria
 
-- [ ] A persisted Creative Collection has a stable ID, a non-empty editable name and an anchor Smart Collection ID.
-- [ ] Two or more Creative Collections can be created from the same Smart Collection with independent names and recipe settings.
-- [ ] Editing, renaming or deleting one Creative Collection does not modify sibling Creative Collections or the anchor Smart Collection.
-- [ ] Existing WI-0121 singleton recipes migrate without losing target/context/policy settings and remain usable after the schema change.
-- [ ] The Slideshows page lists named Creative Collections as first-class launchable entries alongside ordinary Smart Collections.
-- [ ] A Creative Collection entry on the Slideshows page makes its source Smart Collection understandable without exposing recipe implementation details.
-- [ ] Starting a Creative Collection from the Slideshows page uses its current recipe to materialize the same immutable Creative slideshow snapshot used by the existing Smart Collection Creative flow.
-- [ ] Automated tests cover many-to-one persistence, migration, create/rename/edit/delete behavior, independent sibling settings, slideshow-library discovery and direct Creative launch.
+- [x] A persisted Creative Collection has a stable ID, a non-empty editable name and an anchor Smart Collection ID.
+- [x] Two or more Creative Collections can be created from the same Smart Collection with independent names and recipe settings.
+- [x] Editing, renaming or deleting one Creative Collection does not modify sibling Creative Collections or the anchor Smart Collection.
+- [x] Existing WI-0121 singleton recipes migrate without losing target/context/policy settings and remain usable after the schema change.
+- [x] The Slideshows page lists named Creative Collections as first-class launchable entries alongside ordinary Smart Collections.
+- [x] A Creative Collection entry on the Slideshows page makes its source Smart Collection understandable without exposing recipe implementation details.
+- [x] Starting a Creative Collection from the Slideshows page uses its current recipe to materialize the same immutable Creative slideshow snapshot used by the existing Smart Collection Creative flow.
+- [x] Automated tests cover many-to-one persistence, migration, create/rename/edit/delete behavior, independent sibling settings, slideshow-library discovery and direct Creative launch.
 
 ## Verification requirements
 
@@ -59,6 +59,17 @@ Automated persistence/API/UI coverage plus maintainer verification with one Smar
 ## Design notes
 
 - The durable identity belongs to the Creative Collection, not to a particular materialized slideshow snapshot. Regeneration may change selected revisions while the Creative Collection ID and name remain stable.
-- The anchor Smart Collection remains the exact query source and should continue to own its own lifecycle. Deleting an anchor may cascade/delete its dependent Creative Collections as the current recipe relationship does, but this must be explicit and tested.
-- Naming is presentation metadata for the Creative Collection; it must not become a Smart Collection filter or canonical photo metadata.
-- The Slideshows page remains a read-only consumption surface. Creation/editing can stay in the operator Smart Collection/Creative preview flow while discovery and playback are available from `/slideshows`.
+- The anchor Smart Collection remains the exact query source and should continue to own its own lifecycle. Deleting an anchor cascades its dependent Creative Collections through the existing relationship.
+- Naming is presentation metadata for the Creative Collection; it does not become a Smart Collection filter or canonical photo metadata.
+- The Slideshows page remains a read-only consumption surface. Creation/editing lives on a focused `/creative-collections` operator page where the source Smart Collection is explicit; the Slideshows page links to that manager but does not mutate recipes itself.
+
+## Implementation notes
+
+- `CreativeCollectionId` and validated `CreativeCollectionName` make recipe identity independent from the anchor Smart Collection while retaining the complete versioned WI-0121 recipe settings.
+- PostgreSQL and SQLite recipe repositories expose list/create/update/delete by Creative Collection ID plus compatibility methods for the original one-recipe-per-anchor callers.
+- The first named-recipe access performs an idempotent adapter-local shape upgrade when the legacy singleton table is detected. Existing rows keep their recipe settings, use the anchor ID as the deterministic migrated Creative Collection ID and receive `<Smart Collection name> Creative` as the fallback display name.
+- First-class API routes live under `/api/creative-collections`; anchor-scoped creation/listing lives under `/api/smart-collections/{id}/creative-collections`. Original `/creative-recipe` routes remain as compatibility surfaces.
+- `/creative-collections` provides explicit source-Smart-Collection selection and independent create/rename/edit/delete controls. `/slideshows` renders named Creative cards with `Creative · from <anchor>` context and a direct management link.
+- Direct launch keeps the existing `/slideshow/{id}?creative=true` player contract. Named Creative IDs are resolved back to their anchor only for materialization and exposure accounting, while the immutable snapshot carries the Creative Collection ID/name and fixed revision sequence.
+- Focused tests cover legacy migration, multiple sibling recipes, rename/delete independence, named snapshot identity and Creative library navigation.
+- Implementation PR: #414. Completion remains pending CI and maintainer desktop/phone verification.

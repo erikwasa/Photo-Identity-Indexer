@@ -34,23 +34,19 @@ For a family archive, age and relationship context can unlock high-value collect
 
 ## Acceptance criteria
 
-- [x] Person birth metadata supports exact and partial-date knowledge without inventing precision.
-- [x] Relationship records survive normal Person rename/merge semantics with deterministic conflict handling.
-- [x] Age-at-photo calculation handles missing/partial capture and birth dates explicitly.
-- [x] Creative Collection anchors can express at least one age-based and one relationship-based story through saved Smart Collection criteria.
-- [ ] Automated tests cover partial dates, merges, relationship directionality and age boundary cases and pass in CI/live PostgreSQL verification.
+- [ ] Person birth metadata supports exact and partial-date knowledge without inventing precision.
+- [ ] Relationship records survive normal Person rename/merge semantics with deterministic conflict handling.
+- [ ] Age-at-photo calculation handles missing/partial capture and birth dates explicitly.
+- [ ] Creative Collection recipes can express at least one age-based and one relationship-based story.
+- [ ] Automated tests cover partial dates, merges, relationship directionality and age boundary cases.
 
 ## Verification requirements
 
 Automated domain/persistence/UI tests plus maintainer verification using private representative people and photos.
 
-For manual verification, create or choose three known people, enter at least one year-only or month-only birth date, add a directed family relationship, reopen both people and confirm the inverse relationship is understandable. Then create saved Smart Collection criteria for a known age range and a known relationship story and confirm Creative preview uses the resulting exact anchor set without changing Person or photo metadata.
-
 ## Completion notes
 
-- Files changed: added a Person family-metadata domain model and age-range calculator; PostgreSQL birth/relationship persistence with merge rewiring; People maintenance API/UI; saved Smart Collection age/relationship filter persistence/query support; domain and live-PostgreSQL tests.
-- Trade-offs: partial dates remain inclusive ranges. Age filtering matches when the possible age range overlaps the requested range, rather than pretending year/month precision is exact. Relationships are stored canonically as parent/spouse/sibling/grandparent edges and exposed from either person's perspective with deterministic inverse semantics. Symmetric edges are canonicalized to avoid duplicate spouse/sibling rows.
-- Merge behavior: existing survivor birth metadata wins; otherwise source birth metadata moves to the survivor. Relationships are rewired to the surviving PersonId, duplicate edges collapse and self-relationships are discarded.
-- Creative boundary: the new criteria extend exact saved Smart Collection anchors. Creative Collection selection itself remains unchanged and consumes the resulting anchor set through the existing WI-0121/WI-0120 path.
-- Persistence note: the first implementation keeps the family tables additive and idempotently ensured by the PostgreSQL repository/query boundary while schema migration integration is reviewed against the current schema-v31 replay tests. No SQLite compatibility implementation is added because M29 already schedules retirement of SQLite runtime support.
-- Commands run: implementation and review prepared through the GitHub connector; PR CI plus `verify-postgres.ps1` are the required execution gates before completion.
+- Files changed:
+- Trade-offs:
+- Deferred work:
+- Commands run:

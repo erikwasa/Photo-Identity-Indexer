@@ -13,7 +13,7 @@ Photo Identity can turn exact Smart Collection matches into a bounded, story-ori
 
 The milestone is intentionally metadata-first. Capture time is the primary signal for moment grouping; identified people, tags, source/path proximity and location may strengthen a grouping when available, but GPS or named-place metadata is never required. Creative grouping and selection are derived, regenerable presentation decisions rather than canonical facts about the archive.
 
-WI-0118 through WI-0120 are the core proof-of-value sequence. WI-0121 through WI-0128 plus WI-0158 and WI-0162 are deliberately recorded as follow-on product/quality work so useful ideas are not lost while M26 is evaluated. They are not an assertion that every feature must ship: a follow-on may conclude with a measured no-go/retirement decision recorded through the normal work-item lifecycle rather than forcing unnecessary implementation.
+WI-0118 through WI-0120 are the core proof-of-value sequence. WI-0121 through WI-0128 plus WI-0158 are deliberately recorded as follow-on product/quality work so useful ideas are not lost while M26 is evaluated. They are not an assertion that every feature must ship: a follow-on may conclude with a measured no-go/retirement decision recorded through the normal work-item lifecycle rather than forcing unnecessary implementation.
 
 ## Delivery principles
 
@@ -58,12 +58,11 @@ The same workflow must remain useful for archives with little or no GPS/location
 - [WI-0125](../work-items/WI-0125-person-family-metadata.md) - add optional birth-date and family-relationship metadata for age/relationship-oriented family stories.
 - [WI-0158](../work-items/WI-0158-named-creative-collections-slideshow-library.md) - make Creative Collections named first-class objects, allow multiple variants per Smart Collection and expose them from the Slideshows page.
 
-### Candidate follow-on semantic experiments and search
+### Candidate follow-on semantic experiments
 
 - [WI-0126](../work-items/WI-0126-visible-content-tagging.md) - re-evaluate local visible-content tagging with Creative Collection quality as the concrete consumer.
 - [WI-0127](../work-items/WI-0127-whole-image-embeddings.md) - evaluate whole-image embeddings for semantic retrieval, visual similarity and diversity before adopting vector infrastructure.
 - [WI-0128](../work-items/WI-0128-caption-narration-experiment.md) - evaluate optional local captions/story narration only after the simpler Creative Collection product is useful.
-- [WI-0162](../work-items/WI-0162-semantic-caption-search-slideshow-collections.md) - scale the successful WI-0127 text-to-photo retrieval direction, combine it with WI-0128 generated-caption search, and save search results as explicit slideshow collections.
 
 ## Delivery sequence
 
@@ -74,7 +73,6 @@ The same workflow must remain useful for archives with little or no GPS/location
 5. WI-0126 and WI-0127 are independent semantic experiments. Either may be skipped, rejected or selected based on incremental quality versus runtime/storage complexity.
 6. WI-0128 is intentionally late and optional; deterministic titles/templates should remain a valid simpler alternative to generative narration.
 7. WI-0158 lifts the deliberately narrow WI-0121 one-recipe-per-Smart-Collection shape into named, independently manageable Creative Collections that can be discovered and launched from the Slideshows page.
-8. WI-0162 productizes only the successful semantic retrieval direction from WI-0127, supplements expensive WI-0128 captions rather than depending on them, and uses explicit photo-list collections as the stable save boundary for arbitrary search results.
 
 Each stage should remain independently inspectable so unsuccessful heuristics/models can be replaced or retired without changing canonical Smart Collection or slideshow semantics.
 
@@ -85,11 +83,11 @@ On 2026-09-18, the maintainer accepted the pursued presentation-quality follow-o
 - WI-0122: Prefer, Avoid and Clear behaved correctly on a representative private Creative Collection; Avoid changed Creative presentation only and the photo remained in the ordinary exact Smart Collection.
 - WI-0124: slideshow show counts updated for actually displayed photos; freshness disabled preserved the stable baseline; freshness enabled produced a sensible different selection with more unseen photos.
 
-On 2026-09-18 the maintainer intentionally put WI-0125 on hold. On 2026-09-23 the maintainer explicitly reactivated WI-0125 and requested implementation; it is now the active M26 item.
+On 2026-09-18 the maintainer intentionally put WI-0125 on hold.
 
 On 2026-09-19 the maintainer completed WI-0126 with an explicit no-go for the evaluated zero-shot controlled-vocabulary tagging approach. The private run scored all 185 candidates from durable review proxies with no proxy failures; 20 proxy/original comparisons produced 0.700 top-1 agreement and 0.633 mean top-2 Jaccard overlap. Semantic scoring replaced 8 of 50 selected photos and raised nominal concept coverage from 14 to 16, but the visual review found repeated false labels for categories absent from the tested set. Aggregate output assigned `birthday` to 59 candidates and `wedding` to 29 despite neither being present, with additional false baby/dog labels. The result does not justify persisting automatic tags or enabling the semantic-diversity policy in production. Manual tags and the metadata/presentation-first selector remain unchanged. WI-0127 and WI-0128 remain optional independent experiments rather than follow-on commitments.
 
-On 2026-09-20 the maintainer completed WI-0127 with a split decision. The private run embedded all 185 candidates from durable review proxies with zero proxy failures. The 512-dimensional float32 vectors averaged 64.6 ms per proxy and require 2,048 raw bytes each (about 204.8 MB per 100,000 photos before database/index overhead). Semantic text-to-photo retrieval was strong: for the seven queries individually scored in the maintainer note, 7/8 or 8/8 returned photos were relevant. Similar-photo retrieval was inconsistent, with only two of four seeds producing meaningfully related neighbors. Embedding diversity replaced 8 of 50 baseline selections but the maintainer judged the replacements as merely different; mean pairwise cosine changed only from 0.5371 to 0.5354 and p95 from 0.7119 to 0.7008. Therefore M26 will not persist embeddings, add pgvector/ANN infrastructure or enable embedding-based Creative diversity. The semantic-retrieval result is retained as a promising future search direction and is now the basis for WI-0162 rather than a reason to revive the rejected diversity path.
+On 2026-09-20 the maintainer completed WI-0127 with a split decision. The private run embedded all 185 candidates from durable review proxies with zero proxy failures. The 512-dimensional float32 vectors averaged 64.6 ms per proxy and require 2,048 raw bytes each (about 204.8 MB per 100,000 photos before database/index overhead). Semantic text-to-photo retrieval was strong: for the seven queries individually scored in the maintainer note, 7/8 or 8/8 returned photos were relevant. Similar-photo retrieval was inconsistent, with only two of four seeds producing meaningfully related neighbors. Embedding diversity replaced 8 of 50 baseline selections but the maintainer judged the replacements as merely different; mean pairwise cosine changed only from 0.5371 to 0.5354 and p95 from 0.7119 to 0.7008. Therefore M26 will not persist embeddings, add pgvector/ANN infrastructure or enable embedding-based Creative diversity. The semantic-retrieval result is retained as a promising future search direction that should be productized separately if prioritized.
 
 On 2026-09-20 the maintainer accepted the WI-0128 bounded experiment as a positive result. A four-photo 480x320 thumbnail run generated 4/4 captions with zero generation failures; all four passed the guard, all four were judged useful and no factual errors were observed. Average runtime was 95,858.8 ms per caption on the maintainer hardware with the 3,200,627,168-byte qwen2.5vl:3b package. A full-proxy single caption took 373,568.2 ms and the first thumbnail probe took 118,081.4 ms. The quality result justified optional product integration, while the latency ruled out synchronous generation.
 
@@ -97,9 +95,9 @@ WI-0128 productized that positive result as **optional archive enrichment**, not
 
 On 2026-09-22 the maintainer sampled the 30 most recent Swedish `wi-0128-photo-caption-v2` rows. All 30 had empty risk flags, confirming the sentence-boundary proper-name/location correction. The same sample exposed a separate output-quality defect: many model responses ignored the requested single-sentence/20-word shape and several stored outputs ended mid-word or mid-sentence. WI-0128 therefore added generation policy `wi-0128-photo-caption-v3`, which deterministically normalizes output to one complete sentence of at most 20 words before claim guarding and persistence. Retained v1/v2 text is promoted locally when possible; malformed output that cannot produce a bounded complete sentence remains blocked rather than becoming presentation text. Final maintainer verification later on 2026-09-22 accepted v3: a fresh 30-row Swedish sample stayed within the one-sentence/20-word display contract, the strict SQL validation returned zero displayable violations, blocked relationship evidence remained non-displayable, captions persisted across restart, slideshow consumption remained read-only, and disabling enrichment stopped new work. WI-0128 is therefore complete.
 
-On 2026-09-23 the maintainer requested a larger-scale continuation of the successful WI-0127 text-to-photo result because Ollama captions remain expensive to generate. WI-0162 records that direction: evaluate many more natural-language queries at materially larger archive scale, combine semantic visual retrieval with durable generated-caption search, support Swedish input explicitly, and allow result sets to be frozen as named explicit slideshow collections.
+The next explicit Creative Collection product gap is WI-0158: Creative Collections need their own names and durable identities, multiple Creative Collections must be able to share one anchor Smart Collection, and the read-only Slideshows page must make those named Creative Collections directly discoverable and launchable.
 
-WI-0125 is currently in progress. WI-0158 and WI-0162 remain ready follow-on product items.
+With WI-0128 completed and no M26 item currently started, the milestone lifecycle returns to **ready**. WI-0158 is the next ready M26 item; WI-0125 remains intentionally deferred/proposed.
 
 ## Exit criteria
 
