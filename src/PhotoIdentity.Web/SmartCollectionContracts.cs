@@ -12,6 +12,15 @@ public sealed record SmartCollectionDateRangeRequest(
     string From,
     string To);
 
+public sealed record SmartCollectionAgeRequest(
+    string PersonId,
+    int MinimumYears,
+    int MaximumYears);
+
+public sealed record SmartCollectionRelationshipRequest(
+    string PersonId,
+    string[] Kinds);
+
 public sealed record SmartCollectionDefinitionRequest(
     string Name,
     string[]? People = null,
@@ -20,7 +29,9 @@ public sealed record SmartCollectionDefinitionRequest(
     string? TagMatch = null,
     SmartCollectionLocationRequest? Location = null,
     string? Taken = null,
-    SmartCollectionDateRangeRequest? TakenRange = null);
+    SmartCollectionDateRangeRequest? TakenRange = null,
+    SmartCollectionAgeRequest? Age = null,
+    SmartCollectionRelationshipRequest? Relationship = null);
 
 public sealed record SmartCollectionQueryRequest(
     string[]? People = null,
@@ -31,7 +42,9 @@ public sealed record SmartCollectionQueryRequest(
     string? Taken = null,
     int Offset = 0,
     int Limit = 40,
-    SmartCollectionDateRangeRequest? TakenRange = null);
+    SmartCollectionDateRangeRequest? TakenRange = null,
+    SmartCollectionAgeRequest? Age = null,
+    SmartCollectionRelationshipRequest? Relationship = null);
 
 public sealed record SmartCollectionDateRangeResponse(
     string From,
@@ -43,7 +56,9 @@ public sealed record SmartCollectionFilterResponse(
     string[] Tags,
     string TagMatch,
     SmartCollectionLocationRequest? Location,
-    SmartCollectionDateRangeResponse? Taken);
+    SmartCollectionDateRangeResponse? Taken,
+    SmartCollectionAgeRequest? Age = null,
+    SmartCollectionRelationshipRequest? Relationship = null);
 
 public sealed record SmartCollectionDefinitionResponse(
     string Id,
