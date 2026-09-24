@@ -7,12 +7,12 @@ public partial class SmartCollectionsWorkspace
 {
     private static readonly FamilyRelationshipOption[] FamilyRelationshipOptions =
     [
-        new("parent", "Parent"),
-        new("child", "Child"),
-        new("spouse", "Spouse"),
-        new("sibling", "Sibling"),
-        new("grandparent", "Grandparent"),
-        new("grandchild", "Grandchild"),
+        new("parent", "Parent of"),
+        new("child", "Child of"),
+        new("spouse", "Spouse of"),
+        new("sibling", "Sibling of"),
+        new("grandparent", "Grandparent of"),
+        new("grandchild", "Grandchild of"),
     ];
 
     private bool UseAgeFilter { get; set; }
@@ -156,7 +156,7 @@ public partial class SmartCollectionsWorkspace
         string kinds = string.Join(
             ", ",
             filter.Relationship.Kinds.Select(RelationshipKindLabel));
-        return $"Family of {PersonLabel(filter.Relationship.PersonId)}: {kinds}";
+        return $"Relationships from {PersonLabel(filter.Relationship.PersonId)}: {kinds}";
     }
 
     private string PersonLabel(string id) =>
@@ -164,12 +164,12 @@ public partial class SmartCollectionsWorkspace
 
     private static string RelationshipKindLabel(string kind) => kind switch
     {
-        "parent" => "parent",
-        "child" => "child",
-        "spouse" => "spouse",
-        "sibling" => "sibling",
-        "grandparent" => "grandparent",
-        "grandchild" => "grandchild",
+        "parent" => "parent of",
+        "child" => "child of",
+        "spouse" => "spouse of",
+        "sibling" => "sibling of",
+        "grandparent" => "grandparent of",
+        "grandchild" => "grandchild of",
         _ => kind,
     };
 
