@@ -159,6 +159,7 @@ public partial class SmartCollectionsWorkspace
         PendingPlace = null;
         UseLocation = false;
         South = West = North = East = "";
+        ResetFamilyFilters();
         Results = null;
         ActiveResultMode = ResultMode.None;
         ResetCreativeRecipeState();
@@ -220,6 +221,7 @@ public partial class SmartCollectionsWorkspace
             South = West = North = East = "";
         }
 
+        ApplyFamilyFilters(definition.Filter.Age, definition.Filter.Relationship);
         Results = null;
         ActiveResultMode = ResultMode.None;
         ResetCreativeRecipeState();
@@ -267,6 +269,7 @@ public partial class SmartCollectionsWorkspace
         West = state.West;
         North = state.North;
         East = state.East;
+        ApplyFamilyFilters(state.Age, state.Relationship);
         Results = null;
         ActiveResultMode = ResultMode.None;
         ResetCreativeRecipeState();
@@ -895,7 +898,9 @@ public partial class SmartCollectionsWorkspace
             TakenDate,
             TakenFrom,
             TakenTo,
-            Places: SelectedPlaces.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray());
+            Places: SelectedPlaces.OrderBy(value => value, StringComparer.OrdinalIgnoreCase).ToArray(),
+            Age: CurrentAgeRequest,
+            Relationship: CurrentRelationshipRequest);
 
         try
         {
@@ -966,6 +971,13 @@ public partial class SmartCollectionsWorkspace
             return false;
         }
 
+        if (!TryBuildFamilyFilters(
+                out SmartCollectionAgeRequest? age,
+                out SmartCollectionRelationshipRequest? relationship))
+        {
+            return false;
+        }
+
         request = new SmartCollectionDefinitionRequest(
             Name.Trim(),
             SelectedPeople.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
@@ -974,7 +986,9 @@ public partial class SmartCollectionsWorkspace
             TagMatch,
             location,
             Taken: null,
-            TakenRange: takenRange);
+            TakenRange: takenRange,
+            Age: age,
+            Relationship: relationship);
         return true;
     }
 
@@ -991,6 +1005,13 @@ public partial class SmartCollectionsWorkspace
             return false;
         }
 
+        if (!TryBuildFamilyFilters(
+                out SmartCollectionAgeRequest? age,
+                out SmartCollectionRelationshipRequest? relationship))
+        {
+            return false;
+        }
+
         request = new SmartCollectionQueryRequest(
             SelectedPeople.OrderBy(value => value, StringComparer.Ordinal).ToArray(),
             PeopleMatch,
@@ -1000,7 +1021,9 @@ public partial class SmartCollectionsWorkspace
             Taken: null,
             Offset: Math.Max(0, offset),
             Limit: PageSize,
-            TakenRange: takenRange);
+            TakenRange: takenRange,
+            Age: age,
+            Relationship: relationship);
         return true;
     }
 
