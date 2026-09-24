@@ -109,6 +109,13 @@ public sealed partial class PostgresCatalogueDatabase
                 PostgresIdentityMultiEvidenceAutoAssignmentPolicyRepository.MultiEvidencePolicySchema.Sql;
         }
 
+        if (!sql.Contains(
+                "person_birth_metadata",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            sql += Environment.NewLine + PostgresPersonFamilyMetadataSchema.Sql;
+        }
+
         if (!string.Equals(sql, current.Sql, StringComparison.Ordinal))
         {
             Migrations[currentMigrationIndex] = current with { Sql = sql };

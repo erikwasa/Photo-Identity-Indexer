@@ -6,7 +6,7 @@
     <div class="smart-workspace-heading">
         <div>
             <p class="eyebrow">Saved smart collections</p>
-            <h2 id="smart-collections-heading">People, tags, location and taken time</h2>
+            <h2 id="smart-collections-heading">People, family, tags, location and taken time</h2>
             <p>Save a filter definition and reopen it later. Results are always evaluated against the current catalogue.</p>
         </div>
         <button type="button" class="button secondary" disabled="@Busy" @onclick="NewCollection">New collection</button>
@@ -52,6 +52,8 @@
                                     @onclick="() => OpenSavedAsync(definition)">
                                 <strong>@definition.Name</strong>
                                 <span>@PeopleSummary(definition.Filter)</span>
+                                <span>@AgeSummary(definition.Filter)</span>
+                                <span>@RelationshipSummary(definition.Filter)</span>
                                 <span>@TagsSummary(definition.Filter)</span>
                                 <span>@DateSummary(definition.Filter)</span>
                                 <span>@LocationSummary(definition.Filter)</span>
@@ -274,6 +276,96 @@
                             </label>
                         </div>
                         <small class="smart-help">The named-place group and GPS rectangle are independent. If both are populated, a photo must match any selected place AND the GPS rectangle. Missing GPS metadata will not match a populated rectangle.</small>
+                    </fieldset>
+                </div>
+
+                <div class="smart-filter-grid smart-secondary-grid">
+                    <fieldset class="smart-filter-card">
+                        <legend>Age at photo</legend>
+
+                        <label class="smart-location-toggle">
+                            <input type="checkbox" @bind="UseAgeFilter" disabled="@Busy" />
+                            <span>Limit one person to an age range</span>
+                        </label>
+
+                        <label class="smart-field">
+                            <span class="field-label">Person</span>
+                            <select @bind="AgePersonId" disabled="@(!UseAgeFilter || Busy)">
+                                <option value="">Choose person</option>
+                                @foreach (ReviewPersonResponse person in OrderedPeople)
+                                {
+                                    <option value="@person.Id">@person.DisplayName</option>
+                                }
+                            </select>
+                        </label>
+
+                        <div class="smart-date-range">
+                            <label class="smart-field">
+                                <span class="field-label">Minimum age</span>
+                                <input type="number"
+                                       min="0"
+                                       max="130"
+                                       step="1"
+                                       inputmode="numeric"
+                                       @bind="AgeMinimumYears"
+                                       disabled="@(!UseAgeFilter || Busy)" />
+                            </label>
+                            <label class="smart-field">
+                                <span class="field-label">Maximum age</span>
+                                <input type="number"
+                                       min="0"
+                                       max="130"
+                                       step="1"
+                                       inputmode="numeric"
+                                       @bind="AgeMaximumYears"
+                                       disabled="@(!UseAgeFilter || Busy)" />
+                            </label>
+                        </div>
+
+                        <small class="smart-help">
+                            The selected person must appear in the photo. The photo's effective capture-date range and the person's
+                            birth-date precision are used to calculate a possible age range; a match occurs when that range overlaps this filter.
+                            Photos without enough date evidence do not match.
+                        </small>
+                    </fieldset>
+
+                    <fieldset class="smart-filter-card">
+                        <legend>Family relationship</legend>
+
+                        <label class="smart-location-toggle">
+                            <input type="checkbox" @bind="UseRelationshipFilter" disabled="@Busy" />
+                            <span>Require a relative of one person</span>
+                        </label>
+
+                        <label class="smart-field">
+                            <span class="field-label">Related to</span>
+                            <select @bind="RelationshipPersonId" disabled="@(!UseRelationshipFilter || Busy)">
+                                <option value="">Choose person</option>
+                                @foreach (ReviewPersonResponse person in OrderedPeople)
+                                {
+                                    <option value="@person.Id">@person.DisplayName</option>
+                                }
+                            </select>
+                        </label>
+
+                        <div class="smart-option-list" role="group" aria-label="Family relationship filter">
+                            @foreach (FamilyRelationshipOption option in FamilyRelationshipOptions)
+                            {
+                                <label class="smart-check-option">
+                                    <input type="checkbox"
+                                           checked="@SelectedRelationshipKinds.Contains(option.Value)"
+                                           disabled="@(!UseRelationshipFilter || Busy)"
+                                           @onchange="args => ToggleRelationshipKind(option.Value, args)" />
+                                    <span>@option.Label</span>
+                                </label>
+                            }
+                        </div>
+
+                        <small class="smart-help">
+                            Match photos containing at least one person who has any selected relationship to the focal person.
+                            Parent/child and grandparent/grandchild directions are shown from the focal person's perspective;
+                            spouse and sibling are symmetric. The focal person does not also need to appear in the photo.
+                        </small>
                     </fieldset>
                 </div>
 

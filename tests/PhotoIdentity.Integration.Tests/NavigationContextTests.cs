@@ -1,4 +1,5 @@
 using PhotoIdentity.Web;
+using PhotoIdentity.Web.Contracts;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -46,7 +47,9 @@ public sealed class NavigationContextTests
             TakenMode: SmartCollectionDateModes.Range,
             TakenFrom: "2025-05-01",
             TakenTo: "2025-05-10",
-            Places: ["Sweden/Stockholm region", "Sweden/Uppsala län"]);
+            Places: ["Sweden/Stockholm region", "Sweden/Uppsala län"],
+            Age: new SmartCollectionAgeRequest("person-1", 4, 7),
+            Relationship: new SmartCollectionRelationshipRequest("person-2", ["child", "sibling"]));
 
         string json = SmartCollectionNavigation.SerializeTransientState(state);
         SmartCollectionTransientNavigationState? restored = SmartCollectionNavigation.DeserializeTransientState(json);
@@ -69,6 +72,10 @@ public sealed class NavigationContextTests
         Assert.Equal("2025-05-01", restored.TakenFrom);
         Assert.Equal("2025-05-10", restored.TakenTo);
         Assert.Equal(state.Places, restored.Places);
+        Assert.Equal(state.Age, restored.Age);
+        Assert.NotNull(restored.Relationship);
+        Assert.Equal(state.Relationship!.PersonId, restored.Relationship.PersonId);
+        Assert.Equal(state.Relationship.Kinds, restored.Relationship.Kinds);
     }
 
     [Fact]
@@ -82,6 +89,8 @@ public sealed class NavigationContextTests
 
         Assert.NotNull(restored);
         Assert.Null(restored.Place);
+        Assert.Null(restored.Age);
+        Assert.Null(restored.Relationship);
         Assert.True(restored.UseLocation);
         Assert.Equal("59", restored.South);
     }
