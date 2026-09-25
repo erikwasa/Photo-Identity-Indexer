@@ -254,7 +254,8 @@
         SmartCollectionWorkspaceContext context = WorkspaceContext
             ?? throw new InvalidOperationException("Smart Collection workspace context is unavailable.");
         int offset = SmartCollectionNavigation.PageOffsetForIndex(index);
-        string returnUrl = SmartCollectionNavigation.BuildWorkspaceUrl(context, offset);
+        string returnUrl = SmartCollectionNavigation.BuildWorkspaceUrl(context, offset) +
+            $"&focus={Uri.EscapeDataString(revisionId)}";
         return SmartCollectionNavigation.BuildPhotoUrl(revisionId, returnUrl);
     }
 
