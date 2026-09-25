@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using PhotoIdentity.Core.Clustering;
 using PhotoIdentity.Core.Review;
+using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Worker;
 
@@ -9,11 +10,8 @@ namespace PhotoIdentity.Api;
 
 /// <summary>
 /// Advances durable identity regeneration work in bounded batches so browser requests only
-/// enqueue or inspect work. Each target still commits independently, preserving durable restart
-/// and reclaim semantics while avoiding a scheduler delay between every target. Qualifying
-/// identity-evidence changes may also enqueue a later coalesced run through the same controller.
-/// PostgreSQL provisional clustering runs only from idle identity cycles so expensive exact
-/// clustering remains lower priority than review matching.
+/// enqueue or inspect work. Excluded faces are completed without scoring, preventing new identity
+/// evidence from being generated for a source copy after its privacy tombstone is durable.
 /// </summary>
 public sealed class IdentityMatchRegenerationHostedService : BackgroundService
 {
@@ -31,6 +29,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
     private readonly ILogger<IdentityMatchRegenerationHostedService> _logger;
     private readonly IIdentityMatchFollowUpPlanner _followUpPlanner;
     private readonly ProvisionalFaceClusteringWorker? _provisionalClustering;
+    private readonly ISourceCopyExclusionRepository? _exclusions;
 
     public IdentityMatchRegenerationHostedService(
         IIdentityMatchRegenerationRepository runs,
@@ -43,7 +42,8 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         ILogger<IdentityMatchRegenerationHostedService>? logger = null,
         IIdentityMatchModelRepository? models = null,
         IConfiguration? configuration = null,
-        PostgresCatalogueDatabase? postgresCatalogueDatabase = null)
+        PostgresCatalogueDatabase? postgresCatalogueDatabase = null,
+        ISourceCopyExclusionRepository? exclusions = null)
     {
         _runs = runs;
         _scorer = scorer;
@@ -53,6 +53,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
         _timeProvider = timeProvider;
         _metrics = metrics;
         _logger = logger ?? NullLogger<IdentityMatchRegenerationHostedService>.Instance;
+        _exclusions = exclusions;
         _followUpPlanner = models is null
             ? DisabledIdentityMatchFollowUpPlanner.Instance
             : new IdentityMatchFollowUpPlanner(
@@ -90,9 +91,6 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
             }
             catch (Exception exception)
             {
-                // A brief catalogue/service interruption must not escape BackgroundService and
-                // trigger the host's default StopHost behavior. Durable run/target state remains
-                // the authority; retry from that state after the normal idle delay.
                 _logger.LogError(
                     exception,
                     "Identity match regeneration failed unexpectedly; retrying without stopping Photo Identity.");
@@ -136,6 +134,21 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 ArchiveThroughputMetricNames.IdentityRegenerationTargetsClaimed);
             try
             {
+                if (_exclusions is not null &&
+                    await _exclusions.IsFaceOccurrenceExcludedAsync(target.FaceOccurrenceId, cancellationToken))
+                {
+                    await _runs.CompleteTargetAsync(
+                        run.Id,
+                        target.FaceOccurrenceId,
+                        suggestionCount: 0,
+                        _timeProvider.GetUtcNow(),
+                        cancellationToken);
+                    _metrics.RecordCounter(
+                        ArchiveThroughputMetricNames.IdentityRegenerationTargetsCompleted);
+                    processedInBatch++;
+                    continue;
+                }
+
                 if (!prepared)
                 {
                     await _scorer.PrepareRunAsync(run, cancellationToken);
@@ -204,8 +217,6 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
 
         if (!await _runs.EvidenceStillMatchesAsync(latest, cancellationToken))
         {
-            // ClaimNextTargetAsync normally detects this. This check closes the window after the
-            // final target and before automatic assignment/finalization.
             await _runs.MarkFailedAsync(
                 run.Id,
                 "Identity evidence changed after the final target was scored. Start a new regeneration from the current catalogue state.",
@@ -255,7 +266,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
             {
                 await _runs.MarkFailedAsync(
                     run.Id,
-                    "Identity evidence changed while automatic assignments were being finalized. The generated suggestions are stale; start a new regeneration.",
+                    "Identity evidence changed while automatic assignments were being finalized. The generated suggestions are stale; start a new regeneration from the current catalogue state.",
                     _timeProvider.GetUtcNow(),
                     cancellationToken);
                 await _scorer.ReleaseRunAsync(run.Id, cancellationToken);
