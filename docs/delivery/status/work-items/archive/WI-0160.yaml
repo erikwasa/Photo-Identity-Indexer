@@ -1,0 +1,22 @@
+id: WI-0160
+title: Replace Smart Collection paging with infinite scroll
+milestone: M28
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0160-smart-collection-infinite-scroll.md
+started_at: 2026-09-25
+completed_at: 2026-09-25
+verified_at: 2026-09-25
+verified_by: maintainer
+last_updated_at: 2026-09-25
+branch: agent/WI-0160-WI-0161-smart-browsing
+blockers:
+- WI-0159
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/422
+- type: verification
+  value: '2026-09-25 maintainer verification: Smart Collection infinite scrolling, bounded incremental loading and return-to-browsing behavior work as expected.'
+- type: ci
+  value: 'PR #422 workflow run #2164 completed successfully.'
