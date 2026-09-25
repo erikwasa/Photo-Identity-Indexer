@@ -1,15 +1,29 @@
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
+using PhotoIdentity.Persistence.Postgres;
+using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Web;
 using PhotoIdentity.Worker;
 
 namespace PhotoIdentity.Api;
+
+public sealed record ArchiveExactDuplicateCopyResponse(
+    string SourceId,
+    string AssetId,
+    string RevisionId,
+    string SourceKey,
+    bool IsMissing);
+
+public sealed record ArchiveExactDuplicateGroupResponse(
+    string ContentSha256,
+    IReadOnlyList<ArchiveExactDuplicateCopyResponse> Copies);
 
 public static class ArchiveItemFilterEndpoints
 {
     public static IEndpointRouteBuilder MapArchiveItemFilterEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/archive/items/filter", GetItemsAsync);
+        endpoints.MapGet("/api/archive/exact-duplicates", GetExactDuplicatesAsync);
         return endpoints;
     }
 
@@ -59,6 +73,50 @@ public static class ArchiveItemFilterEndpoints
         {
             return Results.BadRequest(new ArchiveErrorResponse(exception.Message));
         }
+    }
+
+    private static async Task<IResult> GetExactDuplicatesAsync(
+        IArchiveCoverageRepository coverageRepository,
+        IServiceProvider services,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
+                ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
+            IExactDuplicateRepository repository = ResolveExactDuplicateRepository(services);
+            IReadOnlyList<ExactDuplicateGroup> groups = await repository.GetGroupsAsync(
+                configured.Source.SourceId,
+                cancellationToken);
+
+            return Results.Ok(groups.Select(group => new ArchiveExactDuplicateGroupResponse(
+                group.ContentHash.ToString(),
+                group.Copies.Select(copy => new ArchiveExactDuplicateCopyResponse(
+                    copy.SourceId.ToString(),
+                    copy.AssetId.ToString(),
+                    copy.RevisionId.ToString(),
+                    copy.SourceKey,
+                    copy.IsMissing)).ToArray())).ToArray());
+        }
+        catch (Exception exception)
+        {
+            return Results.BadRequest(new ArchiveErrorResponse(exception.Message));
+        }
+    }
+
+    private static IExactDuplicateRepository ResolveExactDuplicateRepository(IServiceProvider services)
+    {
+        if (services.GetService(typeof(PostgresCatalogueDatabase)) is PostgresCatalogueDatabase postgres)
+        {
+            return new PostgresExactDuplicateRepository(postgres);
+        }
+
+        if (services.GetService(typeof(SqliteCatalogueDatabase)) is SqliteCatalogueDatabase sqlite)
+        {
+            return new SqliteExactDuplicateRepository(sqlite);
+        }
+
+        throw new InvalidOperationException("No supported catalogue provider is configured.");
     }
 
     private static async Task<Sha256Digest?> ResolveProfileHashAsync(
