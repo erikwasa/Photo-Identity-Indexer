@@ -1,0 +1,133 @@
+.smart-results {
+    display: grid;
+    gap: 0.7rem;
+    min-width: 0;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border, #d8dde6);
+}
+
+.smart-workspace-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.smart-workspace-heading.compact {
+    align-items: center;
+}
+
+.smart-workspace-heading h3,
+.smart-workspace-heading p {
+    margin-top: 0;
+    overflow-wrap: anywhere;
+}
+
+.smart-workspace-heading h3 {
+    margin-bottom: 0.35rem;
+}
+
+.smart-workspace-heading p {
+    margin-bottom: 0;
+    line-height: 1.4;
+}
+
+.smart-result-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.smart-result-label,
+.smart-photo-card span,
+.smart-end-of-results {
+    color: var(--text-muted, #667085);
+}
+
+.smart-result-label,
+.smart-photo-card span,
+.smart-end-of-results {
+    font-size: 0.82rem;
+}
+
+.smart-photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: 1rem;
+    min-width: 0;
+}
+
+.smart-photo-card {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--border, #d8dde6);
+    border-radius: 0.75rem;
+    background: var(--surface, #fff);
+    scroll-margin-top: 5.5rem;
+}
+
+.smart-photo-card a {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: #111;
+}
+
+.smart-photo-card img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.smart-photo-card > div {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+    padding: 0.75rem;
+}
+
+.smart-photo-card span {
+    overflow-wrap: anywhere;
+}
+
+.smart-photo-place {
+    font-weight: 600;
+}
+
+.smart-infinite-status,
+.smart-infinite-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    min-height: 3rem;
+}
+
+.smart-infinite-error {
+    flex-wrap: wrap;
+    color: var(--danger, #b42318);
+}
+
+.smart-end-of-results {
+    margin: 0;
+    padding: 0.75rem;
+    text-align: center;
+}
+
+@media (max-width: 600px) {
+    .smart-workspace-heading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .smart-result-meta {
+        justify-content: flex-start;
+    }
+}

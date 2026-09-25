@@ -518,62 +518,9 @@
 
         @if (Results is SmartCollectionPageResponse resultPage)
         {
-            <section class="smart-results" aria-labelledby="smart-results-heading">
-                <div class="smart-workspace-heading compact">
-                    <div>
-                        <p class="eyebrow">Current catalogue</p>
-                        <h3 id="smart-results-heading">@resultPage.Total photo@(resultPage.Total == 1 ? "" : "s")</h3>
-                    </div>
-                    @if (!string.IsNullOrWhiteSpace(resultPage.CollectionName))
-                    {
-                        <span class="smart-result-label">@resultPage.CollectionName</span>
-                    }
-                </div>
-
-                @if (resultPage.Items.Length == 0)
-                {
-                    <div class="empty-state compact">
-                        <p>No photos currently match this definition.</p>
-                    </div>
-                }
-                else
-                {
-                    <div class="smart-photo-grid">
-                        @foreach (SmartCollectionPhotoResponse photo in resultPage.Items)
-                        {
-                            <article class="smart-photo-card">
-                                <a href="@PhotoHref(photo)" aria-label="Open photo">
-                                    <img src="@photo.ThumbnailUrl" alt="Smart collection photo" loading="lazy" decoding="async" />
-                                </a>
-                                <div>
-                                    <strong>@PhotoDate(photo)</strong>
-                                    <span>@PhotoLocation(photo)</span>
-                                    @if (photo.Width is int width && photo.Height is int height)
-                                    {
-                                        <span>@width × @height</span>
-                                    }
-                                </div>
-                            </article>
-                        }
-                    </div>
-
-                    <nav class="pagination" aria-label="Smart collection pages">
-                        <button type="button"
-                                class="button secondary"
-                                disabled="@(Busy || resultPage.Offset == 0)"
-                                @onclick="PreviousPageAsync">
-                            Previous
-                        </button>
-                        <span>Showing @FirstResult–@LastResult</span>
-                        <button type="button"
-                                class="button secondary"
-                                disabled="@(Busy || resultPage.Offset + resultPage.Items.Length >= resultPage.Total)"
-                                @onclick="NextPageAsync">
-                            Next
-                        </button>
-                    </nav>
-                }
-            </section>
+            <SmartCollectionResultBrowser @key="resultPage"
+                                          InitialPage="resultPage"
+                                          TransientPreviewKey="@TransientPreviewKey" />
         }
     }
 </section>

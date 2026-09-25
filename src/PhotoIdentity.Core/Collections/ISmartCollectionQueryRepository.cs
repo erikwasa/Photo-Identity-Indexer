@@ -15,7 +15,8 @@ public sealed record SmartCollectionPhoto(
     double? Longitude,
     IReadOnlyList<string>? PeopleKeys = null,
     PhotoCaptureDateRange? EffectiveCaptureDate = null,
-    string? CaptureDateSource = null);
+    string? CaptureDateSource = null,
+    string? EffectivePlace = null);
 
 public sealed record SmartCollectionPhotoPage(
     IReadOnlyList<SmartCollectionPhoto> Items,

@@ -22,3 +22,29 @@ export function observe(element, dotNetReference) {
         }
     };
 }
+
+export function scrollIntoViewById(id) {
+    const element = document.getElementById(id);
+    if (!element) {
+        return false;
+    }
+
+    element.scrollIntoView({ block: "center", inline: "nearest" });
+    return true;
+}
+
+export function elementTopById(id) {
+    const element = document.getElementById(id);
+    return element ? element.getBoundingClientRect().top : null;
+}
+
+export function restoreElementTopById(id, previousTop) {
+    const element = document.getElementById(id);
+    if (!element || typeof previousTop !== "number") {
+        return false;
+    }
+
+    const currentTop = element.getBoundingClientRect().top;
+    window.scrollBy(0, currentTop - previousTop);
+    return true;
+}

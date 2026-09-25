@@ -5,11 +5,11 @@
     @if (Busy)
     {
         <div class="spinner" aria-hidden="true"></div>
-        <span>Loading more faces…</span>
+        <span>@LoadingText</span>
     }
     else
     {
-        <span>More faces load automatically</span>
+        <span>@IdleText</span>
     }
 </div>
 
@@ -19,6 +19,12 @@
 
     [Parameter]
     public bool Busy { get; set; }
+
+    [Parameter]
+    public string IdleText { get; set; } = "More faces load automatically";
+
+    [Parameter]
+    public string LoadingText { get; set; } = "Loading more faces…";
 
     [Parameter, EditorRequired]
     public EventCallback LoadMore { get; set; }
