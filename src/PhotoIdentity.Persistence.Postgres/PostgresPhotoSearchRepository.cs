@@ -294,25 +294,36 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                     latest.asset_revision_id,
                     latest.language,
                     latest.content,
-                    ts_rank_cd(
-                        to_tsvector('simple', latest.content),
-                        plainto_tsquery('simple', @query))
-                    + CASE
-                        WHEN lower(latest.content) LIKE '%' || lower(@query) || '%' THEN 1.0
-                        ELSE 0.0
-                      END AS score
+                    (
+                        ts_rank_cd(
+                            to_tsvector('simple', latest.content),
+                            plainto_tsquery('simple', @query))
+                        + CASE
+                            WHEN lower(latest.content) LIKE '%' || lower(@query) || '%' THEN 1.0
+                            ELSE 0.0
+                          END
+                    )::double precision AS score
                 FROM latest
                 WHERE to_tsvector('simple', latest.content)
                       @@ plainto_tsquery('simple', @query)
                    OR lower(latest.content) LIKE '%' || lower(@query) || '%'
+            ),
+            best AS (
+                SELECT DISTINCT ON (asset_revision_id)
+                    asset_revision_id,
+                    language,
+                    content,
+                    score
+                FROM ranked
+                ORDER BY asset_revision_id, score DESC, language
             )
-            SELECT DISTINCT ON (asset_revision_id)
+            SELECT
                 asset_revision_id,
                 language,
                 content,
                 score
-            FROM ranked
-            ORDER BY asset_revision_id, score DESC, language
+            FROM best
+            ORDER BY score DESC, asset_revision_id
             LIMIT @limit;
             """;
         command.Parameters.AddWithValue("query", NpgsqlDbType.Text, query.Trim());
@@ -328,12 +339,49 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                 reader.GetString(2),
                 reader.GetDouble(3)));
         }
+        return result;
+    }
 
-        return result
-            .OrderByDescending(item => item.Score)
-            .ThenBy(item => item.RevisionId.ToString(), StringComparer.Ordinal)
-            .Take(limit)
-            .ToArray();
+    public async Task<PhotoSearchCatalogueStatistics> GetCatalogueStatisticsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureSchemaAsync(cancellationToken);
+        await using NpgsqlConnection connection =
+            await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = """
+            WITH current_revisions AS (
+                SELECT revision.id
+                FROM assets AS asset
+                INNER JOIN LATERAL (
+                    SELECT candidate.id
+                    FROM asset_revisions AS candidate
+                    WHERE candidate.asset_id = asset.id
+                    ORDER BY candidate.observed_at_utc DESC, candidate.id DESC
+                    LIMIT 1
+                ) AS revision ON TRUE
+                WHERE asset.deleted_at_utc IS NULL
+            ),
+            displayable_captions AS (
+                SELECT DISTINCT caption.asset_revision_id
+                FROM photo_generated_captions AS caption
+                INNER JOIN current_revisions AS current
+                    ON current.id = caption.asset_revision_id
+                WHERE caption.content IS NOT NULL
+                  AND cardinality(caption.risk_flags) = 0
+            )
+            SELECT
+                (SELECT count(*) FROM current_revisions),
+                (SELECT count(*) FROM displayable_captions);
+            """;
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            throw new InvalidDataException("Photo search catalogue statistics query returned no row.");
+        }
+        return new PhotoSearchCatalogueStatistics(
+            checked((int)reader.GetInt64(0)),
+            checked((int)reader.GetInt64(1)));
     }
 
     public async Task<PhotoSearchStorageStatistics> GetStatisticsAsync(
