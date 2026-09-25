@@ -1,0 +1,72 @@
+{
+  "generatedAtUtc": "2026-09-25T15:29:26+00:00",
+  "mode": "dry-run",
+  "summary": {
+    "TotalPhotos": 10,
+    "MissingDate": 0,
+    "MissingLocation": 5,
+    "DateProposals": 0,
+    "PlaceProposals": 5,
+    "Ambiguous": 0,
+    "AppliedDates": 0,
+    "AppliedPlaces": 0,
+    "SkippedBecauseChanged": 0
+  },
+  "items": [
+    {
+      "revisionId": "00000000-0000-0000-0000-000000000001",
+      "sourceKey": "2024/03/a.jpg",
+      "existingDate": "2024-03-23",
+      "hasLocation": false,
+      "proposedDate": null,
+      "dateReason": null,
+      "proposedPlace": "Sverige/Stockholm/Södermalm",
+      "placeRule": "2024-03-23-sodermalm",
+      "ambiguity": null
+    },
+    {
+      "revisionId": "00000000-0000-0000-0000-000000000002",
+      "sourceKey": "fideli/a.jpg",
+      "existingDate": "2024-03-23",
+      "hasLocation": false,
+      "proposedDate": null,
+      "dateReason": null,
+      "proposedPlace": "Sverige/Stockholm/Södermalm",
+      "placeRule": "2024-03-23-sodermalm",
+      "ambiguity": null
+    },
+    {
+      "revisionId": "00000000-0000-0000-0000-000000000003",
+      "sourceKey": "2026/08/a.jpg",
+      "existingDate": "2026-08-15",
+      "hasLocation": false,
+      "proposedDate": null,
+      "dateReason": null,
+      "proposedPlace": "Sverige/Värmdö/Svartsö",
+      "placeRule": "2026-08-15-svartso",
+      "ambiguity": null
+    },
+    {
+      "revisionId": "00000000-0000-0000-0000-000000000004",
+      "sourceKey": "2026/08/b.jpg",
+      "existingDate": "2026-08-15",
+      "hasLocation": false,
+      "proposedDate": null,
+      "dateReason": null,
+      "proposedPlace": "Sverige/Värmdö/Svartsö",
+      "placeRule": "2026-08-15-svartso",
+      "ambiguity": null
+    },
+    {
+      "revisionId": "00000000-0000-0000-0000-000000000005",
+      "sourceKey": "Moa/a.jpg",
+      "existingDate": "2026-08-15",
+      "hasLocation": false,
+      "proposedDate": null,
+      "dateReason": null,
+      "proposedPlace": "Sverige/Värmdö/Svartsö",
+      "placeRule": "2026-08-15-svartso",
+      "ambiguity": null
+    }
+  ]
+}
