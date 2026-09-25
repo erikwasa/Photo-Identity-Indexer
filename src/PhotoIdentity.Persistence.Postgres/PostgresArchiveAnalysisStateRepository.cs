@@ -10,11 +10,13 @@ namespace PhotoIdentity.Persistence.Postgres;
 public sealed partial class PostgresArchiveAnalysisStateRepository : IArchiveAnalysisStateRepository
 {
     private readonly PostgresCatalogueDatabase _database;
+    private readonly PostgresSourceCopyExclusionRepository _exclusions;
 
     public PostgresArchiveAnalysisStateRepository(PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+        _exclusions = new PostgresSourceCopyExclusionRepository(database);
     }
 
     public async Task RegisterRunAsync(
