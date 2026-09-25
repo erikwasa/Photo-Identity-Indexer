@@ -13,12 +13,14 @@ public sealed class SqliteFaceReviewDerivativeBackfillRepository : IFaceReviewDe
 {
     private readonly SqliteCatalogueDatabase _database;
     private readonly SqliteFaceReviewDerivativeRepository _derivatives;
+    private readonly SqliteSourceCopyExclusionRepository _exclusions;
 
     public SqliteFaceReviewDerivativeBackfillRepository(SqliteCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
         _derivatives = new SqliteFaceReviewDerivativeRepository(database);
+        _exclusions = new SqliteSourceCopyExclusionRepository(database);
     }
 
     public async Task<AssetRevisionId?> GetNextPendingCurrentRevisionAsync(
@@ -29,7 +31,7 @@ public sealed class SqliteFaceReviewDerivativeBackfillRepository : IFaceReviewDe
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
         await _derivatives.EnsureSchemaAsync(cancellationToken);
         IReadOnlyList<SourceCopyExclusionState> exclusions =
-            await new SqliteSourceCopyExclusionRepository(_database).ListAsync(sourceId, cancellationToken);
+            await _exclusions.ListAsync(sourceId, cancellationToken);
         HashSet<string> excludedKeys = exclusions
             .Select(item => item.SourceKey)
             .ToHashSet(StringComparer.Ordinal);
