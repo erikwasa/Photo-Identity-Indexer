@@ -72,4 +72,8 @@ Automated persistence/API/UI coverage plus maintainer verification with one Smar
 - `/creative-collections` provides explicit source-Smart-Collection selection and independent create/rename/edit/delete controls. `/slideshows` renders named Creative cards with `Creative · from <anchor>` context and a direct management link.
 - Direct launch keeps the existing `/slideshow/{id}?creative=true` player contract. Named Creative IDs are resolved back to their anchor only for materialization and exposure accounting, while the immutable snapshot carries the Creative Collection ID/name and fixed revision sequence.
 - Focused tests cover legacy migration, multiple sibling recipes, rename/delete independence, named snapshot identity and Creative library navigation.
-- Implementation PR: #414. Completion remains pending CI and maintainer desktop/phone verification.
+- Implementation PR: #414.
+
+## Maintainer acceptance — 2026-09-25
+
+The maintainer reported WI-0158 working as expected after merge. Named Creative Collections remain independent and are discoverable/launchable from the Slideshows surface. A separate presentation regression was then identified on `/slideshows`: the Creative child component did not inherit the parent page's isolated card CSS, allowing its cover to escape the intended card bounds and leaving Creative entries visually inconsistent. That layout defect is being corrected independently and does not reopen WI-0158's persistence/lifecycle/launch semantics.
