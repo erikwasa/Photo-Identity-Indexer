@@ -1,0 +1,26 @@
+id: WI-0162
+title: Scale semantic photo search and create slideshow collections from caption search
+milestone: M26
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0162-semantic-caption-search-slideshow-collections.md
+started_at: 2026-09-25
+completed_at: 2026-09-25
+verified_at: 2026-09-25
+verified_by: maintainer
+last_updated_at: 2026-09-25
+branch: agent/WI-0162-semantic-caption-search
+blockers:
+- WI-0127
+- WI-0128
+- WI-0145
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/425
+- type: ci
+  value: 'GitHub Actions build run #2180 completed successfully on PR #425.'
+- type: evaluation
+  value: '2026-09-25 private-archive WI-0162 evaluation: 10,585 indexed photos, 517 displayable captions, 24 paired English/Swedish queries; English semantic precision@10 107/120 (0.89), Swedish 35/120 (0.29). Maintainer accepted English-only Visual/CLIP search.'
+- type: verification
+  value: '2026-09-25 maintainer saved WI-0162 Cakes (53 revisions) and WI-0162 snow test (80 revisions), launched both through Slideshows, restarted the application, and verified exact ordered membership remained unchanged for both (Same order: True).'
