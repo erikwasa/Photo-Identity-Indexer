@@ -36,8 +36,7 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
 
         CREATE INDEX IF NOT EXISTS ix_photo_generated_captions_search_simple
             ON photo_generated_captions
-            USING GIN (to_tsvector('simple', COALESCE(content, '')))
-            WHERE content IS NOT NULL AND cardinality(risk_flags) = 0;
+            USING GIN (to_tsvector('simple', COALESCE(content, '')));
         """;
 
     private readonly PostgresCatalogueDatabase _database;
@@ -278,12 +277,11 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                     caption.asset_revision_id,
                     caption.language,
                     caption.content,
+                    caption.risk_flags,
                     caption.generated_at_utc
                 FROM photo_generated_captions AS caption
                 INNER JOIN current_revisions AS current
                     ON current.id = caption.asset_revision_id
-                WHERE caption.content IS NOT NULL
-                  AND cardinality(caption.risk_flags) = 0
                 ORDER BY
                     caption.asset_revision_id,
                     caption.language,
@@ -304,9 +302,13 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                           END
                     )::double precision AS score
                 FROM latest
-                WHERE to_tsvector('simple', latest.content)
-                      @@ plainto_tsquery('simple', @query)
-                   OR lower(latest.content) LIKE '%' || lower(@query) || '%'
+                WHERE latest.content IS NOT NULL
+                  AND cardinality(latest.risk_flags) = 0
+                  AND (
+                      to_tsvector('simple', latest.content)
+                          @@ plainto_tsquery('simple', @query)
+                      OR lower(latest.content) LIKE '%' || lower(@query) || '%'
+                  )
             ),
             best AS (
                 SELECT DISTINCT ON (asset_revision_id)
@@ -362,13 +364,25 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                 ) AS revision ON TRUE
                 WHERE asset.deleted_at_utc IS NULL
             ),
-            displayable_captions AS (
-                SELECT DISTINCT caption.asset_revision_id
+            latest_captions AS (
+                SELECT DISTINCT ON (caption.asset_revision_id, caption.language)
+                    caption.asset_revision_id,
+                    caption.language,
+                    caption.content,
+                    caption.risk_flags
                 FROM photo_generated_captions AS caption
                 INNER JOIN current_revisions AS current
                     ON current.id = caption.asset_revision_id
-                WHERE caption.content IS NOT NULL
-                  AND cardinality(caption.risk_flags) = 0
+                ORDER BY
+                    caption.asset_revision_id,
+                    caption.language,
+                    caption.generated_at_utc DESC
+            ),
+            displayable_captions AS (
+                SELECT DISTINCT asset_revision_id
+                FROM latest_captions
+                WHERE content IS NOT NULL
+                  AND cardinality(risk_flags) = 0
             )
             SELECT
                 (SELECT count(*) FROM current_revisions),
@@ -420,13 +434,25 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
                   AND embedding.preprocessing_version = @preprocessing_version
                   AND embedding.vector_encoding = @vector_encoding
             ),
-            displayable_captions AS (
-                SELECT DISTINCT caption.asset_revision_id
+            latest_captions AS (
+                SELECT DISTINCT ON (caption.asset_revision_id, caption.language)
+                    caption.asset_revision_id,
+                    caption.language,
+                    caption.content,
+                    caption.risk_flags
                 FROM photo_generated_captions AS caption
                 INNER JOIN current_revisions AS current
                     ON current.id = caption.asset_revision_id
-                WHERE caption.content IS NOT NULL
-                  AND cardinality(caption.risk_flags) = 0
+                ORDER BY
+                    caption.asset_revision_id,
+                    caption.language,
+                    caption.generated_at_utc DESC
+            ),
+            displayable_captions AS (
+                SELECT DISTINCT asset_revision_id
+                FROM latest_captions
+                WHERE content IS NOT NULL
+                  AND cardinality(risk_flags) = 0
             )
             SELECT
                 (SELECT count(*) FROM current_revisions),
@@ -467,6 +493,9 @@ public sealed class PostgresPhotoSearchRepository : IPhotoSearchRepository
             {
                 return;
             }
+
+            PostgresPhotoCaptionRepository captionRepository = new(_database);
+            _ = await captionRepository.GetSettingsAsync(cancellationToken);
 
             await using NpgsqlConnection connection =
                 await _database.OpenConnectionAsync(cancellationToken);
