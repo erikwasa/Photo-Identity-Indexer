@@ -1,0 +1,256 @@
+@implements IDisposable
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+@if (Visible)
+{
+    <section class="archive-photo-navigator" aria-label="Archive photo navigation">
+        @if (Loading)
+        {
+            <span class="archive-photo-nav-status">Restoring archive navigation…</span>
+        }
+        else if (Resolved is ArchivePhotoNavigationResolution navigation)
+        {
+            <div class="archive-photo-nav-controls">
+                @if (navigation.Previous is ArchivePhotoNeighbor previous)
+                {
+                    <a class="button secondary"
+                       href="@BuildNeighborHref(previous)"
+                       rel="prev">
+                        Previous
+                    </a>
+                }
+                else
+                {
+                    <button type="button" class="button secondary" disabled>Previous</button>
+                }
+
+                <span class="archive-photo-nav-status">
+                    Archive item @(navigation.Index + 1) of @navigation.Total
+                </span>
+
+                @if (navigation.Next is ArchivePhotoNeighbor next)
+                {
+                    <a class="button secondary"
+                       href="@BuildNeighborHref(next)"
+                       rel="next">
+                        Next
+                    </a>
+                }
+                else
+                {
+                    <button type="button" class="button secondary" disabled>Next</button>
+                }
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(Notice))
+        {
+            <span class="archive-photo-nav-status" role="status">@Notice</span>
+        }
+    </section>
+}
+
+@code {
+    private bool Visible { get; set; }
+    private bool Loading { get; set; }
+    private string? Notice { get; set; }
+    private ArchivePhotoWorkspaceContext? WorkspaceContext { get; set; }
+    private ArchivePhotoNavigationResolution? Resolved { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += HandleLocationChanged;
+        await ReloadAsync();
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await ReloadAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task ReloadAsync()
+    {
+        Visible = false;
+        Loading = false;
+        Notice = null;
+        WorkspaceContext = null;
+        Resolved = null;
+
+        if (!SmartCollectionNavigation.TryParsePhotoUrl(
+                Navigation.Uri,
+                out string? revisionId,
+                out string? returnUrl))
+        {
+            return;
+        }
+
+        string? normalizedReturnUrl = PhotoReturnContext.NormalizeLocalReturnUrl(returnUrl);
+        if (!ArchivePhotoNavigation.TryParseWorkspaceContext(
+                normalizedReturnUrl,
+                out ArchivePhotoWorkspaceContext? context) ||
+            context is null)
+        {
+            return;
+        }
+
+        Visible = true;
+        Loading = true;
+        WorkspaceContext = context;
+
+        try
+        {
+            ArchiveItemPageResponse? page = await QueryPageAsync(
+                context,
+                context.Offset,
+                ArchivePhotoNavigation.ResultPageSize);
+            if (page is null)
+            {
+                return;
+            }
+
+            if (!ArchivePhotoNavigation.TryFindCurrent(
+                    page,
+                    revisionId!,
+                    out int localIndex,
+                    out int globalIndex))
+            {
+                Notice = "Archive results changed or this photo is no longer on the active archive page. Return to Archive to refresh the results.";
+                return;
+            }
+
+            ArchivePhotoNeighbor? previous = ArchivePhotoNavigation.FindPreviousNeighbor(page, localIndex);
+            if (previous is null && globalIndex > 0)
+            {
+                previous = await FindNeighborOutsidePageAsync(
+                    context,
+                    globalIndex - 1,
+                    direction: -1,
+                    page.Total);
+            }
+
+            ArchivePhotoNeighbor? next = ArchivePhotoNavigation.FindNextNeighbor(page, localIndex);
+            if (next is null && globalIndex + 1 < page.Total)
+            {
+                next = await FindNeighborOutsidePageAsync(
+                    context,
+                    globalIndex + 1,
+                    direction: 1,
+                    page.Total);
+            }
+
+            Resolved = new ArchivePhotoNavigationResolution(
+                globalIndex,
+                page.Total,
+                previous,
+                next);
+        }
+        catch (Exception exception)
+        {
+            Notice = $"Archive navigation could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task<ArchivePhotoNeighbor?> FindNeighborOutsidePageAsync(
+        ArchivePhotoWorkspaceContext context,
+        int startIndex,
+        int direction,
+        int total)
+    {
+        int cursor = startIndex;
+        while (cursor >= 0 && cursor < total)
+        {
+            int offset;
+            int limit;
+            if (direction < 0)
+            {
+                offset = Math.Max(0, cursor - ArchivePhotoNavigation.ResultPageSize + 1);
+                limit = cursor - offset + 1;
+            }
+            else
+            {
+                offset = cursor;
+                limit = Math.Min(ArchivePhotoNavigation.ResultPageSize, total - cursor);
+            }
+
+            ArchiveItemPageResponse? page = await QueryPageAsync(context, offset, limit);
+            if (page is null || page.Items.Count == 0)
+            {
+                return null;
+            }
+
+            if (direction < 0)
+            {
+                int localStart = Math.Min(cursor - page.Offset, page.Items.Count - 1);
+                for (int index = localStart; index >= 0; index--)
+                {
+                    string? revisionId = page.Items[index].RevisionId;
+                    if (!string.IsNullOrWhiteSpace(revisionId))
+                    {
+                        return new ArchivePhotoNeighbor(page.Offset + index, revisionId);
+                    }
+                }
+
+                cursor = page.Offset - 1;
+            }
+            else
+            {
+                int localStart = Math.Max(0, cursor - page.Offset);
+                for (int index = localStart; index < page.Items.Count; index++)
+                {
+                    string? revisionId = page.Items[index].RevisionId;
+                    if (!string.IsNullOrWhiteSpace(revisionId))
+                    {
+                        return new ArchivePhotoNeighbor(page.Offset + index, revisionId);
+                    }
+                }
+
+                cursor = page.Offset + page.Items.Count;
+            }
+        }
+
+        return null;
+    }
+
+    private async Task<ArchiveItemPageResponse?> QueryPageAsync(
+        ArchivePhotoWorkspaceContext context,
+        int offset,
+        int limit)
+    {
+        using HttpResponseMessage response = await Http.GetAsync(
+            ArchivePhotoNavigation.BuildItemsUrl(context, offset, limit));
+        if (!response.IsSuccessStatusCode)
+        {
+            Notice = $"Archive navigation query failed with HTTP {(int)response.StatusCode}.";
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ArchiveItemPageResponse>();
+    }
+
+    private string BuildNeighborHref(ArchivePhotoNeighbor neighbor)
+    {
+        ArchivePhotoWorkspaceContext context = WorkspaceContext
+            ?? throw new InvalidOperationException("Archive workspace context is unavailable.");
+        int offset = ArchivePhotoNavigation.PageOffsetForIndex(neighbor.Index);
+        string returnUrl = ArchiveNavigation.BuildWorkspaceUrl(
+            context.Folder,
+            context.Availability,
+            context.Verification,
+            context.Analysis,
+            offset);
+        return ArchiveNavigation.BuildPhotoUrl(neighbor.RevisionId, returnUrl);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= HandleLocationChanged;
+    }
+}
