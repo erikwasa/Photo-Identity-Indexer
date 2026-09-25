@@ -94,6 +94,34 @@ public sealed class SourceCopyExclusionTests
         Assert.Null(await catalogue.Exclusions.GetAsync(catalogue.SourceId, "B/moved.jpg"));
     }
 
+    [Fact]
+    public async Task Excluded_revision_is_not_returned_for_archive_analysis_scheduling()
+    {
+        await using TestCatalogue catalogue = await TestCatalogue.CreateAsync();
+        MutableArchiveSource source = new(catalogue.SourceId);
+        DateTimeOffset t0 = Utc(10);
+
+        source.Set(
+            new TestItem("A/private.jpg", [1, 3, 5, 7], t0, AssetAvailability.Local),
+            new TestItem("B/visible.jpg", [2, 4, 6, 8], t0, AssetAvailability.Local));
+        await catalogue.SyncAsync(source, ["A", "B"], t0);
+
+        AssetRow privateAsset = Assert.IsType<AssetRow>(await catalogue.FindAssetAsync("A/private.jpg"));
+        AssetRow visibleAsset = Assert.IsType<AssetRow>(await catalogue.FindAssetAsync("B/visible.jpg"));
+        Assert.NotNull(privateAsset.RevisionId);
+        Assert.NotNull(visibleAsset.RevisionId);
+
+        await catalogue.Exclusions.ExcludeAsync(catalogue.SourceId, "A/private.jpg", Utc(11));
+
+        SqliteArchiveAnalysisRepository analysis = new(catalogue.Database);
+        IReadOnlyList<AssetRevisionId> pending = await analysis.GetPendingCurrentRevisionIdsAsync(
+            catalogue.SourceId,
+            new Sha256Digest(new string('a', 64)));
+
+        Assert.DoesNotContain(privateAsset.RevisionId.Value, pending);
+        Assert.Contains(visibleAsset.RevisionId.Value, pending);
+    }
+
     private static DateTimeOffset Utc(int hour) =>
         new(2026, 9, 25, hour, 0, 0, TimeSpan.Zero);
 
