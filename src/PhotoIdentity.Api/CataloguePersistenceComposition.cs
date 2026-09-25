@@ -35,6 +35,8 @@ internal static class CataloguePersistenceComposition
     public static void AddSqlite(IServiceCollection services, string databasePath)
     {
         services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
+        services.AddSingleton<SqliteSourceCopyExclusionRepository>();
+        services.AddSingleton<ISourceCopyExclusionRepository>(sp => sp.GetRequiredService<SqliteSourceCopyExclusionRepository>());
 
         services.AddSingleton<SqliteReviewRepository>();
         services.AddSingleton<IReviewActionRepository>(sp => sp.GetRequiredService<SqliteReviewRepository>());
@@ -172,6 +174,8 @@ internal static class CataloguePersistenceComposition
         PostgresCatalogueDatabase database = new(connectionString);
         services.AddSingleton(database);
         services.AddSingleton<ICatalogueStoreInitializer>(sp => sp.GetRequiredService<PostgresCatalogueDatabase>());
+        services.AddSingleton<PostgresSourceCopyExclusionRepository>();
+        services.AddSingleton<ISourceCopyExclusionRepository>(sp => sp.GetRequiredService<PostgresSourceCopyExclusionRepository>());
 
         services.AddSingleton<PostgresReviewActionRepository>();
         services.AddSingleton<IReviewActionRepository>(sp => sp.GetRequiredService<PostgresReviewActionRepository>());
