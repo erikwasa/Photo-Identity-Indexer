@@ -13,11 +13,13 @@ namespace PhotoIdentity.Persistence.Sqlite;
 public sealed class SqliteArchiveAnalysisRepository : IArchiveAnalysisStateRepository
 {
     private readonly SqliteCatalogueDatabase _database;
+    private readonly SqliteSourceCopyExclusionRepository _exclusions;
 
     public SqliteArchiveAnalysisRepository(SqliteCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+        _exclusions = new SqliteSourceCopyExclusionRepository(database);
     }
 
     public async Task RegisterRunAsync(
@@ -123,7 +125,7 @@ public sealed class SqliteArchiveAnalysisRepository : IArchiveAnalysisStateRepos
     {
         await EnsureSchemaAsync(cancellationToken);
         IReadOnlyList<SourceCopyExclusionState> exclusions =
-            await new SqliteSourceCopyExclusionRepository(_database).ListAsync(sourceId, cancellationToken);
+            await _exclusions.ListAsync(sourceId, cancellationToken);
         HashSet<string> excludedKeys = exclusions
             .Select(item => item.SourceKey)
             .ToHashSet(StringComparer.Ordinal);
