@@ -53,9 +53,9 @@ The next experiment should therefore scale the part that worked instead of reviv
 - [x] Swedish natural-language semantic search is evaluated explicitly and the chosen product strategy is documented with measured quality/latency.
 - [x] Similar-photo and embedding-diversity features remain disabled unless new measured evidence independently justifies reopening them.
 - [x] The product search surface indicates or retains provenance for semantic versus caption matches.
-- [ ] Search results can be saved as a named explicit slideshow/photo-list collection and launched through normal slideshow playback.
-- [ ] A saved result collection retains its revision membership even if captions or semantic model evidence later change.
-- [ ] Automated tests protect result provenance, caption-absent behavior, collection materialization and immutable saved membership.
+- [x] Search results can be saved as a named explicit slideshow/photo-list collection and launched through normal slideshow playback.
+- [x] A saved result collection retains its revision membership even if captions or semantic model evidence later change.
+- [x] Automated tests protect result provenance, caption-absent behavior, collection materialization and immutable saved membership.
 
 ## Evaluation evidence — 2026-09-25
 
@@ -77,9 +77,24 @@ Caption retrieval was also measured. Across the 24-query suite it returned only 
 
 The checked-in bilingual query suite remains evaluation/regression material only. It is not runtime configuration and does not constrain normal search input.
 
+## Completion verification — 2026-09-25
+
+The maintainer completed the remaining product verification against the PostgreSQL rehearsal catalogue:
+
+- saved `WI-0162 Cakes` with **53** ordered revisions and `WI-0162 snow test` with **80** ordered revisions from Search;
+- launched both collections through the normal Slideshows surface and confirmed playback works as expected;
+- restarted Photo Identity and re-read both explicit photo-list collections;
+- verified both retained the same counts and exact ordered revision membership (`Same order: True` for both collections).
+
+Automated coverage is also in place and passed in PR #425 CI run #2180:
+
+- `PhotoSearchRankerTests` protects combined semantic/caption provenance, semantic-only results without captions, caption-only isolation and deterministic fusion ordering;
+- `PostgresPhotoSearchRepositoryTests` protects versioned semantic evidence plus displayable-caption filtering/search behavior;
+- `PhotoListCollectionEndpointTests` protects ordered explicit membership and playback-compatible slideshow snapshot materialization.
+
 ## Verification requirements
 
-The large-scale relevance and language evaluation has been completed. Remaining maintainer verification is product behavior: run representative English Visual searches, inspect provenance, exercise caption-only behavior in the language of stored captions, save at least two result sets as named slideshow collections, restart the application, and verify both remain independently launchable with unchanged ordered membership.
+Completed. The large-scale relevance/language evaluation, provenance/caption-absent behavior, two independent saved-result collections, slideshow playback, application restart and exact ordered-membership persistence have all been verified. English is the supported Visual/CLIP query language for this implementation; the bilingual suite remains as regression/evaluation evidence.
 
 ## Design notes
 
