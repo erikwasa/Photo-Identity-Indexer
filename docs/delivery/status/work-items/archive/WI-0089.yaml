@@ -1,10 +1,13 @@
 id: WI-0089
 title: Add durable source-copy exclusion and access enforcement
 milestone: M23
-status: in_review
+status: completed
 owner: ai-agent
 document: ../work-items/WI-0089-source-copy-exclusion-boundary.md
 started_at: 2026-09-25
+completed_at: 2026-09-26
+verified_at: 2026-09-26
+verified_by: ai-agent
 last_updated_at: 2026-09-26
 branch: agent/wi-0089-source-copy-exclusion
 blockers:
@@ -14,3 +17,5 @@ blocker_notes: []
 evidence:
 - type: pull_request
   value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/428
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/36198419182
