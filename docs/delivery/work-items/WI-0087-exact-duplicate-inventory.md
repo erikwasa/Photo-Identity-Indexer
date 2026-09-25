@@ -5,7 +5,7 @@ milestone: M23
 status_source: ../status/work-items.yaml
 depends_on: [WI-0041]
 related_adrs: [ADR-0008]
-affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Api, documentation]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Api, documentation]
 ---
 
 # WI-0087: Add authoritative exact-duplicate source-copy inventory
@@ -53,7 +53,11 @@ Automated SQLite/integration coverage is required. Maintainer review should veri
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+Implementation started 2026-09-25 on `agent/wi-0087-exact-duplicate-inventory`.
+
+- Files changed: added the provider-neutral exact-duplicate contract, SQLite and PostgreSQL query adapters, a read-only `/api/archive/exact-duplicates` endpoint, and focused provider tests.
+- Semantics: duplicate membership uses the revision explicitly verified as current by the archive source observation. `needs-source-verification` and never-verified source copies are excluded; verified online-only and later-missing copies retain duplicate membership.
+- Indexing: both adapters idempotently ensure a non-unique `(content_sha256, asset_id)` lookup index before querying. This keeps the slice deployable on both current PostgreSQL catalogues and legacy SQLite catalogues without introducing cross-copy uniqueness.
+- Trade-offs: the operator UI remains intentionally deferred to WI-0091. The endpoint exposes source-copy identities and lifecycle presence but does not merge, suppress or mutate them.
+- Deferred work: maintainer real-catalogue verification and final documentation/status completion after CI.
+- Commands run: repository inspection through the GitHub connector; CI commands will be recorded after the PR workflow runs.
