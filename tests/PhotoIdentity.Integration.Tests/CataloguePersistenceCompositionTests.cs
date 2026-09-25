@@ -48,14 +48,17 @@ public sealed class CataloguePersistenceCompositionTests
         Assert.Same(database, provider.GetRequiredService<PostgresCatalogueDatabase>());
         Assert.Same(database, provider.GetRequiredService<ICatalogueStoreInitializer>());
 
-        Assert.IsType<PostgresReviewQueryRepository>(provider.GetRequiredService<IReviewFaceRepository>());
-        Assert.IsType<PostgresReviewActionRepository>(provider.GetRequiredService<IReviewActionRepository>());
+        Assert.IsType<PostgresReviewQueryRepository>(provider.GetRequiredService<PostgresReviewQueryRepository>());
+        Assert.IsType<ExclusionAwareReviewFaceRepository>(provider.GetRequiredService<IReviewFaceRepository>());
+        Assert.IsType<PostgresReviewActionRepository>(provider.GetRequiredService<PostgresReviewActionRepository>());
+        Assert.IsType<ExclusionAwareReviewActionRepository>(provider.GetRequiredService<IReviewActionRepository>());
+        Assert.IsType<PostgresSourceCopyExclusionRepository>(provider.GetRequiredService<ISourceCopyExclusionRepository>());
         Assert.IsType<PostgresIdentityMatchModelRepository>(provider.GetRequiredService<IIdentityMatchModelRepository>());
         Assert.IsType<PostgresIdentityMatchRegenerationRepository>(provider.GetRequiredService<IIdentityMatchRegenerationRepository>());
         Assert.IsType<PostgresIdentityMatchRegenerationScorer>(provider.GetRequiredService<IIdentityMatchRegenerationScorer>());
         Assert.IsType<PostgresPersonPresentationRepository>(provider.GetRequiredService<IPersonFeaturedFaceRepository>());
-        Assert.IsType<PostgresCollectionQueryRepository>(provider.GetRequiredService<ICollectionQueryRepository>());
-        Assert.IsType<PostgresSmartCollectionQueryRepository>(provider.GetRequiredService<ISmartCollectionQueryRepository>());
+        Assert.IsType<ExclusionAwareCollectionQueryRepository>(provider.GetRequiredService<ICollectionQueryRepository>());
+        Assert.IsType<ExclusionAwareSmartCollectionQueryRepository>(provider.GetRequiredService<ISmartCollectionQueryRepository>());
         Assert.IsType<PostgresPhotoMetadataInspectionRepository>(provider.GetRequiredService<IPhotoMetadataInspectionRepository>());
         Assert.IsType<PostgresPhotoCaptureDateRepository>(provider.GetRequiredService<IPhotoCaptureDateRepository>());
         Assert.IsType<PostgresPhotoPlaceRepository>(provider.GetRequiredService<IPhotoPlaceRepository>());
