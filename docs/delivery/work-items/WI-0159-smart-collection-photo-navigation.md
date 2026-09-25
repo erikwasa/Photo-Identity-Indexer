@@ -44,7 +44,7 @@ The current details workflow makes inspection unnecessarily repetitive: open one
 - [x] Navigating several photos and then returning restores the Smart Collection context without requiring filter re-entry.
 - [x] Saved and transient Smart Collection result contexts are supported.
 - [x] Direct Photo Details navigation that did not originate in Smart Collections still works without collection navigation controls.
-- [ ] Automated coverage protects ordering, boundaries, stale/deleted result handling, and return routing.
+- [x] Automated coverage protects ordering, boundaries, stale/deleted result handling, and return routing.
 
 ## Verification requirements
 
@@ -52,10 +52,14 @@ Maintainer verification on desktop and phone: open a Smart Collection with more 
 
 ## Completion notes
 
-- Implementation is in PR #417 and remains `in_progress` until CI and the deferred maintainer desktop/phone verification are complete.
+- Implementation shipped in PR #417.
 - Photo Details reuses the existing Smart Collection `returnUrl` as the navigation context. Saved collections retain the collection ID; transient previews retain their per-tab preview key and reconstruct the exact stored filter state from `sessionStorage`.
 - Navigation reuses the existing bounded saved/transient Smart Collection query endpoints, so the canonical query ordering remains authoritative and the browser never requests an unbounded result set.
 - The navigator normally evaluates the current 40-photo result page. When the current photo is at a page edge it performs one additional three-row query around that boundary to resolve the adjacent photo without changing collection semantics.
 - Previous/next links update the nested Smart Collection return offset to the 40-photo page containing the destination, so returning after traversing several photos restores the useful browsing position.
 - If the collection changes enough that the current revision cannot be reconciled with the expected result page, navigation is disabled with a stale-context notice rather than jumping to a different photo.
 - Direct Photo Details and Archive-originated Photo Details remain unchanged because the navigator activates only for a validated saved/transient Smart Collection return context.
+
+## Maintainer acceptance — 2026-09-25
+
+The maintainer reported WI-0159 working as expected after merge. Saved/transient Smart Collection sequence navigation and return-context behavior were accepted, so the item is complete and WI-0160 is unblocked.
