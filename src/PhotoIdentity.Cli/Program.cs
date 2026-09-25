@@ -96,6 +96,11 @@ public static class Program
                     MatchCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
                     cancellationToken),
+                "metadata" when args.Length > 1 && args[1] == "enrich" =>
+                    await MetadataEnrichmentCommandRunner.RunAsync(
+                        MetadataEnrichmentCommandOptions.Parse(args.Skip(2).ToArray()),
+                        output,
+                        cancellationToken),
                 "rollout" => await DetectorRolloutCommandRunner.RunAsync(
                     DetectorRolloutCommandOptions.Parse(args.Skip(1).ToArray()),
                     output,
@@ -211,6 +216,9 @@ public static class Program
                                [--high-score-threshold 0..1]
                                [--high-margin-threshold 0..2]
                                [--medium-score-threshold 0..1]
+
+              metadata enrich --postgres-connection-env NAME --rules PATH
+                              [--report PATH] [--apply]
 
               semantic-tags evaluate --postgres-connection-env NAME
                                      --collection COLLECTION_ID
@@ -349,6 +357,15 @@ public static class Program
             five-point SFace alignment and embeddings. It writes an annotated SVG,
             per-face outputs, a reproducibility manifest and detailed timings without
             modifying the source image.
+
+            Metadata enrich is the WI-0163 catalogue-only bulk correction path. It is dry-run
+            by default, reads explicit JSON rules, proposes dates only for currently undated
+            photos and Places only for photos without a named Place or valid non-zero GPS.
+            Directory inference preserves month precision and excludes the configured catch-all
+            directories such as 1970. Place rules apply only when the photo's entire effective
+            date range is contained by the rule. Ambiguities are reported rather than guessed.
+            --apply is required for writes, which use the existing append-only capture-date and
+            Place repositories. Originals and extracted metadata are never modified.
 
             Semantic-tags evaluate is the WI-0126 bounded local visible-content experiment.
             It reads one saved Smart Collection from PostgreSQL, generates the same timestamp-first
