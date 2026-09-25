@@ -65,6 +65,12 @@ public sealed class PostgresSmartCollectionFamilyFilterTests
                 "parent",
                 "test",
                 DateTimeOffset.UtcNow);
+            await family.AddRelationshipAsync(
+                alice,
+                carol,
+                "cousin",
+                "test",
+                DateTimeOffset.UtcNow);
 
             PostgresSmartCollectionRepository definitions = new(database, TimeProvider.System);
             PostgresSmartCollectionQueryRepository query = new(database, definitions, TimeProvider.System);
@@ -88,17 +94,23 @@ public sealed class PostgresSmartCollectionFamilyFilterTests
             Assert.Contains(childOf.Items, photo => photo.RevisionId == family2015);
             Assert.Contains(childOf.Items, photo => photo.RevisionId == alice2025);
 
+            SmartCollectionPhotoPage cousinOf = await query.QueryAsync(
+                new SmartCollectionFilter(
+                    relationship: new SmartCollectionRelationshipCriterion(alice, ["cousin"])));
+            Assert.Equal(1, cousinOf.Total);
+            Assert.Equal(family2015, Assert.Single(cousinOf.Items).RevisionId);
+
             SmartCollectionDefinition saved = await definitions.CreateAsync(
                 "Alice with child around age five",
                 new SmartCollectionFilter(
                     people: [alice],
                     age: new SmartCollectionAgeCriterion(alice, 4, 5),
-                    relationship: new SmartCollectionRelationshipCriterion(alice, ["parent"])));
+                    relationship: new SmartCollectionRelationshipCriterion(alice, ["parent", "cousin"])));
             SmartCollectionDefinition reopened =
                 await definitions.GetAsync(saved.Id) ?? throw new InvalidOperationException();
             Assert.Equal(alice, reopened.Filter.Age?.PersonId);
             Assert.Equal(4, reopened.Filter.Age?.MinimumYears);
-            Assert.Equal(["parent"], reopened.Filter.Relationship?.Kinds);
+            Assert.Equal(["cousin", "parent"], reopened.Filter.Relationship?.Kinds);
         }
         finally
         {

@@ -68,6 +68,10 @@
     margin-bottom: 1rem;
 }
 
+.family-metadata-grid {
+    grid-template-columns: minmax(15rem, 0.72fr) minmax(0, 1.28fr);
+}
+
 .maintenance-card {
     padding: 1.1rem;
 }
@@ -89,6 +93,71 @@
 .maintenance-card input,
 .maintenance-card button {
     max-width: 100%;
+}
+
+.relationship-editor-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: 0.8rem;
+}
+
+.relationship-editor-grid > label {
+    display: grid;
+    align-content: start;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.relationship-editor-grid select {
+    width: 100%;
+}
+
+.relationship-groups {
+    display: grid;
+    gap: 0.9rem;
+    margin-top: 1.1rem;
+}
+
+.relationship-group {
+    display: grid;
+    gap: 0.45rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--line);
+}
+
+.relationship-group h4 {
+    margin: 0;
+    font-size: 0.92rem;
+    letter-spacing: 0.01em;
+}
+
+.relationship-group-list {
+    display: grid;
+    gap: 0.4rem;
+}
+
+.relationship-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.45rem 0.55rem;
+    border-radius: 0.65rem;
+    background: color-mix(in srgb, var(--surface) 78%, var(--ink) 4%);
+}
+
+.relationship-row > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.relationship-row .relationship-remove {
+    width: auto;
+    min-width: max-content;
+    margin: 0;
+    padding-inline: 0.75rem;
+    white-space: nowrap;
 }
 
 .spaced {
@@ -135,11 +204,17 @@
 }
 
 @media (max-width: 760px) {
-    .maintenance-grid {
+    .maintenance-grid,
+    .family-metadata-grid,
+    .relationship-editor-grid {
         grid-template-columns: 1fr;
     }
 
     .maintenance-card > p:not(.eyebrow) {
         min-height: 0;
+    }
+
+    .relationship-row {
+        gap: 0.55rem;
     }
 }

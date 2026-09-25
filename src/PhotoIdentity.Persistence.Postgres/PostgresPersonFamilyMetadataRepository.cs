@@ -232,7 +232,7 @@ public sealed class PostgresPersonFamilyMetadataRepository : IPersonFamilyMetada
             return (relatedPersonId, personId, PersonRelationshipKinds.Grandparent);
         }
 
-        if (kind is PersonRelationshipKinds.Spouse or PersonRelationshipKinds.Sibling &&
+        if (PersonRelationshipKinds.IsSymmetric(kind) &&
             string.CompareOrdinal(personId.ToString(), relatedPersonId.ToString()) > 0)
         {
             return (relatedPersonId, personId, kind);

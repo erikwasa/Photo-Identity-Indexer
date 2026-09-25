@@ -72,6 +72,19 @@ public sealed class PostgresPersonFamilyMetadataRepositoryTests
                 "spouse",
                 "tester",
                 now);
+            PersonFamilyRelationship cousin = await repository.AddRelationshipAsync(
+                bob,
+                carol,
+                "cousin",
+                "tester",
+                now);
+            PersonFamilyRelationship reverseCousin = await repository.AddRelationshipAsync(
+                carol,
+                bob,
+                "cousin",
+                "tester",
+                now);
+            Assert.Equal(cousin.Id, reverseCousin.Id);
 
             PersonFamilyMetadata aliceMetadata = await repository.GetAsync(alice);
             Assert.Equal("month", aliceMetadata.BirthDate?.Precision);
@@ -87,12 +100,24 @@ public sealed class PostgresPersonFamilyMetadataRepositoryTests
                     relationship.Kind == "spouse" &&
                     relationship.RelatedPersonId == bob);
 
+            PersonFamilyMetadata bobBeforeMerge = await repository.GetAsync(bob);
+            Assert.Contains(
+                bobBeforeMerge.Relationships,
+                relationship => relationship.Id == cousin.Id &&
+                    relationship.Kind == "cousin" &&
+                    relationship.RelatedPersonId == carol);
+
             PersonFamilyMetadata carolMetadata = await repository.GetAsync(carol);
             Assert.Contains(
                 carolMetadata.Relationships,
                 relationship => relationship.Id == parent.Id &&
                     relationship.Kind == "child" &&
                     relationship.RelatedPersonId == alice);
+            Assert.Contains(
+                carolMetadata.Relationships,
+                relationship => relationship.Id == cousin.Id &&
+                    relationship.Kind == "cousin" &&
+                    relationship.RelatedPersonId == bob);
 
             PostgresPersonMaintenanceRepository maintenance = new(database);
             await maintenance.MergeAsync(
@@ -108,6 +133,10 @@ public sealed class PostgresPersonFamilyMetadataRepositoryTests
                 bobMetadata.Relationships,
                 relationship => relationship.Kind == "parent" &&
                     relationship.RelatedPersonId == carol);
+            Assert.Contains(
+                bobMetadata.Relationships,
+                relationship => relationship.Kind == "cousin" &&
+                    relationship.RelatedPersonId == carol);
             Assert.DoesNotContain(
                 bobMetadata.Relationships,
                 relationship => relationship.RelatedPersonId == bob);
@@ -116,6 +145,10 @@ public sealed class PostgresPersonFamilyMetadataRepositoryTests
             Assert.Contains(
                 carolAfterMerge.Relationships,
                 relationship => relationship.Kind == "child" &&
+                    relationship.RelatedPersonId == bob);
+            Assert.Contains(
+                carolAfterMerge.Relationships,
+                relationship => relationship.Kind == "cousin" &&
                     relationship.RelatedPersonId == bob);
             Assert.DoesNotContain(
                 carolAfterMerge.Relationships,

@@ -140,9 +140,10 @@ public static class PersonRelationshipKinds
     public const string Sibling = "sibling";
     public const string Grandparent = "grandparent";
     public const string Grandchild = "grandchild";
+    public const string Cousin = "cousin";
 
     public static IReadOnlyList<string> All { get; } =
-    [Parent, Child, Spouse, Sibling, Grandparent, Grandchild];
+    [Parent, Child, Spouse, Sibling, Grandparent, Grandchild, Cousin];
 
     public static string Normalize(string value) => value?.Trim().ToLowerInvariant() switch
     {
@@ -152,8 +153,9 @@ public static class PersonRelationshipKinds
         Sibling => Sibling,
         Grandparent => Grandparent,
         Grandchild => Grandchild,
+        Cousin => Cousin,
         _ => throw new ArgumentException(
-            "Relationship kind must be parent, child, spouse, sibling, grandparent, or grandchild.",
+            "Relationship kind must be parent, child, spouse, sibling, grandparent, grandchild, or cousin.",
             nameof(value)),
     };
 
@@ -165,13 +167,14 @@ public static class PersonRelationshipKinds
         Grandchild => Grandparent,
         Spouse => Spouse,
         Sibling => Sibling,
+        Cousin => Cousin,
         _ => throw new InvalidOperationException("Unsupported relationship kind."),
     };
 
     public static bool IsSymmetric(string value)
     {
         string kind = Normalize(value);
-        return kind is Spouse or Sibling;
+        return kind is Spouse or Sibling or Cousin;
     }
 }
 

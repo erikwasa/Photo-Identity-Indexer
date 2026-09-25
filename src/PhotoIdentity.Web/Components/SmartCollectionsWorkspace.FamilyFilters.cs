@@ -13,6 +13,7 @@ public partial class SmartCollectionsWorkspace
         new("sibling", "Sibling of"),
         new("grandparent", "Grandparent of"),
         new("grandchild", "Grandchild of"),
+        new("cousin", "Cousin of"),
     ];
 
     private bool UseAgeFilter { get; set; }
@@ -170,6 +171,7 @@ public partial class SmartCollectionsWorkspace
         "sibling" => "sibling of",
         "grandparent" => "grandparent of",
         "grandchild" => "grandchild of",
+        "cousin" => "cousin of",
         _ => kind,
     };
 

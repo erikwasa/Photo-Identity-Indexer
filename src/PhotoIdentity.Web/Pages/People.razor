@@ -154,7 +154,7 @@ else
             <span>Manual metadata only</span>
         </div>
 
-        <div class="maintenance-grid">
+        <div class="maintenance-grid family-metadata-grid">
             <section class="maintenance-card">
                 <label class="field-label" for="family-person">Person</label>
                 <select id="family-person" value="@FamilyPersonId" @onchange="FamilyPersonChangedAsync">
@@ -200,27 +200,34 @@ else
                 </div>
             </section>
 
-            <section class="maintenance-card">
+            <section class="maintenance-card family-relationships-card">
                 <h3>Add relationship</h3>
                 <p>Choose the relationship from <strong>@FamilyPersonName</strong>'s perspective. The inverse relationship is shown automatically for the other person.</p>
 
-                <label class="field-label" for="relationship-kind">Relationship</label>
-                <select id="relationship-kind" @bind="RelationshipKind">
-                    <option value="parent">Parent</option>
-                    <option value="child">Child</option>
-                    <option value="spouse">Spouse</option>
-                    <option value="sibling">Sibling</option>
-                    <option value="grandparent">Grandparent</option>
-                    <option value="grandchild">Grandchild</option>
-                </select>
+                <div class="relationship-editor-grid">
+                    <label>
+                        <span class="field-label">Relationship</span>
+                        <select id="relationship-kind" @bind="RelationshipKind">
+                            <option value="parent">Parent</option>
+                            <option value="child">Child</option>
+                            <option value="spouse">Spouse</option>
+                            <option value="sibling">Sibling</option>
+                            <option value="grandparent">Grandparent</option>
+                            <option value="grandchild">Grandchild</option>
+                            <option value="cousin">Cousin</option>
+                        </select>
+                    </label>
 
-                <label class="field-label spaced" for="relationship-person">Related person</label>
-                <select id="relationship-person" @bind="RelationshipTargetId" disabled="@(FamilyRelationshipTargets.Count == 0)">
-                    @foreach (PersonMaintenancePersonResponse person in FamilyRelationshipTargets)
-                    {
-                        <option value="@person.Id">@PersonSelectLabel(person)</option>
-                    }
-                </select>
+                    <label>
+                        <span class="field-label">Related person</span>
+                        <select id="relationship-person" @bind="RelationshipTargetId" disabled="@(FamilyRelationshipTargets.Count == 0)">
+                            @foreach (PersonMaintenancePersonResponse person in FamilyRelationshipTargets)
+                            {
+                                <option value="@person.Id">@PersonSelectLabel(person)</option>
+                            }
+                        </select>
+                    </label>
+                </div>
 
                 <button class="button primary full-width"
                         disabled="@(Busy || string.IsNullOrWhiteSpace(RelationshipTargetId) || FamilyRelationshipTargets.Count == 0)"
@@ -230,22 +237,38 @@ else
 
                 @if (FamilyMetadata?.Relationships.Length > 0)
                 {
-                    <ul class="timeline">
-                        @foreach (PersonFamilyRelationshipResponse relationship in FamilyMetadata.Relationships)
+                    <div class="relationship-groups" aria-label="Existing family relationships">
+                        @foreach (string kind in RelationshipDisplayOrder)
                         {
-                            <li>
-                                <div>
-                                    <strong>@RelationshipLabel(relationship.Kind): @relationship.RelatedPersonDisplayName</strong>
-                                    <button type="button"
-                                            class="button secondary"
-                                            disabled="@Busy"
-                                            @onclick="() => RemoveRelationshipAsync(relationship.Id)">
-                                        Remove
-                                    </button>
-                                </div>
-                            </li>
+                            PersonFamilyRelationshipResponse[] relationships = FamilyMetadata.Relationships
+                                .Where(relationship => string.Equals(relationship.Kind, kind, StringComparison.OrdinalIgnoreCase))
+                                .OrderBy(relationship => relationship.RelatedPersonDisplayName, StringComparer.OrdinalIgnoreCase)
+                                .ThenBy(relationship => relationship.RelatedPersonId, StringComparer.Ordinal)
+                                .ToArray();
+
+                            @if (relationships.Length > 0)
+                            {
+                                <section class="relationship-group">
+                                    <h4>@RelationshipLabel(kind)</h4>
+                                    <div class="relationship-group-list">
+                                        @foreach (PersonFamilyRelationshipResponse relationship in relationships)
+                                        {
+                                            <div class="relationship-row">
+                                                <span>@relationship.RelatedPersonDisplayName</span>
+                                                <button type="button"
+                                                        class="button secondary relationship-remove"
+                                                        disabled="@Busy"
+                                                        aria-label="Remove @RelationshipLabel(kind).ToLowerInvariant() relationship with @relationship.RelatedPersonDisplayName"
+                                                        @onclick="() => RemoveRelationshipAsync(relationship.Id)">
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        }
+                                    </div>
+                                </section>
+                            }
                         }
-                    </ul>
+                    </div>
                 }
                 else
                 {
@@ -295,6 +318,16 @@ else
 
 @code {
     private const string Actor = "local-reviewer";
+    private static readonly string[] RelationshipDisplayOrder =
+    [
+        "parent",
+        "child",
+        "spouse",
+        "sibling",
+        "grandparent",
+        "grandchild",
+        "cousin",
+    ];
 
     private IReadOnlyList<PersonMaintenancePersonResponse> ActivePeople { get; set; } = [];
     private IReadOnlyList<PersonMaintenanceActionResponse> History { get; set; } = [];
@@ -604,6 +637,7 @@ else
         "sibling" => "Sibling",
         "grandparent" => "Grandparent",
         "grandchild" => "Grandchild",
+        "cousin" => "Cousin",
         _ => kind,
     };
 
