@@ -72,12 +72,12 @@ work_items:
   document: ../work-items/WI-0125-person-family-metadata.md
   started_at: 2026-09-23
   last_updated_at: 2026-09-25
-  branch: agent/WI-0125-person-family-metadata
+  branch: agent/WI-0125-cousin-grouped-family-ui
   blockers:
   - WI-0121
   - WI-0060
   blocker_notes:
-  - '2026-09-25 maintainer verification found the implemented birth metadata, age filters and existing relationship directions working, but WI-0125 remains open: cousin must be added as a symmetric relationship and the People relationship UI must group multiple relatives by category in a wider responsive column with usable Remove controls.'
+  - '2026-09-25 final follow-up implements cousin as a symmetric relationship across domain/PostgreSQL/People/Smart Collections and groups People relationships by category in a wider responsive layout. Completion remains pending PR CI, verify-postgres.ps1 and maintainer desktop/phone UI verification.'
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/415
@@ -86,7 +86,7 @@ work_items:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/418
   - type: verification
-    value: '2026-09-25 maintainer manual verification: birth metadata, age filtering, relationship directionality and saved/reopened family-aware Smart Collections work; cousin and relationship-panel layout remain to be implemented.'
+    value: '2026-09-25 maintainer manual verification: birth metadata, age filtering, relationship directionality and saved/reopened family-aware Smart Collections work; cousin and relationship-panel layout were the remaining requested follow-ups.'
 - id: WI-0147
   title: Make PostgreSQL the unconditional runtime catalogue
   milestone: M29
