@@ -4,27 +4,26 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**M28 Library curation and metadata editing is complete.**
+**WI-0163 Add safe bulk capture-date and Place enrichment is in progress under M31 Bulk archive metadata enrichment.**
 
-WI-0140 through WI-0146 and WI-0157 are completed. WI-0145's explicit photo-list collection backend merged in PR #407 with successful CI run #2095. WI-0146 merged in PR #410 and added Photo Details create/add/remove controls, lightweight review/reorder, slideshow-library discovery and normal manual snapshot playback.
+The maintainer measured 17,892 current photos: 234 have no effective capture date, 12,603 have no named Place or valid non-zero GPS, and 12,371 of the location-less photos already have an effective date. Directory `1970` is a miscellaneous catch-all and must never be interpreted as a real capture year merely from its path.
 
-On 2026-09-23 the maintainer verified the combined WI-0145/WI-0146 flow on desktop and phone. Explicit manual slideshow membership and ordering persisted as expected, create/add/remove/reorder worked, the collection appeared in the slideshow library, and launch/return routing plus normal playback worked as expected. This closes the final M28 exit criterion.
+The implementation branch is `agent/wi-0163-bulk-metadata-enrichment`. The first CLI slice adds `metadata enrich`, which is dry-run by default, reads explicit JSON rules, proposes missing dates from conservative filename/path patterns, and proposes Places only when an effective date range is fully contained by an operator-supplied rule. `--apply` uses the existing PostgreSQL capture-date and Place repositories; existing effective dates, named Places and valid non-zero GPS are protected by default. Optional private reports contain per-photo source/revision details while normal stdout remains aggregate-only.
 
-M26 is ready with WI-0158 as the next named-Creative-Collection product item; WI-0125 remains deferred. M29 is ready with WI-0147 as its first PostgreSQL-only cleanup item. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+M28 remains completed. M26 is ready with WI-0162 as its remaining semantic-search follow-on. M29 is ready with WI-0147 as its first PostgreSQL-only cleanup item. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Proceed with WI-0158 if continuing product-facing Creative Collection work, or WI-0147 if prioritising PostgreSQL-only catalogue cleanup.
+Get WI-0163 compile/tests/docs validation green in the draft PR, then have the maintainer run a production-catalogue dry-run with a local rule file before any broad `--apply` operation.
 
 ## Relevant files
 
-- docs/delivery/milestones/M28-library-curation-metadata-editing.md
-- docs/delivery/work-items/WI-0145-manual-slideshow-collection-model.md
-- docs/delivery/status/work-items/archive/WI-0145.yaml
-- docs/delivery/work-items/WI-0146-manual-slideshow-curation-ui.md
-- docs/delivery/status/work-items/archive/WI-0146.yaml
-- docs/delivery/work-items/WI-0158-named-creative-collections-slideshow-library.md
-- docs/delivery/work-items/WI-0147-postgres-only-runtime-composition.md
+- docs/delivery/milestones/M31-bulk-metadata-enrichment.md
+- docs/delivery/work-items/WI-0163-bulk-metadata-enrichment.md
+- docs/delivery/status/work-items/active/WI-0163.yaml
+- src/PhotoIdentity.Cli/MetadataEnrichmentCommand.cs
+- src/PhotoIdentity.Cli/Program.cs
+- tests/PhotoIdentity.Integration.Tests/MetadataEnrichmentPlannerTests.cs
 
 ## Repository validation
 
