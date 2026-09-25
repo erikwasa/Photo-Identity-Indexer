@@ -47,6 +47,10 @@ public sealed record PhotoSearchRankedHit(
     string? Caption,
     IReadOnlyList<string> Sources);
 
+public sealed record PhotoSearchCatalogueStatistics(
+    int CurrentPhotoCount,
+    int DisplayableCaptionCount);
+
 public sealed record PhotoSearchStorageStatistics(
     int CurrentPhotoCount,
     int EmbeddingCount,
@@ -86,6 +90,9 @@ public interface IPhotoSearchRepository
     Task<IReadOnlyList<PhotoSearchCaptionHit>> SearchCaptionsAsync(
         string query,
         int limit,
+        CancellationToken cancellationToken = default);
+
+    Task<PhotoSearchCatalogueStatistics> GetCatalogueStatisticsAsync(
         CancellationToken cancellationToken = default);
 
     Task<PhotoSearchStorageStatistics> GetStatisticsAsync(
