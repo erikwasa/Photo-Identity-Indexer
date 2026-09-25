@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
 using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Worker;
