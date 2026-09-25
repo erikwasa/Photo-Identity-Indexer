@@ -33,7 +33,14 @@
         }
         else
         {
-            @if (NavigationReady && HasEarlier)
+            @if (LoadingEarlier)
+            {
+                <div class="smart-infinite-status" aria-live="polite">
+                    <div class="spinner" aria-hidden="true"></div>
+                    <span>Loading earlier photos…</span>
+                </div>
+            }
+            else if (NavigationReady && HasEarlier && string.IsNullOrWhiteSpace(LoadError))
             {
                 <InfiniteScrollTrigger @key="EarlierScrollGeneration"
                                        Enabled="true"
@@ -41,13 +48,6 @@
                                        IdleText="Earlier photos load automatically"
                                        LoadingText="Loading earlier photos…"
                                        LoadMore="LoadEarlierAsync" />
-            }
-            else if (LoadingEarlier)
-            {
-                <div class="smart-infinite-status" aria-live="polite">
-                    <div class="spinner" aria-hidden="true"></div>
-                    <span>Loading earlier photos…</span>
-                </div>
             }
 
             <div class="smart-photo-grid">
