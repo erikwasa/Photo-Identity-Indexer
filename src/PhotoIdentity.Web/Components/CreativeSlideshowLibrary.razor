@@ -4,7 +4,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
 
-<section aria-labelledby="creative-slideshow-library-heading">
+<section class="creative-slideshow-library" aria-labelledby="creative-slideshow-library-heading">
     <div class="slideshow-library-header">
         <div>
             <p class="eyebrow">Creative Collections</p>
@@ -43,7 +43,7 @@
                     <button type="button"
                             class="slideshow-library-primary"
                             disabled="@Starting.Contains(item.Id)"
-                            aria-label="Play @item.Name"
+                            aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(item.Name)"
                             @onclick="() => StartAsync(item)">
                         <SlideshowLibraryCover CollectionId="@item.AnchorCollectionId" />
                         <span class="slideshow-library-card-shade" aria-hidden="true"></span>
@@ -52,7 +52,7 @@
                             <span class="slideshow-library-card-kind">Creative · from @item.AnchorCollectionName</span>
                             <span class="slideshow-library-card-cue">
                                 <span class="slideshow-library-play-mark" aria-hidden="true">▶</span>
-                                <span>@(Starting.Contains(item.Id) ? "Starting…" : "Play creative slideshow")</span>
+                                <span>@(Starting.Contains(item.Id) ? "Starting…" : "Play slideshow")</span>
                             </span>
                         </span>
                     </button>

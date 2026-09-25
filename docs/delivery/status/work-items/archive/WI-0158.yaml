@@ -1,0 +1,20 @@
+id: WI-0158
+title: Make named Creative Collections first-class slideshow library entries
+milestone: M26
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0158-named-creative-collections-slideshow-library.md
+started_at: 2026-09-23
+completed_at: 2026-09-25
+verified_at: 2026-09-25
+verified_by: maintainer
+last_updated_at: 2026-09-25
+branch: agent/WI-0158-named-creative-collections
+blockers:
+- WI-0121
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/414
+- type: verification
+  value: '2026-09-25 maintainer verification: WI-0158 works as expected. Named Creative Collections can coexist, are discoverable from Slideshows and launch independently. A separate slideshow-library presentation regression was reported for card layout and is being fixed independently.'
