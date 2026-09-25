@@ -147,7 +147,9 @@ internal static class CataloguePersistenceComposition
         services.AddSingleton<SqliteProcessingRepository>();
         services.AddSingleton<IProcessingRunConfigurationReader>(sp => sp.GetRequiredService<SqliteProcessingRepository>());
         services.AddSingleton<IProcessingRunRepository>(sp => sp.GetRequiredService<SqliteProcessingRepository>());
-        services.AddSingleton<IProcessingExecutionRepository>(sp => sp.GetRequiredService<SqliteProcessingRepository>());
+        services.AddSingleton<IProcessingExecutionRepository>(sp => new ExclusionAwareProcessingExecutionRepository(
+            sp.GetRequiredService<SqliteProcessingRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<IDetectorReconciliationPlanRepository, SqliteDetectorRolloutRepository>();
         services.AddSingleton<IDetectorRolloutReviewRepository, SqliteDetectorRolloutReviewRepository>();
         services.AddSingleton<IDetectorRolloutApplicationRepository, SqliteDetectorRolloutApplicationRepository>();
@@ -298,7 +300,9 @@ internal static class CataloguePersistenceComposition
         services.AddSingleton<PostgresProcessingRepository>();
         services.AddSingleton<IProcessingRunConfigurationReader>(sp => sp.GetRequiredService<PostgresProcessingRepository>());
         services.AddSingleton<IProcessingRunRepository>(sp => sp.GetRequiredService<PostgresProcessingRepository>());
-        services.AddSingleton<IProcessingExecutionRepository>(sp => sp.GetRequiredService<PostgresProcessingRepository>());
+        services.AddSingleton<IProcessingExecutionRepository>(sp => new ExclusionAwareProcessingExecutionRepository(
+            sp.GetRequiredService<PostgresProcessingRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<PostgresDetectorReconciliationPlanRepository>();
         services.AddSingleton<IDetectorReconciliationPlanRepository>(sp => sp.GetRequiredService<PostgresDetectorReconciliationPlanRepository>());
         services.AddSingleton<PostgresDetectorRolloutReviewRepository>();
