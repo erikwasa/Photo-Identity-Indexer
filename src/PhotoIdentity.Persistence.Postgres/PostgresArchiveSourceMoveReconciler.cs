@@ -1,0 +1,284 @@
+using Npgsql;
+using NpgsqlTypes;
+using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
+
+namespace PhotoIdentity.Persistence.Postgres;
+
+/// <summary>
+/// Reconciles a source move only when one verified missing copy and one verified current copy are
+/// the complete exact-hash group inside the configured archive coverage, and both transitions were
+/// observed by the same completed synchronization.
+/// </summary>
+public sealed class PostgresArchiveSourceMoveReconciler : IArchiveSourceMoveReconciler
+{
+    private readonly PostgresCatalogueDatabase _database;
+
+    public PostgresArchiveSourceMoveReconciler(PostgresCatalogueDatabase database)
+    {
+        ArgumentNullException.ThrowIfNull(database);
+        _database = database;
+    }
+
+    public async Task<int> ReconcileAsync(
+        SourceId sourceId,
+        IReadOnlyList<string> includedFolders,
+        DateTimeOffset scannedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(includedFolders);
+        IReadOnlyList<string> coverage = ArchiveCoverage.NormalizeIncludedFolders(includedFolders);
+        if (coverage.Count == 0)
+        {
+            return 0;
+        }
+
+        DateTimeOffset scannedAt = scannedAtUtc.ToUniversalTime();
+        await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
+        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(
+            System.Data.IsolationLevel.Serializable,
+            cancellationToken);
+
+        List<MoveCandidate> candidates = await ReadCandidatesAsync(
+            connection,
+            transaction,
+            sourceId,
+            coverage,
+            cancellationToken);
+
+        int reconciled = 0;
+        foreach (IGrouping<Sha256Digest, MoveCandidate> group in candidates.GroupBy(static candidate => candidate.ContentHash))
+        {
+            MoveCandidate[] current = group.Where(static candidate => candidate.DeletedAtUtc is null).ToArray();
+            MoveCandidate[] missing = group.Where(static candidate => candidate.DeletedAtUtc is not null).ToArray();
+            if (current.Length != 1 || missing.Length != 1)
+            {
+                continue;
+            }
+
+            MoveCandidate newCopy = current[0];
+            MoveCandidate oldCopy = missing[0];
+            if (newCopy.CreatedAtUtc != scannedAt || oldCopy.DeletedAtUtc != scannedAt)
+            {
+                continue;
+            }
+
+            await CopyCurrentObservationAsync(
+                connection,
+                transaction,
+                oldCopy,
+                newCopy,
+                cancellationToken);
+            await CopyCurrentAvailabilityAsync(
+                connection,
+                transaction,
+                oldCopy.AssetId,
+                newCopy.AssetId,
+                cancellationToken);
+
+            int deleted = await DeleteTransientNewAssetAsync(
+                connection,
+                transaction,
+                newCopy,
+                scannedAt,
+                cancellationToken);
+            if (deleted != 1)
+            {
+                throw new InvalidOperationException("The transient move target changed during reconciliation.");
+            }
+
+            int updated = await RetargetOldAssetAsync(
+                connection,
+                transaction,
+                sourceId,
+                oldCopy,
+                newCopy.SourceKey,
+                scannedAt,
+                cancellationToken);
+            if (updated != 1)
+            {
+                throw new InvalidOperationException("The missing move source changed during reconciliation.");
+            }
+
+            reconciled++;
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return reconciled;
+    }
+
+    private static async Task<List<MoveCandidate>> ReadCandidatesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        SourceId sourceId,
+        IReadOnlyList<string> coverage,
+        CancellationToken cancellationToken)
+    {
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT
+                asset.id,
+                asset.source_key,
+                asset.created_at_utc,
+                asset.deleted_at_utc,
+                observation.verified_revision_id,
+                revision.content_sha256
+            FROM assets AS asset
+            INNER JOIN archive_source_observations AS observation
+                ON observation.asset_id = asset.id
+            INNER JOIN asset_revisions AS revision
+                ON revision.id = observation.verified_revision_id
+               AND revision.asset_id = asset.id
+            WHERE asset.source_id = @source_id
+              AND observation.verification_state = 'verified'
+              AND observation.verified_revision_id IS NOT NULL;
+            """;
+        command.Parameters.AddWithValue("source_id", sourceId.Value);
+
+        List<MoveCandidate> candidates = [];
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            string sourceKey = reader.GetString(1);
+            if (!coverage.Any(folder => ArchiveCoverage.Covers(folder, sourceKey)))
+            {
+                continue;
+            }
+
+            candidates.Add(new MoveCandidate(
+                AssetId.From(reader.GetGuid(0)),
+                sourceKey,
+                reader.GetFieldValue<DateTimeOffset>(2).ToUniversalTime(),
+                reader.IsDBNull(3) ? null : reader.GetFieldValue<DateTimeOffset>(3).ToUniversalTime(),
+                AssetRevisionId.From(reader.GetGuid(4)),
+                new Sha256Digest(reader.GetString(5))));
+        }
+
+        return candidates;
+    }
+
+    private static async Task CopyCurrentObservationAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        MoveCandidate oldCopy,
+        MoveCandidate newCopy,
+        CancellationToken cancellationToken)
+    {
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE archive_source_observations AS old_observation
+            SET observed_size_bytes = new_observation.observed_size_bytes,
+                observed_last_write_utc = new_observation.observed_last_write_utc,
+                observed_media_type = new_observation.observed_media_type,
+                observed_at_utc = new_observation.observed_at_utc,
+                verification_state = 'verified',
+                verified_revision_id = @old_revision_id,
+                verified_size_bytes = new_observation.verified_size_bytes,
+                verified_last_write_utc = new_observation.verified_last_write_utc,
+                verified_media_type = new_observation.verified_media_type,
+                verified_at_utc = new_observation.verified_at_utc,
+                observed_last_write_ticks = new_observation.observed_last_write_ticks,
+                verified_last_write_ticks = new_observation.verified_last_write_ticks
+            FROM archive_source_observations AS new_observation
+            WHERE old_observation.asset_id = @old_asset_id
+              AND new_observation.asset_id = @new_asset_id;
+            """;
+        command.Parameters.AddWithValue("old_asset_id", oldCopy.AssetId.Value);
+        command.Parameters.AddWithValue("new_asset_id", newCopy.AssetId.Value);
+        command.Parameters.AddWithValue("old_revision_id", oldCopy.VerifiedRevisionId.Value);
+        int updated = await command.ExecuteNonQueryAsync(cancellationToken);
+        if (updated != 1)
+        {
+            throw new InvalidOperationException("Move reconciliation could not transfer the verified source observation.");
+        }
+    }
+
+    private static async Task CopyCurrentAvailabilityAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        AssetId oldAssetId,
+        AssetId newAssetId,
+        CancellationToken cancellationToken)
+    {
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO archive_asset_availability (asset_id, availability, checked_at_utc)
+            SELECT @old_asset_id, availability, checked_at_utc
+            FROM archive_asset_availability
+            WHERE asset_id = @new_asset_id
+            ON CONFLICT(asset_id) DO UPDATE SET
+                availability = excluded.availability,
+                checked_at_utc = excluded.checked_at_utc;
+            """;
+        command.Parameters.AddWithValue("old_asset_id", oldAssetId.Value);
+        command.Parameters.AddWithValue("new_asset_id", newAssetId.Value);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<int> DeleteTransientNewAssetAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        MoveCandidate newCopy,
+        DateTimeOffset scannedAt,
+        CancellationToken cancellationToken)
+    {
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            DELETE FROM assets
+            WHERE id = @asset_id
+              AND source_key = @source_key
+              AND created_at_utc = @scanned_at_utc
+              AND deleted_at_utc IS NULL;
+            """;
+        command.Parameters.AddWithValue("asset_id", newCopy.AssetId.Value);
+        command.Parameters.AddWithValue("source_key", newCopy.SourceKey);
+        command.Parameters.AddWithValue("scanned_at_utc", scannedAt);
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<int> RetargetOldAssetAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        SourceId sourceId,
+        MoveCandidate oldCopy,
+        string newSourceKey,
+        DateTimeOffset scannedAt,
+        CancellationToken cancellationToken)
+    {
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            UPDATE assets
+            SET source_key = @new_source_key,
+                last_seen_at_utc = @scanned_at_utc,
+                deleted_at_utc = NULL
+            WHERE id = @asset_id
+              AND source_id = @source_id
+              AND deleted_at_utc = @scanned_at_utc
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM assets AS other
+                  WHERE other.source_id = @source_id
+                    AND other.source_key = @new_source_key
+                    AND other.id <> @asset_id);
+            """;
+        command.Parameters.AddWithValue("asset_id", oldCopy.AssetId.Value);
+        command.Parameters.AddWithValue("source_id", sourceId.Value);
+        command.Parameters.AddWithValue("new_source_key", newSourceKey);
+        command.Parameters.AddWithValue("scanned_at_utc", scannedAt);
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private sealed record MoveCandidate(
+        AssetId AssetId,
+        string SourceKey,
+        DateTimeOffset CreatedAtUtc,
+        DateTimeOffset? DeletedAtUtc,
+        AssetRevisionId VerifiedRevisionId,
+        Sha256Digest ContentHash);
+}

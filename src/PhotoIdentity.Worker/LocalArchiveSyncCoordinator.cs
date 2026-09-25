@@ -42,7 +42,10 @@ public sealed record LocalArchiveSyncSummary(
     int NeedsSourceVerificationCount,
     int UnverifiedSourceCount,
     int MarkedDeletedCount,
-    LocalArchiveSyncDiagnostics Diagnostics);
+    LocalArchiveSyncDiagnostics Diagnostics)
+{
+    public int ReconciledMoveCount { get; init; }
+}
 
 /// <summary>
 /// Synchronizes selected recursive folders under one permanent catalogue source root.
@@ -53,13 +56,16 @@ public sealed class LocalArchiveSyncCoordinator
 {
     private readonly ArchiveSourceCatalogueScanner _scanner;
     private readonly ArchiveThroughputMetrics? _metrics;
+    private readonly IArchiveSourceMoveReconciler? _moveReconciler;
 
     public LocalArchiveSyncCoordinator(
         ArchiveSourceCatalogueScanner scanner,
-        ArchiveThroughputMetrics? metrics = null)
+        ArchiveThroughputMetrics? metrics = null,
+        IArchiveSourceMoveReconciler? moveReconciler = null)
     {
         _scanner = scanner ?? throw new ArgumentNullException(nameof(scanner));
         _metrics = metrics;
+        _moveReconciler = moveReconciler;
     }
 
     public async Task<LocalArchiveSyncSummary> SyncAsync(
@@ -96,6 +102,7 @@ public sealed class LocalArchiveSyncCoordinator
         int needsVerification = 0;
         int unverified = 0;
         int deleted = 0;
+        int reconciledMoves = 0;
 
         try
         {
@@ -145,6 +152,21 @@ public sealed class LocalArchiveSyncCoordinator
                 folderDiagnostics.Add(diagnostics);
                 WriteFolderDiagnostics(diagnostics);
             }
+
+            if (_moveReconciler is not null)
+            {
+                reconciledMoves = await _moveReconciler.ReconcileAsync(
+                    catalogueSource.SourceId,
+                    normalized,
+                    scannedAtUtc,
+                    cancellationToken);
+                if (reconciledMoves > 0)
+                {
+                    deleted = Math.Max(0, deleted - reconciledMoves);
+                    newRevisions = Math.Max(0, newRevisions - reconciledMoves);
+                    unchanged += reconciledMoves;
+                }
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -160,6 +182,9 @@ public sealed class LocalArchiveSyncCoordinator
         totalStopwatch.Stop();
         LocalArchiveSyncDiagnostics diagnosticsSummary = new(totalStopwatch.Elapsed, folderDiagnostics);
         WriteTotalDiagnostics(diagnosticsSummary);
+        Console.WriteLine(
+            "[WI-0088 sync diagnostics] reconciled_moves={0}",
+            reconciledMoves);
         int hashedFiles = folderDiagnostics.Sum(static value => value.HashedFileCount);
         long hashedBytes = folderDiagnostics.Sum(static value => value.HashedBytes);
         _metrics?.RecordAggregateHashReads(
@@ -184,7 +209,10 @@ public sealed class LocalArchiveSyncCoordinator
             needsVerification,
             unverified,
             deleted,
-            diagnosticsSummary);
+            diagnosticsSummary)
+        {
+            ReconciledMoveCount = reconciledMoves,
+        };
     }
 
     private static void WriteFolderDiagnostics(LocalArchiveFolderSyncDiagnostics diagnostics)
