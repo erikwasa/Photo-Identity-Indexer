@@ -35,17 +35,29 @@ internal static class CataloguePersistenceComposition
     public static void AddSqlite(IServiceCollection services, string databasePath)
     {
         services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
+        services.AddSingleton<SqliteSourceCopyExclusionRepository>();
+        services.AddSingleton<ISourceCopyExclusionRepository>(sp => sp.GetRequiredService<SqliteSourceCopyExclusionRepository>());
 
         services.AddSingleton<SqliteReviewRepository>();
-        services.AddSingleton<IReviewActionRepository>(sp => sp.GetRequiredService<SqliteReviewRepository>());
+        services.AddSingleton<IReviewActionRepository>(sp => new ExclusionAwareReviewActionRepository(
+            sp.GetRequiredService<SqliteReviewRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<SqliteReviewFilterRepository>();
-        services.AddSingleton<IReviewFaceRepository>(sp => sp.GetRequiredService<SqliteReviewRepository>());
-        services.AddSingleton<IReviewFilterRepository>(sp => sp.GetRequiredService<SqliteReviewFilterRepository>());
+        services.AddSingleton<IReviewFaceRepository>(sp => new ExclusionAwareReviewFaceRepository(
+            sp.GetRequiredService<SqliteReviewRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
+        services.AddSingleton<IReviewFilterRepository>(sp => new ExclusionAwareReviewFilterRepository(
+            sp.GetRequiredService<SqliteReviewFilterRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<SqliteReviewSuggestionRepository>();
-        services.AddSingleton<IReviewSuggestionRepository>(sp => sp.GetRequiredService<SqliteReviewSuggestionRepository>());
+        services.AddSingleton<IReviewSuggestionRepository>(sp => new ExclusionAwareReviewSuggestionRepository(
+            sp.GetRequiredService<SqliteReviewSuggestionRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<SqliteSuggestionGalleryRepository>();
         services.AddSingleton<SqliteSuggestionGalleryAdapter>();
-        services.AddSingleton<ISuggestionGalleryRepository>(sp => sp.GetRequiredService<SqliteSuggestionGalleryAdapter>());
+        services.AddSingleton<ISuggestionGalleryRepository>(sp => new ExclusionAwareSuggestionGalleryRepository(
+            sp.GetRequiredService<SqliteSuggestionGalleryAdapter>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
 
         services.AddSingleton<SqliteIdentitySuggestionPolicyRepository>();
         services.AddSingleton<SqliteIdentitySuggestionPolicyAdapter>();
@@ -83,13 +95,19 @@ internal static class CataloguePersistenceComposition
         services.AddSingleton<IBulkSuggestionReviewRepository>(sp => sp.GetRequiredService<SqliteBulkSuggestionReviewRepository>());
 
         services.AddSingleton<SqliteCollectionQueryRepository>();
-        services.AddSingleton<ICollectionQueryRepository>(sp => sp.GetRequiredService<SqliteCollectionQueryRepository>());
+        services.AddSingleton<ICollectionQueryRepository>(sp => new ExclusionAwareCollectionQueryRepository(
+            sp.GetRequiredService<SqliteCollectionQueryRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<SqlitePhotoDetailsRepository>();
-        services.AddSingleton<IPhotoDetailsRepository>(sp => sp.GetRequiredService<SqlitePhotoDetailsRepository>());
+        services.AddSingleton<IPhotoDetailsRepository>(sp => new ExclusionAwarePhotoDetailsRepository(
+            sp.GetRequiredService<SqlitePhotoDetailsRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<SqlitePhotoCaptionRepository>();
         services.AddSingleton<IPhotoCaptionRepository>(sp => sp.GetRequiredService<SqlitePhotoCaptionRepository>());
         services.AddSingleton<SqliteSmartCollectionQueryRepository>();
-        services.AddSingleton<ISmartCollectionQueryRepository>(sp => sp.GetRequiredService<SqliteSmartCollectionQueryRepository>());
+        services.AddSingleton<ISmartCollectionQueryRepository>(sp => new ExclusionAwareSmartCollectionQueryRepository(
+            sp.GetRequiredService<SqliteSmartCollectionQueryRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<SqliteSmartCollectionRepository>();
         services.AddSingleton<ISmartCollectionRepository>(sp => sp.GetRequiredService<SqliteSmartCollectionRepository>());
         services.AddSingleton<SqliteCreativeCollectionRecipeRepository>();
@@ -129,7 +147,9 @@ internal static class CataloguePersistenceComposition
         services.AddSingleton<SqliteProcessingRepository>();
         services.AddSingleton<IProcessingRunConfigurationReader>(sp => sp.GetRequiredService<SqliteProcessingRepository>());
         services.AddSingleton<IProcessingRunRepository>(sp => sp.GetRequiredService<SqliteProcessingRepository>());
-        services.AddSingleton<IProcessingExecutionRepository>(sp => sp.GetRequiredService<SqliteProcessingRepository>());
+        services.AddSingleton<IProcessingExecutionRepository>(sp => new ExclusionAwareProcessingExecutionRepository(
+            sp.GetRequiredService<SqliteProcessingRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<IDetectorReconciliationPlanRepository, SqliteDetectorRolloutRepository>();
         services.AddSingleton<IDetectorRolloutReviewRepository, SqliteDetectorRolloutReviewRepository>();
         services.AddSingleton<IDetectorRolloutApplicationRepository, SqliteDetectorRolloutApplicationRepository>();
@@ -172,16 +192,28 @@ internal static class CataloguePersistenceComposition
         PostgresCatalogueDatabase database = new(connectionString);
         services.AddSingleton(database);
         services.AddSingleton<ICatalogueStoreInitializer>(sp => sp.GetRequiredService<PostgresCatalogueDatabase>());
+        services.AddSingleton<PostgresSourceCopyExclusionRepository>();
+        services.AddSingleton<ISourceCopyExclusionRepository>(sp => sp.GetRequiredService<PostgresSourceCopyExclusionRepository>());
 
         services.AddSingleton<PostgresReviewActionRepository>();
-        services.AddSingleton<IReviewActionRepository>(sp => sp.GetRequiredService<PostgresReviewActionRepository>());
+        services.AddSingleton<IReviewActionRepository>(sp => new ExclusionAwareReviewActionRepository(
+            sp.GetRequiredService<PostgresReviewActionRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<PostgresReviewQueryRepository>();
-        services.AddSingleton<IReviewFaceRepository>(sp => sp.GetRequiredService<PostgresReviewQueryRepository>());
-        services.AddSingleton<IReviewFilterRepository>(sp => sp.GetRequiredService<PostgresReviewQueryRepository>());
+        services.AddSingleton<IReviewFaceRepository>(sp => new ExclusionAwareReviewFaceRepository(
+            sp.GetRequiredService<PostgresReviewQueryRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
+        services.AddSingleton<IReviewFilterRepository>(sp => new ExclusionAwareReviewFilterRepository(
+            sp.GetRequiredService<PostgresReviewQueryRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<PostgresReviewSuggestionRepository>();
-        services.AddSingleton<IReviewSuggestionRepository>(sp => sp.GetRequiredService<PostgresReviewSuggestionRepository>());
+        services.AddSingleton<IReviewSuggestionRepository>(sp => new ExclusionAwareReviewSuggestionRepository(
+            sp.GetRequiredService<PostgresReviewSuggestionRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<PostgresSuggestionGalleryRepository>();
-        services.AddSingleton<ISuggestionGalleryRepository>(sp => sp.GetRequiredService<PostgresSuggestionGalleryRepository>());
+        services.AddSingleton<ISuggestionGalleryRepository>(sp => new ExclusionAwareSuggestionGalleryRepository(
+            sp.GetRequiredService<PostgresSuggestionGalleryRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
 
         services.AddSingleton<PostgresIdentitySuggestionPolicyRepository>();
         services.AddSingleton<IIdentitySuggestionPolicyRepository>(sp => sp.GetRequiredService<PostgresIdentitySuggestionPolicyRepository>());
@@ -211,13 +243,19 @@ internal static class CataloguePersistenceComposition
         services.AddSingleton<IBulkSuggestionReviewRepository>(sp => sp.GetRequiredService<PostgresBulkSuggestionReviewRepository>());
 
         services.AddSingleton<PostgresCollectionQueryRepository>();
-        services.AddSingleton<ICollectionQueryRepository>(sp => sp.GetRequiredService<PostgresCollectionQueryRepository>());
+        services.AddSingleton<ICollectionQueryRepository>(sp => new ExclusionAwareCollectionQueryRepository(
+            sp.GetRequiredService<PostgresCollectionQueryRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<PostgresPhotoDetailsRepository>();
-        services.AddSingleton<IPhotoDetailsRepository>(sp => sp.GetRequiredService<PostgresPhotoDetailsRepository>());
+        services.AddSingleton<IPhotoDetailsRepository>(sp => new ExclusionAwarePhotoDetailsRepository(
+            sp.GetRequiredService<PostgresPhotoDetailsRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<PostgresPhotoCaptionRepository>();
         services.AddSingleton<IPhotoCaptionRepository>(sp => sp.GetRequiredService<PostgresPhotoCaptionRepository>());
         services.AddSingleton<PostgresSmartCollectionQueryRepository>();
-        services.AddSingleton<ISmartCollectionQueryRepository>(sp => sp.GetRequiredService<PostgresSmartCollectionQueryRepository>());
+        services.AddSingleton<ISmartCollectionQueryRepository>(sp => new ExclusionAwareSmartCollectionQueryRepository(
+            sp.GetRequiredService<PostgresSmartCollectionQueryRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<PostgresSmartCollectionRepository>();
         services.AddSingleton<ISmartCollectionRepository>(sp => sp.GetRequiredService<PostgresSmartCollectionRepository>());
         services.AddSingleton<PostgresPhotoListCollectionRepository>();
@@ -262,7 +300,9 @@ internal static class CataloguePersistenceComposition
         services.AddSingleton<PostgresProcessingRepository>();
         services.AddSingleton<IProcessingRunConfigurationReader>(sp => sp.GetRequiredService<PostgresProcessingRepository>());
         services.AddSingleton<IProcessingRunRepository>(sp => sp.GetRequiredService<PostgresProcessingRepository>());
-        services.AddSingleton<IProcessingExecutionRepository>(sp => sp.GetRequiredService<PostgresProcessingRepository>());
+        services.AddSingleton<IProcessingExecutionRepository>(sp => new ExclusionAwareProcessingExecutionRepository(
+            sp.GetRequiredService<PostgresProcessingRepository>(),
+            sp.GetRequiredService<ISourceCopyExclusionRepository>()));
         services.AddSingleton<PostgresDetectorReconciliationPlanRepository>();
         services.AddSingleton<IDetectorReconciliationPlanRepository>(sp => sp.GetRequiredService<PostgresDetectorReconciliationPlanRepository>());
         services.AddSingleton<PostgresDetectorRolloutReviewRepository>();

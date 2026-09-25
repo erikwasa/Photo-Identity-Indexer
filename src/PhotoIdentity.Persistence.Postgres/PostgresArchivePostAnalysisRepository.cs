@@ -7,17 +7,20 @@ namespace PhotoIdentity.Persistence.Postgres;
 
 /// <summary>
 /// Finds analyzed current revisions whose selected review proxy is still missing.
+/// Excluded source copies are filtered before post-analysis derivative work is selected.
 /// </summary>
 public sealed class PostgresArchivePostAnalysisRepository :
     IArchivePostAnalysisRepository
 {
     private readonly PostgresCatalogueDatabase _database;
+    private readonly PostgresSourceCopyExclusionRepository _exclusions;
 
     public PostgresArchivePostAnalysisRepository(
         PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+        _exclusions = new PostgresSourceCopyExclusionRepository(database);
     }
 
     public async Task<AssetRevisionId?> GetNextMissingProxyRevisionAsync(
@@ -27,13 +30,18 @@ public sealed class PostgresArchivePostAnalysisRepository :
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(proxyProfileId);
+        IReadOnlyList<SourceCopyExclusionState> exclusions =
+            await _exclusions.ListAsync(sourceId, cancellationToken);
+        HashSet<string> excludedKeys = exclusions
+            .Select(item => item.SourceKey)
+            .ToHashSet(StringComparer.Ordinal);
 
         await using NpgsqlConnection connection =
             await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT revision.id
+            SELECT revision.id, asset.source_key
             FROM assets AS asset
             INNER JOIN asset_revisions AS revision
                 ON revision.id = (
@@ -51,8 +59,7 @@ public sealed class PostgresArchivePostAnalysisRepository :
             WHERE asset.source_id = @source_id
               AND asset.deleted_at_utc IS NULL
               AND proxy.asset_revision_id IS NULL
-            ORDER BY asset.source_key
-            LIMIT 1;
+            ORDER BY asset.source_key;
             """;
         command.Parameters.AddWithValue(
             "source_id",
@@ -64,10 +71,15 @@ public sealed class PostgresArchivePostAnalysisRepository :
             "proxy_profile_id",
             proxyProfileId.Trim());
 
-        object? value =
-            await command.ExecuteScalarAsync(cancellationToken);
-        return value is Guid id
-            ? AssetRevisionId.From(id)
-            : null;
+        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (!excludedKeys.Contains(reader.GetString(1)))
+            {
+                return AssetRevisionId.From(reader.GetGuid(0));
+            }
+        }
+
+        return null;
     }
 }

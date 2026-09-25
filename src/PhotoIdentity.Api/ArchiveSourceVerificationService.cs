@@ -18,10 +18,8 @@ public sealed record ArchiveSourceVerificationAdvanceResult(
     bool ManagedHydrationTransferred);
 
 /// <summary>
-/// Resolves unverified or metadata-divergent archive sources before analysis. Placeholder metadata
-/// can enqueue work but never becomes immutable identity: local bytes are SHA-256 hashed before a
-/// revision is established/reselected. Photo-Identity-owned pre-revision hydration is transferred
-/// to the resulting revision so analysis/proxy generation can finish before release.
+/// Resolves unverified or metadata-divergent archive sources before analysis. Excluded assets are
+/// refused before source-path resolution, hydration requests or content hashing.
 /// </summary>
 public sealed class ArchiveSourceVerificationService
 {
@@ -31,6 +29,7 @@ public sealed class ArchiveSourceVerificationService
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly IOneDriveFilesOnDemandPlatform _platform;
     private readonly TimeProvider _timeProvider;
+    private readonly ISourceCopyExclusionRepository? _exclusions;
     private readonly ArchiveThroughputMetrics? _metrics;
     private readonly StringComparison _pathComparison;
 
@@ -41,6 +40,19 @@ public sealed class ArchiveSourceVerificationService
         ArchiveHydrationCapacityService capacity,
         IOneDriveFilesOnDemandPlatform platform,
         TimeProvider timeProvider,
+        ArchiveThroughputMetrics? metrics = null)
+        : this(observations, sourceHydrations, availability, capacity, platform, timeProvider, null, metrics)
+    {
+    }
+
+    public ArchiveSourceVerificationService(
+        IArchiveSourceObservationRepository observations,
+        IArchiveSourceHydrationRepository sourceHydrations,
+        IArchiveAvailabilityRepository availability,
+        ArchiveHydrationCapacityService capacity,
+        IOneDriveFilesOnDemandPlatform platform,
+        TimeProvider timeProvider,
+        ISourceCopyExclusionRepository? exclusions,
         ArchiveThroughputMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(observations);
@@ -55,6 +67,7 @@ public sealed class ArchiveSourceVerificationService
         _capacity = capacity;
         _platform = platform;
         _timeProvider = timeProvider;
+        _exclusions = exclusions;
         _metrics = metrics;
         _pathComparison = OperatingSystem.IsWindows()
             ? StringComparison.OrdinalIgnoreCase
@@ -70,6 +83,14 @@ public sealed class ArchiveSourceVerificationService
         {
             return new ArchiveSourceVerificationAdvanceResult(
                 false, false, false, null, null, false, false, false);
+        }
+
+        if (_exclusions is not null &&
+            await _exclusions.IsAssetExcludedAsync(source.AssetId, cancellationToken))
+        {
+            // The durable exclusion is the stronger state. Do not resolve the path, hydrate or hash.
+            return new ArchiveSourceVerificationAdvanceResult(
+                true, false, false, null, null, false, false, false);
         }
 
         using IDisposable? verificationTiming = _metrics?.Measure(

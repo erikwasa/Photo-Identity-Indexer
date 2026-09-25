@@ -7,17 +7,18 @@ namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
 /// Finds current immutable revisions whose governed analysis is durable but whose selected review
-/// proxy is still missing. This is the retry boundary that lets proxy failures resume without
-/// rerunning already-successful detector/embedder inference.
+/// proxy is still missing. Excluded source copies are filtered before derivative work is selected.
 /// </summary>
 public sealed class SqliteArchivePostAnalysisRepository : IArchivePostAnalysisRepository
 {
     private readonly SqliteCatalogueDatabase _database;
+    private readonly SqliteSourceCopyExclusionRepository _exclusions;
 
     public SqliteArchivePostAnalysisRepository(SqliteCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+        _exclusions = new SqliteSourceCopyExclusionRepository(database);
     }
 
     public async Task<AssetRevisionId?> GetNextMissingProxyRevisionAsync(
@@ -27,10 +28,16 @@ public sealed class SqliteArchivePostAnalysisRepository : IArchivePostAnalysisRe
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(proxyProfileId);
+        IReadOnlyList<SourceCopyExclusionState> exclusions =
+            await _exclusions.ListAsync(sourceId, cancellationToken);
+        HashSet<string> excludedKeys = exclusions
+            .Select(item => item.SourceKey)
+            .ToHashSet(StringComparer.Ordinal);
+
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
-            SELECT revision.id
+            SELECT revision.id, asset.source_key
             FROM assets AS asset
             INNER JOIN asset_revisions AS revision
                 ON revision.id = (
@@ -48,16 +55,23 @@ public sealed class SqliteArchivePostAnalysisRepository : IArchivePostAnalysisRe
             WHERE asset.source_id = $source_id
               AND asset.deleted_at_utc IS NULL
               AND proxy.asset_revision_id IS NULL
-            ORDER BY asset.source_key
-            LIMIT 1;
+            ORDER BY asset.source_key;
             """;
         command.Parameters.AddWithValue("$source_id", sourceId.ToString());
         command.Parameters.AddWithValue("$analysis_profile_hash", analysisProfileHash.ToString());
         command.Parameters.AddWithValue("$proxy_profile_id", proxyProfileId.Trim());
         try
         {
-            object? value = await command.ExecuteScalarAsync(cancellationToken);
-            return value is string id ? AssetRevisionId.From(Guid.Parse(id)) : null;
+            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                if (!excludedKeys.Contains(reader.GetString(1)))
+                {
+                    return AssetRevisionId.From(Guid.Parse(reader.GetString(0)));
+                }
+            }
+
+            return null;
         }
         catch (SqliteException exception) when (exception.SqliteErrorCode == 1)
         {

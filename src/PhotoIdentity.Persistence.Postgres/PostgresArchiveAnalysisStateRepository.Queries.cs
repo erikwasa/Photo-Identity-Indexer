@@ -2,6 +2,7 @@ using System.Globalization;
 using Npgsql;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Postgres;
 
@@ -19,10 +20,16 @@ public sealed partial class PostgresArchiveAnalysisStateRepository
         bool includeHydratable,
         CancellationToken cancellationToken = default)
     {
+        IReadOnlyList<SourceCopyExclusionState> exclusions =
+            await _exclusions.ListAsync(sourceId, cancellationToken);
+        HashSet<string> excludedKeys = exclusions
+            .Select(item => item.SourceKey)
+            .ToHashSet(StringComparer.Ordinal);
+
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using NpgsqlCommand command = connection.CreateCommand();
         command.CommandText = """
-            SELECT revision.id
+            SELECT revision.id, asset.source_key
             FROM assets AS asset
             INNER JOIN asset_revisions AS revision
                 ON revision.id = (
@@ -56,7 +63,10 @@ public sealed partial class PostgresArchiveAnalysisStateRepository
         await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            revisions.Add(AssetRevisionId.From(reader.GetGuid(0)));
+            if (!excludedKeys.Contains(reader.GetString(1)))
+            {
+                revisions.Add(AssetRevisionId.From(reader.GetGuid(0)));
+            }
         }
 
         return revisions;
@@ -93,5 +103,4 @@ public sealed partial class PostgresArchiveAnalysisStateRepository
         object? value = await command.ExecuteScalarAsync(cancellationToken);
         return Convert.ToInt32(value, CultureInfo.InvariantCulture);
     }
-
 }

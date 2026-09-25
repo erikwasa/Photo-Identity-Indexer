@@ -5,7 +5,7 @@ milestone: M23
 status_source: ../status/work-items.yaml
 depends_on: [WI-0041, WI-0042]
 related_adrs: [ADR-0008]
-affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Worker, documentation]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Api, PhotoIdentity.Web, PhotoIdentity.Worker, documentation]
 ---
 
 # WI-0089: Add durable source-copy exclusion and access enforcement
@@ -41,16 +41,16 @@ A private photo can legitimately remain backed up in personal OneDrive while bei
 
 ## Acceptance criteria
 
-- [ ] Exclusion is keyed to one source copy/locator and is durable across restart.
-- [ ] Excluding one of two exact duplicate paths does not exclude the other.
-- [ ] A moved/renamed excluded file is not automatically excluded at its new path.
-- [ ] A source file at an actively excluded locator cannot be scheduled for new photo, face, metadata, place or identity work.
-- [ ] Smart Collections, slideshow manifests and normal review/library queries cannot return excluded content.
-- [ ] Original/proxy/hydration endpoints reject excluded content even if a caller holds a previously valid opaque revision/resource identifier.
-- [ ] The excluded original is never modified or deleted.
-- [ ] Exclusion remains effective while purge is pending or failed.
-- [ ] Repeated scans do not recreate revisions/proxies/analysis for the excluded locator.
-- [ ] Logging and API errors do not expose private source paths or photo content.
+- [x] Exclusion is keyed to one source copy/locator and is durable across restart.
+- [x] Excluding one of two exact duplicate paths does not exclude the other.
+- [x] A moved/renamed excluded file is not automatically excluded at its new path.
+- [x] A source file at an actively excluded locator cannot be scheduled for new photo, face, metadata, place or identity work.
+- [x] Smart Collections, slideshow manifests and normal review/library queries cannot return excluded content.
+- [x] Original/proxy/hydration endpoints reject excluded content even if a caller holds a previously valid opaque revision/resource identifier.
+- [x] The excluded original is never modified or deleted.
+- [x] Exclusion remains effective while purge is pending or failed.
+- [x] Repeated scans do not recreate revisions/proxies/analysis for the excluded locator.
+- [x] Logging and API errors do not expose private source paths or photo content.
 
 ## Verification requirements
 
@@ -58,7 +58,7 @@ Automated cross-layer tests are required for scheduler/query exclusion and direc
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: added the provider-neutral source-copy exclusion contract and SQLite/PostgreSQL persistence; enforced exclusion in archive scanning/move reconciliation, processing claims, metadata/place/identity paths, review/library/Smart Collection queries, photo-list collections, proxy/original/hydration access and minimum archive exclusion status endpoints; added integration and persistence coverage.
+- Trade-offs: the durable tombstone is intentionally keyed only by normalized `(source_id, source_key)` and minimal purge state, not by content hash; restore explicitly removes that locator tombstone. Physical derivative/catalogue deletion is intentionally not part of this boundary.
+- Deferred work: WI-0090 owns crash-safe purge/deletion and WI-0091 owns the complete operator exclusion/purge/retry UX.
+- Commands run: GitHub Actions workflow `36198419182` passed the Release build, fast test assemblies, both required integration shards, documentation validation/generated-file check, published review verification, Windows mixed-media verification, package verification and launcher verification.

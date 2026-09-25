@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Api;
 
@@ -33,17 +34,24 @@ public static class PhotoListCollectionEndpoints
     private static async Task<IResult> CreateAsync(
         PhotoListCollectionRequest request,
         IPhotoListCollectionRepository repository,
+        ISourceCopyExclusionRepository exclusions,
         CancellationToken cancellationToken)
     {
         try
         {
+            AssetRevisionId[] revisionIds = ParseRevisionIds(request.RevisionIds);
+            if (await ContainsExcludedAsync(revisionIds, exclusions, cancellationToken))
+            {
+                return Results.BadRequest(new { error = "One or more revisions are unavailable." });
+            }
+
             PhotoListCollectionDefinition definition = await repository.CreateAsync(
                 request.Name,
-                ParseRevisionIds(request.RevisionIds),
+                revisionIds,
                 cancellationToken);
             return Results.Created(
                 $"/api/photo-list-collections/{definition.Id}",
-                ToResponse(definition));
+                await ToResponseAsync(definition, exclusions, cancellationToken));
         }
         catch (PhotoListCollectionNameConflictException exception)
         {
@@ -65,16 +73,23 @@ public static class PhotoListCollectionEndpoints
 
     private static async Task<IResult> ListAsync(
         IPhotoListCollectionRepository repository,
+        ISourceCopyExclusionRepository exclusions,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<PhotoListCollectionDefinition> definitions =
             await repository.ListAsync(cancellationToken);
-        return Results.Ok(definitions.Select(ToResponse).ToArray());
+        List<PhotoListCollectionResponse> responses = new(definitions.Count);
+        foreach (PhotoListCollectionDefinition definition in definitions)
+        {
+            responses.Add(await ToResponseAsync(definition, exclusions, cancellationToken));
+        }
+        return Results.Ok(responses);
     }
 
     private static async Task<IResult> GetAsync(
         Guid id,
         IPhotoListCollectionRepository repository,
+        ISourceCopyExclusionRepository exclusions,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out PhotoListCollectionId collectionId, out IResult? error))
@@ -86,13 +101,14 @@ public static class PhotoListCollectionEndpoints
             await repository.GetAsync(collectionId, cancellationToken);
         return definition is null
             ? Results.NotFound()
-            : Results.Ok(ToResponse(definition));
+            : Results.Ok(await ToResponseAsync(definition, exclusions, cancellationToken));
     }
 
     private static async Task<IResult> UpdateAsync(
         Guid id,
         PhotoListCollectionRequest request,
         IPhotoListCollectionRepository repository,
+        ISourceCopyExclusionRepository exclusions,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out PhotoListCollectionId collectionId, out IResult? error))
@@ -102,14 +118,20 @@ public static class PhotoListCollectionEndpoints
 
         try
         {
+            AssetRevisionId[] revisionIds = ParseRevisionIds(request.RevisionIds);
+            if (await ContainsExcludedAsync(revisionIds, exclusions, cancellationToken))
+            {
+                return Results.BadRequest(new { error = "One or more revisions are unavailable." });
+            }
+
             PhotoListCollectionDefinition? definition = await repository.UpdateAsync(
                 collectionId,
                 request.Name,
-                ParseRevisionIds(request.RevisionIds),
+                revisionIds,
                 cancellationToken);
             return definition is null
                 ? Results.NotFound()
-                : Results.Ok(ToResponse(definition));
+                : Results.Ok(await ToResponseAsync(definition, exclusions, cancellationToken));
         }
         catch (PhotoListCollectionNameConflictException exception)
         {
@@ -147,6 +169,7 @@ public static class PhotoListCollectionEndpoints
     private static async Task<IResult> CreateSlideshowSnapshotAsync(
         Guid id,
         IPhotoListCollectionRepository repository,
+        ISourceCopyExclusionRepository exclusions,
         CancellationToken cancellationToken)
     {
         if (!TryGetId(id, out PhotoListCollectionId collectionId, out IResult? error))
@@ -163,29 +186,59 @@ public static class PhotoListCollectionEndpoints
             return Results.NotFound();
         }
 
-        SmartCollectionSlideshowSnapshotItemResponse[] items = snapshot.RevisionIds
-            .Select(
-                revisionId =>
-                    new SmartCollectionSlideshowSnapshotItemResponse(
-                        revisionId.ToString()))
-            .ToArray();
+        List<SmartCollectionSlideshowSnapshotItemResponse> items = [];
+        foreach (AssetRevisionId revisionId in snapshot.RevisionIds)
+        {
+            if (!await exclusions.IsRevisionExcludedAsync(revisionId, cancellationToken))
+            {
+                items.Add(new SmartCollectionSlideshowSnapshotItemResponse(revisionId.ToString()));
+            }
+        }
 
         return Results.Ok(new SmartCollectionSlideshowSnapshotResponse(
             snapshot.CollectionId.ToString(),
             snapshot.CollectionName,
             snapshot.CreatedAtUtc,
-            items,
-            items.Length));
+            items.ToArray(),
+            items.Count));
     }
 
-    private static PhotoListCollectionResponse ToResponse(
-        PhotoListCollectionDefinition definition) =>
-        new(
+    private static async Task<PhotoListCollectionResponse> ToResponseAsync(
+        PhotoListCollectionDefinition definition,
+        ISourceCopyExclusionRepository exclusions,
+        CancellationToken cancellationToken)
+    {
+        List<string> visible = [];
+        foreach (AssetRevisionId revisionId in definition.RevisionIds)
+        {
+            if (!await exclusions.IsRevisionExcludedAsync(revisionId, cancellationToken))
+            {
+                visible.Add(revisionId.ToString());
+            }
+        }
+
+        return new PhotoListCollectionResponse(
             definition.Id.ToString(),
             definition.Name,
-            definition.RevisionIds.Select(item => item.ToString()).ToArray(),
+            visible.ToArray(),
             definition.CreatedAtUtc,
             definition.UpdatedAtUtc);
+    }
+
+    private static async Task<bool> ContainsExcludedAsync(
+        IReadOnlyList<AssetRevisionId> revisionIds,
+        ISourceCopyExclusionRepository exclusions,
+        CancellationToken cancellationToken)
+    {
+        foreach (AssetRevisionId revisionId in revisionIds)
+        {
+            if (await exclusions.IsRevisionExcludedAsync(revisionId, cancellationToken))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private static AssetRevisionId[] ParseRevisionIds(string[]? values)
     {

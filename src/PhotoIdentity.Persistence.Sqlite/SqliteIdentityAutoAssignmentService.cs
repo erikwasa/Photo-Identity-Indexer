@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -11,12 +12,8 @@ public sealed record IdentityAutoAssignmentSummary(
 
 /// <summary>
 /// Promotes qualifying persisted rank-1 matcher suggestions through the same canonical
-/// suggestion-acceptance boundary used by manual review. Eligibility comes from the
-/// persisted exact-model confidence policy: only High suggestions may be promoted, and
-/// High requires both the absolute rank-1 score and rank-1/rank-2 score gap. The service
-/// is deliberately separate from ranking so one regeneration always scores from one fixed
-/// exemplar snapshot. Unknown faces remain human-controlled even if an intentional rematch
-/// later produces advisory suggestions for them.
+/// suggestion-acceptance boundary used by manual review. A durable source-copy exclusion wins
+/// over already-persisted suggestions and is checked immediately before canonical assignment.
 /// </summary>
 public sealed class SqliteIdentityAutoAssignmentService
 {
@@ -24,14 +21,17 @@ public sealed class SqliteIdentityAutoAssignmentService
 
     private readonly SqliteCatalogueDatabase _database;
     private readonly TimeProvider _timeProvider;
+    private readonly ISourceCopyExclusionRepository? _exclusions;
 
     public SqliteIdentityAutoAssignmentService(
         SqliteCatalogueDatabase database,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ISourceCopyExclusionRepository? exclusions = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _exclusions = exclusions;
     }
 
     public async Task<IdentityAutoAssignmentSummary> ApplyAsync(
@@ -72,6 +72,13 @@ public sealed class SqliteIdentityAutoAssignmentService
         int skippedCount = 0;
         foreach (AutoAssignmentCandidate candidate in candidates)
         {
+            if (_exclusions is not null &&
+                await _exclusions.IsFaceOccurrenceExcludedAsync(candidate.FaceOccurrenceId, cancellationToken))
+            {
+                skippedCount++;
+                continue;
+            }
+
             DateTimeOffset decidedAtUtc = _timeProvider.GetUtcNow().ToUniversalTime();
             string note = FormattableString.Invariant(
                 $"Automatic assignment from persisted High rank-1 identity suggestion; model-id={modelId}; model-hash={modelHash}; score={candidate.Score:R}; rank1-rank2-margin={candidate.ScoreMargin:R}; policy-version={policy.Version}; high-score-threshold={policy.HighScoreThreshold:R}; high-margin-threshold={policy.HighMarginThreshold:R}; medium-score-threshold={policy.MediumScoreThreshold:R}.");
@@ -93,7 +100,6 @@ public sealed class SqliteIdentityAutoAssignmentService
             }
             catch (KeyNotFoundException)
             {
-                // Regeneration or review may have superseded the candidate after the read snapshot.
                 skippedCount++;
             }
         }

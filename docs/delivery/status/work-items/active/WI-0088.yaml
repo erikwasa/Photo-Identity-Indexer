@@ -1,11 +1,23 @@
 id: WI-0088
 title: Reconcile exact unambiguous source moves for included photos
 milestone: M23
-status: proposed
-owner: unassigned
+status: in_review
+owner: ai-agent
 document: ../work-items/WI-0088-source-move-reconciliation.md
+started_at: 2026-09-25
+last_updated_at: 2026-09-26
+branch: agent/wi-0088-source-move-reconciliation-v2
 blockers:
 - WI-0041
 - WI-0087
-blocker_notes: []
-evidence: []
+blocker_notes:
+- Core move reconciliation merged in pull request 427. The exclusion-dependent acceptance criteria are implemented by pull request 428; only maintainer real-catalogue rename/move verification remains before completion.
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/427
+- type: workflow
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/actions/runs/36189384133
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/428
+- type: verification
+  value: Automated coverage includes unique exact moves, copy-not-move behavior, ambiguous hashes, online-only safety, scoped-scan safety, idempotence, revision-linked history preservation, excluded-locator filtering and exclusion not following a move.

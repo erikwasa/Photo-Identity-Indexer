@@ -1,5 +1,6 @@
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Imaging;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Api;
 
@@ -14,18 +15,20 @@ public sealed record ReviewProxyServingConfiguration(
 
 /// <summary>
 /// Resolves durable review derivative metadata to verified paths under the configured derivative
-/// root. It never falls back to or opens the authoritative source original.
+/// root. It never falls back to or opens the authoritative source original. Excluded source copies
+/// are denied before derivative metadata or files are resolved.
 /// </summary>
 public sealed class CollectionReviewProxyFileResolver
 {
     private readonly IArchiveReviewProxyRepository _repository;
     private readonly IFaceReviewDerivativeRepository? _derivatives;
+    private readonly ISourceCopyExclusionRepository? _exclusions;
     private readonly ReviewProxyServingConfiguration _configuration;
 
     public CollectionReviewProxyFileResolver(
         IArchiveReviewProxyRepository repository,
         ReviewProxyServingConfiguration configuration)
-        : this(repository, derivatives: null, configuration)
+        : this(repository, derivatives: null, exclusions: null, configuration)
     {
     }
 
@@ -33,11 +36,21 @@ public sealed class CollectionReviewProxyFileResolver
         IArchiveReviewProxyRepository repository,
         IFaceReviewDerivativeRepository? derivatives,
         ReviewProxyServingConfiguration configuration)
+        : this(repository, derivatives, exclusions: null, configuration)
+    {
+    }
+
+    public CollectionReviewProxyFileResolver(
+        IArchiveReviewProxyRepository repository,
+        IFaceReviewDerivativeRepository? derivatives,
+        ISourceCopyExclusionRepository? exclusions,
+        ReviewProxyServingConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(configuration);
         _repository = repository;
         _derivatives = derivatives;
+        _exclusions = exclusions;
         _configuration = configuration;
     }
 
@@ -45,7 +58,8 @@ public sealed class CollectionReviewProxyFileResolver
         AssetRevisionId revisionId,
         CancellationToken cancellationToken = default)
     {
-        if (!_configuration.IsConfigured)
+        if (!_configuration.IsConfigured ||
+            (_exclusions is not null && await _exclusions.IsRevisionExcludedAsync(revisionId, cancellationToken)))
         {
             return null;
         }
@@ -63,16 +77,17 @@ public sealed class CollectionReviewProxyFileResolver
         return path is null ? null : new CollectionPhotoFile(path, "image/jpeg");
     }
 
-    public Task<FaceReviewDerivativeFile?> ResolveFaceReviewAsync(
+    public async Task<FaceReviewDerivativeFile?> ResolveFaceReviewAsync(
         FaceOccurrenceId faceOccurrenceId,
         CancellationToken cancellationToken = default)
     {
-        if (_derivatives is null)
+        if (_derivatives is null ||
+            (_exclusions is not null && await _exclusions.IsFaceOccurrenceExcludedAsync(faceOccurrenceId, cancellationToken)))
         {
-            return Task.FromResult<FaceReviewDerivativeFile?>(null);
+            return null;
         }
 
-        return new FaceReviewDerivativeFileResolver(_derivatives, _configuration)
+        return await new FaceReviewDerivativeFileResolver(_derivatives, _exclusions, _configuration)
             .ResolveAsync(faceOccurrenceId, cancellationToken);
     }
 
@@ -94,9 +109,7 @@ public sealed class CollectionReviewProxyFileResolver
             path = Path.GetFullPath(Path.Combine(root, platformPath));
         }
         catch (Exception exception) when (
-            exception is ArgumentException or
-            NotSupportedException or
-            PathTooLongException)
+            exception is ArgumentException or NotSupportedException or PathTooLongException)
         {
             return null;
         }
@@ -123,9 +136,7 @@ public sealed class CollectionReviewProxyFileResolver
             }
         }
         catch (Exception exception) when (
-            exception is IOException or
-            UnauthorizedAccessException or
-            System.Security.SecurityException)
+            exception is IOException or UnauthorizedAccessException or System.Security.SecurityException)
         {
             return null;
         }

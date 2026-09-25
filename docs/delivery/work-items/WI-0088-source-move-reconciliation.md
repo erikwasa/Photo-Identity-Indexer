@@ -41,15 +41,15 @@ The canonical data model intends asset identity to survive path reconciliation, 
 
 ## Acceptance criteria
 
-- [ ] Rename/move of one included local/verified file to one new path with the same authoritative SHA-256 preserves its AssetId.
-- [ ] Existing revision-linked faces, people, tags, metadata and review history remain attached after the reconciled move.
-- [ ] If both old and new same-hash paths exist, both remain separate source copies and no move reconciliation occurs.
-- [ ] Multiple same-hash missing candidates remain unresolved rather than being guessed.
-- [ ] A new unverified online-only path is not auto-reconciled from metadata alone.
-- [ ] Scoped scans cannot reconcile against paths whose absence was not authoritatively established in the relevant scope.
-- [ ] Excluded locators are never move candidates.
-- [ ] Moving/renaming an excluded file results in a new non-excluded source copy at the new path.
-- [ ] Repeated scans after a successful reconciliation are idempotent and do not create duplicate assets/revisions.
+- [x] Rename/move of one included local/verified file to one new path with the same authoritative SHA-256 preserves its AssetId.
+- [x] Existing revision-linked faces, people, tags, metadata and review history remain attached after the reconciled move.
+- [x] If both old and new same-hash paths exist, both remain separate source copies and no move reconciliation occurs.
+- [x] Multiple same-hash missing candidates remain unresolved rather than being guessed.
+- [x] A new unverified online-only path is not auto-reconciled from metadata alone.
+- [x] Scoped scans cannot reconcile against paths whose absence was not authoritatively established in the relevant scope.
+- [x] Excluded locators are never move candidates.
+- [x] Moving/renaming an excluded file results in a new non-excluded source copy at the new path.
+- [x] Repeated scans after a successful reconciliation are idempotent and do not create duplicate assets/revisions.
 
 ## Verification requirements
 
@@ -57,7 +57,7 @@ Automated scanner/persistence integration coverage is required for unique move, 
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: PR #427 added the provider-neutral `IArchiveSourceMoveReconciler`, SQLite/PostgreSQL implementations, post-scan reconciliation in `LocalArchiveSyncCoordinator`, reconciliation diagnostics, and SQLite/PostgreSQL verification coverage. PR #428 completes the exclusion-dependent portion by filtering tombstoned locators from both reconciliation providers and covering the excluded-file move/rename case.
+- Trade-offs: reconciliation is intentionally conservative. It requires authoritative SHA-256 identity, exactly one eligible missing/current mapping inside authoritative scan coverage, and matching synchronization timing; ambiguity is left unresolved rather than guessed.
+- Deferred work: maintainer real-catalogue verification remains required before the work item can move from `in_review` to `completed`. WI-0091 owns any operator-facing ambiguous-move/duplicate workflow.
+- Commands run: PR #427 CI validated the core implementation before merge. PR #428 CI exercises the exclusion integration; the branch also contains explicit integration coverage for exclusion not following a move.

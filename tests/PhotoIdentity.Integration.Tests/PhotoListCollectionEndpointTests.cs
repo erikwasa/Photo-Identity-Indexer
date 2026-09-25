@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PhotoIdentity.Api;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Sources;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -20,6 +21,7 @@ public sealed class PhotoListCollectionEndpointTests
         WebApplicationBuilder builder = WebApplication.CreateBuilder([]);
         builder.WebHost.UseTestServer();
         builder.Services.AddSingleton<IPhotoListCollectionRepository>(repository);
+        builder.Services.AddSingleton<ISourceCopyExclusionRepository>(new AllowAllExclusionRepository());
 
         await using WebApplication app = builder.Build();
         app.MapPhotoListCollectionEndpoints();
@@ -86,6 +88,7 @@ public sealed class PhotoListCollectionEndpointTests
         WebApplicationBuilder builder = WebApplication.CreateBuilder([]);
         builder.WebHost.UseTestServer();
         builder.Services.AddSingleton<IPhotoListCollectionRepository>(repository);
+        builder.Services.AddSingleton<ISourceCopyExclusionRepository>(new AllowAllExclusionRepository());
 
         await using WebApplication app = builder.Build();
         app.MapPhotoListCollectionEndpoints();
@@ -224,5 +227,70 @@ public sealed class PhotoListCollectionEndpointTests
                     _now.AddMinutes(2),
                     definition.RevisionIds.ToArray()));
         }
+    }
+
+    private sealed class AllowAllExclusionRepository : ISourceCopyExclusionRepository
+    {
+        public Task<SourceCopyExclusionState?> GetAsync(
+            SourceId sourceId,
+            string sourceKey,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<SourceCopyExclusionState?>(null);
+
+        public Task<IReadOnlyList<SourceCopyExclusionState>> ListAsync(
+            SourceId? sourceId = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<SourceCopyExclusionState>>([]);
+
+        public Task<SourceCopyExclusionState> ExcludeAsync(
+            SourceId sourceId,
+            string sourceKey,
+            DateTimeOffset excludedAtUtc,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new SourceCopyExclusionState(
+                sourceId,
+                sourceKey,
+                excludedAtUtc,
+                null,
+                SourceCopyPurgeStates.Pending,
+                null,
+                excludedAtUtc));
+
+        public Task<bool> RestoreAsync(
+            SourceId sourceId,
+            string sourceKey,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task<bool> RecordObservedIfExcludedAsync(
+            SourceId sourceId,
+            string sourceKey,
+            DateTimeOffset observedAtUtc,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task SetPurgeStateAsync(
+            SourceId sourceId,
+            string sourceKey,
+            string purgeState,
+            string? errorCode,
+            DateTimeOffset updatedAtUtc,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<bool> IsAssetExcludedAsync(
+            AssetId assetId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task<bool> IsRevisionExcludedAsync(
+            AssetRevisionId revisionId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task<bool> IsFaceOccurrenceExcludedAsync(
+            FaceOccurrenceId faceOccurrenceId,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
     }
 }

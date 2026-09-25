@@ -18,20 +18,28 @@ public sealed record PhotoMetadataBackfillReport(
 
 /// <summary>
 /// Reads photo metadata only from source files that are already local and still match the immutable
-/// revision fingerprint. Normal execution processes missing and stale extraction-contract rows;
-/// force mode can intentionally re-read current rows for repair. The service never requests Files
-/// On-Demand hydration.
+/// revision fingerprint. Excluded source copies are rejected before any path resolution or file IO.
 /// </summary>
 public sealed class PhotoMetadataBackfillService
 {
     private readonly IPhotoMetadataBackfillRepository _backfill;
     private readonly IOneDriveFilesOnDemandPlatform _filesOnDemand;
     private readonly PhotoMetadataInspectionService _inspection;
+    private readonly ISourceCopyExclusionRepository? _exclusions;
 
     public PhotoMetadataBackfillService(
         IPhotoMetadataBackfillRepository backfill,
         IOneDriveFilesOnDemandPlatform filesOnDemand,
         PhotoMetadataInspectionService inspection)
+        : this(backfill, filesOnDemand, inspection, exclusions: null)
+    {
+    }
+
+    public PhotoMetadataBackfillService(
+        IPhotoMetadataBackfillRepository backfill,
+        IOneDriveFilesOnDemandPlatform filesOnDemand,
+        PhotoMetadataInspectionService inspection,
+        ISourceCopyExclusionRepository? exclusions)
     {
         ArgumentNullException.ThrowIfNull(backfill);
         ArgumentNullException.ThrowIfNull(filesOnDemand);
@@ -39,6 +47,7 @@ public sealed class PhotoMetadataBackfillService
         _backfill = backfill;
         _filesOnDemand = filesOnDemand;
         _inspection = inspection;
+        _exclusions = exclusions;
     }
 
     public async Task<PhotoMetadataBackfillReport> ExecuteBatchAsync(
@@ -68,6 +77,13 @@ public sealed class PhotoMetadataBackfillService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (_exclusions is not null &&
+                await _exclusions.IsRevisionExcludedAsync(candidate.RevisionId, cancellationToken))
+            {
+                deferredUnavailable++;
+                continue;
+            }
+
             string path;
             try
             {
@@ -90,7 +106,6 @@ public sealed class PhotoMetadataBackfillService
                 {
                     deferredUnavailable++;
                 }
-
                 continue;
             }
 
@@ -142,9 +157,7 @@ public sealed class PhotoMetadataBackfillService
                 }
             }
             catch (Exception exception) when (
-                exception is IOException or
-                UnauthorizedAccessException or
-                InvalidDataException)
+                exception is IOException or UnauthorizedAccessException or InvalidDataException)
             {
                 deferredUnavailable++;
             }

@@ -9,16 +9,20 @@ namespace PhotoIdentity.Persistence.Postgres;
 /// <summary>
 /// Reconciles a source move only when one verified missing copy and one verified current copy are
 /// the complete exact-hash group inside the configured archive coverage, and both transitions were
-/// observed by the same completed synchronization.
+/// observed by the same completed synchronization. Excluded locators are never move candidates.
 /// </summary>
 public sealed class PostgresArchiveSourceMoveReconciler : IArchiveSourceMoveReconciler
 {
     private readonly PostgresCatalogueDatabase _database;
+    private readonly ISourceCopyExclusionRepository? _exclusions;
 
-    public PostgresArchiveSourceMoveReconciler(PostgresCatalogueDatabase database)
+    public PostgresArchiveSourceMoveReconciler(
+        PostgresCatalogueDatabase database,
+        ISourceCopyExclusionRepository? exclusions = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+        _exclusions = exclusions;
     }
 
     public async Task<int> ReconcileAsync(
@@ -34,6 +38,15 @@ public sealed class PostgresArchiveSourceMoveReconciler : IArchiveSourceMoveReco
             return 0;
         }
 
+        HashSet<string>? excludedKeys = null;
+        if (_exclusions is not null)
+        {
+            IReadOnlyList<SourceCopyExclusionState> excluded = await _exclusions.ListAsync(sourceId, cancellationToken);
+            excludedKeys = excluded
+                .Select(static state => state.SourceKey)
+                .ToHashSet(StringComparer.Ordinal);
+        }
+
         DateTimeOffset scannedAt = scannedAtUtc.ToUniversalTime();
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(
@@ -46,6 +59,10 @@ public sealed class PostgresArchiveSourceMoveReconciler : IArchiveSourceMoveReco
             sourceId,
             coverage,
             cancellationToken);
+        if (excludedKeys is not null)
+        {
+            candidates.RemoveAll(candidate => excludedKeys.Contains(candidate.SourceKey));
+        }
 
         int reconciled = 0;
         foreach (IGrouping<Sha256Digest, MoveCandidate> group in candidates.GroupBy(static candidate => candidate.ContentHash))

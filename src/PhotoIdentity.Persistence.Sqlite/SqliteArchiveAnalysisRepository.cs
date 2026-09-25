@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -12,11 +13,13 @@ namespace PhotoIdentity.Persistence.Sqlite;
 public sealed class SqliteArchiveAnalysisRepository : IArchiveAnalysisStateRepository
 {
     private readonly SqliteCatalogueDatabase _database;
+    private readonly SqliteSourceCopyExclusionRepository _exclusions;
 
     public SqliteArchiveAnalysisRepository(SqliteCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+        _exclusions = new SqliteSourceCopyExclusionRepository(database);
     }
 
     public async Task RegisterRunAsync(
@@ -121,10 +124,16 @@ public sealed class SqliteArchiveAnalysisRepository : IArchiveAnalysisStateRepos
         CancellationToken cancellationToken = default)
     {
         await EnsureSchemaAsync(cancellationToken);
+        IReadOnlyList<SourceCopyExclusionState> exclusions =
+            await _exclusions.ListAsync(sourceId, cancellationToken);
+        HashSet<string> excludedKeys = exclusions
+            .Select(item => item.SourceKey)
+            .ToHashSet(StringComparer.Ordinal);
+
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
         command.CommandText = """
-            SELECT revision.id
+            SELECT revision.id, asset.source_key
             FROM assets AS asset
             INNER JOIN asset_revisions AS revision
                 ON revision.id = (
@@ -158,7 +167,10 @@ public sealed class SqliteArchiveAnalysisRepository : IArchiveAnalysisStateRepos
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            revisions.Add(AssetRevisionId.From(Guid.Parse(reader.GetString(0))));
+            if (!excludedKeys.Contains(reader.GetString(1)))
+            {
+                revisions.Add(AssetRevisionId.From(Guid.Parse(reader.GetString(0))));
+            }
         }
 
         return revisions;

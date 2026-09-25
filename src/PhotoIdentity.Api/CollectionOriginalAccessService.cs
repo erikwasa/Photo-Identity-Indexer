@@ -18,9 +18,7 @@ public sealed record CollectionOriginalAccessSnapshot(
     bool CanRelease,
     string? Message);
 
-public sealed record VerifiedCollectionOriginal(
-    FileStream Stream,
-    string ContentType);
+public sealed record VerifiedCollectionOriginal(FileStream Stream, string ContentType);
 
 public sealed class CollectionOriginalAccessService
 {
@@ -38,8 +36,22 @@ public sealed class CollectionOriginalAccessService
     private readonly IOneDriveFilesOnDemandPlatform _platform;
     private readonly ArchiveHydrationCapacityService _capacity;
     private readonly TimeProvider _timeProvider;
+    private readonly ISourceCopyExclusionRepository? _exclusions;
     private readonly ArchiveThroughputMetrics? _metrics;
     private readonly StringComparison _pathComparison;
+
+    // Retained for tests and non-DI callers that predate the exclusion boundary.
+    public CollectionOriginalAccessService(
+        IAssetRevisionLookupRepository catalogue,
+        IArchiveHydrationRepository hydrations,
+        IArchiveAvailabilityRepository availability,
+        IOneDriveFilesOnDemandPlatform platform,
+        ArchiveHydrationCapacityService capacity,
+        TimeProvider timeProvider,
+        ArchiveThroughputMetrics? metrics = null)
+        : this(catalogue, hydrations, availability, platform, capacity, timeProvider, null, metrics)
+    {
+    }
 
     public CollectionOriginalAccessService(
         IAssetRevisionLookupRepository catalogue,
@@ -48,6 +60,7 @@ public sealed class CollectionOriginalAccessService
         IOneDriveFilesOnDemandPlatform platform,
         ArchiveHydrationCapacityService capacity,
         TimeProvider timeProvider,
+        ISourceCopyExclusionRepository? exclusions,
         ArchiveThroughputMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(catalogue);
@@ -62,6 +75,7 @@ public sealed class CollectionOriginalAccessService
         _platform = platform;
         _capacity = capacity;
         _timeProvider = timeProvider;
+        _exclusions = exclusions;
         _metrics = metrics;
         _pathComparison = OperatingSystem.IsWindows()
             ? StringComparison.OrdinalIgnoreCase
@@ -80,14 +94,10 @@ public sealed class CollectionOriginalAccessService
 
         ArchiveManagedHydrationState? ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
         OneDriveFilesOnDemandState platformState = await ObserveStateAsync(resolved, cancellationToken);
-
         if (ownership is { IsActive: true, IsReleaseRequested: true } &&
             platformState.Availability == AssetAvailability.OnlineOnly)
         {
-            await _hydrations.MarkReleasedAsync(
-                revisionId,
-                _timeProvider.GetUtcNow(),
-                cancellationToken);
+            await _hydrations.MarkReleasedAsync(revisionId, _timeProvider.GetUtcNow(), cancellationToken);
             ownership = await _hydrations.GetAsync(revisionId, cancellationToken);
         }
 
@@ -97,23 +107,22 @@ public sealed class CollectionOriginalAccessService
         {
             AssetAvailability.Local when releasing => Snapshot(
                 revisionId, ReleasingState, managed, platformState.IsPinned,
-                canHydrate: false, canView: false, canRelease: true,
+                false, false, true,
                 "Photo Identity requested release and is waiting for OneDrive to make the original online-only."),
-            AssetAvailability.Local => await LocalSnapshotAsync(
-                resolved, managed, platformState.IsPinned, cancellationToken),
+            AssetAvailability.Local => await LocalSnapshotAsync(resolved, managed, platformState.IsPinned, cancellationToken),
             AssetAvailability.OnlineOnly => Snapshot(
                 revisionId, OnlineOnlyState, managed, platformState.IsPinned,
-                canHydrate: true, canView: false, canRelease: false,
+                true, false, false,
                 managed
                     ? "The managed original is online-only. Hydration can be requested again subject to the storage policy."
                     : "The original is online-only. Normal browsing can continue from its review proxy."),
             AssetAvailability.Downloading when releasing => Snapshot(
                 revisionId, ReleasingState, managed, platformState.IsPinned,
-                canHydrate: false, canView: false, canRelease: true,
+                false, false, true,
                 "Photo Identity requested release and is waiting for OneDrive."),
             AssetAvailability.Downloading => Snapshot(
                 revisionId, DownloadingState, managed, platformState.IsPinned,
-                canHydrate: false, canView: false, canRelease: managed,
+                false, false, managed,
                 managed
                     ? "Photo Identity requested hydration and is waiting for the original to become local."
                     : "The original is already being made local outside Photo Identity; it will not be claimed or automatically released."),
@@ -156,9 +165,6 @@ public sealed class CollectionOriginalAccessService
                 resolved.Revision,
                 async () =>
                 {
-                    // Claim ownership only after Windows accepts our explicit pin request. A crash
-                    // between these operations leaks local storage rather than risking release of
-                    // content Photo Identity did not hydrate.
                     using (IDisposable? timing = _metrics?.Measure(ArchiveThroughputMetricNames.HydrationRequest))
                     {
                         await _platform.RequestHydrationAsync(resolved.Path, cancellationToken);
@@ -166,10 +172,7 @@ public sealed class CollectionOriginalAccessService
                     _metrics?.RecordCounter(ArchiveThroughputMetricNames.HydrationRequests);
                     if (ownership is not { IsActive: true })
                     {
-                        await _hydrations.ClaimAsync(
-                            revisionId,
-                            _timeProvider.GetUtcNow(),
-                            cancellationToken);
+                        await _hydrations.ClaimAsync(revisionId, _timeProvider.GetUtcNow(), cancellationToken);
                     }
                     else
                     {
@@ -179,7 +182,8 @@ public sealed class CollectionOriginalAccessService
                 cancellationToken);
             if (!admission.Allowed)
             {
-                throw new InvalidOperationException(admission.Message ?? "Managed hydration is blocked by the configured storage policy.");
+                throw new InvalidOperationException(
+                    admission.Message ?? "Managed hydration is blocked by the configured storage policy.");
             }
         }
         else if (state.Availability == AssetAvailability.Unavailable)
@@ -191,8 +195,6 @@ public sealed class CollectionOriginalAccessService
             throw new IOException("OneDrive availability could not be determined.");
         }
 
-        // Local or already-downloading originals are deliberately not claimed. That preserves
-        // content which was local or user-pinned before Photo Identity became involved.
         return await GetStatusAsync(revisionId, cancellationToken);
     }
 
@@ -216,18 +218,13 @@ public sealed class CollectionOriginalAccessService
         OneDriveFilesOnDemandState state = await ObserveStateAsync(resolved, cancellationToken);
         if (state.Availability == AssetAvailability.OnlineOnly)
         {
-            await _hydrations.MarkReleasedAsync(
-                revisionId,
-                _timeProvider.GetUtcNow(),
-                cancellationToken);
+            await _hydrations.MarkReleasedAsync(revisionId, _timeProvider.GetUtcNow(), cancellationToken);
             return await GetStatusAsync(revisionId, cancellationToken);
         }
-
         if (state.Availability == AssetAvailability.Unavailable)
         {
             throw new FileNotFoundException("The authoritative original is unavailable.");
         }
-
         if (state.Availability == AssetAvailability.Error)
         {
             throw new IOException("OneDrive availability could not be determined.");
@@ -240,10 +237,7 @@ public sealed class CollectionOriginalAccessService
                 await _platform.RequestOnlineOnlyAsync(resolved.Path, cancellationToken);
             }
             _metrics?.RecordCounter(ArchiveThroughputMetricNames.ReleaseRequests);
-            await _hydrations.MarkReleaseRequestedAsync(
-                revisionId,
-                _timeProvider.GetUtcNow(),
-                cancellationToken);
+            await _hydrations.MarkReleaseRequestedAsync(revisionId, _timeProvider.GetUtcNow(), cancellationToken);
         }
 
         return await GetStatusAsync(revisionId, cancellationToken);
@@ -280,7 +274,6 @@ public sealed class CollectionOriginalAccessService
         {
             await _capacity.TouchAsync(revisionId, cancellationToken);
         }
-
         return verified;
     }
 
@@ -323,8 +316,7 @@ public sealed class CollectionOriginalAccessService
                 ArchiveThroughputMetricNames.OriginalOpenHashKind,
                 resolved.Revision.RevisionId.ToString(),
                 bytes);
-            Sha256Digest actual = new(Convert.ToHexString(hash).ToLowerInvariant());
-            if (actual != resolved.Revision.ContentHash)
+            if (new Sha256Digest(Convert.ToHexString(hash).ToLowerInvariant()) != resolved.Revision.ContentHash)
             {
                 await stream.DisposeAsync();
                 return null;
@@ -359,22 +351,22 @@ public sealed class CollectionOriginalAccessService
                 ReadyState,
                 managed,
                 isPinned,
-                canHydrate: false,
-                canView: browserRenderable,
-                canRelease: managed,
+                false,
+                browserRenderable,
+                managed,
                 browserRenderable
                     ? managed
                         ? "The original is local, revision-verified and owned by Photo Identity."
                         : "The original is local and revision-verified. Photo Identity will not release it automatically."
-                    : "The original is local and revision-verified, but its format is not directly browser-renderable. The photo viewer will use the durable review proxy when available." )
+                    : "The original is local and revision-verified, but its format is not directly browser-renderable. The photo viewer will use the durable review proxy when available.")
             : Snapshot(
                 resolved.Revision.RevisionId,
                 HashMismatchState,
                 managed,
                 isPinned,
-                canHydrate: false,
-                canView: false,
-                canRelease: managed,
+                false,
+                false,
+                managed,
                 "The local bytes do not match the immutable catalogue revision, so the original will not be served.");
     }
 
@@ -403,8 +395,7 @@ public sealed class CollectionOriginalAccessService
                 ArchiveThroughputMetricNames.OriginalStatusHashKind,
                 resolved.Revision.RevisionId.ToString(),
                 bytes);
-            return new Sha256Digest(Convert.ToHexString(hash).ToLowerInvariant()) ==
-                resolved.Revision.ContentHash;
+            return new Sha256Digest(Convert.ToHexString(hash).ToLowerInvariant()) == resolved.Revision.ContentHash;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -416,9 +407,15 @@ public sealed class CollectionOriginalAccessService
         AssetRevisionId revisionId,
         CancellationToken cancellationToken)
     {
-        AssetRevisionLookup? revision = await _catalogue.GetRevisionAsync(
-            revisionId,
-            cancellationToken);
+        // The privacy boundary is evaluated before resolving or probing the source path, so callers
+        // holding an identifier captured before exclusion cannot hydrate, view or hash the content.
+        if (_exclusions is not null &&
+            await _exclusions.IsRevisionExcludedAsync(revisionId, cancellationToken))
+        {
+            return null;
+        }
+
+        AssetRevisionLookup? revision = await _catalogue.GetRevisionAsync(revisionId, cancellationToken);
         if (revision is null ||
             !string.Equals(revision.SourceKind, "local-folder", StringComparison.Ordinal))
         {
@@ -438,8 +435,6 @@ public sealed class CollectionOriginalAccessService
             return null;
         }
 
-        // File symlinks are not valid authoritative originals. Cloud Files placeholders may carry
-        // the ReparsePoint attribute while still reporting no link target, so they remain allowed.
         if (File.Exists(path) && new FileInfo(path).LinkTarget is not null)
         {
             return null;
@@ -459,7 +454,5 @@ public sealed class CollectionOriginalAccessService
         string? message) =>
         new(revisionId, state, managed, pinned, canHydrate, canView, canRelease, message);
 
-    private sealed record ResolvedOriginal(
-        AssetRevisionLookup Revision,
-        string Path);
+    private sealed record ResolvedOriginal(AssetRevisionLookup Revision, string Path);
 }
