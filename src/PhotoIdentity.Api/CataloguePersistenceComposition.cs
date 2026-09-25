@@ -124,6 +124,8 @@ internal static class CataloguePersistenceComposition
         services.AddSingleton<IAssetRevisionLookupRepository>(sp => sp.GetRequiredService<SqliteLocalBatchRepository>());
         services.AddSingleton<ICatalogueSourceRepository>(sp => sp.GetRequiredService<SqliteLocalBatchRepository>());
         services.AddSingleton<IArchiveSourceScanPersistence, SqliteArchiveSourceScanBatchRepository>();
+        services.AddSingleton<SqliteArchiveSourceMoveReconciler>();
+        services.AddSingleton<IArchiveSourceMoveReconciler>(sp => sp.GetRequiredService<SqliteArchiveSourceMoveReconciler>());
         services.AddSingleton<SqliteProcessingRepository>();
         services.AddSingleton<IProcessingRunConfigurationReader>(sp => sp.GetRequiredService<SqliteProcessingRepository>());
         services.AddSingleton<IProcessingRunRepository>(sp => sp.GetRequiredService<SqliteProcessingRepository>());
@@ -255,6 +257,8 @@ internal static class CataloguePersistenceComposition
         services.AddSingleton<ICatalogueSourceRepository>(sp => sp.GetRequiredService<PostgresCatalogueSourceRepository>());
         services.AddSingleton<PostgresArchiveSourceScanBatchRepository>();
         services.AddSingleton<IArchiveSourceScanPersistence>(sp => sp.GetRequiredService<PostgresArchiveSourceScanBatchRepository>());
+        services.AddSingleton<PostgresArchiveSourceMoveReconciler>();
+        services.AddSingleton<IArchiveSourceMoveReconciler>(sp => sp.GetRequiredService<PostgresArchiveSourceMoveReconciler>());
         services.AddSingleton<PostgresProcessingRepository>();
         services.AddSingleton<IProcessingRunConfigurationReader>(sp => sp.GetRequiredService<PostgresProcessingRepository>());
         services.AddSingleton<IProcessingRunRepository>(sp => sp.GetRequiredService<PostgresProcessingRepository>());
