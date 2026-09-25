@@ -3,6 +3,7 @@ using Npgsql;
 using NpgsqlTypes;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Places;
 using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Persistence.Postgres;
@@ -95,7 +96,8 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         effective_revision_places AS (
             SELECT
                 latest_place_action.asset_revision_id AS revision_id,
-                photo_tags.normalized_name AS normalized_value
+                photo_tags.normalized_name AS normalized_value,
+                photo_tags.display_name AS display_value
             FROM latest_place_action
             INNER JOIN photo_tags ON photo_tags.id = latest_place_action.tag_id
             WHERE latest_place_action.row_number = 1
@@ -278,13 +280,16 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                     ORDER BY revision_people.person_id::text),
                 effective_capture_dates.date_from,
                 effective_capture_dates.date_to,
-                effective_capture_dates.source
+                effective_capture_dates.source,
+                effective_revision_places.display_value
             FROM asset_revisions
             INNER JOIN assets ON assets.id = asset_revisions.asset_id
             LEFT JOIN photo_capture_metadata
                 ON photo_capture_metadata.asset_revision_id = asset_revisions.id
             LEFT JOIN effective_capture_dates
                 ON effective_capture_dates.revision_id = asset_revisions.id
+            LEFT JOIN effective_revision_places
+                ON effective_revision_places.revision_id = asset_revisions.id
             WHERE assets.deleted_at_utc IS NULL
               {where}
             ORDER BY
@@ -345,7 +350,8 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 COALESCE(people_by_revision.people_keys, ARRAY[]::text[]),
                 effective_capture_dates.date_from,
                 effective_capture_dates.date_to,
-                effective_capture_dates.source
+                effective_capture_dates.source,
+                effective_revision_places.display_value
             FROM asset_revisions
             INNER JOIN assets ON assets.id = asset_revisions.asset_id
             LEFT JOIN photo_capture_metadata
@@ -354,6 +360,8 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
                 ON effective_capture_dates.revision_id = asset_revisions.id
             LEFT JOIN people_by_revision
                 ON people_by_revision.revision_id = asset_revisions.id
+            LEFT JOIN effective_revision_places
+                ON effective_revision_places.revision_id = asset_revisions.id
             WHERE assets.deleted_at_utc IS NULL
               {where}
             ORDER BY
@@ -454,7 +462,8 @@ public sealed class PostgresSmartCollectionQueryRepository : ISmartCollectionQue
         reader.IsDBNull(8) ? null : reader.GetDouble(8),
         reader.GetFieldValue<string[]>(9),
         ReadEffectiveRange(reader, 10, 11),
-        reader.IsDBNull(12) ? null : reader.GetString(12));
+        reader.IsDBNull(12) ? null : reader.GetString(12),
+        reader.IsDBNull(13) ? null : PhotoPlacePath.Parse(reader.GetString(13)).DisplayValue);
 
     private static DateTime EffectiveSlideshowTime(SlideshowSnapshotCandidate candidate)
     {
