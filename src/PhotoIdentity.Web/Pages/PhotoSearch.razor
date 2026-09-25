@@ -10,8 +10,8 @@
         <p class="eyebrow">Semantic photo search</p>
         <h1>Search photos in natural language</h1>
         <p>
-            Search combines local visual similarity with durable generated captions where they exist.
-            Results always keep the evidence source visible.
+            Visual search uses local CLIP similarity and is supported for English queries.
+            Caption evidence searches durable generated captions in their stored language, and results always keep the evidence source visible.
         </p>
     </div>
     @if (Status is not null)
@@ -41,9 +41,10 @@
         <input @bind="Query"
                @bind:event="oninput"
                maxlength="300"
-               placeholder="barn som leker utomhus / children playing outdoors"
+               placeholder="children playing outdoors"
                disabled="@Busy"
                @onkeydown="HandleQueryKeyDown" />
+        <small>Use English for Visual search. Captions are searched in the language in which they were generated.</small>
     </label>
 
     <label>
@@ -182,8 +183,9 @@
         displayable WI-0128 caption evidence. Similar-photo retrieval and embedding-based slideshow diversity remain disabled.
     </p>
     <p>
-        Swedish and English input are accepted. WI-0162's larger private evaluation measures Swedish visual-query quality
-        separately before deciding whether a translation or multilingual model is justified.
+        WI-0162's archive-scale evaluation measured 0.89 precision at 10 for English visual queries and 0.29 for Swedish
+        on the same query concepts. Visual search therefore supports English queries; no translation or multilingual CLIP
+        layer is added. Caption-only search can still use the language of the stored generated captions.
     </p>
 </details>
 
