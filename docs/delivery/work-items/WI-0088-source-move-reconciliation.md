@@ -5,7 +5,7 @@ milestone: M23
 status_source: ../status/work-items.yaml
 depends_on: [WI-0041, WI-0087]
 related_adrs: [ADR-0008]
-affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Source.Local, PhotoIdentity.Source.OneDriveSync, documentation]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Source.Local, PhotoIdentity.Source.OneDriveSync, documentation]
 ---
 
 # WI-0088: Reconcile exact unambiguous source moves for included photos
@@ -57,7 +57,7 @@ Automated scanner/persistence integration coverage is required for unique move, 
 
 ## Completion notes
 
-- Files changed: PR #427 added the provider-neutral `IArchiveSourceMoveReconciler`, SQLite/PostgreSQL implementations, post-scan reconciliation in `LocalArchiveSyncCoordinator`, reconciliation diagnostics, and SQLite/PostgreSQL verification coverage. PR #428 completes the exclusion-dependent portion by filtering tombstoned locators from both reconciliation providers and covering the excluded-file move/rename case.
+- Files changed: PR #427 added the provider-neutral `IArchiveSourceMoveReconciler`, SQLite/PostgreSQL implementations, post-scan reconciliation in `LocalArchiveSyncCoordinator`, reconciliation diagnostics, and SQLite/PostgreSQL verification coverage. PR #428 added the exclusion-dependent portion by filtering tombstoned locators from both reconciliation providers and covering the excluded-file move/rename case; that PR merged to `main` on 2026-09-25.
 - Trade-offs: reconciliation is intentionally conservative. It requires authoritative SHA-256 identity, exactly one eligible missing/current mapping inside authoritative scan coverage, and matching synchronization timing; ambiguity is left unresolved rather than guessed.
 - Deferred work: maintainer real-catalogue verification remains required before the work item can move from `in_review` to `completed`. WI-0091 owns any operator-facing ambiguous-move/duplicate workflow.
-- Commands run: PR #427 CI validated the core implementation before merge. PR #428 CI exercises the exclusion integration; the branch also contains explicit integration coverage for exclusion not following a move.
+- Commands run: PR #427 CI validated the core implementation before merge. PR #428 final-head workflow `36199153432` passed both integration shards plus the full required repository gate before merge; the remaining requirement is the maintainer real-catalogue rename/move check.

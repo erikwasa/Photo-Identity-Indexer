@@ -12,6 +12,8 @@ The implementation branch is `agent/wi-0163-bulk-metadata-enrichment`. The first
 
 M28 remains completed. **M26 Creative Collections is completed.** WI-0162 closed the final M26 follow-on: the private-archive scale evaluation reached 10,585 indexed photos, English Visual/CLIP precision@10 was 0.89, English-only Visual search was accepted, and two saved search-result collections were verified through slideshow playback plus exact ordered-membership persistence after restart. M29 is ready with WI-0147 as its first PostgreSQL-only cleanup item. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
+**M23 Source-copy lifecycle and privacy exclusion remains in progress.** WI-0089 completed and merged to `main` in PR #428 on 2026-09-25, establishing the durable exclusion/access boundary. WI-0088 remains `in_review` pending the maintainer real-catalogue rename/move check; WI-0087 remains ready. With WI-0089 completed, WI-0090's dependency gate is cleared and `PhotoIdentity.Docs next` can surface it even while its canonical status remains `proposed`; WI-0091 still depends on the remaining M23 sequence.
+
 ## Next concrete step
 
 Get WI-0163 compile/tests/docs validation green in the draft PR, then have the maintainer run a production-catalogue dry-run with a local rule file before any broad `--apply` operation.
