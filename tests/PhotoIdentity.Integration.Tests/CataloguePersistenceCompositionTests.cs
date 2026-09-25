@@ -64,7 +64,8 @@ public sealed class CataloguePersistenceCompositionTests
         Assert.IsType<PostgresPhotoPlaceRepository>(provider.GetRequiredService<IPhotoPlaceRepository>());
         Assert.IsType<PostgresDetectorEvaluationCatalogueRepository>(provider.GetRequiredService<IDetectorEvaluationCatalogueRepository>());
         Assert.IsType<PostgresAssetRevisionLookupRepository>(provider.GetRequiredService<IAssetRevisionLookupRepository>());
-        Assert.IsType<PostgresProcessingRepository>(provider.GetRequiredService<IProcessingExecutionRepository>());
+        Assert.IsType<PostgresProcessingRepository>(provider.GetRequiredService<PostgresProcessingRepository>());
+        Assert.IsType<ExclusionAwareProcessingExecutionRepository>(provider.GetRequiredService<IProcessingExecutionRepository>());
         Assert.IsType<PostgresFaceInspectionRepository>(provider.GetRequiredService<IFaceInspectionRepository>());
         Assert.IsType<PostgresArchiveCoverageRepository>(provider.GetRequiredService<IArchiveCoverageRepository>());
         Assert.IsType<PostgresFaceReviewDerivativeRepository>(provider.GetRequiredService<IFaceReviewDerivativeRepository>());
