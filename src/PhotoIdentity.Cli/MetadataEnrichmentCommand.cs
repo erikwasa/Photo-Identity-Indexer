@@ -362,7 +362,7 @@ internal static partial class MetadataEnrichmentPlanner
                 throw new ArgumentException($"Place rule {index + 1} has 'from' later than 'to'.");
             }
 
-            string place = PhotoPlacePath.Parse(definition.Place).Value;
+            string place = PhotoPlacePath.Parse(definition.Place).DisplayValue;
             string name = string.IsNullOrWhiteSpace(definition.Name)
                 ? $"{from:yyyy-MM-dd}..{to:yyyy-MM-dd}"
                 : definition.Name.Trim();
