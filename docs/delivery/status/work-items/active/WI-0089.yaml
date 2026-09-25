@@ -1,7 +1,7 @@
 id: WI-0089
 title: Add durable source-copy exclusion and access enforcement
 milestone: M23
-status: in_progress
+status: in_review
 owner: ai-agent
 document: ../work-items/WI-0089-source-copy-exclusion-boundary.md
 started_at: 2026-09-25
