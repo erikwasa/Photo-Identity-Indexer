@@ -157,6 +157,6 @@ public sealed class ExactDuplicateRepositoryTests
             return;
         }
 
-        Assert.True(false, "Expected ix_asset_revisions_content_sha256 to exist.");
+        Assert.Fail("Expected ix_asset_revisions_content_sha256 to exist.");
     }
 }
