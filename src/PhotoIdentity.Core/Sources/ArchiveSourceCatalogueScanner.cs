@@ -39,17 +39,25 @@ public sealed record ArchiveSourceCatalogueScanSummary(
 /// Lightweight size/last-write observations are retained for every item. A previously verified
 /// local file reuses its immutable revision when size, last-write timestamp and media type still
 /// match the verified baseline; otherwise local content is SHA-256 verified before persistence.
+/// Excluded locators are observed only through their privacy tombstone and are never opened,
+/// hashed or written back into normal catalogue/analysis state.
 /// </summary>
 public sealed class ArchiveSourceCatalogueScanner
 {
     private readonly ICatalogueStoreInitializer _store;
     private readonly IArchiveSourceScanPersistence _persistence;
+    private readonly ISourceCopyExclusionRepository? _exclusions;
 
-    public ArchiveSourceCatalogueScanner(ICatalogueStoreInitializer store, IArchiveSourceScanPersistence persistence)
+    public ArchiveSourceCatalogueScanner(
+        ICatalogueStoreInitializer store,
+        IArchiveSourceScanPersistence persistence,
+        ISourceCopyExclusionRepository? exclusions = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
+        _exclusions = exclusions;
     }
+
     public async Task<ArchiveSourceCatalogueScanSummary> ScanAsync(
         IAssetSource source,
         ArchiveCatalogueSource catalogueSource,
@@ -121,6 +129,16 @@ public sealed class ArchiveSourceCatalogueScanner
                         nameof(sourceAsset.Availability),
                         sourceAsset.Availability,
                         "Unsupported archive availability state.");
+            }
+
+            if (_exclusions is not null &&
+                await _exclusions.RecordObservedIfExcludedAsync(
+                    catalogueSource.SourceId,
+                    sourceAsset.Reference.ItemKey,
+                    scannedAt,
+                    cancellationToken))
+            {
+                continue;
             }
 
             Sha256Digest? contentHash = null;
@@ -227,5 +245,4 @@ public sealed class ArchiveSourceCatalogueScanner
             deleted,
             diagnostics);
     }
-
 }
