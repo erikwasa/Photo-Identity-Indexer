@@ -85,7 +85,8 @@ public sealed record SmartCollectionPhotoResponse(
     int? Height,
     DateTime? TakenAtLocal,
     double? Latitude,
-    double? Longitude);
+    double? Longitude,
+    string? EffectivePlace = null);
 
 public sealed record SmartCollectionPageResponse(
     SmartCollectionPhotoResponse[] Items,
@@ -551,7 +552,8 @@ public static class SmartCollectionEndpoints
             photo.Height,
             photo.TakenAtLocal,
             photo.Latitude,
-            photo.Longitude)).ToArray(),
+            photo.Longitude,
+            photo.EffectivePlace)).ToArray(),
         page.Offset,
         page.Limit,
         page.Total,
