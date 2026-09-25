@@ -10,7 +10,7 @@ The maintainer measured 17,892 current photos: 234 have no effective capture dat
 
 The implementation branch is `agent/wi-0163-bulk-metadata-enrichment`. The first CLI slice adds `metadata enrich`, which is dry-run by default, reads explicit JSON rules, proposes missing dates from conservative filename/path patterns, and proposes Places only when an effective date range is fully contained by an operator-supplied rule. `--apply` uses the existing PostgreSQL capture-date and Place repositories; existing effective dates, named Places and valid non-zero GPS are protected by default. Optional private reports contain per-photo source/revision details while normal stdout remains aggregate-only.
 
-M28 remains completed. WI-0162 is completed under M26: the private-archive scale evaluation reached 10,585 indexed photos, English Visual/CLIP precision@10 was 0.89, English-only Visual search was accepted, and two saved search-result collections were verified through slideshow playback plus exact ordered-membership persistence after restart. WI-0125 remains deferred. M29 is ready with WI-0147 as its first PostgreSQL-only cleanup item. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+M28 remains completed. **M26 Creative Collections is completed.** WI-0162 closed the final M26 follow-on: the private-archive scale evaluation reached 10,585 indexed photos, English Visual/CLIP precision@10 was 0.89, English-only Visual search was accepted, and two saved search-result collections were verified through slideshow playback plus exact ordered-membership persistence after restart. M29 is ready with WI-0147 as its first PostgreSQL-only cleanup item. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
@@ -21,6 +21,7 @@ Get WI-0163 compile/tests/docs validation green in the draft PR, then have the m
 - docs/delivery/milestones/M31-bulk-metadata-enrichment.md
 - docs/delivery/work-items/WI-0163-bulk-metadata-enrichment.md
 - docs/delivery/status/work-items/active/WI-0163.yaml
+- docs/delivery/milestones/M26-creative-collections.md
 - docs/delivery/work-items/WI-0162-semantic-caption-search-slideshow-collections.md
 - docs/delivery/status/work-items/archive/WI-0162.yaml
 - src/PhotoIdentity.Cli/MetadataEnrichmentCommand.cs
