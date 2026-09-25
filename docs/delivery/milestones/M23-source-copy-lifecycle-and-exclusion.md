@@ -31,7 +31,7 @@ A representative archive can demonstrate all of the following:
 - [WI-0087](../work-items/WI-0087-exact-duplicate-inventory.md) - add authoritative exact-duplicate inventory without merging or suppressing independent source copies.
 - [WI-0088](../work-items/WI-0088-source-move-reconciliation.md) - preserve included asset identity across exact, unambiguous source moves/renames while refusing ambiguous and excluded matches.
 - [WI-0089](../work-items/WI-0089-source-copy-exclusion-boundary.md) - add durable source-copy exclusion state and enforce it below UI/media/processing boundaries.
-- [WI-0090](../work-items/WI-0090-exclusion-purge-service.md) - implement crash-safe, resumable deletion of revision-linked SQLite state and filesystem derivatives.
+- [WI-0090](../work-items/WI-0090-exclusion-purge-service.md) - implement crash-safe, resumable deletion of revision-linked catalogue state and filesystem derivatives.
 - [WI-0091](../work-items/WI-0091-archive-lifecycle-review.md) - add Removed from source, Exact duplicates, Excluded and purge-status operator workflows with manual/bulk exclusion.
 
 ## Delivery sequence
@@ -59,7 +59,7 @@ A representative archive can demonstrate all of the following:
 
 - Partial/scoped scans can create false move candidates unless reconciliation is scope-aware.
 - Multiple byte-identical copies can make move inference ambiguous; the implementation must prefer no reconciliation over a wrong one.
-- Filesystem derivative deletion and SQLite cleanup can diverge on crash unless purge state is durable and resumable.
+- Filesystem derivative deletion and catalogue cleanup can diverge on crash unless purge state is durable and resumable.
 - A missed access path could leak excluded media unless exclusion is enforced below the UI/query layer.
 - Purging canonical review links is intentionally irreversible and must remain clearly separated from ordinary missing-source handling.
 
