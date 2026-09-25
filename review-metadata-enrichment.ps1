@@ -52,7 +52,7 @@ function Get-SourceRoot {
 }
 
 $reportPath = Resolve-ExistingFile -Path $Report -Label 'Report'
-$reportData = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json -Depth 100
+$reportData = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
 
 if ($null -eq $reportData.summary -or $null -eq $reportData.items) {
     throw "Report '$reportPath' is not a metadata enrichment report."
@@ -75,7 +75,7 @@ Write-Host ("Ambiguous:         {0}" -f $reportData.summary.Ambiguous)
 if ($placeItems.Count -eq 0) {
     Write-Host ''
     Write-Host 'No place proposals to review.'
-    exit 0
+    return
 }
 
 $grouped = @(
@@ -89,7 +89,10 @@ $grouped = @(
                 $items |
                     ForEach-Object { Get-SourceRoot -SourceKey ([string]$_.sourceKey) } |
                     Group-Object |
-                    Sort-Object Count -Descending, Name |
+                    Sort-Object -Property @(
+                        @{ Expression = 'Count'; Descending = $true },
+                        @{ Expression = 'Name'; Descending = $false }
+                    ) |
                     ForEach-Object { '{0}:{1}' -f $_.Name, $_.Count }
             )
 
@@ -101,7 +104,10 @@ $grouped = @(
                 Roots  = $roots -join ', '
             }
         } |
-        Sort-Object Photos -Descending, Rule
+        Sort-Object -Property @(
+            @{ Expression = 'Photos'; Descending = $true },
+            @{ Expression = 'Rule'; Descending = $false }
+        )
 )
 
 Write-Host ''
@@ -124,23 +130,24 @@ if ($SamplesPerRule -gt 0) {
 }
 
 if ([string]::IsNullOrWhiteSpace($ApprovedRulesOutput)) {
-    exit 0
+    return
 }
 
 if ([string]::IsNullOrWhiteSpace($Rules)) {
     throw '-Rules is required when -ApprovedRulesOutput is used.'
 }
 
-if ($ApproveAll -and $ApproveRule.Count -gt 0) {
+$approveRuleCount = @($ApproveRule).Count
+if ($ApproveAll -and $approveRuleCount -gt 0) {
     throw 'Use either -ApproveAll or -ApproveRule, not both.'
 }
 
-if (-not $ApproveAll -and $ApproveRule.Count -eq 0) {
+if (-not $ApproveAll -and $approveRuleCount -eq 0) {
     throw 'Specify -ApproveAll or at least one -ApproveRule when writing approved rules.'
 }
 
 $rulesPath = Resolve-ExistingFile -Path $Rules -Label 'Rules'
-$rulesData = Get-Content -LiteralPath $rulesPath -Raw | ConvertFrom-Json -Depth 100
+$rulesData = Get-Content -LiteralPath $rulesPath -Raw | ConvertFrom-Json
 $availableRules = @($rulesData.placeRules)
 
 $selectedNames = if ($ApproveAll) {
@@ -161,9 +168,10 @@ $selectedRules = @(
         Where-Object { [string]$_.name -in $selectedNames }
 )
 
+$selectedRuleNames = @($selectedRules | ForEach-Object { [string]$_.name })
 $missingDefinitions = @(
     $selectedNames |
-        Where-Object { $_ -notin @($selectedRules.name) }
+        Where-Object { $_ -notin $selectedRuleNames }
 )
 if ($missingDefinitions.Count -gt 0) {
     throw "Selected rule(s) are missing from the rules file: $($missingDefinitions -join ', ')"
@@ -186,7 +194,12 @@ $outputObject |
     ConvertTo-Json -Depth 100 |
     Set-Content -LiteralPath $outputFullPath -Encoding utf8
 
+$approvedPhotoCount = @(
+    $placeItems |
+        Where-Object { [string]$_.placeRule -in $selectedNames }
+).Count
+
 Write-Host ''
 Write-Host ("Approved rules written: {0}" -f $outputFullPath)
 Write-Host ("Approved rule count:    {0}" -f $selectedRules.Count)
-Write-Host ("Approved photo count:   {0}" -f (($placeItems | Where-Object { [string]$_.placeRule -in $selectedNames }).Count))
+Write-Host ("Approved photo count:   {0}" -f $approvedPhotoCount)
