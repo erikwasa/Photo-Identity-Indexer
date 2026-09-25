@@ -75,23 +75,30 @@ public sealed class PostgresSmartCollectionFamilyFilterTests
             Assert.Equal(1, age.Total);
             Assert.Equal(family2015, Assert.Single(age.Items).RevisionId);
 
-            SmartCollectionPhotoPage relationship = await query.QueryAsync(
+            SmartCollectionPhotoPage parentOf = await query.QueryAsync(
                 new SmartCollectionFilter(
-                    relationship: new SmartCollectionRelationshipCriterion(alice, ["child"])));
-            Assert.Equal(1, relationship.Total);
-            Assert.Equal(family2015, Assert.Single(relationship.Items).RevisionId);
+                    relationship: new SmartCollectionRelationshipCriterion(alice, ["parent"])));
+            Assert.Equal(1, parentOf.Total);
+            Assert.Equal(family2015, Assert.Single(parentOf.Items).RevisionId);
+
+            SmartCollectionPhotoPage childOf = await query.QueryAsync(
+                new SmartCollectionFilter(
+                    relationship: new SmartCollectionRelationshipCriterion(carol, ["child"])));
+            Assert.Equal(2, childOf.Total);
+            Assert.Contains(childOf.Items, photo => photo.RevisionId == family2015);
+            Assert.Contains(childOf.Items, photo => photo.RevisionId == alice2025);
 
             SmartCollectionDefinition saved = await definitions.CreateAsync(
                 "Alice with child around age five",
                 new SmartCollectionFilter(
                     people: [alice],
                     age: new SmartCollectionAgeCriterion(alice, 4, 5),
-                    relationship: new SmartCollectionRelationshipCriterion(alice, ["child"])));
+                    relationship: new SmartCollectionRelationshipCriterion(alice, ["parent"])));
             SmartCollectionDefinition reopened =
                 await definitions.GetAsync(saved.Id) ?? throw new InvalidOperationException();
             Assert.Equal(alice, reopened.Filter.Age?.PersonId);
             Assert.Equal(4, reopened.Filter.Age?.MinimumYears);
-            Assert.Equal(["child"], reopened.Filter.Relationship?.Kinds);
+            Assert.Equal(["parent"], reopened.Filter.Relationship?.Kinds);
         }
         finally
         {
