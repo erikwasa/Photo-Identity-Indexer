@@ -12,11 +12,13 @@ namespace PhotoIdentity.Persistence.Postgres;
 public sealed class PostgresFaceReviewDerivativeBackfillRepository : IFaceReviewDerivativeBackfillRepository
 {
     private readonly PostgresCatalogueDatabase _database;
+    private readonly PostgresSourceCopyExclusionRepository _exclusions;
 
     public PostgresFaceReviewDerivativeBackfillRepository(PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+        _exclusions = new PostgresSourceCopyExclusionRepository(database);
     }
 
     public async Task<AssetRevisionId?> GetNextPendingCurrentRevisionAsync(
@@ -26,7 +28,7 @@ public sealed class PostgresFaceReviewDerivativeBackfillRepository : IFaceReview
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(profileId);
         IReadOnlyList<SourceCopyExclusionState> exclusions =
-            await new PostgresSourceCopyExclusionRepository(_database).ListAsync(sourceId, cancellationToken);
+            await _exclusions.ListAsync(sourceId, cancellationToken);
         HashSet<string> excludedKeys = exclusions
             .Select(item => item.SourceKey)
             .ToHashSet(StringComparer.Ordinal);
