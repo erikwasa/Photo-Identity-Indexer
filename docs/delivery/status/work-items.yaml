@@ -169,18 +169,6 @@ work_items:
   - WI-0151
   blocker_notes: []
   evidence: []
-- id: WI-0162
-  title: Scale semantic photo search and create slideshow collections from caption search
-  milestone: M26
-  status: ready
-  owner: unassigned
-  document: ../work-items/WI-0162-semantic-caption-search-slideshow-collections.md
-  blockers:
-  - WI-0127
-  - WI-0128
-  - WI-0145
-  blocker_notes: []
-  evidence: []
 - id: WI-0163
   title: Add safe bulk capture-date and Place enrichment
   milestone: M31

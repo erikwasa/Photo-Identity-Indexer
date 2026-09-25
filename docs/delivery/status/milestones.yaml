@@ -249,7 +249,7 @@ milestones:
   - WI-0138
 - id: M26
   title: Creative Collections
-  status: ready
+  status: completed
   document: ../milestones/M26-creative-collections.md
   work_items:
   - WI-0118

@@ -1,0 +1,355 @@
+@page "/search"
+@using System.Net.Http.Json
+@using PhotoIdentity.Web.Contracts
+@inject HttpClient Http
+
+<PageTitle>Photo search · Photo Identity</PageTitle>
+
+<section class="photo-search-header">
+    <div>
+        <p class="eyebrow">Semantic photo search</p>
+        <h1>Search photos in natural language</h1>
+        <p>
+            Visual search uses local CLIP similarity and is supported for English queries.
+            Caption evidence searches durable generated captions in their stored language, and results always keep the evidence source visible.
+        </p>
+    </div>
+    @if (Status is not null)
+    {
+        <div class="photo-search-index-status" role="status">
+            <strong>@Status.IndexedPhotoCount / @Status.CurrentPhotoCount</strong>
+            <span>semantic vectors</span>
+            <small>@Status.DisplayableCaptionCount displayable captions</small>
+        </div>
+    }
+</section>
+
+@if (Status is { SemanticModelAvailable: false })
+{
+    <section class="photo-search-notice" role="status">
+        <strong>Caption search is available; semantic indexing is not active yet.</strong>
+        <p>
+            Install the pinned local CLIP assets with <code>.\models\Get-SemanticSearchClipModel.ps1</code>
+            and restart the application. No model is downloaded automatically.
+        </p>
+    </section>
+}
+
+<section class="photo-search-controls" aria-label="Photo search controls">
+    <label class="photo-search-query">
+        <span>Describe the photo</span>
+        <input @bind="Query"
+               @bind:event="oninput"
+               maxlength="300"
+               placeholder="children playing outdoors"
+               disabled="@Busy"
+               @onkeydown="HandleQueryKeyDown" />
+        <small>Use English for Visual search. Captions are searched in the language in which they were generated.</small>
+    </label>
+
+    <label>
+        <span>Evidence</span>
+        <select @bind="Mode" disabled="@Busy">
+            <option value="combined">Visual + captions</option>
+            <option value="semantic">Visual only</option>
+            <option value="caption">Captions only</option>
+        </select>
+    </label>
+
+    <label>
+        <span>Results</span>
+        <select @bind="Limit" disabled="@Busy">
+            <option value="40">40</option>
+            <option value="80">80</option>
+            <option value="120">120</option>
+            <option value="200">200</option>
+        </select>
+    </label>
+
+    <button type="button"
+            class="button primary"
+            disabled="@(Busy || string.IsNullOrWhiteSpace(Query))"
+            @onclick="SearchAsync">
+        @(Busy ? "Searching…" : "Search")
+    </button>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="photo-search-error" role="alert">@Error</div>
+}
+
+@if (Results is not null)
+{
+    <section class="photo-search-summary">
+        <div>
+            <strong>@Results.Items.Length results</strong>
+            <span>in @Results.SearchMilliseconds.ToString("0") ms</span>
+            <span>· @Results.IndexedPhotoCount semantic vectors</span>
+            <span>· @Results.DisplayableCaptionCount captions</span>
+        </div>
+        <div class="photo-search-selection-actions">
+            <button type="button" class="button secondary" @onclick="SelectAll">Select all</button>
+            <button type="button" class="button secondary" @onclick="ClearSelection">Clear</button>
+        </div>
+    </section>
+
+    @if (Results.Items.Length == 0)
+    {
+        <section class="empty-state compact">
+            <p>No photos matched this search yet. Try a simpler phrase or a different evidence mode.</p>
+        </section>
+    }
+    else
+    {
+        <section class="photo-search-grid" aria-label="Photo search results">
+            @for (int index = 0; index < Results.Items.Length; index++)
+            {
+                PhotoSearchResultResponse result = Results.Items[index];
+                bool selected = SelectedRevisionIds.Contains(result.RevisionId);
+                <article class="photo-search-card @(selected ? "selected" : null)">
+                    <label class="photo-search-select">
+                        <input type="checkbox"
+                               checked="@selected"
+                               @onchange="args => SetSelected(result.RevisionId, args)" />
+                        <span>Select</span>
+                    </label>
+                    <a href="@result.PhotoUrl" aria-label="Open photo">
+                        <img src="@result.ThumbnailUrl"
+                             alt="Photo search result"
+                             loading="lazy"
+                             decoding="async" />
+                    </a>
+                    <div class="photo-search-card-body">
+                        <div class="photo-search-badges">
+                            @if (result.Sources.Contains("semantic", StringComparer.Ordinal))
+                            {
+                                <span class="photo-search-badge">Visual</span>
+                            }
+                            @if (result.Sources.Contains("caption", StringComparer.Ordinal))
+                            {
+                                <span class="photo-search-badge caption">Caption</span>
+                            }
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(result.Caption))
+                        {
+                            <p>@result.Caption</p>
+                        }
+                        else
+                        {
+                            <p class="photo-search-muted">Matched without a generated caption.</p>
+                        }
+                    </div>
+                </article>
+            }
+        </section>
+
+        <section class="photo-search-save" aria-labelledby="photo-search-save-heading">
+            <div>
+                <p class="eyebrow">Frozen slideshow collection</p>
+                <h2 id="photo-search-save-heading">Save selected results</h2>
+                <p>
+                    Saving copies the current ordered revision list. Later captions, embeddings or search-model changes
+                    will not rewrite this slideshow collection.
+                </p>
+            </div>
+            <label>
+                <span>Collection name</span>
+                <input @bind="CollectionName"
+                       maxlength="120"
+                       placeholder="Summer memories"
+                       disabled="@Saving" />
+            </label>
+            <button type="button"
+                    class="button primary"
+                    disabled="@(Saving || SelectedRevisionIds.Count == 0 || string.IsNullOrWhiteSpace(CollectionName))"
+                    @onclick="SaveCollectionAsync">
+                @(Saving ? "Saving…" : $"Save {SelectedRevisionIds.Count} selected")
+            </button>
+            @if (!string.IsNullOrWhiteSpace(SaveMessage))
+            {
+                <p class="photo-search-save-message" role="status">
+                    @SaveMessage <a href="/slideshows">Open Slideshows</a>
+                </p>
+            }
+        </section>
+    }
+}
+
+<details class="photo-search-details">
+    <summary>How search works</summary>
+    <p>
+        Visual matches use exact local cosine comparison over versioned CLIP image embeddings. Caption matches use only
+        displayable WI-0128 caption evidence. Similar-photo retrieval and embedding-based slideshow diversity remain disabled.
+    </p>
+    <p>
+        WI-0162's archive-scale evaluation measured 0.89 precision at 10 for English visual queries and 0.29 for Swedish
+        on the same query concepts. Visual search therefore supports English queries; no translation or multilingual CLIP
+        layer is added. Caption-only search can still use the language of the stored generated captions.
+    </p>
+</details>
+
+@code {
+    private string Query { get; set; } = string.Empty;
+    private string Mode { get; set; } = "combined";
+    private int Limit { get; set; } = 80;
+    private bool Busy { get; set; }
+    private bool Saving { get; set; }
+    private string? Error { get; set; }
+    private string? SaveMessage { get; set; }
+    private string CollectionName { get; set; } = string.Empty;
+    private PhotoSearchResponse? Results { get; set; }
+    private PhotoSearchStatusResponse? Status { get; set; }
+    private HashSet<string> SelectedRevisionIds { get; } = new(StringComparer.Ordinal);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatusAsync();
+    }
+
+    private async Task LoadStatusAsync()
+    {
+        try
+        {
+            Status = await Http.GetFromJsonAsync<PhotoSearchStatusResponse>("/api/photo-search/status");
+        }
+        catch
+        {
+            Status = null;
+        }
+    }
+
+    private async Task SearchAsync()
+    {
+        if (Busy || string.IsNullOrWhiteSpace(Query))
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        SaveMessage = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "/api/photo-search/query",
+                new PhotoSearchRequest(Query.Trim(), Mode, Limit));
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await ReadErrorAsync(response, "Photo search failed.");
+                return;
+            }
+
+            Results = await response.Content.ReadFromJsonAsync<PhotoSearchResponse>();
+            SelectedRevisionIds.Clear();
+            if (Results is not null)
+            {
+                foreach (PhotoSearchResultResponse item in Results.Items)
+                {
+                    SelectedRevisionIds.Add(item.RevisionId);
+                }
+            }
+            await LoadStatusAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = $"Photo search failed: {exception.Message}";
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task SaveCollectionAsync()
+    {
+        if (Results is null || Saving || SelectedRevisionIds.Count == 0 || string.IsNullOrWhiteSpace(CollectionName))
+        {
+            return;
+        }
+
+        Saving = true;
+        Error = null;
+        SaveMessage = null;
+        try
+        {
+            string[] ordered = Results.Items
+                .Where(item => SelectedRevisionIds.Contains(item.RevisionId))
+                .Select(item => item.RevisionId)
+                .ToArray();
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "/api/photo-search/collections",
+                new PhotoSearchSaveCollectionRequest(CollectionName.Trim(), ordered));
+            if (!response.IsSuccessStatusCode)
+            {
+                Error = await ReadErrorAsync(response, "The slideshow collection could not be saved.");
+                return;
+            }
+
+            PhotoListCollectionResponse? saved =
+                await response.Content.ReadFromJsonAsync<PhotoListCollectionResponse>();
+            SaveMessage = saved is null
+                ? "Saved the selected search results."
+                : $"Saved “{saved.Name}” with {saved.RevisionIds.Length} photos.";
+            CollectionName = string.Empty;
+        }
+        catch (Exception exception)
+        {
+            Error = $"The slideshow collection could not be saved: {exception.Message}";
+        }
+        finally
+        {
+            Saving = false;
+        }
+    }
+
+    private async Task HandleQueryKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            await SearchAsync();
+        }
+    }
+
+    private void SetSelected(string revisionId, ChangeEventArgs args)
+    {
+        bool selected = args.Value is bool value && value;
+        if (selected)
+        {
+            SelectedRevisionIds.Add(revisionId);
+        }
+        else
+        {
+            SelectedRevisionIds.Remove(revisionId);
+        }
+    }
+
+    private void SelectAll()
+    {
+        if (Results is null)
+        {
+            return;
+        }
+        foreach (PhotoSearchResultResponse result in Results.Items)
+        {
+            SelectedRevisionIds.Add(result.RevisionId);
+        }
+    }
+
+    private void ClearSelection() => SelectedRevisionIds.Clear();
+
+    private static async Task<string> ReadErrorAsync(HttpResponseMessage response, string fallback)
+    {
+        try
+        {
+            ApiErrorResponse? error = await response.Content.ReadFromJsonAsync<ApiErrorResponse>();
+            return string.IsNullOrWhiteSpace(error?.Error) ? fallback : error.Error;
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
+    private sealed record ApiErrorResponse(string Error);
+}

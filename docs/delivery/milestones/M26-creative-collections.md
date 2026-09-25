@@ -74,7 +74,7 @@ The same workflow must remain useful for archives with little or no GPS/location
 5. WI-0126 and WI-0127 are independent semantic experiments. Either may be skipped, rejected or selected based on incremental quality versus runtime/storage complexity.
 6. WI-0128 is intentionally late and optional; deterministic titles/templates remain a valid simpler alternative to generative narration, while durable local captions can still become reusable archive evidence when explicitly enabled.
 7. WI-0158 lifts the deliberately narrow WI-0121 one-recipe-per-Smart-Collection shape into named, independently manageable Creative Collections that can be discovered and launched from the Slideshows page.
-8. WI-0162 is the remaining follow-on: it should use the semantic-retrieval result from WI-0127 plus durable WI-0128 captions for scalable search, without reviving the rejected embedding-diversity path.
+8. WI-0162 closes the semantic-search follow-on by scaling the successful WI-0127 text-to-photo signal, measuring caption retrieval, and freezing selected search results through the explicit slideshow collection boundary.
 
 Each stage should remain independently inspectable so unsuccessful heuristics/models can be replaced or retired without changing canonical Smart Collection or slideshow semantics.
 
@@ -101,7 +101,9 @@ On 2026-09-25 the maintainer accepted WI-0158 after named Creative Collections b
 
 WI-0125 was subsequently reactivated and completed. The implementation added partial birth metadata, age-aware Smart Collection criteria, directed/symmetric family relationships, cousin support, merge-safe PostgreSQL persistence and a grouped responsive People relationship UI. On 2026-09-25 the maintainer confirmed the final WI-0125 behavior works as expected after PR #421; workflow run #2157 was green.
 
-With WI-0125 completed, no M26 item is currently in progress. WI-0162 remains the ready follow-on for scaled semantic/caption search and saving search results as explicit slideshow collections, so the M26 lifecycle is **ready**.
+On 2026-09-25 the maintainer completed WI-0162 after an archive-scale semantic-search evaluation and saved-result persistence verification. The paired 24-query evaluation ran against 10,585 indexed photos and measured semantic precision@10 of 0.89 for English and 0.29 for Swedish; the maintainer accepted English as the supported Visual/CLIP query language rather than adding translation or a multilingual model. Caption retrieval contributed only three benchmark rows, so combined quality matched semantic-only quality. Two saved search result sets (`WI-0162 Cakes`, 53 revisions; `WI-0162 snow test`, 80 revisions) launched through normal slideshow playback and retained identical counts and exact ordered revision membership after application restart.
+
+With WI-0162 completed, all M26 work items are terminal and the M26 lifecycle is **completed**.
 
 ## Exit criteria
 
@@ -114,7 +116,7 @@ With WI-0125 completed, no M26 item is currently in progress. WI-0162 remains th
 - [x] Selection reduces obvious repetition and improves coverage across time/moments/people compared with simple chronological truncation on a representative private sample.
 - [x] The final ordered revision list can use the existing stable slideshow playback/snapshot lifecycle without changing playback into a live query.
 - [x] Automated tests protect deterministic grouping/selection, provenance, exact-anchor semantics and important edge cases such as zero anchors, fewer candidates than target and many near-consecutive photos.
-- [ ] Follow-on work that is pursued retains the canonical-versus-derived/presentation boundaries above; follow-on ideas that are rejected are explicitly closed with evidence instead of being silently abandoned.
+- [x] Follow-on work that is pursued retains the canonical-versus-derived/presentation boundaries above; follow-on ideas that are rejected are explicitly closed with evidence instead of being silently abandoned.
 
 ## Risks
 

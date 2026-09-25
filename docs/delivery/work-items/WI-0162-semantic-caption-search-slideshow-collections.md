@@ -31,7 +31,7 @@ The next experiment should therefore scale the part that worked instead of reviv
   - durable displayable generated captions from WI-0128.
 - Preserve provenance so a result can explain whether it matched semantic visual evidence, generated caption text, or both.
 - Make useful search possible even when a photo has no generated Ollama caption yet.
-- Support Swedish search input as an explicit evaluation/product requirement, including measurement of whether query translation, multilingual text encoding or another local strategy is needed for the semantic path.
+- Evaluate Swedish semantic search explicitly. If measured quality is materially worse than English, an evidence-backed English-only Visual/CLIP product decision is acceptable; translation or a multilingual model is not required unless the maintainer wants that scope.
 - Allow the operator to select/search a result set and save it as a named explicit photo-list/slideshow collection using the WI-0145 persistence model.
 - Preserve the saved collection as an immutable ordered revision list at save time; later model/caption changes must not silently rewrite the saved slideshow.
 - Keep semantic evidence derived/versioned and separate from canonical photo metadata, tags, people and Places.
@@ -43,25 +43,62 @@ The next experiment should therefore scale the part that worked instead of reviv
 - Requiring Ollama captions to exist before a photo is searchable.
 - Generating captions synchronously when search is opened.
 - Automatically mutating existing saved slideshow collections as search models evolve.
+- Adding a translation layer or multilingual replacement model solely to make Swedish CLIP queries match English quality after the maintainer accepted English-only Visual search.
 
 ## Acceptance criteria
 
-- [ ] The larger evaluation uses materially more photos and materially more text queries than WI-0127 and records per-query relevance evidence.
-- [ ] The evaluation separately reports semantic-only, generated-caption-only and combined retrieval quality where comparable evidence exists.
-- [ ] Search remains useful for photos without generated Ollama captions.
-- [ ] Swedish natural-language search is evaluated explicitly and the chosen local strategy is documented with measured quality/latency.
-- [ ] Similar-photo and embedding-diversity features remain disabled unless new measured evidence independently justifies reopening them.
-- [ ] The product search surface indicates or retains provenance for semantic versus caption matches.
-- [ ] Search results can be saved as a named explicit slideshow/photo-list collection and launched through normal slideshow playback.
-- [ ] A saved result collection retains its revision membership even if captions or semantic model evidence later change.
-- [ ] Automated tests protect result provenance, caption-absent behavior, collection materialization and immutable saved membership.
+- [x] The larger evaluation uses materially more photos and materially more text queries than WI-0127 and records per-query relevance evidence.
+- [x] The evaluation separately reports semantic-only, generated-caption-only and combined retrieval quality where comparable evidence exists.
+- [x] Search remains useful for photos without generated Ollama captions.
+- [x] Swedish natural-language semantic search is evaluated explicitly and the chosen product strategy is documented with measured quality/latency.
+- [x] Similar-photo and embedding-diversity features remain disabled unless new measured evidence independently justifies reopening them.
+- [x] The product search surface indicates or retains provenance for semantic versus caption matches.
+- [x] Search results can be saved as a named explicit slideshow/photo-list collection and launched through normal slideshow playback.
+- [x] A saved result collection retains its revision membership even if captions or semantic model evidence later change.
+- [x] Automated tests protect result provenance, caption-absent behavior, collection materialization and immutable saved membership.
+
+## Evaluation evidence — 2026-09-25
+
+The maintainer ran the checked-in 24-query bilingual WI-0162 suite against a private archive snapshot with **10,585 indexed photos** and **517 displayable captions**, well beyond WI-0127's 185-photo probe.
+
+Semantic precision@10:
+
+- English: **107 / 120 = 0.89**.
+- Swedish: **35 / 120 = 0.29**.
+
+Average semantic server latency:
+
+- English: about **270 ms**.
+- Swedish: about **284 ms**.
+
+English semantic retrieval was strong across most evaluated concepts. Swedish performance was inconsistent and included multiple 0/10 concept pairs despite some strong queries. The maintainer explicitly accepted using English for Visual/CLIP search rather than adding translation or a multilingual model. The product and documentation therefore describe English as the supported Visual query language while leaving caption-only search independent of CLIP language support.
+
+Caption retrieval was also measured. Across the 24-query suite it returned only three caption-only rows, all Swedish, and aggregate combined precision was therefore identical to semantic-only precision. This demonstrates that the current caption-search path does not yet provide a material second retrieval signal for this benchmark; future caption-search improvements can reuse the same suite for regression evidence without changing the Visual/CLIP language decision.
+
+The checked-in bilingual query suite remains evaluation/regression material only. It is not runtime configuration and does not constrain normal search input.
+
+## Completion verification — 2026-09-25
+
+The maintainer completed the remaining product verification against the PostgreSQL rehearsal catalogue:
+
+- saved `WI-0162 Cakes` with **53** ordered revisions and `WI-0162 snow test` with **80** ordered revisions from Search;
+- launched both collections through the normal Slideshows surface and confirmed playback works as expected;
+- restarted Photo Identity and re-read both explicit photo-list collections;
+- verified both retained the same counts and exact ordered revision membership (`Same order: True` for both collections).
+
+Automated coverage is also in place and passed in PR #425 CI run #2180:
+
+- `PhotoSearchRankerTests` protects combined semantic/caption provenance, semantic-only results without captions, caption-only isolation and deterministic fusion ordering;
+- `PostgresPhotoSearchRepositoryTests` protects versioned semantic evidence plus displayable-caption filtering/search behavior;
+- `PhotoListCollectionEndpointTests` protects ordered explicit membership and playback-compatible slideshow snapshot materialization.
 
 ## Verification requirements
 
-Use a representative private archive sample large enough to expose scaling behavior and a broad query suite rather than the small WI-0127 probe set. Report query-level relevance, latency and storage evidence, then perform maintainer review of mixed semantic/caption searches in both Swedish and English. Save at least two result sets as named slideshow collections, restart the application, and verify both remain independently launchable with unchanged membership.
+Completed. The large-scale relevance/language evaluation, provenance/caption-absent behavior, two independent saved-result collections, slideshow playback, application restart and exact ordered-membership persistence have all been verified. English is the supported Visual/CLIP query language for this implementation; the bilingual suite remains as regression/evaluation evidence.
 
 ## Design notes
 
 - The term "caption" in the UI may cover two different evidence sources, but storage/provenance must not conflate them. WI-0128 text is generated natural-language evidence; CLIP-style retrieval is vector similarity evidence and should remain identifiable as such.
 - The explicit photo-list collection model is the correct save boundary for arbitrary semantic search results because saving freezes the current result membership without redefining exact Smart Collection semantics.
-- If large-scale measurement shows that persisting image embeddings is justified, the storage/index choice should be documented as an explicit decision with model/version provenance, rebuild behavior and size estimates. The earlier WI-0127 no-go against adopting pgvector merely for diversity remains valid until superseded by search-specific evidence.
+- The 2026-09-25 scale run showed exact in-memory cosine search remaining practical at 10,585 indexed photos, so no search-specific evidence currently justifies pgvector/ANN adoption.
+- The bilingual WI-0162 suite should stay checked in as reproducible benchmark material even though Swedish CLIP queries are not a supported product target.
