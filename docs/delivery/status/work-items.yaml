@@ -32,7 +32,7 @@ work_items:
   - WI-0041
   - WI-0087
   blocker_notes:
-  - Core move reconciliation merged in PR #427. The exclusion-dependent acceptance criteria are implemented by PR #428; only maintainer real-catalogue rename/move verification remains before completion.
+  - Core move reconciliation merged in pull request 427. The exclusion-dependent acceptance criteria are implemented by pull request 428; only maintainer real-catalogue rename/move verification remains before completion.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/427
