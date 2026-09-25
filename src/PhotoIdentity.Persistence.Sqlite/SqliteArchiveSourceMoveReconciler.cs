@@ -9,15 +9,20 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// <summary>
 /// SQLite implementation of conservative exact source-move reconciliation. Only one-to-one
 /// verified hash groups whose missing/new transitions belong to the same completed sync qualify.
+/// Excluded locators are never move candidates.
 /// </summary>
 public sealed class SqliteArchiveSourceMoveReconciler : IArchiveSourceMoveReconciler
 {
     private readonly SqliteCatalogueDatabase _database;
+    private readonly ISourceCopyExclusionRepository? _exclusions;
 
-    public SqliteArchiveSourceMoveReconciler(SqliteCatalogueDatabase database)
+    public SqliteArchiveSourceMoveReconciler(
+        SqliteCatalogueDatabase database,
+        ISourceCopyExclusionRepository? exclusions = null)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+        _exclusions = exclusions;
     }
 
     public async Task<int> ReconcileAsync(
@@ -33,6 +38,15 @@ public sealed class SqliteArchiveSourceMoveReconciler : IArchiveSourceMoveReconc
             return 0;
         }
 
+        HashSet<string>? excludedKeys = null;
+        if (_exclusions is not null)
+        {
+            IReadOnlyList<SourceCopyExclusionState> excluded = await _exclusions.ListAsync(sourceId, cancellationToken);
+            excludedKeys = excluded
+                .Select(static state => state.SourceKey)
+                .ToHashSet(StringComparer.Ordinal);
+        }
+
         await new SqliteArchiveSourceObservationRepository(_database).EnsureSchemaAsync(cancellationToken);
         DateTimeOffset scannedAt = scannedAtUtc.ToUniversalTime();
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
@@ -44,6 +58,10 @@ public sealed class SqliteArchiveSourceMoveReconciler : IArchiveSourceMoveReconc
             sourceId,
             coverage,
             cancellationToken);
+        if (excludedKeys is not null)
+        {
+            candidates.RemoveAll(candidate => excludedKeys.Contains(candidate.SourceKey));
+        }
 
         int reconciled = 0;
         foreach (IGrouping<Sha256Digest, MoveCandidate> group in candidates.GroupBy(static candidate => candidate.ContentHash))
