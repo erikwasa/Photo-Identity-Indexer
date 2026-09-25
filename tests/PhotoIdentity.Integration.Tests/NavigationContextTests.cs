@@ -30,26 +30,7 @@ public sealed class NavigationContextTests
     [Fact]
     public void Transient_state_round_trip_preserves_editor_filters()
     {
-        SmartCollectionTransientNavigationState state = new(
-            "saved-1",
-            "Current preview",
-            ["person-2", "person-1"],
-            "any",
-            ["Family", "Travel"],
-            "all",
-            "2025/05/01-2025/05/10",
-            true,
-            "59.0",
-            "17.0",
-            "60.0",
-            "18.0",
-            "Sweden/Stockholm region/Norrtälje",
-            TakenMode: SmartCollectionDateModes.Range,
-            TakenFrom: "2025-05-01",
-            TakenTo: "2025-05-10",
-            Places: ["Sweden/Stockholm region", "Sweden/Uppsala län"],
-            Age: new SmartCollectionAgeRequest("person-1", 4, 7),
-            Relationship: new SmartCollectionRelationshipRequest("person-2", ["child", "sibling"]));
+        SmartCollectionTransientNavigationState state = BuildTransientState();
 
         string json = SmartCollectionNavigation.SerializeTransientState(state);
         SmartCollectionTransientNavigationState? restored = SmartCollectionNavigation.DeserializeTransientState(json);
@@ -79,6 +60,38 @@ public sealed class NavigationContextTests
     }
 
     [Fact]
+    public void Transient_state_rebuilds_the_same_bounded_navigation_filter()
+    {
+        SmartCollectionTransientNavigationState state = BuildTransientState();
+
+        Assert.True(SmartCollectionNavigation.TryBuildTransientQuery(
+            state,
+            39,
+            3,
+            out SmartCollectionQueryRequest? request));
+
+        Assert.NotNull(request);
+        Assert.Equal(39, request.Offset);
+        Assert.Equal(3, request.Limit);
+        Assert.Equal(state.People, request.People);
+        Assert.Equal(state.PeopleMatch, request.PeopleMatch);
+        Assert.Equal(state.Tags, request.Tags);
+        Assert.Equal(state.TagMatch, request.TagMatch);
+        Assert.NotNull(request.Location);
+        Assert.Equal(59d, request.Location.South!.Value);
+        Assert.Equal(17d, request.Location.West!.Value);
+        Assert.Equal(60d, request.Location.North!.Value);
+        Assert.Equal(18d, request.Location.East!.Value);
+        Assert.Equal(state.Places, request.Location.Places);
+        Assert.Equal("2025-05-01", request.TakenRange?.From);
+        Assert.Equal("2025-05-10", request.TakenRange?.To);
+        Assert.Equal(state.Age, request.Age);
+        Assert.NotNull(request.Relationship);
+        Assert.Equal(state.Relationship!.PersonId, request.Relationship.PersonId);
+        Assert.Equal(state.Relationship.Kinds, request.Relationship.Kinds);
+    }
+
+    [Fact]
     public void Legacy_transient_state_without_named_place_remains_readable()
     {
         const string json = """
@@ -105,6 +118,144 @@ public sealed class NavigationContextTests
         Assert.StartsWith("/photo/revision-1?returnUrl=", url);
         Assert.Contains("%2Fsmart-collections%3Fmode%3Dsaved%26collection%3Dcollection-1%26offset%3D40", url);
         Assert.DoesNotContain("&offset=40", url);
+    }
+
+    [Fact]
+    public void Photo_url_round_trip_recovers_saved_workspace_context()
+    {
+        string collectionId = Guid.NewGuid().ToString();
+        string returnUrl = SmartCollectionNavigation.BuildSavedWorkspaceUrl(collectionId, 40);
+        string url = SmartCollectionNavigation.BuildPhotoUrl(Guid.NewGuid().ToString(), returnUrl);
+
+        Assert.True(SmartCollectionNavigation.TryParsePhotoUrl(
+            url,
+            out string? revisionId,
+            out string? parsedReturnUrl));
+        Assert.NotNull(revisionId);
+        Assert.Equal(returnUrl, parsedReturnUrl);
+        Assert.True(SmartCollectionNavigation.TryParseWorkspaceContext(
+            parsedReturnUrl,
+            out SmartCollectionWorkspaceContext? context));
+        Assert.NotNull(context);
+        Assert.Equal("saved", context.Mode);
+        Assert.Equal(collectionId, context.CollectionId);
+        Assert.Equal(40, context.Offset);
+    }
+
+    [Fact]
+    public void Transient_workspace_context_round_trip_preserves_preview_and_offset()
+    {
+        const string previewKey = "0123456789abcdef0123456789abcdef";
+        string returnUrl = SmartCollectionNavigation.BuildTransientWorkspaceUrl(previewKey, 80);
+
+        Assert.True(SmartCollectionNavigation.TryParseWorkspaceContext(
+            returnUrl,
+            out SmartCollectionWorkspaceContext? context));
+        Assert.NotNull(context);
+        Assert.Equal("transient", context.Mode);
+        Assert.Equal(previewKey, context.PreviewKey);
+        Assert.Equal(80, context.Offset);
+        Assert.Equal(returnUrl, SmartCollectionNavigation.BuildWorkspaceUrl(context, context.Offset));
+    }
+
+    [Fact]
+    public void Direct_photo_details_without_smart_collection_return_has_no_smart_context()
+    {
+        string url = SmartCollectionNavigation.BuildPhotoUrl("revision-1", "/collections");
+
+        Assert.True(SmartCollectionNavigation.TryParsePhotoUrl(
+            url,
+            out _,
+            out string? returnUrl));
+        Assert.False(SmartCollectionNavigation.TryParseWorkspaceContext(returnUrl, out _));
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(39, 0)]
+    [InlineData(40, 40)]
+    [InlineData(79, 40)]
+    [InlineData(80, 80)]
+    public void Result_index_maps_back_to_the_containing_workspace_page(int index, int expectedOffset)
+    {
+        Assert.Equal(expectedOffset, SmartCollectionNavigation.PageOffsetForIndex(index));
+    }
+
+    [Fact]
+    public void Photo_navigation_resolves_exact_order_and_first_last_boundaries()
+    {
+        SmartCollectionPageResponse page = Page(
+            offset: 0,
+            total: 3,
+            Photo("revision-1"),
+            Photo("revision-2"),
+            Photo("revision-3"));
+
+        Assert.True(SmartCollectionNavigation.TryResolvePhotoNavigation(
+            page,
+            "revision-1",
+            0,
+            out SmartCollectionPhotoNavigationResolution? first));
+        Assert.NotNull(first);
+        Assert.Null(first.PreviousRevisionId);
+        Assert.Equal("revision-2", first.NextRevisionId);
+
+        Assert.True(SmartCollectionNavigation.TryResolvePhotoNavigation(
+            page,
+            "revision-2",
+            1,
+            out SmartCollectionPhotoNavigationResolution? middle));
+        Assert.NotNull(middle);
+        Assert.Equal("revision-1", middle.PreviousRevisionId);
+        Assert.Equal("revision-3", middle.NextRevisionId);
+
+        Assert.True(SmartCollectionNavigation.TryResolvePhotoNavigation(
+            page,
+            "revision-3",
+            2,
+            out SmartCollectionPhotoNavigationResolution? last));
+        Assert.NotNull(last);
+        Assert.Equal("revision-2", last.PreviousRevisionId);
+        Assert.Null(last.NextRevisionId);
+    }
+
+    [Fact]
+    public void Photo_navigation_resolves_neighbors_across_workspace_page_boundary()
+    {
+        SmartCollectionPageResponse neighbors = Page(
+            offset: 39,
+            total: 82,
+            Photo("revision-39"),
+            Photo("revision-40"),
+            Photo("revision-41"));
+
+        Assert.True(SmartCollectionNavigation.TryResolvePhotoNavigation(
+            neighbors,
+            "revision-40",
+            40,
+            out SmartCollectionPhotoNavigationResolution? navigation));
+        Assert.NotNull(navigation);
+        Assert.Equal("revision-39", navigation.PreviousRevisionId);
+        Assert.Equal("revision-41", navigation.NextRevisionId);
+        Assert.Equal(40, SmartCollectionNavigation.PageOffsetForIndex(navigation.Index));
+    }
+
+    [Fact]
+    public void Photo_navigation_rejects_stale_or_deleted_result_context_instead_of_jumping()
+    {
+        SmartCollectionPageResponse page = Page(
+            offset: 39,
+            total: 81,
+            Photo("revision-39"),
+            Photo("different-revision"),
+            Photo("revision-41"));
+
+        Assert.False(SmartCollectionNavigation.TryResolvePhotoNavigation(
+            page,
+            "revision-40",
+            40,
+            out SmartCollectionPhotoNavigationResolution? navigation));
+        Assert.Null(navigation);
     }
 
     [Fact]
@@ -178,4 +329,49 @@ public sealed class NavigationContextTests
     {
         Assert.Equal(expected, PhotoReturnContext.IsArchiveReturn(candidate));
     }
+
+    private static SmartCollectionTransientNavigationState BuildTransientState() => new(
+        "saved-1",
+        "Current preview",
+        ["person-2", "person-1"],
+        "any",
+        ["Family", "Travel"],
+        "all",
+        "2025/05/01-2025/05/10",
+        true,
+        "59.0",
+        "17.0",
+        "60.0",
+        "18.0",
+        "Sweden/Stockholm region/Norrtälje",
+        TakenMode: SmartCollectionDateModes.Range,
+        TakenFrom: "2025-05-01",
+        TakenTo: "2025-05-10",
+        Places: ["Sweden/Stockholm region", "Sweden/Uppsala län"],
+        Age: new SmartCollectionAgeRequest("person-1", 4, 7),
+        Relationship: new SmartCollectionRelationshipRequest("person-2", ["child", "sibling"]));
+
+    private static SmartCollectionPageResponse Page(
+        int offset,
+        int total,
+        params SmartCollectionPhotoResponse[] items) => new(
+        items,
+        offset,
+        Math.Max(1, items.Length),
+        total,
+        new SmartCollectionFilterResponse([], "all", [], "all", null, null));
+
+    private static SmartCollectionPhotoResponse Photo(string revisionId) => new(
+        revisionId,
+        $"asset-{revisionId}",
+        $"/thumbnail/{revisionId}",
+        $"/preview/{revisionId}",
+        $"/original/{revisionId}",
+        DateTimeOffset.UnixEpoch,
+        "image/jpeg",
+        100,
+        100,
+        null,
+        null,
+        null);
 }

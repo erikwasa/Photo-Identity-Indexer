@@ -1,0 +1,265 @@
+@using System.Text.Json
+@implements IDisposable
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+@if (Visible)
+{
+    <section class="smart-photo-navigator" aria-label="Smart Collection photo navigation">
+        @if (Loading)
+        {
+            <span class="smart-photo-nav-status">Restoring Smart Collection navigation…</span>
+        }
+        else if (Resolved is SmartCollectionPhotoNavigationResolution navigation)
+        {
+            <div class="smart-photo-nav-controls">
+                @if (navigation.PreviousRevisionId is string previousRevisionId)
+                {
+                    <a class="button secondary"
+                       href="@BuildNeighborHref(previousRevisionId, navigation.Index - 1)"
+                       rel="prev">
+                        Previous
+                    </a>
+                }
+                else
+                {
+                    <button type="button" class="button secondary" disabled>Previous</button>
+                }
+
+                <span class="smart-photo-nav-status">
+                    Smart Collection photo @(navigation.Index + 1) of @navigation.Total
+                </span>
+
+                @if (navigation.NextRevisionId is string nextRevisionId)
+                {
+                    <a class="button secondary"
+                       href="@BuildNeighborHref(nextRevisionId, navigation.Index + 1)"
+                       rel="next">
+                        Next
+                    </a>
+                }
+                else
+                {
+                    <button type="button" class="button secondary" disabled>Next</button>
+                }
+            </div>
+        }
+        else if (!string.IsNullOrWhiteSpace(Notice))
+        {
+            <span class="smart-photo-nav-status" role="status">@Notice</span>
+        }
+    </section>
+}
+
+@code {
+    private bool Visible { get; set; }
+    private bool Loading { get; set; }
+    private string? Notice { get; set; }
+    private SmartCollectionWorkspaceContext? WorkspaceContext { get; set; }
+    private SmartCollectionPhotoNavigationResolution? Resolved { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += HandleLocationChanged;
+        await ReloadAsync();
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await ReloadAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task ReloadAsync()
+    {
+        Visible = false;
+        Loading = false;
+        Notice = null;
+        WorkspaceContext = null;
+        Resolved = null;
+
+        if (!SmartCollectionNavigation.TryParsePhotoUrl(
+                Navigation.Uri,
+                out string? revisionId,
+                out string? returnUrl))
+        {
+            return;
+        }
+
+        string? normalizedReturnUrl = PhotoReturnContext.NormalizeLocalReturnUrl(returnUrl);
+        if (!SmartCollectionNavigation.TryParseWorkspaceContext(
+                normalizedReturnUrl,
+                out SmartCollectionWorkspaceContext? context) ||
+            context is null)
+        {
+            return;
+        }
+
+        Visible = true;
+        Loading = true;
+        WorkspaceContext = context;
+
+        try
+        {
+            SmartCollectionTransientNavigationState? transientState = null;
+            if (string.Equals(context.Mode, "transient", StringComparison.Ordinal))
+            {
+                transientState = await LoadTransientStateAsync(context);
+                if (transientState is null)
+                {
+                    return;
+                }
+            }
+
+            SmartCollectionPageResponse? page = await QueryPageAsync(
+                context,
+                transientState,
+                context.Offset,
+                SmartCollectionNavigation.ResultPageSize);
+            if (page is null)
+            {
+                return;
+            }
+
+            int localIndex = Array.FindIndex(
+                page.Items,
+                item => string.Equals(item.RevisionId, revisionId, StringComparison.Ordinal));
+            if (localIndex < 0)
+            {
+                Notice = "Smart Collection results changed or this photo is no longer in the active result set. Return to Smart Collections to refresh the results.";
+                return;
+            }
+
+            int globalIndex = page.Offset + localIndex;
+            if (SmartCollectionNavigation.TryResolvePhotoNavigation(
+                    page,
+                    revisionId!,
+                    globalIndex,
+                    out SmartCollectionPhotoNavigationResolution? navigation))
+            {
+                Resolved = navigation;
+                return;
+            }
+
+            int neighborOffset = Math.Max(0, globalIndex - 1);
+            SmartCollectionPageResponse? neighbors = await QueryPageAsync(
+                context,
+                transientState,
+                neighborOffset,
+                3);
+            if (neighbors is not null &&
+                SmartCollectionNavigation.TryResolvePhotoNavigation(
+                    neighbors,
+                    revisionId!,
+                    globalIndex,
+                    out navigation))
+            {
+                Resolved = navigation;
+                return;
+            }
+
+            Notice = "Smart Collection results changed while this photo was open. Previous/next navigation is disabled until the collection is refreshed.";
+        }
+        catch (Exception exception) when (exception is JSException or JsonException)
+        {
+            Notice = $"Smart Collection navigation could not be restored: {exception.Message}";
+        }
+        catch (Exception exception)
+        {
+            Notice = $"Smart Collection navigation could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task<SmartCollectionTransientNavigationState?> LoadTransientStateAsync(
+        SmartCollectionWorkspaceContext context)
+    {
+        if (string.IsNullOrWhiteSpace(context.PreviewKey))
+        {
+            Notice = "The transient Smart Collection context is incomplete.";
+            return null;
+        }
+
+        string? json = await JS.InvokeAsync<string?>(
+            "sessionStorage.getItem",
+            SmartCollectionNavigation.PreviewStorageKey(context.PreviewKey));
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            Notice = "This unsaved Smart Collection preview is no longer available in this browser tab.";
+            return null;
+        }
+
+        SmartCollectionTransientNavigationState? state =
+            SmartCollectionNavigation.DeserializeTransientState(json);
+        if (state is null)
+        {
+            Notice = "This unsaved Smart Collection preview could not be restored.";
+            return null;
+        }
+
+        return state;
+    }
+
+    private async Task<SmartCollectionPageResponse?> QueryPageAsync(
+        SmartCollectionWorkspaceContext context,
+        SmartCollectionTransientNavigationState? transientState,
+        int offset,
+        int limit)
+    {
+        using HttpResponseMessage response = string.Equals(context.Mode, "saved", StringComparison.Ordinal)
+            ? await Http.GetAsync(
+                $"api/smart-collections/{Uri.EscapeDataString(context.CollectionId!)}/query?offset={offset}&limit={limit}")
+            : await QueryTransientAsync(transientState, offset, limit);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            Notice = response.StatusCode == System.Net.HttpStatusCode.NotFound
+                ? "The saved Smart Collection is no longer available."
+                : $"Smart Collection navigation query failed with HTTP {(int)response.StatusCode}.";
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<SmartCollectionPageResponse>();
+    }
+
+    private async Task<HttpResponseMessage> QueryTransientAsync(
+        SmartCollectionTransientNavigationState? state,
+        int offset,
+        int limit)
+    {
+        if (state is null ||
+            !SmartCollectionNavigation.TryBuildTransientQuery(
+                state,
+                offset,
+                limit,
+                out SmartCollectionQueryRequest? request) ||
+            request is null)
+        {
+            Notice = "The unsaved Smart Collection filter could not be reconstructed for photo navigation.";
+            return new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest);
+        }
+
+        return await Http.PostAsJsonAsync("api/smart-collections/query", request);
+    }
+
+    private string BuildNeighborHref(string revisionId, int index)
+    {
+        SmartCollectionWorkspaceContext context = WorkspaceContext
+            ?? throw new InvalidOperationException("Smart Collection workspace context is unavailable.");
+        int offset = SmartCollectionNavigation.PageOffsetForIndex(index);
+        string returnUrl = SmartCollectionNavigation.BuildWorkspaceUrl(context, offset);
+        return SmartCollectionNavigation.BuildPhotoUrl(revisionId, returnUrl);
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= HandleLocationChanged;
+    }
+}
