@@ -20,6 +20,29 @@ public sealed class SmartCollectionResultBrowserModelTests
     }
 
     [Fact]
+    public void Append_can_prepend_an_earlier_batch_with_one_stable_boundary_overlap()
+    {
+        SmartCollectionPageResponse earlier = Page(
+            0,
+            6,
+            Photo("r1"),
+            Photo("r2"),
+            Photo("r3"));
+        SmartCollectionPageResponse current = Page(
+            2,
+            6,
+            Photo("r3"),
+            Photo("r4"),
+            Photo("r5"));
+
+        SmartCollectionPageResponse merged = SmartCollectionResultBrowserModel.Append(earlier, current);
+
+        Assert.Equal(["r1", "r2", "r3", "r4", "r5"], merged.Items.Select(photo => photo.RevisionId));
+        Assert.Equal(0, merged.Offset);
+        Assert.Equal(6, merged.Total);
+    }
+
+    [Fact]
     public void Append_treats_an_identical_retry_overlap_as_idempotent()
     {
         SmartCollectionPageResponse current = Page(0, 4, Photo("r1"), Photo("r2"), Photo("r3"), Photo("r4"));
