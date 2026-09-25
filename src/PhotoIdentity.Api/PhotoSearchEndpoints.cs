@@ -74,7 +74,7 @@ public static class PhotoSearchEndpoints
                     item.Caption,
                     item.Sources.ToArray())).ToArray()));
         }
-        catch (Exception exception) when (exception is ArgumentException or ArgumentOutOfRangeException)
+        catch (ArgumentException exception)
         {
             return Results.BadRequest(new { error = exception.Message });
         }
