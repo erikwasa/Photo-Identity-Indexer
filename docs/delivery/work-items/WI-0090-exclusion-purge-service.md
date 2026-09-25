@@ -5,7 +5,7 @@ milestone: M23
 status_source: ../status/work-items.yaml
 depends_on: [WI-0089]
 related_adrs: [ADR-0008]
-affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Worker, PhotoIdentity.Api, documentation]
+affected_modules: [PhotoIdentity.Core, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Worker, PhotoIdentity.Api, documentation]
 ---
 
 # WI-0090: Purge excluded photo data and derivatives safely
@@ -16,7 +16,7 @@ Turn source-copy exclusion into a real privacy purge by removing Photo Identity'
 
 ## Why
 
-SQLite cascades can remove linked records but cannot delete proxy/crop files on disk. Deleting database references before deleting those files could strand sensitive orphaned artifacts. Conversely, a partial filesystem failure must not make the excluded photo accessible again.
+Database cascades can remove linked catalogue rows but cannot delete proxy/crop files on disk. Deleting database references before deleting those files could strand sensitive orphaned artifacts. Conversely, a partial filesystem failure must not make the excluded photo accessible again. PostgreSQL is the authoritative writable production catalogue; retained SQLite support is compatibility/migration tooling and must not be treated as sufficient production-provider verification.
 
 ## In scope
 
@@ -49,11 +49,11 @@ SQLite cascades can remove linked records but cannot delete proxy/crop files on 
 - [ ] Repeating purge is idempotent when files or rows have already disappeared.
 - [ ] Locked/unavailable derivative files result in visible retryable purge failure/pending state rather than silent success.
 - [ ] Purge completion verifies that no known local derivative files for the excluded source copy remain.
-- [ ] Automated tests exercise filesystem and SQLite cleanup together, not database cascades alone.
+- [ ] Automated tests exercise filesystem and PostgreSQL catalogue cleanup together; retained SQLite compatibility coverage does not substitute for production-provider coverage.
 
 ## Verification requirements
 
-Focused integration tests must use generated safe test images and temporary derivative roots. Include injected failures before/after filesystem deletion and before/after database cleanup to prove restart safety and idempotency.
+Focused integration tests must use generated safe test images and temporary derivative roots. Include injected failures before/after filesystem deletion and before/after database cleanup to prove restart safety and idempotency. Production-provider verification must cover PostgreSQL cleanup; equivalent SQLite coverage should be retained only where that compatibility path remains supported.
 
 ## Completion notes
 
