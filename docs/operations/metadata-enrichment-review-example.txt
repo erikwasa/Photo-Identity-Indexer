@@ -1,0 +1,9 @@
+Expected review shape (example only):
+
+Rule                         Photos  Date        Place
+----                         ------  ----        -----
+2024-03-24-sodermalm             64  2024-03-24  Sverige/.../Södermalm
+2024-03-23-sodermalm             50  2024-03-23  Sverige/.../Södermalm
+2024-03-20-flemingsberg          12  2024-03-20  Sverige/.../Flemingsberg
+
+The actual helper also shows represented source roots and optional source-key samples.
