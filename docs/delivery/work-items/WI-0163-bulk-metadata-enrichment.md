@@ -34,6 +34,7 @@ The maintainer measured 17,892 current photos, including 234 with no effective c
 - Recheck current state immediately before apply so changes made after a dry-run are not overwritten.
 - Persist accepted changes through the existing append-only capture-date and Place repositories so provenance, hierarchy creation and idempotence remain consistent with UI edits.
 - Optionally write a local private JSON review report containing source keys, revision ids, proposed values and ambiguities. Normal stdout remains aggregate-only.
+- Provide a local review helper that collapses photo-level Place proposals into one row per rule, shows a small sample, and can write an approved subset of rules without touching the catalogue.
 - Never modify originals, rewrite EXIF, hydrate source files, or infer a Place from image content.
 
 ## Rule file shape
@@ -67,12 +68,31 @@ dotnet run --project src/PhotoIdentity.Cli -c Release -- metadata enrich `
   --report .\artifacts\metadata-enrichment-dry-run.json
 ```
 
-After reviewing the private report, apply the same rules explicitly:
+For Place-heavy reports, review grouped decisions instead of every individual source path:
+
+```powershell
+.\review-metadata-enrichment.ps1 `
+  -Report .\artifacts\metadata-enrichment-dry-run.json
+```
+
+To write a reviewed rule file containing every rule represented by that report:
+
+```powershell
+.\review-metadata-enrichment.ps1 `
+  -Report .\artifacts\metadata-enrichment-dry-run.json `
+  -Rules .\metadata-rules.json `
+  -ApproveAll `
+  -ApprovedRulesOutput .\artifacts\metadata-enrichment-approved.json
+```
+
+Use `-ApproveRule @(...)` instead of `-ApproveAll` to select only specific groups. The helper is review-only: it never writes catalogue metadata. See `docs/operations/metadata-enrichment-review.md` for the full workflow.
+
+After reviewing the private report or grouped approved rules, apply explicitly:
 
 ```powershell
 dotnet run --project src/PhotoIdentity.Cli -c Release -- metadata enrich `
   --postgres-connection-env PHOTOIDENTITY_POSTGRES `
-  --rules .\metadata-rules.json `
+  --rules .\artifacts\metadata-enrichment-approved.json `
   --report .\artifacts\metadata-enrichment-apply.json `
   --apply
 ```
@@ -92,6 +112,7 @@ A rerun should be safe: already-effective values are not proposed, and repositor
 - [ ] Conflicting matching Place rules are ambiguous and do not write a Place.
 - [ ] Apply uses the existing PostgreSQL capture-date and Place repositories and rechecks current state before each write.
 - [ ] Optional private report is sufficient to inspect proposed revision/source/value changes before apply.
+- [ ] Place-heavy private reports can be summarized and reduced to an approved rule subset without catalogue writes.
 - [ ] Automated tests cover filename, directory, catch-all, conflict and precision-containment behavior.
 - [ ] Maintainer verifies a production-catalogue dry-run before any broad apply operation.
 
@@ -101,9 +122,10 @@ A rerun should be safe: already-effective values are not proposed, and repositor
 2. Run documentation validation/generation checks.
 3. On the maintainer catalogue, create a rule file with no Place rules and run dry-run to compare missing-date counts with the known baseline.
 4. Review a sample of exact filename proposals, month-directory proposals, `1970` timestamp proposals and ambiguities in the private report.
-5. Add one known trip rule, dry-run it, and confirm that exact dates inside the trip are proposed while partial month/year precision that extends outside the trip is not.
-6. Only after the dry-run is accepted, use `--apply`, then rerun dry-run and confirm the applied rows are no longer proposed.
+5. For Place rules, run `review-metadata-enrichment.ps1` and confirm the grouped counts match the photo-level report before approving all or selected rules.
+6. Add one known trip rule, dry-run it, and confirm that exact dates inside the trip are proposed while partial month/year precision that extends outside the trip is not.
+7. Only after the dry-run is accepted, use `--apply`, then rerun dry-run and confirm the applied rows are no longer proposed.
 
 ## Privacy and safety notes
 
-The rule and report files can contain private archive paths and travel/location history. They are operator-local artifacts and must not be committed. CLI stdout intentionally exposes only aggregate counts. Source originals remain read-only throughout this workflow.
+The rule and report files can contain private archive paths and travel/location history. They are operator-local artifacts and must not be committed. CLI stdout intentionally exposes only aggregate counts. The grouped review helper reads only the local report/rules files and writes only a new local approved-rules file when requested. Source originals remain read-only throughout this workflow.
