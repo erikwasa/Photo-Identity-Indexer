@@ -33,6 +33,23 @@
         }
         else
         {
+            @if (NavigationReady && HasEarlier)
+            {
+                <InfiniteScrollTrigger @key="EarlierScrollGeneration"
+                                       Enabled="true"
+                                       Busy="false"
+                                       IdleText="Earlier photos load automatically"
+                                       LoadingText="Loading earlier photos…"
+                                       LoadMore="LoadEarlierAsync" />
+            }
+            else if (LoadingEarlier)
+            {
+                <div class="smart-infinite-status" aria-live="polite">
+                    <div class="spinner" aria-hidden="true"></div>
+                    <span>Loading earlier photos…</span>
+                </div>
+            }
+
             <div class="smart-photo-grid">
                 @for (int index = 0; index < resultPage.Items.Length; index++)
                 {
@@ -57,14 +74,7 @@
                 }
             </div>
 
-            @if (RestoringHistory)
-            {
-                <div class="smart-infinite-status" aria-live="polite">
-                    <div class="spinner" aria-hidden="true"></div>
-                    <span>Restoring earlier photos…</span>
-                </div>
-            }
-            else if (LoadingMore)
+            @if (LoadingMore)
             {
                 <div class="smart-infinite-status" aria-live="polite">
                     <div class="spinner" aria-hidden="true"></div>
@@ -75,21 +85,25 @@
             {
                 <div class="smart-infinite-error" role="alert">
                     <span>@LoadError</span>
-                    <button type="button" class="button secondary" @onclick="LoadMoreAsync">Retry</button>
+                    <button type="button" class="button secondary" @onclick="RetryAsync">Retry</button>
                 </div>
             }
-            else if (HasMore)
+            else if (NavigationReady && HasMore)
             {
-                <InfiniteScrollTrigger @key="ScrollGeneration"
+                <InfiniteScrollTrigger @key="LaterScrollGeneration"
                                        Enabled="true"
                                        Busy="false"
                                        IdleText="More photos load automatically"
                                        LoadingText="Loading more photos…"
                                        LoadMore="LoadMoreAsync" />
             }
-            else
+            else if (NavigationReady)
             {
-                <p class="smart-end-of-results">All @resultPage.Total matching photo@(resultPage.Total == 1 ? " is" : "s are") loaded.</p>
+                <p class="smart-end-of-results">
+                    @(HasEarlier
+                        ? "End of matching photos."
+                        : $"All {resultPage.Total} matching photo{(resultPage.Total == 1 ? " is" : "s are")} loaded.")
+                </p>
             }
         }
     </section>
@@ -105,16 +119,22 @@
     private readonly string rootId = $"smart-results-{Guid.NewGuid():N}";
     private SmartCollectionPageResponse? sourcePage;
     private SmartCollectionPageResponse? Accumulated { get; set; }
+    private bool LoadingEarlier { get; set; }
     private bool LoadingMore { get; set; }
-    private bool RestoringHistory { get; set; }
-    private bool RestoreHistoryPending { get; set; }
+    private bool NavigationReady { get; set; }
     private bool ScrollRestorePending { get; set; }
     private string? RestoreAnchorRevisionId { get; set; }
+    private string? ViewportAnchorRevisionId { get; set; }
+    private double? ViewportAnchorTop { get; set; }
     private string? LoadError { get; set; }
-    private int ScrollGeneration { get; set; }
+    private string? RetryDirection { get; set; }
+    private int EarlierScrollGeneration { get; set; }
+    private int LaterScrollGeneration { get; set; }
     private IJSObjectReference? Module { get; set; }
 
     private string RootId => rootId;
+    private int BatchSize => Math.Min(Math.Clamp(InitialPage.Limit, 1, 200), 199);
+    private bool HasEarlier => Accumulated is not null && Accumulated.Offset > 0;
     private bool HasMore => Accumulated is not null &&
         Accumulated.Offset + Accumulated.Items.Length < Accumulated.Total;
 
@@ -127,10 +147,12 @@
 
         sourcePage = InitialPage;
         Accumulated = InitialPage;
+        LoadingEarlier = false;
         LoadingMore = false;
-        RestoringHistory = false;
         LoadError = null;
-        ScrollGeneration++;
+        RetryDirection = null;
+        EarlierScrollGeneration++;
+        LaterScrollGeneration++;
 
         string? focusRevisionId = SmartCollectionResultBrowserModel.ParseFocusRevisionId(Navigation.Uri);
         RestoreAnchorRevisionId = !string.IsNullOrWhiteSpace(focusRevisionId)
@@ -138,8 +160,8 @@
             : InitialPage.Offset > 0
                 ? InitialPage.Items.FirstOrDefault()?.RevisionId
                 : null;
-        RestoreHistoryPending = InitialPage.Offset > 0;
-        ScrollRestorePending = !RestoreHistoryPending && !string.IsNullOrWhiteSpace(RestoreAnchorRevisionId);
+        ScrollRestorePending = !string.IsNullOrWhiteSpace(RestoreAnchorRevisionId);
+        NavigationReady = !ScrollRestorePending;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -149,86 +171,94 @@
             Module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/infinite-scroll.js");
         }
 
-        if (RestoreHistoryPending)
+        if (ScrollRestorePending && Accumulated is not null)
         {
-            RestoreHistoryPending = false;
-            await RestoreEarlierResultsAsync();
-            ScrollRestorePending = !string.IsNullOrWhiteSpace(RestoreAnchorRevisionId);
+            ScrollRestorePending = false;
+            string targetId = !string.IsNullOrWhiteSpace(RestoreAnchorRevisionId) &&
+                Accumulated.Items.Any(photo => string.Equals(photo.RevisionId, RestoreAnchorRevisionId, StringComparison.Ordinal))
+                    ? CardId(RestoreAnchorRevisionId!)
+                    : RootId;
+            await Module.InvokeVoidAsync("scrollIntoViewById", targetId);
+            NavigationReady = true;
             await InvokeAsync(StateHasChanged);
             return;
         }
 
-        if (!ScrollRestorePending || Accumulated is null)
+        if (!string.IsNullOrWhiteSpace(ViewportAnchorRevisionId) && ViewportAnchorTop is double previousTop)
         {
-            return;
+            string anchorId = CardId(ViewportAnchorRevisionId);
+            ViewportAnchorRevisionId = null;
+            ViewportAnchorTop = null;
+            await Module.InvokeVoidAsync("restoreElementTopById", anchorId, previousTop);
         }
-
-        ScrollRestorePending = false;
-        string targetId = !string.IsNullOrWhiteSpace(RestoreAnchorRevisionId) &&
-            Accumulated.Items.Any(photo => string.Equals(photo.RevisionId, RestoreAnchorRevisionId, StringComparison.Ordinal))
-                ? CardId(RestoreAnchorRevisionId!)
-                : RootId;
-        await Module.InvokeVoidAsync("scrollIntoViewById", targetId);
     }
 
-    private async Task RestoreEarlierResultsAsync()
+    private async Task LoadEarlierAsync()
     {
-        if (InitialPage.Offset <= 0)
+        if (LoadingEarlier || LoadingMore || !HasEarlier || Accumulated is null)
         {
             return;
         }
 
-        RestoringHistory = true;
+        LoadingEarlier = true;
         LoadError = null;
+        RetryDirection = null;
         try
         {
-            int limit = Math.Clamp(InitialPage.Limit, 1, 200);
-            SmartCollectionPageResponse? restored = null;
-            for (int offset = 0; offset < InitialPage.Offset; offset += limit)
-            {
-                SmartCollectionPageResponse? earlier = await QueryPageAsync(offset, limit);
-                if (earlier is null)
-                {
-                    return;
-                }
+            string anchorRevisionId = Accumulated.Items[0].RevisionId;
+            double? anchorTop = Module is null
+                ? null
+                : await Module.InvokeAsync<double?>("elementTopById", CardId(anchorRevisionId));
 
-                restored = restored is null
-                    ? earlier
-                    : SmartCollectionResultBrowserModel.Append(restored, earlier);
+            int previousOffset = Math.Max(0, Accumulated.Offset - BatchSize);
+            int previousCount = Accumulated.Offset - previousOffset;
+            SmartCollectionPageResponse? previous = await QueryPageAsync(
+                previousOffset,
+                previousCount + 1);
+            if (previous is null)
+            {
+                RetryDirection = "earlier";
+                return;
             }
 
-            if (restored is not null)
+            Accumulated = SmartCollectionResultBrowserModel.Append(previous, Accumulated);
+            EarlierScrollGeneration++;
+            LaterScrollGeneration++;
+            if (anchorTop.HasValue)
             {
-                Accumulated = SmartCollectionResultBrowserModel.Append(restored, InitialPage);
-                ScrollGeneration++;
+                ViewportAnchorRevisionId = anchorRevisionId;
+                ViewportAnchorTop = anchorTop;
             }
         }
         catch (Exception exception)
         {
-            LoadError = $"Earlier Smart Collection photos could not be restored: {exception.Message}";
+            RetryDirection = "earlier";
+            LoadError = $"Earlier Smart Collection photos could not be loaded: {exception.Message}";
         }
         finally
         {
-            RestoringHistory = false;
+            LoadingEarlier = false;
         }
     }
 
     private async Task LoadMoreAsync()
     {
-        if (LoadingMore || RestoringHistory || !HasMore || Accumulated is null)
+        if (LoadingEarlier || LoadingMore || !HasMore || Accumulated is null)
         {
             return;
         }
 
         LoadingMore = true;
         LoadError = null;
+        RetryDirection = null;
         try
         {
-            int nextOffset = Accumulated.Offset + Accumulated.Items.Length;
-            int limit = Math.Clamp(InitialPage.Limit, 1, 200);
-            SmartCollectionPageResponse? next = await QueryPageAsync(nextOffset, limit);
+            int currentEnd = Accumulated.Offset + Accumulated.Items.Length;
+            int queryOffset = Math.Max(Accumulated.Offset, currentEnd - 1);
+            SmartCollectionPageResponse? next = await QueryPageAsync(queryOffset, BatchSize + 1);
             if (next is null)
             {
+                RetryDirection = "more";
                 return;
             }
 
@@ -237,14 +267,17 @@
             if (Accumulated.Items.Length == previousCount &&
                 Accumulated.Offset + Accumulated.Items.Length < Accumulated.Total)
             {
+                RetryDirection = "more";
                 LoadError = "The next Smart Collection batch did not advance. Retry after re-evaluating the collection.";
                 return;
             }
 
-            ScrollGeneration++;
+            EarlierScrollGeneration++;
+            LaterScrollGeneration++;
         }
         catch (Exception exception)
         {
+            RetryDirection = "more";
             LoadError = $"More Smart Collection photos could not be loaded: {exception.Message}";
         }
         finally
@@ -252,6 +285,10 @@
             LoadingMore = false;
         }
     }
+
+    private Task RetryAsync() => string.Equals(RetryDirection, "earlier", StringComparison.Ordinal)
+        ? LoadEarlierAsync()
+        : LoadMoreAsync();
 
     private async Task<SmartCollectionPageResponse?> QueryPageAsync(int offset, int limit)
     {
@@ -271,7 +308,7 @@
 
     private Task<HttpResponseMessage> QueryTransientAsync(int offset, int limit)
     {
-        SmartCollectionPageResponse? filterSource = Accumulated ?? InitialPage;
+        SmartCollectionPageResponse filterSource = Accumulated ?? InitialPage;
         if (string.IsNullOrWhiteSpace(TransientPreviewKey))
         {
             return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
