@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.Data.Sqlite;
 using PhotoIdentity.Core.Collections;
 using PhotoIdentity.Core.Identifiers;
+using PhotoIdentity.Core.Places;
 
 namespace PhotoIdentity.Persistence.Sqlite;
 
@@ -101,7 +102,8 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
         effective_revision_places AS (
             SELECT
                 latest_place_action.asset_revision_id AS revision_id,
-                photo_tags.normalized_name AS normalized_value
+                photo_tags.normalized_name AS normalized_value,
+                photo_tags.display_name AS display_value
             FROM latest_place_action
             INNER JOIN photo_tags ON photo_tags.id = latest_place_action.tag_id
             WHERE latest_place_action.row_number = 1
@@ -181,11 +183,14 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
                 COALESCE((
                     SELECT group_concat(revision_people.person_id, ',')
                     FROM revision_people
-                    WHERE revision_people.revision_id = asset_revisions.id), '')
+                    WHERE revision_people.revision_id = asset_revisions.id), ''),
+                effective_revision_places.display_value
             FROM asset_revisions
             INNER JOIN assets ON assets.id = asset_revisions.asset_id
             LEFT JOIN photo_capture_metadata
                 ON photo_capture_metadata.asset_revision_id = asset_revisions.id
+            LEFT JOIN effective_revision_places
+                ON effective_revision_places.revision_id = asset_revisions.id
             WHERE assets.deleted_at_utc IS NULL
               {where}
             ORDER BY
@@ -212,7 +217,10 @@ public sealed class SqliteSmartCollectionQueryRepository : ISmartCollectionQuery
                 reader.IsDBNull(6) ? null : ParseLocal(reader.GetString(6)),
                 reader.IsDBNull(7) ? null : reader.GetDouble(7),
                 reader.IsDBNull(8) ? null : reader.GetDouble(8),
-                ParsePeopleKeys(reader.GetString(9))));
+                ParsePeopleKeys(reader.GetString(9)),
+                EffectivePlace: reader.IsDBNull(10)
+                    ? null
+                    : PhotoPlacePath.Parse(reader.GetString(10)).DisplayValue));
         }
 
         return new SmartCollectionPhotoPage(items, offset, limit, total, filter);
