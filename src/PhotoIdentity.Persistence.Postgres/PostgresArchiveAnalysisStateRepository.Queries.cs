@@ -21,7 +21,7 @@ public sealed partial class PostgresArchiveAnalysisStateRepository
         CancellationToken cancellationToken = default)
     {
         IReadOnlyList<SourceCopyExclusionState> exclusions =
-            await new PostgresSourceCopyExclusionRepository(_database).ListAsync(sourceId, cancellationToken);
+            await _exclusions.ListAsync(sourceId, cancellationToken);
         HashSet<string> excludedKeys = exclusions
             .Select(item => item.SourceKey)
             .ToHashSet(StringComparer.Ordinal);
