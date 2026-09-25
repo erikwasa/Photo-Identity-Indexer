@@ -37,14 +37,27 @@ Coordinates are useful evidence but poor browsing labels. The application alread
 
 ## Acceptance criteria
 
-- [ ] A Smart Collection result with a manually assigned Place shows a compact human-readable Place label rather than latitude/longitude.
-- [ ] A result with an automatically enriched Place shows the same compact format.
-- [ ] Manual Place overrides continue to win over automatic Place evidence according to the existing effective-Place model.
-- [ ] A multi-level Place hierarchy is compacted to first and last meaningful display components without exposing normalized storage paths.
-- [ ] A photo with coordinates but no effective named Place shows no coordinate label in the result card.
-- [ ] Photo Details and stored metadata continue to retain GPS evidence unchanged.
-- [ ] Automated tests cover manual, automatic, cleared/missing and multi-level Place cases.
+- [x] A Smart Collection result with a manually assigned Place shows a compact human-readable Place label rather than latitude/longitude.
+- [x] A result with an automatically enriched Place shows the same compact format.
+- [x] Manual Place overrides continue to win over automatic Place evidence according to the existing effective-Place model.
+- [x] A multi-level Place hierarchy is compacted to first and last meaningful display components without exposing normalized storage paths.
+- [x] A photo with coordinates but no effective named Place shows no coordinate label in the result card.
+- [x] Photo Details and stored metadata continue to retain GPS evidence unchanged.
+- [x] Automated tests cover manual, automatic, cleared/missing and multi-level Place cases.
 
 ## Verification requirements
 
 Maintainer verification with representative photos covering a manual Place, a GPS-enriched Place, a reduced-precision administrative fallback and GPS with no resolved Place. Confirm labels are useful and compact on both desktop and phone.
+
+## Maintainer review — 2026-09-25
+
+The maintainer confirmed WI-0161 works as expected after PR #422. Smart Collection cards show compact named Places where available and avoid raw-coordinate fallback when no effective named Place exists.
+
+## Completion notes
+
+- PR #422 implemented WI-0161 together with WI-0160 because both affect the Smart Collection result browsing surface.
+- Smart Collection queries now project the effective latest Place action while preserving latest-set/latest-clear semantics and manual override precedence.
+- Result cards render display/canonical hierarchy names in compact form, including first/last hierarchy compaction for deeper paths.
+- Coordinates remain stored and available in Photo Details/filter metadata but are no longer the normal Smart Collection card label fallback.
+- Automated coverage includes missing, one-level, two-level, deep/canonical-root Place labels plus live PostgreSQL checks for automatic Place, manual override, blocked automatic replacement and manual clear.
+- PR #422 workflow run #2164 completed successfully. Maintainer acceptance on 2026-09-25 completes WI-0161.

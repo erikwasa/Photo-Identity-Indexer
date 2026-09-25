@@ -1,0 +1,29 @@
+id: WI-0125
+title: Add birth dates and family relationships for age-aware Creative Collections
+milestone: M26
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0125-person-family-metadata.md
+started_at: 2026-09-23
+completed_at: 2026-09-25
+verified_at: 2026-09-25
+verified_by: maintainer
+last_updated_at: 2026-09-25
+branch: agent/WI-0125-cousin-grouped-family-ui
+blockers:
+- WI-0121
+- WI-0060
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/415
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/416
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/418
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/421
+- type: verification
+  value: '2026-09-25 maintainer verification: birth metadata, age filters, relationship directionality, cousin symmetry, grouped responsive relationship UI and saved/reopened family-aware Smart Collections work as expected.'
+- type: ci
+  value: 'PR #421 workflow run #2157 completed successfully.'
