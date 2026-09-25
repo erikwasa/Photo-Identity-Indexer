@@ -77,7 +77,7 @@ work_items:
   - WI-0121
   - WI-0060
   blocker_notes:
-  - '2026-09-25 final follow-up implements cousin as a symmetric relationship across domain/PostgreSQL/People/Smart Collections and groups People relationships by category in a wider responsive layout. Completion remains pending PR CI, verify-postgres.ps1 and maintainer desktop/phone UI verification.'
+  - 2026-09-25 final follow-up implements cousin as a symmetric relationship across domain/PostgreSQL/People/Smart Collections and groups People relationships by category in a wider responsive layout. Completion remains pending PR CI, verify-postgres.ps1 and maintainer desktop/phone UI verification.
   evidence:
   - type: pull_request
     value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/415
