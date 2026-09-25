@@ -169,3 +169,15 @@ work_items:
   - WI-0151
   blocker_notes: []
   evidence: []
+- id: WI-0163
+  title: Add safe bulk capture-date and Place enrichment
+  milestone: M31
+  status: in_progress
+  owner: ai-agent
+  document: ../work-items/WI-0163-bulk-metadata-enrichment.md
+  started_at: 2026-09-25
+  last_updated_at: 2026-09-25
+  branch: agent/wi-0163-bulk-metadata-enrichment
+  blockers: []
+  blocker_notes: []
+  evidence: []

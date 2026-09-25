@@ -316,3 +316,9 @@ milestones:
   - WI-0154
   - WI-0155
   - WI-0156
+- id: M31
+  title: Bulk archive metadata enrichment
+  status: in_progress
+  document: ../milestones/M31-bulk-metadata-enrichment.md
+  work_items:
+  - WI-0163
