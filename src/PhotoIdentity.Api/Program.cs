@@ -50,6 +50,13 @@ public partial class Program
             builder.Configuration["PhotoIdentity:ArchiveAnalysisOutputRoot"] ?? defaultArchiveAnalysisRoot;
         string? reviewProxyRoot = builder.Configuration["PhotoIdentity:ReviewProxyRoot"];
         string? reviewProxyProfileId = builder.Configuration["PhotoIdentity:ReviewProxyProfileId"];
+        string semanticSearchModelDirectory =
+            builder.Configuration["PhotoIdentity:SemanticSearch:ModelDirectory"]
+            ?? Path.Combine(
+                defaultApplicationRoot,
+                "Models",
+                "WI-0126",
+                PhotoSemanticSearchConfiguration.DefaultModelFolderName);
 
         string captionBaseUrl =
             builder.Configuration["PhotoIdentity:CaptionEnrichment:OllamaBaseUrl"]
@@ -116,6 +123,9 @@ public partial class Program
                 builder.Services,
                 postgresConnectionString);
             builder.Services.AddSingleton<ISimilarFaceRepository, PostgresSimilarFaceRepository>();
+            builder.Services.AddSingleton<PostgresPhotoSearchRepository>();
+            builder.Services.AddSingleton<IPhotoSearchRepository>(
+                services => services.GetRequiredService<PostgresPhotoSearchRepository>());
         }
         else
         {
@@ -143,6 +153,8 @@ public partial class Program
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:ReviewProxyMaximumLongEdge"),
             ParseOptionalInt(builder.Configuration, "PhotoIdentity:ReviewProxyJpegQuality")));
         builder.Services.AddSingleton(captionConfiguration);
+        builder.Services.AddSingleton(new PhotoSemanticSearchConfiguration(
+            Path.GetFullPath(semanticSearchModelDirectory)));
         builder.Services.AddSingleton(new ArchiveHydrationPolicyConfiguration(
             ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MinimumFreeSpaceReserveBytes"),
             ParseOptionalLong(builder.Configuration, "PhotoIdentity:ArchiveHydration:MaximumManagedHydrationBytes"),
@@ -197,6 +209,12 @@ public partial class Program
             client => client.Timeout = TimeSpan.FromSeconds(captionConfiguration.TimeoutSeconds));
         builder.Services.AddSingleton<LocalPhotoCaptionGenerator>();
         builder.Services.AddHostedService<PhotoCaptionEnrichmentHostedService>();
+        if (catalogueProvider == CatalogueProviderKind.Postgres)
+        {
+            builder.Services.AddSingleton<PhotoSemanticSearchModel>();
+            builder.Services.AddSingleton<PhotoSearchService>();
+            builder.Services.AddHostedService<PhotoSemanticEmbeddingHostedService>();
+        }
         builder.Services.AddSingleton<IReverseGeocoder, GeoNamesReverseGeocoder>();
         builder.Services.AddSingleton<PhotoPlaceEnrichmentService>();
         builder.Services.AddHostedService<PhotoPlaceEnrichmentHostedService>();
@@ -298,6 +316,7 @@ public partial class Program
             if (context.Request.Path.StartsWithSegments("/api/review") ||
                 context.Request.Path.StartsWithSegments("/api/collections") ||
                 context.Request.Path.StartsWithSegments("/api/smart-collections") ||
+                context.Request.Path.StartsWithSegments("/api/photo-search") ||
                 context.Request.Path.StartsWithSegments("/api/moments") ||
                 context.Request.Path.StartsWithSegments("/api/slideshows") ||
                 context.Request.Path.StartsWithSegments("/api/photo-metadata") ||
@@ -344,6 +363,7 @@ public partial class Program
         if (catalogueProvider == CatalogueProviderKind.Postgres)
         {
             app.MapPhotoListCollectionEndpoints();
+            app.MapPhotoSearchEndpoints();
         }
         app.MapMomentPreviewEndpoints();
         app.MapSlideshowOriginalPreparationEndpoints();
@@ -423,6 +443,7 @@ public partial class Program
 
         if (path.StartsWithSegments("/api/collections") ||
             path.StartsWithSegments("/api/smart-collections") ||
+            path.StartsWithSegments("/api/photo-search") ||
             path.StartsWithSegments("/api/moments"))
         {
             return ArchiveThroughputMetricNames.ApiCollectionRequest;
