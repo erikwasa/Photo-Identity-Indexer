@@ -13,12 +13,14 @@ public sealed class PostgresArchivePostAnalysisRepository :
     IArchivePostAnalysisRepository
 {
     private readonly PostgresCatalogueDatabase _database;
+    private readonly PostgresSourceCopyExclusionRepository _exclusions;
 
     public PostgresArchivePostAnalysisRepository(
         PostgresCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         _database = database;
+        _exclusions = new PostgresSourceCopyExclusionRepository(database);
     }
 
     public async Task<AssetRevisionId?> GetNextMissingProxyRevisionAsync(
@@ -29,7 +31,7 @@ public sealed class PostgresArchivePostAnalysisRepository :
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(proxyProfileId);
         IReadOnlyList<SourceCopyExclusionState> exclusions =
-            await new PostgresSourceCopyExclusionRepository(_database).ListAsync(sourceId, cancellationToken);
+            await _exclusions.ListAsync(sourceId, cancellationToken);
         HashSet<string> excludedKeys = exclusions
             .Select(item => item.SourceKey)
             .ToHashSet(StringComparer.Ordinal);
