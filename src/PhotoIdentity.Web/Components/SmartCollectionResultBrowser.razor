@@ -57,7 +57,14 @@
                 }
             </div>
 
-            @if (LoadingMore)
+            @if (RestoringHistory)
+            {
+                <div class="smart-infinite-status" aria-live="polite">
+                    <div class="spinner" aria-hidden="true"></div>
+                    <span>Restoring earlier photos…</span>
+                </div>
+            }
+            else if (LoadingMore)
             {
                 <div class="smart-infinite-status" aria-live="polite">
                     <div class="spinner" aria-hidden="true"></div>
@@ -99,10 +106,12 @@
     private SmartCollectionPageResponse? sourcePage;
     private SmartCollectionPageResponse? Accumulated { get; set; }
     private bool LoadingMore { get; set; }
+    private bool RestoringHistory { get; set; }
+    private bool RestoreHistoryPending { get; set; }
+    private bool ScrollRestorePending { get; set; }
+    private string? RestoreAnchorRevisionId { get; set; }
     private string? LoadError { get; set; }
     private int ScrollGeneration { get; set; }
-    private bool RestorePending { get; set; }
-    private string? FocusRevisionId { get; set; }
     private IJSObjectReference? Module { get; set; }
 
     private string RootId => rootId;
@@ -119,10 +128,18 @@
         sourcePage = InitialPage;
         Accumulated = InitialPage;
         LoadingMore = false;
+        RestoringHistory = false;
         LoadError = null;
         ScrollGeneration++;
-        FocusRevisionId = SmartCollectionResultBrowserModel.ParseFocusRevisionId(Navigation.Uri);
-        RestorePending = InitialPage.Offset > 0 || !string.IsNullOrWhiteSpace(FocusRevisionId);
+
+        string? focusRevisionId = SmartCollectionResultBrowserModel.ParseFocusRevisionId(Navigation.Uri);
+        RestoreAnchorRevisionId = !string.IsNullOrWhiteSpace(focusRevisionId)
+            ? focusRevisionId
+            : InitialPage.Offset > 0
+                ? InitialPage.Items.FirstOrDefault()?.RevisionId
+                : null;
+        RestoreHistoryPending = InitialPage.Offset > 0;
+        ScrollRestorePending = !RestoreHistoryPending && !string.IsNullOrWhiteSpace(RestoreAnchorRevisionId);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -132,22 +149,73 @@
             Module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/infinite-scroll.js");
         }
 
-        if (!RestorePending || Accumulated is null)
+        if (RestoreHistoryPending)
+        {
+            RestoreHistoryPending = false;
+            await RestoreEarlierResultsAsync();
+            ScrollRestorePending = !string.IsNullOrWhiteSpace(RestoreAnchorRevisionId);
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+
+        if (!ScrollRestorePending || Accumulated is null)
         {
             return;
         }
 
-        RestorePending = false;
-        string targetId = !string.IsNullOrWhiteSpace(FocusRevisionId) &&
-            Accumulated.Items.Any(photo => string.Equals(photo.RevisionId, FocusRevisionId, StringComparison.Ordinal))
-                ? CardId(FocusRevisionId!)
+        ScrollRestorePending = false;
+        string targetId = !string.IsNullOrWhiteSpace(RestoreAnchorRevisionId) &&
+            Accumulated.Items.Any(photo => string.Equals(photo.RevisionId, RestoreAnchorRevisionId, StringComparison.Ordinal))
+                ? CardId(RestoreAnchorRevisionId!)
                 : RootId;
         await Module.InvokeVoidAsync("scrollIntoViewById", targetId);
     }
 
+    private async Task RestoreEarlierResultsAsync()
+    {
+        if (InitialPage.Offset <= 0)
+        {
+            return;
+        }
+
+        RestoringHistory = true;
+        LoadError = null;
+        try
+        {
+            int limit = Math.Clamp(InitialPage.Limit, 1, 200);
+            SmartCollectionPageResponse? restored = null;
+            for (int offset = 0; offset < InitialPage.Offset; offset += limit)
+            {
+                SmartCollectionPageResponse? earlier = await QueryPageAsync(offset, limit);
+                if (earlier is null)
+                {
+                    return;
+                }
+
+                restored = restored is null
+                    ? earlier
+                    : SmartCollectionResultBrowserModel.Append(restored, earlier);
+            }
+
+            if (restored is not null)
+            {
+                Accumulated = SmartCollectionResultBrowserModel.Append(restored, InitialPage);
+                ScrollGeneration++;
+            }
+        }
+        catch (Exception exception)
+        {
+            LoadError = $"Earlier Smart Collection photos could not be restored: {exception.Message}";
+        }
+        finally
+        {
+            RestoringHistory = false;
+        }
+    }
+
     private async Task LoadMoreAsync()
     {
-        if (LoadingMore || !HasMore || Accumulated is null)
+        if (LoadingMore || RestoringHistory || !HasMore || Accumulated is null)
         {
             return;
         }
@@ -158,7 +226,7 @@
         {
             int nextOffset = Accumulated.Offset + Accumulated.Items.Length;
             int limit = Math.Clamp(InitialPage.Limit, 1, 200);
-            SmartCollectionPageResponse? next = await QueryNextPageAsync(nextOffset, limit);
+            SmartCollectionPageResponse? next = await QueryPageAsync(nextOffset, limit);
             if (next is null)
             {
                 return;
@@ -185,7 +253,7 @@
         }
     }
 
-    private async Task<SmartCollectionPageResponse?> QueryNextPageAsync(int offset, int limit)
+    private async Task<SmartCollectionPageResponse?> QueryPageAsync(int offset, int limit)
     {
         using HttpResponseMessage response = !string.IsNullOrWhiteSpace(InitialPage.CollectionId)
             ? await Http.GetAsync(
@@ -203,13 +271,14 @@
 
     private Task<HttpResponseMessage> QueryTransientAsync(int offset, int limit)
     {
-        if (Accumulated is null || string.IsNullOrWhiteSpace(TransientPreviewKey))
+        SmartCollectionPageResponse? filterSource = Accumulated ?? InitialPage;
+        if (string.IsNullOrWhiteSpace(TransientPreviewKey))
         {
             return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.BadRequest));
         }
 
         SmartCollectionQueryRequest request = SmartCollectionResultBrowserModel.BuildTransientRequest(
-            Accumulated.Filter,
+            filterSource.Filter,
             offset,
             limit);
         return Http.PostAsJsonAsync("api/smart-collections/query", request);
