@@ -1,4 +1,5 @@
 using PhotoIdentity.Core.Places;
+using PhotoIdentity.Core.Sources;
 
 namespace PhotoIdentity.Api;
 
@@ -25,8 +26,8 @@ public sealed record PhotoPlaceEnrichmentReport(
     IReadOnlyList<PhotoPlaceEnrichmentIssue>? Issues = null);
 
 /// <summary>
-/// Applies reverse-geocoded places from persisted GPS only. The service never resolves source paths,
-/// opens photos or asks OneDrive to hydrate content.
+/// Applies reverse-geocoded places from persisted GPS only. Excluded revisions are rejected before
+/// cached/provider lookups and before automatic place writes.
 /// </summary>
 public sealed class PhotoPlaceEnrichmentService
 {
@@ -35,12 +36,22 @@ public sealed class PhotoPlaceEnrichmentService
     private readonly IReverseGeocoder _geocoder;
     private readonly IPhotoPlaceEnrichmentStateRepository _enrichment;
     private readonly IAutomaticPhotoPlaceRepository _automaticPlaces;
+    private readonly ISourceCopyExclusionRepository? _exclusions;
     private readonly SemaphoreSlim _executionGate = new(1, 1);
 
     public PhotoPlaceEnrichmentService(
         IReverseGeocoder geocoder,
         IPhotoPlaceEnrichmentStateRepository enrichment,
         IAutomaticPhotoPlaceRepository automaticPlaces)
+        : this(geocoder, enrichment, automaticPlaces, exclusions: null)
+    {
+    }
+
+    public PhotoPlaceEnrichmentService(
+        IReverseGeocoder geocoder,
+        IPhotoPlaceEnrichmentStateRepository enrichment,
+        IAutomaticPhotoPlaceRepository automaticPlaces,
+        ISourceCopyExclusionRepository? exclusions)
     {
         ArgumentNullException.ThrowIfNull(geocoder);
         ArgumentNullException.ThrowIfNull(enrichment);
@@ -48,6 +59,7 @@ public sealed class PhotoPlaceEnrichmentService
         _geocoder = geocoder;
         _enrichment = enrichment;
         _automaticPlaces = automaticPlaces;
+        _exclusions = exclusions;
     }
 
     public async Task<PhotoPlaceEnrichmentReport> ExecuteBatchAsync(
@@ -96,6 +108,13 @@ public sealed class PhotoPlaceEnrichmentService
         foreach (PhotoPlaceEnrichmentCandidate candidate in candidates)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (_exclusions is not null &&
+                await _exclusions.IsRevisionExcludedAsync(candidate.RevisionId, cancellationToken))
+            {
+                deferred++;
+                continue;
+            }
 
             AutomaticPhotoPlaceEligibility eligibility =
                 await _automaticPlaces.GetEligibilityAsync(candidate.RevisionId, cancellationToken);
