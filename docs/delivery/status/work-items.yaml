@@ -71,14 +71,22 @@ work_items:
   owner: ai-agent
   document: ../work-items/WI-0125-person-family-metadata.md
   started_at: 2026-09-23
-  last_updated_at: 2026-09-23
+  last_updated_at: 2026-09-25
   branch: agent/WI-0125-person-family-metadata
   blockers:
   - WI-0121
   - WI-0060
   blocker_notes:
-  - Reactivated by the maintainer on 2026-09-23. Implementation is adding partial birth dates, explicit family relationships, deterministic age ranges, People maintenance UI, and Smart Collection age/relationship criteria for Creative Collection anchors.
-  evidence: []
+  - '2026-09-25 maintainer verification found the implemented birth metadata, age filters and existing relationship directions working, but WI-0125 remains open: cousin must be added as a symmetric relationship and the People relationship UI must group multiple relatives by category in a wider responsive column with usable Remove controls.'
+  evidence:
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/415
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/416
+  - type: pull_request
+    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/418
+  - type: verification
+    value: '2026-09-25 maintainer manual verification: birth metadata, age filtering, relationship directionality and saved/reopened family-aware Smart Collections work; cousin and relationship-panel layout remain to be implemented.'
 - id: WI-0147
   title: Make PostgreSQL the unconditional runtime catalogue
   milestone: M29
@@ -184,47 +192,16 @@ work_items:
   - WI-0151
   blocker_notes: []
   evidence: []
-- id: WI-0158
-  title: Make named Creative Collections first-class slideshow library entries
-  milestone: M26
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0158-named-creative-collections-slideshow-library.md
-  started_at: 2026-09-23
-  last_updated_at: 2026-09-23
-  branch: agent/WI-0158-named-creative-collections
-  blockers:
-  - WI-0121
-  blocker_notes:
-  - 'Named Creative Collection persistence, lifecycle APIs, management UI, slideshow-library discovery and direct playback routing are implemented in PR #414; completion remains pending CI and maintainer desktop/phone verification.'
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/414
-- id: WI-0159
-  title: Keep Smart Collection context while navigating photos
-  milestone: M28
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0159-smart-collection-photo-navigation.md
-  started_at: 2026-09-24
-  last_updated_at: 2026-09-24
-  branch: agent/WI-0159-smart-collection-photo-navigation
-  blockers:
-  - WI-0146
-  blocker_notes:
-  - 'Saved/transient Smart Collection photo sequence navigation, bounded boundary queries and stale-result protection are implemented in PR #417; completion remains pending CI and deferred maintainer desktop/phone verification.'
-  evidence:
-  - type: pull_request
-    value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/417
 - id: WI-0160
   title: Replace Smart Collection paging with infinite scroll
   milestone: M28
-  status: proposed
+  status: ready
   owner: unassigned
   document: ../work-items/WI-0160-smart-collection-infinite-scroll.md
   blockers:
   - WI-0159
-  blocker_notes: []
+  blocker_notes:
+  - WI-0159 completed with maintainer verification on 2026-09-25, so infinite-scroll work is now unblocked.
   evidence: []
 - id: WI-0161
   title: Show compact effective Place labels on Smart Collection photos
