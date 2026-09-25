@@ -24,7 +24,7 @@ public sealed class PhotoSearchRankerTests
             PhotoSearchModes.Combined,
             limit: 10);
 
-        PhotoSearchRankedHit first = Assert.Single(result.Where(item => item.RevisionId == both));
+        PhotoSearchRankedHit first = Assert.Single(result, item => item.RevisionId == both);
         Assert.Equal(new[] { "semantic", "caption" }, first.Sources);
         Assert.Equal(0.91, first.SemanticScore);
         Assert.Equal(1.2, first.CaptionScore);
