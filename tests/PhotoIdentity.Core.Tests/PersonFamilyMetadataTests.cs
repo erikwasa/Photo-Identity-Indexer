@@ -48,6 +48,8 @@ public sealed class PersonFamilyMetadataTests
         Assert.Equal("grandparent", PersonRelationshipKinds.Inverse("grandchild"));
         Assert.Equal("spouse", PersonRelationshipKinds.Inverse("spouse"));
         Assert.Equal("sibling", PersonRelationshipKinds.Inverse("sibling"));
+        Assert.Equal("cousin", PersonRelationshipKinds.Inverse("cousin"));
+        Assert.True(PersonRelationshipKinds.IsSymmetric("cousin"));
     }
 
     [Fact]
@@ -55,10 +57,11 @@ public sealed class PersonFamilyMetadataTests
     {
         PersonId person = PersonId.New();
         _ = new PhotoIdentity.Core.Collections.SmartCollectionAgeCriterion(person, 2, 6);
-        _ = new PhotoIdentity.Core.Collections.SmartCollectionRelationshipCriterion(
+        PhotoIdentity.Core.Collections.SmartCollectionRelationshipCriterion relationships = new(
             person,
-            ["child", "spouse"]);
+            ["child", "spouse", "cousin"]);
 
+        Assert.Contains("cousin", relationships.Kinds);
         Assert.Throws<ArgumentException>(() =>
             new PhotoIdentity.Core.Collections.SmartCollectionAgeCriterion(person, 7, 6));
         Assert.Throws<ArgumentException>(() =>
