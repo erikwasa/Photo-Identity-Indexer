@@ -79,7 +79,8 @@ public sealed record SmartCollectionPhotoResponse(
     int? Height,
     DateTime? TakenAtLocal,
     double? Latitude,
-    double? Longitude);
+    double? Longitude,
+    string? EffectivePlace = null);
 
 public sealed record SmartCollectionPageResponse(
     SmartCollectionPhotoResponse[] Items,
