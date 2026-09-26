@@ -38,6 +38,8 @@
     <Compile Remove="SqliteProcessingMigrationTests.cs" />
     <Compile Remove="SqliteIdentityMatcherMigrationTests.cs" />
     <Compile Remove="SqliteDetectorRolloutRepositoryTests.cs" />
+    <Compile Remove="SqliteDetectorRolloutReviewRepositoryTests.cs" />
+    <Compile Remove="SqliteDetectorRolloutApplicationRepositoryTests.cs" />
     <Compile Remove="SqliteIdentityCatalogueRepositoryTests.cs" />
     <Compile Remove="SqliteIdentityMatcherTests.cs" />
     <Compile Remove="SqliteIdentityAutoAssignmentServiceTests.cs" />
