@@ -39,18 +39,20 @@
         <div class="slideshow-library-grid" aria-label="Creative Collections">
             @foreach (CreativeCollectionRecipeResponse item in Items)
             {
+                string targetLabel = SlideshowLibraryPresentation.CreativeTargetLabel(item.TargetCount);
+
                 <article class="slideshow-library-card">
                     <button type="button"
                             class="slideshow-library-primary"
                             disabled="@Starting.Contains(item.Id)"
-                            aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(item.Name)"
+                            aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(item.Name, targetLabel)"
                             @onclick="() => StartAsync(item)">
                         <SlideshowLibraryCover CollectionId="@item.AnchorCollectionId" />
                         <span class="slideshow-library-card-shade" aria-hidden="true"></span>
                         <span class="slideshow-library-card-copy">
                             <span class="slideshow-library-card-meta">
                                 <span class="slideshow-library-card-badge">
-                                    @SlideshowLibraryPresentation.CreativeTargetLabel(item.TargetCount)
+                                    @targetLabel
                                 </span>
                             </span>
                             <span class="slideshow-library-card-title">@item.Name</span>
