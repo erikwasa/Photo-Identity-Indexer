@@ -9,7 +9,8 @@ namespace PhotoIdentity.Testing.Postgres;
 /// PostgreSQL-backed compatibility facade for mature integration fixtures that still pass the
 /// historical TestSupport CatalogueSource record into source-observation persistence.
 /// </summary>
-public sealed class PostgresArchiveSourceObservationCompatibilityRepository
+public sealed class PostgresArchiveSourceObservationCompatibilityRepository :
+    IArchiveSourceObservationRepository
 {
     private readonly PostgresTestCatalogueDatabase _database;
     private readonly PostgresArchiveSourceObservationRepository _inner;
@@ -30,12 +31,25 @@ public sealed class PostgresArchiveSourceObservationCompatibilityRepository
         Sha256Digest? verifiedContentHash,
         DateTimeOffset scannedAtUtc,
         CancellationToken cancellationToken = default) =>
-        _inner.RecordScanObservationAsync(
+        RecordScanObservationAsync(
             new ArchiveCatalogueSource(
                 source.Id,
                 source.Kind,
                 source.RootLocator,
                 source.CreatedAtUtc),
+            sourceAsset,
+            verifiedContentHash,
+            scannedAtUtc,
+            cancellationToken);
+
+    public Task<ArchiveSourceObservationPersistenceResult> RecordScanObservationAsync(
+        ArchiveCatalogueSource source,
+        SourceAsset sourceAsset,
+        Sha256Digest? verifiedContentHash,
+        DateTimeOffset scannedAtUtc,
+        CancellationToken cancellationToken = default) =>
+        _inner.RecordScanObservationAsync(
+            source,
             sourceAsset,
             verifiedContentHash,
             scannedAtUtc,
