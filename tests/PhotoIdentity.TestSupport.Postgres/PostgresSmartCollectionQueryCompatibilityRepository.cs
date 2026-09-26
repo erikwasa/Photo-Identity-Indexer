@@ -25,7 +25,7 @@ public sealed class PostgresSmartCollectionQueryCompatibilityRepository : ISmart
         ArgumentNullException.ThrowIfNull(timeProvider);
         _inner = new PostgresSmartCollectionQueryRepository(
             database,
-            new PostgresSmartCollectionRepository(database),
+            new PostgresSmartCollectionRepository(database, timeProvider),
             timeProvider);
     }
 
