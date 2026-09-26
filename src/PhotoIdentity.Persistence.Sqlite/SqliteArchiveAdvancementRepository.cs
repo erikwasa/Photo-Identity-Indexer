@@ -94,6 +94,19 @@ public sealed class SqliteArchiveAdvancementRepository : IArchiveAdvancementCont
         CancellationToken cancellationToken = default) =>
         UpsertAsync(sourceId, "running", "queued", syncRequired: true, null, now, cancellationToken);
 
+    public Task RequestSyncAsync(
+        SourceId sourceId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default) =>
+        UpsertAsync(
+            sourceId,
+            "sync",
+            "queued",
+            syncRequired: true,
+            "Archive synchronization is queued.",
+            now,
+            cancellationToken);
+
     public Task PauseAsync(
         SourceId sourceId,
         DateTimeOffset now,
@@ -133,6 +146,12 @@ public sealed class SqliteArchiveAdvancementRepository : IArchiveAdvancementCont
         DateTimeOffset now,
         CancellationToken cancellationToken = default) =>
         UpsertAsync(sourceId, "paused", "complete", syncRequired: false, "Archive advancement completed.", now, cancellationToken);
+
+    public Task CompleteSyncAsync(
+        SourceId sourceId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default) =>
+        UpsertAsync(sourceId, "paused", "sync-complete", syncRequired: false, "Archive synchronization completed.", now, cancellationToken);
 
     public Task BlockAsync(
         SourceId sourceId,
