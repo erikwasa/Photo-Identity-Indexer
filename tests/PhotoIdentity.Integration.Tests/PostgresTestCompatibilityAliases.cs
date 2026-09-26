@@ -1,6 +1,14 @@
 // WI-0148 transitional aliases: these keep mature integration-test setup code readable while the
 // active dependency is PostgreSQL-only. WI-0149 removes the remaining Sqlite-prefixed identifiers
 // together with the retired adapter implementation.
+global using CatalogueSource = PhotoIdentity.Testing.Postgres.CatalogueSource;
+global using CatalogueAsset = PhotoIdentity.Testing.Postgres.CatalogueAsset;
+global using CatalogueAssetRevision = PhotoIdentity.Testing.Postgres.CatalogueAssetRevision;
+global using CatalogueFaceOccurrence = PhotoIdentity.Testing.Postgres.CatalogueFaceOccurrence;
+global using CatalogueFaceObservation = PhotoIdentity.Testing.Postgres.CatalogueFaceObservation;
+global using CatalogueFaceCrop = PhotoIdentity.Testing.Postgres.CatalogueFaceCrop;
+global using CatalogueFaceEmbedding = PhotoIdentity.Testing.Postgres.CatalogueFaceEmbedding;
+global using CatalogueFaceInspection = PhotoIdentity.Testing.Postgres.CatalogueFaceInspection;
 global using SqliteCatalogueDatabase = PhotoIdentity.Testing.Postgres.PostgresTestCatalogueDatabase;
 global using SqliteAssetCatalogueRepository = PhotoIdentity.Testing.Postgres.PostgresAssetCatalogueCompatibilityRepository;
 global using SqliteFaceCatalogueRepository = PhotoIdentity.Testing.Postgres.PostgresFaceCatalogueCompatibilityRepository;
