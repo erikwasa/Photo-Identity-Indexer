@@ -269,11 +269,13 @@ public sealed class ArchiveApplicationTests
 
     private static async Task<ArchiveStatusResponse> WaitForSyncCompletionAsync(HttpClient client)
     {
-        for (int attempt = 0; attempt < 200; attempt++)
+        ArchiveAdvancementStatusResponse? lastAdvancement = null;
+        for (int attempt = 0; attempt < 120; attempt++)
         {
             ArchiveStatusResponse status = Assert.IsType<ArchiveStatusResponse>(
                 await client.GetFromJsonAsync<ArchiveStatusResponse>("/api/archive/status"));
             ArchiveAdvancementStatusResponse? advancement = status.Advancement;
+            lastAdvancement = advancement;
             if (string.Equals(advancement?.State, "sync-complete", StringComparison.Ordinal))
             {
                 return status;
@@ -286,10 +288,14 @@ public sealed class ArchiveApplicationTests
                     advancement.Message ?? "Archive synchronization was blocked.");
             }
 
-            await Task.Delay(50);
+            // The real Archive UI polls every two seconds. Keep integration polling frequent enough
+            // for a fast test while avoiding a 50 ms SQLite read loop that can starve the background
+            // writer under sharded CI load.
+            await Task.Delay(250);
         }
 
-        throw new TimeoutException("Archive synchronization did not complete within the integration-test polling window.");
+        throw new TimeoutException(
+            $"Archive synchronization did not complete within the integration-test polling window. Last state: {lastAdvancement?.State ?? "none"}. Message: {lastAdvancement?.Message ?? "none"}.");
     }
 
     private static string FindRepositoryRoot()
