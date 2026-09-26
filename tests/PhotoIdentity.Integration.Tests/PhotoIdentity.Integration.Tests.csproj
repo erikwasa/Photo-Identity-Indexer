@@ -32,4 +32,16 @@
     <ProjectReference Include="../../src/PhotoIdentity.Web/PhotoIdentity.Web.csproj" />
     <ProjectReference Include="../../src/PhotoIdentity.Worker/PhotoIdentity.Worker.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- WI-0148 retires provider-specific coverage that is superseded by PostgreSQL persistence tests. -->
+    <Compile Remove="SqliteCatalogueDatabaseTests.cs" />
+    <Compile Remove="SqliteProcessingMigrationTests.cs" />
+    <Compile Remove="SqliteIdentityMatcherMigrationTests.cs" />
+    <Compile Remove="SqliteDetectorRolloutRepositoryTests.cs" />
+    <Compile Remove="SqliteIdentityCatalogueRepositoryTests.cs" />
+    <Compile Remove="SqliteIdentityMatcherTests.cs" />
+    <Compile Remove="SqliteIdentityAutoAssignmentServiceTests.cs" />
+    <Compile Remove="IdentityMatchRegenerationTests.cs" />
+    <Compile Remove="SqliteProcessingRepositoryTests.cs" />
+  </ItemGroup>
 </Project>
