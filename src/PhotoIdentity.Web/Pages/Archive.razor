@@ -40,7 +40,9 @@ else
             </div>
             @if (Status.Configured)
             {
-                <button class="button secondary" disabled="@Busy" @onclick="SyncAsync">Sync included folders</button>
+                <button class="button secondary" disabled="@(Busy || HasActiveArchiveWork(Status.Advancement))" @onclick="SyncAsync">
+                    @(IsStandaloneSyncActive(Status.Advancement) ? "Syncing included folders…" : "Sync included folders")
+                </button>
             }
         </div>
 
@@ -49,17 +51,17 @@ else
             {
                 <div>
                     <label class="field-label" for="archive-root">Permanent archive root</label>
-                    <input id="archive-root" @bind="RootPath" disabled="@Busy" placeholder="C:\…\Kamerabilder" />
+                    <input id="archive-root" @bind="RootPath" disabled="@(Busy || HasActiveArchiveWork(Status.Advancement))" placeholder="C:\…\Kamerabilder" />
                     <p class="field-help">This root becomes the permanent source identity for this catalogue.</p>
                 </div>
             }
             <div>
                 <label class="field-label" for="archive-folder">Folder to include</label>
-                <input id="archive-folder" @bind="RelativeFolder" disabled="@Busy" placeholder="1970/01" />
+                <input id="archive-folder" @bind="RelativeFolder" disabled="@(Busy || HasActiveArchiveWork(Status.Advancement))" placeholder="1970/01" />
                 <p class="field-help">Use a root-relative folder. A parent such as <code>1970</code> automatically subsumes included month folders.</p>
             </div>
             <div class="archive-form-action">
-                <button class="button primary" disabled="@(Busy || string.IsNullOrWhiteSpace(RelativeFolder) || (!Status.Configured && string.IsNullOrWhiteSpace(RootPath)))" @onclick="IncludeAsync">
+                <button class="button primary" disabled="@(Busy || HasActiveArchiveWork(Status.Advancement) || string.IsNullOrWhiteSpace(RelativeFolder) || (!Status.Configured && string.IsNullOrWhiteSpace(RootPath)))" @onclick="IncludeAsync">
                     Add folder
                 </button>
             </div>
@@ -143,7 +145,7 @@ else
             }
             else
             {
-                <button class="button primary" disabled="@(Busy || !Status.Configured || !Status.AnalysisReady)" @onclick="AnalyzePendingAsync">Advance archive</button>
+                <button class="button primary" disabled="@(Busy || HasActiveArchiveWork(Status.Advancement) || !Status.Configured || !Status.AnalysisReady)" @onclick="AnalyzePendingAsync">Advance archive</button>
             }
         </div>
 
@@ -449,6 +451,7 @@ else
         {
             await LoadItemsAsync();
         }
+        StartAdvancementPollingIfNeeded();
     }
 
     private async Task LoadAsync()
@@ -530,14 +533,9 @@ else
         try
         {
             using HttpResponseMessage response = await Http.PostAsync("api/archive/sync", content: null);
-            ArchiveSyncResponse result = await ReadResponseAsync<ArchiveSyncResponse>(response);
-            Status = result.Status;
-            Message = $"Sync complete: {result.NewRevisions} new revision(s), {result.UnchangedFiles} unchanged local, {result.NeedsSourceVerification} needing re-verification, {result.UnverifiedSources} awaiting first verification, {result.OnlineOnlyFiles} online-only, {result.DownloadingFiles} downloading, {result.AvailabilityErrors + result.UnavailableFiles} availability issue(s), {result.MarkedMissing} marked missing.";
-            ItemOffset = 0;
-            if (!UpdateArchiveUrl())
-            {
-                await LoadItemsAsync();
-            }
+            Status = await ReadResponseAsync<ArchiveStatusResponse>(response);
+            Message = "Archive synchronization started in the background. You can leave this page; synchronization will continue on the server.";
+            StartAdvancementPollingIfNeeded();
         }
         catch (Exception exception)
         {
@@ -596,7 +594,7 @@ else
 
     private void StartAdvancementPollingIfNeeded()
     {
-        if (Status?.Advancement?.IsRunning != true || AdvancementPolling is not null)
+        if (!HasActiveArchiveWork(Status?.Advancement) || AdvancementPolling is not null)
         {
             return;
         }
@@ -611,16 +609,21 @@ else
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+                await Task.Delay(TimeSpan.FromSeconds(2), cancellationToken);
                 Status = await Http.GetFromJsonAsync<ArchiveStatusResponse>("api/archive/status", cancellationToken);
-                if (Status?.Configured == true)
-                {
-                    await LoadItemsAsync();
-                }
                 await InvokeAsync(StateHasChanged);
 
-                if (Status?.Advancement?.IsRunning != true)
+                if (!HasActiveArchiveWork(Status?.Advancement))
                 {
+                    if (Status?.Configured == true)
+                    {
+                        await LoadItemsAsync();
+                    }
+                    if (string.Equals(Status?.Advancement?.State, "sync-complete", StringComparison.Ordinal))
+                    {
+                        Message = "Archive synchronization completed.";
+                    }
+                    await InvokeAsync(StateHasChanged);
                     return;
                 }
             }
@@ -711,6 +714,12 @@ else
 
     private string AnalysisCount(int value) => Status?.AnalysisReady == true ? value.ToString() : "—";
 
+    private static bool IsStandaloneSyncActive(ArchiveAdvancementStatusResponse? advancement) =>
+        advancement is { IsRunning: false } && advancement.State is "queued" or "syncing";
+
+    private static bool HasActiveArchiveWork(ArchiveAdvancementStatusResponse? advancement) =>
+        advancement?.IsRunning == true || IsStandaloneSyncActive(advancement);
+
     private static string NormalizeFilter(string? candidate, HashSet<string> allowed, string fallback)
     {
         string value = candidate?.Trim() ?? string.Empty;
@@ -773,8 +782,9 @@ else
 
         return advancement.State switch
         {
-            "queued" => "Queued",
+            "queued" => IsStandaloneSyncActive(advancement) ? "Synchronization queued" : "Queued",
             "syncing" => "Synchronizing",
+            "sync-complete" => "Synchronization complete",
             "running" when activeAnalysisJobs > 0 && transitions > 0 => $"Running · {analysisSummary} · {transitionSummary}",
             "running" when activeAnalysisJobs > 0 => $"Running · {analysisSummary}",
             "running" when transitions > 0 => $"Running · {transitionSummary}",
