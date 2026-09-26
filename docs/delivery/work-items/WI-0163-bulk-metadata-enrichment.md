@@ -29,7 +29,9 @@ The maintainer measured 17,892 current photos, including 234 with no effective c
 - Exclude configured miscellaneous/catch-all directories from directory-date inference; `1970` is excluded by default and must never be treated as an actual capture year merely because it is the first directory segment.
 - Treat conflicting filename and directory dates as ambiguous and do not write either value.
 - Accept explicit inclusive date-range-to-Place rules.
-- Apply a Place rule only when the photo's entire effective date range is contained inside the rule. A month- or year-precision value that merely overlaps a trip is ambiguous rather than a match.
+- Allow a Place rule to include an optional archive-relative `sourcePrefix`, such as `fideli/`, so a date/location rule can be restricted to one imported folder or capture stream instead of affecting unrelated photos from the same date.
+- Normalize `sourcePrefix` separators and folder boundaries; `fideli` and `fideli/` mean the same folder scope, while `fideli-backup/` does not match. Parent-directory (`..`) traversal is rejected.
+- Apply a Place rule only when the photo's entire effective date range is contained inside the rule and, when present, the photo's source key is inside the rule's `sourcePrefix`. A month- or year-precision value that merely overlaps a trip is ambiguous rather than a match.
 - Do not replace an existing effective capture date, named Place, or valid non-zero GPS location by default.
 - Recheck current state immediately before apply so changes made after a dry-run are not overwritten.
 - Persist accepted changes through the existing append-only capture-date and Place repositories so provenance, hierarchy creation and idempotence remain consistent with UI edits.
@@ -50,12 +52,19 @@ The maintainer measured 17,892 current photos, including 234 with no effective c
       "from": "2024-07-06",
       "to": "2024-07-20",
       "place": "Spain/Canary Islands/Tenerife"
+    },
+    {
+      "name": "fideli-hospital-day",
+      "sourcePrefix": "fideli/",
+      "from": "2024-03-23",
+      "to": "2024-03-23",
+      "place": "Sverige/Stockholms län/Stockholms stad/Södermalm/Södersjukhuset"
     }
   ]
 }
 ```
 
-The Place value uses the same normal UI hierarchy accepted by the existing Place repository; callers do not need to add the reserved `Places/` prefix.
+The Place value uses the same normal UI hierarchy accepted by the existing Place repository; callers do not need to add the reserved `Places/` prefix. `sourcePrefix` is optional. Omitting it preserves the original archive-wide date-rule behavior.
 
 ## Operator workflow
 
@@ -85,7 +94,7 @@ To write a reviewed rule file containing every rule represented by that report:
   -ApprovedRulesOutput .\artifacts\metadata-enrichment-approved.json
 ```
 
-Use `-ApproveRule @(...)` instead of `-ApproveAll` to select only specific groups. The helper is review-only: it never writes catalogue metadata. See `docs/operations/metadata-enrichment-review.md` for the full workflow.
+Use `-ApproveRule @(...)` instead of `-ApproveAll` to select only specific groups. The helper is review-only: it never writes catalogue metadata. Scoped rule properties such as `sourcePrefix` are preserved in the approved rule file. See `docs/operations/metadata-enrichment-review.md` for the full workflow.
 
 After reviewing the private report or grouped approved rules, apply explicitly:
 
@@ -109,22 +118,25 @@ A rerun should be safe: already-effective values are not proposed, and repositor
 - [ ] Filename dates that disagree with a non-excluded `YYYY/MM` directory are reported as ambiguous rather than written.
 - [ ] Folder-only inference stores `YYYY-MM` precision rather than inventing a day.
 - [ ] Date-range Place rules require full containment of the photo's effective precision range.
+- [ ] A Place rule with `sourcePrefix` affects only source keys under that folder boundary; similarly named sibling folders remain unaffected.
+- [ ] Different source-scoped Place rules can safely assign different Places for the same date without conflicting when their source scopes do not overlap.
 - [ ] Conflicting matching Place rules are ambiguous and do not write a Place.
 - [ ] Apply uses the existing PostgreSQL capture-date and Place repositories and rechecks current state before each write.
 - [ ] Optional private report is sufficient to inspect proposed revision/source/value changes before apply.
 - [ ] Place-heavy private reports can be summarized and reduced to an approved rule subset without catalogue writes.
-- [ ] Automated tests cover filename, directory, catch-all, conflict and precision-containment behavior.
+- [ ] Automated tests cover filename, directory, catch-all, conflict, precision-containment and source-prefix behavior.
 - [ ] Maintainer verifies a production-catalogue dry-run before any broad apply operation.
 
 ## Verification plan
 
-1. Run focused integration tests for `MetadataEnrichmentPlannerTests` and the ordinary repository validation suite.
+1. Run focused integration tests for `MetadataEnrichmentPlannerTests`, `MetadataEnrichmentSourcePrefixTests` and the ordinary repository validation suite.
 2. Run documentation validation/generation checks.
 3. On the maintainer catalogue, create a rule file with no Place rules and run dry-run to compare missing-date counts with the known baseline.
 4. Review a sample of exact filename proposals, month-directory proposals, `1970` timestamp proposals and ambiguities in the private report.
 5. For Place rules, run `review-metadata-enrichment.ps1` and confirm the grouped counts match the photo-level report before approving all or selected rules.
-6. Add one known trip rule, dry-run it, and confirm that exact dates inside the trip are proposed while partial month/year precision that extends outside the trip is not.
-7. Only after the dry-run is accepted, use `--apply`, then rerun dry-run and confirm the applied rows are no longer proposed.
+6. Add a `sourcePrefix` rule for a known folder/date and confirm the dry-run proposes only matching source keys while same-date photos outside that folder remain untouched.
+7. Add one known trip rule, dry-run it, and confirm that exact dates inside the trip are proposed while partial month/year precision that extends outside the trip is not.
+8. Only after the dry-run is accepted, use `--apply`, then rerun dry-run and confirm the applied rows are no longer proposed.
 
 ## Privacy and safety notes
 
