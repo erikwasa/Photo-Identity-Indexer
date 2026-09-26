@@ -1,5 +1,6 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using PhotoIdentity.Testing.Postgres;
@@ -20,18 +21,29 @@ internal class WebApplicationFactory<TEntryPoint> :
 
     protected virtual bool DisableBackgroundWorkers => true;
 
-    protected string TestPostgresConnectionString => _databaseLease.ConnectionString;
-
     protected override IHost CreateHost(IHostBuilder builder)
     {
         builder.UseEnvironment("IntegrationTestPostgres");
-        builder.ConfigureWebHost(webHost =>
+        builder.ConfigureAppConfiguration((_, configuration) =>
         {
-            webHost.UseSetting(
-                "PhotoIdentity:Postgres:ConnectionString",
-                TestPostgresConnectionString);
-            webHost.UseStaticWebAssets();
+            IConfiguration current = configuration.Build();
+            string? configuredConnectionString =
+                current["PhotoIdentity:Postgres:ConnectionString"];
+            if (!string.IsNullOrWhiteSpace(configuredConnectionString))
+            {
+                return;
+            }
+
+            string? compatibilityPath = current["PhotoIdentity:DatabasePath"];
+            string connectionString = !string.IsNullOrWhiteSpace(compatibilityPath)
+                ? PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(compatibilityPath)
+                : _databaseLease.ConnectionString;
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["PhotoIdentity:Postgres:ConnectionString"] = connectionString,
+            });
         });
+        builder.ConfigureWebHost(webHost => webHost.UseStaticWebAssets());
 
         if (DisableBackgroundWorkers)
         {
@@ -73,30 +85,38 @@ internal class WebApplicationFactory<TEntryPoint> :
 
 /// <summary>
 /// Shared host foundation for API integration tests.
-/// The historical database-path argument is retained only so existing fixtures do not need to
-/// rewrite their temporary-directory plumbing; every host now uses an isolated PostgreSQL database.
+/// The historical database-path argument is retained only as a PostgreSQL compatibility key so
+/// existing fixtures can share seeded state with the API host while WI-0148 removes SQLite usage.
 /// </summary>
 internal class PhotoIdentityApiTestFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
 {
+    private readonly string _databasePath;
     private readonly Action<IWebHostBuilder>? _configureWebHost;
     private readonly bool _disableBackgroundWorkers;
+    private readonly bool _useCompatibilityDatabase;
 
     public PhotoIdentityApiTestFactory(
         string databasePath,
         Action<IWebHostBuilder>? configureWebHost = null,
         bool disableBackgroundWorkers = true,
-        bool useSqliteTestCompatibility = false)
+        bool useSqliteTestCompatibility = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
-        _ = useSqliteTestCompatibility;
+        _databasePath = databasePath;
         _configureWebHost = configureWebHost;
         _disableBackgroundWorkers = disableBackgroundWorkers;
+        _useCompatibilityDatabase = useSqliteTestCompatibility;
     }
 
     protected override bool DisableBackgroundWorkers => _disableBackgroundWorkers;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        if (_useCompatibilityDatabase)
+        {
+            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+        }
+
         builder.UseSetting(WebHostDefaults.DetailedErrorsKey, "true");
         _configureWebHost?.Invoke(builder);
     }
