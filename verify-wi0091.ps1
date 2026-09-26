@@ -86,12 +86,27 @@ function Get-HttpStatus {
     }
 }
 
+function Get-ApiArray {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $response = Invoke-ApiGet $Path
+    if ($null -eq $response) {
+        return
+    }
+
+    foreach ($item in $response) {
+        if ($null -ne $item) {
+            Write-Output $item
+        }
+    }
+}
+
 function Get-Exclusions {
-    return @(Invoke-ApiGet "/api/archive/exclusions")
+    Get-ApiArray "/api/archive/exclusions"
 }
 
 function Get-DuplicateGroups {
-    return @(Invoke-ApiGet "/api/archive/exact-duplicates")
+    Get-ApiArray "/api/archive/exact-duplicates"
 }
 
 function Get-ArchiveItems {
