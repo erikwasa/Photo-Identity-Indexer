@@ -1,3 +1,5 @@
+using PhotoIdentity.Core.Identifiers;
+
 namespace PhotoIdentity.Core.Sources;
 
 public sealed record SourceCopyPurgeRoots(
