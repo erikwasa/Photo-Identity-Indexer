@@ -1,7 +1,6 @@
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Source.Local;
 using PhotoIdentity.Web;
 using PhotoIdentity.Worker;
 
@@ -249,8 +248,6 @@ public static class ArchiveEndpoints
         IArchiveStatusRepository archiveStatusRepository,
         IArchiveAdvancementControlRepository advancementControl,
         ArchiveOperatorConfiguration operatorConfiguration,
-        LocalArchiveSyncCoordinator syncCoordinator,
-        ArchiveThroughputMetrics metrics,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -258,38 +255,31 @@ public static class ArchiveEndpoints
         {
             ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
+            ArchiveAdvancementControlState? control = await advancementControl.GetAsync(
+                configured.Source.SourceId,
+                cancellationToken);
 
-            LocalFolderAssetSource source = new(configured.Source.SourceId, configured.Source.RootLocator);
-            LocalArchiveSyncSummary summary;
-            using (IDisposable syncTiming = metrics.Measure(ArchiveThroughputMetricNames.Synchronization))
+            if (control?.IsRequested == true)
             {
-                summary = await syncCoordinator.SyncAsync(
-                    source,
-                    configured.Source,
-                    configured.IncludedFolders,
+                throw new InvalidOperationException(
+                    "Archive advancement is already running and owns archive synchronization. Pause advancement before starting a standalone sync.");
+            }
+
+            if (control?.IsSyncOnlyRequested != true)
+            {
+                await advancementControl.RequestSyncAsync(
+                    configured.Source.SourceId,
                     timeProvider.GetUtcNow(),
                     cancellationToken);
             }
+
             ArchiveStatusResponse status = await BuildStatusAsync(
                 coverageRepository,
                 archiveStatusRepository,
                 advancementControl,
                 operatorConfiguration,
                 cancellationToken);
-            return Results.Ok(new ArchiveSyncResponse(
-                summary.SupportedFileCount,
-                summary.LocalFileCount,
-                summary.OnlineOnlyFileCount,
-                summary.DownloadingFileCount,
-                summary.UnavailableFileCount,
-                summary.AvailabilityErrorCount,
-                summary.NewRevisionCount,
-                summary.UnchangedFileCount,
-                summary.VerifiedSourceCount,
-                summary.NeedsSourceVerificationCount,
-                summary.UnverifiedSourceCount,
-                summary.MarkedDeletedCount,
-                status));
+            return Results.Accepted("/api/archive/status", status);
         }
         catch (Exception exception)
         {
@@ -309,6 +299,15 @@ public static class ArchiveEndpoints
         {
             ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
+            ArchiveAdvancementControlState? control = await advancementControl.GetAsync(
+                configured.Source.SourceId,
+                cancellationToken);
+            if (control?.IsSyncOnlyRequested == true)
+            {
+                throw new InvalidOperationException(
+                    "Archive synchronization is already running. Start archive advancement after synchronization completes.");
+            }
+
             await advancementControl.RequestRunAsync(
                 configured.Source.SourceId,
                 timeProvider.GetUtcNow(),
