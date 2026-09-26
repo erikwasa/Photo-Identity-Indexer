@@ -10,19 +10,19 @@ The maintainer measured 17,892 current photos: 234 have no effective capture dat
 
 WI-0163 remains on `agent/wi-0163-bulk-metadata-enrichment`. Its first CLI slice adds `metadata enrich`, which is dry-run by default, reads explicit JSON rules, proposes missing dates from conservative filename/path patterns, and proposes Places only when an effective date range is fully contained by an operator-supplied rule. `--apply` uses the existing PostgreSQL capture-date and Place repositories; existing effective dates, named Places and valid non-zero GPS are protected by default.
 
-M23 Source-copy lifecycle and privacy exclusion is completed with all five work items and the maintainer real-catalogue acceptance recorded. M28 and M26 remain completed. M29 is in progress with WI-0147 implemented and under review in PR #446; WI-0148 and WI-0149 remain the follow-up PostgreSQL-only cleanup items. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+M23 Source-copy lifecycle and privacy exclusion is completed with all five work items and the maintainer real-catalogue acceptance recorded. M28 and M26 remain completed. WI-0147 is completed with maintainer verification of PostgreSQL-only packaged startup/restart and the live PostgreSQL verifier; M29 is ready for WI-0148, followed by WI-0149. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Continue WI-0163 from its canonical work-item/status shard. In parallel, complete maintainer review of WI-0147 / PR #446 before starting WI-0148.
+Continue WI-0163 from its canonical work-item/status shard. In parallel, WI-0148 is the next ready M29 PostgreSQL-only cleanup item.
 
 ## Relevant files
 
 - docs/delivery/milestones/M31-bulk-metadata-enrichment.md
 - docs/delivery/work-items/WI-0163-bulk-metadata-enrichment.md
 - docs/delivery/status/work-items/active/WI-0163.yaml
-- docs/delivery/work-items/WI-0147-postgres-only-runtime-composition.md
-- docs/delivery/status/work-items/active/WI-0147.yaml
+- docs/delivery/work-items/WI-0148-retire-sqlite-test-tool-dependencies.md
+- docs/delivery/status/work-items/active/WI-0148.yaml
 
 ## Repository validation
 
