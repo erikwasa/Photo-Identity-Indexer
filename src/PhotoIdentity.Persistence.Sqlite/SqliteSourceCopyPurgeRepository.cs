@@ -387,6 +387,8 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
         CancellationToken cancellationToken)
     {
         Dictionary<Guid, string> runRoots = [];
+        HashSet<(Guid RunId, Guid RevisionId)> directories = [];
+
         if (await TableExistsAsync(connection, transaction, "asset_revision_analysis", cancellationToken))
         {
             using SqliteCommand runs = connection.CreateCommand();
@@ -408,10 +410,43 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
                 Guid revisionId = Guid.Parse(reader.GetString(1));
                 string root = ReadOutputRoot(reader.GetString(2), fallbackRoot);
                 runRoots[runId] = root;
-                artifacts.Add(new SourceCopyPurgeArtifact(
-                    ResolveUnderRoot(root, $"runs/{runId:D}/assets/{revisionId:D}"),
-                    true));
+                directories.Add((runId, revisionId));
             }
+        }
+
+        if (await TableExistsAsync(connection, transaction, "archive_analysis_runs", cancellationToken) &&
+            await TableExistsAsync(connection, transaction, "processing_jobs", cancellationToken))
+        {
+            using SqliteCommand jobs = connection.CreateCommand();
+            jobs.Transaction = transaction;
+            jobs.CommandText = """
+                SELECT job.processing_run_id, revision.id, run.configuration_json
+                FROM processing_jobs AS job
+                INNER JOIN asset_revisions AS revision ON revision.id = job.asset_revision_id
+                INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                INNER JOIN archive_analysis_runs AS archive_run
+                    ON archive_run.processing_run_id = job.processing_run_id
+                INNER JOIN processing_runs AS run ON run.id = job.processing_run_id
+                WHERE asset.source_id = $source_id AND asset.source_key = $source_key;
+                """;
+            jobs.Parameters.AddWithValue("$source_id", sourceId.ToString());
+            jobs.Parameters.AddWithValue("$source_key", sourceKey);
+            await using SqliteDataReader reader = await jobs.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                Guid runId = Guid.Parse(reader.GetString(0));
+                Guid revisionId = Guid.Parse(reader.GetString(1));
+                string root = ReadOutputRoot(reader.GetString(2), fallbackRoot);
+                runRoots[runId] = root;
+                directories.Add((runId, revisionId));
+            }
+        }
+
+        foreach ((Guid runId, Guid revisionId) in directories)
+        {
+            artifacts.Add(new SourceCopyPurgeArtifact(
+                ResolveUnderRoot(runRoots[runId], $"runs/{runId:D}/assets/{revisionId:D}"),
+                true));
         }
 
         if (!await TableExistsAsync(connection, transaction, "face_crops", cancellationToken))
@@ -419,25 +454,44 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
             return;
         }
 
-        using SqliteCommand crops = connection.CreateCommand();
-        crops.Transaction = transaction;
-        crops.CommandText = """
-            SELECT crop.storage_path
-            FROM face_crops AS crop
-            INNER JOIN face_occurrences AS face ON face.id = crop.face_occurrence_id
-            INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
-            INNER JOIN assets AS asset ON asset.id = revision.asset_id
-            WHERE asset.source_id = $source_id AND asset.source_key = $source_key;
-            """;
-        crops.Parameters.AddWithValue("$source_id", sourceId.ToString());
-        crops.Parameters.AddWithValue("$source_key", sourceKey);
-        await using SqliteDataReader cropReader = await crops.ExecuteReaderAsync(cancellationToken);
-        while (await cropReader.ReadAsync(cancellationToken))
+        List<string> cropPaths = [];
+        using (SqliteCommand crops = connection.CreateCommand())
         {
-            string relative = cropReader.GetString(0);
-            string root = TryReadRunId(relative, "runs", out Guid runId) && runRoots.TryGetValue(runId, out string? configured)
-                ? configured
-                : fallbackRoot;
+            crops.Transaction = transaction;
+            crops.CommandText = """
+                SELECT crop.storage_path
+                FROM face_crops AS crop
+                INNER JOIN face_occurrences AS face ON face.id = crop.face_occurrence_id
+                INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                WHERE asset.source_id = $source_id AND asset.source_key = $source_key;
+                """;
+            crops.Parameters.AddWithValue("$source_id", sourceId.ToString());
+            crops.Parameters.AddWithValue("$source_key", sourceKey);
+            await using SqliteDataReader cropReader = await crops.ExecuteReaderAsync(cancellationToken);
+            while (await cropReader.ReadAsync(cancellationToken))
+            {
+                cropPaths.Add(cropReader.GetString(0));
+            }
+        }
+
+        foreach (string relative in cropPaths)
+        {
+            string root = fallbackRoot;
+            if (TryReadRunId(relative, "runs", out Guid runId))
+            {
+                if (!runRoots.TryGetValue(runId, out string? configured))
+                {
+                    configured = await ReadProcessingRunRootAsync(
+                        connection,
+                        transaction,
+                        runId,
+                        fallbackRoot,
+                        cancellationToken);
+                    runRoots[runId] = configured;
+                }
+                root = configured;
+            }
             artifacts.Add(new SourceCopyPurgeArtifact(ResolveUnderRoot(root, relative), false));
         }
     }
@@ -478,6 +532,27 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
                 ResolveUnderRoot(root, $"rollouts/{runId:D}/assets/{revisionId:D}"),
                 true));
         }
+    }
+
+    private static async Task<string> ReadProcessingRunRootAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid runId,
+        string fallbackRoot,
+        CancellationToken cancellationToken)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT configuration_json
+            FROM processing_runs
+            WHERE id = $run_id;
+            """;
+        command.Parameters.AddWithValue("$run_id", runId.ToString());
+        object? configuration = await command.ExecuteScalarAsync(cancellationToken);
+        return configuration is string json
+            ? ReadOutputRoot(json, fallbackRoot)
+            : Path.GetFullPath(fallbackRoot);
     }
 
     private static async Task<IReadOnlyList<string>> QueryPathsAsync(
