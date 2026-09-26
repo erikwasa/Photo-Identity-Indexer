@@ -10,6 +10,7 @@ try {
     $reportPath = Join-Path $tempRoot 'report.json'
     $rulesPath = Join-Path $tempRoot 'rules.json'
     $approvedPath = Join-Path $tempRoot 'approved.json'
+    $approvedAllPath = Join-Path $tempRoot 'approved-all.json'
 
     @'
 {
@@ -86,6 +87,27 @@ try {
 
     if ([string]$approved.placeRules[0].name -ne '2024-03-23-sodermalm') {
         throw 'Approved rules contained the wrong Place rule.'
+    }
+
+    & $helper `
+        -Report $reportPath `
+        -SamplesPerRule 0 `
+        -Rules $rulesPath `
+        -ApproveAll `
+        -ApprovedRulesOutput $approvedAllPath
+
+    if (-not (Test-Path -LiteralPath $approvedAllPath -PathType Leaf)) {
+        throw 'ApproveAll did not write an approved rules file.'
+    }
+
+    $approvedAll = Get-Content -LiteralPath $approvedAllPath -Raw | ConvertFrom-Json
+    if (@($approvedAll.placeRules).Count -ne 2) {
+        throw 'ApproveAll did not include every reviewed Place rule.'
+    }
+
+    $approvedAllNames = @($approvedAll.placeRules | ForEach-Object { [string]$_.name } | Sort-Object)
+    if (($approvedAllNames -join ',') -ne '2024-03-23-sodermalm,2026-08-15-svartso') {
+        throw 'ApproveAll wrote an unexpected Place rule set.'
     }
 
     Write-Host 'review-metadata-enrichment smoke test passed.'
