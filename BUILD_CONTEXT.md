@@ -4,38 +4,27 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-**WI-0163 Add safe bulk capture-date and Place enrichment is in progress under M31 Bulk archive metadata enrichment. WI-0091 Archive lifecycle review is also in progress under M23.**
+WI-0147 makes PostgreSQL unconditional for normal API, detector-rollout CLI and packaged launcher composition. Implementation and automated verification are complete on `codex/WI-0147`; the item is ready for maintainer review and PR creation.
 
-The maintainer measured 17,892 current photos: 234 have no effective capture date, 12,603 have no named Place or valid non-zero GPS, and 12,371 of the location-less photos already have an effective date. Directory `1970` is a miscellaneous catch-all and must never be interpreted as a real capture year merely from its path.
-
-WI-0163 remains on `agent/wi-0163-bulk-metadata-enrichment`. Its first CLI slice adds `metadata enrich`, which is dry-run by default, reads explicit JSON rules, proposes missing dates from conservative filename/path patterns, and proposes Places only when an effective date range is fully contained by an operator-supplied rule. `--apply` uses the existing PostgreSQL capture-date and Place repositories; existing effective dates, named Places and valid non-zero GPS are protected by default.
-
-M28 remains completed. **M26 Creative Collections is completed.** M29 is ready with WI-0147 as its first PostgreSQL-only cleanup item. M30 video support remains intentionally blocked until explicit maintainer reactivation.
-
-**M23 Source-copy lifecycle and privacy exclusion is in progress on its final item, WI-0091.** WI-0087, WI-0088, WI-0089 and WI-0090 are completed and maintainer-verified. WI-0091 is being implemented on `agent/wi-0091-archive-lifecycle-review`: a dedicated archive lifecycle workspace exposes Removed from source, Exact duplicates, Excluded, Purge pending and Purge failed review states; removed/duplicate copies can be selected for source-copy-specific bulk exclusion; completed exclusions are text/status-only with fresh re-inclusion; failed purges can be retried; and photo-viewer routes expose a confirmation-gated still-present privacy exclusion action. The backend bulk endpoint validates all selected revisions before mutating any exclusion state, and the exact-duplicate API filters excluded locators immediately.
+SQLite remains only in the isolated API integration-test compatibility graph and explicit migration/test/tooling surfaces assigned to WI-0148 and WI-0149. Do not expand this item into that cleanup.
 
 ## Next concrete step
 
-Finish automated API/web validation for WI-0091, then run the complete M23 maintainer scenarios against the real PostgreSQL catalogue before closing WI-0091 and M23.
+Create and review the WI-0147 PR. After it lands, use `PhotoIdentity.Docs show WI-0148` before starting the next M29 item.
 
 ## Relevant files
 
-- docs/delivery/milestones/M23-source-copy-lifecycle-and-exclusion.md
-- docs/delivery/work-items/WI-0091-archive-lifecycle-review.md
-- docs/delivery/status/work-items/active/WI-0091.yaml
-- src/PhotoIdentity.Api/ArchiveItemFilterEndpoints.cs
-- src/PhotoIdentity.Web/Pages/ArchiveLifecycle.razor
-- src/PhotoIdentity.Web/Components/ExclusionList.razor
-- src/PhotoIdentity.Web/Components/PhotoPrivacyExclusionAction.razor
-- src/PhotoIdentity.Web/ArchiveContracts.cs
-- docs/delivery/milestones/M31-bulk-metadata-enrichment.md
-- docs/delivery/work-items/WI-0163-bulk-metadata-enrichment.md
-- docs/delivery/status/work-items/active/WI-0163.yaml
+- docs/delivery/work-items/WI-0147-postgres-only-runtime-composition.md
+- docs/delivery/status/work-items/active/WI-0147.yaml
+- src/PhotoIdentity.Api/Program.cs
+- src/PhotoIdentity.Api/CataloguePersistenceComposition.cs
+- src/PhotoIdentity.Cli/DetectorRolloutCommand.cs
+- Start-PhotoIdentity.ps1
+- docs/architecture/postgresql-runtime-composition.md
 
-## Repository validation
+## Verification
 
-    ./build.ps1
-    ./test.ps1
-    dotnet run --project tools/PhotoIdentity.Docs -- validate
-    dotnet run --project tools/PhotoIdentity.Docs -- generate --check
-    ./verify-postgres.ps1
+- Solution build passed with zero warnings/errors.
+- `./test.ps1` passed all suites, including 652/652 integration tests.
+- Launcher validation passed with PostgreSQL as the unconditional provider.
+- Missing PostgreSQL API configuration failed with the expected explicit startup error.

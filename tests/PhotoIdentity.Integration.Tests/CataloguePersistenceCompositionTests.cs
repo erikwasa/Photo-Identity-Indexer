@@ -73,15 +73,16 @@ public sealed class CataloguePersistenceCompositionTests
     }
 
     [Fact]
-    public void Provider_selection_defaults_to_SQLite_and_requires_known_value()
+    public void Runtime_configuration_requires_PostgreSQL_connection_string()
     {
         ConfigurationManager configuration = new();
-        Assert.Equal(CatalogueProviderKind.Sqlite, CataloguePersistenceComposition.ResolveProvider(configuration));
+        InvalidOperationException missing = Assert.Throws<InvalidOperationException>(
+            () => CataloguePersistenceComposition.GetRequiredPostgresConnectionString(configuration));
+        Assert.Contains("PostgreSQL is the only supported runtime catalogue", missing.Message);
 
-        configuration["PhotoIdentity:CatalogueProvider"] = "postgresql";
-        Assert.Equal(CatalogueProviderKind.Postgres, CataloguePersistenceComposition.ResolveProvider(configuration));
-
-        configuration["PhotoIdentity:CatalogueProvider"] = "unexpected";
-        Assert.Throws<InvalidOperationException>(() => CataloguePersistenceComposition.ResolveProvider(configuration));
+        configuration["PhotoIdentity:Postgres:ConnectionString"] = " Host=localhost;Database=photo_identity ";
+        Assert.Equal(
+            " Host=localhost;Database=photo_identity ",
+            CataloguePersistenceComposition.GetRequiredPostgresConnectionString(configuration));
     }
 }

@@ -22,7 +22,6 @@ public static class SuggestionGalleryEndpoints
 
     private static async Task<IResult> GetGroupsAsync(
         IServiceProvider services,
-        IConfiguration configuration,
         string? modelId,
         string? modelHash,
         int offset = 0,
@@ -39,10 +38,8 @@ public static class SuggestionGalleryEndpoints
             IIdentitySuggestionPolicyRepository policyRepository = services
                 .GetRequiredService<IIdentitySuggestionPolicyRepository>();
             ISuggestedPersonGroupRepository repository =
-                CataloguePersistenceComposition.ResolveProvider(configuration) == CatalogueProviderKind.Postgres
-                    ? new PostgresSuggestedPersonGroupRepository(
-                        services.GetRequiredService<PostgresCatalogueDatabase>(),
-                        policyRepository)
+                services.GetService<PostgresCatalogueDatabase>() is PostgresCatalogueDatabase postgres
+                    ? new PostgresSuggestedPersonGroupRepository(postgres, policyRepository)
                     : new SqliteSuggestedPersonGroupRepository(
                         services.GetRequiredService<SqliteCatalogueDatabase>(),
                         policyRepository);

@@ -247,7 +247,6 @@ public sealed class SuggestedPersonGroupApplicationTests
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
-            builder.UseSetting("PhotoIdentity:CatalogueProvider", "sqlite");
             builder.UseSetting("PhotoIdentity:DatabasePath", databasePath);
         }
     }

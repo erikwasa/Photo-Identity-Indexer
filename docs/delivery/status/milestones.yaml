@@ -298,7 +298,7 @@ milestones:
   - WI-0161
 - id: M29
   title: PostgreSQL-only catalogue cleanup
-  status: ready
+  status: in_progress
   document: ../milestones/M29-postgresql-only-catalogue-cleanup.md
   work_items:
   - WI-0147

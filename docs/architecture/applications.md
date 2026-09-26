@@ -6,7 +6,8 @@ Photo Identity Indexer is one modular system with several executable entry point
 
 The PowerShell-oriented command-line application for repeatable local operations:
 
-- initialize and use the SQLite catalogue;
+- run PostgreSQL-backed catalogue administration and evaluation workflows;
+- perform explicit SQLite-to-PostgreSQL migration/compatibility operations that are pending retirement under M29;
 - scan local or OneDrive-synchronised folders;
 - start, inspect and resume persisted processing runs;
 - select exact detector and embedder model IDs;

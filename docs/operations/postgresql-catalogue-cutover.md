@@ -1,6 +1,6 @@
 # PostgreSQL catalogue migration and cutover
 
-WI-0102 moves one existing authoritative SQLite catalogue to PostgreSQL. The migration is an offline authority-transfer operation, not a dual-write deployment. At every point there must be exactly one writable authoritative catalogue.
+WI-0102 moved one existing authoritative SQLite catalogue to PostgreSQL. This document preserves the accepted offline migration evidence. Since WI-0147, PostgreSQL is unconditional at runtime; the former SQLite runtime rollback procedure is historical and must not be used with current builds.
 
 ## Safety rules
 
@@ -143,18 +143,15 @@ First put the accepted target connection string in a Windows environment variabl
   "User")
 ~~~
 
-Then update the private launcher configuration. Keep all existing non-secret settings and add/change only this provider boundary:
+Current launcher configuration keeps all existing non-secret settings and names the environment variable holding the PostgreSQL connection string:
 
 ~~~json
 {
-  "postgresConnectionEnvironmentVariable": "PHOTOIDENTITY_POSTGRES_CONNECTION_STRING",
-  "settings": {
-    "PhotoIdentity__CatalogueProvider": "postgresql"
-  }
+  "postgresConnectionEnvironmentVariable": "PHOTOIDENTITY_POSTGRES_CONNECTION_STRING"
 }
 ~~~
 
-The abbreviated example above is not a complete replacement configuration; retain the existing database/archive/proxy/GeoNames settings alongside `PhotoIdentity__CatalogueProvider`. A direct `PhotoIdentity__Postgres__ConnectionString` value under `settings` is intentionally rejected.
+The abbreviated example above is not a complete replacement configuration; retain existing archive/proxy/GeoNames settings. A direct `PhotoIdentity__Postgres__ConnectionString` value under `settings` is intentionally rejected, as are the retired catalogue-provider and SQLite database-path settings.
 
 The launcher searches Process, User and Machine environment scopes for `postgresConnectionEnvironmentVariable`, copies the resolved value only into the child Photo Identity process, and never prints it. Before starting the app, preflight the exact private configuration:
 
@@ -173,18 +170,9 @@ After start, the launcher itself requires the healthy runtime provider to match 
 
 Do not delete the pre-cutover SQLite backup. Keep it unchanged through maintainer acceptance and the operational stabilization period owned by later M24 work.
 
-## 7. Rollback boundary
+## 7. Historical rollback boundary
 
-Rollback is intentionally a return to the exact pre-cutover SQLite state, not a reverse migration.
-
-1. Stop the PostgreSQL-authoritative Photo Identity process so no further PostgreSQL writes occur.
-2. Preserve PostgreSQL for diagnosis; do not attempt to merge its post-cutover writes into SQLite.
-3. Make a new working copy from the unchanged pre-cutover SQLite backup. Do not use or modify the preserved backup itself as the working database.
-4. Change `PhotoIdentity__CatalogueProvider` back to `sqlite` and restore the normal SQLite catalogue path. `postgresConnectionEnvironmentVariable` may be removed from the JSON; it is ignored while SQLite is selected.
-5. Start Photo Identity and confirm the launcher and `/health` report `catalogueProvider: sqlite`.
-6. Verify representative Review, Library and Archive state is the expected pre-cutover state.
-
-Any user changes made after PostgreSQL cutover are outside this rollback snapshot. That limitation is why cutover acceptance should happen before normal writes resume and why the rollback window should be short and controlled.
+WI-0102 originally verified a controlled return to the exact pre-cutover SQLite snapshot. WI-0147 retires that runtime mode. Current recovery must restore PostgreSQL using the supported backup/recovery procedure; the preserved SQLite backup remains migration evidence and must not be configured as a writable runtime authority.
 
 ## 8. Acceptance evidence
 

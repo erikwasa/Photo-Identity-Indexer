@@ -76,17 +76,6 @@ function Get-LauncherSelectedDatabase {
         throw "Launcher configuration is not valid JSON: $launcherPath"
     }
 
-    $provider = $null
-    if ($null -ne $configuration.PSObject.Properties["settings"] -and
-        $null -ne $configuration.settings -and
-        $null -ne $configuration.settings.PSObject.Properties["PhotoIdentity__CatalogueProvider"]) {
-        $provider = ([string]$configuration.settings.PhotoIdentity__CatalogueProvider).Trim().ToLowerInvariant()
-    }
-
-    if ($provider -ne "postgresql") {
-        return $null
-    }
-
     if ($null -eq $configuration.PSObject.Properties["postgresConnectionEnvironmentVariable"] -or
         [string]::IsNullOrWhiteSpace([string]$configuration.postgresConnectionEnvironmentVariable)) {
         throw "The PostgreSQL launcher configuration does not specify postgresConnectionEnvironmentVariable."

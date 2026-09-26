@@ -141,6 +141,8 @@ jobs:
 
       - name: Run published review verification
         shell: powershell
+        env:
+          ASPNETCORE_ENVIRONMENT: IntegrationTest
         run: |
           $smokeProfile = if ("${{ github.event_name }}" -eq "pull_request") { "PublishedMinimum" } else { "Comprehensive" }
           ./verify-review.ps1 -Mode Smoke -SmokeProfile $smokeProfile -Configuration Release -SkipBuild -Port 5081
@@ -304,8 +306,26 @@ jobs:
       - name: Build launcher host
         run: dotnet build src/PhotoIdentity.Api/PhotoIdentity.Api.csproj --configuration Release --no-restore
 
+      - name: Start PostgreSQL for launcher verification
+        shell: pwsh
+        run: |
+          $service = Get-Service -Name 'postgresql-x64-*' | Sort-Object Name -Descending | Select-Object -First 1
+          if ($null -eq $service) {
+            throw "The Windows runner does not provide a PostgreSQL service."
+          }
+          Set-Service -Name $service.Name -StartupType Manual
+          Start-Service -Name $service.Name
+          $service.WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+          $env:PGPASSWORD = 'root'
+          & "$env:PGBIN\createdb.exe" -h 127.0.0.1 -U postgres photoidentity_launcher_verification
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Run Windows launcher verification
         shell: powershell
+        env:
+          PHOTOIDENTITY_LAUNCHER_VERIFICATION_POSTGRES_CONNECTION: Host=127.0.0.1;Port=5432;Database=photoidentity_launcher_verification;Username=postgres;Password=root
         run: ./verify-launcher.ps1 -Configuration Release -Port 5082
 
       - name: Upload launcher verification diagnostics
@@ -329,8 +349,26 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Start PostgreSQL for package verification
+        shell: pwsh
+        run: |
+          $service = Get-Service -Name 'postgresql-x64-*' | Sort-Object Name -Descending | Select-Object -First 1
+          if ($null -eq $service) {
+            throw "The Windows runner does not provide a PostgreSQL service."
+          }
+          Set-Service -Name $service.Name -StartupType Manual
+          Start-Service -Name $service.Name
+          $service.WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+          $env:PGPASSWORD = 'root'
+          & "$env:PGBIN\createdb.exe" -h 127.0.0.1 -U postgres photoidentity_package_verification
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
       - name: Run Windows package verification
         shell: powershell
+        env:
+          PHOTOIDENTITY_PACKAGE_VERIFICATION_POSTGRES_CONNECTION: Host=127.0.0.1;Port=5432;Database=photoidentity_package_verification;Username=postgres;Password=root
         run: ./verify-package.ps1 -Configuration Release -Port 5083
 
       - name: Upload Windows operator package

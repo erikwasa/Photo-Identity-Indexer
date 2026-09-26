@@ -19,6 +19,7 @@ $archiveRoot = Join-Path $artifactRoot "archive-source"
 $packageScript = Join-Path $repositoryRoot "Package-PhotoIdentity.ps1"
 $packageZip = Join-Path $packageOutputRoot "PhotoIdentity-win-x64.zip"
 $url = "http://127.0.0.1:$Port"
+$postgresEnvironmentName = "PHOTOIDENTITY_PACKAGE_VERIFICATION_POSTGRES_CONNECTION"
 
 function Get-PackageServerProcesses {
     $processes = @(Get-CimInstance Win32_Process | Where-Object {
@@ -72,6 +73,9 @@ function Assert-Healthy {
     $payload = $response.Content | ConvertFrom-Json
     if ($response.StatusCode -ne 200 -or [string]$payload.status -ne "ok") {
         throw "Packaged application did not return the expected health response."
+    }
+    if ([string]$payload.catalogueProvider -ne "postgresql") {
+        throw "Packaged PostgreSQL-only verification expected catalogueProvider=postgresql."
     }
 }
 
@@ -149,6 +153,10 @@ if (-not (Test-Path -LiteralPath $packageScript -PathType Leaf)) {
     throw "Package script was not found: $packageScript"
 }
 
+if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($postgresEnvironmentName, "Process"))) {
+    throw "Package verification requires PostgreSQL connection environment variable '$postgresEnvironmentName'."
+}
+
 Remove-Item -LiteralPath $artifactRoot -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $localAppData -Force | Out-Null
@@ -222,6 +230,9 @@ try {
     if ([string]$launcherExample.url -ne "http://127.0.0.1:5080") {
         throw "Package launcher example must preserve the default loopback HTTP URL."
     }
+    if ([string]::IsNullOrWhiteSpace([string]$launcherExample.postgresConnectionEnvironmentVariable)) {
+        throw "Package launcher example must identify the PostgreSQL connection environment variable."
+    }
     if ($null -eq $launcherExample.PSObject.Properties["mobileAccess"] -or
         $null -eq $launcherExample.mobileAccess -or
         [bool]$launcherExample.mobileAccess.enabled) {
@@ -256,13 +267,12 @@ try {
     $configurationDirectory = Join-Path $localAppData "PhotoIdentity"
     New-Item -ItemType Directory -Path $configurationDirectory -Force | Out-Null
     $configurationPath = Join-Path $configurationDirectory "launcher.json"
-    $databasePath = Join-Path $configurationDirectory "catalogue.db"
     $analysisPath = Join-Path $configurationDirectory "archive-analysis"
     $reviewProxyPath = Join-Path $configurationDirectory "review-proxies"
     $launcherConfiguration = [ordered]@{
         url = $url
+        postgresConnectionEnvironmentVariable = $postgresEnvironmentName
         settings = [ordered]@{
-            PhotoIdentity__DatabasePath = $databasePath
             PhotoIdentity__ArchiveAnalysisOutputRoot = $analysisPath
             PhotoIdentity__ReviewProxyRoot = $reviewProxyPath
             PhotoIdentity__ReviewProxyProfileId = "jpeg-1600-q78"
@@ -295,12 +305,13 @@ try {
     $firstProcessId = [int]$firstProcesses[0].ProcessId
     $startedProcessIds = @($firstProcessId)
 
-    if (-not (Test-Path -LiteralPath $databasePath -PathType Leaf)) {
-        throw "Packaged application did not create the catalogue in durable local application data."
-    }
-
-    if (Test-Path -LiteralPath (Join-Path $installV1 "catalogue.db") -PathType Leaf) {
-        throw "Packaged application wrote the catalogue into the replaceable package directory."
+    $unexpectedLocalCatalogueFiles = @(Get-ChildItem -LiteralPath $configurationDirectory -Recurse -File | Where-Object {
+        $_.Extension -ieq ".db" -or
+        $_.Extension -ieq ".sqlite" -or
+        $_.Extension -ieq ".sqlite3"
+    })
+    if ($unexpectedLocalCatalogueFiles.Count -ne 0) {
+        throw "Packaged PostgreSQL runtime created an unexpected local catalogue file: $($unexpectedLocalCatalogueFiles.FullName -join ', ')."
     }
 
     Invoke-PackageEntryPoint -InstallRoot $installV1
@@ -325,9 +336,6 @@ try {
     }
     $startedProcessIds = @([int]$upgradeProcesses[0].ProcessId)
 
-    if (-not (Test-Path -LiteralPath $databasePath -PathType Leaf)) {
-        throw "Catalogue was not preserved across package replacement."
-    }
     if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
         throw "Durable local application data was not preserved across package replacement."
     }

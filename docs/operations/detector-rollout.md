@@ -43,7 +43,7 @@ The ordinary `batch start` path still has its historical deterministic ordinal s
 
 ## PostgreSQL provider selection
 
-All four rollout CLI actions accept `--postgres-connection-env NAME` instead of `--database PATH`. The named environment variable contains the PostgreSQL connection string; keep credentials out of command arguments and shell history. Exactly one provider must be selected. PostgreSQL selection initializes its migrations and uses PostgreSQL processing, revision lookup, reconciliation, review and application repositories throughout the rollout worker. It does not open a SQLite catalogue or perform dual writes.
+All four rollout CLI actions require `--postgres-connection-env NAME`. The named environment variable contains the PostgreSQL connection string; keep credentials out of command arguments and shell history. The command initializes PostgreSQL migrations and uses PostgreSQL processing, revision lookup, reconciliation, review and application repositories throughout the rollout worker. It does not recognize a SQLite catalogue option or perform dual writes.
 
 For example, after configuring the connection variable securely:
 
