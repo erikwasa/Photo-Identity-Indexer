@@ -58,6 +58,19 @@ Focused integration tests must use generated safe test images and temporary deri
 ## Completion notes
 
 - Files changed:
+  - `src/PhotoIdentity.Core/Sources/ISourceCopyExclusionRepository.cs` and `ISourceCopyPurgeRepository.cs` define the durable purge lifecycle, manifest and provider-neutral purge boundary.
+  - `src/PhotoIdentity.Persistence.Postgres/PostgresSourceCopyExclusionRepository.cs` and `PostgresSourceCopyPurgeRepository.cs` persist purge state/manifest, inventory completed and partial analysis output plus detector output, and remove restrictive reconciliation/review-history links before deleting the locator-owned asset graph.
+  - `src/PhotoIdentity.Persistence.Sqlite/SqliteSourceCopyExclusionRepository.cs` and `SqliteSourceCopyPurgeRepository.cs` retain equivalent compatibility behavior, including dependency-safe review-action cleanup and partial-analysis output discovery.
+  - `src/PhotoIdentity.Api/SourceCopyPurgeService.cs` provides retryable manifest-first filesystem deletion, post-delete verification, catalogue cleanup, idempotency and privacy-safe failure codes; `ArchiveAdvancementHostedService.cs` drains purge work even when ordinary archive advancement is idle.
+  - Integration coverage exercises real temporary files, crash/retry behavior, locked-file failure, restrictive review history, partial archive-analysis output under a configured non-default root, and a conditional live-PostgreSQL end-to-end purge preserving a shared Person and an unrelated photo.
 - Trade-offs:
+  - The durable source-copy exclusion tombstone remains after successful purge and intentionally retains only the source locator plus purge operational state; restore is blocked until purge reaches `completed`.
+  - Provider cleanup explicitly retires detector reconciliation plans and review-action dependency chains before asset deletion because those schemas contain restrictive foreign keys that cannot rely on the ordinary revision cascade.
+  - Analysis manifests include output directories from both completed `asset_revision_analysis` rows and archive-analysis `processing_jobs`, so interrupted/failed runs do not strand partial files; crop paths also resolve their processing-run `outputRoot` when no completion row exists.
+  - Ordinary archive analysis is synchronously advanced behind the archive advancement gate, while exclusion-aware processing claims/original access prevent new work for an excluded revision. This keeps the manifest/deletion sequence aligned with the active in-process archive workflow.
 - Deferred work:
+  - WI-0091 owns the operator-facing Excluded / Purge pending / Purge failed review workflow.
+  - Final WI-0090 completion remains gated on executing the live PostgreSQL verification entry point against a real test PostgreSQL instance; standard GitHub CI does not provide that external database.
 - Commands run:
+  - GitHub Actions CI is used for compilation, normal integration coverage and documentation validation on PR #431.
+  - Live PostgreSQL verification is wired into the existing `verify-postgres.ps1` integration filter through `PostgresRuntimeApplicationTests_SourceCopyPurge`; the maintainer command is `./verify-postgres.ps1 -SkipContainerStart` when the test PostgreSQL instance is already running (or `./verify-postgres.ps1` when the script should start it).
