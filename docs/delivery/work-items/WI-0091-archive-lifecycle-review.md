@@ -5,7 +5,7 @@ milestone: M23
 status_source: ../status/work-items.yaml
 depends_on: [WI-0087, WI-0088, WI-0089, WI-0090]
 related_adrs: [ADR-0008]
-affected_modules: [PhotoIdentity.Api, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Web, documentation]
+affected_modules: [PhotoIdentity.Api, PhotoIdentity.Persistence.Sqlite, PhotoIdentity.Persistence.Postgres, PhotoIdentity.Web, documentation]
 ---
 
 # WI-0091: Add archive lifecycle review and exclusion workflows
@@ -41,15 +41,15 @@ The expected archive workflow includes deleting low-quality/inappropriate/burst 
 
 ## Acceptance criteria
 
-- [ ] Archive exposes Removed from source, Exact duplicates, Excluded and purge-problem states with useful counts/filtering.
-- [ ] Removed-from-source entries retain enough preview context for the operator to decide until exclusion/purge is chosen.
-- [ ] Multiple removed entries can be selected and excluded/purged in one operator action.
-- [ ] Duplicate groups show each source copy independently; excluding one leaves another identical source path included.
-- [ ] A still-present photo can be manually excluded with clear non-source-deletion warning.
-- [ ] Once exclusion starts, the photo disappears from normal library/review/collection/slideshow surfaces immediately.
-- [ ] After purge completes, Excluded shows no thumbnail or original-view action.
-- [ ] Purge pending/failed entries remain blocked and offer retry/actionable status.
-- [ ] Restore/re-include starts fresh processing and does not restore purged identifications/history.
+- [x] Archive exposes Removed from source, Exact duplicates, Excluded and purge-problem states with useful counts/filtering.
+- [x] Removed-from-source entries retain enough preview context for the operator to decide until exclusion/purge is chosen.
+- [x] Multiple removed entries can be selected and excluded/purged in one operator action.
+- [x] Duplicate groups show each source copy independently; excluding one leaves another identical source path included.
+- [x] A still-present photo can be manually excluded with clear non-source-deletion warning.
+- [x] Once exclusion starts, the photo disappears from normal library/review/collection/slideshow surfaces immediately.
+- [x] After purge completes, Excluded shows no thumbnail or original-view action.
+- [x] Purge pending/failed entries remain blocked and offer retry/actionable status.
+- [x] Restore/re-include starts fresh processing and does not restore purged identifications/history.
 - [ ] Maintainer acceptance proves: duplicate A/B exclude A only; included rename preserves identity; excluded rename appears as a new included copy; OneDrive deletion enters Removed from source; bulk removed-source purge works; still-present private photo leaves no local Photo Identity derivative/identity data after purge.
 
 ## Verification requirements
@@ -58,7 +58,12 @@ Automated web/API integration tests should cover state/filter/action contracts a
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: PR #438 adds the dedicated `/archive/lifecycle` workspace, lifecycle API actions/contracts, review-navigation entry, a route-aware photo privacy exclusion action and focused application integration tests.
+- State model: Removed from source, Exact duplicates, Excluded, Purge pending and Purge failed are separate operator surfaces. Excluded locators are removed immediately from exact-duplicate and removed-source review results while the lower-level exclusion boundary blocks normal media/query/processing access.
+- Bulk safety: the bulk endpoint parses and resolves every selected revision before creating any tombstone, so an invalid/stale selection cannot leave a partially excluded batch.
+- Privacy UX: destructive confirmations explicitly say the OneDrive/source original is not deleted. Completed exclusions are text/status-only; failed purge exposes only the stored privacy-safe error code and a retry action.
+- Re-inclusion: only a completed purge may be restored. The UI removes the tombstone and triggers archive synchronization so any still-present source copy is catalogued again from source; purged revision-linked identities/history are not reconstructed.
+- Automated coverage: focused API tests cover atomic bulk validation, independent duplicate-copy exclusion, immediate withdrawal from duplicate and removed review queues, failed-purge retry, completed-purge restore gating and removed-source revision retention.
+- Trade-offs: the lifecycle UI uses the existing durable review proxy endpoint for recognizable removed-photo previews rather than introducing a second preview store. Exact-duplicate copies are paged in the browser after the provider query because WI-0087 already owns the indexed authoritative duplicate inventory.
+- Deferred work: the final checkbox remains the maintainer real-catalogue acceptance sequence for M23. WI-0091 and M23 remain in progress until that evidence is recorded.
+- Commands run: GitHub Actions is the automated gate for PR #438; live PostgreSQL and real-catalogue acceptance remain to be run before completion.
