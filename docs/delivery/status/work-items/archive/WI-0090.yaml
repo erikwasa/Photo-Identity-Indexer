@@ -1,0 +1,22 @@
+id: WI-0090
+title: Purge excluded photo data and derivatives safely
+milestone: M23
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0090-exclusion-purge-service.md
+started_at: 2026-09-26
+completed_at: 2026-09-26
+verified_at: 2026-09-26
+verified_by: maintainer
+last_updated_at: 2026-09-26
+branch: agent/wi-0090-exclusion-purge-service
+blockers:
+- WI-0089
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/431
+- type: verification
+  value: '2026-09-26 maintainer verification: .\verify-postgres.ps1 -SkipContainerStart passed against a live PostgreSQL test instance, exercising the WI-0090 production-provider purge coverage.'
+- type: ci
+  value: 'PR #431 workflow run #2253 completed successfully.'
