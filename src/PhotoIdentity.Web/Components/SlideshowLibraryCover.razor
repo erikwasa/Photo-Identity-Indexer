@@ -67,7 +67,7 @@
                 $"api/smart-collections/{Uri.EscapeDataString(CollectionId)}/query?offset=0&limit=1",
                 _lifetime.Token);
             _coverUrl = SlideshowLibraryPresentation.SelectCoverThumbnailUrl(page);
-            await PhotoCountChanged.InvokeAsync(page?.Total);
+            await PhotoCountChanged.InvokeAsync(SlideshowLibraryPresentation.SmartPhotoCount(page));
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
