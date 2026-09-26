@@ -97,13 +97,14 @@ function Get-DuplicateGroups {
 function Get-ArchiveItems {
     param(
         [string]$Analysis = "all",
-        [int]$PageSize = 250
+        [int]$PageSize = 200
     )
 
+    $effectivePageSize = [Math]::Min(200, [Math]::Max(1, $PageSize))
     $items = @()
     $offset = 0
     do {
-        $path = "/api/archive/items/filter?availability=all&verification=all&analysis=$([Uri]::EscapeDataString($Analysis))&folder=&offset=$offset&limit=$PageSize"
+        $path = "/api/archive/items/filter?availability=all&verification=all&analysis=$([Uri]::EscapeDataString($Analysis))&folder=&offset=$offset&limit=$effectivePageSize"
         $page = Invoke-ApiGet $path
         $pageItems = @($page.items)
         $items += $pageItems
