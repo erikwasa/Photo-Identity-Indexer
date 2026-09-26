@@ -8,21 +8,24 @@ The module implements neutral `PhotoIdentity.Core` contracts and returns applica
 
 ## Decoder behaviour
 
-- Accepts JPEG, PNG and HEIC/HEIF content identified by file signature/container brand.
+- Accepts JPEG, PNG, HEIC/HEIF and DNG content identified by file signature/container metadata.
 - Keeps the established OpenCV JPEG/PNG decode path.
 - Uses the bundled Magick.NET HEIF delegate for HEIC/HEIF, applies orientation, converts an embedded color profile to sRGB when present, strips metadata and exports packed BGR pixels directly.
 - Optionally downsizes HEIC/HEIF inside the ImageMagick path before pixel export when `DecodeOptions.MaximumSize` is supplied, avoiding an unnecessary full-size intermediate render for proxy/preview work.
 - Converts decoded content to packed 8-bit BGR pixels.
 - Optionally downsizes JPEG/PNG to fit `DecodeOptions.MaximumSize` without upscaling.
+- Recognizes DNG only when the TIFF IFD0 contains the mandatory DNG version tag; ordinary TIFF and every other RAW family remain unsupported.
+- For the verified maintained-archive DNG variants, uses the full-resolution 8-bit RGB/YCbCr JPEG preview from IFD0 when it is a structurally valid single strip, applies the DNG orientation exactly once and then uses the existing packed BGR/resize contract. This is a full-resolution camera-rendered preview, not the small DNG thumbnail.
+- Falls back to the bundled ImageMagick DNG delegate with explicit sRGB output and camera white balance when a valid DNG has no verified full-resolution preview layout. The fallback is deterministic but more memory-intensive than the preview path.
 - Throws `ImageDecodingException` with `UnsupportedFormat` for other signatures.
 - Throws `ImageDecodingException` with `CorruptMedia` when recognized image content cannot be decoded.
 - Honours cancellation while reading the encoded stream.
 
-RAW formats are deliberately not accepted merely by extension. WI-0053 adds a RAW variant only after that format is found in the real archive and representative private input has established its rendering, orientation and resource-use policy.
+RAW formats are deliberately not accepted merely by extension. DNG is the only verified RAW family. CR2/CR3, NEF, ARW, RAF and other RAW variants remain unsupported until representative private input establishes a format-specific rendering, orientation and resource-use policy.
 
 ## Review proxies
 
-`OpenCvReviewProxyRenderer` uses the same `OpenCvImageDecoder` path before producing the configured metadata-free JPEG derivative. HEIC therefore has one rendered-pixel interpretation for archive analysis and normal review-proxy generation rather than separate format-specific implementations.
+`OpenCvReviewProxyRenderer` uses the same `OpenCvImageDecoder` path before producing the configured metadata-free JPEG derivative. HEIC and DNG therefore each have one rendered-pixel interpretation for archive analysis and normal review-proxy generation rather than separate format-specific implementations.
 
 ## Face crops
 

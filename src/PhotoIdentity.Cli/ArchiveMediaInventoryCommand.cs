@@ -138,6 +138,7 @@ internal static class ArchiveMediaInventoryCommandRunner
             ".jpg" or ".jpeg" => ("jpeg", true),
             ".png" => ("png", true),
             ".heic" or ".heif" => ("heif", true),
+            ".dng" => ("raw", true),
             _ when RawExtensions.Contains(extension) => ("raw", false),
             _ => ("other", false),
         };

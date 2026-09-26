@@ -306,7 +306,7 @@ public static class Program
             durable job progress.
 
             Archive proxy measure is a pre-default measurement path. It renders every
-            supported JPEG/PNG/HEIC/HEIF source image with one or more exact profiles, writes
+            supported JPEG/PNG/HEIC/HEIF/DNG source image with one or more exact profiles, writes
             those derivatives outside the source root, and reports only aggregate logical
             source bytes plus total/mean/median/p95 proxy bytes and source-to-proxy compression.
             Candidate syntax is ID:MAX_LONG_EDGE:JPEG_QUALITY. Use at least two profiles for
@@ -344,7 +344,7 @@ public static class Program
             before replay-safe SQLite persistence. Face-crop jobs treat every 112x112 input
             as an already-aligned face and record explicit crop-input provenance.
 
-            The decode command reads JPEG, PNG, HEIC or HEIF content, applies orientation,
+            The decode command reads JPEG, PNG, HEIC, HEIF or DNG content, applies orientation,
             optionally downsizes it, and writes a normalised PNG without modifying the input.
 
             Evaluate export reads only human-assigned catalogue faces for exact detector and

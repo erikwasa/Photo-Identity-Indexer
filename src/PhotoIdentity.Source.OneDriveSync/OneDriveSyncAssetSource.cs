@@ -83,6 +83,7 @@ public sealed class OneDriveSyncAssetSource : IAssetSource
             [".png"] = "image/png",
             [".heic"] = "image/heic",
             [".heif"] = "image/heif",
+            [".dng"] = "image/dng",
         };
 
     private readonly IOneDriveFileStatusProvider _statusProvider;

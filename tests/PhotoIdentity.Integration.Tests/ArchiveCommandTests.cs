@@ -89,6 +89,7 @@ public sealed class ArchiveCommandTests
             await File.WriteAllBytesAsync(Path.Combine(included, "camera.dng"), [2]);
             await File.WriteAllBytesAsync(Path.Combine(included, "existing.jpg"), [3]);
             await File.WriteAllBytesAsync(Path.Combine(included, "notes.txt"), [4]);
+            await File.WriteAllBytesAsync(Path.Combine(included, "other.cr2"), [5]);
 
             string databasePath = Path.Combine(directory, "catalogue.db");
             Assert.Equal(0, await RunAsync(
@@ -100,9 +101,10 @@ public sealed class ArchiveCommandTests
             Assert.Equal(0, exitCode);
             Assert.Equal(string.Empty, error);
             Assert.Contains("archive-media-inventory: complete", output, StringComparison.Ordinal);
-            Assert.Contains("files-total: 4", output, StringComparison.Ordinal);
+            Assert.Contains("files-total: 5", output, StringComparison.Ordinal);
             Assert.Contains("extension: .heic count=1 family=heif supported=true", output, StringComparison.Ordinal);
-            Assert.Contains("extension: .dng count=1 family=raw supported=false", output, StringComparison.Ordinal);
+            Assert.Contains("extension: .dng count=1 family=raw supported=true", output, StringComparison.Ordinal);
+            Assert.Contains("extension: .cr2 count=1 family=raw supported=false", output, StringComparison.Ordinal);
             Assert.Contains("extension: .jpg count=1 family=jpeg supported=true", output, StringComparison.Ordinal);
             Assert.Contains("extension: .txt count=1 family=other supported=false", output, StringComparison.Ordinal);
             Assert.DoesNotContain("phone.heic", output, StringComparison.Ordinal);

@@ -4,6 +4,8 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
+**WI-0164 Add verified DNG archive support is implemented and locally verified on `codex/wi-0164-dng-archive-support`; it is ready for the maintainer to open a PR.** The maintained archive contains 50 DNG files. Production decoding prefers their structurally verified full-resolution embedded JPEG preview, preserves TIFF orientation and falls back to a deterministic full RAW render for other valid DNG layouts. Local/OneDrive discovery, inventory, metadata, review proxies and the governed CenterFace/SFace path were verified; other RAW formats remain unsupported.
+
 **WI-0163 Add safe bulk capture-date and Place enrichment is in progress under M31 Bulk archive metadata enrichment. WI-0091 Archive lifecycle review is also in progress under M23.**
 
 The maintainer measured 17,892 current photos: 234 have no effective capture date, 12,603 have no named Place or valid non-zero GPS, and 12,371 of the location-less photos already have an effective date. Directory `1970` is a miscellaneous catch-all and must never be interpreted as a real capture year merely from its path.
@@ -16,10 +18,14 @@ M28 remains completed. **M26 Creative Collections is completed.** M29 is ready w
 
 ## Next concrete step
 
-Finish automated API/web validation for WI-0091, then run the complete M23 maintainer scenarios against the real PostgreSQL catalogue before closing WI-0091 and M23.
+Open and validate the WI-0164 PR from `codex/wi-0164-dng-archive-support`. Separately, finish automated API/web validation for WI-0091, then run the complete M23 maintainer scenarios against the real PostgreSQL catalogue before closing WI-0091 and M23.
 
 ## Relevant files
 
+- docs/delivery/work-items/WI-0164-dng-archive-support.md
+- src/PhotoIdentity.Imaging.OpenCv/DngEmbeddedPreview.cs
+- src/PhotoIdentity.Imaging.OpenCv/OpenCvImageDecoder.cs
+- tests/PhotoIdentity.Recognition.Tests/DngImageDecoderTests.cs
 - docs/delivery/milestones/M23-source-copy-lifecycle-and-exclusion.md
 - docs/delivery/work-items/WI-0091-archive-lifecycle-review.md
 - docs/delivery/status/work-items/active/WI-0091.yaml

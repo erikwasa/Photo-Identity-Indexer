@@ -36,6 +36,7 @@ public sealed class LocalFolderAssetSource : IAssetSource
             [".png"] = "image/png",
             [".heic"] = "image/heic",
             [".heif"] = "image/heif",
+            [".dng"] = "image/dng",
         };
 
     private readonly StringComparison _pathComparison;

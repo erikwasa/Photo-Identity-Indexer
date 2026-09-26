@@ -181,7 +181,7 @@ The CLI `archive analyze` command exists for the archive analysis coordinator, b
 
 ## 7. Media-format completeness
 
-HEIC/HEIF is being added under WI-0053; RAW support is activated only for formats actually found in the real archive. The SQLite CLI inventory example below is a compatibility diagnostic, not the normal PostgreSQL authority path:
+HEIC/HEIF and DNG are supported. Other RAW families are activated only after a representative real-archive sample has been verified. The SQLite CLI inventory example below is a compatibility diagnostic, not the normal PostgreSQL authority path:
 
 ```powershell
 dotnet run --project src/PhotoIdentity.Cli -- `
@@ -194,10 +194,11 @@ Expected examples include:
 
 ```text
 extension: .heic count=<n> family=heif supported=true
-extension: .dng count=<n> family=raw supported=false
+extension: .dng count=<n> family=raw supported=true
+extension: .cr3 count=<n> family=raw supported=false
 ```
 
-A RAW line with `supported=false` is a deliberate trigger for format-specific WI-0053 work, not permission to omit the file. When the current archive reports no RAW family, retain that aggregate result and defer RAW decoding until a real variant appears.
+A RAW line with `supported=false` is a deliberate trigger for separate format-specific verification, not permission to omit the file. DNG uses its verified full-resolution embedded JPEG preview when available, with TIFF orientation applied exactly once; valid DNGs without that layout fall back to the deterministic full RAW render. Neither path modifies the original or writes a conversion beside it.
 
 Do not treat a scan with silently omitted media as full archive coverage.
 
