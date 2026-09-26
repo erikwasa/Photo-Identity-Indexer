@@ -546,9 +546,7 @@ public static class ProvisionalFaceClusterEndpoints
 
     private static bool UsesPostgres(IServiceProvider services)
     {
-        IConfiguration? configuration = services.GetService<IConfiguration>();
-        return configuration is not null &&
-               CataloguePersistenceComposition.ResolveProvider(configuration) == CatalogueProviderKind.Postgres;
+        return services.GetService<PostgresCatalogueDatabase>() is not null;
     }
 
     private static object? ToAdvisoryCandidate(ProvisionalFaceClusterKnownPersonCandidate? candidate) =>

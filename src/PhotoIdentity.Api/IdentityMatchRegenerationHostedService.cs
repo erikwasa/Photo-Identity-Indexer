@@ -64,9 +64,7 @@ public sealed class IdentityMatchRegenerationHostedService : BackgroundService
                 timeProvider,
                 IdentityMatchFollowUpConfiguration.FromConfiguration(configuration));
 
-        bool postgresSelected = configuration is not null &&
-            CataloguePersistenceComposition.ResolveProvider(configuration) == CatalogueProviderKind.Postgres;
-        _provisionalClustering = postgresSelected && postgresCatalogueDatabase is not null
+        _provisionalClustering = postgresCatalogueDatabase is not null
             ? new ProvisionalFaceClusteringWorker(
                 new PostgresProvisionalFaceClusterRepository(postgresCatalogueDatabase),
                 new ProvisionalFaceDbscanClusterer(),

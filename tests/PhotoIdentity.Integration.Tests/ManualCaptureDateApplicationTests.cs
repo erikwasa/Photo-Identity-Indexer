@@ -68,11 +68,13 @@ public sealed class ManualCaptureDateApplicationTests
 
             Action<IWebHostBuilder> configure = builder =>
             {
-                builder.UseSetting("PhotoIdentity:CatalogueProvider", "postgresql");
                 builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", testBuilder.ConnectionString);
             };
 
-            await using (PhotoIdentityApiTestFactory factory = new(sqlitePath, configure))
+            await using (PhotoIdentityApiTestFactory factory = new(
+                sqlitePath,
+                configure,
+                useSqliteTestCompatibility: false))
             {
                 using HttpClient client = factory.CreateClient();
                 string url = $"/api/collections/photos/{revisionId}/capture-date";

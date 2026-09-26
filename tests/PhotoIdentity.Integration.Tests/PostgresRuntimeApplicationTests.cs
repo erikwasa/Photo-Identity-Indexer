@@ -14,7 +14,7 @@ public sealed class PostgresRuntimeApplicationTests
     private const string TestModelHash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
     [Fact]
-    public async Task Provisional_clustering_endpoint_rejects_SQLite_selected_provider()
+    public async Task Provisional_clustering_endpoint_rejects_SQLite_test_compatibility_host()
     {
         string directory = Path.Combine(
             Path.GetTempPath(),
@@ -26,8 +26,7 @@ public sealed class PostgresRuntimeApplicationTests
         try
         {
             await using PhotoIdentityApiTestFactory factory = new(
-                sqlitePath,
-                builder => builder.UseSetting("PhotoIdentity:CatalogueProvider", "sqlite"));
+                sqlitePath);
             using HttpClient client = factory.CreateClient();
             using HttpResponseMessage response = await client.GetAsync(
                 $"/api/review/provisional-clusters?modelId=test-model&modelHash={TestModelHash}");
@@ -100,9 +99,9 @@ public sealed class PostgresRuntimeApplicationTests
                 sqlitePath,
                 builder =>
                 {
-                    builder.UseSetting("PhotoIdentity:CatalogueProvider", "postgresql");
                     builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", testBuilder.ConnectionString);
-                });
+                },
+                useSqliteTestCompatibility: false);
             using HttpClient client = factory.CreateClient();
             using HttpResponseMessage response = await client.GetAsync("/health");
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);

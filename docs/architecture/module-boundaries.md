@@ -7,7 +7,8 @@ The implementation is a modular monolith with explicit project boundaries. Execu
 | Project | Responsibility |
 |---|---|
 | `PhotoIdentity.Core` | Stable identifiers, model-provenance types and application/domain contracts |
-| `PhotoIdentity.Persistence.Sqlite` | Canonical catalogue, review history, processing state and collection queries |
+| `PhotoIdentity.Persistence.Postgres` | Canonical catalogue, review history, processing state and collection queries |
+| `PhotoIdentity.Persistence.Sqlite` | Temporary migration and integration-test compatibility pending removal under M29 |
 | `PhotoIdentity.Source.Local` | Local filesystem discovery and source access |
 | `PhotoIdentity.Source.OneDriveSync` | OneDrive-synchronised-folder availability and staging through the Windows filesystem |
 | `PhotoIdentity.Imaging.OpenCv` | Image decoding, crop/alignment support and bounded thumbnail rendering |
@@ -64,7 +65,7 @@ OpenCV image matrices and ONNX tensors are adapter-owned and must not escape int
 
 ## Canonical and derived ownership
 
-`PhotoIdentity.Persistence.Sqlite` owns durable catalogue and review state. Imaging and recognition projects produce derived observations, crops and embeddings under exact provenance. Transfer code packages selected inputs or results but does not become an alternative source of truth.
+`PhotoIdentity.Persistence.Postgres` owns durable catalogue and review state. Imaging and recognition projects produce derived observations, crops and embeddings under exact provenance. Transfer code packages selected inputs or results but does not become an alternative source of truth.
 
 The Web project owns shared HTTP response contracts used by the hosted client, but filesystem paths and persistence implementation details remain server-side.
 
@@ -72,9 +73,9 @@ The Web project owns shared HTTP response contracts used by the hosted client, b
 
 Each executable selects and wires the adapters it needs:
 
-- the CLI composes local sources, SQLite, imaging, recognition, evaluation and bundle operations;
-- the worker composes bundle input/output, imaging and recognition without SQLite identity state;
-- the API composes SQLite-backed review/collection services, local file resolution and hosted Web assets; and
+- the CLI composes PostgreSQL-backed active operations plus explicit migration/compatibility commands, imaging, recognition, evaluation and bundle operations;
+- the worker composes bundle input/output, imaging and recognition without catalogue identity state;
+- the API composes PostgreSQL-backed review/collection services, local file resolution and hosted Web assets; and
 - the Web client consumes API contracts only.
 
 See [Applications](applications.md), [Canonical data model](data-model.md) and [Portable processing bundles](portable-bundles.md).

@@ -3,7 +3,6 @@ using PhotoIdentity.Core.Catalogue;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Persistence.Postgres;
 using PhotoIdentity.Worker;
 
@@ -19,7 +18,6 @@ internal enum DetectorRolloutCommandAction
 
 internal sealed record DetectorRolloutCommandOptions(
     DetectorRolloutCommandAction Action,
-    string? DatabasePath,
     ProcessingRunId? RunId,
     IReadOnlyList<AssetRevisionId> RevisionIds,
     string? RevisionFile,
@@ -45,7 +43,6 @@ internal sealed record DetectorRolloutCommandOptions(
             _ => throw new ArgumentException($"Unknown rollout action '{args[0]}'."),
         };
 
-        string? databasePath = null;
         string? postgresConnectionEnvironment = null;
         ProcessingRunId? runId = null;
         List<AssetRevisionId> revisions = [];
@@ -63,9 +60,6 @@ internal sealed record DetectorRolloutCommandOptions(
                 : throw new ArgumentException($"Option '{option}' requires a value.");
             switch (option)
             {
-                case "--database":
-                    databasePath = Single(databasePath, value, option);
-                    break;
                 case "--postgres-connection-env":
                     postgresConnectionEnvironment = Single(postgresConnectionEnvironment, value, option);
                     break;
@@ -105,9 +99,9 @@ internal sealed record DetectorRolloutCommandOptions(
             }
         }
 
-        if ((databasePath is null) == (postgresConnectionEnvironment is null))
+        if (postgresConnectionEnvironment is null)
         {
-            throw new ArgumentException("Specify exactly one of '--database' or '--postgres-connection-env'.");
+            throw new ArgumentException("Option '--postgres-connection-env' is required. PostgreSQL is the only supported rollout catalogue.");
         }
 
         if (action == DetectorRolloutCommandAction.Start)
@@ -135,7 +129,6 @@ internal sealed record DetectorRolloutCommandOptions(
 
         return new DetectorRolloutCommandOptions(
             action,
-            databasePath,
             runId,
             revisions,
             revisionFile,
@@ -176,28 +169,19 @@ internal static class DetectorRolloutCommandRunner
         TextWriter output,
         CancellationToken cancellationToken)
     {
-        if (options.PostgresConnectionEnvironment is string environmentName)
+        string environmentName = options.PostgresConnectionEnvironment!;
+        string? connectionString = Environment.GetEnvironmentVariable(environmentName);
+        if (string.IsNullOrWhiteSpace(connectionString))
         {
-            string? connectionString = Environment.GetEnvironmentVariable(environmentName);
-            if (string.IsNullOrWhiteSpace(connectionString))
-            {
-                throw new ArgumentException("The selected PostgreSQL connection environment variable is empty or missing.");
-            }
-            await using PostgresCatalogueDatabase postgres = new(connectionString);
-            PostgresProcessingRepository processing = new(postgres);
-            return await RunCoreAsync(options, new RolloutPersistence(
-                postgres, new PostgresAssetRevisionLookupRepository(postgres), processing, processing,
-                new PostgresDetectorReconciliationPlanRepository(postgres),
-                new PostgresDetectorRolloutReviewRepository(postgres),
-                new PostgresDetectorRolloutApplicationRepository(postgres)), output, cancellationToken);
+            throw new ArgumentException("The selected PostgreSQL connection environment variable is empty or missing.");
         }
-
-        SqliteCatalogueDatabase sqlite = new(options.DatabasePath!);
-        SqliteProcessingRepository sqliteProcessing = new(sqlite);
+        await using PostgresCatalogueDatabase postgres = new(connectionString);
+        PostgresProcessingRepository processing = new(postgres);
         return await RunCoreAsync(options, new RolloutPersistence(
-            sqlite, new SqliteLocalBatchRepository(sqlite), sqliteProcessing, sqliteProcessing,
-            new SqliteDetectorRolloutRepository(sqlite), new SqliteDetectorRolloutReviewRepository(sqlite),
-            new SqliteDetectorRolloutApplicationRepository(sqlite)), output, cancellationToken);
+            postgres, new PostgresAssetRevisionLookupRepository(postgres), processing, processing,
+            new PostgresDetectorReconciliationPlanRepository(postgres),
+            new PostgresDetectorRolloutReviewRepository(postgres),
+            new PostgresDetectorRolloutApplicationRepository(postgres)), output, cancellationToken);
     }
 
     private sealed record RolloutPersistence(
