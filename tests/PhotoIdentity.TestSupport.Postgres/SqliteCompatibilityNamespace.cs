@@ -1,3 +1,5 @@
+using PhotoIdentity.Testing.Postgres;
+
 namespace PhotoIdentity.Persistence.Sqlite;
 
 /// <summary>
@@ -8,4 +10,16 @@ namespace PhotoIdentity.Persistence.Sqlite;
 /// </summary>
 public static class PostgresBackedTestCompatibilityMarker
 {
+}
+
+/// <summary>
+/// Historical fixture name retained only for the legacy Places migration regression. The work is
+/// performed against an isolated PostgreSQL catalogue by PostgresPhotoPlaceSchemaCompatibility.
+/// </summary>
+public static class SqlitePhotoPlaceSchema
+{
+    public static Task EnsureAndMigrateAsync(
+        PostgresTestCatalogueDatabase database,
+        CancellationToken cancellationToken = default) =>
+        PostgresPhotoPlaceSchemaCompatibility.EnsureAndMigrateAsync(database, cancellationToken);
 }
