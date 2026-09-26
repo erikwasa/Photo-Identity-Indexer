@@ -112,7 +112,12 @@ public sealed class SqliteSourceCopyExclusionRepository : ISourceCopyExclusionRe
         string key = SourceCopyLocator.NormalizeSourceKey(sourceKey);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM source_copy_exclusions WHERE source_id = $source_id AND source_key = $source_key;";
+        command.CommandText = """
+            DELETE FROM source_copy_exclusions
+            WHERE source_id = $source_id
+              AND source_key = $source_key
+              AND purge_state = 'completed';
+            """;
         command.Parameters.AddWithValue("$source_id", sourceId.ToString());
         command.Parameters.AddWithValue("$source_key", key);
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
@@ -215,24 +220,82 @@ public sealed class SqliteSourceCopyExclusionRepository : ISourceCopyExclusionRe
     {
         await _database.InitializeAsync(cancellationToken);
         await using SqliteConnection connection = await _database.OpenConnectionAsync(cancellationToken);
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            CREATE TABLE IF NOT EXISTS source_copy_exclusions (
-                source_id TEXT NOT NULL,
-                source_key TEXT NOT NULL,
-                excluded_at_utc TEXT NOT NULL,
-                last_seen_at_utc TEXT NULL,
-                purge_state TEXT NOT NULL CHECK (purge_state IN ('pending', 'failed', 'completed')),
-                purge_error_code TEXT NULL,
-                purge_updated_at_utc TEXT NOT NULL,
-                PRIMARY KEY (source_id, source_key),
-                FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
-                CHECK (purge_state = 'failed' OR purge_error_code IS NULL)
-            );
-            CREATE INDEX IF NOT EXISTS ix_source_copy_exclusions_purge_state
-                ON source_copy_exclusions (purge_state, purge_updated_at_utc, source_id, source_key);
-            """;
-        await command.ExecuteNonQueryAsync(cancellationToken);
+        using (SqliteCommand command = connection.CreateCommand())
+        {
+            command.CommandText = """
+                CREATE TABLE IF NOT EXISTS source_copy_exclusions (
+                    source_id TEXT NOT NULL,
+                    source_key TEXT NOT NULL,
+                    excluded_at_utc TEXT NOT NULL,
+                    last_seen_at_utc TEXT NULL,
+                    purge_state TEXT NOT NULL CHECK (purge_state IN ('pending', 'attempting', 'failed', 'completed')),
+                    purge_error_code TEXT NULL,
+                    purge_updated_at_utc TEXT NOT NULL,
+                    PRIMARY KEY (source_id, source_key),
+                    FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
+                    CHECK (purge_state = 'failed' OR purge_error_code IS NULL)
+                );
+                CREATE INDEX IF NOT EXISTS ix_source_copy_exclusions_purge_state
+                    ON source_copy_exclusions (purge_state, purge_updated_at_utc, source_id, source_key);
+                """;
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        string? schemaSql;
+        using (SqliteCommand inspect = connection.CreateCommand())
+        {
+            inspect.CommandText = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'source_copy_exclusions';";
+            schemaSql = (string?)await inspect.ExecuteScalarAsync(cancellationToken);
+        }
+        if (schemaSql?.Contains("'attempting'", StringComparison.Ordinal) == true)
+        {
+            return;
+        }
+
+        using (SqliteCommand foreignKeysOff = connection.CreateCommand())
+        {
+            foreignKeysOff.CommandText = "PRAGMA foreign_keys = OFF;";
+            await foreignKeysOff.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using SqliteTransaction transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+            using SqliteCommand migrate = connection.CreateCommand();
+            migrate.Transaction = transaction;
+            migrate.CommandText = """
+                CREATE TABLE source_copy_exclusions_v2 (
+                    source_id TEXT NOT NULL,
+                    source_key TEXT NOT NULL,
+                    excluded_at_utc TEXT NOT NULL,
+                    last_seen_at_utc TEXT NULL,
+                    purge_state TEXT NOT NULL CHECK (purge_state IN ('pending', 'attempting', 'failed', 'completed')),
+                    purge_error_code TEXT NULL,
+                    purge_updated_at_utc TEXT NOT NULL,
+                    PRIMARY KEY (source_id, source_key),
+                    FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
+                    CHECK (purge_state = 'failed' OR purge_error_code IS NULL)
+                );
+                INSERT INTO source_copy_exclusions_v2 (
+                    source_id, source_key, excluded_at_utc, last_seen_at_utc,
+                    purge_state, purge_error_code, purge_updated_at_utc)
+                SELECT source_id, source_key, excluded_at_utc, last_seen_at_utc,
+                       purge_state, purge_error_code, purge_updated_at_utc
+                FROM source_copy_exclusions;
+                DROP TABLE source_copy_exclusions;
+                ALTER TABLE source_copy_exclusions_v2 RENAME TO source_copy_exclusions;
+                CREATE INDEX ix_source_copy_exclusions_purge_state
+                    ON source_copy_exclusions (purge_state, purge_updated_at_utc, source_id, source_key);
+                """;
+            await migrate.ExecuteNonQueryAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        finally
+        {
+            using SqliteCommand foreignKeysOn = connection.CreateCommand();
+            foreignKeysOn.CommandText = "PRAGMA foreign_keys = ON;";
+            await foreignKeysOn.ExecuteNonQueryAsync(cancellationToken);
+        }
     }
 
     private static SourceCopyExclusionState Read(SqliteDataReader reader) => new(

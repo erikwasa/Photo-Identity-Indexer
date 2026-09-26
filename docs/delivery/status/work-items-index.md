@@ -8,7 +8,7 @@ Current work items: **15**. Archived terminal items: **147**.
 |---|---|---|---|---|
 | [WI-0087](../work-items/WI-0087-exact-duplicate-inventory.md) Add authoritative exact-duplicate source-copy inventory | M23 | in_review | ai-agent | [YAML](work-items/active/WI-0087.yaml) |
 | [WI-0088](../work-items/WI-0088-source-move-reconciliation.md) Reconcile exact unambiguous source moves for included photos | M23 | in_review | ai-agent | [YAML](work-items/active/WI-0088.yaml) |
-| [WI-0090](../work-items/WI-0090-exclusion-purge-service.md) Purge excluded photo data and derivatives safely | M23 | proposed | unassigned | [YAML](work-items/active/WI-0090.yaml) |
+| [WI-0090](../work-items/WI-0090-exclusion-purge-service.md) Purge excluded photo data and derivatives safely | M23 | in_progress | ai-agent | [YAML](work-items/active/WI-0090.yaml) |
 | [WI-0091](../work-items/WI-0091-archive-lifecycle-review.md) Add archive lifecycle review and exclusion workflows | M23 | proposed | unassigned | [YAML](work-items/active/WI-0091.yaml) |
 | [WI-0147](../work-items/WI-0147-postgres-only-runtime-composition.md) Make PostgreSQL the unconditional runtime catalogue | M29 | ready | unassigned | [YAML](work-items/active/WI-0147.yaml) |
 | [WI-0148](../work-items/WI-0148-retire-sqlite-test-tool-dependencies.md) Retire SQLite-dependent tests and compatibility tools that no longer protect supported behavior | M29 | proposed | unassigned | [YAML](work-items/active/WI-0148.yaml) |

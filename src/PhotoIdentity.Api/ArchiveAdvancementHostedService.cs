@@ -1,6 +1,8 @@
 using PhotoIdentity.Core.Imaging;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
+using PhotoIdentity.Persistence.Postgres;
+using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Source.Local;
 using PhotoIdentity.Worker;
 
@@ -26,6 +28,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
     private readonly LocalArchiveSyncCoordinator _syncCoordinator;
     private readonly ArchiveOperatorConfiguration _operatorConfiguration;
     private readonly ReviewProxyGenerationConfiguration _proxyConfiguration;
+    private readonly SourceCopyPurgeService _purges;
     private readonly TimeProvider _timeProvider;
     private readonly ArchiveThroughputMetrics _metrics;
     private readonly ILogger<ArchiveAdvancementHostedService> _logger;
@@ -46,6 +49,9 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         LocalArchiveSyncCoordinator syncCoordinator,
         ArchiveOperatorConfiguration operatorConfiguration,
         ReviewProxyGenerationConfiguration proxyConfiguration,
+        ISourceCopyExclusionRepository exclusions,
+        IServiceProvider services,
+        IConfiguration configuration,
         TimeProvider timeProvider,
         ArchiveThroughputMetrics metrics,
         ILogger<ArchiveAdvancementHostedService> logger)
@@ -68,6 +74,31 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         _timeProvider = timeProvider;
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _logger = logger;
+
+        CatalogueProviderKind provider = CataloguePersistenceComposition.ResolveProvider(configuration);
+        ISourceCopyPurgeRepository purgeRepository = provider switch
+        {
+            CatalogueProviderKind.Postgres => new PostgresSourceCopyPurgeRepository(
+                services.GetRequiredService<PostgresCatalogueDatabase>()),
+            CatalogueProviderKind.Sqlite => new SqliteSourceCopyPurgeRepository(
+                services.GetRequiredService<SqliteCatalogueDatabase>()),
+            _ => throw new InvalidOperationException("No supported catalogue provider is configured for source-copy purge."),
+        };
+        string defaultApplicationRoot = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "PhotoIdentity");
+        string detectorEvaluationRoot =
+            configuration["PhotoIdentity:DetectorEvaluationRoot"]
+            ?? Path.Combine(defaultApplicationRoot, "detector-evaluations");
+        _purges = new SourceCopyPurgeService(
+            exclusions,
+            purgeRepository,
+            new SourceCopyPurgeRoots(
+                operatorConfiguration.OutputRoot,
+                proxyConfiguration.RootPath,
+                detectorEvaluationRoot),
+            new SourceCopyPurgeFileSystem(),
+            timeProvider);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -79,6 +110,8 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
 
             try
             {
+                await DrainPurgeWorkAsync(stoppingToken);
+
                 coverage = await _coverage.GetAsync(stoppingToken);
                 if (coverage is null)
                 {
@@ -186,6 +219,32 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                     stoppingToken);
                 await Task.Delay(IdleDelay, stoppingToken);
             }
+        }
+    }
+
+    private async Task DrainPurgeWorkAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            SourceCopyPurgeCycleResult result = await _purges.RunEligibleAsync(
+                maximumAttempts: 4,
+                cancellationToken);
+            if (result.Failed > 0)
+            {
+                _logger.LogWarning(
+                    "Source-copy purge cycle recorded {FailedCount} retryable failure(s).",
+                    result.Failed);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Provider and filesystem exception messages can include private derivative paths.
+            // Keep host logs generic; item-level durable state records only privacy-safe error codes.
+            _logger.LogError("Source-copy purge cycle failed before item-level retry state could be recorded.");
         }
     }
 

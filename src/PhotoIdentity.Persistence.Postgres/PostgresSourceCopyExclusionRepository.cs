@@ -112,7 +112,12 @@ public sealed class PostgresSourceCopyExclusionRepository : ISourceCopyExclusion
         string key = SourceCopyLocator.NormalizeSourceKey(sourceKey);
         await using NpgsqlConnection connection = await _database.OpenConnectionAsync(cancellationToken);
         using NpgsqlCommand command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM source_copy_exclusions WHERE source_id = @source_id AND source_key = @source_key;";
+        command.CommandText = """
+            DELETE FROM source_copy_exclusions
+            WHERE source_id = @source_id
+              AND source_key = @source_key
+              AND purge_state = 'completed';
+            """;
         command.Parameters.AddWithValue("source_id", sourceId.Value);
         command.Parameters.AddWithValue("source_key", key);
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
@@ -222,7 +227,7 @@ public sealed class PostgresSourceCopyExclusionRepository : ISourceCopyExclusion
                 source_key text NOT NULL CHECK (btrim(source_key) <> ''),
                 excluded_at_utc timestamp with time zone NOT NULL,
                 last_seen_at_utc timestamp with time zone NULL,
-                purge_state text NOT NULL CHECK (purge_state IN ('pending', 'failed', 'completed')),
+                purge_state text NOT NULL CHECK (purge_state IN ('pending', 'attempting', 'failed', 'completed')),
                 purge_error_code text NULL,
                 purge_updated_at_utc timestamp with time zone NOT NULL,
                 PRIMARY KEY (source_id, source_key),
@@ -230,6 +235,11 @@ public sealed class PostgresSourceCopyExclusionRepository : ISourceCopyExclusion
                     FOREIGN KEY (source_id) REFERENCES sources (id) ON DELETE CASCADE,
                 CHECK (purge_state = 'failed' OR purge_error_code IS NULL)
             );
+            ALTER TABLE source_copy_exclusions
+                DROP CONSTRAINT IF EXISTS source_copy_exclusions_purge_state_check;
+            ALTER TABLE source_copy_exclusions
+                ADD CONSTRAINT source_copy_exclusions_purge_state_check
+                CHECK (purge_state IN ('pending', 'attempting', 'failed', 'completed'));
             CREATE INDEX IF NOT EXISTS ix_source_copy_exclusions_purge_state
                 ON source_copy_exclusions (purge_state, purge_updated_at_utc, source_id, source_key);
             """;

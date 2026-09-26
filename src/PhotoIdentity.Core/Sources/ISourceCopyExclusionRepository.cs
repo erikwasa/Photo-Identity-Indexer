@@ -5,11 +5,12 @@ namespace PhotoIdentity.Core.Sources;
 public static class SourceCopyPurgeStates
 {
     public const string Pending = "pending";
+    public const string Attempting = "attempting";
     public const string Failed = "failed";
     public const string Completed = "completed";
 
     public static bool IsValid(string value) =>
-        value is Pending or Failed or Completed;
+        value is Pending or Attempting or Failed or Completed;
 }
 
 /// <summary>
@@ -48,7 +49,10 @@ public interface ISourceCopyExclusionRepository
         DateTimeOffset excludedAtUtc,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Explicitly removes the locator tombstone so the source copy may be indexed again.</summary>
+    /// <summary>
+    /// Explicitly removes a fully purged locator tombstone so the source copy may be indexed again.
+    /// Implementations must refuse restore while cleanup is pending, attempting or failed.
+    /// </summary>
     Task<bool> RestoreAsync(
         SourceId sourceId,
         string sourceKey,
