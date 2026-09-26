@@ -10,7 +10,15 @@ public sealed record ArchiveAdvancementControlState(
     string? Message,
     DateTimeOffset UpdatedAtUtc)
 {
+    public bool IsSyncOnlyRequested =>
+        string.Equals(DesiredState, "running", StringComparison.Ordinal) &&
+        RuntimeState is "sync-queued" or "syncing-only" or "sync-waiting";
+
     public bool IsRequested =>
+        string.Equals(DesiredState, "running", StringComparison.Ordinal) &&
+        !IsSyncOnlyRequested;
+
+    public bool HasRequestedWork =>
         string.Equals(DesiredState, "running", StringComparison.Ordinal);
 }
 
@@ -24,6 +32,11 @@ public interface IArchiveAdvancementControlRepository
         CancellationToken cancellationToken = default);
 
     Task RequestRunAsync(
+        SourceId sourceId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
+    Task RequestSyncAsync(
         SourceId sourceId,
         DateTimeOffset now,
         CancellationToken cancellationToken = default);
@@ -42,6 +55,11 @@ public interface IArchiveAdvancementControlRepository
         CancellationToken cancellationToken = default);
 
     Task CompleteAsync(
+        SourceId sourceId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
+    Task CompleteSyncAsync(
         SourceId sourceId,
         DateTimeOffset now,
         CancellationToken cancellationToken = default);

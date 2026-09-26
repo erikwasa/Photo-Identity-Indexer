@@ -76,6 +76,7 @@ public static class ArchiveEndpoints
         group.MapPost("/include", IncludeAsync);
         group.MapPut("/coverage", ReplaceCoverageAsync);
         group.MapPost("/sync", SyncAsync);
+        group.MapPost("/sync/start", StartSyncAsync);
         group.MapPost("/advance/start", StartAdvancementAsync);
         group.MapPost("/advance/pause", PauseAdvancementAsync);
         group.MapPost("/analysis/step", AnalysisStepAsync);
@@ -297,6 +298,50 @@ public static class ArchiveEndpoints
         }
     }
 
+    private static async Task<IResult> StartSyncAsync(
+        IArchiveCoverageRepository coverageRepository,
+        IArchiveStatusRepository archiveStatusRepository,
+        IArchiveAdvancementControlRepository advancementControl,
+        ArchiveOperatorConfiguration operatorConfiguration,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
+                ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
+            ArchiveAdvancementControlState? control = await advancementControl.GetAsync(
+                configured.Source.SourceId,
+                cancellationToken);
+
+            if (control?.IsRequested == true)
+            {
+                throw new InvalidOperationException(
+                    "Archive advancement is already running and owns archive synchronization. Pause advancement before starting a standalone sync.");
+            }
+
+            if (control?.IsSyncOnlyRequested != true)
+            {
+                await advancementControl.RequestSyncAsync(
+                    configured.Source.SourceId,
+                    timeProvider.GetUtcNow(),
+                    cancellationToken);
+            }
+
+            ArchiveStatusResponse status = await BuildStatusAsync(
+                coverageRepository,
+                archiveStatusRepository,
+                advancementControl,
+                operatorConfiguration,
+                cancellationToken);
+            return Results.Accepted("/api/archive/status", status);
+        }
+        catch (Exception exception)
+        {
+            return BadRequest(exception);
+        }
+    }
+
     private static async Task<IResult> StartAdvancementAsync(
         IArchiveCoverageRepository coverageRepository,
         IArchiveStatusRepository archiveStatusRepository,
@@ -309,6 +354,15 @@ public static class ArchiveEndpoints
         {
             ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
                 ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
+            ArchiveAdvancementControlState? control = await advancementControl.GetAsync(
+                configured.Source.SourceId,
+                cancellationToken);
+            if (control?.IsSyncOnlyRequested == true)
+            {
+                throw new InvalidOperationException(
+                    "Archive synchronization is already running. Start archive advancement after synchronization completes.");
+            }
+
             await advancementControl.RequestRunAsync(
                 configured.Source.SourceId,
                 timeProvider.GetUtcNow(),
@@ -496,7 +550,7 @@ public static class ArchiveEndpoints
         ArchiveAdvancementStatusResponse? advancementResponse = advancement is null
             ? null
             : new ArchiveAdvancementStatusResponse(
-                advancement.RuntimeState,
+                ToPublicRuntimeState(advancement),
                 advancement.IsRequested,
                 advancement.Message,
                 advancement.UpdatedAtUtc);
@@ -516,6 +570,22 @@ public static class ArchiveEndpoints
             folders,
             latestRun,
             advancementResponse);
+    }
+
+    private static string ToPublicRuntimeState(ArchiveAdvancementControlState advancement)
+    {
+        if (!advancement.IsSyncOnlyRequested)
+        {
+            return advancement.RuntimeState;
+        }
+
+        return advancement.RuntimeState switch
+        {
+            "sync-queued" => "queued",
+            "syncing-only" => "syncing",
+            "sync-waiting" => "syncing",
+            _ => advancement.RuntimeState,
+        };
     }
 
     private static async Task<Sha256Digest?> ResolveProfileHashAsync(

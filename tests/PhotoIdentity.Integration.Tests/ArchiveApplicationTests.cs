@@ -54,21 +54,25 @@ public sealed class ArchiveApplicationTests
                     .Content.ReadFromJsonAsync<ArchiveStatusResponse>());
             Assert.Equal(["1970"], parent.IncludedFolders);
 
-            ArchiveSyncResponse firstSync = Assert.IsType<ArchiveSyncResponse>(
-                await (await client.PostAsync("/api/archive/sync", null))
-                    .Content.ReadFromJsonAsync<ArchiveSyncResponse>());
-            Assert.Equal(2, firstSync.NewRevisions);
-            Assert.Equal(2, firstSync.LocalFiles);
-            Assert.Equal(0, firstSync.OnlineOnlyFiles);
-            Assert.Equal(2, firstSync.Status.Totals.CurrentImages);
-            Assert.Equal(2, firstSync.Status.Totals.LocalImages);
-            Assert.Equal(0, firstSync.Status.Totals.OnlineOnlyImages);
-            Assert.Equal(0, firstSync.Status.Totals.AnalysedImages);
-            Assert.Equal(2, firstSync.Status.Totals.PendingImages);
-            Assert.True(firstSync.Status.AnalysisReady);
-            Assert.NotNull(firstSync.Status.ProfileHash);
-            Assert.Single(firstSync.Status.Folders);
-            Assert.Equal("1970", firstSync.Status.Folders[0].RelativeFolder);
+            using HttpResponseMessage firstSyncRequest = await client.PostAsync("/api/archive/sync/start", null);
+            Assert.Equal(HttpStatusCode.Accepted, firstSyncRequest.StatusCode);
+            ArchiveStatusResponse firstQueued = Assert.IsType<ArchiveStatusResponse>(
+                await firstSyncRequest.Content.ReadFromJsonAsync<ArchiveStatusResponse>());
+            Assert.NotNull(firstQueued.Advancement);
+            Assert.Contains(firstQueued.Advancement.State, new[] { "queued", "syncing", "sync-complete" });
+
+            ArchiveStatusResponse firstSync = await WaitForSyncCompletionAsync(client);
+            Assert.Equal(2, firstSync.Totals.CurrentImages);
+            Assert.Equal(2, firstSync.Totals.LocalImages);
+            Assert.Equal(0, firstSync.Totals.OnlineOnlyImages);
+            Assert.Equal(0, firstSync.Totals.AnalysedImages);
+            Assert.Equal(2, firstSync.Totals.PendingImages);
+            Assert.True(firstSync.AnalysisReady);
+            Assert.NotNull(firstSync.ProfileHash);
+            Assert.Single(firstSync.Folders);
+            Assert.Equal("1970", firstSync.Folders[0].RelativeFolder);
+            Assert.Equal("sync-complete", firstSync.Advancement?.State);
+            Assert.False(firstSync.Advancement?.IsRunning);
 
             using HttpResponseMessage itemResponse = await client.GetAsync(
                 "/api/archive/items?folder=1970&state=pending&offset=0&limit=50");
@@ -83,12 +87,11 @@ public sealed class ArchiveApplicationTests
             Assert.All(itemPage.Items, item => Assert.Equal("pending", item.AnalysisState));
 
             File.Delete(Path.Combine(january, "one.jpg"));
-            ArchiveSyncResponse secondSync = Assert.IsType<ArchiveSyncResponse>(
-                await (await client.PostAsync("/api/archive/sync", null))
-                    .Content.ReadFromJsonAsync<ArchiveSyncResponse>());
-            Assert.Equal(1, secondSync.MarkedMissing);
-            Assert.Equal(1, secondSync.Status.Totals.CurrentImages);
-            Assert.Equal(1, secondSync.Status.Totals.MissingImages);
+            using HttpResponseMessage secondSyncRequest = await client.PostAsync("/api/archive/sync/start", null);
+            Assert.Equal(HttpStatusCode.Accepted, secondSyncRequest.StatusCode);
+            ArchiveStatusResponse secondSync = await WaitForSyncCompletionAsync(client);
+            Assert.Equal(1, secondSync.Totals.CurrentImages);
+            Assert.Equal(1, secondSync.Totals.MissingImages);
 
             ArchiveItemPageResponse missing = Assert.IsType<ArchiveItemPageResponse>(
                 await client.GetFromJsonAsync<ArchiveItemPageResponse>(
@@ -230,8 +233,9 @@ public sealed class ArchiveApplicationTests
                 "/api/archive/include",
                 new ArchiveIncludeRequest(archiveRoot, "1970"));
             configure.EnsureSuccessStatusCode();
-            using HttpResponseMessage initialSync = await client.PostAsync("/api/archive/sync", null);
-            initialSync.EnsureSuccessStatusCode();
+            using HttpResponseMessage initialSync = await client.PostAsync("/api/archive/sync/start", null);
+            Assert.Equal(HttpStatusCode.Accepted, initialSync.StatusCode);
+            _ = await WaitForSyncCompletionAsync(client);
 
             using HttpResponseMessage replace = await client.PutAsJsonAsync(
                 "/api/archive/coverage",
@@ -261,6 +265,37 @@ public sealed class ArchiveApplicationTests
         {
             DeleteTemporaryDirectory(directory);
         }
+    }
+
+    private static async Task<ArchiveStatusResponse> WaitForSyncCompletionAsync(HttpClient client)
+    {
+        ArchiveAdvancementStatusResponse? lastAdvancement = null;
+        for (int attempt = 0; attempt < 120; attempt++)
+        {
+            ArchiveStatusResponse status = Assert.IsType<ArchiveStatusResponse>(
+                await client.GetFromJsonAsync<ArchiveStatusResponse>("/api/archive/status"));
+            ArchiveAdvancementStatusResponse? advancement = status.Advancement;
+            lastAdvancement = advancement;
+            if (string.Equals(advancement?.State, "sync-complete", StringComparison.Ordinal))
+            {
+                return status;
+            }
+
+            if (advancement is not null &&
+                string.Equals(advancement.State, "blocked", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    advancement.Message ?? "Archive synchronization was blocked.");
+            }
+
+            // The real Archive UI polls every two seconds. Keep integration polling frequent enough
+            // for a fast test while avoiding a 50 ms SQLite read loop that can starve the background
+            // writer under sharded CI load.
+            await Task.Delay(250);
+        }
+
+        throw new TimeoutException(
+            $"Archive synchronization did not complete within the integration-test polling window. Last state: {lastAdvancement?.State ?? "none"}. Message: {lastAdvancement?.Message ?? "none"}.");
     }
 
     private static string FindRepositoryRoot()
@@ -313,6 +348,8 @@ public sealed class ArchiveApplicationTests
             _repositoryRoot = repositoryRoot;
             _analysisOutputRoot = analysisOutputRoot;
         }
+
+        protected override bool DisableBackgroundWorkers => false;
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
