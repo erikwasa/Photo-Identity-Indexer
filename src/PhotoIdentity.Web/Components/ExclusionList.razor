@@ -118,11 +118,11 @@
             }
 
             // Re-catalogue from the source instead of reconstructing any purged revision-linked data.
-            using HttpResponseMessage syncResponse = await Http.PostAsync("api/archive/sync", content: null);
+            using HttpResponseMessage syncResponse = await Http.PostAsync("api/archive/sync/start", content: null);
             if (!syncResponse.IsSuccessStatusCode)
             {
                 throw new InvalidOperationException(
-                    "The exclusion was restored, but archive synchronization failed. Use Sync included folders on Archive to finish re-inclusion.");
+                    "The exclusion was restored, but archive synchronization could not be queued. Use Sync included folders on Archive to finish re-inclusion.");
             }
 
             Navigation.NavigateTo("/archive/lifecycle?state=excluded", forceLoad: true);
