@@ -38,14 +38,14 @@ The same photo can legitimately exist at multiple OneDrive source paths. Exact d
 
 ## Acceptance criteria
 
-- [ ] Two independently catalogued source paths with the same authoritative SHA-256 are returned in one exact-duplicate group.
-- [ ] Each duplicate entry retains its own source/asset identity.
-- [ ] A third non-matching source copy does not enter the group.
-- [ ] Changing one path's bytes creates/uses the appropriate new revision and removes that current revision from the old exact group.
+- [x] Two independently catalogued source paths with the same authoritative SHA-256 are returned in one exact-duplicate group.
+- [x] Each duplicate entry retains its own source/asset identity.
+- [x] A third non-matching source copy does not enter the group.
+- [x] Changing one path's bytes creates/uses the appropriate new revision and removes that current revision from the old exact group.
 - [ ] Duplicate lookup is backed by an appropriate non-unique index and remains practical on the permanent catalogue.
-- [ ] No UNIQUE constraint is introduced across content SHA-256 values.
-- [ ] Online-only/current-source state does not erase a previously established immutable hash, but unverified metadata alone never establishes a duplicate.
-- [ ] Tests prove duplicate inventory does not merge or rewrite existing review/identity data.
+- [x] No UNIQUE constraint is introduced across content SHA-256 values.
+- [x] Online-only/current-source state does not erase a previously established immutable hash, but unverified metadata alone never establishes a duplicate.
+- [x] Tests prove duplicate inventory does not merge or rewrite existing review/identity data.
 
 ## Verification requirements
 
@@ -53,11 +53,14 @@ Automated SQLite/integration coverage is required. Maintainer review should veri
 
 ## Completion notes
 
-Implementation started 2026-09-25 on `agent/wi-0087-exact-duplicate-inventory`.
+Implementation was merged to `main` in PR #426 on 2026-09-25 from
+`agent/wi-0087-exact-duplicate-inventory`. Verification closeout resumed on
+`codex/wi-0087-verification-closeout` on 2026-09-26.
 
 - Files changed: added the provider-neutral exact-duplicate contract, SQLite and PostgreSQL query adapters, a read-only `/api/archive/exact-duplicates` endpoint, and focused provider tests.
 - Semantics: duplicate membership uses the revision explicitly verified as current by the archive source observation. `needs-source-verification` and never-verified source copies are excluded; verified online-only and later-missing copies retain duplicate membership.
 - Indexing: both adapters idempotently ensure a non-unique `(content_sha256, asset_id)` lookup index before querying. This keeps the slice deployable on both current PostgreSQL catalogues and legacy SQLite catalogues without introducing cross-copy uniqueness.
 - Trade-offs: the operator UI remains intentionally deferred to WI-0091. The endpoint exposes source-copy identities and lifecycle presence but does not merge, suppress or mutate them.
-- Deferred work: maintainer real-catalogue verification and final documentation/status completion after CI.
-- Commands run: repository inspection through the GitHub connector; CI commands will be recorded after the PR workflow runs.
+- Verification hardening: the focused SQLite integration test now seeds an assigned face and proves that exact-duplicate reads preserve the face occurrence, person, confirmed label, append-only review action and effective assignment.
+- Automated evidence on 2026-09-26: the focused SQLite test passed; `./build.ps1` passed with zero warnings and errors; `./test.ps1` passed 888 tests; `PhotoIdentity.Docs validate` and `generate --check` passed; and `./verify-postgres.ps1 -SkipContainerStart` passed 52 live PostgreSQL persistence tests plus 8 PostgreSQL runtime/composition integration tests.
+- Deferred work: the maintainer real-catalogue exact-duplicate check remains required to confirm practical lookup behavior without recording private filenames or hashes. After that evidence is available, WI-0087 can be completed.
