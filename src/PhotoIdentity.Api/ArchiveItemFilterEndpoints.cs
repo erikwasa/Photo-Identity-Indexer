@@ -40,7 +40,7 @@ public sealed record ArchiveRetrySourceCopyPurgeRequest(string? SourceId, string
 
 public static class ArchiveItemFilterEndpoints
 {
-    private const int MissingLifecycleReadBatchSize = 500;
+    private const int MissingLifecycleReadBatchSize = 200;
 
     public static IEndpointRouteBuilder MapArchiveItemFilterEndpoints(this IEndpointRouteBuilder endpoints)
     {
