@@ -9,6 +9,8 @@ global using CatalogueFaceObservation = PhotoIdentity.Testing.Postgres.Catalogue
 global using CatalogueFaceCrop = PhotoIdentity.Testing.Postgres.CatalogueFaceCrop;
 global using CatalogueFaceEmbedding = PhotoIdentity.Testing.Postgres.CatalogueFaceEmbedding;
 global using CatalogueFaceInspection = PhotoIdentity.Testing.Postgres.CatalogueFaceInspection;
+global using CatalogueHumanLabel = PhotoIdentity.Testing.Postgres.CatalogueHumanLabel;
+global using CatalogueRankedIdentitySuggestion = PhotoIdentity.Testing.Postgres.CatalogueRankedIdentitySuggestion;
 global using CatalogueProcessingAssetRevision = PhotoIdentity.Core.Catalogue.AssetRevisionLookup;
 global using CataloguePhotoDetails = PhotoIdentity.Core.Catalogue.PhotoDetails;
 global using CataloguePhotoDetailsPerson = PhotoIdentity.Core.Catalogue.PhotoDetailsPerson;
@@ -33,6 +35,8 @@ global using SourceCatalogueScanSummary = PhotoIdentity.Testing.Postgres.SourceC
 global using IdentitySuggestionPolicy = PhotoIdentity.Core.Review.ReviewIdentitySuggestionPolicy;
 global using IdentitySuggestionConfidenceGroups = PhotoIdentity.Core.Review.ReviewIdentitySuggestionConfidenceGroups;
 global using IdentityAutoAssignmentSummary = PhotoIdentity.Core.Review.ReviewIdentityAutoAssignmentSummary;
+global using IdentityMatchSummary = PhotoIdentity.Testing.Postgres.IdentityMatchSummary;
+global using IdentityMatchTargetScope = PhotoIdentity.Testing.Postgres.IdentityMatchTargetScope;
 
 // These are identifier-only aliases. The mature fixtures still spell the ADO.NET primitives with
 // their old provider names, but every object created by PostgresTestCatalogueDatabase is Npgsql.
@@ -51,6 +55,8 @@ global using SqliteArchiveSourceCatalogueScanner = PhotoIdentity.Testing.Postgre
 global using SqliteAssetCatalogueRepository = PhotoIdentity.Testing.Postgres.PostgresAssetCatalogueCompatibilityRepository;
 global using SqliteFaceCatalogueRepository = PhotoIdentity.Testing.Postgres.PostgresFaceCatalogueCompatibilityRepository;
 global using SqliteReviewRepository = PhotoIdentity.Testing.Postgres.PostgresReviewCompatibilityRepository;
+global using SqliteIdentityCatalogueRepository = PhotoIdentity.Testing.Postgres.PostgresIdentityCatalogueCompatibilityRepository;
+global using SqliteIdentityMatcher = PhotoIdentity.Testing.Postgres.PostgresIdentityMatcherCompatibility;
 global using PhotoMetadataBackfillCandidate = PhotoIdentity.Testing.Postgres.PhotoMetadataBackfillCandidate;
 
 global using SqliteSourceCopyExclusionRepository = PhotoIdentity.Persistence.Postgres.PostgresSourceCopyExclusionRepository;
@@ -62,7 +68,7 @@ global using SqliteIdentitySuggestionPolicyRepository = PhotoIdentity.Persistenc
 global using SqliteIdentityMatchRegenerationModelRepository = PhotoIdentity.Persistence.Postgres.PostgresIdentityMatchModelRepository;
 global using SqliteIdentityMatchRegenerationRepository = PhotoIdentity.Persistence.Postgres.PostgresIdentityMatchRegenerationRepository;
 global using SqliteIdentityMatchRegenerationScorer = PhotoIdentity.Persistence.Postgres.PostgresIdentityMatchRegenerationScorer;
-global using SqliteIdentityAutoAssignmentService = PhotoIdentity.Persistence.Postgres.PostgresIdentityAutoAssignmentService;
+global using SqliteIdentityAutoAssignmentService = PhotoIdentity.Testing.Postgres.PostgresIdentityAutoAssignmentCompatibilityService;
 global using SqlitePersonAuditRepository = PhotoIdentity.Persistence.Postgres.PostgresPersonAuditRepository;
 global using SqlitePersonMaintenanceRepository = PhotoIdentity.Persistence.Postgres.PostgresPersonMaintenanceRepository;
 global using SqlitePersonPhotoCountRepository = PhotoIdentity.Persistence.Postgres.PostgresPersonPresentationRepository;
@@ -79,7 +85,7 @@ global using SqliteSmartCollectionRepository = PhotoIdentity.Persistence.Postgre
 global using SqliteCreativeCollectionRecipeRepository = PhotoIdentity.Persistence.Postgres.PostgresCreativeCollectionRecipeRepository;
 global using SqlitePhotoPresentationPreferenceRepository = PhotoIdentity.Persistence.Postgres.PostgresPhotoPresentationPreferenceRepository;
 global using SqlitePhotoSlideshowExposureRepository = PhotoIdentity.Persistence.Postgres.PostgresPhotoSlideshowExposureRepository;
-global using SqlitePhotoMetadataBackfillRepository = PhotoIdentity.Persistence.Postgres.PostgresPhotoMetadataBackfillRepository;
+global using SqlitePhotoMetadataBackfillRepository = PhotoIdentity.Testing.Postgres.PostgresPhotoMetadataBackfillCompatibilityRepository;
 global using SqliteExtendedPhotoMetadataRepository = PhotoIdentity.Persistence.Postgres.PostgresExtendedPhotoMetadataRepository;
 global using SqlitePhotoMetadataInspectionRepository = PhotoIdentity.Persistence.Postgres.PostgresPhotoMetadataInspectionRepository;
 global using SqlitePhotoTagRepository = PhotoIdentity.Persistence.Postgres.PostgresPhotoTagRepository;
