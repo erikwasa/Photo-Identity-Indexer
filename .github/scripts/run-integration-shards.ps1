@@ -20,6 +20,24 @@ if ($ShardNumber -lt 1 -or $ShardNumber -gt $ShardCount) {
     throw "ShardNumber must be between 1 and ShardCount."
 }
 
+if ([string]::IsNullOrWhiteSpace($env:PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING) -and
+    [string]::Equals($env:GITHUB_ACTIONS, "true", [StringComparison]::OrdinalIgnoreCase)) {
+    $service = Get-Service -Name 'postgresql-x64-*' | Sort-Object Name -Descending | Select-Object -First 1
+    if ($null -eq $service) {
+        throw "The Windows integration-test runner does not provide a PostgreSQL service."
+    }
+
+    Set-Service -Name $service.Name -StartupType Manual
+    if ($service.Status -ne [System.ServiceProcess.ServiceControllerStatus]::Running) {
+        Start-Service -Name $service.Name
+        $service.WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+    }
+
+    $env:PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING =
+        "Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=root;Pooling=false"
+    Write-Host "Started PostgreSQL and configured an isolated-database admin connection for integration tests."
+}
+
 $projectPath = (Resolve-Path $Project).Path
 $baseline = Get-Content $BaselinePath -Raw | ConvertFrom-Json
 $baselineWeights = @{}
