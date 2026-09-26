@@ -349,6 +349,8 @@ public sealed class ArchiveApplicationTests
             _analysisOutputRoot = analysisOutputRoot;
         }
 
+        protected override bool DisableBackgroundWorkers => false;
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
