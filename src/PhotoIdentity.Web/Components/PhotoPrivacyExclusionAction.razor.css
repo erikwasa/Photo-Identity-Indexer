@@ -1,0 +1,15 @@
+.photo-privacy-action {
+    margin: 0 0 1.25rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--border, #d9d9d9);
+    border-radius: 0.9rem;
+    background: var(--surface, #fff);
+}
+
+.photo-privacy-action h2 {
+    margin-bottom: 0.35rem;
+}
+
+.photo-privacy-action .notice {
+    margin-top: 0.75rem;
+}

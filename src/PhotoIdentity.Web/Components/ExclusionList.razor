@@ -1,0 +1,162 @@
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<section class="lifecycle-panel">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">Privacy state</p>
+            <h2>@Title</h2>
+            <p>@Description</p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <div class="notice error" role="alert">@Error</div>
+    }
+
+    @if (Items.Count == 0)
+    {
+        <div class="empty-state compact"><p>No entries in this state.</p></div>
+    }
+    else
+    {
+        <div class="archive-table-wrap">
+            <table class="archive-table lifecycle-table">
+                <thead>
+                    <tr><th>Source copy</th><th>Status</th><th>Updated</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (ArchiveSourceCopyExclusionResponse item in Items)
+                    {
+                        <tr>
+                            <td><code>@item.SourceKey</code></td>
+                            <td>
+                                <span class="archive-state state-@item.PurgeState">@PurgeLabel(item)</span>
+                                @if (!string.IsNullOrWhiteSpace(item.PurgeErrorCode))
+                                {
+                                    <small class="purge-error-code">@item.PurgeErrorCode</small>
+                                }
+                            </td>
+                            <td>@item.PurgeUpdatedAtUtc.ToLocalTime().ToString("g")</td>
+                            <td>
+                                @if (ShowRestore)
+                                {
+                                    <button type="button" class="button secondary" disabled="@Busy" @onclick="() => RestoreAsync(item)">Re-include from source</button>
+                                }
+                                else if (ShowRetry)
+                                {
+                                    <button type="button" class="button primary" disabled="@Busy" @onclick="() => RetryAsync(item)">Retry purge</button>
+                                }
+                                else
+                                {
+                                    <span>@(item.PurgeState == "attempting" ? "Cleanup running" : "Cleanup queued")</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Description { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ArchiveSourceCopyExclusionResponse> Items { get; set; } = [];
+
+    [Parameter]
+    public bool ShowRestore { get; set; }
+
+    [Parameter]
+    public bool ShowRetry { get; set; }
+
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+
+    private async Task RetryAsync(ArchiveSourceCopyExclusionResponse item)
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/archive/exclusions/retry",
+                new ArchiveRetrySourceCopyPurgeRequest(item.SourceId, item.SourceKey));
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(await ReadErrorAsync(response));
+            }
+
+            Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+            Busy = false;
+        }
+    }
+
+    private async Task RestoreAsync(ArchiveSourceCopyExclusionResponse item)
+    {
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/archive/exclusions/restore",
+                new ArchiveRestoreSourceCopyRequest(item.SourceId, item.SourceKey));
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(await ReadErrorAsync(response));
+            }
+
+            // Re-catalogue from the source instead of reconstructing any purged revision-linked data.
+            using HttpResponseMessage syncResponse = await Http.PostAsync("api/archive/sync", content: null);
+            if (!syncResponse.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(
+                    "The exclusion was restored, but archive synchronization failed. Use Sync included folders on Archive to finish re-inclusion.");
+            }
+
+            Navigation.NavigateTo("/archive/lifecycle?state=excluded", forceLoad: true);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+            Busy = false;
+        }
+    }
+
+    private static string PurgeLabel(ArchiveSourceCopyExclusionResponse item) => item.PurgeState switch
+    {
+        "completed" => "Excluded · purge complete",
+        "pending" => "Purge pending",
+        "attempting" => "Purge running",
+        "failed" => "Purge failed",
+        _ => item.PurgeState,
+    };
+
+    private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            ArchiveErrorResponse? error = await response.Content.ReadFromJsonAsync<ArchiveErrorResponse>();
+            if (!string.IsNullOrWhiteSpace(error?.Error))
+            {
+                return error.Error;
+            }
+        }
+        catch
+        {
+        }
+
+        return $"Archive lifecycle operation failed with HTTP {(int)response.StatusCode}.";
+    }
+}

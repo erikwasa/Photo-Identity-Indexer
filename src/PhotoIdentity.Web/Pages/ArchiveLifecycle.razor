@@ -1,0 +1,534 @@
+@page "/archive/lifecycle"
+@inject HttpClient Http
+
+<PageTitle>Archive lifecycle · Photo Identity</PageTitle>
+
+<section class="hero archive-lifecycle-hero">
+    <div>
+        <p class="eyebrow">Source-copy lifecycle</p>
+        <h1>Archive lifecycle review</h1>
+        <p>Review removed source photos, exact duplicate copies and privacy exclusions. Exclusion applies to one source copy at a time and never deletes the OneDrive/source original.</p>
+    </div>
+    <div class="collection-inline-actions">
+        <a class="button secondary" href="/archive">Back to archive</a>
+        <button class="button secondary" disabled="@Busy" @onclick="LoadAsync">Refresh</button>
+    </div>
+</section>
+
+@if (!string.IsNullOrWhiteSpace(Error))
+{
+    <div class="notice error" role="alert">@Error</div>
+}
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="notice" role="status">@Message</div>
+}
+
+@if (Loading)
+{
+    <section class="empty-state" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Loading lifecycle review…</p>
+    </section>
+}
+else
+{
+    <section class="lifecycle-summary" aria-label="Archive lifecycle counts">
+        <a class="lifecycle-summary-card @(SelectedState == "removed" ? "selected" : null)" href="/archive/lifecycle?state=removed">
+            <span>Removed from source</span>
+            <strong>@(Status?.Totals.MissingImages ?? RemovedPage?.Total ?? 0)</strong>
+        </a>
+        <a class="lifecycle-summary-card @(SelectedState == "duplicates" ? "selected" : null)" href="/archive/lifecycle?state=duplicates">
+            <span>Exact duplicate copies</span>
+            <strong>@DuplicateRows.Count</strong>
+            <small>@DuplicateGroups.Count group@((DuplicateGroups.Count == 1) ? "" : "s")</small>
+        </a>
+        <a class="lifecycle-summary-card @(SelectedState == "excluded" ? "selected" : null)" href="/archive/lifecycle?state=excluded">
+            <span>Excluded</span>
+            <strong>@CompletedExclusions.Count</strong>
+        </a>
+        <a class="lifecycle-summary-card @(SelectedState == "pending" ? "selected" : null)" href="/archive/lifecycle?state=pending">
+            <span>Purge pending</span>
+            <strong>@PendingExclusions.Count</strong>
+        </a>
+        <a class="lifecycle-summary-card @(SelectedState == "failed" ? "selected" : null)" href="/archive/lifecycle?state=failed">
+            <span>Purge failed</span>
+            <strong>@FailedExclusions.Count</strong>
+        </a>
+    </section>
+
+    @if (ConfirmingExclusion)
+    {
+        <section class="lifecycle-confirmation" role="alertdialog" aria-labelledby="exclude-confirmation-title">
+            <h2 id="exclude-confirmation-title">Exclude &amp; purge @SelectedRevisionIds.Count selected source cop@((SelectedRevisionIds.Count == 1) ? "y" : "ies")?</h2>
+            <p><strong>The OneDrive/source original will not be deleted.</strong> Photo Identity will immediately block the selected source copy and permanently remove its retained photo data, review proxies/crops, faces, identity links and photo metadata.</p>
+            <p>If the source copy is restored later, it is catalogued and analyzed again from source. Purged identifications and history are not restored.</p>
+            <div class="collection-inline-actions">
+                <button class="button danger" disabled="@Busy" @onclick="ConfirmExcludeSelectedAsync">Exclude &amp; purge selected</button>
+                <button class="button secondary" disabled="@Busy" @onclick="CancelExclude">Cancel</button>
+            </div>
+        </section>
+    }
+
+    @if (SelectedState == "removed")
+    {
+        <section class="lifecycle-panel" aria-labelledby="removed-heading">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Review queue</p>
+                    <h2 id="removed-heading">Removed from source</h2>
+                    <p>These photos are missing from the source but remain non-destructive and reviewable until you explicitly exclude them.</p>
+                </div>
+                <button class="button danger" disabled="@(Busy || SelectedRevisionIds.Count == 0)" @onclick="BeginExcludeSelected">Exclude &amp; purge selected (@SelectedRevisionIds.Count)</button>
+            </div>
+
+            @if (RemovedPage is null || RemovedPage.Items.Count == 0)
+            {
+                <div class="empty-state compact"><p>No removed source photos need review.</p></div>
+            }
+            else
+            {
+                <div class="lifecycle-list">
+                    @foreach (ArchiveItemStatusResponse item in RemovedPage.Items)
+                    {
+                        <article class="removed-card">
+                            <label class="lifecycle-select">
+                                <input type="checkbox"
+                                       disabled="@(Busy || string.IsNullOrWhiteSpace(item.RevisionId))"
+                                       checked="@(item.RevisionId is not null && SelectedRevisionIds.Contains(item.RevisionId))"
+                                       @onchange="args => SetSelected(item.RevisionId, args)" />
+                                <span>Select</span>
+                            </label>
+                            @if (!string.IsNullOrWhiteSpace(item.RevisionId))
+                            {
+                                <a class="removed-preview" href="@PhotoUrl(item.RevisionId!, "removed")">
+                                    <img src="@PreviewUrl(item.RevisionId!)" loading="lazy" alt="Removed photo preview" />
+                                </a>
+                            }
+                            <div class="removed-copy-details">
+                                <code>@item.RelativePath</code>
+                                <span class="archive-state state-missing">Removed from source</span>
+                                <span>@(string.IsNullOrWhiteSpace(item.LastError) ? "Retained for review" : item.LastError)</span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(item.RevisionId))
+                            {
+                                <a class="button secondary" href="@PhotoUrl(item.RevisionId!, "removed")">Review</a>
+                            }
+                        </article>
+                    }
+                </div>
+                <div class="pagination">
+                    <button class="button secondary" disabled="@(Busy || RemovedPage.Offset == 0)" @onclick="PreviousRemovedAsync">Previous</button>
+                    <span>Showing @(RemovedPage.Offset + 1)–@Math.Min(RemovedPage.Offset + RemovedPage.Items.Count, RemovedPage.Total) of @RemovedPage.Total</span>
+                    <button class="button secondary" disabled="@(Busy || RemovedPage.Offset + RemovedPage.Limit >= RemovedPage.Total)" @onclick="NextRemovedAsync">Next</button>
+                </div>
+            }
+        </section>
+    }
+    else if (SelectedState == "duplicates")
+    {
+        <section class="lifecycle-panel" aria-labelledby="duplicates-heading">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Exact content</p>
+                    <h2 id="duplicates-heading">Exact duplicates</h2>
+                    <p>Every row is an independently controlled source copy. Selecting or excluding one copy does not exclude another identical path.</p>
+                </div>
+                <button class="button danger" disabled="@(Busy || SelectedRevisionIds.Count == 0)" @onclick="BeginExcludeSelected">Exclude &amp; purge selected (@SelectedRevisionIds.Count)</button>
+            </div>
+
+            @if (DuplicateRows.Count == 0)
+            {
+                <div class="empty-state compact"><p>No current exact duplicate groups remain.</p></div>
+            }
+            else
+            {
+                <div class="archive-table-wrap">
+                    <table class="archive-table lifecycle-table">
+                        <thead>
+                            <tr><th>Select</th><th>Group</th><th>Source copy</th><th>Status</th><th>View</th></tr>
+                        </thead>
+                        <tbody>
+                            @foreach (DuplicateRow row in VisibleDuplicateRows)
+                            {
+                                <tr>
+                                    <td><input type="checkbox" disabled="@Busy" checked="@SelectedRevisionIds.Contains(row.Copy.RevisionId)" @onchange="args => SetSelected(row.Copy.RevisionId, args)" /></td>
+                                    <td>@row.GroupNumber <span class="muted">(@row.GroupSize copies)</span></td>
+                                    <td><code>@row.Copy.SourceKey</code></td>
+                                    <td><span class="archive-state @(row.Copy.IsMissing ? "state-missing" : "state-local")">@(row.Copy.IsMissing ? "Removed" : "Present")</span></td>
+                                    <td><a class="button secondary" href="@PhotoUrl(row.Copy.RevisionId, "duplicates")">View</a></td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <button class="button secondary" disabled="@(Busy || DuplicateOffset == 0)" @onclick="PreviousDuplicates">Previous</button>
+                    <span>Showing @(DuplicateOffset + 1)–@Math.Min(DuplicateOffset + DuplicatePageSize, DuplicateRows.Count) of @DuplicateRows.Count copies</span>
+                    <button class="button secondary" disabled="@(Busy || DuplicateOffset + DuplicatePageSize >= DuplicateRows.Count)" @onclick="NextDuplicates">Next</button>
+                </div>
+            }
+        </section>
+    }
+    else if (SelectedState == "excluded")
+    {
+        <ExclusionList Title="Excluded" Description="Purge is complete. These are text/status-only tombstones: no thumbnail, original-view action, photo metadata, face data or identity data remains in Photo Identity." Items="CompletedExclusions" ShowRestore="true" />
+    }
+    else if (SelectedState == "pending")
+    {
+        <ExclusionList Title="Purge pending" Description="These copies are already blocked from normal Photo Identity access while cleanup is pending or running." Items="PendingExclusions" ShowRestore="false" />
+    }
+    else
+    {
+        <ExclusionList Title="Purge failed" Description="These copies remain blocked. Retry queues the privacy cleanup again without exposing source paths through error messages." Items="FailedExclusions" ShowRestore="false" ShowRetry="true" />
+    }
+}
+
+@code {
+    private const int RemovedPageSize = 50;
+    private const int DuplicatePageSize = 100;
+    private static readonly HashSet<string> AllowedStates = new(StringComparer.Ordinal)
+    {
+        "removed", "duplicates", "excluded", "pending", "failed",
+    };
+
+    [Parameter, SupplyParameterFromQuery(Name = "state")]
+    public string? QueryState { get; set; }
+
+    private string SelectedState { get; set; } = "removed";
+    private ArchiveStatusResponse? Status { get; set; }
+    private ArchiveItemPageResponse? RemovedPage { get; set; }
+    private IReadOnlyList<ArchiveExactDuplicateGroupResponse> DuplicateGroups { get; set; } = [];
+    private IReadOnlyList<DuplicateRow> DuplicateRows { get; set; } = [];
+    private IReadOnlyList<ArchiveSourceCopyExclusionResponse> Exclusions { get; set; } = [];
+    private IReadOnlyList<ArchiveSourceCopyExclusionResponse> CompletedExclusions => Exclusions.Where(static item => item.PurgeState == "completed").ToArray();
+    private IReadOnlyList<ArchiveSourceCopyExclusionResponse> PendingExclusions => Exclusions.Where(static item => item.PurgeState is "pending" or "attempting").ToArray();
+    private IReadOnlyList<ArchiveSourceCopyExclusionResponse> FailedExclusions => Exclusions.Where(static item => item.PurgeState == "failed").ToArray();
+    private IEnumerable<DuplicateRow> VisibleDuplicateRows => DuplicateRows.Skip(DuplicateOffset).Take(DuplicatePageSize);
+    private HashSet<string> SelectedRevisionIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+    private int RemovedOffset { get; set; }
+    private int DuplicateOffset { get; set; }
+    private bool Loading { get; set; } = true;
+    private bool Busy { get; set; }
+    private bool ConfirmingExclusion { get; set; }
+    private string? Error { get; set; }
+    private string? Message { get; set; }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        SelectedState = NormalizeState(QueryState);
+        SelectedRevisionIds.Clear();
+        ConfirmingExclusion = false;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        Loading = true;
+        Error = null;
+        try
+        {
+            Status = await Http.GetFromJsonAsync<ArchiveStatusResponse>("api/archive/status");
+            await Task.WhenAll(LoadRemovedAsync(), LoadDuplicatesAsync(), LoadExclusionsAsync());
+        }
+        catch (Exception exception)
+        {
+            Error = $"Lifecycle review could not be loaded: {exception.Message}";
+        }
+        finally
+        {
+            Loading = false;
+        }
+    }
+
+    private async Task LoadRemovedAsync()
+    {
+        RemovedPage = await Http.GetFromJsonAsync<ArchiveItemPageResponse>(
+            $"api/archive/items/filter?availability=all&verification=all&analysis=missing&folder=&offset={RemovedOffset}&limit={RemovedPageSize}");
+    }
+
+    private async Task LoadDuplicatesAsync()
+    {
+        DuplicateGroups = await Http.GetFromJsonAsync<ArchiveExactDuplicateGroupResponse[]>("api/archive/exact-duplicates") ?? [];
+        List<DuplicateRow> rows = [];
+        for (int groupIndex = 0; groupIndex < DuplicateGroups.Count; groupIndex++)
+        {
+            ArchiveExactDuplicateGroupResponse group = DuplicateGroups[groupIndex];
+            foreach (ArchiveExactDuplicateCopyResponse copy in group.Copies)
+            {
+                rows.Add(new DuplicateRow(groupIndex + 1, group.Copies.Count, copy));
+            }
+        }
+
+        DuplicateRows = rows;
+        DuplicateOffset = Math.Min(DuplicateOffset, Math.Max(0, DuplicateRows.Count - 1));
+    }
+
+    private async Task LoadExclusionsAsync()
+    {
+        Exclusions = await Http.GetFromJsonAsync<ArchiveSourceCopyExclusionResponse[]>("api/archive/exclusions") ?? [];
+    }
+
+    private void SetSelected(string? revisionId, ChangeEventArgs args)
+    {
+        if (string.IsNullOrWhiteSpace(revisionId))
+        {
+            return;
+        }
+
+        bool selected = args.Value is bool value && value;
+        if (selected)
+        {
+            SelectedRevisionIds.Add(revisionId);
+        }
+        else
+        {
+            SelectedRevisionIds.Remove(revisionId);
+        }
+    }
+
+    private void BeginExcludeSelected()
+    {
+        if (SelectedRevisionIds.Count > 0)
+        {
+            ConfirmingExclusion = true;
+            Message = null;
+            Error = null;
+        }
+    }
+
+    private void CancelExclude() => ConfirmingExclusion = false;
+
+    private async Task ConfirmExcludeSelectedAsync()
+    {
+        if (SelectedRevisionIds.Count == 0)
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            string[] revisionIds = SelectedRevisionIds.ToArray();
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/archive/exclusions/revisions",
+                new ArchiveExcludeRevisionsRequest(revisionIds));
+            ArchiveBulkExclusionResponse result = await ReadResponseAsync<ArchiveBulkExclusionResponse>(response);
+            Message = $"Exclusion is durable for {result.Excluded} source cop{(result.Excluded == 1 ? "y" : "ies")}. Privacy purge will continue in the background.";
+            SelectedRevisionIds.Clear();
+            ConfirmingExclusion = false;
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RetryAsync(ArchiveSourceCopyExclusionResponse item)
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/archive/exclusions/retry",
+                new ArchiveRetrySourceCopyPurgeRequest(item.SourceId, item.SourceKey));
+            _ = await ReadResponseAsync<ArchiveSourceCopyExclusionResponse>(response);
+            Message = "Purge retry queued. The source copy remains blocked while cleanup continues.";
+            await LoadExclusionsAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RestoreAsync(ArchiveSourceCopyExclusionResponse item)
+    {
+        Busy = true;
+        Error = null;
+        Message = null;
+        try
+        {
+            using HttpResponseMessage restoreResponse = await Http.PostAsJsonAsync(
+                "api/archive/exclusions/restore",
+                new ArchiveRestoreSourceCopyRequest(item.SourceId, item.SourceKey));
+            if (!restoreResponse.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(await ReadErrorAsync(restoreResponse));
+            }
+
+            using HttpResponseMessage syncResponse = await Http.PostAsync("api/archive/sync", content: null);
+            if (!syncResponse.IsSuccessStatusCode)
+            {
+                Message = "The exclusion tombstone was removed, but archive synchronization did not complete. Run Sync included folders from Archive to re-catalogue the source copy.";
+            }
+            else
+            {
+                Message = "Source copy restored and archive synchronized. If the source still exists, it is re-catalogued as fresh work; purged identifications/history are not restored.";
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task PreviousRemovedAsync()
+    {
+        RemovedOffset = Math.Max(0, RemovedOffset - RemovedPageSize);
+        SelectedRevisionIds.Clear();
+        await LoadRemovedAsync();
+    }
+
+    private async Task NextRemovedAsync()
+    {
+        RemovedOffset += RemovedPageSize;
+        SelectedRevisionIds.Clear();
+        await LoadRemovedAsync();
+    }
+
+    private void PreviousDuplicates()
+    {
+        DuplicateOffset = Math.Max(0, DuplicateOffset - DuplicatePageSize);
+    }
+
+    private void NextDuplicates()
+    {
+        DuplicateOffset = Math.Min(Math.Max(0, DuplicateRows.Count - 1), DuplicateOffset + DuplicatePageSize);
+    }
+
+    private RenderFragment ExclusionList(
+        string Title,
+        string Description,
+        IReadOnlyList<ArchiveSourceCopyExclusionResponse> Items,
+        bool ShowRestore,
+        bool ShowRetry = false) => builder =>
+    {
+        int sequence = 0;
+        builder.OpenElement(sequence++, "section");
+        builder.AddAttribute(sequence++, "class", "lifecycle-panel");
+        builder.OpenElement(sequence++, "div");
+        builder.AddAttribute(sequence++, "class", "section-heading");
+        builder.OpenElement(sequence++, "div");
+        builder.OpenElement(sequence++, "p"); builder.AddAttribute(sequence++, "class", "eyebrow"); builder.AddContent(sequence++, "Privacy state"); builder.CloseElement();
+        builder.OpenElement(sequence++, "h2"); builder.AddContent(sequence++, Title); builder.CloseElement();
+        builder.OpenElement(sequence++, "p"); builder.AddContent(sequence++, Description); builder.CloseElement();
+        builder.CloseElement(); builder.CloseElement();
+
+        if (Items.Count == 0)
+        {
+            builder.OpenElement(sequence++, "div"); builder.AddAttribute(sequence++, "class", "empty-state compact");
+            builder.OpenElement(sequence++, "p"); builder.AddContent(sequence++, "No entries in this state."); builder.CloseElement(); builder.CloseElement();
+        }
+        else
+        {
+            builder.OpenElement(sequence++, "div"); builder.AddAttribute(sequence++, "class", "archive-table-wrap");
+            builder.OpenElement(sequence++, "table"); builder.AddAttribute(sequence++, "class", "archive-table lifecycle-table");
+            builder.AddMarkupContent(sequence++, "<thead><tr><th>Source copy</th><th>Status</th><th>Updated</th><th>Action</th></tr></thead>");
+            builder.OpenElement(sequence++, "tbody");
+            foreach (ArchiveSourceCopyExclusionResponse item in Items)
+            {
+                builder.OpenElement(sequence++, "tr");
+                builder.OpenElement(sequence++, "td"); builder.OpenElement(sequence++, "code"); builder.AddContent(sequence++, item.SourceKey); builder.CloseElement(); builder.CloseElement();
+                builder.OpenElement(sequence++, "td");
+                builder.OpenElement(sequence++, "span"); builder.AddAttribute(sequence++, "class", $"archive-state state-{item.PurgeState}"); builder.AddContent(sequence++, PurgeLabel(item)); builder.CloseElement();
+                if (!string.IsNullOrWhiteSpace(item.PurgeErrorCode))
+                {
+                    builder.OpenElement(sequence++, "small"); builder.AddAttribute(sequence++, "class", "purge-error-code"); builder.AddContent(sequence++, item.PurgeErrorCode); builder.CloseElement();
+                }
+                builder.CloseElement();
+                builder.OpenElement(sequence++, "td"); builder.AddContent(sequence++, item.PurgeUpdatedAtUtc.ToLocalTime().ToString("g")); builder.CloseElement();
+                builder.OpenElement(sequence++, "td");
+                if (ShowRestore)
+                {
+                    builder.OpenElement(sequence++, "button"); builder.AddAttribute(sequence++, "type", "button"); builder.AddAttribute(sequence++, "class", "button secondary"); builder.AddAttribute(sequence++, "disabled", Busy); builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => RestoreAsync(item))); builder.AddContent(sequence++, "Re-include from source"); builder.CloseElement();
+                }
+                else if (ShowRetry)
+                {
+                    builder.OpenElement(sequence++, "button"); builder.AddAttribute(sequence++, "type", "button"); builder.AddAttribute(sequence++, "class", "button primary"); builder.AddAttribute(sequence++, "disabled", Busy); builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => RetryAsync(item))); builder.AddContent(sequence++, "Retry purge"); builder.CloseElement();
+                }
+                else
+                {
+                    builder.AddContent(sequence++, item.PurgeState == "attempting" ? "Cleanup running" : "Cleanup queued");
+                }
+                builder.CloseElement(); builder.CloseElement();
+            }
+            builder.CloseElement(); builder.CloseElement(); builder.CloseElement();
+        }
+
+        builder.CloseElement();
+    };
+
+    private static string NormalizeState(string? value)
+    {
+        string state = value?.Trim().ToLowerInvariant() ?? "removed";
+        return AllowedStates.Contains(state) ? state : "removed";
+    }
+
+    private static string PreviewUrl(string revisionId) =>
+        $"api/collections/photos/{Uri.EscapeDataString(revisionId)}/viewer-preview";
+
+    private static string PhotoUrl(string revisionId, string state)
+    {
+        string returnUrl = Uri.EscapeDataString($"/archive/lifecycle?state={state}");
+        return $"/photo/{Uri.EscapeDataString(revisionId)}?returnUrl={returnUrl}";
+    }
+
+    private static string PurgeLabel(ArchiveSourceCopyExclusionResponse item) => item.PurgeState switch
+    {
+        "completed" => "Excluded · purge complete",
+        "pending" => "Purge pending",
+        "attempting" => "Purge running",
+        "failed" => "Purge failed",
+        _ => item.PurgeState,
+    };
+
+    private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            ArchiveErrorResponse? error = await response.Content.ReadFromJsonAsync<ArchiveErrorResponse>();
+            if (!string.IsNullOrWhiteSpace(error?.Error))
+            {
+                return error.Error;
+            }
+        }
+        catch
+        {
+        }
+
+        return $"Archive lifecycle operation failed with HTTP {(int)response.StatusCode}.";
+    }
+
+    private static async Task<T> ReadResponseAsync<T>(HttpResponseMessage response)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(await ReadErrorAsync(response));
+        }
+
+        return await response.Content.ReadFromJsonAsync<T>()
+            ?? throw new InvalidOperationException("The archive lifecycle API returned an empty response.");
+    }
+
+    private sealed record DuplicateRow(int GroupNumber, int GroupSize, ArchiveExactDuplicateCopyResponse Copy);
+}

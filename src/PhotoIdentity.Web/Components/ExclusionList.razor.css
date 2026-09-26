@@ -1,0 +1,60 @@
+.lifecycle-panel {
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--border, #d9d9d9);
+    border-radius: 1rem;
+    background: var(--surface, #fff);
+}
+
+.archive-table-wrap {
+    overflow-x: auto;
+}
+
+.archive-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.archive-table th,
+.archive-table td {
+    padding: 0.7rem 0.8rem;
+    border-bottom: 1px solid var(--border, #ddd);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.archive-table td:first-child {
+    width: 100%;
+}
+
+.archive-table code {
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+.archive-state {
+    display: inline-block;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(127, 127, 127, 0.12);
+    font-size: 0.82rem;
+}
+
+.state-pending,
+.state-attempting {
+    color: #8a5a00;
+}
+
+.state-failed {
+    color: #a32727;
+}
+
+.state-completed {
+    color: #246b34;
+}
+
+.purge-error-code {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--muted, #666);
+}

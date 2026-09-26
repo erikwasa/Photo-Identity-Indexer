@@ -1,0 +1,130 @@
+@implements IDisposable
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+@if (CurrentRevisionId is not null)
+{
+    <section class="photo-privacy-action" aria-labelledby="photo-privacy-heading">
+        <div>
+            <p class="eyebrow">Privacy</p>
+            <h2 id="photo-privacy-heading">Exclude from Photo Identity</h2>
+            @if (!Confirming)
+            {
+                <p>Use this when the source photo should remain in OneDrive but Photo Identity must stop retaining or processing this source copy.</p>
+            }
+            else
+            {
+                <div class="notice warning">
+                    <p><strong>The OneDrive/source original will not be deleted.</strong></p>
+                    <p>Photo Identity will immediately block this source copy and permanently remove its retained photo data, review proxies/crops, faces, identity links and photo metadata. Re-including later starts fresh and does not restore purged identifications/history.</p>
+                </div>
+            }
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <div class="notice error" role="alert">@Error</div>
+        }
+
+        <div class="collection-inline-actions">
+            @if (!Confirming)
+            {
+                <button type="button" class="button danger" disabled="@Busy" @onclick="() => Confirming = true">Exclude from Photo Identity</button>
+            }
+            else
+            {
+                <button type="button" class="button danger" disabled="@Busy" @onclick="ExcludeAsync">@(Busy ? "Excluding…" : "Confirm exclude & purge")</button>
+                <button type="button" class="button secondary" disabled="@Busy" @onclick="Cancel">Cancel</button>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private string? CurrentRevisionId { get; set; }
+    private bool Confirming { get; set; }
+    private bool Busy { get; set; }
+    private string? Error { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += HandleLocationChanged;
+        ResolveRevisionId(Navigation.Uri);
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        ResolveRevisionId(args.Location);
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void ResolveRevisionId(string location)
+    {
+        string path = Navigation.ToBaseRelativePath(location).Split('?', 2)[0].Trim('/');
+        string[] segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        CurrentRevisionId = segments.Length == 2 &&
+                            string.Equals(segments[0], "photo", StringComparison.OrdinalIgnoreCase) &&
+                            Guid.TryParse(segments[1], out Guid revisionId) && revisionId != Guid.Empty
+            ? revisionId.ToString()
+            : null;
+        Confirming = false;
+        Busy = false;
+        Error = null;
+    }
+
+    private void Cancel()
+    {
+        Confirming = false;
+        Error = null;
+    }
+
+    private async Task ExcludeAsync()
+    {
+        if (CurrentRevisionId is null)
+        {
+            return;
+        }
+
+        Busy = true;
+        Error = null;
+        try
+        {
+            using HttpResponseMessage response = await Http.PostAsJsonAsync(
+                "api/archive/exclusions/revision",
+                new ArchiveExcludeRevisionRequest(CurrentRevisionId));
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException(await ReadErrorAsync(response));
+            }
+
+            Navigation.NavigateTo("/archive/lifecycle?state=pending", forceLoad: true);
+        }
+        catch (Exception exception)
+        {
+            Error = exception.Message;
+            Busy = false;
+        }
+    }
+
+    private static async Task<string> ReadErrorAsync(HttpResponseMessage response)
+    {
+        try
+        {
+            ArchiveErrorResponse? error = await response.Content.ReadFromJsonAsync<ArchiveErrorResponse>();
+            if (!string.IsNullOrWhiteSpace(error?.Error))
+            {
+                return error.Error;
+            }
+        }
+        catch
+        {
+        }
+
+        return $"Exclusion failed with HTTP {(int)response.StatusCode}.";
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= HandleLocationChanged;
+    }
+}

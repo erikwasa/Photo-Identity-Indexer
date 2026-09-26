@@ -29,6 +29,35 @@ public sealed record ArchiveItemPageResponse(
     int Total,
     IReadOnlyList<ArchiveItemStatusResponse> Items);
 
+public sealed record ArchiveExactDuplicateCopyResponse(
+    string SourceId,
+    string AssetId,
+    string RevisionId,
+    string SourceKey,
+    bool IsMissing);
+
+public sealed record ArchiveExactDuplicateGroupResponse(
+    string ContentSha256,
+    IReadOnlyList<ArchiveExactDuplicateCopyResponse> Copies);
+
+public sealed record ArchiveSourceCopyExclusionResponse(
+    string SourceId,
+    string SourceKey,
+    DateTimeOffset ExcludedAtUtc,
+    DateTimeOffset? LastSeenAtUtc,
+    string PurgeState,
+    string? PurgeErrorCode,
+    DateTimeOffset PurgeUpdatedAtUtc);
+
+public sealed record ArchiveExcludeRevisionRequest(string RevisionId);
+public sealed record ArchiveExcludeRevisionsRequest(IReadOnlyList<string> RevisionIds);
+public sealed record ArchiveBulkExclusionResponse(
+    int Requested,
+    int Excluded,
+    IReadOnlyList<ArchiveSourceCopyExclusionResponse> Exclusions);
+public sealed record ArchiveRestoreSourceCopyRequest(string SourceId, string SourceKey);
+public sealed record ArchiveRetrySourceCopyPurgeRequest(string SourceId, string SourceKey);
+
 public sealed record ArchiveRunStatusResponse(
     string RunId,
     string Status,
@@ -112,7 +141,6 @@ public sealed record ArchiveAnalysisStepResponse(
     ArchiveStatusResponse Status);
 
 public sealed record ArchiveErrorResponse(string Error);
-
 
 public sealed record ArchiveThroughputStageMetricResponse(
     string Name,
