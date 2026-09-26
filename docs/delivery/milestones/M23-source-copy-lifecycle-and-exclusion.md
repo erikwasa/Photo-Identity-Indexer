@@ -65,4 +65,15 @@ A representative archive can demonstrate all of the following:
 
 ## Evidence
 
-Implementation work items will record automated verification, privacy-safe workflow evidence and maintainer real-catalogue acceptance. Repository evidence must never contain personal image content, crops, embeddings, private paths or source filenames.
+M23 completed maintainer acceptance on 2026-09-26 with privacy-safe evidence only:
+
+- Exact duplicate A/B: A was excluded and fully purged while B remained independently included and accessible.
+- Included rename: accepted WI-0088 evidence preserved the same AssetId/history, reconciled one authoritative move and was idempotent on the following synchronization.
+- Excluded rename: the old locator remained excluded while the moved source appeared as a new included catalogue copy with fresh processing.
+- Source deletion: a real source deletion entered **Removed from source** after synchronization while retaining the verified revision for review.
+- Bulk removed-source purge: two Removed entries were selected together, left the Removed queue immediately, completed purge, and exposed no thumbnail/original-view action afterward.
+- Still-present privacy exclusion: the source original was left untouched, normal viewer access was blocked immediately, purge completed, and re-inclusion produced fresh catalogue processing rather than restoring the purged revision.
+- Real-catalogue PostgreSQL residue check for the purged revision returned zero revision rows, zero direct revision-reference rows and zero tables with residue.
+- The live PostgreSQL acceptance gate passed 53 persistence tests and 9 runtime/composition tests; automated WI-0090 coverage verifies derivative-file cleanup and dependent identity/review graph deletion.
+
+Repository evidence intentionally contains no personal image content, crops, embeddings, private paths, source filenames, photo identifiers or hashes.
