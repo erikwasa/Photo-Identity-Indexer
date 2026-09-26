@@ -103,6 +103,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         {
             ArchiveCoverageState? coverage = null;
             bool workRequested = false;
+            bool syncOnlyRequested = false;
 
             try
             {
@@ -123,12 +124,12 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                 }
 
                 workRequested = true;
-                bool syncOnlyRequested = control.IsSyncOnlyRequested;
+                syncOnlyRequested = control.IsSyncOnlyRequested;
                 if (control.SyncRequired)
                 {
                     await _control.UpdateRuntimeAsync(
                         coverage.Source.SourceId,
-                        "syncing",
+                        syncOnlyRequested ? "syncing-only" : "syncing",
                         syncRequired: null,
                         syncOnlyRequested
                             ? "Synchronizing included folders in the background."
@@ -212,11 +213,12 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
 
                 if (IsRetryableTransition(exception))
                 {
+                    string recoveryState = syncOnlyRequested ? "sync-waiting" : "waiting";
                     await TryPersistRecoveryStateAsync(
-                        "waiting",
+                        recoveryState,
                         cancellationToken => _control.UpdateRuntimeAsync(
                             coverage.Source.SourceId,
-                            "waiting",
+                            recoveryState,
                             syncRequired: null,
                             exception.Message,
                             _timeProvider.GetUtcNow(),
