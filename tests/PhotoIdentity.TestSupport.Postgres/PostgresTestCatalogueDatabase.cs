@@ -7,7 +7,8 @@ namespace PhotoIdentity.Testing.Postgres;
 
 /// <summary>
 /// PostgreSQL-backed replacement for the old file-path test catalogue. The path argument is kept
-/// only so existing test setup code can migrate without changing its fixture plumbing.
+/// only as a compatibility key so independently-created mature fixtures that used the same SQLite
+/// file continue to address the same isolated PostgreSQL database during the test process.
 /// </summary>
 public sealed class PostgresTestCatalogueDatabase :
     ICatalogueStoreInitializer,
@@ -16,19 +17,29 @@ public sealed class PostgresTestCatalogueDatabase :
 {
     public const int CurrentSchemaVersion = PostgresCatalogueDatabase.CurrentSchemaVersion;
 
+    private static readonly object CompatibilityLeaseGate = new();
+    private static readonly Dictionary<string, PostgresTestDatabaseLease> CompatibilityLeases =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private readonly PostgresTestDatabaseLease _lease;
     private bool _disposed;
 
     public PostgresTestCatalogueDatabase(string compatibilityPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(compatibilityPath);
-        _lease = PostgresTestDatabaseLease.Create();
+        _lease = GetOrCreateCompatibilityLease(compatibilityPath);
         Database = new PostgresCatalogueDatabase(_lease.ConnectionString);
     }
 
     public PostgresCatalogueDatabase Database { get; }
 
     public string ConnectionString => _lease.ConnectionString;
+
+    public static string GetCompatibilityConnectionString(string compatibilityPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(compatibilityPath);
+        return GetOrCreateCompatibilityLease(compatibilityPath).ConnectionString;
+    }
 
     public Task InitializeAsync(CancellationToken cancellationToken = default) =>
         Database.InitializeAsync(cancellationToken);
@@ -43,8 +54,10 @@ public sealed class PostgresTestCatalogueDatabase :
             return;
         }
 
+        // Compatibility leases deliberately outlive individual wrapper instances. Mature fixtures
+        // frequently dispose one repository graph and then create an API host against the same
+        // historical path. PostgresTestDatabaseLease's process-exit cleanup drops these databases.
         _disposed = true;
-        _lease.Dispose();
     }
 
     public async ValueTask DisposeAsync()
@@ -56,13 +69,27 @@ public sealed class PostgresTestCatalogueDatabase :
 
         _disposed = true;
         await Database.DisposeAsync();
-        await _lease.DisposeAsync();
     }
 
     public static implicit operator PostgresCatalogueDatabase(PostgresTestCatalogueDatabase database)
     {
         ArgumentNullException.ThrowIfNull(database);
         return database.Database;
+    }
+
+    private static PostgresTestDatabaseLease GetOrCreateCompatibilityLease(string compatibilityPath)
+    {
+        string key = Path.GetFullPath(compatibilityPath);
+        lock (CompatibilityLeaseGate)
+        {
+            if (!CompatibilityLeases.TryGetValue(key, out PostgresTestDatabaseLease? lease))
+            {
+                lease = PostgresTestDatabaseLease.Create();
+                CompatibilityLeases.Add(key, lease);
+            }
+
+            return lease;
+        }
     }
 }
 
