@@ -4,10 +4,24 @@ namespace PhotoIdentity.Web;
 
 public static class SlideshowLibraryPresentation
 {
-    public static string PlayAriaLabel(string collectionName)
+    public static string PlayAriaLabel(
+        string collectionName,
+        string? quantityLabel = null,
+        bool prepared = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(collectionName);
-        return $"Play {collectionName.Trim()} slideshow";
+        string label = $"Play {collectionName.Trim()} slideshow";
+        if (!string.IsNullOrWhiteSpace(quantityLabel))
+        {
+            label += $". {quantityLabel.Trim()}";
+        }
+
+        if (prepared)
+        {
+            label += ". Prepared";
+        }
+
+        return label;
     }
 
     public static string? SelectCoverThumbnailUrl(SmartCollectionPageResponse? page) =>
