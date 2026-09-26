@@ -1,0 +1,22 @@
+id: WI-0087
+title: Add authoritative exact-duplicate source-copy inventory
+milestone: M23
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0087-exact-duplicate-inventory.md
+started_at: 2026-09-25
+completed_at: 2026-09-26
+verified_at: 2026-09-26
+verified_by: maintainer
+last_updated_at: 2026-09-26
+branch: codex/wi-0087-verification-closeout
+blockers:
+- WI-0041
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/426
+- type: verification
+  value: '2026-09-26 maintainer real-catalogue verification: the exact-duplicate endpoint returned one group containing 1,878 independently catalogued copies; inspected members were confirmed copies, copies had different AssetIds, and lookup completed normally on the permanent PostgreSQL catalogue.'
+- type: verification
+  value: 'Automated closeout evidence passed: focused SQLite integration coverage, ./build.ps1, ./test.ps1 with 888 tests, PhotoIdentity.Docs validate/generate --check, and ./verify-postgres.ps1 -SkipContainerStart with live PostgreSQL coverage.'

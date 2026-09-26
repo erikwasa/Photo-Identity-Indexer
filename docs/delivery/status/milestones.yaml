@@ -209,7 +209,7 @@ milestones:
   - WI-0107
 - id: M23
   title: Source-copy lifecycle and privacy exclusion
-  status: in_progress
+  status: ready
   document: ../milestones/M23-source-copy-lifecycle-and-exclusion.md
   work_items:
   - WI-0087
