@@ -38,11 +38,11 @@ global using IdentityAutoAssignmentSummary = PhotoIdentity.Core.Review.ReviewIde
 global using IdentityMatchSummary = PhotoIdentity.Testing.Postgres.IdentityMatchSummary;
 global using IdentityMatchTargetScope = PhotoIdentity.Testing.Postgres.IdentityMatchTargetScope;
 
-// These are identifier-only aliases. The mature fixtures still spell the ADO.NET primitives with
-// their old provider names, but every object created by PostgresTestCatalogueDatabase is Npgsql.
-// Keeping the translation here avoids retaining Microsoft.Data.Sqlite as an active test dependency.
-global using SqliteConnection = Npgsql.NpgsqlConnection;
-global using SqliteCommand = Npgsql.NpgsqlCommand;
+// These are identifier-only aliases. Mature fixtures still spell their ADO.NET primitives with
+// old provider names, but the connection/command facade executes through Npgsql and only translates
+// legacy $name parameter tokens. It deliberately does not emulate SQLite-specific SQL syntax.
+global using SqliteConnection = PhotoIdentity.Testing.Postgres.PostgresCompatibilityConnection;
+global using SqliteCommand = PhotoIdentity.Testing.Postgres.PostgresCompatibilityCommand;
 global using SqliteTransaction = Npgsql.NpgsqlTransaction;
 global using SqliteDataReader = Npgsql.NpgsqlDataReader;
 global using SqliteParameter = Npgsql.NpgsqlParameter;
