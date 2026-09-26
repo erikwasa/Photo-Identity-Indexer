@@ -93,7 +93,7 @@ function Resolve-PostgresAdminConnection {
         return $env:PhotoIdentity__Postgres__ConnectionString
     }
 
-    if ($env:GITHUB_ACTIONS -eq "true" -and $IsWindows) {
+    if ($env:GITHUB_ACTIONS -eq "true" -and $env:OS -eq "Windows_NT") {
         $service = Get-Service -Name 'postgresql-x64-*' | Sort-Object Name -Descending | Select-Object -First 1
         if ($null -eq $service) {
             throw "The Windows GitHub Actions runner does not provide a PostgreSQL service."
@@ -126,6 +126,7 @@ $adminConnection = Resolve-PostgresAdminConnection -ExplicitConnectionString $Po
 $previousVerificationAdmin = [Environment]::GetEnvironmentVariable($verificationAdminVariable, "Process")
 [Environment]::SetEnvironmentVariable($verificationAdminVariable, $adminConnection, "Process")
 $manifest = $null
+$report = $null
 $process = $null
 $previousPostgresConnection = $env:PhotoIdentity__Postgres__ConnectionString
 $previousEnvironment = $env:ASPNETCORE_ENVIRONMENT
@@ -137,6 +138,9 @@ try {
         throw "Review verification fixture preparation failed with exit code $LASTEXITCODE."
     }
     $manifest = ($manifestText -join [Environment]::NewLine) | ConvertFrom-Json
+    if ($null -eq $manifest.PSObject.Properties["DatabasePath"]) {
+        $manifest | Add-Member -NotePropertyName DatabasePath -NotePropertyValue $manifest.DatabaseName
+    }
 
     $notRunSmoke = [ordered]@{
         health = "not_run"
@@ -284,7 +288,7 @@ try {
     }
 }
 catch {
-    if ($null -ne $manifest) {
+    if ($null -ne $manifest -and $null -ne $report) {
         $report.result = "failed"
         $report.failure = $_.Exception.Message
         New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
