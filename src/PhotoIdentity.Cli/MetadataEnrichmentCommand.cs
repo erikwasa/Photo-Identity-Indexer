@@ -100,13 +100,15 @@ internal sealed class MetadataPlaceRuleDefinition
     public string From { get; init; } = "";
     public string To { get; init; } = "";
     public string Place { get; init; } = "";
+    public string? SourcePrefix { get; init; }
 }
 
 internal sealed record MetadataPlaceRule(
     string Name,
     DateOnly From,
     DateOnly To,
-    string Place);
+    string Place,
+    string? SourcePrefix);
 
 internal sealed record MetadataEnrichmentCandidate(
     AssetRevisionId RevisionId,
@@ -191,7 +193,7 @@ internal static partial class MetadataEnrichmentPlanner
 
             if (!candidate.HasLocation && effectiveRange is not null)
             {
-                PlaceInferenceResult place = InferPlace(effectiveRange, placeRules);
+                PlaceInferenceResult place = InferPlace(candidate.SourceKey, effectiveRange, placeRules);
                 proposedPlace = place.Place;
                 placeRule = place.RuleName;
                 ambiguity ??= place.Ambiguity;
@@ -363,20 +365,53 @@ internal static partial class MetadataEnrichmentPlanner
             }
 
             string place = PhotoPlacePath.Parse(definition.Place).DisplayValue;
+            string? sourcePrefix = NormalizeSourcePrefix(definition.SourcePrefix, index + 1);
             string name = string.IsNullOrWhiteSpace(definition.Name)
-                ? $"{from:yyyy-MM-dd}..{to:yyyy-MM-dd}"
+                ? sourcePrefix is null
+                    ? $"{from:yyyy-MM-dd}..{to:yyyy-MM-dd}"
+                    : $"{sourcePrefix}{from:yyyy-MM-dd}..{to:yyyy-MM-dd}"
                 : definition.Name.Trim();
-            rules.Add(new MetadataPlaceRule(name, from, to, place));
+            rules.Add(new MetadataPlaceRule(name, from, to, place, sourcePrefix));
         }
 
         return rules;
     }
 
+    private static string? NormalizeSourcePrefix(string? sourcePrefix, int ruleNumber)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePrefix))
+        {
+            return null;
+        }
+
+        string normalized = sourcePrefix.Trim().Replace('\\', '/').Trim('/');
+        if (normalized.Length == 0)
+        {
+            return null;
+        }
+
+        string[] segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Any(segment => segment is "." or ".."))
+        {
+            throw new ArgumentException(
+                $"Place rule {ruleNumber} sourcePrefix must be an archive-relative folder prefix without '.' or '..' segments.");
+        }
+
+        return string.Join('/', segments) + "/";
+    }
+
     private static PlaceInferenceResult InferPlace(
+        string sourceKey,
         PhotoCaptureDateRange range,
         IReadOnlyList<MetadataPlaceRule> rules)
     {
-        MetadataPlaceRule[] contained = rules
+        string normalizedSourceKey = sourceKey.Replace('\\', '/').TrimStart('/');
+        MetadataPlaceRule[] applicable = rules
+            .Where(rule => rule.SourcePrefix is null ||
+                normalizedSourceKey.StartsWith(rule.SourcePrefix, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        MetadataPlaceRule[] contained = applicable
             .Where(rule => range.From >= rule.From && range.To <= rule.To)
             .ToArray();
 
@@ -395,15 +430,15 @@ internal static partial class MetadataEnrichmentPlanner
             return new PlaceInferenceResult(
                 null,
                 null,
-                "multiple place rules with different Places fully contain the effective date range");
+                "multiple applicable place rules with different Places fully contain the effective date range");
         }
 
-        bool overlaps = rules.Any(rule => range.From <= rule.To && range.To >= rule.From);
+        bool overlaps = applicable.Any(rule => range.From <= rule.To && range.To >= rule.From);
         return overlaps
             ? new PlaceInferenceResult(
                 null,
                 null,
-                "effective date precision overlaps a place rule but is not fully contained by it")
+                "effective date precision overlaps an applicable place rule but is not fully contained by it")
             : new PlaceInferenceResult(null, null, null);
     }
 
