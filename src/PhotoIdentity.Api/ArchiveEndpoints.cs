@@ -550,7 +550,7 @@ public static class ArchiveEndpoints
         ArchiveAdvancementStatusResponse? advancementResponse = advancement is null
             ? null
             : new ArchiveAdvancementStatusResponse(
-                advancement.RuntimeState,
+                ToPublicRuntimeState(advancement),
                 advancement.IsRequested,
                 advancement.Message,
                 advancement.UpdatedAtUtc);
@@ -570,6 +570,22 @@ public static class ArchiveEndpoints
             folders,
             latestRun,
             advancementResponse);
+    }
+
+    private static string ToPublicRuntimeState(ArchiveAdvancementControlState advancement)
+    {
+        if (!advancement.IsSyncOnlyRequested)
+        {
+            return advancement.RuntimeState;
+        }
+
+        return advancement.RuntimeState switch
+        {
+            "sync-queued" => "queued",
+            "syncing-only" => "syncing",
+            "sync-waiting" => "syncing",
+            _ => advancement.RuntimeState,
+        };
     }
 
     private static async Task<Sha256Digest?> ResolveProfileHashAsync(
