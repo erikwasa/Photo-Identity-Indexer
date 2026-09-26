@@ -13,6 +13,8 @@ public static class SlideshowLibraryPresentation
     public static string? SelectCoverThumbnailUrl(SmartCollectionPageResponse? page) =>
         page?.Items.FirstOrDefault()?.ThumbnailUrl;
 
+    public static int? SmartPhotoCount(SmartCollectionPageResponse? page) => page?.Total;
+
     public static int ManualPhotoCount(PhotoListCollectionResponse collection)
     {
         ArgumentNullException.ThrowIfNull(collection);
