@@ -102,7 +102,7 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         while (!stoppingToken.IsCancellationRequested)
         {
             ArchiveCoverageState? coverage = null;
-            bool advancementRequested = false;
+            bool workRequested = false;
 
             try
             {
@@ -116,23 +116,36 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                 }
 
                 ArchiveAdvancementControlState? control = await _control.GetAsync(coverage.Source.SourceId, stoppingToken);
-                if (control?.IsRequested != true)
+                if (control?.HasRequestedWork != true)
                 {
                     await Task.Delay(IdleDelay, stoppingToken);
                     continue;
                 }
 
-                advancementRequested = true;
+                workRequested = true;
+                bool syncOnlyRequested = control.IsSyncOnlyRequested;
                 if (control.SyncRequired)
                 {
                     await _control.UpdateRuntimeAsync(
                         coverage.Source.SourceId,
                         "syncing",
                         syncRequired: null,
-                        "Synchronizing included folders before archive processing.",
+                        syncOnlyRequested
+                            ? "Synchronizing included folders in the background."
+                            : "Synchronizing included folders before archive processing.",
                         _timeProvider.GetUtcNow(),
                         stoppingToken);
                     await SynchronizeAsync(coverage, stoppingToken);
+
+                    if (syncOnlyRequested)
+                    {
+                        await _control.CompleteSyncAsync(
+                            coverage.Source.SourceId,
+                            _timeProvider.GetUtcNow(),
+                            stoppingToken);
+                        continue;
+                    }
+
                     await _control.UpdateRuntimeAsync(
                         coverage.Source.SourceId,
                         "running",
@@ -140,6 +153,14 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
                         "Archive synchronization completed; processing is continuing.",
                         _timeProvider.GetUtcNow(),
                         stoppingToken);
+                }
+                else if (syncOnlyRequested)
+                {
+                    await _control.CompleteSyncAsync(
+                        coverage.Source.SourceId,
+                        _timeProvider.GetUtcNow(),
+                        stoppingToken);
+                    continue;
                 }
 
                 _ = await _faceReviewBackfill.AdvanceAsync(coverage, stoppingToken);
@@ -180,11 +201,11 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
             {
                 _metrics.RecordCounter(ArchiveThroughputMetricNames.ArchiveErrors);
 
-                if (coverage is null || !advancementRequested)
+                if (coverage is null || !workRequested)
                 {
                     _logger.LogError(
                         exception,
-                        "Archive advancement could not read its startup/control state; retrying without stopping Photo Identity.");
+                        "Archive background work could not read its startup/control state; retrying without stopping Photo Identity.");
                     await Task.Delay(IdleDelay, stoppingToken);
                     continue;
                 }
