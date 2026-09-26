@@ -21,8 +21,10 @@ Optional launcher configuration is read from:
 
 Copy PhotoIdentity.launcher.example.json there if you need non-default durable paths. For the packaged application, normally leave publishPath unset; PhotoIdentity.cmd always starts the app directory shipped beside it.
 
-The launcher example explicitly selects the normal SQLite authority:
-  PhotoIdentity__CatalogueProvider = sqlite
+The launcher always uses PostgreSQL as the catalogue. Set
+postgresConnectionEnvironmentVariable to the name of an environment variable that contains
+the private PostgreSQL connection string. The connection string itself must not be stored in
+launcher.json.
 
 The current launcher example selects the measured review-proxy profile used for the maintained archive:
   PhotoIdentity__ReviewProxyProfileId = jpeg-1600-q78
@@ -55,22 +57,18 @@ The Settings page shows the effective hydration values, whether managed hydratio
 
 POSTGRESQL CATALOGUE AUTHORITY
 -----------------------------
-Do not switch the packaged application to PostgreSQL until the WI-0102 stopped backup, migration report and representative rehearsal have been accepted.
+The packaged application always uses PostgreSQL. SQLite is not a selectable runtime catalogue.
 
 The launcher never accepts the PostgreSQL connection string directly inside launcher.json. Store the secret connection string in a Windows environment variable and put only that variable's name in launcher.json. For example, create a private user environment variable named:
   PHOTOIDENTITY_POSTGRES_CONNECTION_STRING
 
-Then change the private launcher configuration to include:
+Then configure the launcher with only the environment-variable name:
 
-  "postgresConnectionEnvironmentVariable": "PHOTOIDENTITY_POSTGRES_CONNECTION_STRING",
-  "settings": {
-    "PhotoIdentity__CatalogueProvider": "postgresql",
-    ... existing non-secret settings ...
-  }
+  "postgresConnectionEnvironmentVariable": "PHOTOIDENTITY_POSTGRES_CONNECTION_STRING"
 
 The launcher searches Process, User and Machine environment scopes for the named variable, copies the value only into the child Photo Identity process, and never prints it. A direct `PhotoIdentity__Postgres__ConnectionString` entry under settings is rejected.
 
-Before the real provider switch, stop the currently running PhotoIdentity.Api process. The launcher compares a healthy existing process's `/health` catalogueProvider with the requested provider and refuses to claim a switch while the old authority is still running.
+The launcher verifies that a healthy existing process also reports PostgreSQL catalogue authority.
 
 Preflight the private configuration without starting the app:
 

@@ -10,17 +10,19 @@ The maintainer measured 17,892 current photos: 234 have no effective capture dat
 
 WI-0163 remains on `agent/wi-0163-bulk-metadata-enrichment`. Its first CLI slice adds `metadata enrich`, which is dry-run by default, reads explicit JSON rules, proposes missing dates from conservative filename/path patterns, and proposes Places only when an effective date range is fully contained by an operator-supplied rule. `--apply` uses the existing PostgreSQL capture-date and Place repositories; existing effective dates, named Places and valid non-zero GPS are protected by default.
 
-M23 Source-copy lifecycle and privacy exclusion is completed with all five work items and the maintainer real-catalogue acceptance recorded. M28 and M26 remain completed. M29 is ready with WI-0147 as its first PostgreSQL-only cleanup item. M30 video support remains intentionally blocked until explicit maintainer reactivation.
+M23 Source-copy lifecycle and privacy exclusion is completed with all five work items and the maintainer real-catalogue acceptance recorded. M28 and M26 remain completed. M29 is in progress with WI-0147 implemented and under review in PR #446; WI-0148 and WI-0149 remain the follow-up PostgreSQL-only cleanup items. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Continue WI-0163 from its canonical work-item/status shard and complete its remaining verification before closeout.
+Continue WI-0163 from its canonical work-item/status shard. In parallel, complete maintainer review of WI-0147 / PR #446 before starting WI-0148.
 
 ## Relevant files
 
 - docs/delivery/milestones/M31-bulk-metadata-enrichment.md
 - docs/delivery/work-items/WI-0163-bulk-metadata-enrichment.md
 - docs/delivery/status/work-items/active/WI-0163.yaml
+- docs/delivery/work-items/WI-0147-postgres-only-runtime-composition.md
+- docs/delivery/status/work-items/active/WI-0147.yaml
 
 ## Repository validation
 

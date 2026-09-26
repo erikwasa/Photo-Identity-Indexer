@@ -26,9 +26,8 @@ param(
     [string]$Photo,
     [string]$NewSourceKey,
 
-    [Alias("Target")]
     [ValidateSet("duplicate", "removed", "photo", "all")]
-    [string]$PurgeTarget = "all",
+    [string]$Target = "all",
     [ValidateRange(1, 3600)]
     [int]$TimeoutSeconds = 300,
 
@@ -456,7 +455,7 @@ switch ($Stage) {
 
     "WaitForPurge" {
         $state = Get-State
-        $targets = @(Get-TargetLocators -State $state -RequestedTarget $PurgeTarget)
+        $targets = @(Get-TargetLocators -State $state -RequestedTarget $Target)
         Assert-Condition ($targets.Count -gt 0) "at least one recorded target is available for purge monitoring"
 
         $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)

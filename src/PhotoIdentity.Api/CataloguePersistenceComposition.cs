@@ -12,27 +12,22 @@ using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity.Api;
 
-internal enum CatalogueProviderKind
-{
-    Sqlite,
-    Postgres,
-}
-
 internal static class CataloguePersistenceComposition
 {
-    public static CatalogueProviderKind ResolveProvider(IConfiguration configuration)
+    public static string GetRequiredPostgresConnectionString(IConfiguration configuration)
     {
-        string configured = configuration["PhotoIdentity:CatalogueProvider"]?.Trim().ToLowerInvariant() ?? "sqlite";
-        return configured switch
-        {
-            "sqlite" => CatalogueProviderKind.Sqlite,
-            "postgres" or "postgresql" => CatalogueProviderKind.Postgres,
-            _ => throw new InvalidOperationException(
-                "Configuration 'PhotoIdentity:CatalogueProvider' must be 'sqlite' or 'postgresql'."),
-        };
+        string? connectionString = configuration["PhotoIdentity:Postgres:ConnectionString"];
+        return !string.IsNullOrWhiteSpace(connectionString)
+            ? connectionString
+            : throw new InvalidOperationException(
+                "PhotoIdentity:Postgres:ConnectionString is required. PostgreSQL is the only supported runtime catalogue.");
     }
 
-    public static void AddSqlite(IServiceCollection services, string databasePath)
+    /// <summary>
+    /// Temporary integration-test compatibility graph. Normal API and launcher composition is
+    /// PostgreSQL-only; WI-0148/WI-0149 retire this graph with the remaining SQLite test surface.
+    /// </summary>
+    public static void AddSqliteTestCompatibility(IServiceCollection services, string databasePath)
     {
         services.AddSingleton(new SqliteCatalogueDatabase(databasePath));
         services.AddSingleton<SqliteSourceCopyExclusionRepository>();

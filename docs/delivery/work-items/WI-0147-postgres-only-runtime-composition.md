@@ -33,11 +33,11 @@ M24 established PostgreSQL as the sole writable production catalogue, but compos
 
 ## Acceptance criteria
 
-- [ ] Normal startup has no supported SQLite provider mode.
-- [ ] Missing PostgreSQL config fails clearly rather than selecting SQLite.
-- [ ] Provider-conditional runtime paths are removed or justified as compatibility tools.
-- [ ] Runtime/integration tests protect PostgreSQL expectations.
-- [ ] Operator docs describe PostgreSQL as the active catalogue.
+- [x] Normal startup has no supported SQLite provider mode.
+- [x] Missing PostgreSQL config fails clearly rather than selecting SQLite.
+- [x] Provider-conditional runtime paths are removed or justified as compatibility tools.
+- [x] Runtime/integration tests protect PostgreSQL expectations.
+- [x] Operator docs describe PostgreSQL as the active catalogue.
 
 ## Verification requirements
 
@@ -45,7 +45,8 @@ Build, relevant tests and packaged/runtime startup verification.
 
 ## Completion notes
 
-- Files changed:
-- Trade-offs:
-- Deferred work:
-- Commands run:
+- Files changed: API catalogue composition/startup and PostgreSQL-only endpoint branches; detector-rollout CLI parsing/composition; Windows launcher, backup helper, examples and verifier; runtime/integration tests; active architecture/operator documentation.
+- Trade-offs: existing API integration tests retain an isolated `IntegrationTest` SQLite compatibility graph so WI-0147 can remove the operator/runtime provider switch without forcing the separate WI-0148 test migration into this item. The normal launcher cannot select this environment.
+- Deferred work: WI-0148 ports or retires the remaining SQLite-dependent tests/tools; WI-0149 removes the SQLite project, the compatibility composition and its API project reference.
+- Test layer and CI impact: composition and CLI assertions remain at the integration-test layer because they cover executable service registration, host startup and command parsing. No required CI gate changed. The complete 652-test integration assembly passed in 5m09s Debug and 4m13s Release; the runtime-composition-focused set passed 13/13 in 1 second.
+- Commands run: `dotnet restore PhotoIdentity.slnx`; `./build.ps1`; focused `dotnet test` filters for catalogue composition, PostgreSQL runtime, rollout CLI and host regressions; complete Debug integration assembly (652/652); `./test.ps1` (all suites passed); launcher `-ValidateConfigurationOnly`; direct API startup without PostgreSQL configuration (expected explicit failure); `PhotoIdentity.Docs validate`; `PhotoIdentity.Docs generate --check`. `./verify-postgres.ps1` was attempted but this isolated worktree has no private `deploy/postgres/.env`; no live PostgreSQL claim is made by this item.

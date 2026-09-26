@@ -1,26 +1,23 @@
-using Microsoft.Data.Sqlite;
 using PhotoIdentity.Cli;
-using PhotoIdentity.Persistence.Sqlite;
 
 namespace PhotoIdentity_Integration_Tests;
 
 public sealed class DetectorRolloutCommandTests
 {
     [Fact]
-    public async Task Provider_selection_requires_exactly_one_provider_and_an_available_connection_variable()
+    public async Task Rollout_requires_PostgreSQL_and_an_available_connection_variable()
     {
         string run = Guid.NewGuid().ToString();
-        foreach (string[] selection in new[]
-        {
-            Array.Empty<string>(),
-            new[] { "--database", "catalogue.db", "--postgres-connection-env", "UNUSED" },
-        })
-        {
-            StringWriter error = new();
-            int exit = await Program.RunAsync(["rollout", "status", "--run", run, .. selection], new StringWriter(), error);
-            Assert.Equal(2, exit);
-            Assert.Contains("Specify exactly one", error.ToString());
-        }
+        StringWriter absent = new();
+        Assert.Equal(2, await Program.RunAsync(
+            ["rollout", "status", "--run", run], new StringWriter(), absent));
+        Assert.Contains("PostgreSQL is the only supported rollout catalogue", absent.ToString());
+
+        StringWriter sqlite = new();
+        Assert.Equal(2, await Program.RunAsync(
+            ["rollout", "status", "--run", run, "--database", "catalogue.db"],
+            new StringWriter(), sqlite));
+        Assert.Contains("Unknown option '--database'", sqlite.ToString());
 
         StringWriter missing = new();
         Assert.Equal(2, await Program.RunAsync(
@@ -90,7 +87,7 @@ public sealed class DetectorRolloutCommandTests
         StringWriter error = new();
 
         int exit = await Program.RunAsync(
-            ["rollout", "start", "--database", "catalogue.db", "--output", "rollout-output"],
+            ["rollout", "start", "--postgres-connection-env", "UNUSED", "--output", "rollout-output"],
             output,
             error);
 
@@ -112,7 +109,7 @@ public sealed class DetectorRolloutCommandTests
             List<string> args =
             [
                 "rollout", "start",
-                "--database", "catalogue.db",
+                "--postgres-connection-env", "UNUSED",
                 "--output", "rollout-output",
                 "--revision", revisionId,
             ];
@@ -124,79 +121,6 @@ public sealed class DetectorRolloutCommandTests
 
             Assert.Equal(2, exit);
             Assert.Contains("Unknown option", error.ToString(), StringComparison.OrdinalIgnoreCase);
-        }
-    }
-
-    [Fact]
-    public async Task Status_reports_failed_processing_run_as_incomplete_even_without_candidates()
-    {
-        string directory = Path.Combine(Path.GetTempPath(), $"photoidentity-rollout-status-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
-        string databasePath = Path.Combine(directory, "catalogue.db");
-        Guid runId = Guid.NewGuid();
-        string pipelineHash = new('a', 64);
-        string detectorHash = new('b', 64);
-
-        try
-        {
-            SqliteCatalogueDatabase database = new(databasePath);
-            await database.InitializeAsync();
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
-            {
-                using SqliteTransaction transaction = connection.BeginTransaction();
-                using (SqliteCommand run = connection.CreateCommand())
-                {
-                    run.Transaction = transaction;
-                    run.CommandText = """
-                        INSERT INTO processing_runs (
-                            id, status, configuration_json, started_at_utc, completed_at_utc, error)
-                        VALUES ($id, 'failed', '{}', $now, $now, 'test failure');
-                        """;
-                    run.Parameters.AddWithValue("$id", runId.ToString());
-                    run.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
-                    await run.ExecuteNonQueryAsync();
-                }
-
-                using (SqliteCommand pipeline = connection.CreateCommand())
-                {
-                    pipeline.Transaction = transaction;
-                    pipeline.CommandText = """
-                        INSERT INTO detector_pipelines (
-                            pipeline_hash, detector_model_id, detector_model_hash, canonical_definition, recorded_at_utc)
-                        VALUES ($pipeline_hash, 'centerface-2019-fp32', $detector_hash, '{}', $now);
-                        INSERT INTO processing_run_detector_pipelines (
-                            processing_run_id, pipeline_hash, recorded_at_utc)
-                        VALUES ($run_id, $pipeline_hash, $now);
-                        """;
-                    pipeline.Parameters.AddWithValue("$pipeline_hash", pipelineHash);
-                    pipeline.Parameters.AddWithValue("$detector_hash", detectorHash);
-                    pipeline.Parameters.AddWithValue("$run_id", runId.ToString());
-                    pipeline.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
-                    await pipeline.ExecuteNonQueryAsync();
-                }
-
-                transaction.Commit();
-            }
-
-            StringWriter output = new();
-            StringWriter error = new();
-            int exit = await Program.RunAsync(
-                ["rollout", "status", "--database", databasePath, "--run", runId.ToString()],
-                output,
-                error);
-
-            Assert.Equal(0, exit);
-            Assert.Contains("processing-status: failed", output.ToString(), StringComparison.Ordinal);
-            Assert.Contains("rollout-complete: false", output.ToString(), StringComparison.Ordinal);
-            Assert.Equal(string.Empty, error.ToString());
-        }
-        finally
-        {
-            SqliteConnection.ClearAllPools();
-            if (Directory.Exists(directory))
-            {
-                Directory.Delete(directory, recursive: true);
-            }
         }
     }
 

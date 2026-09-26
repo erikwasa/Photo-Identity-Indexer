@@ -12,8 +12,6 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
 $SupportedSettings = @(
-    "PhotoIdentity__CatalogueProvider",
-    "PhotoIdentity__DatabasePath",
     "PhotoIdentity__ArchiveAnalysisOutputRoot",
     "PhotoIdentity__ReviewProxyRoot",
     "PhotoIdentity__ReviewProxyProfileId",
@@ -59,12 +57,6 @@ function Assert-LauncherSettingValue {
     )
 
     switch ($Name) {
-        "PhotoIdentity__CatalogueProvider" {
-            $provider = $Value.Trim().ToLowerInvariant()
-            if ($provider -notin @("sqlite", "postgresql")) {
-                throw "$Name must be sqlite or postgresql."
-            }
-        }
         "PhotoIdentity__GeoNames__AutomaticEnrichmentEnabled" {
             [bool]$parsed = $false
             if (-not [bool]::TryParse($Value, [ref]$parsed)) {
@@ -330,9 +322,6 @@ function Read-LauncherConfiguration {
 
                 $value = [Environment]::ExpandEnvironmentVariables(([string]$property.Value).Trim())
                 Assert-LauncherSettingValue -Name $property.Name -Value $value
-                if ($property.Name -eq "PhotoIdentity__CatalogueProvider") {
-                    $value = $value.ToLowerInvariant()
-                }
                 $settings[$property.Name] = $value
             }
         }
@@ -345,22 +334,13 @@ function Read-LauncherConfiguration {
         $publishPath = Resolve-ConfiguredPath -Value $PublishPathOverride -BaseDirectory $PSScriptRoot
     }
 
-    $catalogueProvider = if ($settings.ContainsKey("PhotoIdentity__CatalogueProvider")) {
-        [string]$settings["PhotoIdentity__CatalogueProvider"]
-    }
-    else {
-        "sqlite"
+    if ([string]::IsNullOrWhiteSpace($postgresConnectionEnvironmentVariable)) {
+        throw "postgresConnectionEnvironmentVariable is required. PostgreSQL is the only supported runtime catalogue; store only the environment-variable name in launcher.json, never the connection string."
     }
 
-    if ($catalogueProvider -eq "postgresql") {
-        if ([string]::IsNullOrWhiteSpace($postgresConnectionEnvironmentVariable)) {
-            throw "postgresConnectionEnvironmentVariable is required when PhotoIdentity__CatalogueProvider is postgresql. Store only the environment-variable name in launcher.json, never the connection string."
-        }
-
-        $postgresConnectionString = Get-LauncherEnvironmentValue -Name $postgresConnectionEnvironmentVariable
-        if ([string]::IsNullOrWhiteSpace($postgresConnectionString)) {
-            throw "The PostgreSQL connection environment variable '$postgresConnectionEnvironmentVariable' is empty or missing."
-        }
+    $postgresConnectionString = Get-LauncherEnvironmentValue -Name $postgresConnectionEnvironmentVariable
+    if ([string]::IsNullOrWhiteSpace($postgresConnectionString)) {
+        throw "The PostgreSQL connection environment variable '$postgresConnectionEnvironmentVariable' is empty or missing."
     }
 
     try {
@@ -383,7 +363,7 @@ function Read-LauncherConfiguration {
         PublishPath = [IO.Path]::GetFullPath($publishPath)
         BaseUri = $baseUri
         Settings = $settings
-        CatalogueProvider = $catalogueProvider
+        CatalogueProvider = "postgresql"
         PostgresConnectionEnvironmentVariable = $postgresConnectionEnvironmentVariable
         MobileAccess = $mobileAccess
         LocalApplicationRoot = [IO.Path]::GetFullPath($localApplicationRoot)
@@ -487,13 +467,11 @@ function Start-PhotoIdentityServer {
         $processEnvironment[$name] = $Configuration.Settings[$name]
     }
 
-    if ($Configuration.CatalogueProvider -eq "postgresql") {
-        $postgresConnectionString = Get-LauncherEnvironmentValue -Name $Configuration.PostgresConnectionEnvironmentVariable
-        if ([string]::IsNullOrWhiteSpace($postgresConnectionString)) {
-            throw "The PostgreSQL connection environment variable '$($Configuration.PostgresConnectionEnvironmentVariable)' became unavailable before process start."
-        }
-        $processEnvironment["PhotoIdentity__Postgres__ConnectionString"] = $postgresConnectionString
+    $postgresConnectionString = Get-LauncherEnvironmentValue -Name $Configuration.PostgresConnectionEnvironmentVariable
+    if ([string]::IsNullOrWhiteSpace($postgresConnectionString)) {
+        throw "The PostgreSQL connection environment variable '$($Configuration.PostgresConnectionEnvironmentVariable)' became unavailable before process start."
     }
+    $processEnvironment["PhotoIdentity__Postgres__ConnectionString"] = $postgresConnectionString
 
     if ($Configuration.MobileAccess.Enabled) {
         $processEnvironment["ASPNETCORE_Kestrel__Certificates__Default__Path"] = $Configuration.MobileAccess.CertificatePath
@@ -536,9 +514,7 @@ try {
     if ($ValidateConfigurationOnly) {
         Write-Host "Photo Identity launcher configuration validation passed."
         Write-Host "catalogueProvider: $($configuration.CatalogueProvider)"
-        if ($configuration.CatalogueProvider -eq "postgresql") {
-            Write-Host "postgresConnectionEnvironmentVariable: $($configuration.PostgresConnectionEnvironmentVariable)"
-        }
+        Write-Host "postgresConnectionEnvironmentVariable: $($configuration.PostgresConnectionEnvironmentVariable)"
         exit 0
     }
 

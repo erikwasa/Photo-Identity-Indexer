@@ -16,9 +16,16 @@ internal class WebApplicationFactory<TEntryPoint> :
     where TEntryPoint : class
 {
     protected virtual bool DisableBackgroundWorkers => true;
+    protected virtual bool UseSqliteTestCompatibility => true;
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
+        if (UseSqliteTestCompatibility)
+        {
+            builder.UseEnvironment("IntegrationTest");
+            builder.ConfigureWebHost(webHost => webHost.UseStaticWebAssets());
+        }
+
         if (DisableBackgroundWorkers)
         {
             builder.ConfigureServices(services =>
@@ -58,19 +65,23 @@ internal class PhotoIdentityApiTestFactory : WebApplicationFactory<PhotoIdentity
     private readonly string _databasePath;
     private readonly Action<IWebHostBuilder>? _configureWebHost;
     private readonly bool _disableBackgroundWorkers;
+    private readonly bool _useSqliteTestCompatibility;
 
     public PhotoIdentityApiTestFactory(
         string databasePath,
         Action<IWebHostBuilder>? configureWebHost = null,
-        bool disableBackgroundWorkers = true)
+        bool disableBackgroundWorkers = true,
+        bool useSqliteTestCompatibility = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
         _databasePath = databasePath;
         _configureWebHost = configureWebHost;
         _disableBackgroundWorkers = disableBackgroundWorkers;
+        _useSqliteTestCompatibility = useSqliteTestCompatibility;
     }
 
     protected override bool DisableBackgroundWorkers => _disableBackgroundWorkers;
+    protected override bool UseSqliteTestCompatibility => _useSqliteTestCompatibility;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

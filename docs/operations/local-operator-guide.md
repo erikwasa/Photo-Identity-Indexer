@@ -63,7 +63,7 @@ The actual Personal OneDrive archive root is private configuration and must not 
 
 ## 3. Configure bounded archive storage
 
-The API host reads the catalogue-provider and archive settings before normal operation. At minimum, permanent archive operation needs the selected catalogue provider, analysis output and selected review-proxy configuration. Managed hydration remains disabled until explicit limits are supplied.
+The API host requires the PostgreSQL connection string and reads archive settings before normal operation. At minimum, permanent archive operation needs PostgreSQL, analysis output and selected review-proxy configuration. Managed hydration remains disabled until explicit limits are supplied.
 
 The following environment-variable form shows the archive/storage settings. `PhotoIdentity__DatabasePath` is an SQLite compatibility setting and is ignored as authoritative storage when the selected provider is PostgreSQL:
 
@@ -81,7 +81,7 @@ $env:PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations = "<accepted-c
 
 Do not invent production values. Use the values accepted through [bounded archive acceptance](bounded-archive-acceptance.md). See [review-proxy serving and bounded originals](review-proxy-serving.md) for exact semantics.
 
-For routine packaged use, store the same accepted values in `%LOCALAPPDATA%\PhotoIdentity\launcher.json` instead of setting them manually before every start. The accepted post-WI-0102 launcher also persists `PhotoIdentity__CatalogueProvider=postgresql` and only the **name** of the environment variable holding the PostgreSQL connection string; the secret itself must not be stored in launcher JSON. For the packaged application, normally leave `publishPath` unset: the package entry point selects the code directory, while private configuration remains durable outside the replaceable package. The real launcher configuration must remain private.
+For routine packaged use, store the same accepted values in `%LOCALAPPDATA%\PhotoIdentity\launcher.json` instead of setting them manually before every start. The launcher persists only the **name** of the environment variable holding the PostgreSQL connection string; the secret itself must not be stored in launcher JSON. PostgreSQL is unconditional, so neither a catalogue-provider switch nor a SQLite database path is accepted. For the packaged application, normally leave `publishPath` unset: the package entry point selects the code directory, while private configuration remains durable outside the replaceable package. The real launcher configuration must remain private.
 
 ## 4. Install and run the Windows application
 
