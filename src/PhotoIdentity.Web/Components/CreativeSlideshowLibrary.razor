@@ -48,6 +48,11 @@
                         <SlideshowLibraryCover CollectionId="@item.AnchorCollectionId" />
                         <span class="slideshow-library-card-shade" aria-hidden="true"></span>
                         <span class="slideshow-library-card-copy">
+                            <span class="slideshow-library-card-meta">
+                                <span class="slideshow-library-card-badge">
+                                    @SlideshowLibraryPresentation.CreativeTargetLabel(item.TargetCount)
+                                </span>
+                            </span>
                             <span class="slideshow-library-card-title">@item.Name</span>
                             <span class="slideshow-library-card-kind">Creative · from @item.AnchorCollectionName</span>
                             <span class="slideshow-library-card-cue">
