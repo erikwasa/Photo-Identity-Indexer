@@ -5,6 +5,7 @@ Use this page to decide which runbook is current. Some files under `docs/operati
 ## Current operator path
 
 - [Local operator guide](local-operator-guide.md) — authoritative day-to-day setup, application, permanent-archive and recovery path.
+- [Archive background synchronization](archive-background-sync.md) — current browser-triggered archive-sync behavior, durable background states, API compatibility and troubleshooting for long-running scans.
 - [Windows operator package](windows-package.md) — self-contained `win-x64` package build, installation, durable-data boundary and side-by-side upgrade procedure.
 - [PostgreSQL production operations](postgresql-operations.md) — current production startup/restart, logical backup, isolated restore verification, upgrade boundary and WI-0106 catch-up acceptance path.
 - [PostgreSQL local runtime](postgresql-local-runtime.md) — Podman/WSL PostgreSQL service setup, localhost diagnostics and verification details.
