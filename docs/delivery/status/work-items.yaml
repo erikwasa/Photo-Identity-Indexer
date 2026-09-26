@@ -9,28 +9,15 @@ allowed_statuses:
 - completed
 - cancelled
 work_items:
-- id: WI-0091
-  title: Add archive lifecycle review and exclusion workflows
-  milestone: M23
-  status: in_progress
-  owner: ai-agent
-  document: ../work-items/WI-0091-archive-lifecycle-review.md
-  started_at: 2026-09-26
-  last_updated_at: 2026-09-26
-  branch: agent/wi-0091-archive-lifecycle-review
-  blockers:
-  - WI-0087
-  - WI-0088
-  - WI-0089
-  - WI-0090
-  blocker_notes: []
-  evidence: []
 - id: WI-0147
   title: Make PostgreSQL the unconditional runtime catalogue
   milestone: M29
-  status: ready
-  owner: unassigned
+  status: in_review
+  owner: codex
   document: ../work-items/WI-0147-postgres-only-runtime-composition.md
+  started_at: 2026-09-26
+  last_updated_at: 2026-09-26
+  branch: codex/WI-0147
   blockers:
   - WI-0102
   - WI-0106

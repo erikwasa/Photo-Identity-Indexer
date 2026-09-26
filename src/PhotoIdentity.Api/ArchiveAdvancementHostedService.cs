@@ -75,15 +75,11 @@ public sealed class ArchiveAdvancementHostedService : BackgroundService
         _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
         _logger = logger;
 
-        CatalogueProviderKind provider = CataloguePersistenceComposition.ResolveProvider(configuration);
-        ISourceCopyPurgeRepository purgeRepository = provider switch
-        {
-            CatalogueProviderKind.Postgres => new PostgresSourceCopyPurgeRepository(
-                services.GetRequiredService<PostgresCatalogueDatabase>()),
-            CatalogueProviderKind.Sqlite => new SqliteSourceCopyPurgeRepository(
-                services.GetRequiredService<SqliteCatalogueDatabase>()),
-            _ => throw new InvalidOperationException("No supported catalogue provider is configured for source-copy purge."),
-        };
+        ISourceCopyPurgeRepository purgeRepository =
+            services.GetService<PostgresCatalogueDatabase>() is PostgresCatalogueDatabase postgres
+                ? new PostgresSourceCopyPurgeRepository(postgres)
+                : new SqliteSourceCopyPurgeRepository(
+                    services.GetRequiredService<SqliteCatalogueDatabase>());
         string defaultApplicationRoot = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "PhotoIdentity");

@@ -53,13 +53,12 @@ The script does not print the configured PostgreSQL password or connection strin
 
 ## Connect Photo Identity to PostgreSQL
 
-The supported production launcher keeps the PostgreSQL connection string outside source control and `launcher.json`. Persist the private connection string in a Windows environment variable and configure the launcher with only that environment-variable name plus `PhotoIdentity__CatalogueProvider=postgresql`; see [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) for the accepted WI-0102 boundary.
+The supported production launcher keeps the PostgreSQL connection string outside source control and `launcher.json`. Persist the private connection string in a Windows environment variable and configure the launcher with only that environment-variable name; PostgreSQL is the unconditional runtime catalogue. See [PostgreSQL catalogue migration and cutover](postgresql-catalogue-cutover.md) for the accepted WI-0102 boundary.
 
 For an ad-hoc development shell, a direct process environment variable can still be used:
 
 ~~~powershell
 $env:PhotoIdentity__Postgres__ConnectionString = "Host=127.0.0.1;Port=5432;Database=photoidentity;Username=photoidentity;Password=<private-password>;SSL Mode=Disable;GSS Encryption Mode=Disable"
-$env:PhotoIdentity__CatalogueProvider = "postgresql"
 ~~~
 
 A healthy PostgreSQL-authoritative runtime reports:
@@ -112,7 +111,7 @@ This removes the named PostgreSQL data volume.
 
 ## Current authority boundary
 
-WI-0102 completed the real SQLite-to-PostgreSQL migration and controlled authority transfer. The normal maintainer runtime now selects PostgreSQL. SQLite remains supported for explicit migration/import compatibility and as the tested rollback path from the preserved pre-cutover backup, but it must not run concurrently as another writable production authority.
+WI-0102 completed the real SQLite-to-PostgreSQL migration and controlled authority transfer. The maintainer runtime now requires PostgreSQL. Remaining SQLite migration/import and test compatibility code is transitional M29 cleanup surface, not a supported runtime or rollback authority.
 
 Longer-term PostgreSQL backup/recovery, stabilization and sustained real-archive catch-up are owned by WI-0106.
 

@@ -19,13 +19,11 @@ $invalidPrimaryUrlConfigurationPath = Join-Path $artifactRoot "launcher-invalid-
 $invalidMobileHttpConfigurationPath = Join-Path $artifactRoot "launcher-invalid-mobile-http.json"
 $invalidMobileWildcardConfigurationPath = Join-Path $artifactRoot "launcher-invalid-mobile-wildcard.json"
 $invalidMobileCertificateConfigurationPath = Join-Path $artifactRoot "launcher-invalid-mobile-certificate.json"
-$invalidProviderConfigurationPath = Join-Path $artifactRoot "launcher-invalid-provider.json"
+$legacyProviderConfigurationPath = Join-Path $artifactRoot "launcher-legacy-provider.json"
 $missingPostgresEnvironmentConfigurationPath = Join-Path $artifactRoot "launcher-missing-postgres-env.json"
 $directPostgresSecretConfigurationPath = Join-Path $artifactRoot "launcher-direct-postgres-secret.json"
 $validPostgresValidationConfigurationPath = Join-Path $artifactRoot "launcher-valid-postgres-reference.json"
-$providerSwitchConfigurationPath = Join-Path $artifactRoot "launcher-provider-switch.json"
 $launcherPath = Join-Path $repositoryRoot "Start-PhotoIdentity.ps1"
-$databasePath = Join-Path $artifactRoot "catalogue.db"
 $analysisPath = Join-Path $artifactRoot "analysis"
 $reviewProxyPath = Join-Path $artifactRoot "review-proxies"
 $url = "http://127.0.0.1:$Port"
@@ -81,16 +79,16 @@ function Invoke-LauncherExpectFailure {
 }
 
 function Assert-PostgresLauncherConfiguration {
-    $invalidProvider = [ordered]@{
+    $legacyProvider = [ordered]@{
         publishPath = $publishPath
         url = $url
+        postgresConnectionEnvironmentVariable = $postgresEnvironmentName
         settings = [ordered]@{
-            PhotoIdentity__CatalogueProvider = "mysql"
-            PhotoIdentity__DatabasePath = $databasePath
+            PhotoIdentity__CatalogueProvider = "sqlite"
         }
     }
-    $invalidProvider | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $invalidProviderConfigurationPath -Encoding UTF8
-    Invoke-LauncherExpectFailure -Path $invalidProviderConfigurationPath -ExpectedPattern "must be sqlite or postgresql" -Description "unsupported catalogue provider"
+    $legacyProvider | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $legacyProviderConfigurationPath -Encoding UTF8
+    Invoke-LauncherExpectFailure -Path $legacyProviderConfigurationPath -ExpectedPattern "Unsupported launcher setting.*CatalogueProvider" -Description "removed catalogue-provider switch"
 
     $missingEnvironmentName = "PHOTOIDENTITY_LAUNCHER_MISSING_$([Guid]::NewGuid().ToString('N'))"
     [Environment]::SetEnvironmentVariable($missingEnvironmentName, $null, "Process")
@@ -98,10 +96,7 @@ function Assert-PostgresLauncherConfiguration {
         publishPath = $publishPath
         url = $url
         postgresConnectionEnvironmentVariable = $missingEnvironmentName
-        settings = [ordered]@{
-            PhotoIdentity__CatalogueProvider = "postgresql"
-            PhotoIdentity__DatabasePath = $databasePath
-        }
+        settings = [ordered]@{}
     }
     $missingPostgresEnvironment | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $missingPostgresEnvironmentConfigurationPath -Encoding UTF8
     Invoke-LauncherExpectFailure -Path $missingPostgresEnvironmentConfigurationPath -ExpectedPattern "empty or missing" -Description "missing PostgreSQL launcher secret"
@@ -110,7 +105,6 @@ function Assert-PostgresLauncherConfiguration {
         publishPath = $publishPath
         url = $url
         settings = [ordered]@{
-            PhotoIdentity__CatalogueProvider = "postgresql"
             PhotoIdentity__Postgres__ConnectionString = $postgresSentinelConnection
         }
     }
@@ -124,10 +118,7 @@ function Assert-PostgresLauncherConfiguration {
             publishPath = $publishPath
             url = $url
             postgresConnectionEnvironmentVariable = $postgresEnvironmentName
-            settings = [ordered]@{
-                PhotoIdentity__CatalogueProvider = "postgresql"
-                PhotoIdentity__DatabasePath = $databasePath
-            }
+            settings = [ordered]@{}
         }
         $validReference | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $validPostgresValidationConfigurationPath -Encoding UTF8
 
@@ -166,6 +157,7 @@ function Assert-RejectsUnsafeMobileAccess {
     $primaryRemote = [ordered]@{
         publishPath = $publishPath
         url = "http://0.0.0.0:$Port"
+        postgresConnectionEnvironmentVariable = $postgresEnvironmentName
     }
     $primaryRemote | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $invalidPrimaryUrlConfigurationPath -Encoding UTF8
     Invoke-LauncherExpectFailure -Path $invalidPrimaryUrlConfigurationPath -ExpectedPattern "absolute loopback HTTP URL" -Description "remote primary launcher URL"
@@ -173,6 +165,7 @@ function Assert-RejectsUnsafeMobileAccess {
     $mobileHttp = [ordered]@{
         publishPath = $publishPath
         url = $url
+        postgresConnectionEnvironmentVariable = $postgresEnvironmentName
         mobileAccess = [ordered]@{
             enabled = $true
             listenUrl = "http://192.0.2.10:5443"
@@ -185,6 +178,7 @@ function Assert-RejectsUnsafeMobileAccess {
     $mobileWildcard = [ordered]@{
         publishPath = $publishPath
         url = $url
+        postgresConnectionEnvironmentVariable = $postgresEnvironmentName
         mobileAccess = [ordered]@{
             enabled = $true
             listenUrl = "https://0.0.0.0:5443"
@@ -197,6 +191,7 @@ function Assert-RejectsUnsafeMobileAccess {
     $mobileMissingCertificate = [ordered]@{
         publishPath = $publishPath
         url = $url
+        postgresConnectionEnvironmentVariable = $postgresEnvironmentName
         mobileAccess = [ordered]@{
             enabled = $true
             listenUrl = "https://192.0.2.10:5443"
@@ -212,8 +207,8 @@ function Assert-RejectsInvalidGeoNamesTiming {
     $invalidConfiguration = [ordered]@{
         publishPath = $publishPath
         url = $url
+        postgresConnectionEnvironmentVariable = $postgresEnvironmentName
         settings = [ordered]@{
-            PhotoIdentity__DatabasePath = $databasePath
             PhotoIdentity__GeoNames__AutomaticMinimumRequestIntervalMilliseconds = "-1"
         }
     }
@@ -269,9 +264,8 @@ New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
 $launcherConfiguration = [ordered]@{
     publishPath = $publishPath
     url = $url
+    postgresConnectionEnvironmentVariable = $postgresEnvironmentName
     settings = [ordered]@{
-        PhotoIdentity__CatalogueProvider = "sqlite"
-        PhotoIdentity__DatabasePath = $databasePath
         PhotoIdentity__ArchiveAnalysisOutputRoot = $analysisPath
         PhotoIdentity__ReviewProxyRoot = $reviewProxyPath
         PhotoIdentity__GeoNames__Username = "launcher-verification"
@@ -310,43 +304,8 @@ try {
     if ($health.StatusCode -ne 200 -or [string]$payload.status -ne "ok") {
         throw "Launcher-started application did not return the expected health response."
     }
-    if ([string]$payload.catalogueProvider -ne "sqlite") {
-        throw "SQLite launcher verification expected catalogueProvider=sqlite."
-    }
-
-    $previousPostgres = [Environment]::GetEnvironmentVariable($postgresEnvironmentName, "Process")
-    try {
-        [Environment]::SetEnvironmentVariable($postgresEnvironmentName, $postgresSentinelConnection, "Process")
-        $providerSwitchConfiguration = [ordered]@{
-            publishPath = $publishPath
-            url = $url
-            postgresConnectionEnvironmentVariable = $postgresEnvironmentName
-            settings = [ordered]@{
-                PhotoIdentity__CatalogueProvider = "postgresql"
-                PhotoIdentity__DatabasePath = $databasePath
-            }
-        }
-        $providerSwitchConfiguration | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $providerSwitchConfigurationPath -Encoding UTF8
-
-        $switchOutput = @(& powershell.exe `
-            -NoLogo `
-            -NoProfile `
-            -ExecutionPolicy Bypass `
-            -File $launcherPath `
-            -ConfigurationPath $providerSwitchConfigurationPath `
-            -NoBrowser `
-            -StartupTimeoutSeconds 5 2>&1)
-        $switchExitCode = $LASTEXITCODE
-        $switchMessage = $switchOutput -join [Environment]::NewLine
-        if ($switchExitCode -eq 0 -or $switchMessage -notmatch "already running with catalogueProvider 'sqlite'") {
-            throw "Launcher did not require the existing SQLite-authoritative process to stop before a PostgreSQL provider switch. Output: $switchMessage"
-        }
-        if ($switchMessage -match "launcher-secret-sentinel") {
-            throw "Provider-switch rejection leaked the PostgreSQL secret."
-        }
-    }
-    finally {
-        [Environment]::SetEnvironmentVariable($postgresEnvironmentName, $previousPostgres, "Process")
+    if ([string]$payload.catalogueProvider -ne "postgresql") {
+        throw "PostgreSQL-only launcher verification expected catalogueProvider=postgresql."
     }
 
     $geoNamesStatus = Invoke-RestMethod -Method Get -Uri "$url/api/place-enrichment/status" -TimeoutSec 5

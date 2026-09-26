@@ -172,12 +172,12 @@ public static class Program
               batch status --database PATH --run RUN_ID
               batch cancel --database PATH --run RUN_ID
 
-              rollout start --database PATH --output DIR
+              rollout start --postgres-connection-env NAME --output DIR
                             (--revision REVISION_ID [...] | --revision-file PATH)
                             [--root PATH] [--model-dir DIR] [--max-attempts COUNT]
-              rollout resume --database PATH --run RUN_ID [--max-attempts COUNT]
-              rollout status --database PATH --run RUN_ID
-              rollout apply --database PATH --run RUN_ID
+              rollout resume --postgres-connection-env NAME --run RUN_ID [--max-attempts COUNT]
+              rollout status --postgres-connection-env NAME --run RUN_ID
+              rollout apply --postgres-connection-env NAME --run RUN_ID
 
               bundle export --database PATH --revision REVISION_ID --job PATH
                             [--profile full-image|reduced-image|face-crops]
@@ -306,7 +306,7 @@ public static class Program
             durable job progress.
 
             Archive proxy measure is a pre-default measurement path. It renders every
-            supported JPEG/PNG/HEIC/HEIF/DNG source image with one or more exact profiles, writes
+            supported JPEG/PNG/HEIC/HEIF source image with one or more exact profiles, writes
             those derivatives outside the source root, and reports only aggregate logical
             source bytes plus total/mean/median/p95 proxy bytes and source-to-proxy compression.
             Candidate syntax is ID:MAX_LONG_EDGE:JPEG_QUALITY. Use at least two profiles for
@@ -331,9 +331,9 @@ public static class Program
             review at /detector-rollout/{RUN_ID}; rollout apply persists reviewed choices
             from the saved payload without re-running detector inference. The ordinary
             batch command is not a detector-migration mechanism.
-            For every rollout action, replace --database PATH with
-            --postgres-connection-env NAME to use the PostgreSQL connection string in
-            that environment variable. Exactly one provider must be selected.
+            Every rollout action requires --postgres-connection-env NAME. The named
+            environment variable contains the PostgreSQL connection string; SQLite is
+            not a supported rollout catalogue.
 
             Bundle export verifies a canonical immutable revision and writes a portable
             full-image, reduced-image or aligned face-crop job. Face-crop exports require
@@ -344,7 +344,7 @@ public static class Program
             before replay-safe SQLite persistence. Face-crop jobs treat every 112x112 input
             as an already-aligned face and record explicit crop-input provenance.
 
-            The decode command reads JPEG, PNG, HEIC, HEIF or DNG content, applies orientation,
+            The decode command reads JPEG, PNG, HEIC or HEIF content, applies orientation,
             optionally downsizes it, and writes a normalised PNG without modifying the input.
 
             Evaluate export reads only human-assigned catalogue faces for exact detector and

@@ -27,13 +27,13 @@ Generated from [`status/milestones.yaml`](status/milestones.yaml). Do not edit t
 | M20 | Operator polish and archive throughput | completed |
 | M21 | Reliability and recognition quality | completed |
 | M22 | Protected Smart Collection slideshow | completed |
-| M23 | Source-copy lifecycle and privacy exclusion | in_progress |
+| M23 | Source-copy lifecycle and privacy exclusion | completed |
 | M24 | PostgreSQL catalogue migration and archive-scale operation | completed |
 | M25 | Face discovery and cluster-assisted identity review | completed |
 | M26 | Creative Collections | completed |
 | M27 | Slideshow presentation experience | completed |
 | M28 | Library curation and metadata editing | completed |
-| M29 | PostgreSQL-only catalogue cleanup | ready |
+| M29 | PostgreSQL-only catalogue cleanup | in_progress |
 | M30 | Video media support | blocked |
 | M31 | Bulk archive metadata enrichment | in_progress |
 | M32 | Archive media compatibility and slideshow library polish | in_progress |

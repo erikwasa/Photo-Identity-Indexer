@@ -1,14 +1,14 @@
 # PostgreSQL runtime composition
 
-WI-0101 separates catalogue-provider selection from application services. `PhotoIdentity:CatalogueProvider` selects one authoritative catalogue graph for the API and hosted workers. WI-0102 completed the controlled maintainer production cutover on 2026-09-11; the accepted production launcher now selects `postgresql`. The process never dual-writes authoritative catalogue state.
+WI-0101 separated catalogue-provider selection from application services, and WI-0102 completed the controlled maintainer production cutover on 2026-09-11. WI-0147 removes that transitional provider switch: the API and Windows launcher now compose PostgreSQL unconditionally and never dual-write authoritative catalogue state.
 
-## Provider selection
+## Runtime composition
 
-When `PhotoIdentity:CatalogueProvider=sqlite` (or the setting is omitted), the API binds authoritative Core contracts to SQLite as before. This remains a supported compatibility, migration and rollback mode, but it is not the accepted maintainer production authority after WI-0102. If a PostgreSQL connection string is also configured while SQLite is selected, it is used only for the migration/readiness probe and is not bound to authoritative contracts.
+`PhotoIdentity:Postgres:ConnectionString` is required at API startup. Missing configuration fails immediately with a message that PostgreSQL is the only supported runtime catalogue. Review and identity, people and presentation state, Smart Collections, metadata and Places, detector state, source scanning, processing, archive state, hydration ownership and derivative metadata are bound directly to PostgreSQL implementations. PostgreSQL initialization must succeed before the application starts.
 
-When `PhotoIdentity:CatalogueProvider=postgresql`, `PhotoIdentity:Postgres:ConnectionString` is required. Review and identity, people and presentation state, Smart Collections, metadata and Places, detector state, source scanning, processing, archive state, hydration ownership and derivative metadata are bound to PostgreSQL implementations. PostgreSQL initialization runs before the application starts. The SQLite catalogue is not registered, opened or migrated in this mode, and the SQLite schema ensure helpers are not called.
+The Windows launcher requires `postgresConnectionEnvironmentVariable`, resolves the private connection string from Process, User or Machine environment scope, and supplies it only to the child process. Launcher settings no longer accept `PhotoIdentity__CatalogueProvider` or `PhotoIdentity__DatabasePath`. `/health` always reports `catalogueProvider: postgresql` for a supported runtime host.
 
-`PhotoIdentity.Api` intentionally keeps a project reference to the SQLite adapter because SQLite remains a supported compatibility and rollback provider. `Program.cs` and `CataloguePersistenceComposition.cs` therefore contain legitimate provider-selection references; this does not imply an SQLite dependency in PostgreSQL mode. `PhotoIdentity.Worker` has no SQLite project reference; worker application services cannot silently acquire a concrete SQLite dependency. Detector-evaluation API files consume Core catalogue contracts only; stale SQLite namespace imports were removed so those provider-independent paths are not mistaken for catalogue dependencies.
+`PhotoIdentity.Api` temporarily retains a project reference to the SQLite adapter only for the isolated `IntegrationTest` host used by existing API tests. The shared test factory selects that environment and explicitly enables static-web assets; the production launcher cannot select it and it is not an operator runtime mode. WI-0148 ports or retires those tests, and WI-0149 removes the adapter reference and compatibility composition. `PhotoIdentity.Worker` has no SQLite project reference; worker application services cannot silently acquire a concrete SQLite dependency.
 
 The portable bundle CLI remains an explicit compatibility boundary. Bundle export consumes Core store/revision contracts, while the current CLI `--database` workflow deliberately composes the SQLite provider. Bundle result import remains an SQLite compatibility adapter. Detector-evaluation session, comparison and ground-truth JSON stores are provider-independent portable private artifacts, not catalogue persistence.
 
@@ -25,7 +25,7 @@ The practical boundary is:
 - saved Smart Collection definitions, people/tags/Places metadata, asset revisions and archive hydration/accounting state are authoritative and provider-backed;
 - generated slideshow snapshot lists are request-time presentation artifacts;
 - preparation sessions and slideshow eviction-protection leases are transient coordination state;
-- durable hydration ownership created while preparing originals remains authoritative archive state and follows the selected catalogue provider.
+- durable hydration ownership created while preparing originals remains authoritative PostgreSQL archive state.
 
 No additional PostgreSQL slideshow-session or snapshot tables are required for WI-0101. WI-0108 may optimize snapshot/query execution, but it must preserve these semantics rather than make transient presentation state authoritative.
 

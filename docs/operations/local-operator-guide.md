@@ -63,7 +63,7 @@ The actual Personal OneDrive archive root is private configuration and must not 
 
 ## 3. Configure bounded archive storage
 
-The API host reads the catalogue-provider and archive settings before normal operation. At minimum, permanent archive operation needs the selected catalogue provider, analysis output and selected review-proxy configuration. Managed hydration remains disabled until explicit limits are supplied.
+The API host requires the PostgreSQL connection string and reads archive settings before normal operation. At minimum, permanent archive operation needs PostgreSQL, analysis output and selected review-proxy configuration. Managed hydration remains disabled until explicit limits are supplied.
 
 The following environment-variable form shows the archive/storage settings. `PhotoIdentity__DatabasePath` is an SQLite compatibility setting and is ignored as authoritative storage when the selected provider is PostgreSQL:
 
@@ -81,7 +81,7 @@ $env:PhotoIdentity__ArchiveHydration__MaximumConcurrentOperations = "<accepted-c
 
 Do not invent production values. Use the values accepted through [bounded archive acceptance](bounded-archive-acceptance.md). See [review-proxy serving and bounded originals](review-proxy-serving.md) for exact semantics.
 
-For routine packaged use, store the same accepted values in `%LOCALAPPDATA%\PhotoIdentity\launcher.json` instead of setting them manually before every start. The accepted post-WI-0102 launcher also persists `PhotoIdentity__CatalogueProvider=postgresql` and only the **name** of the environment variable holding the PostgreSQL connection string; the secret itself must not be stored in launcher JSON. For the packaged application, normally leave `publishPath` unset: the package entry point selects the code directory, while private configuration remains durable outside the replaceable package. The real launcher configuration must remain private.
+For routine packaged use, store the same accepted values in `%LOCALAPPDATA%\PhotoIdentity\launcher.json` instead of setting them manually before every start. The launcher persists only the **name** of the environment variable holding the PostgreSQL connection string; the secret itself must not be stored in launcher JSON. PostgreSQL is unconditional, so neither a catalogue-provider switch nor a SQLite database path is accepted. For the packaged application, normally leave `publishPath` unset: the package entry point selects the code directory, while private configuration remains durable outside the replaceable package. The real launcher configuration must remain private.
 
 ## 4. Install and run the Windows application
 
@@ -181,7 +181,7 @@ The CLI `archive analyze` command exists for the archive analysis coordinator, b
 
 ## 7. Media-format completeness
 
-HEIC/HEIF and DNG are supported. Other RAW families are activated only after a representative real-archive sample has been verified. The SQLite CLI inventory example below is a compatibility diagnostic, not the normal PostgreSQL authority path:
+HEIC/HEIF is being added under WI-0053; RAW support is activated only for formats actually found in the real archive. The SQLite CLI inventory example below is a compatibility diagnostic, not the normal PostgreSQL authority path:
 
 ```powershell
 dotnet run --project src/PhotoIdentity.Cli -- `
@@ -194,11 +194,10 @@ Expected examples include:
 
 ```text
 extension: .heic count=<n> family=heif supported=true
-extension: .dng count=<n> family=raw supported=true
-extension: .cr3 count=<n> family=raw supported=false
+extension: .dng count=<n> family=raw supported=false
 ```
 
-A RAW line with `supported=false` is a deliberate trigger for separate format-specific verification, not permission to omit the file. DNG uses its verified full-resolution embedded JPEG preview when available, with TIFF orientation applied exactly once; valid DNGs without that layout fall back to the deterministic full RAW render. Neither path modifies the original or writes a conversion beside it.
+A RAW line with `supported=false` is a deliberate trigger for format-specific WI-0053 work, not permission to omit the file. When the current archive reports no RAW family, retain that aggregate result and defer RAW decoding until a real variant appears.
 
 Do not treat a scan with silently omitted media as full archive coverage.
 
