@@ -12,11 +12,11 @@ The implementation branch is `agent/wi-0163-bulk-metadata-enrichment`. The first
 
 M28 remains completed. **M26 Creative Collections is completed.** WI-0162 closed the final M26 follow-on: the private-archive scale evaluation reached 10,585 indexed photos, English Visual/CLIP precision@10 was 0.89, English-only Visual search was accepted, and two saved search-result collections were verified through slideshow playback plus exact ordered-membership persistence after restart. M29 is ready with WI-0147 as its first PostgreSQL-only cleanup item. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
-**M23 Source-copy lifecycle and privacy exclusion remains in progress.** WI-0089 and WI-0090 are completed. WI-0090 merged in PR #431 on 2026-09-26; final GitHub Actions CI passed and the maintainer's live PostgreSQL `verify-postgres.ps1 -SkipContainerStart` run passed, closing the production-provider purge acceptance gate. WI-0087 remains in review on `codex/wi-0087-verification-closeout`: automated SQLite, full-suite and live PostgreSQL verification is green, and only the privacy-safe maintainer real-catalogue duplicate check remains. WI-0088 also remains `in_review` pending the maintainer real-catalogue rename/move check. WI-0091 remains sequenced behind the remaining M23 review items.
+**M23 Source-copy lifecycle and privacy exclusion is ready, with only WI-0091 left.** WI-0087, WI-0088, WI-0089 and WI-0090 are completed. On 2026-09-26 the maintainer verified WI-0087 against the permanent PostgreSQL catalogue: the exact-duplicate endpoint completed normally, returned one group containing 1,878 independently catalogued copies, and inspected copies were genuine while retaining different AssetIds. The maintainer also verified WI-0088 by renaming one included local photo: synchronization reported `reconciled_moves=1`, preserved the AssetId and existing history, and a second synchronization reported `reconciled_moves=0`. WI-0091 is now fully unblocked and owns the remaining operator-facing lifecycle review/exclusion workflow for M23.
 
 ## Next concrete step
 
-Have the maintainer verify one small real-catalogue WI-0087 exact-duplicate example without recording private filenames or hashes, then complete WI-0087 through `PhotoIdentity.Docs`. WI-0088's separate real-catalogue move/rename check remains pending.
+Continue WI-0163 under M31. When returning to M23, start WI-0091; all of its source-copy lifecycle dependencies are now completed and maintainer-verified.
 
 ## Relevant files
 
@@ -27,8 +27,12 @@ Have the maintainer verify one small real-catalogue WI-0087 exact-duplicate exam
 - docs/delivery/work-items/WI-0162-semantic-caption-search-slideshow-collections.md
 - docs/delivery/status/work-items/archive/WI-0162.yaml
 - docs/delivery/work-items/WI-0087-exact-duplicate-inventory.md
-- docs/delivery/status/work-items/active/WI-0087.yaml
+- docs/delivery/status/work-items/archive/WI-0087.yaml
+- docs/delivery/work-items/WI-0088-source-move-reconciliation.md
+- docs/delivery/status/work-items/archive/WI-0088.yaml
+- docs/delivery/work-items/WI-0091-archive-lifecycle-review.md
 - tests/PhotoIdentity.Integration.Tests/ExactDuplicateRepositoryTests.cs
+- tests/PhotoIdentity.Integration.Tests/SourceMoveReconciliationTests.cs
 - src/PhotoIdentity.Cli/MetadataEnrichmentCommand.cs
 - src/PhotoIdentity.Cli/Program.cs
 - tests/PhotoIdentity.Integration.Tests/MetadataEnrichmentPlannerTests.cs

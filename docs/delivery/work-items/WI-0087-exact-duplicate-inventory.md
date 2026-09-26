@@ -42,7 +42,7 @@ The same photo can legitimately exist at multiple OneDrive source paths. Exact d
 - [x] Each duplicate entry retains its own source/asset identity.
 - [x] A third non-matching source copy does not enter the group.
 - [x] Changing one path's bytes creates/uses the appropriate new revision and removes that current revision from the old exact group.
-- [ ] Duplicate lookup is backed by an appropriate non-unique index and remains practical on the permanent catalogue.
+- [x] Duplicate lookup is backed by an appropriate non-unique index and remains practical on the permanent catalogue.
 - [x] No UNIQUE constraint is introduced across content SHA-256 values.
 - [x] Online-only/current-source state does not erase a previously established immutable hash, but unverified metadata alone never establishes a duplicate.
 - [x] Tests prove duplicate inventory does not merge or rewrite existing review/identity data.
@@ -63,4 +63,5 @@ Implementation was merged to `main` in PR #426 on 2026-09-25 from
 - Trade-offs: the operator UI remains intentionally deferred to WI-0091. The endpoint exposes source-copy identities and lifecycle presence but does not merge, suppress or mutate them.
 - Verification hardening: the focused SQLite integration test now seeds an assigned face and proves that exact-duplicate reads preserve the face occurrence, person, confirmed label, append-only review action and effective assignment.
 - Automated evidence on 2026-09-26: the focused SQLite test passed; `./build.ps1` passed with zero warnings and errors; `./test.ps1` passed 888 tests; `PhotoIdentity.Docs validate` and `generate --check` passed; and `./verify-postgres.ps1 -SkipContainerStart` passed 52 live PostgreSQL persistence tests plus 8 PostgreSQL runtime/composition integration tests.
-- Deferred work: the maintainer real-catalogue exact-duplicate check remains required to confirm practical lookup behavior without recording private filenames or hashes. After that evidence is available, WI-0087 can be completed.
+- Maintainer real-catalogue evidence on 2026-09-26: `/api/archive/exact-duplicates` completed normally against the permanent PostgreSQL catalogue and returned one group containing 1,878 independently catalogued copies. The maintainer inspected members, confirmed they were genuine copies, and confirmed copies retained different AssetIds. No private filenames, source paths or hashes are recorded in delivery evidence.
+- Status: completed on 2026-09-26 after maintainer acceptance.
