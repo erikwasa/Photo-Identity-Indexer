@@ -386,7 +386,7 @@ public sealed class PostgresSourceCopyPurgeRepository : ISourceCopyPurgeReposito
         CancellationToken cancellationToken)
     {
         Dictionary<Guid, string> runRoots = [];
-        List<(Guid RunId, Guid RevisionId)> directories = [];
+        HashSet<(Guid RunId, Guid RevisionId)> directories = [];
         using (NpgsqlCommand runs = connection.CreateCommand())
         {
             runs.Transaction = transaction;
@@ -396,6 +396,15 @@ public sealed class PostgresSourceCopyPurgeRepository : ISourceCopyPurgeReposito
                 INNER JOIN asset_revisions AS revision ON revision.id = analysis.asset_revision_id
                 INNER JOIN assets AS asset ON asset.id = revision.asset_id
                 INNER JOIN processing_runs AS run ON run.id = analysis.processing_run_id
+                WHERE asset.source_id = @source_id AND asset.source_key = @source_key
+                UNION
+                SELECT job.processing_run_id, revision.id, run.configuration_json::text
+                FROM processing_jobs AS job
+                INNER JOIN asset_revisions AS revision ON revision.id = job.asset_revision_id
+                INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                INNER JOIN archive_analysis_runs AS archive_run
+                    ON archive_run.processing_run_id = job.processing_run_id
+                INNER JOIN processing_runs AS run ON run.id = job.processing_run_id
                 WHERE asset.source_id = @source_id AND asset.source_key = @source_key;
                 """;
             runs.Parameters.AddWithValue("source_id", sourceId.Value);
@@ -418,25 +427,44 @@ public sealed class PostgresSourceCopyPurgeRepository : ISourceCopyPurgeReposito
             artifacts.Add(new SourceCopyPurgeArtifact(ResolveUnderRoot(root, relative), true));
         }
 
-        using NpgsqlCommand crops = connection.CreateCommand();
-        crops.Transaction = transaction;
-        crops.CommandText = """
-            SELECT crop.storage_path
-            FROM face_crops AS crop
-            INNER JOIN face_occurrences AS face ON face.id = crop.face_occurrence_id
-            INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
-            INNER JOIN assets AS asset ON asset.id = revision.asset_id
-            WHERE asset.source_id = @source_id AND asset.source_key = @source_key;
-            """;
-        crops.Parameters.AddWithValue("source_id", sourceId.Value);
-        crops.Parameters.AddWithValue("source_key", sourceKey);
-        await using NpgsqlDataReader cropReader = await crops.ExecuteReaderAsync(cancellationToken);
-        while (await cropReader.ReadAsync(cancellationToken))
+        List<string> cropPaths = [];
+        using (NpgsqlCommand crops = connection.CreateCommand())
         {
-            string relative = cropReader.GetString(0);
-            string root = TryReadRunId(relative, "runs", out Guid runId) && runRoots.TryGetValue(runId, out string? configured)
-                ? configured
-                : fallbackRoot;
+            crops.Transaction = transaction;
+            crops.CommandText = """
+                SELECT crop.storage_path
+                FROM face_crops AS crop
+                INNER JOIN face_occurrences AS face ON face.id = crop.face_occurrence_id
+                INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                WHERE asset.source_id = @source_id AND asset.source_key = @source_key;
+                """;
+            crops.Parameters.AddWithValue("source_id", sourceId.Value);
+            crops.Parameters.AddWithValue("source_key", sourceKey);
+            await using NpgsqlDataReader cropReader = await crops.ExecuteReaderAsync(cancellationToken);
+            while (await cropReader.ReadAsync(cancellationToken))
+            {
+                cropPaths.Add(cropReader.GetString(0));
+            }
+        }
+
+        foreach (string relative in cropPaths)
+        {
+            string root = fallbackRoot;
+            if (TryReadRunId(relative, "runs", out Guid runId))
+            {
+                if (!runRoots.TryGetValue(runId, out string? configured))
+                {
+                    configured = await ReadProcessingRunRootAsync(
+                        connection,
+                        transaction,
+                        runId,
+                        fallbackRoot,
+                        cancellationToken);
+                    runRoots[runId] = configured;
+                }
+                root = configured;
+            }
             artifacts.Add(new SourceCopyPurgeArtifact(ResolveUnderRoot(root, relative), false));
         }
     }
@@ -479,6 +507,27 @@ public sealed class PostgresSourceCopyPurgeRepository : ISourceCopyPurgeReposito
             string relative = $"rollouts/{runId:D}/assets/{revisionId:D}";
             artifacts.Add(new SourceCopyPurgeArtifact(ResolveUnderRoot(runRoots[runId], relative), true));
         }
+    }
+
+    private static async Task<string> ReadProcessingRunRootAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid runId,
+        string fallbackRoot,
+        CancellationToken cancellationToken)
+    {
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT configuration_json::text
+            FROM processing_runs
+            WHERE id = @run_id;
+            """;
+        command.Parameters.AddWithValue("run_id", runId);
+        object? configuration = await command.ExecuteScalarAsync(cancellationToken);
+        return configuration is string json
+            ? ReadOutputRoot(json, fallbackRoot)
+            : Path.GetFullPath(fallbackRoot);
     }
 
     private static async Task ExecuteForLocatorAsync(
