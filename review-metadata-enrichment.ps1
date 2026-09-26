@@ -35,6 +35,15 @@ function Resolve-ExistingFile {
     return $resolved.Path
 }
 
+function Resolve-OutputPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    return $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
+}
+
 function Get-SourceRoot {
     param([string]$SourceKey)
 
@@ -187,7 +196,7 @@ $outputObject = [ordered]@{
     placeRules = $selectedRules
 }
 
-$outputFullPath = [System.IO.Path]::GetFullPath($ApprovedRulesOutput)
+$outputFullPath = Resolve-OutputPath -Path $ApprovedRulesOutput
 $outputDirectory = [System.IO.Path]::GetDirectoryName($outputFullPath)
 if (-not [string]::IsNullOrWhiteSpace($outputDirectory)) {
     [System.IO.Directory]::CreateDirectory($outputDirectory) | Out-Null

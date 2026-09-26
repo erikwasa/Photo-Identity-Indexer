@@ -6,6 +6,8 @@ $helper = Join-Path $repoRoot 'review-metadata-enrichment.ps1'
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('photoidentity-wi0163-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
 
+$originalProcessDirectory = [Environment]::CurrentDirectory
+
 try {
     $reportPath = Join-Path $tempRoot 'report.json'
     $rulesPath = Join-Path $tempRoot 'rules.json'
@@ -110,8 +112,30 @@ try {
         throw 'ApproveAll wrote an unexpected Place rule set.'
     }
 
+    $relativeRoot = Join-Path $tempRoot 'relative-working-directory'
+    New-Item -ItemType Directory -Path $relativeRoot | Out-Null
+    [Environment]::CurrentDirectory = $repoRoot
+    Push-Location $relativeRoot
+    try {
+        & $helper `
+            -Report $reportPath `
+            -SamplesPerRule 0 `
+            -Rules $rulesPath `
+            -ApproveAll `
+            -ApprovedRulesOutput '.\artifacts\approved-relative.json'
+    }
+    finally {
+        Pop-Location
+    }
+
+    $expectedRelativePath = Join-Path $relativeRoot 'artifacts\approved-relative.json'
+    if (-not (Test-Path -LiteralPath $expectedRelativePath -PathType Leaf)) {
+        throw 'Relative approved output was not resolved from the PowerShell working directory.'
+    }
+
     Write-Host 'review-metadata-enrichment smoke test passed.'
 }
 finally {
+    [Environment]::CurrentDirectory = $originalProcessDirectory
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
