@@ -7,7 +7,7 @@ using Xunit;
 
 namespace PhotoIdentity.Integration.Tests;
 
-public sealed class PostgresSourceCopyPurgeIntegrationTests
+public sealed class PostgresRuntimeApplicationTests_SourceCopyPurge
 {
     [Fact]
     public async Task Purge_removes_real_derivatives_and_photo_state_while_preserving_shared_person_and_other_photo()
