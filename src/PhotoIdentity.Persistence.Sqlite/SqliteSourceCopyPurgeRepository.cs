@@ -98,7 +98,10 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
             await header.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        foreach (SourceCopyPurgeArtifact artifact in artifacts.OrderBy(value => value.AbsolutePath, StringComparer.Ordinal))
+        SourceCopyPurgeArtifact[] ordered = artifacts
+            .OrderBy(value => value.AbsolutePath, StringComparer.Ordinal)
+            .ToArray();
+        foreach (SourceCopyPurgeArtifact artifact in ordered)
         {
             using SqliteCommand insert = connection.CreateCommand();
             insert.Transaction = transaction;
@@ -115,11 +118,7 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
         }
 
         await transaction.CommitAsync(cancellationToken);
-        return new SourceCopyPurgeManifest(
-            sourceId,
-            key,
-            prepared,
-            artifacts.OrderBy(value => value.AbsolutePath, StringComparer.Ordinal).ToArray());
+        return new SourceCopyPurgeManifest(sourceId, key, prepared, ordered);
     }
 
     public async Task PurgeCatalogueAsync(
@@ -148,18 +147,55 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
             }
         }
 
-        using (SqliteCommand delete = connection.CreateCommand())
+        if (await TableExistsAsync(connection, transaction, "detector_reconciliation_plans", cancellationToken))
         {
-            delete.Transaction = transaction;
-            delete.CommandText = """
-                DELETE FROM assets
-                WHERE source_id = $source_id AND source_key = $source_key;
-                """;
-            delete.Parameters.AddWithValue("$source_id", sourceId.ToString());
-            delete.Parameters.AddWithValue("$source_key", key);
-            await delete.ExecuteNonQueryAsync(cancellationToken);
+            await ExecuteForLocatorAsync(
+                connection,
+                transaction,
+                """
+                DELETE FROM detector_reconciliation_plans
+                WHERE asset_revision_id IN (
+                    SELECT revision.id
+                    FROM asset_revisions AS revision
+                    INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                    WHERE asset.source_id = $source_id AND asset.source_key = $source_key);
+                """,
+                sourceId,
+                key,
+                cancellationToken);
         }
 
+        if (await TableExistsAsync(connection, transaction, "review_actions", cancellationToken))
+        {
+            await ExecuteForLocatorAsync(
+                connection,
+                transaction,
+                """
+                UPDATE review_actions
+                SET reverses_action_id = NULL
+                WHERE reverses_action_id IN (
+                    SELECT target.id
+                    FROM review_actions AS target
+                    INNER JOIN face_occurrences AS face ON face.id = target.face_occurrence_id
+                    INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                    INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                    WHERE asset.source_id = $source_id AND asset.source_key = $source_key);
+                """,
+                sourceId,
+                key,
+                cancellationToken);
+        }
+
+        await ExecuteForLocatorAsync(
+            connection,
+            transaction,
+            """
+            DELETE FROM assets
+            WHERE source_id = $source_id AND source_key = $source_key;
+            """,
+            sourceId,
+            key,
+            cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }
 
@@ -188,7 +224,7 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
         string sourceKey,
         CancellationToken cancellationToken)
     {
-        string? preparedAt = null;
+        string? preparedAt;
         using (SqliteCommand header = connection.CreateCommand())
         {
             header.Transaction = transaction;
@@ -208,22 +244,20 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
         }
 
         List<SourceCopyPurgeArtifact> artifacts = [];
-        using (SqliteCommand command = connection.CreateCommand())
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT absolute_path, is_directory
+            FROM source_copy_purge_manifest_artifacts
+            WHERE source_id = $source_id AND source_key = $source_key
+            ORDER BY absolute_path;
+            """;
+        command.Parameters.AddWithValue("$source_id", sourceId.ToString());
+        command.Parameters.AddWithValue("$source_key", sourceKey);
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
         {
-            command.Transaction = transaction;
-            command.CommandText = """
-                SELECT absolute_path, is_directory
-                FROM source_copy_purge_manifest_artifacts
-                WHERE source_id = $source_id AND source_key = $source_key
-                ORDER BY absolute_path;
-                """;
-            command.Parameters.AddWithValue("$source_id", sourceId.ToString());
-            command.Parameters.AddWithValue("$source_key", sourceKey);
-            await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-            while (await reader.ReadAsync(cancellationToken))
-            {
-                artifacts.Add(new SourceCopyPurgeArtifact(reader.GetString(0), reader.GetInt64(1) != 0));
-            }
+            artifacts.Add(new SourceCopyPurgeArtifact(reader.GetString(0), reader.GetInt64(1) != 0));
         }
 
         return new SourceCopyPurgeManifest(sourceId, sourceKey, Parse(preparedAt), artifacts);
@@ -239,28 +273,39 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
         CancellationToken cancellationToken)
     {
         List<string> relativePaths = [];
-        using SqliteCommand command = connection.CreateCommand();
-        command.Transaction = transaction;
-        command.CommandText = """
-            SELECT proxy.relative_path
-            FROM asset_revision_review_proxies AS proxy
-            INNER JOIN asset_revisions AS revision ON revision.id = proxy.asset_revision_id
-            INNER JOIN assets AS asset ON asset.id = revision.asset_id
-            WHERE asset.source_id = $source_id AND asset.source_key = $source_key
-            UNION
-            SELECT derivative.relative_path
-            FROM face_review_derivatives AS derivative
-            INNER JOIN face_occurrences AS face ON face.id = derivative.face_occurrence_id
-            INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
-            INNER JOIN assets AS asset ON asset.id = revision.asset_id
-            WHERE asset.source_id = $source_id AND asset.source_key = $source_key;
-            """;
-        command.Parameters.AddWithValue("$source_id", sourceId.ToString());
-        command.Parameters.AddWithValue("$source_key", sourceKey);
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
-        while (await reader.ReadAsync(cancellationToken))
+        if (await TableExistsAsync(connection, transaction, "asset_revision_review_proxies", cancellationToken))
         {
-            relativePaths.Add(reader.GetString(0));
+            relativePaths.AddRange(await QueryPathsAsync(
+                connection,
+                transaction,
+                """
+                SELECT proxy.relative_path
+                FROM asset_revision_review_proxies AS proxy
+                INNER JOIN asset_revisions AS revision ON revision.id = proxy.asset_revision_id
+                INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                WHERE asset.source_id = $source_id AND asset.source_key = $source_key;
+                """,
+                sourceId,
+                sourceKey,
+                cancellationToken));
+        }
+
+        if (await TableExistsAsync(connection, transaction, "face_review_derivatives", cancellationToken))
+        {
+            relativePaths.AddRange(await QueryPathsAsync(
+                connection,
+                transaction,
+                """
+                SELECT derivative.relative_path
+                FROM face_review_derivatives AS derivative
+                INNER JOIN face_occurrences AS face ON face.id = derivative.face_occurrence_id
+                INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                WHERE asset.source_id = $source_id AND asset.source_key = $source_key;
+                """,
+                sourceId,
+                sourceKey,
+                cancellationToken));
         }
 
         if (relativePaths.Count == 0)
@@ -288,9 +333,9 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
         CancellationToken cancellationToken)
     {
         Dictionary<Guid, string> runRoots = [];
-        List<(Guid RunId, Guid RevisionId)> directories = [];
-        using (SqliteCommand runs = connection.CreateCommand())
+        if (await TableExistsAsync(connection, transaction, "asset_revision_analysis", cancellationToken))
         {
+            using SqliteCommand runs = connection.CreateCommand();
             runs.Transaction = transaction;
             runs.CommandText = """
                 SELECT analysis.processing_run_id, revision.id, run.configuration_json
@@ -309,14 +354,15 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
                 Guid revisionId = Guid.Parse(reader.GetString(1));
                 string root = ReadOutputRoot(reader.GetString(2), fallbackRoot);
                 runRoots[runId] = root;
-                directories.Add((runId, revisionId));
+                artifacts.Add(new SourceCopyPurgeArtifact(
+                    ResolveUnderRoot(root, $"runs/{runId:D}/assets/{revisionId:D}"),
+                    true));
             }
         }
 
-        foreach ((Guid runId, Guid revisionId) in directories)
+        if (!await TableExistsAsync(connection, transaction, "face_crops", cancellationToken))
         {
-            string relative = $"runs/{runId:D}/assets/{revisionId:D}";
-            artifacts.Add(new SourceCopyPurgeArtifact(ResolveUnderRoot(runRoots[runId], relative), true));
+            return;
         }
 
         using SqliteCommand crops = connection.CreateCommand();
@@ -351,6 +397,11 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
         HashSet<SourceCopyPurgeArtifact> artifacts,
         CancellationToken cancellationToken)
     {
+        if (!await TableExistsAsync(connection, transaction, "detector_reconciliation_plans", cancellationToken))
+        {
+            return;
+        }
+
         using SqliteCommand runs = connection.CreateCommand();
         runs.Transaction = transaction;
         runs.CommandText = """
@@ -369,9 +420,65 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
             Guid runId = Guid.Parse(reader.GetString(0));
             Guid revisionId = Guid.Parse(reader.GetString(1));
             string root = ReadOutputRoot(reader.GetString(2), fallbackRoot);
-            string relative = $"rollouts/{runId:D}/assets/{revisionId:D}";
-            artifacts.Add(new SourceCopyPurgeArtifact(ResolveUnderRoot(root, relative), true));
+            artifacts.Add(new SourceCopyPurgeArtifact(
+                ResolveUnderRoot(root, $"rollouts/{runId:D}/assets/{revisionId:D}"),
+                true));
         }
+    }
+
+    private static async Task<IReadOnlyList<string>> QueryPathsAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string sql,
+        SourceId sourceId,
+        string sourceKey,
+        CancellationToken cancellationToken)
+    {
+        List<string> values = [];
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = sql;
+        command.Parameters.AddWithValue("$source_id", sourceId.ToString());
+        command.Parameters.AddWithValue("$source_key", sourceKey);
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            values.Add(reader.GetString(0));
+        }
+        return values;
+    }
+
+    private static async Task ExecuteForLocatorAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string sql,
+        SourceId sourceId,
+        string sourceKey,
+        CancellationToken cancellationToken)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = sql;
+        command.Parameters.AddWithValue("$source_id", sourceId.ToString());
+        command.Parameters.AddWithValue("$source_key", sourceKey);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<bool> TableExistsAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string tableName,
+        CancellationToken cancellationToken)
+    {
+        using SqliteCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            SELECT EXISTS (
+                SELECT 1 FROM sqlite_master
+                WHERE type = 'table' AND name = $table_name);
+            """;
+        command.Parameters.AddWithValue("$table_name", tableName);
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture) != 0;
     }
 
     private async Task EnsureSchemaAsync(CancellationToken cancellationToken) =>
@@ -420,7 +527,6 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
         {
             // The fallback root remains authoritative for legacy configuration payloads.
         }
-
         return Path.GetFullPath(fallbackRoot);
     }
 
