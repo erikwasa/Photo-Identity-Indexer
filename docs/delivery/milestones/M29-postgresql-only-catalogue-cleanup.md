@@ -19,7 +19,7 @@ Photo Identity has one active catalogue implementation: PostgreSQL. SQLite is no
 
 ## Exit criteria
 
-- [ ] API/CLI/package startup has no supported SQLite catalogue mode.
+- [x] API/CLI/package startup has no supported SQLite catalogue mode.
 - [ ] Active tests/verification protect PostgreSQL/provider-neutral behavior without a second persistence implementation.
 - [ ] The solution no longer includes PhotoIdentity.Persistence.Sqlite.
 - [ ] Active docs consistently describe PostgreSQL as the catalogue.
