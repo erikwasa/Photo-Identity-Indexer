@@ -45,12 +45,15 @@ else
             bool busy = preparing || needsAttention || starting;
             bool prepared = SlideshowLibraryPresentation.ShowPreparedIndicator(preparation?.State, busy);
             int? photoCount = PhotoCountFor(collection);
+            string? quantityLabel = photoCount.HasValue
+                ? SlideshowLibraryPresentation.PhotoCountLabel(photoCount.Value)
+                : null;
 
             <article class="slideshow-library-card">
                 <button type="button"
                         class="slideshow-library-primary"
                         disabled="@busy"
-                        aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(collection.Name)"
+                        aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(collection.Name, quantityLabel, prepared)"
                         @onclick="() => StartSlideshowAsync(collection)">
                     <SlideshowLibraryCover CollectionId="@collection.Id"
                                            Manual="@collection.Manual"
@@ -64,7 +67,7 @@ else
                                 @if (photoCount.HasValue)
                                 {
                                     <span class="slideshow-library-card-badge">
-                                        @SlideshowLibraryPresentation.PhotoCountLabel(photoCount.Value)
+                                        @quantityLabel
                                     </span>
                                 }
                                 @if (prepared)
