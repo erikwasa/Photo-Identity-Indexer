@@ -38,6 +38,7 @@ public sealed record SourceCopyPurgeCycleResult(int Attempted, int Completed, in
 /// Executes the privacy purge in the only safe order: durable exclusion, durable artifact manifest,
 /// filesystem deletion and verification, catalogue deletion, then manifest retirement. A crash at
 /// any intermediate point leaves the exclusion active and the next cycle can repeat the work.
+/// Scheduling belongs to the archive advancement loop so there is a single lifecycle coordinator.
 /// </summary>
 public sealed class SourceCopyPurgeService
 {
@@ -218,56 +219,4 @@ public sealed class SourceCopyPurgeService
         InvalidOperationException => "purge-preparation-failed",
         _ => "purge-failed",
     };
-}
-
-public sealed class SourceCopyPurgeHostedService : BackgroundService
-{
-    private static readonly TimeSpan ActiveDelay = TimeSpan.FromMilliseconds(250);
-    private static readonly TimeSpan IdleDelay = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan FailureDelay = TimeSpan.FromSeconds(15);
-
-    private readonly SourceCopyPurgeService _purges;
-    private readonly ILogger<SourceCopyPurgeHostedService> _logger;
-
-    public SourceCopyPurgeHostedService(
-        SourceCopyPurgeService purges,
-        ILogger<SourceCopyPurgeHostedService> logger)
-    {
-        ArgumentNullException.ThrowIfNull(purges);
-        ArgumentNullException.ThrowIfNull(logger);
-        _purges = purges;
-        _logger = logger;
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                SourceCopyPurgeCycleResult result = await _purges.RunEligibleAsync(
-                    maximumAttempts: 4,
-                    stoppingToken);
-                if (result.Failed > 0)
-                {
-                    _logger.LogWarning(
-                        "Source-copy purge cycle recorded {FailedCount} retryable failure(s).",
-                        result.Failed);
-                }
-
-                await Task.Delay(result.Attempted > 0 ? ActiveDelay : IdleDelay, stoppingToken);
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                return;
-            }
-            catch (Exception)
-            {
-                // Do not include exception messages here because provider/file-system errors can contain
-                // private derivative paths. The durable exclusion state carries only a generic error code.
-                _logger.LogError("Source-copy purge cycle failed before item-level retry state could be recorded.");
-                await Task.Delay(FailureDelay, stoppingToken);
-            }
-        }
-    }
 }
