@@ -100,8 +100,8 @@ public sealed class SqliteArchiveAdvancementRepository : IArchiveAdvancementCont
         CancellationToken cancellationToken = default) =>
         UpsertAsync(
             sourceId,
-            "sync",
-            "queued",
+            "running",
+            "sync-queued",
             syncRequired: true,
             "Archive synchronization is queued.",
             now,
