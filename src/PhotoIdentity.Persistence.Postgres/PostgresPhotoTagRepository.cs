@@ -177,16 +177,19 @@ public sealed class PostgresPhotoTagRepository : IPhotoTagRepository
             ORDER BY tag.display_name, tag.normalized_name;
             """;
         command.Parameters.AddWithValue("revision_id", Guid.Parse(revisionId.ToString()));
-        await using NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+
         List<(long Id, string NormalizedValue, string DisplayValue, string Actor, DateTimeOffset CreatedAt)> rows = [];
-        while (await reader.ReadAsync(cancellationToken))
+        await using (NpgsqlDataReader reader = await command.ExecuteReaderAsync(cancellationToken))
         {
-            rows.Add((
-                reader.GetInt64(0),
-                reader.GetString(1),
-                reader.GetString(2),
-                reader.GetString(3),
-                reader.GetFieldValue<DateTimeOffset>(4)));
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                rows.Add((
+                    reader.GetInt64(0),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.GetString(3),
+                    reader.GetFieldValue<DateTimeOffset>(4)));
+            }
         }
 
         List<CatalogueManualPhotoTag> tags = [];
