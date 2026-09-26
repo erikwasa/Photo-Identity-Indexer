@@ -15,7 +15,13 @@ public sealed record SlideshowPreparationReceipt(string[] RevisionIds)
     public bool MatchesSnapshot(SmartCollectionSlideshowSnapshotResponse snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        string[] current = Normalize(snapshot.Items.Select(item => item.RevisionId));
+        return MatchesRevisionIds(snapshot.Items.Select(item => item.RevisionId));
+    }
+
+    public bool MatchesRevisionIds(IEnumerable<string> revisionIds)
+    {
+        ArgumentNullException.ThrowIfNull(revisionIds);
+        string[] current = Normalize(revisionIds);
         string[] prepared = Normalize(RevisionIds ?? []);
         return prepared.SequenceEqual(current, StringComparer.OrdinalIgnoreCase);
     }

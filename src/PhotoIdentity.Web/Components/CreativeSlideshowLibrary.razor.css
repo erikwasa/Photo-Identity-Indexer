@@ -98,6 +98,27 @@
     gap: 0.5rem;
 }
 
+.slideshow-library-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.slideshow-library-card-badge {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    min-height: 1.55rem;
+    padding: 0.18rem 0.48rem;
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.36);
+    color: rgba(255, 255, 255, 0.94);
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
 .slideshow-library-card-title {
     display: block;
     max-width: 24ch;

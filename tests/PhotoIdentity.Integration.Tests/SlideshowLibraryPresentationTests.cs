@@ -26,11 +26,78 @@ public sealed class SlideshowLibraryPresentationTests
     }
 
     [Fact]
+    public void Smart_photo_count_uses_query_total_not_the_one_item_cover_page_size()
+    {
+        SmartCollectionPageResponse page = Page(Photo("/first-thumbnail")) with { Total = 53 };
+
+        Assert.Equal(53, SlideshowLibraryPresentation.SmartPhotoCount(page));
+        Assert.Null(SlideshowLibraryPresentation.SmartPhotoCount(null));
+    }
+
+    [Fact]
     public void Play_accessibility_label_names_the_collection_and_action()
     {
         Assert.Equal(
             "Play Family favourites slideshow",
             SlideshowLibraryPresentation.PlayAriaLabel("  Family favourites  "));
+    }
+
+    [Fact]
+    public void Play_accessibility_label_includes_quantity_and_prepared_state_when_shown()
+    {
+        Assert.Equal(
+            "Play Family favourites slideshow. 53 photos. Prepared",
+            SlideshowLibraryPresentation.PlayAriaLabel(
+                "Family favourites",
+                "53 photos",
+                prepared: true));
+        Assert.Equal(
+            "Play Summer sampler slideshow. Up to 50 photos",
+            SlideshowLibraryPresentation.PlayAriaLabel(
+                "Summer sampler",
+                "Up to 50 photos"));
+    }
+
+    [Fact]
+    public void Manual_photo_count_uses_exact_persisted_revision_membership()
+    {
+        PhotoListCollectionResponse collection = new(
+            Guid.NewGuid().ToString("D"),
+            "Manual",
+            [Guid.NewGuid().ToString("D"), Guid.NewGuid().ToString("D"), Guid.NewGuid().ToString("D")],
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow);
+
+        Assert.Equal(3, SlideshowLibraryPresentation.ManualPhotoCount(collection));
+    }
+
+    [Theory]
+    [InlineData(0, "0 photos")]
+    [InlineData(1, "1 photo")]
+    [InlineData(53, "53 photos")]
+    public void Exact_photo_count_label_is_compact_and_pluralized(int count, string expected)
+    {
+        Assert.Equal(expected, SlideshowLibraryPresentation.PhotoCountLabel(count));
+    }
+
+    [Fact]
+    public void Creative_target_is_not_presented_as_an_exact_materialized_count()
+    {
+        Assert.Equal("Up to 50 photos", SlideshowLibraryPresentation.CreativeTargetLabel(50));
+    }
+
+    [Theory]
+    [InlineData("ready", false, true)]
+    [InlineData("READY", false, true)]
+    [InlineData("ready", true, false)]
+    [InlineData("preparing", false, false)]
+    [InlineData(null, false, false)]
+    public void Prepared_indicator_requires_verified_ready_state_without_higher_priority_activity(
+        string? state,
+        bool busy,
+        bool expected)
+    {
+        Assert.Equal(expected, SlideshowLibraryPresentation.ShowPreparedIndicator(state, busy));
     }
 
     private static SmartCollectionPageResponse Page(params SmartCollectionPhotoResponse[] items) =>

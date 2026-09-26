@@ -41,6 +41,12 @@ The change must preserve the responsive slideshow-library behavior established b
 
 WI-0108 intentionally made `/api/slideshows/collections` cheap by returning saved definitions without catalogue query work. This work item must preserve that boundary. The implementation may add a dedicated count-only/batched API or defer count hydration until after the initial card render, but it must not make the initial slideshow-library response generate full collection snapshots or perform unnecessary image/file preparation.
 
+## Implementation progress
+
+PR #442 implements the library indicators without changing `/api/slideshows/collections`. Manual counts come from the already-loaded persisted revision membership. Smart counts reuse the existing deferred `limit=1` cover query and its `Total`, so no additional Smart count request or slideshow snapshot is introduced solely for the badge. Creative Collection cards display the recipe quantity as `Up to N photos` rather than an exact materialized count.
+
+The ordinary Smart/manual cards show a compact text-and-check **Prepared** badge only after the existing preparation state has been verified as `ready`; starting, preparing and parent-attention states suppress that passive badge. Persisted manual receipts are now validated directly against the current manual revision membership before prepared-original revalidation, fixing the previous Smart-route-only reload behavior. Automated presentation/receipt tests cover exact/manual/Smart/Creative count semantics, Prepared precedence and revision-set invalidation. Maintainer desktop/phone verification and final CI evidence remain pending.
+
 ## Acceptance criteria
 
 - [ ] A slideshow with preparation verified for its exact current revision set displays a small Prepared indicator.

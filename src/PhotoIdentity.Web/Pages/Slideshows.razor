@@ -43,18 +43,42 @@ else
             bool needsAttention = SlideshowPreparationExperience.NeedsParentAttention(preparation);
             bool starting = IsStarting(collection.Id);
             bool busy = preparing || needsAttention || starting;
+            bool prepared = SlideshowLibraryPresentation.ShowPreparedIndicator(preparation?.State, busy);
+            int? photoCount = PhotoCountFor(collection);
+            string? quantityLabel = photoCount.HasValue
+                ? SlideshowLibraryPresentation.PhotoCountLabel(photoCount.Value)
+                : null;
 
             <article class="slideshow-library-card">
                 <button type="button"
                         class="slideshow-library-primary"
                         disabled="@busy"
-                        aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(collection.Name)"
+                        aria-label="@SlideshowLibraryPresentation.PlayAriaLabel(collection.Name, quantityLabel, prepared)"
                         @onclick="() => StartSlideshowAsync(collection)">
                     <SlideshowLibraryCover CollectionId="@collection.Id"
                                            Manual="@collection.Manual"
-                                           CoverRevisionId="@collection.CoverRevisionId" />
+                                           CoverRevisionId="@collection.CoverRevisionId"
+                                           PhotoCountChanged="@(count => SetSmartPhotoCountAsync(collection.Id, count))" />
                     <span class="slideshow-library-card-shade" aria-hidden="true"></span>
                     <span class="slideshow-library-card-copy">
+                        @if (photoCount.HasValue || prepared)
+                        {
+                            <span class="slideshow-library-card-meta">
+                                @if (photoCount.HasValue)
+                                {
+                                    <span class="slideshow-library-card-badge">
+                                        @quantityLabel
+                                    </span>
+                                }
+                                @if (prepared)
+                                {
+                                    <span class="slideshow-library-card-badge slideshow-library-card-badge-prepared">
+                                        <span aria-hidden="true">✓</span>
+                                        <span>Prepared</span>
+                                    </span>
+                                }
+                            </span>
+                        }
                         <span class="slideshow-library-card-title">@collection.Name</span>
                         @if (collection.Manual)
                         {
