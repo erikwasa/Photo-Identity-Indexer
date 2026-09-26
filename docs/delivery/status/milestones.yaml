@@ -322,3 +322,10 @@ milestones:
   document: ../milestones/M31-bulk-metadata-enrichment.md
   work_items:
   - WI-0163
+- id: M32
+  title: Archive media compatibility and slideshow library polish
+  status: ready
+  document: ../milestones/M32-archive-media-and-slideshow-library-polish.md
+  work_items:
+  - WI-0164
+  - WI-0165

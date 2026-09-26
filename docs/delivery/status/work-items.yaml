@@ -142,3 +142,25 @@ work_items:
   blockers: []
   blocker_notes: []
   evidence: []
+- id: WI-0164
+  title: Add verified DNG archive support
+  milestone: M32
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0164-dng-archive-support.md
+  blockers:
+  - WI-0053
+  blocker_notes: []
+  evidence: []
+- id: WI-0165
+  title: Show slideshow preparation state and photo counts in the library
+  milestone: M32
+  status: ready
+  owner: unassigned
+  document: ../work-items/WI-0165-slideshow-library-status-counts.md
+  blockers:
+  - WI-0108
+  - WI-0146
+  - WI-0158
+  blocker_notes: []
+  evidence: []
