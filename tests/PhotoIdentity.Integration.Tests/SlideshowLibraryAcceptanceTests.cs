@@ -127,7 +127,9 @@ public sealed class SlideshowLibraryAcceptanceTests
         string json = JsonSerializer.Serialize(receipt);
 
         Assert.True(receipt.MatchesSnapshot(Snapshot(second, first)));
+        Assert.True(receipt.MatchesRevisionIds([second, first]));
         Assert.False(receipt.MatchesSnapshot(Snapshot(first, Guid.NewGuid().ToString("D"))));
+        Assert.False(receipt.MatchesRevisionIds([first, Guid.NewGuid().ToString("D")]));
         Assert.DoesNotContain("path", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("filename", json, StringComparison.OrdinalIgnoreCase);
         Assert.All(receipt.GetRevisionIds(), value => Assert.True(Guid.TryParse(value, out _)));
