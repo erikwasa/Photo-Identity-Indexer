@@ -38,11 +38,3 @@ public sealed record CatalogueRankedIdentitySuggestion(
     double? ScoreMargin,
     string Status,
     DateTimeOffset GeneratedAtUtc);
-
-public sealed record PhotoMetadataBackfillCandidate(
-    AssetRevisionId RevisionId,
-    Sha256Digest ContentHash,
-    long SizeBytes,
-    string RootLocator,
-    string SourceKey,
-    string? MediaType);
