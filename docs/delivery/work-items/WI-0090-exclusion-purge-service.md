@@ -40,16 +40,16 @@ Database cascades can remove linked catalogue rows but cannot delete proxy/crop 
 
 ## Acceptance criteria
 
-- [ ] Starting purge after exclusion cannot make the source copy accessible again even if the process crashes.
-- [ ] Known proxy, face-derivative and crop files are deleted before the durable references needed to find them are discarded.
-- [ ] Revision-linked face, embedding, suggestion, assignment, tag, place, metadata and analysis state is removed.
-- [ ] Shared Person records and data attached only to other photos remain intact.
-- [ ] Final exclusion state retains no photo revision/content hash, dimensions, location, tags, face occurrences, embeddings or identity links.
-- [ ] A crash/restart at representative purge checkpoints resumes/retries safely.
-- [ ] Repeating purge is idempotent when files or rows have already disappeared.
-- [ ] Locked/unavailable derivative files result in visible retryable purge failure/pending state rather than silent success.
-- [ ] Purge completion verifies that no known local derivative files for the excluded source copy remain.
-- [ ] Automated tests exercise filesystem and PostgreSQL catalogue cleanup together; retained SQLite compatibility coverage does not substitute for production-provider coverage.
+- [x] Starting purge after exclusion cannot make the source copy accessible again even if the process crashes.
+- [x] Known proxy, face-derivative and crop files are deleted before the durable references needed to find them are discarded.
+- [x] Revision-linked face, embedding, suggestion, assignment, tag, place, metadata and analysis state is removed.
+- [x] Shared Person records and data attached only to other photos remain intact.
+- [x] Final exclusion state retains no photo revision/content hash, dimensions, location, tags, face occurrences, embeddings or identity links.
+- [x] A crash/restart at representative purge checkpoints resumes/retries safely.
+- [x] Repeating purge is idempotent when files or rows have already disappeared.
+- [x] Locked/unavailable derivative files result in visible retryable purge failure/pending state rather than silent success.
+- [x] Purge completion verifies that no known local derivative files for the excluded source copy remain.
+- [x] Automated tests exercise filesystem and PostgreSQL catalogue cleanup together; retained SQLite compatibility coverage does not substitute for production-provider coverage.
 
 ## Verification requirements
 
@@ -62,7 +62,7 @@ Focused integration tests must use generated safe test images and temporary deri
   - `src/PhotoIdentity.Persistence.Postgres/PostgresSourceCopyExclusionRepository.cs` and `PostgresSourceCopyPurgeRepository.cs` persist purge state/manifest, inventory completed and partial analysis output plus detector output, and remove restrictive reconciliation/review-history links before deleting the locator-owned asset graph.
   - `src/PhotoIdentity.Persistence.Sqlite/SqliteSourceCopyExclusionRepository.cs` and `SqliteSourceCopyPurgeRepository.cs` retain equivalent compatibility behavior, including dependency-safe review-action cleanup and partial-analysis output discovery.
   - `src/PhotoIdentity.Api/SourceCopyPurgeService.cs` provides retryable manifest-first filesystem deletion, post-delete verification, catalogue cleanup, idempotency and privacy-safe failure codes; `ArchiveAdvancementHostedService.cs` drains purge work even when ordinary archive advancement is idle.
-  - Integration coverage exercises real temporary files, crash/retry behavior, locked-file failure, restrictive review history, partial archive-analysis output under a configured non-default root, and a conditional live-PostgreSQL end-to-end purge preserving a shared Person and an unrelated photo.
+  - Integration coverage exercises real temporary files, crash/retry behavior, locked-file failure, restrictive review history, partial archive-analysis output under a configured non-default root, and live-PostgreSQL end-to-end purge preserving a shared Person and an unrelated photo.
 - Trade-offs:
   - The durable source-copy exclusion tombstone remains after successful purge and intentionally retains only the source locator plus purge operational state; restore is blocked until purge reaches `completed`.
   - Provider cleanup explicitly retires detector reconciliation plans and review-action dependency chains before asset deletion because those schemas contain restrictive foreign keys that cannot rely on the ordinary revision cascade.
@@ -70,7 +70,8 @@ Focused integration tests must use generated safe test images and temporary deri
   - Ordinary archive analysis is synchronously advanced behind the archive advancement gate, while exclusion-aware processing claims/original access prevent new work for an excluded revision. This keeps the manifest/deletion sequence aligned with the active in-process archive workflow.
 - Deferred work:
   - WI-0091 owns the operator-facing Excluded / Purge pending / Purge failed review workflow.
-  - Final WI-0090 completion remains gated on executing the live PostgreSQL verification entry point against a real test PostgreSQL instance; standard GitHub CI does not provide that external database.
-- Commands run:
-  - GitHub Actions CI is used for compilation, normal integration coverage and documentation validation on PR #431.
-  - Live PostgreSQL verification is wired into the existing `verify-postgres.ps1` integration filter through `PostgresRuntimeApplicationTests_SourceCopyPurge`; the maintainer command is `./verify-postgres.ps1 -SkipContainerStart` when the test PostgreSQL instance is already running (or `./verify-postgres.ps1` when the script should start it).
+- Commands and evidence:
+  - PR #431 merged to `main` on 2026-09-26.
+  - GitHub Actions workflow run #2253 completed successfully for the final PR head.
+  - On 2026-09-26 the maintainer ran `.\verify-postgres.ps1 -SkipContainerStart` against a live PostgreSQL test instance and reported it passed. This exercised `PostgresRuntimeApplicationTests_SourceCopyPurge`, including real derivative deletion, restrictive detector/review relationships, shared Person/unrelated-photo preservation, idempotent repeated purge and restore only after completion.
+- Status: completed on 2026-09-26 after merged implementation, green CI and maintainer live-PostgreSQL verification.
