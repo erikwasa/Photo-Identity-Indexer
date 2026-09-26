@@ -1,6 +1,7 @@
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
+using PhotoIdentity.Source.Local;
 using PhotoIdentity.Web;
 using PhotoIdentity.Worker;
 
@@ -75,6 +76,7 @@ public static class ArchiveEndpoints
         group.MapPost("/include", IncludeAsync);
         group.MapPut("/coverage", ReplaceCoverageAsync);
         group.MapPost("/sync", SyncAsync);
+        group.MapPost("/sync/start", StartSyncAsync);
         group.MapPost("/advance/start", StartAdvancementAsync);
         group.MapPost("/advance/pause", PauseAdvancementAsync);
         group.MapPost("/analysis/step", AnalysisStepAsync);
@@ -244,6 +246,59 @@ public static class ArchiveEndpoints
     }
 
     private static async Task<IResult> SyncAsync(
+        IArchiveCoverageRepository coverageRepository,
+        IArchiveStatusRepository archiveStatusRepository,
+        IArchiveAdvancementControlRepository advancementControl,
+        ArchiveOperatorConfiguration operatorConfiguration,
+        LocalArchiveSyncCoordinator syncCoordinator,
+        ArchiveThroughputMetrics metrics,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            ArchiveCoverageState configured = await coverageRepository.GetAsync(cancellationToken)
+                ?? throw new InvalidOperationException("The permanent archive has not been configured yet.");
+
+            LocalFolderAssetSource source = new(configured.Source.SourceId, configured.Source.RootLocator);
+            LocalArchiveSyncSummary summary;
+            using (IDisposable syncTiming = metrics.Measure(ArchiveThroughputMetricNames.Synchronization))
+            {
+                summary = await syncCoordinator.SyncAsync(
+                    source,
+                    configured.Source,
+                    configured.IncludedFolders,
+                    timeProvider.GetUtcNow(),
+                    cancellationToken);
+            }
+            ArchiveStatusResponse status = await BuildStatusAsync(
+                coverageRepository,
+                archiveStatusRepository,
+                advancementControl,
+                operatorConfiguration,
+                cancellationToken);
+            return Results.Ok(new ArchiveSyncResponse(
+                summary.SupportedFileCount,
+                summary.LocalFileCount,
+                summary.OnlineOnlyFileCount,
+                summary.DownloadingFileCount,
+                summary.UnavailableFileCount,
+                summary.AvailabilityErrorCount,
+                summary.NewRevisionCount,
+                summary.UnchangedFileCount,
+                summary.VerifiedSourceCount,
+                summary.NeedsSourceVerificationCount,
+                summary.UnverifiedSourceCount,
+                summary.MarkedDeletedCount,
+                status));
+        }
+        catch (Exception exception)
+        {
+            return BadRequest(exception);
+        }
+    }
+
+    private static async Task<IResult> StartSyncAsync(
         IArchiveCoverageRepository coverageRepository,
         IArchiveStatusRepository archiveStatusRepository,
         IArchiveAdvancementControlRepository advancementControl,
