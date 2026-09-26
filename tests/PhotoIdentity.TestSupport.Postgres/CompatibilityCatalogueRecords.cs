@@ -2,12 +2,12 @@ using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 
-namespace PhotoIdentity.Persistence.Sqlite;
+namespace PhotoIdentity.Testing.Postgres;
 
 /// <summary>
 /// Transitional test-fixture DTOs retained only to avoid rewriting historical integration setup
 /// code while its persistence implementation moves to PostgreSQL. These types do not use SQLite.
-/// WI-0149 removes the remaining Sqlite-namespaced compatibility surface.
+/// WI-0149 removes the remaining legacy aliases at the integration-test boundary.
 /// </summary>
 public sealed record CatalogueSource
 {
