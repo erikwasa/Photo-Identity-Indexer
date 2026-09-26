@@ -9,11 +9,15 @@ namespace PhotoIdentity.Testing.Postgres;
 /// PostgreSQL-backed replacement for the old file-path test catalogue. The path argument is kept
 /// only so existing test setup code can migrate without changing its fixture plumbing.
 /// </summary>
-public sealed class PostgresTestCatalogueDatabase : ICatalogueStoreInitializer
+public sealed class PostgresTestCatalogueDatabase :
+    ICatalogueStoreInitializer,
+    IDisposable,
+    IAsyncDisposable
 {
     public const int CurrentSchemaVersion = PostgresCatalogueDatabase.CurrentSchemaVersion;
 
     private readonly PostgresTestDatabaseLease _lease;
+    private bool _disposed;
 
     public PostgresTestCatalogueDatabase(string compatibilityPath)
     {
@@ -31,6 +35,29 @@ public sealed class PostgresTestCatalogueDatabase : ICatalogueStoreInitializer
 
     public Task<NpgsqlConnection> OpenConnectionAsync(CancellationToken cancellationToken = default) =>
         Database.OpenConnectionAsync(cancellationToken);
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        _lease.Dispose();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        await Database.DisposeAsync();
+        await _lease.DisposeAsync();
+    }
 
     public static implicit operator PostgresCatalogueDatabase(PostgresTestCatalogueDatabase database)
     {
@@ -151,7 +178,7 @@ public sealed class PostgresTestDatabaseLease : IDisposable, IAsyncDisposable
         }
         catch
         {
-            // Best-effort process/test cleanup. The test container is disposable and an individual
+            // Best-effort process/test cleanup. The test runner is disposable and an individual
             // test failure must remain the primary failure signal.
         }
     }
