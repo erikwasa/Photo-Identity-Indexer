@@ -137,7 +137,10 @@ if ([string]::IsNullOrWhiteSpace($Rules)) {
     throw '-Rules is required when -ApprovedRulesOutput is used.'
 }
 
-$approveRuleCount = @($ApproveRule).Count
+$approveRuleCount = @(
+    $ApproveRule |
+        Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }
+).Count
 if ($ApproveAll -and $approveRuleCount -gt 0) {
     throw 'Use either -ApproveAll or -ApproveRule, not both.'
 }
