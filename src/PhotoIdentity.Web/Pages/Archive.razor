@@ -532,7 +532,7 @@ else
         Message = null;
         try
         {
-            using HttpResponseMessage response = await Http.PostAsync("api/archive/sync", content: null);
+            using HttpResponseMessage response = await Http.PostAsync("api/archive/sync/start", content: null);
             Status = await ReadResponseAsync<ArchiveStatusResponse>(response);
             Message = "Archive synchronization started in the background. You can leave this page; synchronization will continue on the server.";
             StartAdvancementPollingIfNeeded();
