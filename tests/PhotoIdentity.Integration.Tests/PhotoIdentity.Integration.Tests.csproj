@@ -43,5 +43,7 @@
     <Compile Remove="SqliteIdentityAutoAssignmentServiceTests.cs" />
     <Compile Remove="IdentityMatchRegenerationTests.cs" />
     <Compile Remove="SqliteProcessingRepositoryTests.cs" />
+    <!-- The legacy match --database command is a SQLite-only normal-operation surface retired by WI-0148. -->
+    <Compile Remove="MatchCommandTests.cs" />
   </ItemGroup>
 </Project>
