@@ -19,7 +19,7 @@ Current work items: **14**. Archived terminal items: **150**.
 | [WI-0156](../work-items/WI-0156-live-photo-pairing-evaluation.md) Evaluate iPhone Live Photo pairing as one logical media experience | M30 | proposed | unassigned | [YAML](work-items/active/WI-0156.yaml) |
 | [WI-0163](../work-items/WI-0163-bulk-metadata-enrichment.md) Add safe bulk capture-date and Place enrichment | M31 | in_progress | ai-agent | [YAML](work-items/active/WI-0163.yaml) |
 | [WI-0164](../work-items/WI-0164-dng-archive-support.md) Add verified DNG archive support | M32 | ready | unassigned | [YAML](work-items/active/WI-0164.yaml) |
-| [WI-0165](../work-items/WI-0165-slideshow-library-status-counts.md) Show slideshow preparation state and photo counts in the library | M32 | ready | unassigned | [YAML](work-items/active/WI-0165.yaml) |
+| [WI-0165](../work-items/WI-0165-slideshow-library-status-counts.md) Show slideshow preparation state and photo counts in the library | M32 | in_review | ai-agent | [YAML](work-items/active/WI-0165.yaml) |
 
 Historical items stay queryable without opening the archive directory:
 
