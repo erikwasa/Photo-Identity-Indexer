@@ -426,6 +426,7 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
 
     private static bool TryReadRunId(string relativePath, string prefix, out Guid runId)
     {
+        runId = default;
         string normalized = relativePath.Replace('\\', '/');
         string[] segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
         return segments.Length >= 2 &&
