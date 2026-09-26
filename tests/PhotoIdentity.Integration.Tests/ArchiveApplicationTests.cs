@@ -54,7 +54,7 @@ public sealed class ArchiveApplicationTests
                     .Content.ReadFromJsonAsync<ArchiveStatusResponse>());
             Assert.Equal(["1970"], parent.IncludedFolders);
 
-            using HttpResponseMessage firstSyncRequest = await client.PostAsync("/api/archive/sync", null);
+            using HttpResponseMessage firstSyncRequest = await client.PostAsync("/api/archive/sync/start", null);
             Assert.Equal(HttpStatusCode.Accepted, firstSyncRequest.StatusCode);
             ArchiveStatusResponse firstQueued = Assert.IsType<ArchiveStatusResponse>(
                 await firstSyncRequest.Content.ReadFromJsonAsync<ArchiveStatusResponse>());
@@ -87,7 +87,7 @@ public sealed class ArchiveApplicationTests
             Assert.All(itemPage.Items, item => Assert.Equal("pending", item.AnalysisState));
 
             File.Delete(Path.Combine(january, "one.jpg"));
-            using HttpResponseMessage secondSyncRequest = await client.PostAsync("/api/archive/sync", null);
+            using HttpResponseMessage secondSyncRequest = await client.PostAsync("/api/archive/sync/start", null);
             Assert.Equal(HttpStatusCode.Accepted, secondSyncRequest.StatusCode);
             ArchiveStatusResponse secondSync = await WaitForSyncCompletionAsync(client);
             Assert.Equal(1, secondSync.Totals.CurrentImages);
@@ -233,7 +233,7 @@ public sealed class ArchiveApplicationTests
                 "/api/archive/include",
                 new ArchiveIncludeRequest(archiveRoot, "1970"));
             configure.EnsureSuccessStatusCode();
-            using HttpResponseMessage initialSync = await client.PostAsync("/api/archive/sync", null);
+            using HttpResponseMessage initialSync = await client.PostAsync("/api/archive/sync/start", null);
             Assert.Equal(HttpStatusCode.Accepted, initialSync.StatusCode);
             _ = await WaitForSyncCompletionAsync(client);
 
