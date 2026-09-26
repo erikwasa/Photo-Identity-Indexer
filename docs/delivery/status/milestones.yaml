@@ -324,7 +324,7 @@ milestones:
   - WI-0163
 - id: M32
   title: Archive media compatibility and slideshow library polish
-  status: ready
+  status: in_progress
   document: ../milestones/M32-archive-media-and-slideshow-library-polish.md
   work_items:
   - WI-0164

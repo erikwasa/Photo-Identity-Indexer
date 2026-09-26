@@ -22,6 +22,8 @@ public partial class Slideshows : IAsyncDisposable
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SlideshowPreparationReceipt> _receipts =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, int> _smartPhotoCounts =
+        new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CancellationTokenSource> _polling =
         new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _starting =
@@ -41,7 +43,9 @@ public partial class Slideshows : IAsyncDisposable
         string Id,
         string Name,
         bool Manual,
-        string? CoverRevisionId);
+        string? CoverRevisionId,
+        string[] RevisionIds,
+        int? PhotoCount);
 
     private SlideshowSettings Settings { get; set; } = SlideshowSettings.Defaults;
     private IReadOnlyList<SlideshowLibraryEntry> Collections { get; set; } = [];
@@ -113,12 +117,16 @@ public partial class Slideshows : IAsyncDisposable
                     collection.Id,
                     collection.Name,
                     Manual: false,
-                    CoverRevisionId: null))
+                    CoverRevisionId: null,
+                    RevisionIds: [],
+                    PhotoCount: null))
                 .Concat(manualCollections.Select(collection => new SlideshowLibraryEntry(
                     collection.Id,
                     collection.Name,
                     Manual: true,
-                    CoverRevisionId: collection.RevisionIds.FirstOrDefault())))
+                    CoverRevisionId: collection.RevisionIds.FirstOrDefault(),
+                    RevisionIds: collection.RevisionIds,
+                    PhotoCount: SlideshowLibraryPresentation.ManualPhotoCount(collection))))
                 .OrderBy(collection => collection.Name, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(collection => collection.Id, StringComparer.Ordinal)
                 .ToArray();
@@ -596,8 +604,9 @@ public partial class Slideshows : IAsyncDisposable
 
         foreach (string collectionId in _receipts.Keys.ToArray())
         {
-            if (!Collections.Any(collection =>
-                    string.Equals(collection.Id, collectionId, StringComparison.OrdinalIgnoreCase)))
+            SlideshowLibraryEntry? collection = Collections.FirstOrDefault(collection =>
+                string.Equals(collection.Id, collectionId, StringComparison.OrdinalIgnoreCase));
+            if (collection is null)
             {
                 _receipts.Remove(collectionId);
                 continue;
@@ -611,30 +620,42 @@ public partial class Slideshows : IAsyncDisposable
             SlideshowPreparationReceipt receipt = _receipts[collectionId];
             try
             {
-                using HttpResponseMessage snapshotResponse = await Http.PostAsync(
-                    $"api/smart-collections/{Uri.EscapeDataString(collectionId)}/slideshow-snapshot",
-                    content: null,
-                    _lifetime.Token);
-                if (snapshotResponse.StatusCode == HttpStatusCode.NotFound)
+                if (collection.Manual)
                 {
-                    _receipts.Remove(collectionId);
-                    continue;
+                    if (!receipt.MatchesRevisionIds(collection.RevisionIds))
+                    {
+                        _receipts.Remove(collectionId);
+                        _preparations.Remove(collectionId);
+                        continue;
+                    }
                 }
-
-                if (!snapshotResponse.IsSuccessStatusCode)
+                else
                 {
-                    continue;
-                }
+                    using HttpResponseMessage snapshotResponse = await Http.PostAsync(
+                        $"api/smart-collections/{Uri.EscapeDataString(collectionId)}/slideshow-snapshot",
+                        content: null,
+                        _lifetime.Token);
+                    if (snapshotResponse.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        _receipts.Remove(collectionId);
+                        continue;
+                    }
 
-                SmartCollectionSlideshowSnapshotResponse snapshot =
-                    await snapshotResponse.Content.ReadFromJsonAsync<SmartCollectionSlideshowSnapshotResponse>(
-                        cancellationToken: _lifetime.Token)
-                    ?? throw new InvalidOperationException("The slideshow snapshot response was empty.");
-                if (!receipt.MatchesSnapshot(snapshot))
-                {
-                    _receipts.Remove(collectionId);
-                    _preparations.Remove(collectionId);
-                    continue;
+                    if (!snapshotResponse.IsSuccessStatusCode)
+                    {
+                        continue;
+                    }
+
+                    SmartCollectionSlideshowSnapshotResponse snapshot =
+                        await snapshotResponse.Content.ReadFromJsonAsync<SmartCollectionSlideshowSnapshotResponse>(
+                            cancellationToken: _lifetime.Token)
+                        ?? throw new InvalidOperationException("The slideshow snapshot response was empty.");
+                    if (!receipt.MatchesSnapshot(snapshot))
+                    {
+                        _receipts.Remove(collectionId);
+                        _preparations.Remove(collectionId);
+                        continue;
+                    }
                 }
 
                 string[] revisionIds = receipt.GetRevisionIds();
@@ -811,6 +832,32 @@ public partial class Slideshows : IAsyncDisposable
 
     private SlideshowOriginalPreparationResponse? PreparationFor(string collectionId) =>
         _preparations.GetValueOrDefault(collectionId);
+
+    private int? PhotoCountFor(SlideshowLibraryEntry collection)
+    {
+        if (collection.Manual)
+        {
+            return collection.PhotoCount;
+        }
+
+        return _smartPhotoCounts.TryGetValue(collection.Id, out int count)
+            ? count
+            : null;
+    }
+
+    private Task SetSmartPhotoCountAsync(string collectionId, int? count)
+    {
+        if (count.HasValue)
+        {
+            _smartPhotoCounts[collectionId] = count.Value;
+        }
+        else
+        {
+            _smartPhotoCounts.Remove(collectionId);
+        }
+
+        return Task.CompletedTask;
+    }
 
     private bool IsStarting(string collectionId) => _starting.Contains(collectionId);
 

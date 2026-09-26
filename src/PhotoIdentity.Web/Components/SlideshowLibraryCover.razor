@@ -35,6 +35,9 @@
     [Parameter]
     public string? CoverRevisionId { get; set; }
 
+    [Parameter]
+    public EventCallback<int?> PhotoCountChanged { get; set; }
+
     protected override async Task OnParametersSetAsync()
     {
         string key = $"{CollectionId}|{Manual}|{CoverRevisionId}";
@@ -64,13 +67,16 @@
                 $"api/smart-collections/{Uri.EscapeDataString(CollectionId)}/query?offset=0&limit=1",
                 _lifetime.Token);
             _coverUrl = SlideshowLibraryPresentation.SelectCoverThumbnailUrl(page);
+            await PhotoCountChanged.InvokeAsync(SlideshowLibraryPresentation.SmartPhotoCount(page));
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
         }
         catch
         {
-            // Covers are decorative. A failed or empty query keeps the stable neutral fallback.
+            await PhotoCountChanged.InvokeAsync(null);
+            // Covers and counts are decorative. A failed query keeps the card playable and the
+            // stable neutral cover fallback.
         }
     }
 
