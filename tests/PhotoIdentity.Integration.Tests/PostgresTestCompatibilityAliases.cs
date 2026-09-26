@@ -25,6 +25,8 @@ global using SqliteDataReader = Npgsql.NpgsqlDataReader;
 global using SqliteParameter = Npgsql.NpgsqlParameter;
 
 global using SqliteCatalogueDatabase = PhotoIdentity.Testing.Postgres.PostgresTestCatalogueDatabase;
+global using SqliteLocalBatchRepository = PhotoIdentity.Testing.Postgres.PostgresLocalBatchCompatibilityRepository;
+global using SqliteArchiveSourceCatalogueScanner = PhotoIdentity.Testing.Postgres.PostgresArchiveSourceCatalogueScannerCompatibility;
 global using SqliteAssetCatalogueRepository = PhotoIdentity.Testing.Postgres.PostgresAssetCatalogueCompatibilityRepository;
 global using SqliteFaceCatalogueRepository = PhotoIdentity.Testing.Postgres.PostgresFaceCatalogueCompatibilityRepository;
 global using SqliteReviewRepository = PhotoIdentity.Testing.Postgres.PostgresReviewCompatibilityRepository;
