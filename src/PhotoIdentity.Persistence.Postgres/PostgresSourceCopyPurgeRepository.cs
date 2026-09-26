@@ -149,17 +149,106 @@ public sealed class PostgresSourceCopyPurgeRepository : ISourceCopyPurgeReposito
             }
         }
 
-        using (NpgsqlCommand delete = connection.CreateCommand())
-        {
-            delete.Transaction = transaction;
-            delete.CommandText = """
-                DELETE FROM assets
-                WHERE source_id = @source_id AND source_key = @source_key;
-                """;
-            delete.Parameters.AddWithValue("source_id", sourceId.Value);
-            delete.Parameters.AddWithValue("source_key", key);
-            await delete.ExecuteNonQueryAsync(cancellationToken);
-        }
+        // Detector reconciliation rows can point back to face occurrences through restrictive
+        // foreign keys. Retire the locator-owned plan first so its candidate graph cascades away
+        // before the asset/revision/face hierarchy is deleted.
+        await ExecuteForLocatorAsync(
+            connection,
+            transaction,
+            """
+            DELETE FROM detector_reconciliation_plans
+            WHERE asset_revision_id IN (
+                SELECT revision.id
+                FROM asset_revisions AS revision
+                INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                WHERE asset.source_id = @source_id AND asset.source_key = @source_key);
+            """,
+            sourceId,
+            key,
+            cancellationToken);
+
+        // Review history contains restrictive self/review links. Delete suggestion-review links
+        // to the purged photo's actions first, then undo rows that depend on those actions, then
+        // the photo-owned actions themselves. Shared Person rows are deliberately untouched.
+        await ExecuteForLocatorAsync(
+            connection,
+            transaction,
+            """
+            DELETE FROM identity_suggestion_review_actions
+            WHERE review_action_id IN (
+                SELECT action.id
+                FROM review_actions AS action
+                INNER JOIN face_occurrences AS face ON face.id = action.face_occurrence_id
+                INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                WHERE asset.source_id = @source_id AND asset.source_key = @source_key)
+               OR review_action_id IN (
+                SELECT undo_action.id
+                FROM review_actions AS undo_action
+                WHERE undo_action.action_kind = 'undo'
+                  AND undo_action.reverses_action_id IN (
+                    SELECT action.id
+                    FROM review_actions AS action
+                    INNER JOIN face_occurrences AS face ON face.id = action.face_occurrence_id
+                    INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                    INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                    WHERE asset.source_id = @source_id AND asset.source_key = @source_key));
+            """,
+            sourceId,
+            key,
+            cancellationToken);
+
+        await ExecuteForLocatorAsync(
+            connection,
+            transaction,
+            """
+            DELETE FROM review_actions
+            WHERE action_kind = 'undo'
+              AND (
+                face_occurrence_id IN (
+                    SELECT face.id
+                    FROM face_occurrences AS face
+                    INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                    INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                    WHERE asset.source_id = @source_id AND asset.source_key = @source_key)
+                OR reverses_action_id IN (
+                    SELECT action.id
+                    FROM review_actions AS action
+                    INNER JOIN face_occurrences AS face ON face.id = action.face_occurrence_id
+                    INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                    INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                    WHERE asset.source_id = @source_id AND asset.source_key = @source_key));
+            """,
+            sourceId,
+            key,
+            cancellationToken);
+
+        await ExecuteForLocatorAsync(
+            connection,
+            transaction,
+            """
+            DELETE FROM review_actions
+            WHERE face_occurrence_id IN (
+                SELECT face.id
+                FROM face_occurrences AS face
+                INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                WHERE asset.source_id = @source_id AND asset.source_key = @source_key);
+            """,
+            sourceId,
+            key,
+            cancellationToken);
+
+        await ExecuteForLocatorAsync(
+            connection,
+            transaction,
+            """
+            DELETE FROM assets
+            WHERE source_id = @source_id AND source_key = @source_key;
+            """,
+            sourceId,
+            key,
+            cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
     }
@@ -390,6 +479,22 @@ public sealed class PostgresSourceCopyPurgeRepository : ISourceCopyPurgeReposito
             string relative = $"rollouts/{runId:D}/assets/{revisionId:D}";
             artifacts.Add(new SourceCopyPurgeArtifact(ResolveUnderRoot(runRoots[runId], relative), true));
         }
+    }
+
+    private static async Task ExecuteForLocatorAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string sql,
+        SourceId sourceId,
+        string sourceKey,
+        CancellationToken cancellationToken)
+    {
+        using NpgsqlCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = sql;
+        command.Parameters.AddWithValue("source_id", sourceId.Value);
+        command.Parameters.AddWithValue("source_key", sourceKey);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private async Task EnsureSchemaAsync(CancellationToken cancellationToken) =>
