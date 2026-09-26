@@ -9,6 +9,11 @@ global using CatalogueFaceObservation = PhotoIdentity.Testing.Postgres.Catalogue
 global using CatalogueFaceCrop = PhotoIdentity.Testing.Postgres.CatalogueFaceCrop;
 global using CatalogueFaceEmbedding = PhotoIdentity.Testing.Postgres.CatalogueFaceEmbedding;
 global using CatalogueFaceInspection = PhotoIdentity.Testing.Postgres.CatalogueFaceInspection;
+global using CatalogueProcessingAssetRevision = PhotoIdentity.Core.Catalogue.AssetRevisionLookup;
+global using ArchiveSourceObservation = PhotoIdentity.Core.Sources.ArchiveSourceObservationSnapshot;
+global using ArchiveSourceVerificationState = PhotoIdentity.Core.Sources.ArchiveSourceObservationVerificationState;
+global using IdentitySuggestionPolicy = PhotoIdentity.Core.Review.ReviewIdentitySuggestionPolicy;
+global using IdentityAutoAssignmentSummary = PhotoIdentity.Core.Review.ReviewIdentityAutoAssignmentSummary;
 
 // These are identifier-only aliases. The mature fixtures still spell the ADO.NET primitives with
 // their old provider names, but every object created by PostgresTestCatalogueDatabase is Npgsql.
