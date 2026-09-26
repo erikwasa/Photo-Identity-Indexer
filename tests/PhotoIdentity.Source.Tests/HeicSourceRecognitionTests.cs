@@ -9,7 +9,7 @@ namespace PhotoIdentity_Source_Tests;
 public sealed class HeicSourceRecognitionTests
 {
     [Fact]
-    public async Task Local_and_OneDrive_scanners_recognize_heic_and_heif_but_not_unverified_raw()
+    public async Task Local_and_OneDrive_scanners_recognize_heic_heif_and_dng_but_not_other_raw()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -17,22 +17,25 @@ public sealed class HeicSourceRecognitionTests
             await File.WriteAllBytesAsync(Path.Combine(directory, "iphone.heic"), [1]);
             await File.WriteAllBytesAsync(Path.Combine(directory, "export.HEIF"), [2]);
             await File.WriteAllBytesAsync(Path.Combine(directory, "future.dng"), [3]);
+            await File.WriteAllBytesAsync(Path.Combine(directory, "future.cr2"), [4]);
 
             LocalFolderAssetSource local = new(SourceId.New(), directory);
             LocalFolderScanReport localReport = await local.ScanAsync(new SourceScanOptions());
 
-            Assert.Equal(2, localReport.Assets.Count);
+            Assert.Equal(3, localReport.Assets.Count);
             Assert.Equal("image/heic", localReport.Assets.Single(asset => asset.RelativePath == "iphone.heic").MediaType);
             Assert.Equal("image/heif", localReport.Assets.Single(asset => asset.RelativePath == "export.HEIF").MediaType);
-            Assert.Equal("future.dng", Assert.Single(localReport.UnsupportedFiles).RelativePath);
+            Assert.Equal("image/dng", localReport.Assets.Single(asset => asset.RelativePath == "future.dng").MediaType);
+            Assert.Equal("future.cr2", Assert.Single(localReport.UnsupportedFiles).RelativePath);
 
             OneDriveSyncAssetSource oneDrive = new(SourceId.New(), directory);
             OneDriveSyncScanReport oneDriveReport = await oneDrive.ScanAsync(new SourceScanOptions());
 
-            Assert.Equal(2, oneDriveReport.Assets.Count);
+            Assert.Equal(3, oneDriveReport.Assets.Count);
             Assert.Equal("image/heic", oneDriveReport.Assets.Single(asset => asset.RelativePath == "iphone.heic").MediaType);
             Assert.Equal("image/heif", oneDriveReport.Assets.Single(asset => asset.RelativePath == "export.HEIF").MediaType);
-            Assert.Equal("future.dng", Assert.Single(oneDriveReport.UnsupportedFiles).RelativePath);
+            Assert.Equal("image/dng", oneDriveReport.Assets.Single(asset => asset.RelativePath == "future.dng").MediaType);
+            Assert.Equal("future.cr2", Assert.Single(oneDriveReport.UnsupportedFiles).RelativePath);
         }
         finally
         {
