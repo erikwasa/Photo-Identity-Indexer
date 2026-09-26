@@ -1,6 +1,6 @@
 using PhotoIdentity.Persistence.Postgres;
 
-namespace PhotoIdentity_Integration_Tests;
+namespace PhotoIdentity.Integration.Tests;
 
 /// <summary>
 /// Compatibility shims for mature fixtures that explicitly invoked SQLite schema guards.
