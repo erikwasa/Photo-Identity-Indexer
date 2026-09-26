@@ -35,19 +35,19 @@ DNG support must cover discovery, catalogue ingestion, metadata, deterministic r
 
 ## Acceptance criteria
 
-- [ ] Local and OneDrive-synchronised sources recognize `.dng` as an eligible image type.
-- [ ] Privacy-safe archive inventory reports DNG as supported only when the production path is available.
-- [ ] Representative private DNG samples decode successfully with correct orientation and dimensions and are visually acceptable for normal viewing.
-- [ ] The chosen full-render versus embedded-preview policy is documented and deterministic.
-- [ ] Available capture-date/GPS metadata from representative DNG files is preserved through normal metadata extraction without inventing missing values.
-- [ ] DNG thumbnails and review/viewer proxies render through the normal application endpoints without requiring browser-native DNG support.
-- [ ] Representative DNG revisions can complete the governed face-analysis pipeline with normal zero-face or detection results.
-- [ ] Existing DNG files already present under configured archive coverage are ingested by normal rescan/reconciliation after deployment.
-- [ ] Restart/retry does not duplicate assets, revisions, detections or derivatives.
-- [ ] Corrupt or unsupported DNG inputs receive explicit actionable failure state and are not silently skipped.
-- [ ] Representative DNG decode/render runtime and peak memory are measured and accepted for bounded archive processing.
-- [ ] Verification confirms source DNG bytes remain unchanged.
-- [ ] Other RAW extensions remain unsupported unless separately verified.
+- [x] Local and OneDrive-synchronised sources recognize `.dng` as an eligible image type.
+- [x] Privacy-safe archive inventory reports DNG as supported only when the production path is available.
+- [x] Representative private DNG samples decode successfully with correct orientation and dimensions and are visually acceptable for normal viewing.
+- [x] The chosen full-render versus embedded-preview policy is documented and deterministic.
+- [x] Available capture-date/GPS metadata from representative DNG files is preserved through normal metadata extraction without inventing missing values.
+- [x] DNG thumbnails and review/viewer proxies render through the normal application endpoints without requiring browser-native DNG support.
+- [x] Representative DNG revisions can complete the governed face-analysis pipeline with normal zero-face or detection results.
+- [x] Existing DNG files already present under configured archive coverage are ingested by normal rescan/reconciliation after deployment.
+- [x] Restart/retry does not duplicate assets, revisions, detections or derivatives.
+- [x] Corrupt or unsupported DNG inputs receive explicit actionable failure state and are not silently skipped.
+- [x] Representative DNG decode/render runtime and peak memory are measured and accepted for bounded archive processing.
+- [x] Verification confirms source DNG bytes remain unchanged.
+- [x] Other RAW extensions remain unsupported unless separately verified.
 
 ## Verification plan
 
@@ -64,3 +64,13 @@ DNG support must cover discovery, catalogue ingestion, metadata, deterministic r
 ## Privacy and sample policy
 
 Real DNG files may contain faces, GPS, capture history and device metadata. Representative production samples remain private and must not be committed. Automated fixtures may be added only when licensing and privacy permit; otherwise tests should use distributable synthetic/minimal fixtures for format contracts while the private samples provide human acceptance evidence.
+
+## Rendering policy and verification evidence
+
+The maintained archive inventory on 2026-09-26 contained 50 DNG files. The verified variants store a full-resolution 8-bit YCbCr JPEG preview in IFD0 alongside the RAW mosaic. Production decoding deterministically prefers that full-resolution preview when it is a structurally valid single strip, applies the TIFF orientation exactly once and returns the existing packed BGR24 contract. This is not the small embedded thumbnail. A valid DNG without that verified preview layout falls back to a full ImageMagick RAW render with explicit sRGB output and camera white balance. Other TIFF and RAW formats remain rejected.
+
+Three private representatives covering the smallest, median and largest observed DNG sizes decoded at 2316x3088, 6048x8064 and 6048x8064 after orientation. Their selected 1600-long-edge review proxies were visually checked for orientation, aspect, colour and detail. Decode elapsed times were 201 ms, 1,287 ms and 945 ms; proxy render times were 116 ms, 565 ms and 519 ms. Combined decode-plus-proxy verification processes peaked at 230,678,528, 1,088,356,352 and 1,178,103,808 bytes respectively. Archive advancement remains bounded to one image step, so the measured large-sample working set was accepted for the maintainer-controlled local hardware.
+
+All three samples exposed orientation, camera make/model and valid GPS metadata. They did not contain a capture date, and extraction correctly left it absent rather than inventing one. SHA-256 before/after checks confirmed every source remained unchanged. The generated proxies were kept in ignored private verification storage and no source filename, path, pixel data, GPS value or device identity is retained in Git.
+
+An isolated normal archive include/sync ingested a copied representative as one `image/dng` revision. The exact governed CenterFace 0.5 single-pass/SFace FP32 profile completed successfully. Repeating sync reported zero new revisions and one unchanged source; repeating analysis reported the exact profile already complete and scheduled zero work. Privacy-safe inventory reported `family=raw supported=true`. Automated coverage adds a synthetic distributable DNG container for orientation/BGR decoding, signature and corrupt-media behavior, source eligibility, inventory classification and protection of other RAW extensions.

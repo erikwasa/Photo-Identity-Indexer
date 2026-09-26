@@ -131,6 +131,7 @@ internal static class ArchiveProxyMeasureCommandRunner
         ".png",
         ".heic",
         ".heif",
+        ".dng",
     };
 
     public static async Task<int> RunAsync(
@@ -161,7 +162,7 @@ internal static class ArchiveProxyMeasureCommandRunner
             .ToArray();
         if (sourceFiles.Length == 0)
         {
-            throw new ArgumentException("Archive proxy measurement source contains no supported JPEG, PNG, HEIC or HEIF images.");
+            throw new ArgumentException("Archive proxy measurement source contains no supported JPEG, PNG, HEIC, HEIF or DNG images.");
         }
 
         Directory.CreateDirectory(outputRoot);

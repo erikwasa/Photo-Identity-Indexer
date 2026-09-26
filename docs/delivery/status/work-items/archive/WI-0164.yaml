@@ -1,0 +1,18 @@
+id: WI-0164
+title: Add verified DNG archive support
+milestone: M32
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0164-dng-archive-support.md
+started_at: 2026-09-26
+completed_at: 2026-09-26
+verified_at: 2026-09-26
+verified_by: ai-agent
+last_updated_at: 2026-09-26
+branch: codex/wi-0164-dng-archive-support
+blockers:
+- WI-0053
+blocker_notes: []
+evidence:
+- type: local-verification
+  value: '2026-09-26: release build passed with zero warnings; 907 tests passed; three private DNG decode/proxy/metadata/immutability checks passed; isolated normal reconciliation and governed CenterFace/SFace retry-idempotence passed.'

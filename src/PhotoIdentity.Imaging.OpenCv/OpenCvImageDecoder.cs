@@ -1,4 +1,5 @@
 using ImageMagick;
+using ImageMagick.Formats;
 using OpenCvSharp;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Imaging;
@@ -36,14 +37,24 @@ public sealed class OpenCvImageDecoder : IImageDecoder
         {
             throw new ImageDecodingException(
                 ImageDecodingFailure.UnsupportedFormat,
-                "Only JPEG, PNG, HEIC and HEIF images are supported by the image decoder.");
+                "Only JPEG, PNG, HEIC, HEIF and DNG images are supported by the image decoder.");
         }
 
         try
         {
             if (format == ImageFileFormat.Heif)
             {
-                return DecodeHeif(encoded, options.MaximumSize, cancellationToken);
+                return DecodeWithImageMagick(
+                    encoded,
+                    MagickFormat.Heic,
+                    "HEIC/HEIF",
+                    options.MaximumSize,
+                    cancellationToken);
+            }
+
+            if (format == ImageFileFormat.Dng)
+            {
+                return DecodeDng(encoded, options.MaximumSize, cancellationToken);
             }
 
             using Mat decoded = Cv2.ImDecode(encoded.ToArray(), ImreadModes.Color);
@@ -77,13 +88,15 @@ public sealed class OpenCvImageDecoder : IImageDecoder
         }
     }
 
-    private static ImageFrame DecodeHeif(
+    private static ImageFrame DecodeWithImageMagick(
         ReadOnlySpan<byte> encoded,
+        MagickFormat magickFormat,
+        string formatName,
         ImageSize? maximumSize,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        using MagickImage image = new(encoded.ToArray());
+        using MagickImage image = new(encoded.ToArray(), magickFormat);
         image.AutoOrient();
         image.TransformColorSpace(ColorProfiles.SRGB);
 
@@ -102,7 +115,7 @@ public sealed class OpenCvImageDecoder : IImageDecoder
         byte[] data = pixels.ToByteArray(PixelMapping.BGR)
             ?? throw new ImageDecodingException(
                 ImageDecodingFailure.CorruptMedia,
-                "The HEIC/HEIF image did not expose decoded BGR pixels.");
+                $"The {formatName} image did not expose decoded BGR pixels.");
         int width = checked((int)image.Width);
         int height = checked((int)image.Height);
         ImageSize size = new(width, height);
@@ -111,6 +124,103 @@ public sealed class OpenCvImageDecoder : IImageDecoder
             PixelFormat.Bgr24,
             checked(width * ImageFrame.BytesPerPixel(PixelFormat.Bgr24)),
             data);
+    }
+
+    private static ImageFrame DecodeDng(
+        ReadOnlySpan<byte> encoded,
+        ImageSize? maximumSize,
+        CancellationToken cancellationToken)
+    {
+        if (DngEmbeddedPreview.TryExtract(encoded, out DngPreview preview))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using Mat decoded = Cv2.ImDecode(
+                preview.Jpeg,
+                ImreadModes.Color | ImreadModes.IgnoreOrientation);
+            if (decoded.Empty())
+            {
+                throw new ImageDecodingException(
+                    ImageDecodingFailure.CorruptMedia,
+                    "The DNG embedded preview could not be decoded.");
+            }
+
+            using Mat oriented = ApplyOrientation(decoded, preview.Orientation);
+            using Mat prepared = ResizeToMaximum(oriented, maximumSize);
+            return ToImageFrame(prepared);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        MagickReadSettings settings = new(new DngReadDefines
+        {
+            OutputColor = DngOutputColor.SRGB,
+            UseCameraWhiteBalance = true,
+        });
+        using MagickImage image = new(encoded.ToArray(), settings);
+        image.AutoOrient();
+
+        if (maximumSize is not null &&
+            (image.Width > (uint)maximumSize.Value.Width ||
+             image.Height > (uint)maximumSize.Value.Height))
+        {
+            image.Resize(
+                (uint)maximumSize.Value.Width,
+                (uint)maximumSize.Value.Height);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        image.Strip();
+        using var pixels = image.GetPixels();
+        byte[] data = pixels.ToByteArray(PixelMapping.BGR)
+            ?? throw new ImageDecodingException(
+                ImageDecodingFailure.CorruptMedia,
+                "The DNG image did not expose decoded BGR pixels.");
+        int width = checked((int)image.Width);
+        int height = checked((int)image.Height);
+        return new ImageFrame(
+            new ImageSize(width, height),
+            PixelFormat.Bgr24,
+            checked(width * ImageFrame.BytesPerPixel(PixelFormat.Bgr24)),
+            data);
+    }
+
+    private static Mat ApplyOrientation(Mat source, OrientationType orientation)
+    {
+        Mat oriented = new();
+        switch (orientation)
+        {
+            case OrientationType.Undefined:
+            case OrientationType.TopLeft:
+                source.CopyTo(oriented);
+                break;
+            case OrientationType.TopRight:
+                Cv2.Flip(source, oriented, FlipMode.Y);
+                break;
+            case OrientationType.BottomRight:
+                Cv2.Rotate(source, oriented, RotateFlags.Rotate180);
+                break;
+            case OrientationType.BottomLeft:
+                Cv2.Flip(source, oriented, FlipMode.X);
+                break;
+            case OrientationType.LeftTop:
+                Cv2.Transpose(source, oriented);
+                break;
+            case OrientationType.RightTop:
+                Cv2.Rotate(source, oriented, RotateFlags.Rotate90Clockwise);
+                break;
+            case OrientationType.RightBottom:
+                using (Mat transposed = source.T())
+                {
+                    Cv2.Flip(transposed, oriented, FlipMode.XY);
+                }
+                break;
+            case OrientationType.LeftBottom:
+                Cv2.Rotate(source, oriented, RotateFlags.Rotate90Counterclockwise);
+                break;
+            default:
+                source.CopyTo(oriented);
+                break;
+        }
+        return oriented;
     }
 
     private static async Task<byte[]> ReadAllAsync(
@@ -184,6 +294,7 @@ internal enum ImageFileFormat
     Jpeg,
     Png,
     Heif,
+    Dng,
 }
 
 internal static class ImageFileSignature
@@ -209,6 +320,11 @@ internal static class ImageFileSignature
         if (IsHeif(encoded))
         {
             return ImageFileFormat.Heif;
+        }
+
+        if (DngEmbeddedPreview.IsDng(encoded))
+        {
+            return ImageFileFormat.Dng;
         }
 
         return ImageFileFormat.Unsupported;
