@@ -43,6 +43,22 @@ public sealed class SlideshowLibraryPresentationTests
     }
 
     [Fact]
+    public void Play_accessibility_label_includes_quantity_and_prepared_state_when_shown()
+    {
+        Assert.Equal(
+            "Play Family favourites slideshow. 53 photos. Prepared",
+            SlideshowLibraryPresentation.PlayAriaLabel(
+                "Family favourites",
+                "53 photos",
+                prepared: true));
+        Assert.Equal(
+            "Play Summer sampler slideshow. Up to 50 photos",
+            SlideshowLibraryPresentation.PlayAriaLabel(
+                "Summer sampler",
+                "Up to 50 photos"));
+    }
+
+    [Fact]
     public void Manual_photo_count_uses_exact_persisted_revision_membership()
     {
         PhotoListCollectionResponse collection = new(
