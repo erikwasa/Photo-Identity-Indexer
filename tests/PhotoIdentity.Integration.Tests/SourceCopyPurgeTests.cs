@@ -61,25 +61,72 @@ public sealed class SourceCopyPurgeTests
         Assert.Equal(1, await fixture.CountAsync("assets"));
         Assert.False(await fixture.Exclusions.RestoreAsync(fixture.SourceId, fixture.SourceKey));
 
-        // Fresh repository/service instances simulate process restart. The first attempt already
-        // persisted the complete artifact manifest before touching the filesystem.
-        SqliteSourceCopyExclusionRepository restartedExclusions = new(fixture.Database);
-        SqliteSourceCopyPurgeRepository restartedPurges = new(fixture.Database);
-        SourceCopyPurgeService restarted = new(
-            restartedExclusions,
-            restartedPurges,
-            fixture.Roots,
-            new SourceCopyPurgeFileSystem(),
-            TimeProvider.System);
-
+        SourceCopyPurgeService restarted = fixture.CreateRestartedService();
         Assert.True(await restarted.PurgeAsync(fixture.SourceId, fixture.SourceKey));
+        await AssertCompletedAsync(fixture);
+    }
+
+    [Fact]
+    public async Task Crash_after_filesystem_cleanup_retries_catalogue_cleanup_with_missing_files()
+    {
+        await using PurgeFixture fixture = await PurgeFixture.CreateAsync();
+        await fixture.Exclusions.ExcludeAsync(fixture.SourceId, fixture.SourceKey, fixture.Now.AddMinutes(1));
+
+        ISourceCopyPurgeRepository inner = new SqliteSourceCopyPurgeRepository(fixture.Database);
+        SourceCopyPurgeService failing = fixture.CreateService(
+            new SourceCopyPurgeFileSystem(),
+            new ThrowOncePurgeRepository(inner, ThrowStage.BeforeCatalogueDelete));
+        Assert.False(await failing.PurgeAsync(fixture.SourceId, fixture.SourceKey));
+
+        Assert.False(File.Exists(fixture.ProxyPath));
+        Assert.False(File.Exists(fixture.FaceReviewPath));
+        Assert.False(File.Exists(fixture.FaceCropPath));
+        Assert.Equal(1, await fixture.CountAsync("assets"));
+        Assert.Equal(1, await fixture.CountAsync("source_copy_purge_manifests"));
+        Assert.False(await fixture.Exclusions.RestoreAsync(fixture.SourceId, fixture.SourceKey));
+
+        SourceCopyPurgeService restarted = fixture.CreateRestartedService();
+        Assert.True(await restarted.PurgeAsync(fixture.SourceId, fixture.SourceKey));
+        await AssertCompletedAsync(fixture);
+    }
+
+    [Fact]
+    public async Task Crash_after_catalogue_cleanup_retries_from_manifest_and_finishes_tombstone()
+    {
+        await using PurgeFixture fixture = await PurgeFixture.CreateAsync();
+        await fixture.Exclusions.ExcludeAsync(fixture.SourceId, fixture.SourceKey, fixture.Now.AddMinutes(1));
+
+        ISourceCopyPurgeRepository inner = new SqliteSourceCopyPurgeRepository(fixture.Database);
+        SourceCopyPurgeService failing = fixture.CreateService(
+            new SourceCopyPurgeFileSystem(),
+            new ThrowOncePurgeRepository(inner, ThrowStage.BeforeManifestClear));
+        Assert.False(await failing.PurgeAsync(fixture.SourceId, fixture.SourceKey));
+
+        Assert.False(File.Exists(fixture.ProxyPath));
+        Assert.False(File.Exists(fixture.FaceReviewPath));
+        Assert.False(File.Exists(fixture.FaceCropPath));
+        Assert.Equal(0, await fixture.CountAsync("assets"));
+        Assert.Equal(1, await fixture.CountAsync("source_copy_purge_manifests"));
+        SourceCopyExclusionState failed = Assert.IsType<SourceCopyExclusionState>(
+            await fixture.Exclusions.GetAsync(fixture.SourceId, fixture.SourceKey));
+        Assert.Equal(SourceCopyPurgeStates.Failed, failed.PurgeState);
+        Assert.False(await fixture.Exclusions.RestoreAsync(fixture.SourceId, fixture.SourceKey));
+
+        SourceCopyPurgeService restarted = fixture.CreateRestartedService();
+        Assert.True(await restarted.PurgeAsync(fixture.SourceId, fixture.SourceKey));
+        await AssertCompletedAsync(fixture);
+        Assert.Equal(0, await fixture.CountAsync("source_copy_purge_manifests"));
+    }
+
+    private static async Task AssertCompletedAsync(PurgeFixture fixture)
+    {
         Assert.False(File.Exists(fixture.ProxyPath));
         Assert.False(File.Exists(fixture.FaceReviewPath));
         Assert.False(File.Exists(fixture.FaceCropPath));
         Assert.Equal(0, await fixture.CountAsync("assets"));
 
         SourceCopyExclusionState completed = Assert.IsType<SourceCopyExclusionState>(
-            await restartedExclusions.GetAsync(fixture.SourceId, fixture.SourceKey));
+            await fixture.Exclusions.GetAsync(fixture.SourceId, fixture.SourceKey));
         Assert.Equal(SourceCopyPurgeStates.Completed, completed.PurgeState);
         Assert.Null(completed.PurgeErrorCode);
     }
@@ -108,6 +155,61 @@ public sealed class SourceCopyPurgeTests
         public void DeleteDirectory(string path) => _inner.DeleteDirectory(path);
         public bool FileExists(string path) => _inner.FileExists(path);
         public bool DirectoryExists(string path) => _inner.DirectoryExists(path);
+    }
+
+    private enum ThrowStage
+    {
+        BeforeCatalogueDelete,
+        BeforeManifestClear,
+    }
+
+    private sealed class ThrowOncePurgeRepository : ISourceCopyPurgeRepository
+    {
+        private readonly ISourceCopyPurgeRepository _inner;
+        private readonly ThrowStage _stage;
+        private bool _thrown;
+
+        public ThrowOncePurgeRepository(ISourceCopyPurgeRepository inner, ThrowStage stage)
+        {
+            _inner = inner;
+            _stage = stage;
+        }
+
+        public Task<SourceCopyPurgeManifest> PrepareManifestAsync(
+            SourceId sourceId,
+            string sourceKey,
+            SourceCopyPurgeRoots roots,
+            DateTimeOffset preparedAtUtc,
+            CancellationToken cancellationToken = default) =>
+            _inner.PrepareManifestAsync(sourceId, sourceKey, roots, preparedAtUtc, cancellationToken);
+
+        public async Task PurgeCatalogueAsync(
+            SourceId sourceId,
+            string sourceKey,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_thrown && _stage == ThrowStage.BeforeCatalogueDelete)
+            {
+                _thrown = true;
+                throw new InvalidOperationException("simulated crash before catalogue cleanup");
+            }
+
+            await _inner.PurgeCatalogueAsync(sourceId, sourceKey, cancellationToken);
+        }
+
+        public async Task ClearManifestAsync(
+            SourceId sourceId,
+            string sourceKey,
+            CancellationToken cancellationToken = default)
+        {
+            if (!_thrown && _stage == ThrowStage.BeforeManifestClear)
+            {
+                _thrown = true;
+                throw new InvalidOperationException("simulated crash after catalogue cleanup");
+            }
+
+            await _inner.ClearManifestAsync(sourceId, sourceKey, cancellationToken);
+        }
     }
 
     private sealed class PurgeFixture : IAsyncDisposable
@@ -247,12 +349,26 @@ public sealed class SourceCopyPurgeTests
                 faceCropPath);
         }
 
-        public SourceCopyPurgeService CreateService(ISourceCopyPurgeFileSystem fileSystem) => new(
+        public SourceCopyPurgeService CreateService(
+            ISourceCopyPurgeFileSystem fileSystem,
+            ISourceCopyPurgeRepository? purgeRepository = null) => new(
             Exclusions,
-            new SqliteSourceCopyPurgeRepository(Database),
+            purgeRepository ?? new SqliteSourceCopyPurgeRepository(Database),
             Roots,
             fileSystem,
             TimeProvider.System);
+
+        public SourceCopyPurgeService CreateRestartedService()
+        {
+            SqliteSourceCopyExclusionRepository exclusions = new(Database);
+            SqliteSourceCopyPurgeRepository purges = new(Database);
+            return new SourceCopyPurgeService(
+                exclusions,
+                purges,
+                Roots,
+                new SourceCopyPurgeFileSystem(),
+                TimeProvider.System);
+        }
 
         public async Task<long> CountAsync(string table)
         {
