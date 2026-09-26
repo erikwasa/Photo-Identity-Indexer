@@ -167,16 +167,70 @@ public sealed class SqliteSourceCopyPurgeRepository : ISourceCopyPurgeRepository
 
         if (await TableExistsAsync(connection, transaction, "review_actions", cancellationToken))
         {
+            if (await TableExistsAsync(connection, transaction, "identity_suggestion_review_actions", cancellationToken))
+            {
+                await ExecuteForLocatorAsync(
+                    connection,
+                    transaction,
+                    """
+                    DELETE FROM identity_suggestion_review_actions
+                    WHERE review_action_id IN (
+                        SELECT action.id
+                        FROM review_actions AS action
+                        INNER JOIN face_occurrences AS face ON face.id = action.face_occurrence_id
+                        INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                        INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                        WHERE asset.source_id = $source_id AND asset.source_key = $source_key)
+                       OR review_action_id IN (
+                        SELECT undo_action.id
+                        FROM review_actions AS undo_action
+                        WHERE undo_action.action_kind = 'undo'
+                          AND undo_action.reverses_action_id IN (
+                            SELECT action.id
+                            FROM review_actions AS action
+                            INNER JOIN face_occurrences AS face ON face.id = action.face_occurrence_id
+                            INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                            INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                            WHERE asset.source_id = $source_id AND asset.source_key = $source_key));
+                    """,
+                    sourceId,
+                    key,
+                    cancellationToken);
+            }
+
             await ExecuteForLocatorAsync(
                 connection,
                 transaction,
                 """
-                UPDATE review_actions
-                SET reverses_action_id = NULL
-                WHERE reverses_action_id IN (
-                    SELECT target.id
-                    FROM review_actions AS target
-                    INNER JOIN face_occurrences AS face ON face.id = target.face_occurrence_id
+                DELETE FROM review_actions
+                WHERE action_kind = 'undo'
+                  AND (
+                    face_occurrence_id IN (
+                        SELECT face.id
+                        FROM face_occurrences AS face
+                        INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                        INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                        WHERE asset.source_id = $source_id AND asset.source_key = $source_key)
+                    OR reverses_action_id IN (
+                        SELECT action.id
+                        FROM review_actions AS action
+                        INNER JOIN face_occurrences AS face ON face.id = action.face_occurrence_id
+                        INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
+                        INNER JOIN assets AS asset ON asset.id = revision.asset_id
+                        WHERE asset.source_id = $source_id AND asset.source_key = $source_key));
+                """,
+                sourceId,
+                key,
+                cancellationToken);
+
+            await ExecuteForLocatorAsync(
+                connection,
+                transaction,
+                """
+                DELETE FROM review_actions
+                WHERE face_occurrence_id IN (
+                    SELECT face.id
+                    FROM face_occurrences AS face
                     INNER JOIN asset_revisions AS revision ON revision.id = face.asset_revision_id
                     INNER JOIN assets AS asset ON asset.id = revision.asset_id
                     WHERE asset.source_id = $source_id AND asset.source_key = $source_key);
