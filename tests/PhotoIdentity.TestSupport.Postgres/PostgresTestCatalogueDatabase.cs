@@ -44,8 +44,9 @@ public sealed class PostgresTestCatalogueDatabase :
     public Task InitializeAsync(CancellationToken cancellationToken = default) =>
         Database.InitializeAsync(cancellationToken);
 
-    public Task<NpgsqlConnection> OpenConnectionAsync(CancellationToken cancellationToken = default) =>
-        Database.OpenConnectionAsync(cancellationToken);
+    public async Task<PostgresCompatibilityConnection> OpenConnectionAsync(
+        CancellationToken cancellationToken = default) =>
+        new(await Database.OpenConnectionAsync(cancellationToken));
 
     public void Dispose()
     {
