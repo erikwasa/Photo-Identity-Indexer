@@ -2,29 +2,36 @@ using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using PhotoIdentity.Testing.Postgres;
 
 namespace PhotoIdentity_Integration_Tests;
 
 /// <summary>
 /// Compatibility foundation for API integration-test factories in this namespace.
 /// Legacy unqualified WebApplicationFactory references resolve here, so generic endpoint hosts
-/// disable unrelated production workers even before they are migrated to PhotoIdentityApiTestFactory.
+/// share an isolated PostgreSQL catalogue and disable unrelated production workers.
 /// Worker-specific tests must explicitly opt back in.
 /// </summary>
 internal class WebApplicationFactory<TEntryPoint> :
     Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<TEntryPoint>
     where TEntryPoint : class
 {
+    private readonly PostgresTestDatabaseLease _databaseLease = PostgresTestDatabaseLease.Create();
+
     protected virtual bool DisableBackgroundWorkers => true;
-    protected virtual bool UseSqliteTestCompatibility => true;
+
+    protected string TestPostgresConnectionString => _databaseLease.ConnectionString;
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        if (UseSqliteTestCompatibility)
+        builder.UseEnvironment("IntegrationTestPostgres");
+        builder.ConfigureWebHost(webHost =>
         {
-            builder.UseEnvironment("IntegrationTest");
-            builder.ConfigureWebHost(webHost => webHost.UseStaticWebAssets());
-        }
+            webHost.UseSetting(
+                "PhotoIdentity:Postgres:ConnectionString",
+                TestPostgresConnectionString);
+            webHost.UseStaticWebAssets();
+        });
 
         if (DisableBackgroundWorkers)
         {
@@ -38,6 +45,15 @@ internal class WebApplicationFactory<TEntryPoint> :
         }
 
         return base.CreateHost(builder);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+        {
+            _databaseLease.Dispose();
+        }
     }
 
     private static void RemoveHostedService<THostedService>(IServiceCollection services)
@@ -57,35 +73,30 @@ internal class WebApplicationFactory<TEntryPoint> :
 
 /// <summary>
 /// Shared host foundation for API integration tests.
-/// Generic endpoint tests should not run unrelated production background loops; worker-specific
-/// behavior is covered by focused tests that exercise the worker directly or can opt back in.
+/// The historical database-path argument is retained only so existing fixtures do not need to
+/// rewrite their temporary-directory plumbing; every host now uses an isolated PostgreSQL database.
 /// </summary>
 internal class PhotoIdentityApiTestFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
 {
-    private readonly string _databasePath;
     private readonly Action<IWebHostBuilder>? _configureWebHost;
     private readonly bool _disableBackgroundWorkers;
-    private readonly bool _useSqliteTestCompatibility;
 
     public PhotoIdentityApiTestFactory(
         string databasePath,
         Action<IWebHostBuilder>? configureWebHost = null,
         bool disableBackgroundWorkers = true,
-        bool useSqliteTestCompatibility = true)
+        bool useSqliteTestCompatibility = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(databasePath);
-        _databasePath = databasePath;
+        _ = useSqliteTestCompatibility;
         _configureWebHost = configureWebHost;
         _disableBackgroundWorkers = disableBackgroundWorkers;
-        _useSqliteTestCompatibility = useSqliteTestCompatibility;
     }
 
     protected override bool DisableBackgroundWorkers => _disableBackgroundWorkers;
-    protected override bool UseSqliteTestCompatibility => _useSqliteTestCompatibility;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
         builder.UseSetting(WebHostDefaults.DetailedErrorsKey, "true");
         _configureWebHost?.Invoke(builder);
     }
