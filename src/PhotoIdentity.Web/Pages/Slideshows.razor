@@ -43,6 +43,8 @@ else
             bool needsAttention = SlideshowPreparationExperience.NeedsParentAttention(preparation);
             bool starting = IsStarting(collection.Id);
             bool busy = preparing || needsAttention || starting;
+            bool prepared = SlideshowLibraryPresentation.ShowPreparedIndicator(preparation?.State, busy);
+            int? photoCount = PhotoCountFor(collection);
 
             <article class="slideshow-library-card">
                 <button type="button"
@@ -52,9 +54,28 @@ else
                         @onclick="() => StartSlideshowAsync(collection)">
                     <SlideshowLibraryCover CollectionId="@collection.Id"
                                            Manual="@collection.Manual"
-                                           CoverRevisionId="@collection.CoverRevisionId" />
+                                           CoverRevisionId="@collection.CoverRevisionId"
+                                           PhotoCountChanged="@(count => SetSmartPhotoCountAsync(collection.Id, count))" />
                     <span class="slideshow-library-card-shade" aria-hidden="true"></span>
                     <span class="slideshow-library-card-copy">
+                        @if (photoCount.HasValue || prepared)
+                        {
+                            <span class="slideshow-library-card-meta">
+                                @if (photoCount.HasValue)
+                                {
+                                    <span class="slideshow-library-card-badge">
+                                        @SlideshowLibraryPresentation.PhotoCountLabel(photoCount.Value)
+                                    </span>
+                                }
+                                @if (prepared)
+                                {
+                                    <span class="slideshow-library-card-badge slideshow-library-card-badge-prepared">
+                                        <span aria-hidden="true">✓</span>
+                                        <span>Prepared</span>
+                                    </span>
+                                }
+                            </span>
+                        }
                         <span class="slideshow-library-card-title">@collection.Name</span>
                         @if (collection.Manual)
                         {
