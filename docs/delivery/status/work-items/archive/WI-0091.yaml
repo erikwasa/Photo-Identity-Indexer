@@ -1,0 +1,33 @@
+id: WI-0091
+title: Add archive lifecycle review and exclusion workflows
+milestone: M23
+status: completed
+owner: ai-agent
+document: ../work-items/WI-0091-archive-lifecycle-review.md
+started_at: 2026-09-26
+completed_at: 2026-09-26
+verified_at: 2026-09-26
+verified_by: maintainer
+last_updated_at: 2026-09-26
+branch: agent/wi-0091-archive-lifecycle-review
+blockers:
+- WI-0087
+- WI-0088
+- WI-0089
+- WI-0090
+blocker_notes: []
+evidence:
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/438
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/441
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/443
+- type: pull_request
+  value: https://github.com/erikwasa/Photo-Identity-Indexer/pull/445
+- type: verification
+  value: '2026-09-26 maintainer real-catalogue acceptance: duplicate A-only exclusion/purge, bulk Removed exclusion/purge, fresh re-inclusion, excluded rename as a new included copy, source deletion entering Removed, and completed exclusions without media actions all passed.'
+- type: verification
+  value: '2026-09-26 privacy-safe PostgreSQL residue check for the purged still-present photo: revision_rows=0, direct_revision_reference_rows=0, tables_with_residue=0.'
+- type: verification
+  value: '2026-09-26 PostgreSQL acceptance gate passed 53 persistence tests and 9 runtime/composition tests; accepted WI-0088 included-rename evidence preserved AssetId/history and was idempotent on the following sync.'

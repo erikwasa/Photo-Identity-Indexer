@@ -4,27 +4,30 @@ This file is intentionally a short handoff for the next development or verificat
 
 ## Current focus
 
-WI-0147 makes PostgreSQL unconditional for normal API, detector-rollout CLI and packaged launcher composition. Implementation and automated verification are complete on `codex/WI-0147`; the item is ready for maintainer review and PR creation.
+**WI-0163 Add safe bulk capture-date and Place enrichment is in progress under M31 Bulk archive metadata enrichment.**
 
-SQLite remains only in the isolated API integration-test compatibility graph and explicit migration/test/tooling surfaces assigned to WI-0148 and WI-0149. Do not expand this item into that cleanup.
+The maintainer measured 17,892 current photos: 234 have no effective capture date, 12,603 have no named Place or valid non-zero GPS, and 12,371 of the location-less photos already have an effective date. Directory `1970` is a miscellaneous catch-all and must never be interpreted as a real capture year merely from its path.
+
+WI-0163 remains on `agent/wi-0163-bulk-metadata-enrichment`. Its first CLI slice adds `metadata enrich`, which is dry-run by default, reads explicit JSON rules, proposes missing dates from conservative filename/path patterns, and proposes Places only when an effective date range is fully contained by an operator-supplied rule. `--apply` uses the existing PostgreSQL capture-date and Place repositories; existing effective dates, named Places and valid non-zero GPS are protected by default.
+
+M23 Source-copy lifecycle and privacy exclusion is completed with all five work items and the maintainer real-catalogue acceptance recorded. M28 and M26 remain completed. M29 is in progress with WI-0147 implemented and under review in PR #446; WI-0148 and WI-0149 remain the follow-up PostgreSQL-only cleanup items. M30 video support remains intentionally blocked until explicit maintainer reactivation.
 
 ## Next concrete step
 
-Create and review the WI-0147 PR. After it lands, use `PhotoIdentity.Docs show WI-0148` before starting the next M29 item.
+Continue WI-0163 from its canonical work-item/status shard. In parallel, complete maintainer review of WI-0147 / PR #446 before starting WI-0148.
 
 ## Relevant files
 
+- docs/delivery/milestones/M31-bulk-metadata-enrichment.md
+- docs/delivery/work-items/WI-0163-bulk-metadata-enrichment.md
+- docs/delivery/status/work-items/active/WI-0163.yaml
 - docs/delivery/work-items/WI-0147-postgres-only-runtime-composition.md
 - docs/delivery/status/work-items/active/WI-0147.yaml
-- src/PhotoIdentity.Api/Program.cs
-- src/PhotoIdentity.Api/CataloguePersistenceComposition.cs
-- src/PhotoIdentity.Cli/DetectorRolloutCommand.cs
-- Start-PhotoIdentity.ps1
-- docs/architecture/postgresql-runtime-composition.md
 
-## Verification
+## Repository validation
 
-- Solution build passed with zero warnings/errors.
-- `./test.ps1` passed all suites, including 652/652 integration tests.
-- Launcher validation passed with PostgreSQL as the unconditional provider.
-- Missing PostgreSQL API configuration failed with the expected explicit startup error.
+    ./build.ps1
+    ./test.ps1
+    dotnet run --project tools/PhotoIdentity.Docs -- validate
+    dotnet run --project tools/PhotoIdentity.Docs -- generate --check
+    ./verify-postgres.ps1

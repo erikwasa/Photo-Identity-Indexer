@@ -50,7 +50,7 @@ The expected archive workflow includes deleting low-quality/inappropriate/burst 
 - [x] After purge completes, Excluded shows no thumbnail or original-view action.
 - [x] Purge pending/failed entries remain blocked and offer retry/actionable status.
 - [x] Restore/re-include starts fresh processing and does not restore purged identifications/history.
-- [ ] Maintainer acceptance proves: duplicate A/B exclude A only; included rename preserves identity; excluded rename appears as a new included copy; OneDrive deletion enters Removed from source; bulk removed-source purge works; still-present private photo leaves no local Photo Identity derivative/identity data after purge.
+- [x] Maintainer acceptance proves: duplicate A/B exclude A only; included rename preserves identity; excluded rename appears as a new included copy; OneDrive deletion enters Removed from source; bulk removed-source purge works; still-present private photo leaves no local Photo Identity derivative/identity data after purge.
 
 ## Verification requirements
 
@@ -81,7 +81,7 @@ Typical flow:
 # Use Exclude from Photo Identity in the viewer, then:
 .\verify-wi0091.ps1 -Stage VerifyPhotoExclusion
 .\verify-wi0091.ps1 -Stage WaitForPurge -Target photo
-# Re-include from the Excluded view, then:
+# Re-include from the Excluded view, synchronize if needed, then:
 .\verify-wi0091.ps1 -Stage VerifyRestore
 ```
 
@@ -105,13 +105,18 @@ The already accepted WI-0088 real-catalogue evidence for an included rename (sam
 
 ## Completion notes
 
-- Files changed: PR #438 adds the dedicated `/archive/lifecycle` workspace, lifecycle API actions/contracts, review-navigation entry, a route-aware photo privacy exclusion action, focused application integration tests and the `verify-wi0091.ps1` maintainer helper.
+- Files changed: PR #438 adds the dedicated `/archive/lifecycle` workspace, lifecycle API actions/contracts, review-navigation entry, a route-aware photo privacy exclusion action, focused application integration tests and the `verify-wi0091.ps1` maintainer helper. Follow-up helper fixes landed in PRs #441, #443 and #445.
 - State model: Removed from source, Exact duplicates, Excluded, Purge pending and Purge failed are separate operator surfaces. Excluded locators are removed immediately from exact-duplicate and removed-source review results while the lower-level exclusion boundary blocks normal media/query/processing access.
 - Bulk safety: the bulk endpoint parses and resolves every selected revision before creating any tombstone, so an invalid/stale selection cannot leave a partially excluded batch.
 - Privacy UX: destructive confirmations explicitly say the OneDrive/source original is not deleted. Completed exclusions are text/status-only; failed purge exposes only the stored privacy-safe error code and a retry action.
 - Re-inclusion: only a completed purge may be restored. The UI removes the tombstone and triggers archive synchronization so any still-present source copy is catalogued again from source; purged revision-linked identities/history are not reconstructed.
-- Automated coverage: focused API tests cover atomic bulk validation, independent duplicate-copy exclusion, immediate withdrawal from duplicate and removed review queues, failed-purge retry, completed-purge restore gating and removed-source revision retention.
+- Automated coverage: focused API tests cover atomic bulk validation, independent duplicate-copy exclusion, immediate withdrawal from duplicate and removed review queues, failed-purge retry, completed-purge restore gating and removed-source revision retention. The accepted PostgreSQL gate passed 53 persistence tests and 9 runtime/composition tests.
+- Real-catalogue duplicate acceptance: one copy of an exact-duplicate pair was excluded and fully purged while its independently catalogued sibling remained included; the excluded copy immediately left duplicate review and viewer-preview access was blocked.
+- Real-catalogue removed-source acceptance: two retained Removed entries were bulk excluded and purged together; both left Removed immediately and completed exclusions had no thumbnail or original/view action.
+- Real-catalogue restore acceptance: a still-present photo was excluded and purged, then re-included. A subsequent archive synchronization catalogued a fresh revision, and verification proved the purged revision was not restored.
+- Real-catalogue excluded-rename acceptance: after exclusion/purge, moving the source produced a new independently included locator and fresh catalogue processing while the old locator remained excluded.
+- Real-catalogue source-deletion acceptance: deleting a recorded source copy outside Photo Identity and synchronizing moved it into **Removed from source** while retaining the previously verified revision for non-destructive review.
+- Real-catalogue privacy-residue acceptance: a direct PostgreSQL aggregate check for the purged still-present revision returned `revision_rows=0`, `direct_revision_reference_rows=0` and `tables_with_residue=0`. No private paths, filenames, hashes, photo IDs or identity data are recorded in repository evidence.
+- Included-rename acceptance is satisfied by the previously accepted WI-0088 real-catalogue evidence: the included move preserved AssetId/history, produced `reconciled_moves=1`, and the next synchronization was idempotent with `reconciled_moves=0`.
 - Trade-offs: the lifecycle UI uses the existing durable review proxy endpoint for recognizable removed-photo previews rather than introducing a second preview store. Exact-duplicate copies are paged in the browser after the provider query because WI-0087 already owns the indexed authoritative duplicate inventory.
-- Verification helper: staged `Preflight`, duplicate, removed-source, still-present exclusion, purge wait, restore, source-deletion and excluded-rename checks reduce manual ID handling while keeping private locators out of normal evidence.
-- Deferred work: the final checkbox remains the maintainer real-catalogue acceptance sequence for M23. WI-0091 and M23 remain in progress until that evidence is recorded.
-- Commands run: GitHub Actions is the automated gate for PR #438; use `verify-wi0091.ps1` for live PostgreSQL and privacy-safe real-catalogue acceptance before completion.
+- Verification result: all WI-0091 acceptance criteria and the complete M23 maintainer scenario set are accepted as of 2026-09-26.
