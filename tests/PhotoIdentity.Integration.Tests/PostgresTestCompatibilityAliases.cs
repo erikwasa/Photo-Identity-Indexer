@@ -9,6 +9,16 @@ global using CatalogueFaceObservation = PhotoIdentity.Testing.Postgres.Catalogue
 global using CatalogueFaceCrop = PhotoIdentity.Testing.Postgres.CatalogueFaceCrop;
 global using CatalogueFaceEmbedding = PhotoIdentity.Testing.Postgres.CatalogueFaceEmbedding;
 global using CatalogueFaceInspection = PhotoIdentity.Testing.Postgres.CatalogueFaceInspection;
+
+// These are identifier-only aliases. The mature fixtures still spell the ADO.NET primitives with
+// their old provider names, but every object created by PostgresTestCatalogueDatabase is Npgsql.
+// Keeping the translation here avoids retaining Microsoft.Data.Sqlite as an active test dependency.
+global using SqliteConnection = Npgsql.NpgsqlConnection;
+global using SqliteCommand = Npgsql.NpgsqlCommand;
+global using SqliteTransaction = Npgsql.NpgsqlTransaction;
+global using SqliteDataReader = Npgsql.NpgsqlDataReader;
+global using SqliteParameter = Npgsql.NpgsqlParameter;
+
 global using SqliteCatalogueDatabase = PhotoIdentity.Testing.Postgres.PostgresTestCatalogueDatabase;
 global using SqliteAssetCatalogueRepository = PhotoIdentity.Testing.Postgres.PostgresAssetCatalogueCompatibilityRepository;
 global using SqliteFaceCatalogueRepository = PhotoIdentity.Testing.Postgres.PostgresFaceCatalogueCompatibilityRepository;
