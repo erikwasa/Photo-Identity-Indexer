@@ -26,6 +26,15 @@ public sealed class SlideshowLibraryPresentationTests
     }
 
     [Fact]
+    public void Smart_photo_count_uses_query_total_not_the_one_item_cover_page_size()
+    {
+        SmartCollectionPageResponse page = Page(Photo("/first-thumbnail")) with { Total = 53 };
+
+        Assert.Equal(53, SlideshowLibraryPresentation.SmartPhotoCount(page));
+        Assert.Null(SlideshowLibraryPresentation.SmartPhotoCount(null));
+    }
+
+    [Fact]
     public void Play_accessibility_label_names_the_collection_and_action()
     {
         Assert.Equal(
