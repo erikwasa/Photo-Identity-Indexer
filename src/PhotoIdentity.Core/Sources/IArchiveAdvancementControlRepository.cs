@@ -10,13 +10,16 @@ public sealed record ArchiveAdvancementControlState(
     string? Message,
     DateTimeOffset UpdatedAtUtc)
 {
-    public bool IsRequested =>
-        string.Equals(DesiredState, "running", StringComparison.Ordinal);
-
     public bool IsSyncOnlyRequested =>
-        string.Equals(DesiredState, "sync", StringComparison.Ordinal);
+        string.Equals(DesiredState, "running", StringComparison.Ordinal) &&
+        RuntimeState is "sync-queued" or "syncing-only" or "sync-waiting";
 
-    public bool HasRequestedWork => IsRequested || IsSyncOnlyRequested;
+    public bool IsRequested =>
+        string.Equals(DesiredState, "running", StringComparison.Ordinal) &&
+        !IsSyncOnlyRequested;
+
+    public bool HasRequestedWork =>
+        string.Equals(DesiredState, "running", StringComparison.Ordinal);
 }
 
 /// <summary>
