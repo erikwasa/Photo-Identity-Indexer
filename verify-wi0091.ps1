@@ -71,16 +71,18 @@ function Invoke-ApiPost {
 function Get-HttpStatus {
     param([Parameter(Mandatory = $true)][string]$Path)
 
+    $client = [System.Net.Http.HttpClient]::new()
     try {
-        $response = Invoke-WebRequest -Method Get -Uri "$api$Path" -SkipHttpErrorCheck
-        return [int]$response.StatusCode
-    }
-    catch {
-        if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
-            return [int]$_.Exception.Response.StatusCode
+        $response = $client.GetAsync("$api$Path").GetAwaiter().GetResult()
+        try {
+            return [int]$response.StatusCode
         }
-
-        throw
+        finally {
+            $response.Dispose()
+        }
+    }
+    finally {
+        $client.Dispose()
     }
 }
 
@@ -151,7 +153,7 @@ function Save-State {
         New-Item -ItemType Directory -Force -Path $directory | Out-Null
     }
 
-    $State.capturedAtUtc = [DateTimeOffset]::UtcNow.ToString("O")
+    $State["capturedAtUtc"] = [DateTimeOffset]::UtcNow.ToString("O")
     $State | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $StatePath -Encoding UTF8
     Write-Host "Verification state saved locally under artifacts/."
 }
@@ -176,29 +178,29 @@ function Get-TargetLocators {
     )
 
     $values = @()
-    if ($RequestedTarget -in @("duplicate", "all") -and $null -ne $State.duplicate) {
+    if ($RequestedTarget -in @("duplicate", "all") -and $null -ne $State["duplicate"]) {
         $values += [pscustomobject]@{
             kind = "duplicate"
-            sourceId = [string]$State.duplicate.target.sourceId
-            sourceKey = [string]$State.duplicate.target.sourceKey
+            sourceId = [string]$State["duplicate"]["target"]["sourceId"]
+            sourceKey = [string]$State["duplicate"]["target"]["sourceKey"]
         }
     }
 
     if ($RequestedTarget -in @("removed", "all")) {
-        foreach ($item in @($State.removed)) {
+        foreach ($item in @($State["removed"])) {
             $values += [pscustomobject]@{
                 kind = "removed"
                 sourceId = ""
-                sourceKey = [string]$item.sourceKey
+                sourceKey = [string]$item["sourceKey"]
             }
         }
     }
 
-    if ($RequestedTarget -in @("photo", "all") -and $null -ne $State.photo -and $State.photo.ContainsKey("sourceKey")) {
+    if ($RequestedTarget -in @("photo", "all") -and $null -ne $State["photo"] -and $State["photo"].ContainsKey("sourceKey")) {
         $values += [pscustomobject]@{
             kind = "photo"
-            sourceId = if ($State.photo.ContainsKey("sourceId")) { [string]$State.photo.sourceId } else { "" }
-            sourceKey = [string]$State.photo.sourceKey
+            sourceId = if ($State["photo"].ContainsKey("sourceId")) { [string]$State["photo"]["sourceId"] } else { "" }
+            sourceKey = [string]$State["photo"]["sourceKey"]
         }
     }
 
@@ -270,7 +272,8 @@ switch ($Stage) {
             Write-Host "Group $($groupIndex + 1): $($copies.Count) copies; present=$present removed=$missing"
             for ($copyIndex = 0; $copyIndex -lt $copies.Count; $copyIndex++) {
                 $copy = $copies[$copyIndex]
-                Write-Host "  Copy $($copyIndex + 1): $(if ($copy.isMissing) { 'removed' } else { 'present' })"
+                $copyState = if ($copy.isMissing) { "removed" } else { "present" }
+                Write-Host "  Copy $($copyIndex + 1): $copyState"
                 Show-PrivateValue ([string]$copy.sourceKey)
             }
         }
@@ -294,7 +297,7 @@ switch ($Stage) {
         Assert-Condition ($null -ne $sibling) "an independently catalogued sibling copy exists"
 
         $state = Get-State
-        $state.duplicate = [ordered]@{
+        $state["duplicate"] = [ordered]@{
             groupNumber = $DuplicateGroup
             target = [ordered]@{
                 sourceId = [string]$target.sourceId
@@ -321,21 +324,21 @@ switch ($Stage) {
 
     "VerifyDuplicate" {
         $state = Get-State
-        Assert-Condition ($null -ne $state.duplicate) "duplicate baseline is available"
-        $target = $state.duplicate.target
-        $sibling = $state.duplicate.sibling
+        Assert-Condition ($null -ne $state["duplicate"]) "duplicate baseline is available"
+        $target = $state["duplicate"]["target"]
+        $sibling = $state["duplicate"]["sibling"]
         $exclusions = @(Get-Exclusions)
 
-        $targetExclusion = Get-MatchingExclusion -Exclusions $exclusions -SourceId ([string]$target.sourceId) -SourceKey ([string]$target.sourceKey)
-        $siblingExclusion = Get-MatchingExclusion -Exclusions $exclusions -SourceId ([string]$sibling.sourceId) -SourceKey ([string]$sibling.sourceKey)
+        $targetExclusion = Get-MatchingExclusion -Exclusions $exclusions -SourceId ([string]$target["sourceId"]) -SourceKey ([string]$target["sourceKey"])
+        $siblingExclusion = Get-MatchingExclusion -Exclusions $exclusions -SourceId ([string]$sibling["sourceId"]) -SourceKey ([string]$sibling["sourceKey"])
         Assert-Condition ($null -ne $targetExclusion) "duplicate A is excluded"
         Assert-Condition ($null -eq $siblingExclusion) "duplicate B remains included"
 
         $groups = @(Get-DuplicateGroups)
         $visibleRevisionIds = @($groups | ForEach-Object { @($_.copies) } | ForEach-Object { [string]$_.revisionId })
-        Assert-Condition ($visibleRevisionIds -notcontains [string]$target.revisionId) "excluded duplicate A immediately leaves duplicate review"
+        Assert-Condition ($visibleRevisionIds -notcontains [string]$target["revisionId"]) "excluded duplicate A immediately leaves duplicate review"
 
-        $previewStatus = Get-HttpStatus "/api/collections/photos/$([Uri]::EscapeDataString([string]$target.revisionId))/viewer-preview"
+        $previewStatus = Get-HttpStatus "/api/collections/photos/$([Uri]::EscapeDataString([string]$target["revisionId"]))/viewer-preview"
         Assert-Condition ($previewStatus -lt 200 -or $previewStatus -ge 300) "excluded duplicate A is blocked from normal viewer-preview access"
         Write-Host "Current purge state for duplicate A: $($targetExclusion.purgeState)"
     }
@@ -345,7 +348,8 @@ switch ($Stage) {
         Write-Host "Removed-source entries: $($removed.Count)"
         for ($index = 0; $index -lt $removed.Count; $index++) {
             $item = $removed[$index]
-            Write-Host "  Row $($index + 1): revision=$(if ([string]::IsNullOrWhiteSpace([string]$item.revisionId)) { 'missing' } else { 'available' })"
+            $revisionState = if ([string]::IsNullOrWhiteSpace([string]$item.revisionId)) { "missing" } else { "available" }
+            Write-Host "  Row $($index + 1): revision=$revisionState"
             Show-PrivateValue ([string]$item.relativePath)
         }
         Write-Host "Choose safe row numbers and use -Stage RecordRemoved -RemovedRows <n1>,<n2>."
@@ -366,23 +370,24 @@ switch ($Stage) {
         }
 
         $state = Get-State
-        $state.removed = $selected
+        $state["removed"] = $selected
         Save-State $state
         Write-Pass "$($selected.Count) removed-source entries recorded for bulk verification"
     }
 
     "VerifyRemoved" {
         $state = Get-State
-        $recorded = @($state.removed)
+        $recorded = @($state["removed"])
         Assert-Condition ($recorded.Count -gt 0) "removed-source baseline is available"
 
         $exclusions = @(Get-Exclusions)
         $remainingRemoved = @(Get-RemovedItems)
         foreach ($item in $recorded) {
-            $matchingExclusion = Get-MatchingExclusion -Exclusions $exclusions -SourceId "" -SourceKey ([string]$item.sourceKey)
+            $matchingExclusion = Get-MatchingExclusion -Exclusions $exclusions -SourceId "" -SourceKey ([string]$item["sourceKey"])
             Assert-Condition ($null -ne $matchingExclusion) "recorded removed source copy has a durable exclusion"
-            Assert-Condition (-not (@($remainingRemoved | Where-Object { $_.relativePath -eq [string]$item.sourceKey }).Count)) "excluded source copy immediately leaves Removed from source"
-            $previewStatus = Get-HttpStatus "/api/collections/photos/$([Uri]::EscapeDataString([string]$item.revisionId))/viewer-preview"
+            $stillRemoved = @($remainingRemoved | Where-Object { $_.relativePath -eq [string]$item["sourceKey"] }).Count -gt 0
+            Assert-Condition (-not $stillRemoved) "excluded source copy immediately leaves Removed from source"
+            $previewStatus = Get-HttpStatus "/api/collections/photos/$([Uri]::EscapeDataString([string]$item["revisionId"]))/viewer-preview"
             Assert-Condition ($previewStatus -lt 200 -or $previewStatus -ge 300) "excluded removed-source revision is blocked from viewer-preview access"
         }
         Write-Pass "all recorded removed entries are in exclusion/purge state"
@@ -397,7 +402,7 @@ switch ($Stage) {
         Assert-Condition ([string]$item.analysisState -ne "missing") "recorded photo is still present in the source"
 
         $state = Get-State
-        $state.photo = [ordered]@{
+        $state["photo"] = [ordered]@{
             revisionId = $revisionId
             sourceKey = [string]$item.relativePath
             previewStatusBefore = Get-HttpStatus "/api/collections/photos/$([Uri]::EscapeDataString($revisionId))/viewer-preview"
@@ -409,25 +414,25 @@ switch ($Stage) {
 
     "VerifyPhotoRemoved" {
         $state = Get-State
-        Assert-Condition ($null -ne $state.photo) "photo baseline is available"
+        Assert-Condition ($null -ne $state["photo"]) "photo baseline is available"
         $removed = @(Get-RemovedItems)
-        $match = @($removed | Where-Object { $_.relativePath -eq [string]$state.photo.sourceKey }) | Select-Object -First 1
+        $match = @($removed | Where-Object { $_.relativePath -eq [string]$state["photo"]["sourceKey"] }) | Select-Object -First 1
         Assert-Condition ($null -ne $match) "source deletion enters Removed from source after synchronization"
-        Assert-Condition ([string]$match.revisionId -eq [string]$state.photo.revisionId) "removed entry retains the previously verified revision for review"
+        Assert-Condition ([string]$match.revisionId -eq [string]$state["photo"]["revisionId"]) "removed entry retains the previously verified revision for review"
     }
 
     "VerifyPhotoExclusion" {
         $state = Get-State
-        Assert-Condition ($null -ne $state.photo) "photo baseline is available"
+        Assert-Condition ($null -ne $state["photo"]) "photo baseline is available"
         $exclusions = @(Get-Exclusions)
-        $match = Get-MatchingExclusion -Exclusions $exclusions -SourceId "" -SourceKey ([string]$state.photo.sourceKey)
+        $match = Get-MatchingExclusion -Exclusions $exclusions -SourceId "" -SourceKey ([string]$state["photo"]["sourceKey"])
         Assert-Condition ($null -ne $match) "still-present photo has a durable source-copy exclusion"
 
-        $previewStatus = Get-HttpStatus "/api/collections/photos/$([Uri]::EscapeDataString([string]$state.photo.revisionId))/viewer-preview"
+        $previewStatus = Get-HttpStatus "/api/collections/photos/$([Uri]::EscapeDataString([string]$state["photo"]["revisionId"]))/viewer-preview"
         Assert-Condition ($previewStatus -lt 200 -or $previewStatus -ge 300) "still-present excluded photo is immediately blocked from viewer-preview access"
 
-        $state.photo.sourceId = [string]$match.sourceId
-        $state.photo.purgeState = [string]$match.purgeState
+        $state["photo"]["sourceId"] = [string]$match.sourceId
+        $state["photo"]["purgeState"] = [string]$match.purgeState
         Save-State $state
         Write-Host "Current purge state for the photo: $($match.purgeState)"
     }
@@ -438,6 +443,7 @@ switch ($Stage) {
         Assert-Condition ($targets.Count -gt 0) "at least one recorded target is available for purge monitoring"
 
         $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
+        $allCompleted = $false
         do {
             $exclusions = @(Get-Exclusions)
             $states = @()
@@ -474,27 +480,27 @@ switch ($Stage) {
 
     "VerifyRestore" {
         $state = Get-State
-        Assert-Condition ($null -ne $state.photo) "photo baseline is available"
-        Assert-Condition ($state.photo.ContainsKey("sourceId")) "photo exclusion locator was recorded; run VerifyPhotoExclusion before restore verification"
+        Assert-Condition ($null -ne $state["photo"]) "photo baseline is available"
+        Assert-Condition ($state["photo"].ContainsKey("sourceId")) "photo exclusion locator was recorded; run VerifyPhotoExclusion before restore verification"
 
         $exclusions = @(Get-Exclusions)
-        $match = Get-MatchingExclusion -Exclusions $exclusions -SourceId ([string]$state.photo.sourceId) -SourceKey ([string]$state.photo.sourceKey)
+        $match = Get-MatchingExclusion -Exclusions $exclusions -SourceId ([string]$state["photo"]["sourceId"]) -SourceKey ([string]$state["photo"]["sourceKey"])
         Assert-Condition ($null -eq $match) "re-include removed the completed exclusion tombstone"
 
         $items = @(Get-ArchiveItems -Analysis "all")
-        $restored = @($items | Where-Object { $_.relativePath -eq [string]$state.photo.sourceKey -and -not [string]::IsNullOrWhiteSpace([string]$_.revisionId) }) | Select-Object -First 1
+        $restored = @($items | Where-Object { $_.relativePath -eq [string]$state["photo"]["sourceKey"] -and -not [string]::IsNullOrWhiteSpace([string]$_.revisionId) }) | Select-Object -First 1
         Assert-Condition ($null -ne $restored) "source copy was re-catalogued after re-include"
-        Assert-Condition ([string]$restored.revisionId -ne [string]$state.photo.revisionId) "re-include produced fresh catalogue processing rather than restoring the purged revision"
+        Assert-Condition ([string]$restored.revisionId -ne [string]$state["photo"]["revisionId"]) "re-include produced fresh catalogue processing rather than restoring the purged revision"
     }
 
     "VerifyExcludedRename" {
         $state = Get-State
-        Assert-Condition ($null -ne $state.photo) "photo baseline is available"
-        Assert-Condition ($state.photo.ContainsKey("sourceId")) "old exclusion locator is recorded"
+        Assert-Condition ($null -ne $state["photo"]) "photo baseline is available"
+        Assert-Condition ($state["photo"].ContainsKey("sourceId")) "old exclusion locator is recorded"
         Assert-Condition (-not [string]::IsNullOrWhiteSpace($NewSourceKey)) "new relative source key was supplied"
 
         $exclusions = @(Get-Exclusions)
-        $old = Get-MatchingExclusion -Exclusions $exclusions -SourceId ([string]$state.photo.sourceId) -SourceKey ([string]$state.photo.sourceKey)
+        $old = Get-MatchingExclusion -Exclusions $exclusions -SourceId ([string]$state["photo"]["sourceId"]) -SourceKey ([string]$state["photo"]["sourceKey"])
         Assert-Condition ($null -ne $old) "old source locator remains excluded after rename"
         $newExclusion = Get-MatchingExclusion -Exclusions $exclusions -SourceId "" -SourceKey $NewSourceKey
         Assert-Condition ($null -eq $newExclusion) "new source locator is independently included"
@@ -502,7 +508,7 @@ switch ($Stage) {
         $items = @(Get-ArchiveItems -Analysis "all")
         $newItem = @($items | Where-Object { $_.relativePath -eq $NewSourceKey -and -not [string]::IsNullOrWhiteSpace([string]$_.revisionId) }) | Select-Object -First 1
         Assert-Condition ($null -ne $newItem) "renamed source appears as a new included catalogue copy"
-        Assert-Condition ([string]$newItem.revisionId -ne [string]$state.photo.revisionId) "renamed excluded source is catalogued as fresh work"
+        Assert-Condition ([string]$newItem.revisionId -ne [string]$state["photo"]["revisionId"]) "renamed excluded source is catalogued as fresh work"
         Show-PrivateValue $NewSourceKey
     }
 }
