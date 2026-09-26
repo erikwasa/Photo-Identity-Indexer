@@ -273,15 +273,17 @@ public sealed class ArchiveApplicationTests
         {
             ArchiveStatusResponse status = Assert.IsType<ArchiveStatusResponse>(
                 await client.GetFromJsonAsync<ArchiveStatusResponse>("/api/archive/status"));
-            if (string.Equals(status.Advancement?.State, "sync-complete", StringComparison.Ordinal))
+            ArchiveAdvancementStatusResponse? advancement = status.Advancement;
+            if (string.Equals(advancement?.State, "sync-complete", StringComparison.Ordinal))
             {
                 return status;
             }
 
-            if (string.Equals(status.Advancement?.State, "blocked", StringComparison.Ordinal))
+            if (advancement is not null &&
+                string.Equals(advancement.State, "blocked", StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    status.Advancement.Message ?? "Archive synchronization was blocked.");
+                    advancement.Message ?? "Archive synchronization was blocked.");
             }
 
             await Task.Delay(50);
