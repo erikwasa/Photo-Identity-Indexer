@@ -16,7 +16,7 @@ Use these references when you need more detail:
 - [Build context](BUILD_CONTEXT.md) for the immediate development/verification handoff
 - [Architecture overview](docs/architecture/overview.md)
 - [PostgreSQL operations](docs/operations/postgresql-operations.md)
-- [Local evaluation and multi-model workflow](docs/operations/local-evaluation.md)
+- [Operations documentation map](docs/operations/index.md), including clearly marked historical evaluation evidence
 - [Security and privacy](docs/architecture/security-and-privacy.md)
 - [Delivery roadmap](docs/delivery/roadmap.md)
 
