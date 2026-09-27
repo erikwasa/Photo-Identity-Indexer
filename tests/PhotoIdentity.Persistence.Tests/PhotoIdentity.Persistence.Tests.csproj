@@ -18,6 +18,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PhotoIdentity.Persistence.Postgres/PhotoIdentity.Persistence.Postgres.csproj" />
-    <ProjectReference Include="../../src/PhotoIdentity.Persistence.Sqlite/PhotoIdentity.Persistence.Sqlite.csproj" />
+    <ProjectReference Include="../PhotoIdentity.TestSupport.Postgres/PhotoIdentity.TestSupport.Postgres.csproj" />
   </ItemGroup>
 </Project>

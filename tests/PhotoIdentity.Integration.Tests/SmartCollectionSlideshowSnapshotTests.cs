@@ -253,8 +253,9 @@ public sealed class SmartCollectionSlideshowSnapshotTests
         {
             source.Transaction = transaction;
             source.CommandText = """
-                INSERT OR IGNORE INTO sources (id, kind, root_locator, created_at_utc)
-                VALUES ($id, 'local-folder', $root, $created);
+                INSERT INTO sources (id, kind, root_locator, created_at_utc)
+                VALUES ($id, 'local-folder', $root, $created)
+                ON CONFLICT (id) DO NOTHING;
                 """;
             source.Parameters.AddWithValue("$id", sourceId.ToString());
             source.Parameters.AddWithValue("$root", sourceRoot);

@@ -3,7 +3,7 @@
 Prepares and verifies the local review application with synthetic data.
 
 .DESCRIPTION
-Builds the solution, creates a disposable SQLite catalogue with synthetic coloured
+Builds the solution, creates a disposable PostgreSQL catalogue with synthetic coloured
 face crops, publishes and starts the review application, and performs privacy and
 mutation smoke checks. Interactive mode prints local and LAN URLs for optional
 browser inspection. The script never changes a real catalogue and never creates
@@ -34,6 +34,8 @@ param(
 
     [string] $ListenAddress = "0.0.0.0",
 
+    [string] $PostgresAdminConnectionString,
+
     [switch] $SkipBuild
 )
 
@@ -50,6 +52,7 @@ $smokeScript = Join-Path $root "tools/PhotoIdentity.ReviewVerification/Invoke-Pu
 $apiProject = Join-Path $root "src/PhotoIdentity.Api/PhotoIdentity.Api.csproj"
 $publishedApiDirectory = Join-Path $artifactDirectory "app"
 $apiAssembly = Join-Path $publishedApiDirectory "PhotoIdentity.Api.dll"
+$verificationAdminVariable = "PHOTOIDENTITY_REVIEW_VERIFICATION_POSTGRES_ADMIN_CONNECTION_STRING"
 
 function Invoke-CheckedNative {
     param(
@@ -77,6 +80,35 @@ function Get-LanUrls {
     return @($addresses | ForEach-Object { "http://$($_):$SelectedPort" })
 }
 
+function Resolve-PostgresAdminConnection {
+    param([string] $ExplicitConnectionString)
+
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitConnectionString)) {
+        return $ExplicitConnectionString
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING)) {
+        return $env:PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:PhotoIdentity__Postgres__ConnectionString)) {
+        return $env:PhotoIdentity__Postgres__ConnectionString
+    }
+
+    if ($env:GITHUB_ACTIONS -eq "true" -and $env:OS -eq "Windows_NT") {
+        $service = Get-Service -Name 'postgresql-x64-*' | Sort-Object Name -Descending | Select-Object -First 1
+        if ($null -eq $service) {
+            throw "The Windows GitHub Actions runner does not provide a PostgreSQL service."
+        }
+        Set-Service -Name $service.Name -StartupType Manual
+        if ($service.Status -ne 'Running') {
+            Start-Service -Name $service.Name
+            $service.WaitForStatus('Running', [TimeSpan]::FromSeconds(30))
+        }
+        return "Host=127.0.0.1;Port=5432;Database=postgres;Username=postgres;Password=root;Pooling=false"
+    }
+
+    throw "PostgreSQL review verification requires -PostgresAdminConnectionString, PHOTOIDENTITY_TEST_POSTGRES_ADMIN_CONNECTION_STRING, or PhotoIdentity__Postgres__ConnectionString."
+}
+
 if (-not $SkipBuild) {
     Invoke-CheckedNative -FilePath "dotnet" -ArgumentList @(
         "build", (Join-Path $root "PhotoIdentity.slnx"),
@@ -90,71 +122,85 @@ foreach ($requiredFile in @($toolAssembly, $apiProject, $smokeScript)) {
     }
 }
 
-New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
-$manifestText = & dotnet $toolAssembly --output $artifactDirectory
-if ($LASTEXITCODE -ne 0) {
-    throw "Review verification fixture preparation failed with exit code $LASTEXITCODE."
-}
-$manifest = ($manifestText -join [Environment]::NewLine) | ConvertFrom-Json
-
-$notRunSmoke = [ordered]@{
-    health = "not_run"
-    hostedClient = "not_run"
-    workflowPages = "not_run"
-    gallery = "not_run"
-    suggestionGallery = "not_run"
-    queueNavigation = "not_run"
-    image = "not_run"
-    assignmentUndo = "not_run"
-    rejection = "not_run"
-    bulkMutation = "not_run"
-    personAudit = "not_run"
-    bulkSuggestionMutation = "not_run"
-    suggestionAccept = "not_run"
-    suggestionReject = "not_run"
-    personRename = "not_run"
-    personMerge = "not_run"
-    cacheControl = "not_run"
-}
-$report = [ordered]@{
-    schemaVersion = 4
-    result = "prepared"
-    mode = $Mode
-    generatedAtUtc = [DateTime]::UtcNow.ToString("O")
-    databasePath = $manifest.DatabasePath
-    artifactDirectory = $manifest.ArtifactDirectory
-    faceCount = $manifest.FaceCount
-    localUrl = "http://localhost:$Port"
-    lanUrls = @(Get-LanUrls -SelectedPort $Port)
-    smoke = $notRunSmoke
-    usesDisposableCatalogue = $true
-    createsFirewallRule = $false
-}
-
-if ($Mode -eq "Prepare") {
-    $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
-    Write-Host "Prepared synthetic review catalogue: $($manifest.DatabasePath)"
-    Write-Host "Report: $reportPath"
-    exit 0
-}
-
-Invoke-CheckedNative -FilePath "dotnet" -ArgumentList @(
-    "publish", $apiProject,
-    "--configuration", $Configuration,
-    "--no-build",
-    "--output", $publishedApiDirectory
-)
-if (-not (Test-Path -LiteralPath $apiAssembly -PathType Leaf)) {
-    throw "Published review API was not found: $apiAssembly"
-}
-if (-not (Test-Path -LiteralPath (Join-Path $publishedApiDirectory "wwwroot/index.html") -PathType Leaf)) {
-    throw "Published review client was not found below $publishedApiDirectory."
-}
-
-$previousDatabasePath = $env:PhotoIdentity__DatabasePath
+$adminConnection = Resolve-PostgresAdminConnection -ExplicitConnectionString $PostgresAdminConnectionString
+$previousVerificationAdmin = [Environment]::GetEnvironmentVariable($verificationAdminVariable, "Process")
+[Environment]::SetEnvironmentVariable($verificationAdminVariable, $adminConnection, "Process")
+$manifest = $null
+$report = $null
 $process = $null
+$previousPostgresConnection = $env:PhotoIdentity__Postgres__ConnectionString
+$previousEnvironment = $env:ASPNETCORE_ENVIRONMENT
+
 try {
-    $env:PhotoIdentity__DatabasePath = $manifest.DatabasePath
+    New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
+    $manifestText = & dotnet $toolAssembly --output $artifactDirectory
+    if ($LASTEXITCODE -ne 0) {
+        throw "Review verification fixture preparation failed with exit code $LASTEXITCODE."
+    }
+    $manifest = ($manifestText -join [Environment]::NewLine) | ConvertFrom-Json
+    if ($null -eq $manifest.PSObject.Properties["DatabasePath"]) {
+        $manifest | Add-Member -NotePropertyName DatabasePath -NotePropertyValue $manifest.DatabaseName
+    }
+
+    $notRunSmoke = [ordered]@{
+        health = "not_run"
+        hostedClient = "not_run"
+        workflowPages = "not_run"
+        gallery = "not_run"
+        suggestionGallery = "not_run"
+        queueNavigation = "not_run"
+        image = "not_run"
+        assignmentUndo = "not_run"
+        rejection = "not_run"
+        bulkMutation = "not_run"
+        personAudit = "not_run"
+        bulkSuggestionMutation = "not_run"
+        suggestionAccept = "not_run"
+        suggestionReject = "not_run"
+        personRename = "not_run"
+        personMerge = "not_run"
+        cacheControl = "not_run"
+    }
+    $report = [ordered]@{
+        schemaVersion = 5
+        result = "prepared"
+        mode = $Mode
+        generatedAtUtc = [DateTime]::UtcNow.ToString("O")
+        databaseName = $manifest.DatabaseName
+        catalogueProvider = "postgresql"
+        artifactDirectory = $manifest.ArtifactDirectory
+        faceCount = $manifest.FaceCount
+        localUrl = "http://localhost:$Port"
+        lanUrls = @(Get-LanUrls -SelectedPort $Port)
+        smoke = $notRunSmoke
+        usesDisposableCatalogue = $true
+        createsFirewallRule = $false
+    }
+
+    if ($Mode -eq "Prepare") {
+        $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+        Write-Host "Prepared synthetic PostgreSQL review catalogue: $($manifest.DatabaseName)"
+        Write-Host "Connection: $($manifest.PostgresConnectionString)"
+        Write-Host "The Prepare mode catalogue is intentionally retained for manual inspection."
+        Write-Host "Report: $reportPath"
+        exit 0
+    }
+
+    Invoke-CheckedNative -FilePath "dotnet" -ArgumentList @(
+        "publish", $apiProject,
+        "--configuration", $Configuration,
+        "--no-build",
+        "--output", $publishedApiDirectory
+    )
+    if (-not (Test-Path -LiteralPath $apiAssembly -PathType Leaf)) {
+        throw "Published review API was not found: $apiAssembly"
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $publishedApiDirectory "wwwroot/index.html") -PathType Leaf)) {
+        throw "Published review client was not found below $publishedApiDirectory."
+    }
+
+    $env:PhotoIdentity__Postgres__ConnectionString = $manifest.PostgresConnectionString
+    $env:ASPNETCORE_ENVIRONMENT = "ReviewVerification"
     Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     $argumentString = ('"{0}" --urls "http://{1}:{2}"' -f $apiAssembly, $ListenAddress, $Port)
     $process = Start-Process -FilePath "dotnet" -ArgumentList $argumentString -PassThru `
@@ -171,6 +217,10 @@ try {
         try {
             $health = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 2
             if ($health.StatusCode -eq 200) {
+                $healthPayload = $health.Content | ConvertFrom-Json
+                if ($healthPayload.catalogueProvider -ne "postgresql") {
+                    throw "Review API started with catalogue provider '$($healthPayload.catalogueProvider)' instead of PostgreSQL."
+                }
                 $ready = $true
                 break
             }
@@ -200,10 +250,10 @@ try {
         if ($gallery.Total -ne $manifest.FaceCount -or $galleryItems.Count -ne 1) {
             throw "Published review verification did not return the prepared synthetic review data."
         }
-        foreach ($privateValue in @($manifest.DatabasePath, $manifest.ArtifactDirectory)) {
+        foreach ($privateValue in @($manifest.PostgresConnectionString, $manifest.ArtifactDirectory)) {
             if (-not [string]::IsNullOrWhiteSpace([string]$privateValue) -and
                 $galleryResponse.Content.IndexOf([string]$privateValue, [StringComparison]::OrdinalIgnoreCase) -ge 0) {
-                throw "Published review verification exposed a private verification path."
+                throw "Published review verification exposed private verification data."
             }
         }
         $galleryCache = [string]$galleryResponse.Headers["Cache-Control"]
@@ -223,6 +273,7 @@ try {
     Write-Host "`nReview application verification passed."
     Write-Host "Mode: $Mode"
     Write-Host "Smoke profile: $SmokeProfile"
+    Write-Host "Catalogue: PostgreSQL / $($manifest.DatabaseName)"
     Write-Host "Windows/local URL: $($report.localUrl)"
     foreach ($url in $report.lanUrls) {
         Write-Host "Trusted-LAN URL: $url"
@@ -237,10 +288,12 @@ try {
     }
 }
 catch {
-    $report.result = "failed"
-    $report.failure = $_.Exception.Message
-    New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
-    $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+    if ($null -ne $manifest -and $null -ne $report) {
+        $report.result = "failed"
+        $report.failure = $_.Exception.Message
+        New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
+        $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $reportPath -Encoding UTF8
+    }
     throw
 }
 finally {
@@ -248,5 +301,25 @@ finally {
         Stop-Process -Id $process.Id -Force
         $process.WaitForExit()
     }
-    $env:PhotoIdentity__DatabasePath = $previousDatabasePath
+
+    $env:PhotoIdentity__Postgres__ConnectionString = $previousPostgresConnection
+    $env:ASPNETCORE_ENVIRONMENT = $previousEnvironment
+
+    if ($Mode -ne "Prepare" -and $null -ne $manifest -and
+        -not [string]::IsNullOrWhiteSpace([string]$manifest.DatabaseName)) {
+        try {
+            & dotnet $toolAssembly --drop-database $manifest.DatabaseName | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Review verification database cleanup failed with exit code $LASTEXITCODE."
+            }
+        }
+        catch {
+            Write-Warning "Review verification database cleanup failed: $($_.Exception.Message)"
+        }
+    }
+
+    [Environment]::SetEnvironmentVariable(
+        $verificationAdminVariable,
+        $previousVerificationAdmin,
+        "Process")
 }

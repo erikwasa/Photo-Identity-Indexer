@@ -347,19 +347,12 @@ public sealed class PhotoPlaceEnrichmentTests
         double latitude,
         double longitude)
     {
-        await using SqliteConnection connection = await database.OpenConnectionAsync();
-        using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = """
-            INSERT INTO photo_capture_metadata (
-                asset_revision_id, taken_at_local, utc_offset_minutes,
-                latitude, longitude, extracted_at_utc)
-            VALUES ($revision_id, NULL, NULL, $latitude, $longitude, $extracted_at_utc);
-            """;
-        command.Parameters.AddWithValue("$revision_id", revisionId.ToString());
-        command.Parameters.AddWithValue("$latitude", latitude);
-        command.Parameters.AddWithValue("$longitude", longitude);
-        command.Parameters.AddWithValue("$extracted_at_utc", "2026-08-17T00:00:00.0000000+00:00");
-        await command.ExecuteNonQueryAsync();
+        await new SqliteAssetCatalogueRepository(database).SavePhotoMetadataAsync(
+            revisionId,
+            new PhotoIdentity.Core.Sources.PhotoCaptureMetadata(
+                latitude: latitude,
+                longitude: longitude),
+            new DateTimeOffset(2026, 8, 17, 0, 0, 0, TimeSpan.Zero));
     }
 
     private static string CreateTemporaryDirectory()

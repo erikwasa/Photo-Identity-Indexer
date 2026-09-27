@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Processing;
 using PhotoIdentity.Core.Recognition;
@@ -9,7 +10,7 @@ namespace PhotoIdentity_Integration_Tests;
 public sealed class ProcessingRunRepositoryContractTests
 {
     [Fact]
-    public async Task Sqlite_adapter_preserves_run_creation_lookup_jobs_and_cancellation_through_contract()
+    public async Task Postgres_adapter_preserves_run_creation_lookup_jobs_and_cancellation_through_contract()
     {
         string directory = CreateTemporaryDirectory();
         try
@@ -62,8 +63,8 @@ public sealed class ProcessingRunRepositoryContractTests
                 runId,
                 now.AddMinutes(1));
 
-            Assert.Equal(run, created.Run);
-            Assert.Equal(run, loaded);
+            AssertEquivalentRun(run, created.Run);
+            AssertEquivalentRun(run, Assert.IsType<CatalogueProcessingRun>(loaded));
             Assert.Equal(job, Assert.Single(jobs));
             Assert.Equal(ProcessingRunStatus.Cancelled, cancelled.Status);
             Assert.Equal(now.AddMinutes(1), cancelled.CancellationRequestedAtUtc);
@@ -77,6 +78,20 @@ public sealed class ProcessingRunRepositoryContractTests
         {
             DeleteTemporaryDirectory(directory);
         }
+    }
+
+    private static void AssertEquivalentRun(CatalogueProcessingRun expected, CatalogueProcessingRun actual)
+    {
+        Assert.Equal(expected.Id, actual.Id);
+        Assert.Equal(expected.Status, actual.Status);
+        Assert.Equal(expected.StartedAtUtc, actual.StartedAtUtc);
+        Assert.Equal(expected.CompletedAtUtc, actual.CompletedAtUtc);
+        Assert.Equal(expected.CancellationRequestedAtUtc, actual.CancellationRequestedAtUtc);
+        Assert.True(
+            JsonNode.DeepEquals(
+                JsonNode.Parse(expected.ConfigurationJson),
+                JsonNode.Parse(actual.ConfigurationJson)),
+            $"Configuration JSON differed semantically. Expected: {expected.ConfigurationJson}; Actual: {actual.ConfigurationJson}");
     }
 
     private static string CreateTemporaryDirectory()

@@ -128,7 +128,7 @@ Canonical assignment from this workspace reuses the existing audited bulk-review
 
 ## Provider boundary and scheduling
 
-Provisional clustering and cluster review use the unconditional PostgreSQL runtime catalogue. The temporary SQLite integration-test compatibility host returns HTTP 409 and does not run the clustering worker; it is not an operator-selectable runtime mode.
+Provisional clustering and cluster review use the unconditional PostgreSQL runtime catalogue. Integration hosts exercise the same provider boundary with isolated disposable PostgreSQL databases; the retired SQLite compatibility host is no longer part of the executable test surface.
 
 The clustering worker is advanced by the existing identity-regeneration hosted service only when no identity-regeneration run is active. This keeps clustering lower priority than review matching and avoids a second competing background loop. An interrupted active clustering run remains durable and is resumed from its captured snapshot after process restart.
 

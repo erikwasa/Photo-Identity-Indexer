@@ -175,51 +175,6 @@ public sealed class PhotoTagApplicationTests
         }
     }
 
-    [Fact]
-    public async Task Schema_version_thirteen_migration_is_preserved_when_upgrading_to_current_schema()
-    {
-        string directory = CreateTemporaryDirectory();
-        try
-        {
-            string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
-            await database.InitializeAsync();
-
-            await using (SqliteConnection connection = await database.OpenConnectionAsync())
-            {
-                using SqliteCommand rewind = connection.CreateCommand();
-                rewind.CommandText = """
-                    DROP TABLE photo_tag_actions;
-                    DROP TABLE photo_tags;
-                    DELETE FROM schema_migrations WHERE version >= 13;
-                    PRAGMA user_version = 12;
-                    """;
-                await rewind.ExecuteNonQueryAsync();
-            }
-
-            await database.InitializeAsync();
-
-            await using SqliteConnection verify = await database.OpenConnectionAsync();
-            Assert.Equal(SqliteCatalogueDatabase.CurrentSchemaVersion, await ReadCountAsync(verify, "PRAGMA user_version;"));
-            Assert.Equal(1, await ReadCountAsync(
-                verify,
-                "SELECT COUNT(*) FROM schema_migrations WHERE version = 13;"));
-            Assert.Equal(1, await ReadCountAsync(
-                verify,
-                "SELECT COUNT(*) FROM schema_migrations WHERE version = 14;"));
-            Assert.Equal(1, await ReadCountAsync(
-                verify,
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'photo_tags';"));
-            Assert.Equal(1, await ReadCountAsync(
-                verify,
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'photo_tag_actions';"));
-        }
-        finally
-        {
-            DeleteTemporaryDirectory(directory);
-        }
-    }
-
     private static async Task<WebPhotoTagResponse[]> PostTagAsync(
         HttpClient client,
         AssetRevisionId revisionId,

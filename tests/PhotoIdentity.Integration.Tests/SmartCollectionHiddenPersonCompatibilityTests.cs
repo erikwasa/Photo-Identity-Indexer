@@ -110,8 +110,8 @@ public sealed class SmartCollectionHiddenPersonCompatibilityTests
             label.Transaction = transaction;
             label.CommandText = """
                 INSERT INTO person_labels (person_id, face_occurrence_id, label_kind, assigned_by, assigned_at_utc)
-                VALUES ($person, $face, 'manual', 'test', $now);
-                SELECT last_insert_rowid();
+                VALUES ($person, $face, 'manual', 'test', $now)
+                RETURNING id;
                 """;
             label.Parameters.AddWithValue("$person", personId.ToString());
             label.Parameters.AddWithValue("$face", faceId.ToString());

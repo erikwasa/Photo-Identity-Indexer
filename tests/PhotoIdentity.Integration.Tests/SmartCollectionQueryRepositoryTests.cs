@@ -129,10 +129,10 @@ public sealed class SmartCollectionQueryRepositoryTests
             SqliteSmartCollectionQueryRepository query = new(database);
             CatalogueAssetRevision tagged = await CreateRevisionAsync(catalogue, directory, "tagged.jpg", 'd');
             _ = await CreateRevisionAsync(catalogue, directory, "untagged.jpg", 'e');
-            await tags.AddManualTagAsync(tagged.Id, "Places/Sweden/Stockholm", "test");
+            await tags.AddManualTagAsync(tagged.Id, "Archive/Sweden/Stockholm", "test");
 
             SmartCollectionPhotoPage result = await query.QueryAsync(
-                new SmartCollectionFilter(tags: ["places/sweden/stockholm"]));
+                new SmartCollectionFilter(tags: ["archive/sweden/stockholm"]));
 
             Assert.Equal(tagged.Id, Assert.Single(result.Items).RevisionId);
             Assert.Equal(1, result.Total);
@@ -180,7 +180,11 @@ public sealed class SmartCollectionQueryRepositoryTests
         using (SqliteCommand person = connection.CreateCommand())
         {
             person.Transaction = transaction;
-            person.CommandText = "INSERT OR IGNORE INTO people (id, display_name, created_at_utc) VALUES ($id, $name, $now);";
+            person.CommandText = """
+                INSERT INTO people (id, display_name, created_at_utc)
+                VALUES ($id, $name, $now)
+                ON CONFLICT (id) DO NOTHING;
+                """;
             person.Parameters.AddWithValue("$id", personId.ToString());
             person.Parameters.AddWithValue("$name", displayName);
             person.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
@@ -193,7 +197,7 @@ public sealed class SmartCollectionQueryRepositoryTests
             nextOrdinal.Transaction = transaction;
             nextOrdinal.CommandText = "SELECT COALESCE(MAX(ordinal), -1) + 1 FROM face_occurrences WHERE asset_revision_id = $revision;";
             nextOrdinal.Parameters.AddWithValue("$revision", revisionId.ToString());
-            ordinal = (long)(await nextOrdinal.ExecuteScalarAsync() ?? 0L);
+            ordinal = Convert.ToInt64(await nextOrdinal.ExecuteScalarAsync() ?? 0L);
         }
 
         using (SqliteCommand face = connection.CreateCommand())
@@ -213,13 +217,13 @@ public sealed class SmartCollectionQueryRepositoryTests
             label.Transaction = transaction;
             label.CommandText = """
                 INSERT INTO person_labels (person_id, face_occurrence_id, label_kind, assigned_by, assigned_at_utc)
-                VALUES ($person, $face, 'manual', 'test', $now);
-                SELECT last_insert_rowid();
+                VALUES ($person, $face, 'manual', 'test', $now)
+                RETURNING id;
                 """;
             label.Parameters.AddWithValue("$person", personId.ToString());
             label.Parameters.AddWithValue("$face", faceId.ToString());
             label.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.ToString("O"));
-            labelId = (long)(await label.ExecuteScalarAsync() ?? throw new InvalidOperationException());
+            labelId = Convert.ToInt64(await label.ExecuteScalarAsync() ?? throw new InvalidOperationException());
         }
 
         using (SqliteCommand action = connection.CreateCommand())

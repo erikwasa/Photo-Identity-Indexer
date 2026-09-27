@@ -179,11 +179,11 @@ public sealed class ManualPhotoPeopleApplicationTests
                 history.Parameters.AddWithValue("$revision_id", seeded.FirstRevisionId);
                 await using SqliteDataReader reader = await history.ExecuteReaderAsync();
                 Assert.True(await reader.ReadAsync());
-                Assert.Equal(seeded.BobPersonId, reader.GetString(0));
+                Assert.Equal(seeded.BobPersonId, reader.GetGuid(0).ToString("D"));
                 Assert.Equal("add", reader.GetString(1));
                 Assert.Equal("merge:test", reader.GetString(2));
                 Assert.True(await reader.ReadAsync());
-                Assert.Equal(seeded.AdaPersonId, reader.GetString(0));
+                Assert.Equal(seeded.AdaPersonId, reader.GetGuid(0).ToString("D"));
                 Assert.Equal("add", reader.GetString(1));
                 Assert.Equal("person-merge", reader.GetString(2));
                 Assert.False(await reader.ReadAsync());

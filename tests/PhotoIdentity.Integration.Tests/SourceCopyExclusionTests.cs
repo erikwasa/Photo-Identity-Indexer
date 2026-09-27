@@ -267,9 +267,9 @@ public sealed class SourceCopyExclusionTests
             }
 
             return new AssetRow(
-                AssetId.From(Guid.Parse(reader.GetString(0))),
-                reader.IsDBNull(1) ? null : AssetRevisionId.From(Guid.Parse(reader.GetString(1))),
-                reader.IsDBNull(2) ? null : Parse(reader.GetString(2)));
+                AssetId.From(reader.GetGuid(0)),
+                reader.IsDBNull(1) ? null : AssetRevisionId.From(reader.GetGuid(1)),
+                reader.IsDBNull(2) ? null : reader.GetFieldValue<DateTimeOffset>(2));
         }
 
         public ValueTask DisposeAsync()
@@ -278,7 +278,5 @@ public sealed class SourceCopyExclusionTests
             return ValueTask.CompletedTask;
         }
 
-        private static DateTimeOffset Parse(string value) =>
-            DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).ToUniversalTime();
     }
 }

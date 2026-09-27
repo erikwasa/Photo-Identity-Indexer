@@ -188,19 +188,16 @@ public sealed class ExactDuplicateRepositoryTests
     {
         await using SqliteConnection connection = await database.OpenConnectionAsync();
         using SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "PRAGMA index_list('asset_revisions');";
-        await using SqliteDataReader reader = await command.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
-        {
-            if (!string.Equals(reader.GetString(1), "ix_asset_revisions_content_sha256", StringComparison.Ordinal))
-            {
-                continue;
-            }
+        command.CommandText = """
+            SELECT indexdef
+            FROM pg_indexes
+            WHERE schemaname = current_schema()
+              AND tablename = 'asset_revisions'
+              AND indexname = 'ix_asset_revisions_content_sha256';
+            """;
+        string? indexDefinition = Convert.ToString(await command.ExecuteScalarAsync());
 
-            Assert.Equal(0L, reader.GetInt64(2));
-            return;
-        }
-
-        Assert.Fail("Expected ix_asset_revisions_content_sha256 to exist.");
+        Assert.False(string.IsNullOrWhiteSpace(indexDefinition));
+        Assert.DoesNotContain("UNIQUE", indexDefinition, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -260,7 +260,9 @@ public sealed class PersonMaintenanceApplicationTests
             command.Parameters.AddWithValue(name, value);
         }
 
-        return (string)(await command.ExecuteScalarAsync())!;
+        object scalar = await command.ExecuteScalarAsync()
+            ?? throw new InvalidOperationException("Expected a scalar value.");
+        return scalar is Guid guid ? guid.ToString("D") : (string)scalar;
     }
 
     private static string CreateTemporaryDirectory()

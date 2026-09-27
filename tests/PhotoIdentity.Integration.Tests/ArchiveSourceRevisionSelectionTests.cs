@@ -1,7 +1,7 @@
+using Npgsql;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
 using PhotoIdentity.Core.Sources;
-using PhotoIdentity.Persistence.Sqlite;
 using Xunit;
 
 namespace PhotoIdentity_Integration_Tests;
@@ -124,13 +124,13 @@ public sealed class ArchiveSourceRevisionSelectionTests
         SqliteCatalogueDatabase database,
         SourceId sourceId)
     {
-        await using Microsoft.Data.Sqlite.SqliteConnection connection = await database.OpenConnectionAsync();
-        using Microsoft.Data.Sqlite.SqliteCommand command = connection.CreateCommand();
-        command.CommandText = "SELECT id FROM assets WHERE source_id = $source_id ORDER BY source_key LIMIT 1;";
-        command.Parameters.AddWithValue("$source_id", sourceId.ToString());
+        await using NpgsqlConnection connection = await database.OpenConnectionAsync();
+        await using NpgsqlCommand command = connection.CreateCommand();
+        command.CommandText = "SELECT id FROM assets WHERE source_id = @source_id ORDER BY source_key LIMIT 1;";
+        command.Parameters.AddWithValue("source_id", sourceId.Value);
         object? value = await command.ExecuteScalarAsync();
-        AssetId assetId = value is string id
-            ? AssetId.From(Guid.Parse(id))
+        AssetId assetId = value is Guid id
+            ? AssetId.From(id)
             : throw new InvalidOperationException("Test asset was unavailable.");
         return await new SqliteArchiveSourceObservationRepository(database).GetAsync(assetId)
             ?? throw new InvalidOperationException("Source observation was unavailable.");

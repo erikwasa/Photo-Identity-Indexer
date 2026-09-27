@@ -66,7 +66,7 @@ public sealed class SmartCollectionPersistenceTests
             Assert.Equal(["trips/italy"], updated.Filter.Tags);
             Assert.Equal(new DateOnly(2020, 1, 1), updated.Filter.Taken?.From);
             Assert.Equal(new DateOnly(2021, 12, 31), updated.Filter.Taken?.To);
-            Assert.Equal(created.CreatedAtUtc, updated.CreatedAtUtc);
+            Assert.Equal(created.CreatedAtUtc, updated.CreatedAtUtc, TimeSpan.FromMicroseconds(1));
             Assert.True(updated.UpdatedAtUtc >= created.UpdatedAtUtc);
 
             Assert.True(await repository.DeleteAsync(created.Id));
@@ -121,7 +121,7 @@ public sealed class SmartCollectionPersistenceTests
                 0,
                 await ReadCountAsync(
                     connection,
-                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'smart_collection_memberships';"));
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'smart_collection_memberships';"));
         }
         finally
         {

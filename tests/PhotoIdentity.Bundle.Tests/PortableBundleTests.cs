@@ -1,10 +1,8 @@
-using PhotoIdentity.Core.Review;
 using System.IO.Compression;
 using System.Security.Cryptography;
 using PhotoIdentity.Core.Geometry;
 using PhotoIdentity.Core.Identifiers;
 using PhotoIdentity.Core.Recognition;
-using PhotoIdentity.Persistence.Sqlite;
 using PhotoIdentity.Transfer.Bundles;
 using Xunit;
 
@@ -103,109 +101,6 @@ public sealed class PortableBundleTests
         }
     }
 
-    [Fact]
-    public async Task Import_is_idempotent_rejects_stale_results_and_preserves_human_labels()
-    {
-        string directory = CreateTemporaryDirectory();
-        try
-        {
-            string databasePath = Path.Combine(directory, "catalogue.db");
-            SqliteCatalogueDatabase database = new(databasePath);
-            await database.InitializeAsync();
-            DateTimeOffset now = new(2026, 7, 26, 13, 0, 0, TimeSpan.Zero);
-            byte[] sourceBytes = "canonical-photo"u8.ToArray();
-            Sha256Digest sourceHash = Digest(sourceBytes);
-            CatalogueAssetRevision revision = await SeedRevisionAsync(database, directory, sourceBytes, sourceHash, now);
-            CatalogueReviewPerson person = await SeedHumanAssignmentAsync(database, revision.Id, directory, now);
-
-            string inputPath = Path.Combine(directory, "bundle-input.jpg");
-            await File.WriteAllBytesAsync(inputPath, sourceBytes);
-            string jobPath = Path.Combine(directory, "job.photoid-job");
-            string resultPath = Path.Combine(directory, "result.photoid-result");
-            await PortableBundleArchive.CreateJobAsync(
-                jobPath,
-                new PortableJobBundleRequest(
-                    revision.Id,
-                    sourceHash,
-                    PortableBundleProfile.FullImage,
-                    "{}",
-                    [new PortableJobInput(inputPath, "inputs/source.jpg", PortableBundleRoles.SourceImage)],
-                    now));
-            await new PortableBundleWorker(new RecordingProcessor()).ProcessAsync(
-                jobPath,
-                resultPath,
-                Path.Combine(directory, "worker"));
-
-            SqliteBundleResultImporter importer = new(database);
-            PortableBundleImportResult first = await importer.ImportAsync(
-                jobPath,
-                resultPath,
-                Path.Combine(directory, "imported"),
-                Path.Combine(directory, "import-work"));
-            PortableBundleImportResult second = await importer.ImportAsync(
-                jobPath,
-                resultPath,
-                Path.Combine(directory, "imported"),
-                Path.Combine(directory, "import-work"));
-            Assert.Equal(first, second);
-            Assert.Single(await new SqliteFaceCatalogueRepository(database).GetOccurrencesAsync(revision.Id));
-
-            CatalogueReviewFace reviewed = Assert.IsType<CatalogueReviewFace>(
-                await new SqliteReviewRepository(database).GetFaceAsync(
-                    Assert.Single(await new SqliteFaceCatalogueRepository(database).GetOccurrencesAsync(revision.Id)).Id));
-            Assert.Equal(CatalogueReviewStates.Assigned, reviewed.State);
-            Assert.Equal(person.Id, reviewed.Person?.Id);
-
-            string staleJobPath = Path.Combine(directory, "stale.photoid-job");
-            string staleResultPath = Path.Combine(directory, "stale.photoid-result");
-            await PortableBundleArchive.CreateJobAsync(
-                staleJobPath,
-                new PortableJobBundleRequest(
-                    revision.Id,
-                    Digest("different-content"u8),
-                    PortableBundleProfile.ReducedImage,
-                    "{}",
-                    [new PortableJobInput(inputPath, "inputs/reduced.jpg", PortableBundleRoles.ReducedImage)],
-                    now));
-            await new PortableBundleWorker(new RecordingProcessor()).ProcessAsync(
-                staleJobPath,
-                staleResultPath,
-                Path.Combine(directory, "stale-worker"));
-            await Assert.ThrowsAsync<PortableBundleValidationException>(() => importer.ImportAsync(
-                staleJobPath,
-                staleResultPath,
-                Path.Combine(directory, "imported"),
-                Path.Combine(directory, "import-work")));
-            await Assert.ThrowsAsync<PortableBundleValidationException>(() => importer.ImportAsync(
-                staleJobPath,
-                resultPath,
-                Path.Combine(directory, "imported"),
-                Path.Combine(directory, "import-work")));
-
-            string corruptCropPath = Assert.Single((await PortableBundleArchive.ExtractResultAsync(
-                resultPath,
-                Path.Combine(directory, "read-before-corrupt"))).Manifest.Files).Path;
-            using (FileStream stream = new(resultPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
-            using (ZipArchive archive = new(stream, ZipArchiveMode.Update))
-            {
-                ZipArchiveEntry original = Assert.IsType<ZipArchiveEntry>(archive.GetEntry(corruptCropPath));
-                original.Delete();
-                ZipArchiveEntry replacement = archive.CreateEntry(corruptCropPath);
-                await using Stream output = replacement.Open();
-                await output.WriteAsync(new byte[] { 7, 7, 7 });
-            }
-            await Assert.ThrowsAsync<PortableBundleValidationException>(() => importer.ImportAsync(
-                jobPath,
-                resultPath,
-                Path.Combine(directory, "imported"),
-                Path.Combine(directory, "import-work")));
-        }
-        finally
-        {
-            DeleteTemporaryDirectory(directory);
-        }
-    }
-
     private static async Task<IReadOnlyList<PortableJobInput>> CreateInputsAsync(
         string directory,
         PortableBundleProfile profile)
@@ -239,74 +134,6 @@ public sealed class PortableBundleTests
         string path = Path.Combine(directory, fileName);
         await File.WriteAllBytesAsync(path, bytes);
         return new PortableJobInput(path, bundlePath, role);
-    }
-
-    private static async Task<CatalogueAssetRevision> SeedRevisionAsync(
-        SqliteCatalogueDatabase database,
-        string directory,
-        byte[] bytes,
-        Sha256Digest hash,
-        DateTimeOffset now)
-    {
-        string sourceRoot = Path.Combine(directory, "source");
-        Directory.CreateDirectory(sourceRoot);
-        await File.WriteAllBytesAsync(Path.Combine(sourceRoot, "photo.jpg"), bytes);
-        SourceId sourceId = SourceId.New();
-        AssetId assetId = AssetId.New();
-        return await new SqliteAssetCatalogueRepository(database).SaveRevisionAsync(
-            new CatalogueSource(sourceId, "local-folder", sourceRoot, now),
-            new CatalogueAsset(assetId, sourceId, "photo.jpg", now),
-            new CatalogueAssetRevision(
-                AssetRevisionId.New(),
-                assetId,
-                hash,
-                bytes.LongLength,
-                now,
-                "image/jpeg",
-                640,
-                480));
-    }
-
-    private static async Task<CatalogueReviewPerson> SeedHumanAssignmentAsync(
-        SqliteCatalogueDatabase database,
-        AssetRevisionId revisionId,
-        string directory,
-        DateTimeOffset now)
-    {
-        string cropPath = Path.Combine(directory, "existing-crop.png");
-        byte[] cropBytes = [11, 12, 13];
-        await File.WriteAllBytesAsync(cropPath, cropBytes);
-        FaceOccurrenceId occurrenceId = FaceOccurrenceId.New();
-        FaceCropId cropId = FaceCropId.New();
-        await new SqliteFaceCatalogueRepository(database).SaveInspectionAsync(
-            new CatalogueFaceOccurrence(occurrenceId, revisionId, 0, now),
-            new CatalogueFaceObservation(
-                occurrenceId,
-                new ModelId("existing-detector"),
-                Digest("existing-detector"u8),
-                0.8,
-                Box,
-                Landmarks,
-                now),
-            new CatalogueFaceCrop(
-                cropId,
-                occurrenceId,
-                new AlignmentProtocolId("existing-alignment"),
-                Digest(cropBytes),
-                cropPath,
-                112,
-                112,
-                now),
-            new CatalogueFaceEmbedding(
-                cropId,
-                new ModelId("existing-embedder"),
-                Digest("existing-embedder"u8),
-                new EmbeddingVector([1f, 0f]),
-                now));
-        SqliteReviewRepository reviewRepository = new(database);
-        CatalogueReviewPerson person = await reviewRepository.CreatePersonAsync("Existing Human Label", now.AddMinutes(1));
-        await reviewRepository.AssignAsync(occurrenceId, person.Id, "human:test", now.AddMinutes(2));
-        return person;
     }
 
     private static readonly NormalizedBoundingBox Box = new(0.1, 0.1, 0.5, 0.5);

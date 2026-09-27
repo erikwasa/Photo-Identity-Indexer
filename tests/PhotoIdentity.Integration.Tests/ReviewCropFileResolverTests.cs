@@ -32,8 +32,8 @@ public sealed class ReviewCropFileResolverTests
                 using SqliteCommand command = connection.CreateCommand();
                 command.CommandText = """
                     INSERT INTO processing_runs (
-                        id, status, configuration_json, started_at_utc)
-                    VALUES ($id, 'completed', $configuration, $started_at_utc);
+                        id, status, configuration_json, started_at_utc, completed_at_utc)
+                    VALUES ($id, 'completed', $configuration, $started_at_utc, $started_at_utc);
                     """;
                 command.Parameters.AddWithValue("$id", runId.ToString());
                 command.Parameters.AddWithValue(

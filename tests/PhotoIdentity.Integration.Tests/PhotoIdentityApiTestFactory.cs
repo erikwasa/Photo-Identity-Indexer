@@ -1,30 +1,63 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using PhotoIdentity.Testing.Postgres;
 
 namespace PhotoIdentity_Integration_Tests;
 
 /// <summary>
 /// Compatibility foundation for API integration-test factories in this namespace.
 /// Legacy unqualified WebApplicationFactory references resolve here, so generic endpoint hosts
-/// disable unrelated production workers even before they are migrated to PhotoIdentityApiTestFactory.
+/// share an isolated PostgreSQL catalogue and disable unrelated production workers.
 /// Worker-specific tests must explicitly opt back in.
 /// </summary>
 internal class WebApplicationFactory<TEntryPoint> :
     Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<TEntryPoint>
     where TEntryPoint : class
 {
+    private readonly PostgresTestDatabaseLease _databaseLease = PostgresTestDatabaseLease.Create();
+
     protected virtual bool DisableBackgroundWorkers => true;
-    protected virtual bool UseSqliteTestCompatibility => true;
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        // Minimal-hosting applications read web-host settings while Program is being constructed.
+        // Give factories that use this base implementation a valid catalogue immediately.
+        builder.UseSetting("PhotoIdentity:Postgres:ConnectionString", _databaseLease.ConnectionString);
+        builder.UseStaticWebAssets();
+    }
 
     protected override IHost CreateHost(IHostBuilder builder)
     {
-        if (UseSqliteTestCompatibility)
+        builder.UseEnvironment("IntegrationTestPostgres");
+        builder.ConfigureWebHost(webBuilder => webBuilder.UseStaticWebAssets());
+
+        // A number of mature endpoint fixtures override ConfigureWebHost without calling base and
+        // still provide only the historical PhotoIdentity:DatabasePath compatibility key. Host
+        // configuration is available before the minimal Program body runs, unlike generic app
+        // configuration callbacks, so translate that key here at bootstrap time. This preserves
+        // each fixture's isolated seeded PostgreSQL catalogue without restoring SQLite runtime use.
+        builder.ConfigureHostConfiguration(configuration =>
         {
-            builder.UseEnvironment("IntegrationTest");
-            builder.ConfigureWebHost(webHost => webHost.UseStaticWebAssets());
-        }
+            IConfiguration current = configuration.Build();
+            string? configuredConnectionString =
+                current["PhotoIdentity:Postgres:ConnectionString"];
+            if (!string.IsNullOrWhiteSpace(configuredConnectionString))
+            {
+                return;
+            }
+
+            string? compatibilityPath = current["PhotoIdentity:DatabasePath"];
+            string connectionString = !string.IsNullOrWhiteSpace(compatibilityPath)
+                ? PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(compatibilityPath)
+                : _databaseLease.ConnectionString;
+            configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["PhotoIdentity:Postgres:ConnectionString"] = connectionString,
+            });
+        });
 
         if (DisableBackgroundWorkers)
         {
@@ -38,6 +71,15 @@ internal class WebApplicationFactory<TEntryPoint> :
         }
 
         return base.CreateHost(builder);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+        {
+            _databaseLease.Dispose();
+        }
     }
 
     private static void RemoveHostedService<THostedService>(IServiceCollection services)
@@ -57,15 +99,15 @@ internal class WebApplicationFactory<TEntryPoint> :
 
 /// <summary>
 /// Shared host foundation for API integration tests.
-/// Generic endpoint tests should not run unrelated production background loops; worker-specific
-/// behavior is covered by focused tests that exercise the worker directly or can opt back in.
+/// The historical database-path argument is retained only as a PostgreSQL compatibility key so
+/// existing fixtures can share seeded state with the API host while WI-0148 removes SQLite usage.
 /// </summary>
 internal class PhotoIdentityApiTestFactory : WebApplicationFactory<PhotoIdentity.Api.Program>
 {
     private readonly string _databasePath;
     private readonly Action<IWebHostBuilder>? _configureWebHost;
     private readonly bool _disableBackgroundWorkers;
-    private readonly bool _useSqliteTestCompatibility;
+    private readonly bool _useCompatibilityDatabase;
 
     public PhotoIdentityApiTestFactory(
         string databasePath,
@@ -77,15 +119,23 @@ internal class PhotoIdentityApiTestFactory : WebApplicationFactory<PhotoIdentity
         _databasePath = databasePath;
         _configureWebHost = configureWebHost;
         _disableBackgroundWorkers = disableBackgroundWorkers;
-        _useSqliteTestCompatibility = useSqliteTestCompatibility;
+        _useCompatibilityDatabase = useSqliteTestCompatibility;
     }
 
     protected override bool DisableBackgroundWorkers => _disableBackgroundWorkers;
-    protected override bool UseSqliteTestCompatibility => _useSqliteTestCompatibility;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+        base.ConfigureWebHost(builder);
+
+        if (_useCompatibilityDatabase)
+        {
+            builder.UseSetting("PhotoIdentity:DatabasePath", _databasePath);
+            builder.UseSetting(
+                "PhotoIdentity:Postgres:ConnectionString",
+                PostgresTestCatalogueDatabase.GetCompatibilityConnectionString(_databasePath));
+        }
+
         builder.UseSetting(WebHostDefaults.DetailedErrorsKey, "true");
         _configureWebHost?.Invoke(builder);
     }

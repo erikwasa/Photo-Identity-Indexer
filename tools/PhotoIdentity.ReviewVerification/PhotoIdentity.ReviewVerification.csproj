@@ -4,6 +4,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/PhotoIdentity.Core/PhotoIdentity.Core.csproj" />
-    <ProjectReference Include="../../src/PhotoIdentity.Persistence.Sqlite/PhotoIdentity.Persistence.Sqlite.csproj" />
+    <ProjectReference Include="../../src/PhotoIdentity.Persistence.Postgres/PhotoIdentity.Persistence.Postgres.csproj" />
   </ItemGroup>
 </Project>

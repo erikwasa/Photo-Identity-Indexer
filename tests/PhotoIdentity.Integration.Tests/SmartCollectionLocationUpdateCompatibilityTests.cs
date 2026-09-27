@@ -79,40 +79,6 @@ public sealed class SmartCollectionLocationUpdateCompatibilityTests
         }
     }
 
-    [Fact]
-    public async Task Schema_fourteen_directly_matches_the_places_guard_contract()
-    {
-        string directory = CreateTemporaryDirectory();
-        try
-        {
-            SqliteCatalogueDatabase database = new(Path.Combine(directory, "catalogue.db"));
-            await database.InitializeAsync();
-
-            await using SqliteConnection connection = await database.OpenConnectionAsync();
-            using SqliteCommand tableInfo = connection.CreateCommand();
-            tableInfo.CommandText = "PRAGMA table_info(photo_place_actions);";
-            bool hasProvider = false;
-            await using (SqliteDataReader reader = await tableInfo.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
-                {
-                    hasProvider |= string.Equals(reader.GetString(1), "provider", StringComparison.OrdinalIgnoreCase);
-                }
-            }
-            Assert.True(hasProvider);
-
-            using SqliteCommand definition = connection.CreateCommand();
-            definition.CommandText = "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'photo_place_actions';";
-            string sql = (string?)await definition.ExecuteScalarAsync() ?? string.Empty;
-            Assert.Contains("'migration'", sql, StringComparison.Ordinal);
-            Assert.DoesNotContain("'legacy-migration'", sql, StringComparison.Ordinal);
-        }
-        finally
-        {
-            DeleteTemporaryDirectory(directory);
-        }
-    }
-
     private static string CreateTemporaryDirectory()
     {
         string directory = Path.Combine(
