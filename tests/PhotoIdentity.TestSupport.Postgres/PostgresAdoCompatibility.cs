@@ -1,14 +1,17 @@
 using System.Data;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace PhotoIdentity.Testing.Postgres;
 
 /// <summary>
 /// Test-only ADO.NET compatibility facade for mature fixtures whose SQL still uses SQLite's
-/// <c>$name</c> named-parameter spelling. The underlying provider is always Npgsql; only named
-/// parameter tokens are translated. Provider-specific SQL such as PRAGMA is intentionally not
-/// rewritten so obsolete SQLite-only coverage remains visible and can be retired explicitly.
+/// <c>$name</c> named-parameter spelling. The underlying provider is always Npgsql; named
+/// parameters and unambiguous legacy scalar encodings are normalized for PostgreSQL. Provider-
+/// specific SQL such as PRAGMA is intentionally not rewritten so obsolete SQLite-only coverage
+/// remains visible and can be retired explicitly.
 /// </summary>
 public sealed class PostgresCompatibilityConnection : IDisposable, IAsyncDisposable
 {
@@ -220,6 +223,38 @@ public sealed class PostgresCompatibilityCommand : IDisposable, IAsyncDisposable
             {
                 parameter.ParameterName = parameter.ParameterName[1..];
             }
+
+            NormalizeLegacyScalar(parameter);
+        }
+    }
+
+    private static void NormalizeLegacyScalar(NpgsqlParameter parameter)
+    {
+        // SQLite fixtures historically represented UUID and UTC timestamp columns as TEXT.
+        // Restrict normalization to values with unambiguous canonical shapes so ordinary text
+        // remains text while the mature seed helpers can execute against typed PostgreSQL columns.
+        if (parameter.Value is not string text)
+        {
+            return;
+        }
+
+        if (Guid.TryParseExact(text, "D", out Guid guid))
+        {
+            parameter.Value = guid;
+            parameter.NpgsqlDbType = NpgsqlDbType.Uuid;
+            return;
+        }
+
+        if (DateTimeOffset.TryParseExact(
+                text,
+                "O",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.RoundtripKind,
+                out DateTimeOffset timestamp) &&
+            timestamp.Offset == TimeSpan.Zero)
+        {
+            parameter.Value = timestamp;
+            parameter.NpgsqlDbType = NpgsqlDbType.TimestampTz;
         }
     }
 }
